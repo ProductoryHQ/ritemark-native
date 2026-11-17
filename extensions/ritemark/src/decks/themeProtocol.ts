@@ -5,6 +5,7 @@
  */
 import type { WallSlide } from './present/presentProtocol';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
+import { logoKindOfName, MAX_LOGO_BYTES } from './themeLogo';
 
 export type ThemeRequest =
   /** The tab is drawn: the host sends the theme's state and its decks. */
@@ -23,7 +24,27 @@ export type ThemeRequest =
   /** "Used by N decks": open this deck (a project path). */
   | { type: 'theme/open-deck'; path: string }
   /** The Save notice's Undo: the decks go back, and the changes stay in the tab, not saved. */
-  | { type: 'theme/undo-save'; token: string };
+  | { type: 'theme/undo-save'; token: string }
+  /**
+   * Sprint 162 PR 4: a picture dropped on the Logo row, as a data URL (an SVG or a PNG, at most `MAX_LOGO_DATA_URL`)
+   * with its file's name. The host checks it, copies it beside the theme file and names it in the draft.
+   */
+  | { type: 'theme/logo-file'; dataUrl: string; filename: string }
+  /** Sprint 162 PR 4: Choose a file… on the Logo row: the host asks for an SVG or a PNG, and takes it as a drop. */
+  | { type: 'theme/choose-logo' };
+
+/**
+ * Sprint 162 PR 4: the draft's logo as the tab shows it: the file it names, its address in the tab (null when it can't
+ * be drawn), and why not (the file is missing, or isn't a picture that can be the logo).
+ */
+export interface ThemeLogoState {
+  file: string;
+  url: string | null;
+  problem: string | null;
+}
+
+/** A logo's data URL: a picture of at most `MAX_LOGO_BYTES`, in base64, with its header. */
+export const MAX_LOGO_DATA_URL = Math.ceil(MAX_LOGO_BYTES / 3) * 4 + 64;
 
 /** A deck that uses the theme, as "Used by N decks" lists it. */
 export interface ThemeDeck {
@@ -41,8 +62,11 @@ export interface ThemePreview {
 }
 
 export type ThemeHostMessage =
-  /** The theme document as it is: its text (the draft, when `dirty`), its project path and the file's own name. */
-  | { type: 'theme/state'; path: string; text: string; dirty: boolean }
+  /**
+   * The theme document as it is: its text (the draft, when `dirty`), its project path and the file's own name; and
+   * (Sprint 162 PR 4) its logo, null when it has none.
+   */
+  | { type: 'theme/state'; path: string; text: string; dirty: boolean; logo: ThemeLogoState | null }
   /**
    * The decks that use the theme; the slides it previews on; the deck Save as a new theme… may put the new one in (the
    * deck the tab was opened from, while its view is open); and the names and files already taken in the folder.
@@ -78,6 +102,7 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/discard':
     case 'theme/undo':
     case 'theme/redo':
+    case 'theme/choose-logo':
       exactKeys(input, ['type']);
       return { type: input.type };
     case 'theme/set':
@@ -97,6 +122,15 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/undo-save':
       exactKeys(input, ['type', 'token']);
       return { type: 'theme/undo-save', token: stringOf(input.token, 64) };
+    case 'theme/logo-file': {
+      exactKeys(input, ['type', 'dataUrl', 'filename']);
+      const dataUrl = stringOf(input.dataUrl, MAX_LOGO_DATA_URL);
+      if (!/^data:image\/(svg\+xml|png);base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) throw new ThemeProtocolError('dataUrl must be an SVG or a PNG');
+      // Only the name's last part, as a picture's name: never a path the host would follow.
+      const filename = stringOf(input.filename, 255);
+      if (/[\\/\u0000]/.test(filename) || !logoKindOfName(filename)) throw new ThemeProtocolError('filename must be an SVG or a PNG name');
+      return { type: 'theme/logo-file', dataUrl, filename };
+    }
     default:
       throw new ThemeProtocolError('Unknown theme request');
   }

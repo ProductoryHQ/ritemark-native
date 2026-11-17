@@ -15,6 +15,8 @@
  *    as relative paths. Every code block is a prompt with Copy; an Exercise slide's numbered steps and every task list
  *    get ticks; a Section slide is the grey band with "Section N" over its title.
  *
+ * The theme's logo is a file beside the page too (`logos/`, Sprint 162 PR 4), drawn as an `<img>`, never as markup.
+ *
  * Pure: the slide CSS and the fonts come in as `PageAssets` (the host reads them, `pageAssets.ts`), and whether a
  * picture is there comes in as `pictureUrl`. The same input always gives the same bytes.
  */
@@ -54,6 +56,11 @@ export interface PageAssets {
   fonts: PageFont[];
   /** The theme's other fonts, as files beside the page; none when the theme draws in Sofia Sans only. */
   themeFonts?: readonly PageThemeFont[];
+  /**
+   * Sprint 162 PR 4: the theme's logo as a file beside the page (`logos/logo-<hash>.svg`, `pageFile.pageLogoFile`),
+   * drawn as an `<img>` in its corner of the slides it is on. None: no logo, or its file is missing.
+   */
+  logo?: { address: string } | null;
 }
 
 export interface PageOptions {
@@ -592,10 +599,12 @@ export const PAGE_CSP = [
 /** The page: one HTML file, the same bytes for the same deck. */
 export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOptions): string {
   const borderless = deck.look === 'borderless';
+  // The logo's address is the file beside the page; a theme whose logo isn't there draws none (Sprint 162 PR 4).
+  const theme = deck.theme.logo && assets.logo ? { ...deck.theme, logoUrl: assets.logo.address } : deck.theme;
   const count = deck.slides.length;
   const layers = deck.slides.map((slide, index) => {
     const drawing = {
-      theme: deck.theme,
+      theme,
       borderless,
       step: slide.step,
       pictureUrl: (picture: string) => options.pictureUrl(picture, 'slide'),

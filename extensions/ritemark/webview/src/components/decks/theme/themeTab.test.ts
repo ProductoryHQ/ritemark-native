@@ -3,7 +3,7 @@
  *   - The contrast line measures the text and the headings against the background (WCAG's ratio, cut to one decimal,
  *     never rounded up past the 4.5 to 1 rule).
  *   - "Used by N decks", the file note, the host's decks message as the tab takes it.
- *   - Only the fields the engine reads: no fonts and no logo yet, not even greyed.
+ *   - Only the fields the engine reads: the fonts (PR 3) and the logo (PR 4) came later.
  * Run with `npx tsx webview/src/components/decks/theme/themeTab.test.ts`.
  */
 import { strict as assert } from 'node:assert'
@@ -65,11 +65,12 @@ const { COLOUR_ROWS, FONT_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, deck
   assert.match(themeFileNote('Evening'), /^Evening is a file in Slide library › Themes\. Nothing changes in the decks until you save;/)
   const tab = readFileSync(fileURLToPath(new URL('./ThemeTab.tsx', import.meta.url)), 'utf8')
   const sheet = readFileSync(fileURLToPath(new URL('./NewThemeSheet.tsx', import.meta.url)), 'utf8')
-  // The logo (PR 4) isn't in this part, not even greyed; nor Claude's row (PR 5).
+  // Claude's row (PR 5) isn't in this part, not even greyed. The logo (PR 4) is: between Fonts and Shape, as the prototype has it.
   for (const source of [tab, sheet]) {
     const shown = source.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-    assert.doesNotMatch(shown, /Drop a logo|Logo|Ask Claude/, 'nothing of a later part shows')
+    assert.doesNotMatch(shown, /Ask Claude/, 'nothing of a later part shows')
   }
+  assert.ok(tab.indexOf('>Logo</div>') > tab.indexOf('>Fonts</div>') && tab.indexOf('>Logo</div>') < tab.indexOf('>Shape</div>'), 'Logo sits between Fonts and Shape')
   // Fonts (PR 3): the prototype's Fonts, Headings and Text, each a choice of the six, between the contrast line and Shape.
   assert.deepEqual(FONT_ROWS.map(row => [row.field, row.label]), [['fh', 'Headings'], ['fb', 'Text']])
   assert.ok(FONT_ROWS.every(row => row.tip.length > 0), 'each font row has a tooltip')

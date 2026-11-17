@@ -99,8 +99,11 @@ export interface DeckPageState {
 export type DeckHostMessage =
   /** Each path the host could resolve to a picture beside the deck, mapped to its webview URI. */
   | { type: 'deck/assets'; assets: Record<string, string>; /** 17 November: the paths it looked for and found no file at. */ missing?: string[] }
-  /** The theme file's text, or null when the deck names none the project has (the view draws the built-in theme). */
-  | { type: 'deck/theme'; path: string; text: string | null }
+  /**
+   * The theme file's text, or null when the deck names none the project has (the view draws the built-in theme); and
+   * (Sprint 162 PR 4) its logo's address in this webview, or null for none or a missing file.
+   */
+  | { type: 'deck/theme'; path: string; text: string | null; logo: string | null }
   /** Sprint 162: the project's themes (`themeEntries`), for the Theme menu. */
   | { type: 'deck/themes'; themes: ThemeEntry[] }
   /** Sprint 162 PR 2: New theme…'s answer: the theme is made, or why not (the sheet stays open and says so). */

@@ -11,7 +11,7 @@
  */
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
 import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
@@ -20,6 +20,7 @@ import { themeStyle } from '../theme/themeVars'
 import { slideIcon } from './iconSet'
 import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
+import { isLayoutTitleSlide } from './slideMarkup'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, editedItemWords, layoutSlide, pastedItemWords, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
@@ -267,10 +268,20 @@ function IconPicker({ box, glyph, editing }: { box: MarkBox; glyph: ReactNode; e
   )
 }
 
+/**
+ * Sprint 162 PR 4: the theme's logo in its corner of the canvas, as `slideLogoHtml` draws it for the page and the
+ * block slides: an `<img>` (an SVG never goes into the slide as markup), or nothing for a slide it isn't on.
+ */
+export function SlideLogoImage({ logo, cover }: { logo: SlideLogo | null; cover: boolean }) {
+  if (!drawsLogo(logo, cover)) return null
+  return <img className={`slide-logo is-${logo.place}`} src={logo.url} alt="" draggable={false} />
+}
+
 /** Does anything on the drawn canvas run past the slide's bottom or out of its own box? */
 function overflows(canvas: HTMLElement): boolean {
   for (const element of Array.from(canvas.children) as HTMLElement[]) {
-    if (element.classList.contains('photo') || element.classList.contains('veil') || element.classList.contains('picbox')) continue
+    // The pictures fill their places, and the logo sits in its corner: neither is words to fit.
+    if (element.classList.contains('photo') || element.classList.contains('veil') || element.classList.contains('picbox') || element.classList.contains('slide-logo')) continue
     if (element.offsetTop + element.offsetHeight > BOTTOM + 6) return true
     if (element.hasAttribute('data-fit') && element.scrollHeight > element.clientHeight + 2) return true
   }
@@ -301,9 +312,16 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
     fontSet.addEventListener?.('loadingdone', remeasure)
     return () => fontSet.removeEventListener?.('loadingdone', remeasure)
   }, [])
+  // Sprint 162 PR 4: the theme's logo, kept while its address, corner and where it shows stay (a new theme object
+  // with the same logo draws nothing new).
+  const logoUrl = theme.logoUrl
+  const logoPlace = theme.logo?.place
+  const logoOn = theme.logo?.on
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn])
   const html = useMemo(
-    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined }),
-    [data, step, width, assets, missing],
+    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo }),
+    [data, step, width, assets, missing, logo],
   )
   // The stage's one measure (`fitFlow`), from the top: words past the top, the bottom or a right edge step it down.
   useLayoutEffect(() => {
@@ -381,6 +399,7 @@ const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, t
     <div className={`deck-slide${borderless ? ' is-borderless' : ''}`} data-step={step} style={{ width, height: Math.round(width * CANVAS_HEIGHT / CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}>
       <div ref={canvasRef} className={`deck-sl${layout.known ? '' : ' is-unknown'}`} style={{ transform: `scale(${scale})` }} aria-hidden={editing ? undefined : true}>
         {layout.boxes.map(box => <Box key={box.key} box={box} editing={editing} assets={assets} />)}
+        <SlideLogoImage logo={themeSlideLogo(theme)} cover={isLayoutTitleSlide(kind)} />
       </div>
     </div>
   )

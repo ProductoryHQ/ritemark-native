@@ -109,6 +109,30 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 /* Sprint 162 PR 3: a font row's choice, as wide as the Corners row's control (both end at the column's edge); each font named in its own face. */
 .theme-font-select { width: 158px; flex: none; }
 
+/* Sprint 162 PR 4: the Logo rows, as the prototype's `.tdrop` (a 76 px place to drop on) and `.tlogo` (the picture on the
+   theme's own ground, 48 px, with Replace and Remove). */
+.theme-tab .theme-logo-drop,
+.theme-tab .theme-logo-drop:hover {
+  display: grid; place-items: center; align-content: center; gap: 4px; width: 100%; height: 76px; padding: 0 12px;
+  border-radius: 9px; box-shadow: inset 0 0 0 1.5px var(--r-hairline-strong); background: var(--r-surface-muted);
+  font-size: 12.5px; line-height: 17px; font-weight: 400; color: var(--r-ink-muted); white-space: normal; text-align: center;
+}
+.theme-tab .theme-logo-drop:hover { box-shadow: inset 0 0 0 1.5px var(--r-accent); color: var(--r-ink-strong); }
+.theme-tab .theme-logo-drop b { color: var(--r-accent); font-weight: 500; }
+.theme-tab .theme-logo-drop.is-over, .theme-tab .theme-logo-box.is-over { box-shadow: inset 0 0 0 2px var(--r-accent); background: var(--r-surface-soft); }
+.theme-logo-box { display: flex; align-items: center; gap: 4px; min-height: 48px; padding: 0 6px 0 12px; border-radius: 9px; box-shadow: inset 0 0 0 1px var(--theme-swatch-ring); }
+.theme-logo-box.is-missing { background: var(--r-warning-surface); color: var(--r-warning-ink); box-shadow: none; }
+.theme-logo-picture { display: block; height: 24px; width: auto; max-width: 150px; object-fit: contain; object-position: left center; }
+.theme-logo-gone { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12.5px; }
+.theme-logo-gone > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-logo-gone > svg { flex: none; }
+/* Replace and Remove, quiet words on the picture's ground (the prototype's `.lnk`): Replace in the accent, Remove muted */
+.theme-tab .theme-logo-box .theme-logo-act { padding: 0 6px; font-weight: 500; color: var(--r-accent); background: var(--r-surface); }
+.theme-tab .theme-logo-box .theme-logo-act.is-quiet { color: var(--r-ink-muted); }
+.theme-tab .theme-logo-box .theme-logo-act:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+.theme-logo-problem { margin: 8px 0 0; font-size: 12px; line-height: 17px; color: var(--r-warning-ink); }
+.theme-logo-box + .theme-logo-problem + .theme-row, .theme-logo-box + .theme-row { margin-top: 4px; }
+
 .theme-note { display: flex; gap: 8px; margin: 22px 0 0; font-size: 12px; line-height: 17px; color: var(--r-ink-muted); }
 .theme-note > svg { flex: none; margin-top: 1px; }
 

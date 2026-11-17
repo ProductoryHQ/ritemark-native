@@ -7,8 +7,8 @@
  *     or Not saved with Discard, and Save ▾ (Save as a new theme…, Discard the changes).
  *   - On the left, the fields the engine reads: the four colours, each a swatch (a palette) and its hex code (typed),
  *     the soft light in a corner, the line that measures the text against the background, the fonts for headings and
- *     text (each from the six that ship with Ritemark, Sprint 162 PR 3), the corners and the boxes. The logo comes in a
- *     later part of the sprint; nothing of it shows until then.
+ *     text (each from the six that ship with Ritemark, Sprint 162 PR 3), the logo (Sprint 162 PR 4, `LogoRow.tsx`), the
+ *     corners and the boxes.
  *   - On the right, six of the deck's own slides in the draft, as Card or Borderless.
  *
  * Every change goes to the host, which writes it into the theme document's lines (`themeTextWith`): the draft is that
@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { DECK_FONT_LIST, deckFont, deckFontStack, isDeckFontName, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { newThemeNameProblem, nextThemeName, normalColour, type ThemeChanges } from '../../../../../src/decks/themeFile'
-import type { ThemeDeck, ThemePreview } from '../../../../../src/decks/themeProtocol'
+import type { ThemeDeck, ThemeLogoState, ThemePreview } from '../../../../../src/decks/themeProtocol'
 import type { DocumentApplyTarget } from '../../../types/documentSync'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Button } from '../../ui/button'
@@ -35,6 +35,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
+import { LogoRows } from './LogoRow'
 import '../decks.css'
 import './themeTab.css'
 
@@ -88,6 +89,16 @@ interface ThemeState {
   path: string
   text: string
   dirty: boolean
+  /** Sprint 162 PR 4: the draft's logo as the host found it, null for none. */
+  logo: ThemeLogoState | null
+}
+
+/** The host's logo state, or null when it is none or malformed. */
+export function logoStateFrom(value: unknown): ThemeLogoState | null {
+  if (!value || typeof value !== 'object') return null
+  const logo = value as Record<string, unknown>
+  if (typeof logo.file !== 'string') return null
+  return { file: logo.file, url: typeof logo.url === 'string' && logo.url ? logo.url : null, problem: typeof logo.problem === 'string' ? logo.problem : null }
 }
 
 interface ThemeDecks {
@@ -127,7 +138,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
 
   useEffect(() => onMessage(message => {
     if (message.type === 'theme/state' && typeof message.text === 'string' && typeof message.path === 'string') {
-      setState({ path: message.path, text: message.text, dirty: message.dirty === true })
+      setState({ path: message.path, text: message.text, dirty: message.dirty === true, logo: logoStateFrom(message.logo) })
     } else if (message.type === 'theme/decks') {
       const next = themeDecksFrom(message)
       if (next) setDecks(next)
@@ -161,7 +172,12 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  const theme = useMemo(() => (state ? parseTheme(state.text) : null), [state])
+  // The draft's theme, with its logo's address in this tab (Sprint 162 PR 4): the preview draws it as the decks will.
+  const theme = useMemo(() => {
+    if (!state) return null
+    const parsed = parseTheme(state.text)
+    return parsed.logo && state.logo?.url ? { ...parsed, logoUrl: state.logo.url } : parsed
+  }, [state])
   const set = useCallback((changes: ThemeChanges) => sendToExtension('theme/set', { changes }), [])
   const save = useCallback(() => sendToExtension('theme/save'), [])
   const discard = useCallback(() => sendToExtension('theme/discard'), [])
@@ -266,6 +282,9 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
           {FONT_ROWS.map(row => (
             <FontRow key={row.field} label={row.label} tip={row.tip} value={theme[row.field]} onChange={value => set({ [row.field]: value })} />
           ))}
+
+          <div className="deck-settings-k">Logo</div>
+          <LogoRows theme={theme} logo={state.logo} ground={theme.bg} onChange={set} />
 
           <div className="deck-settings-k">Shape</div>
           <div className="theme-row">

@@ -18,7 +18,8 @@ import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
-import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type DeckTheme, type ThemeEntry } from './deckTheme';
+import { LOGO_TOO_LARGE, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
@@ -247,7 +248,7 @@ export class DeckPages implements vscode.Disposable {
     await Promise.all([...this.views].map(async view => {
       const named = themePathOf(frontMatterField(view.document.getText().replace(/^﻿/, ''), 'theme'));
       if (!evening && key(named) !== key(changed)) return;
-      await this.post(view.panel.webview, { type: 'deck/theme', path: named, text: await readTheme(view.document, named) });
+      await this.post(view.panel.webview, { type: 'deck/theme', path: named, ...(await deckThemeFor(view.document.uri.fsPath, named, view.panel.webview)) });
     }));
   }
 
@@ -357,7 +358,7 @@ export class DeckPages implements vscode.Disposable {
         return;
       }
       case 'deck/theme':
-        await this.post(webview, { type: 'deck/theme', path: request.path, text: await readTheme(document, request.path) });
+        await this.post(webview, { type: 'deck/theme', path: request.path, ...(await deckThemeFor(document.uri.fsPath, request.path, webview)) });
         return;
       case 'deck/themes':
         await this.post(webview, { type: 'deck/themes', themes: await this.themesFor(document) });
@@ -654,12 +655,85 @@ export function readDeckTheme(deckPath: string, themePath: string): Promise<stri
  * reader draws the built-in theme.
  */
 export async function readThemeOrEvening(root: string, themePath: string | null | undefined): Promise<string | null> {
+  return (await readThemeFileOrEvening(root, themePath))?.text ?? null;
+}
+
+/** `readThemeOrEvening`, with the project path of the file it read (its logo is beside it, Sprint 162 PR 4). */
+export async function readThemeFileOrEvening(root: string, themePath: string | null | undefined): Promise<{ path: string; text: string } | null> {
   const named = themePath && isThemePath(themePath) ? await readProjectTheme(root, themePath) : null;
-  return named ?? readProjectTheme(root, BUILT_IN_THEME_PATH);
+  if (named !== null) return { path: themePath!.trim(), text: named };
+  const evening = await readProjectTheme(root, BUILT_IN_THEME_PATH);
+  return evening === null ? null : { path: BUILT_IN_THEME_PATH, text: evening };
+}
+
+/**
+ * Sprint 162 PR 4: a theme's logo on disk, as every view finds it. `none`: the theme has no logo. `found`: its file,
+ * read (the page carries these bytes), inside the project once links are followed. `missing`: no file there; the
+ * slides draw no logo and the theme's tab says so. `refused`: something there that can't be the logo (too large, not
+ * the picture its name says, an SVG with scripts or links in it, outside the project); drawn as missing, with why.
+ */
+export type ThemeLogoFile =
+  | { state: 'none' }
+  | { state: 'found'; absolute: string; file: string; kind: LogoKind; bytes: Buffer; modified: number }
+  | { state: 'missing'; file: string }
+  | { state: 'refused'; file: string; problem: string };
+
+export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>): Promise<ThemeLogoFile> {
+  const logo = theme.logo;
+  if (!logo) return { state: 'none' };
+  const file = logo.file;
+  const refused = (problem: string): ThemeLogoFile => ({ state: 'refused', file, problem });
+  const kind = logoKindOfName(file);
+  if (!kind) return refused('A logo is an SVG or a PNG picture.');
+  const absolute = path.resolve(root, path.dirname(themePath.trim()), ...file.split(/[\\/]/));
+  if (!projectRelative(root, absolute)) return refused('The logo is outside the project.');
+  let realFile: string;
+  try {
+    realFile = await fs.promises.realpath(absolute);
+  } catch {
+    return { state: 'missing', file };
+  }
+  try {
+    // A link inside the project that points out of it is not followed.
+    if (!projectRelative(await fs.promises.realpath(root), realFile)) return refused('The logo is outside the project.');
+    const stat = await fs.promises.stat(realFile);
+    if (!stat.isFile()) return { state: 'missing', file };
+    if (stat.size > MAX_LOGO_BYTES) return refused(LOGO_TOO_LARGE);
+    const bytes = await fs.promises.readFile(realFile);
+    const problem = logoProblem(file, bytes);
+    return problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs) };
+  } catch {
+    return { state: 'missing', file };
+  }
+}
+
+/** A found logo's address in a webview, with its modified time, so a changed picture is drawn again. */
+export function logoWebviewUri(webview: vscode.Webview, found: Extract<ThemeLogoFile, { state: 'found' }>): string {
+  return `${webview.asWebviewUri(vscode.Uri.file(found.absolute)).toString()}?v=${found.modified}`;
+}
+
+/**
+ * The theme a deck at `deckPath` draws (`readDeckTheme`'s rule), as the deck view and the wall are sent it: the theme
+ * file's text (null: the built-in theme), and its logo's address in this webview (null: none, or a missing file).
+ */
+export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<{ text: string | null; logo: string | null }> {
+  const root = themeRootOf(deckPath);
+  const read = await readThemeFileOrEvening(root, themePath);
+  if (!read) return { text: null, logo: null };
+  const found = await themeLogoFile(root, read.path, parseTheme(read.text));
+  return { text: read.text, logo: found.state === 'found' ? logoWebviewUri(webview, found) : null };
+}
+
+/** The theme a deck at `deckPath` draws, and its logo file (Sprint 162 PR 4: the page carries it). */
+export async function deckThemeAndLogo(deckPath: string, themePath: string): Promise<{ text: string | null; logo: ThemeLogoFile }> {
+  const root = themeRootOf(deckPath);
+  const read = await readThemeFileOrEvening(root, themePath);
+  if (!read) return { text: null, logo: { state: 'none' } };
+  return { text: read.text, logo: await themeLogoFile(root, read.path, parseTheme(read.text)) };
 }
 
 /** The folder a deck at `deckPath` reads its theme from: its project folder, or its own folder when it has none. */
-function themeRootOf(deckPath: string): string {
+export function themeRootOf(deckPath: string): string {
   return vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath);
 }
 

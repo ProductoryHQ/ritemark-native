@@ -13,6 +13,12 @@ import { themeStyle } from '../theme/themeVars'
 import { slideIcon } from './iconSet'
 import { CANVAS_HEIGHT, CANVAS_WIDTH, layoutSlide, type BoxStyle, type SlideBox, type TextBox } from './layoutSlide'
 import { iconSvg, isPageIconName } from './pageIcons'
+import { slideLogoHtml, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+
+/** Sprint 162 PR 4: an old slide drawn big and low, as a title slide: a Title or a Section slide. */
+export function isLayoutTitleSlide(kind: string): boolean {
+  return kind === 'title' || kind === 'section'
+}
 
 export interface SlideMarkupOptions {
   theme: DeckTheme
@@ -103,5 +109,7 @@ export function slideMarkup(kind: string, data: SlideData, options: SlideMarkupO
   return `<div class="deck-slide${options.borderless ? ' is-borderless' : ''}"${attr('style', styleText(outer))}>`
     + `<div class="deck-sl${layout.known ? '' : ' is-unknown'}"${attr('style', inner)} aria-hidden="true">`
     + layout.boxes.map(entry => box(entry, pictureUrl)).join('')
+    // The theme's logo, last, over the slide's words and pictures (Sprint 162 PR 4).
+    + slideLogoHtml(themeSlideLogo(options.theme), isLayoutTitleSlide(kind))
     + '</div></div>'
 }

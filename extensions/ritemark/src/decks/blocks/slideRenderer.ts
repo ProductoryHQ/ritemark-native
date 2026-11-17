@@ -16,7 +16,7 @@
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { EXERCISE_TAG, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import type { DeckTheme } from '../deckTheme';
+import type { DeckTheme, LogoOn, LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
@@ -403,6 +403,8 @@ export interface BlockSlideMarkupOptions {
   width?: number;
   /** The theme's `--s-*` properties on the slide (the page sets them once for every slide). */
   inlineTheme?: boolean;
+  /** Sprint 162 PR 4: the theme's logo; `blockSlideMarkup` takes it from the theme when it isn't given. */
+  logo?: SlideLogo | null;
 }
 
 const kebab = (key: string) => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
@@ -412,11 +414,44 @@ function styleText(style: Record<string, string | number>): string {
 }
 
 
+// ------------------------------------------------------------------ the theme's logo (Sprint 162 PR 4)
+
+/** A theme's logo as a slide draws it: its address, its corner, and where it shows. */
+export interface SlideLogo {
+  url: string;
+  place: LogoPlace;
+  on: LogoOn;
+}
+
+/** The theme's logo to draw, or null: a theme with no logo, or whose picture has no address (a missing file). */
+export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl'> | null | undefined): SlideLogo | null {
+  if (!theme?.logo || !theme.logoUrl) return null;
+  return { url: theme.logoUrl, place: theme.logo.place, on: theme.logo.on };
+}
+
+/**
+ * Does this slide draw the logo? Every slide, or with "the title slides only" a title slide: one drawn big and low,
+ * its title alone (`isCoverSlide`; an old Title or Section slide is one).
+ */
+export function drawsLogo(logo: SlideLogo | null | undefined, cover: boolean): logo is SlideLogo {
+  return !!logo && (logo.on === 'every-slide' || cover);
+}
+
+/**
+ * The logo's markup, in its corner of the slide's 960 × 540 canvas (the 16:9 area, so the wall keeps it there, #779).
+ * Always an `<img>`: an SVG logo is never put into the page as markup, so nothing in it runs or loads (`slide.css`
+ * `.slide-logo`).
+ */
+export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean): string {
+  if (!drawsLogo(logo, cover)) return '';
+  return `<img class="slide-logo is-${logo.place}" src="${esc(logo.url)}" alt="" draggable="false">`;
+}
+
 /**
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width'>): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo'>): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -434,10 +469,12 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
     const gone = !url && !!path && missing(path);
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', isCoverSlide(markdown) ? 'is-cover' : ''].filter(Boolean).join(' ');
+  const cover = isCoverSlide(markdown);
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : ''].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div></div>`;
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div>`
+    + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 
 /** One block slide, as every view draws it: the page puts this markup in; the deck view draws the same canvas. */
@@ -450,5 +487,5 @@ export function blockSlideMarkup(data: SlideData, options: BlockSlideMarkupOptio
   if (options.inlineTheme) Object.assign(outer, themeStyle(options.theme, options.borderless));
   const outerStyle = styleText(outer);
   return `<div class="deck-slide${options.borderless ? ' is-borderless' : ''}"${outerStyle ? ` style="${esc(outerStyle)}"` : ''}>`
-    + blockCanvasMarkup(data, options) + '</div>';
+    + blockCanvasMarkup(data, { ...options, logo: options.logo === undefined ? themeSlideLogo(options.theme) : options.logo }) + '</div>';
 }

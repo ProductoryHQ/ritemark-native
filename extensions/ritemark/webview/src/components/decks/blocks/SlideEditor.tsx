@@ -36,7 +36,7 @@ import { closeHistory } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf, stepsTagOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -44,6 +44,7 @@ import { SlashCommands } from '../../../extensions/SlashCommands'
 import type { BlockItemDef } from '../../../extensions/blockItems'
 import { FormattingBubbleMenu } from '../../FormattingBubbleMenu'
 import { themeStyle } from '../theme/themeVars'
+import { SlideLogoImage } from '../slide/SlideCanvas'
 import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
@@ -953,6 +954,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
               />
             ) : null}
             <EditorContent editor={editor} />
+            {/* Sprint 162 PR 4: the theme's logo in its corner, over the words, as every other view draws it. */}
+            <SlideLogoImage logo={themeSlideLogo(theme)} cover={isCoverSlide(shownMarkdown)} />
           </div>
           {missingSpots.map(spot => (
             <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>

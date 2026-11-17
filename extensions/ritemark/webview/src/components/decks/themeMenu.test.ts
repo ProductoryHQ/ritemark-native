@@ -298,11 +298,11 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(themeKeyOf(FERN, list), FERN)
   // The deck view's own reading (`useDeckTheme`): no text from the host is the built-in theme.
   const bridge = readFileSync(fileURLToPath(new URL('./deckBridge.ts', import.meta.url)), 'utf8')
-  assert.match(bridge, /theme: text === null \? BUILT_IN_THEME : parseTheme\(text\)/)
+  assert.match(bridge, /theme: themeWithLogo\(text === null \? BUILT_IN_THEME : parseTheme\(text\), message\.logo\)/)
   assert.match(bridge, /const path: string \| null = themePathOf\(themePath\)/, 'a deck naming no theme asks for Evening\'s file')
   // The host's readers all fall back to the project's own Evening file, then to the built-in theme.
   const pages = readFileSync(fileURLToPath(new URL('../../../../src/decks/deckPages.ts', import.meta.url)), 'utf8')
-  assert.match(pages, /return named \?\? readProjectTheme\(root, BUILT_IN_THEME_PATH\)/)
+  assert.match(pages, /const evening = await readProjectTheme\(root, BUILT_IN_THEME_PATH\)/)
   for (const reader of ['deckPublish.ts', 'present/DeckPresenter.ts', 'SlideLibraryViewProvider.ts'])
     assert.match(readFileSync(fileURLToPath(new URL(`../../../../src/decks/${reader}`, import.meta.url)), 'utf8'), /themePathOf\(/, reader)
   assert.equal(parseTheme('not a theme').name, 'Evening', 'a file that is no theme reads as Evening too')

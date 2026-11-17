@@ -38,7 +38,7 @@ import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../deckTheme';
-import { readTheme, resolveAssetsIn } from '../deckPages';
+import { deckThemeFor, resolveAssetsIn } from '../deckPages';
 import {
   DECK_PRESENTER_VIEW_TYPE,
   DECK_WALL_VIEW_TYPE,
@@ -409,9 +409,11 @@ export class DeckPresenter implements vscode.Disposable {
     const text = running.origin.document.getText();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
-      // The deck view's own reading of the theme file, from the same project folder.
-      const themeText = await readTheme(running.origin.document, themePathOf(themePath));
-      running.theme = { path: themePath, value: themeText === null ? BUILT_IN_THEME : parseTheme(themeText) };
+      // The deck view's own reading of the theme file, from the same project folder, with its logo's address in the
+      // wall's window (Sprint 162 PR 4; the presenter view draws the wall's state, and the same address).
+      const read = await deckThemeFor(running.origin.document.uri.fsPath, themePathOf(themePath), running.wall.panel.webview);
+      const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
+      running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo } : theme };
     }
     return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };
   }

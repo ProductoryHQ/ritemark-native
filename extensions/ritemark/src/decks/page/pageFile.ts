@@ -235,7 +235,8 @@ export async function buildDeckPage(
   const urls = await foundPictures(deck, input.deckPath, pageFs);
   // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
   // by an app without them, reads as changed once they can go.
-  const digest = pageDigest(deck, [...urls.values(), ...(assets.themeFonts ?? []).map(font => font.address)]);
+  // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
+  const digest = pageDigest(deck, [...urls.values(), ...(assets.themeFonts ?? []).map(font => font.address), ...(deck.theme.logo && assets.logo ? [assets.logo.address] : [])]);
   const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null });
   return { deck, digest, html };
 }
@@ -346,6 +347,44 @@ export function foreignFontLine(shown: string): string {
   return `"${shown}" is already beside this deck, and isn't the font Ritemark puts there, so it stays as it is. Rename it to publish the deck.`;
 }
 
+/** Sprint 162 PR 4: the same line for the logo's place. */
+export function foreignLogoLine(shown: string): string {
+  return `"${shown}" is already beside this deck, and isn't the logo Ritemark puts there, so it stays as it is. Rename it to publish the deck.`;
+}
+
+/**
+ * Where a page's own files go beside it, and the line when their place holds something else: the theme's fonts in
+ * `fonts/` (PR 3), its logo in `logos/` (PR 4). Both are written and taken back by the same rules.
+ */
+export interface PageFilePlace {
+  folder: string;
+  line: (shown: string) => string;
+}
+export const FONT_PLACE: PageFilePlace = { folder: PAGE_FONT_FOLDER, line: foreignFontLine };
+
+// ------------------------------------------------------------------ The theme's logo, as a file beside the page
+
+/**
+ * Sprint 162 PR 4 (step-3-themes.md: "A published page carries the theme's colours, fonts and logo"): the logo goes
+ * beside the page as a file, as the fonts do, in a `logos` folder, `logos/logo-<hash>.svg`, the hash being its bytes'
+ * (SHA-256, 16 characters): the same logo is one file for all the decks in a folder, and another logo never meets an
+ * older file of the same name. Written create-only just before the page, never over another file, and taken back
+ * with a cancelled first Publish by the fonts' rules. The page draws it as an `<img>`, never as markup.
+ */
+export const PAGE_LOGO_FOLDER = 'logos';
+export const LOGO_PLACE: PageFilePlace = { folder: PAGE_LOGO_FOLDER, line: foreignLogoLine };
+
+/** A page's own file beside it: its address on the page and its bytes. */
+export interface PageFile {
+  address: string;
+  bytes: Buffer;
+}
+
+/** The logo's file for the page: `logos/logo-3f9a2c1d7e0b4a65.svg`. */
+export function pageLogoFile(bytes: Buffer, kind: 'svg' | 'png'): PageFile {
+  return { address: `${PAGE_LOGO_FOLDER}/logo-${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.${kind}`, bytes };
+}
+
 export type FontWriteResult =
   /** `created`: the files this call put in; `madeFolder`: whether it made the `fonts` folder too. */
   | { kind: 'written'; created: string[]; madeFolder: boolean }
@@ -394,9 +433,9 @@ async function plainFolder(fontFs: FontFs, folder: string): Promise<boolean> {
  * the system refuses when the name is taken; a create-only write where it can't give one), as the page is written. A file already there with the same bytes stays. Anything else at a font's place, or a `fonts` that isn't a
  * plain folder, stops it: what this call wrote is taken back, and the result says why in one line.
  */
-export async function writePageFonts(fontFs: FontFs, deckPath: string, files: readonly PageFontFile[]): Promise<FontWriteResult> {
+export async function writePageFonts(fontFs: FontFs, deckPath: string, files: readonly PageFile[], place: PageFilePlace = FONT_PLACE): Promise<FontWriteResult> {
   if (files.length === 0) return { kind: 'written', created: [], madeFolder: false };
-  const folder = path.join(path.dirname(deckPath), PAGE_FONT_FOLDER);
+  const folder = path.join(path.dirname(deckPath), place.folder);
   const created: string[] = [];
   let madeFolder = false;
   let noLinks = false;
@@ -406,11 +445,11 @@ export async function writePageFonts(fontFs: FontFs, deckPath: string, files: re
   };
   const refused = async (shown: string): Promise<FontWriteResult> => {
     await takeBack();
-    return { kind: 'refused', line: foreignFontLine(shown) };
+    return { kind: 'refused', line: place.line(shown) };
   };
   try {
     try {
-      if (!(await plainFolder(fontFs, folder))) return await refused(PAGE_FONT_FOLDER);
+      if (!(await plainFolder(fontFs, folder))) return await refused(place.folder);
     } catch (error) {
       if (!isMissing(error)) throw error;
       try {
@@ -418,13 +457,13 @@ export async function writePageFonts(fontFs: FontFs, deckPath: string, files: re
         madeFolder = true;
       } catch (made) {
         if ((made as NodeJS.ErrnoException)?.code !== 'EEXIST') throw made;
-        if (!(await plainFolder(fontFs, folder))) return await refused(PAGE_FONT_FOLDER);
+        if (!(await plainFolder(fontFs, folder))) return await refused(place.folder);
       }
     }
     for (const file of files) {
-      const name = file.address.slice(PAGE_FONT_FOLDER.length + 1);
+      const name = file.address.slice(place.folder.length + 1);
       const target = path.join(folder, name);
-      const shown = `${PAGE_FONT_FOLDER}/${name}`;
+      const shown = `${place.folder}/${name}`;
       const there = await fontAt(fontFs, target, file.bytes);
       if (there === 'same') continue;
       if (there === 'other') return await refused(shown);
@@ -480,8 +519,9 @@ export async function removePageFonts(
   fontFs: FontFs,
   deckPath: string,
   written: { created: readonly string[]; madeFolder: boolean },
-  files: readonly PageFontFile[],
+  files: readonly PageFile[],
   keep: (target: string) => boolean = () => false,
+  place: PageFilePlace = FONT_PLACE,
 ): Promise<void> {
   const { created } = written;
   if (created.length === 0) return;
@@ -498,5 +538,5 @@ export async function removePageFonts(
     if (!file || named.has(file.address) || keep(target)) continue;
     if ((await fontAt(fontFs, target, file.bytes).catch(() => 'other' as const)) === 'same') await fontFs.unlink(target).catch(() => undefined);
   }
-  if (written.madeFolder) await fontFs.rmdir(path.join(folder, PAGE_FONT_FOLDER)).catch(() => undefined);
+  if (written.madeFolder) await fontFs.rmdir(path.join(folder, place.folder)).catch(() => undefined);
 }
