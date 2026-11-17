@@ -178,7 +178,7 @@ export interface SlideCommentsProps {
   /** Open a saved comment, latched (the deck's bar, Prev and Next): its place among the slide's comments; a new serial asks again. */
   open?: { ordinal: number; serial: number } | null
   /** The `open` request was taken: the asker forgets it, so a slide shown again never opens it by itself. */
-  onOpenTaken?: () => void
+  onOpenTaken?: (serial: number) => void
 }
 
 /** After a note's card saves or cancels, the caret is never left on the hidden note (a key would take it). */
@@ -277,7 +277,7 @@ export function SlideComments({ editor, frame, slideNumber, open, onOpenTaken }:
       return
     }
     setOpenKey(current => (current === target ? null : target))
-  }, [editor, composeKey, markers])
+  }, [editor, markers])
 
   // The bar's Prev and Next: a saved comment of this slide, by its place.
   // Taken once per serial: a slide just made current asks again when its markers arrive, never after.
@@ -289,7 +289,7 @@ export function SlideComments({ editor, frame, slideNumber, open, onOpenTaken }:
     if (!marker) return
     takenSerial.current = open.serial
     // Taken: the bar forgets it, so this slide shown again later opens nothing by itself.
-    onOpenTaken?.()
+    onOpenTaken?.(open.serial)
     const target = yieldOpenBox(editor, marker.key)
     if (target) setOpenKey(target)
   }, [open, editor, markers, onOpenTaken])

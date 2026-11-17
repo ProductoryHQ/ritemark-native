@@ -213,7 +213,7 @@ export function DeckView({
   const [commentAt, setCommentAt] = useState<number | null>(null)
   const [commentOpen, setCommentOpen] = useState<{ slide: number; slideId?: string; ordinal: number; serial: number } | null>(null)
   // Once the stage has opened it, the request is forgotten: a slide shown again later opens nothing by itself.
-  const commentOpened = useCallback(() => setCommentOpen(null), [])
+  const commentOpened = useCallback((serial: number) => setCommentOpen(open => (open?.serial === serial ? null : open)), [])
   const commentSerial = useRef(0)
   // Sprint 159 (PR 7): the host asked to select the title slide's title, once the deck's slides are there
   const [selectTitle, setSelectTitle] = useState(false)
@@ -488,6 +488,14 @@ export function DeckView({
     currentRef.current = index
     setCurrent(index)
   }, [])
+
+  // Sprint 161 (review of #766, round 2): a comment the bar asked for that its slide hasn't opened yet is forgotten as
+  // soon as another slide is current, so that slide never opens it by itself later.
+  useEffect(() => {
+    if (!commentOpen) return
+    const here = commentOpen.slideId !== undefined ? commentOpen.slideId === slide?.data.id : commentOpen.slide === shown
+    if (!here) setCommentOpen(null)
+  }, [commentOpen, shown, slide])
 
   // The current slide's part head is marked in the handout; the strip keeps its thumbnail in view.
   useEffect(() => {

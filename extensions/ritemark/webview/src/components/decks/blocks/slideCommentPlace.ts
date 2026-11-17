@@ -10,8 +10,8 @@
  * Pure over ProseMirror documents and transactions, so the tests drive the same rules the stage uses.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { joinBackward, joinForward } from '@tiptap/pm/commands'
+import { NodeSelection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { joinBackward, joinForward, selectNodeBackward, selectNodeForward } from '@tiptap/pm/commands'
 import type { SlideAnchor, SlideBlockShape } from '../../../../../src/decks/blocks/slideComments'
 import { OPEN_FENCE, parseFenceAttributes, slideBlockClassOf, type SlideBlockClass } from '../../../../../src/decks/blocks/fencedDiv'
 
@@ -112,18 +112,23 @@ export function notesOutOfTheWay(state: EditorState, direction: 'backward' | 'fo
 
 /**
  * Backspace or Delete next to a hidden note, as the stage runs it: the notes move (`notesOutOfTheWay`) only when the
- * ordinary key then does what it would do without them (join the two blocks, or take the picture or line before),
- * tried first on the moved document. Returns the move and the key's own step, `'stop'` (the key does nothing, and the
- * note stays where it is), or null when the key is the ordinary one.
+ * ordinary key then does what it would do without them, tried first on the moved document: join the two blocks, take
+ * the picture or line before; then the stage dispatches the move (`done: false`) and the ordinary key runs next, as
+ * always. A block it can't join (a table) is selected, as the key would select it, and the notes stay where they are
+ * (`done: true`: that selection is the key). Returns `'stop'` when the key does nothing (the note stays where it is),
+ * or null when the key is the ordinary one.
  */
-export function keyPastNotes(state: EditorState, direction: 'backward' | 'forward'): [Transaction, Transaction] | 'stop' | null {
+export function keyPastNotes(state: EditorState, direction: 'backward' | 'forward'): { tr: Transaction; done: boolean } | 'stop' | null {
   const move = notesOutOfTheWay(state, direction)
   if (move === null || move === 'stop') return move
   const moved = state.apply(move)
-  let step: Transaction | null = null
-  const command = direction === 'backward' ? joinBackward : joinForward
-  command(moved, tr => { step = tr })
-  return step ? [move, step] : 'stop'
+  const join = direction === 'backward' ? joinBackward : joinForward
+  if (join(moved)) return { tr: move, done: false }
+  let selected: Transaction | null = null
+  const select = direction === 'backward' ? selectNodeBackward : selectNodeForward
+  if (!select(moved, tr => { selected = tr })) return 'stop'
+  const at = move.mapping.invert().map((selected as unknown as Transaction).selection.from)
+  return { tr: state.tr.setSelection(NodeSelection.create(state.doc, at)), done: true }
 }
 
 /** What a note at `notePos` is on: the next block that isn't a note in its parent, or its parent (the slide, a block). */

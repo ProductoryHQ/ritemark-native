@@ -46,7 +46,7 @@ interface StageProps {
   /** Sprint 161: open one of the slide's saved comments (the deck's bar), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for was opened: the asker forgets the request. */
-  onCommentOpened?: () => void
+  onCommentOpened?: (serial: number) => void
 }
 
 export function Stage(props: StageProps) {

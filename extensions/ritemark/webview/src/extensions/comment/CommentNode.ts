@@ -417,7 +417,12 @@ export function liftCommentLine(editor: Editor): boolean {
   const note = m[1].trim()
 
   // A saved note opens no box, so only the empty lift asks the open box (another editor's first, Sprint 161).
-  if (!note && !otherBoxesGiveWay(editor)) return true
+  if (!note) {
+    if (!otherBoxesGiveWay(editor)) return true
+    // Closing another editor's box may have changed this document (a slide's note is written into the deck's
+    // handout): read it again, so the lift is built on the document as it is now (review of #766, round 2).
+    if (editor.state !== state) return liftCommentLine(editor)
+  }
   const box = note ? null : (commentBoxStorage(editor)?.openBox ?? null)
   const decision = decideNewBox(box)
   if (decision === 'bring-forward' && box) {

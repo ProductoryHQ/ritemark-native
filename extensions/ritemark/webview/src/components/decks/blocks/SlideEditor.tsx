@@ -67,7 +67,7 @@ export interface SlideEditorProps {
   /** Sprint 161: open one of the slide's saved comments (the deck's bar, Prev and Next), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for in `commentOpen` was opened: the asker forgets the request. */
-  onCommentOpened?: () => void
+  onCommentOpened?: (serial: number) => void
 }
 
 /** The right-click menu's shortcuts, as the platform writes them. */
@@ -178,11 +178,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       const comment = () => (commentCallouts ? startSlideComment(this.editor as TipTapEditor, caretTarget(this.editor as TipTapEditor)) : false)
       // A comment on a block is a hidden note before it: Backspace and Delete join the blocks around it and keep it.
       // The notes move only when the ordinary key then joins (`keyPastNotes` tries it first); it runs next, as always.
+      // A block it can't join is selected instead, and the notes stay.
       const pastNotes = (direction: 'backward' | 'forward') => () => {
         const step = keyPastNotes(this.editor.state, direction)
         if (step === 'stop') return true
-        if (step) this.editor.view.dispatch(step[0])
-        return false
+        if (!step) return false
+        this.editor.view.dispatch(step.tr)
+        return step.done
       }
       return { 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo, 'Shift-Mod-z': redo, 'Mod-/': comment, Backspace: pastNotes('backward'), Delete: pastNotes('forward') }
     },

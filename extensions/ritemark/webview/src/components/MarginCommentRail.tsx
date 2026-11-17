@@ -1199,7 +1199,7 @@ export function MarginCommentRail({
       // one closes, one with unsaved words comes forward and this one stays shut.
       const empty = markers.find((marker) => marker.key === key)?.note === ''
       // The key comes back moved when closing the box shifted an id-less comment.
-      const target = boxOpen && editor ? yieldOpenBox(editor, key) : key
+      const target = editor ? yieldOpenBox(editor, key) : key
       if (!target) return
       cancelClose()
       setOpenKey(target)
@@ -1349,7 +1349,7 @@ export function MarginCommentRail({
               // A click opens another comment only once the open box gives
               // way (#687); one with unsaved words comes forward instead.
               // The key comes back moved when closing the box shifted an id-less comment.
-              const target = boxOpen && editor ? yieldOpenBox(editor, m.key) : m.key
+              const target = editor ? yieldOpenBox(editor, m.key) : m.key
               if (!target) return
               cancelClose()
               setOpenKey(target)
@@ -1361,7 +1361,7 @@ export function MarginCommentRail({
               setPinnedKey((k) => (k === target ? null : target))
             }}
             onEdit={() => {
-              const target = boxOpen && editor ? yieldOpenBox(editor, m.key) : m.key
+              const target = editor ? yieldOpenBox(editor, m.key) : m.key
               if (!target) return
               setOpenKey(target)
               setComposeKey(target)
