@@ -168,7 +168,17 @@ function titledWhole(markdown: string): string {
  */
 export function slideHasNothing(markdown: string, data: SlideData, notes: string | null): boolean {
   if (markdown.trim() !== '' || (notes ?? '').trim() !== '') return false;
-  // Any key but its id is the slide's own (a picture's place, Skip slide, a library line, a section mark, a v1 slide's
-  // words), so the slide isn't empty.
-  return Object.entries(data).every(([key, value]) => key === 'id' || key === 'markdown' || value === undefined || value === '');
+  // Any key but its id with a value of its own is the slide's (a picture or its place, Skip slide, a library line, a
+  // section mark, a v1 slide's words), so the slide isn't empty. A value that says nothing is no setting: an empty
+  // word, `false`, a picture placed nowhere, an empty list of items or rows (Codex on #770).
+  return Object.entries(data).every(([key, value]) => key === 'id' || key === 'markdown' || (key === 'picture' && value === 'none') || isBlank(value));
+}
+
+/** A value that holds nothing: none, an empty word, `false`, or a list or record of such values only. */
+function isBlank(value: unknown): boolean {
+  if (value === undefined || value === null || value === false) return true;
+  if (typeof value === 'string') return value.trim() === '';
+  if (Array.isArray(value)) return value.every(isBlank);
+  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).every(isBlank);
+  return false;
 }

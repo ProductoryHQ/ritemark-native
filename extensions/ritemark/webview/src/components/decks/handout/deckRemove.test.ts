@@ -173,6 +173,13 @@ const DECK = [
   assert.equal(isEmptyPart(openDeck(commented).state.doc, 1), false, 'a comment in its part')
   assert.equal(slideHasNothing('', { id: 'x' }, null), true)
   assert.equal(slideHasNothing('', { id: 'x' }, 'old notes'), false, 'a v1 slide with notes')
+  // Codex on #770: values that say nothing are no setting (an empty list of items or rows, `skip: false`, a picture placed
+  // nowhere); a word anywhere in them is.
+  assert.equal(slideHasNothing('', { id: 'x', items: [], rows: [], skip: false, picture: 'none' } as never, null), true)
+  assert.equal(slideHasNothing('', { id: 'x', items: [{ heading: '' }] } as never, null), true)
+  assert.equal(slideHasNothing('', { id: 'x', items: [{ heading: 'A word' }] } as never, null), false)
+  assert.equal(slideHasNothing('', { id: 'x', picture: 'none', image: 'images/kept.png' }, null), false, 'a picture kept with its place None')
+  assert.equal(slideHasNothing('', { id: 'x', skip: true }, null), false)
   // The deck's only slide stays.
   const single = openDeck(['---', 'deck: 2', 'handout: text', '---', '', '```slide', '---', 'id: o1', '---', '```', ''].join('\n'))
   const only = slidesOf(single.state.doc)[0]
