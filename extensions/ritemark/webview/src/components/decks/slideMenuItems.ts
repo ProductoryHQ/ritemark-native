@@ -26,16 +26,16 @@ export interface SlideMenuItem {
   separated?: boolean
   danger?: boolean
   disabled?: boolean
-  /** The key beside it (Delete slide's ⌫), so people can find it. */
+  /** The key beside it (Duplicate's ⌘D, Delete slide's ⌫), so people can find it. */
   keyHint?: string
   run: (actions: SlideMenuActions) => void
 }
 
 /** The menu of slide `index` (from 0) in a deck of `count` slides. */
-export function slideMenuItems(input: { index: number; count: number; skipped: boolean; fromLibrary: boolean; deleteKey: string }): SlideMenuItem[] {
-  const { index, count, skipped, fromLibrary, deleteKey } = input
+export function slideMenuItems(input: { index: number; count: number; skipped: boolean; fromLibrary: boolean; deleteKey: string; duplicateKey?: string }): SlideMenuItem[] {
+  const { index, count, skipped, fromLibrary, deleteKey, duplicateKey } = input
   return [
-    { key: 'duplicate', label: 'Duplicate', icon: 'copy', run: actions => actions.duplicate(index) },
+    { key: 'duplicate', label: 'Duplicate', icon: 'copy', keyHint: duplicateKey, run: actions => actions.duplicate(index) },
     { key: 'skip', label: skipped ? 'Show slide' : 'Skip slide', icon: skipped ? 'eye' : 'eye-slash', run: actions => actions.toggleSkip(index) },
     fromLibrary
       ? { key: 'library', label: 'Show in the library', icon: 'cards-three', run: actions => actions.showInLibrary(index) }

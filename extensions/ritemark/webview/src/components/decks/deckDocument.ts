@@ -210,6 +210,35 @@ export function partRange(doc: PMNode, index: number): { from: number; to: numbe
   return { from: slide.pos, to: next ? next.pos : doc.content.size }
 }
 
+/**
+ * The part an undo or a redo changed, in the document after it (17 November: Undo shows what it undid, and the deck
+ * view makes that slide current): the first part it put something into (words, a slide, a slide's new body), else the
+ * part just before the first place it took something out of (an undone copy or new slide: the slide it came from).
+ * Null when nothing changed, or only the preamble did.
+ */
+export function partChangedBy(tr: Transaction): number | null {
+  if (!tr.docChanged) return null
+  const found: { added: number | null; removed: number | null } = { added: null, removed: null }
+  tr.steps.forEach((step, index) => {
+    const after = tr.mapping.slice(index + 1)
+    let ranges = 0
+    step.getMap().forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+      ranges += 1
+      // Inside what this step put in, as later steps left it.
+      const from = after.map(newStart, 1)
+      const to = after.map(newEnd, -1)
+      if (to > from) found.added ??= from
+      else if (newEnd === newStart) found.removed ??= after.map(newStart, -1)
+    })
+    // A step with no map changes a node's attributes in place.
+    const pos = ranges === 0 ? (step.toJSON() as { pos?: unknown }).pos : undefined
+    if (typeof pos === 'number') found.added ??= after.map(pos, 1)
+  })
+  if (found.added !== null) return partIndexAt(tr.doc, found.added)
+  if (found.removed === null) return null
+  return partIndexAt(tr.doc, Math.max(0, found.removed - 1)) ?? partIndexAt(tr.doc, found.removed)
+}
+
 /** Where a part placed "before part `at`" goes: that part's start, or the document's end. */
 function insertPoint(doc: PMNode, at: number): number {
   const slides = slidesOf(doc)
@@ -224,7 +253,20 @@ function idsOf(doc: PMNode): string[] {
   return slidesOf(doc).map(slide => slide.data.id).filter((id): id is string => !!id)
 }
 
-/** Move part `from` so it stands before part `to` (or at the end when `to` is the count). */
+/**
+ * Where ⌘↑ (`step` -1) or ⌘↓ (+1) moves part `index` in a deck of `count` slides, as `moveSlide`'s `to`: before the
+ * part above, or before the part after the next one. Null at the ends: the first slide can't go up, nor the last down.
+ */
+export function nudgeTarget(index: number, step: -1 | 1, count: number): number | null {
+  if (!Number.isInteger(index) || index < 0 || index >= count) return null
+  if (step < 0) return index > 0 ? index - 1 : null
+  return index < count - 1 ? index + 2 : null
+}
+
+/**
+ * Move part `from` so it stands before part `to` (or at the end when `to` is the count). An undo step of its own
+ * (17 November: one Cmd+Z undoes it), never merged with words typed just before.
+ */
 export function moveSlide(state: EditorState, from: number, to: number): Transaction | null {
   if (from === to || from + 1 === to) return null
   const range = partRange(state.doc, from)
@@ -240,10 +282,10 @@ export function moveSlide(state: EditorState, from: number, to: number): Transac
     tr.delete(range.from, range.to)
     tr.insert(target, slice.content)
   }
-  return operation(tr)
+  return operation(closeHistory(tr))
 }
 
-/** A copy of part `index` right after it, its slide with a new id. */
+/** A copy of part `index` right after it, its slide with a new id: an undo step of its own, as a move is. */
 export function duplicateSlide(state: EditorState, index: number, random: () => number = Math.random): Transaction | null {
   const range = partRange(state.doc, index)
   if (!range) return null
@@ -253,7 +295,7 @@ export function duplicateSlide(state: EditorState, index: number, random: () => 
   const id = newId(idsOf(state.doc), random)
   const copy = first.type.create({ ...first.attrs, body: writeSlideData(first.attrs.kind, first.attrs.body, { ...slideDataOf(first.attrs.kind, first.attrs.body), id }) })
   const tr = state.tr.insert(range.to, content.replaceChild(0, copy))
-  return operation(tr)
+  return operation(closeHistory(tr))
 }
 
 /** Take part `index` out: the slide and its handout. Never the deck's last slide. */
