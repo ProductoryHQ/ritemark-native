@@ -586,10 +586,31 @@ export function gripSpot(block: Box): { left: number; top: number } {
   return { left: Math.max(0, block.left - HANDLE_SIZE - 4), top: Math.max(0, block.top) }
 }
 
-/** The round + : on the right edge's middle of a row of boxes or columns, on the bottom edge's middle of a list. */
-export function plusSpot(block: Box, kind: BarKind): { left: number; top: number } {
+/**
+ * The round + (the Experience lead on #773: it never covers words): on the right edge's middle of a row of boxes or
+ * columns; on a list's or Steps' bottom edge, under its numbers or bullets (`markerX`, their middle), where the new
+ * item appears.
+ */
+export function plusSpot(block: Box, kind: BarKind, markerX: number | null = null): { left: number; top: number } {
   if (kind === 'boxes' || kind === 'columns') return { left: block.left + block.width - HANDLE_SIZE / 2, top: block.top + block.height / 2 - HANDLE_SIZE / 2 }
-  return { left: block.left + block.width / 2 - HANDLE_SIZE / 2, top: block.top + block.height - HANDLE_SIZE / 2 }
+  const x = markerX ?? block.left
+  return { left: Math.max(0, x - HANDLE_SIZE / 2), top: block.top + block.height - HANDLE_SIZE / 2 }
+}
+
+/** How far under the block the bar starts: clear of a + on its bottom edge (lists and Steps), with a gap. */
+export function barGap(kind: BarKind): number {
+  return kind === 'boxes' || kind === 'columns' ? 8 : HANDLE_SIZE / 2 + 8
+}
+
+/**
+ * The bar's left edge: under the block, inside the slide's pane (8 px from its edges, the divider included: the
+ * Experience lead on #773), and on the window. Null when the bar is wider than the pane: its own group then folds.
+ */
+export function barLeft(blockLeft: number, width: number, pane: { left: number; right: number }, windowWidth: number): number | null {
+  const min = Math.max(8, pane.left + 8)
+  const max = Math.min(windowWidth - 8, pane.right - 8) - width
+  if (max < min) return null
+  return Math.max(min, Math.min(blockLeft, max))
 }
 
 /**

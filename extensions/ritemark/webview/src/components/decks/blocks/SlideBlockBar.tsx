@@ -22,12 +22,12 @@ import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { Icon, type PhosphorIconName } from '../../ui/Icon'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, MIN_COLUMNS, addItem, chosenBlockAt, columnCount, columnIndexAt, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, moveBlock, nearestGap, plusSpot, removeColumn, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box, type ChosenBlock,
+  BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
+  gripSpot, moveBlock, nearestGap, plusSpot, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box, type ChosenBlock,
 } from './blockBar'
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers' }
@@ -51,12 +51,16 @@ interface Placed {
   screen: DOMRect
   /** Columns: the lines between them, each its x in the frame and the two columns' outer edges on the screen. */
   lines: { x: number; left: number; right: number }[]
+  /** A list's or Steps' numbers or bullets: their middle's x in the frame (the + goes under them). */
+  markerX: number | null
+  /** The slide's pane on the screen: the bar stays inside it. */
+  pane: { left: number; right: number }
 }
 
 function samePlace(a: Placed, b: Placed): boolean {
   const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
   return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
-    && JSON.stringify(a.lines) === JSON.stringify(b.lines)
+    && a.markerX === b.markerX && a.pane.left === b.pane.left && a.pane.right === b.pane.right && JSON.stringify(a.lines) === JSON.stringify(b.lines)
 }
 
 function boxIn(rect: DOMRect, origin: DOMRect): Box {
@@ -86,6 +90,47 @@ function Choice({ on, label, tip, icon, onPick }: { on: boolean; label?: string;
 
 const Segment = ({ children, label }: { children: ReactNode; label: string }) => <div className="deck-bar-seg" role="group" aria-label={label}>{children}</div>
 const Sep = () => <span className="deck-bar-sep" aria-hidden="true" />
+
+/** One of a group's choices. */
+interface Option {
+  key: string
+  on: boolean
+  label?: string
+  icon?: PhosphorIconName
+  tip: string
+  pick: () => void
+}
+
+/**
+ * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
+ * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773).
+ */
+function Group({ label, options, folded }: { label: string; options: Option[]; folded: boolean }) {
+  if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
+  const current = options.find(option => option.on) ?? options[0]
+  return (
+    <DropdownMenu modal={false}>
+      <Tooltip label={label}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="toolbar" size="compact" aria-label={label} onMouseDown={event => event.preventDefault()}>
+            {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
+            {current.label}
+            <Icon name="caret-down" size={12} tone="inherit" />
+          </Button>
+        </DropdownMenuTrigger>
+      </Tooltip>
+      <DropdownMenuContent align="start" onCloseAutoFocus={event => event.preventDefault()}>
+        {options.map(option => (
+          <DropdownMenuItem key={option.key} className="gap-2" onSelect={option.pick}>
+            {option.icon ? <Icon name={option.icon} size={16} tone="inherit" /> : null}
+            <span className="flex-1">{option.label ?? option.tip}</span>
+            {option.on ? <Icon name="check" size={14} tone="inherit" /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
@@ -131,7 +176,16 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
         lines.push({ x: b.left - origin.left, left: a.left, right: b.right })
       }
     }
-    const next: Placed = { block: boxIn(screen, origin), screen, lines }
+    // A list's or Steps' markers sit left of its first item's words: the + goes under their middle.
+    let markerX: number | null = null
+    if (block.kind !== 'boxes' && block.kind !== 'columns') {
+      const words = dom.querySelector('li > *')?.getBoundingClientRect()
+      const item = dom.querySelector('li')?.getBoundingClientRect()
+      if (words && item) markerX = (block.kind === 'steps' ? item.left + (words.left - item.left) * 0.3 : item.left - (item.left - screen.left) / 2) - origin.left
+    }
+    const paneRect = (frame.closest('.deck-stage') as HTMLElement | null)?.getBoundingClientRect()
+    const pane = paneRect ? { left: paneRect.left, right: paneRect.right } : { left: 0, right: window.innerWidth }
+    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane }
     // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
     setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
@@ -169,28 +223,34 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
   useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, enabled: showing })
 
   // Under the block, the page's own size; above it when there is no room under it; never off the window.
+  // Inside the slide's pane (the Experience lead on #773): when the bar is wider than the pane, its own group folds
+  // into menus that show their value, from the right: alignment, then Width (or the count), then Style. A new block or
+  // a new pane width starts again unfolded.
+  const [fold, setFold] = useState(0)
+  const foldKey = `${chosen?.pos}:${chosen?.kind}:${placed ? Math.round(placed.pane.right - placed.pane.left) : 0}`
+  useEffect(() => { setFold(0) }, [foldKey])
   useLayoutEffect(() => {
     const bar = barRef.current
-    if (!showing || !placed || !bar) { setBarAt(null); return }
+    if (!showing || !placed || !bar || !chosen) { setBarAt(null); return }
     const width = bar.offsetWidth
     const height = bar.offsetHeight
     const room = window.innerHeight
-    let top = placed.screen.bottom + 8
+    let top = placed.screen.bottom + barGap(chosen.kind)
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
-    const left = Math.max(8, Math.min(placed.screen.left, window.innerWidth - width - 8))
+    const inPane = barLeft(placed.screen.left, width, placed.pane, window.innerWidth)
+    if (inPane === null && fold < 3) { setFold(fold + 1); return }
+    const left = inPane ?? Math.max(8, placed.pane.left + 8)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
-    // Again only when the block moves or the bar's contents change (its width): never on its own update.
-  }, [showing, placed, chosen?.node, chosen?.kind, drag])
+    // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
+  }, [showing, placed, chosen, drag, fold])
 
   if (!editor || !chosen || !placed || !layer) return null
 
   const run = (tr: Transaction | null) => { apply(tr); editor.view.focus() }
-  const state = editor.state
   const attrs = divAttributesOf(chosen.node)
   const look = chosen.kind === 'boxes' ? boxesLookOf(attrs) : null
   const fill = look?.fill ?? theme.boxes
   const columns = chosen.kind === 'columns' ? columnCount(chosen.node) : 0
-  const caretColumn = chosen.kind === 'columns' ? columnIndexAt(state, chosen.pos) : null
   /**
    * A change on the chosen block as it is now: found again from the caret, so a change that came in meanwhile (an AI's
    * edit, an undo) never makes the bar act on another block's place. Nothing when the block is gone.
@@ -293,8 +353,13 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
 
   const block = placed.block
   const grip = gripSpot(block)
-  const plus = plusSpot(block, chosen.kind)
-  const handleStyle = (spot: { left: number; top: number }): CSSProperties => ({ left: spot.left, top: spot.top, width: HANDLE_SIZE, height: HANDLE_SIZE })
+  const plus = plusSpot(block, chosen.kind, placed.markerX)
+  // While a handle drags, only its drop line or guide shows (the lead on #773): the handles stay in the page, hidden,
+  // so the dragged one keeps its pointer, and no tooltip opens.
+  const hidden: CSSProperties = drag ? { visibility: 'hidden' } : {}
+  const handleStyle = (spot: { left: number; top: number }): CSSProperties => ({ left: spot.left, top: spot.top, width: HANDLE_SIZE, height: HANDLE_SIZE, ...hidden })
+  // The ring keeps 8 px from the words: a box has its own padding, so a Boxes block's ring sits closer.
+  const ring = chosen.kind === 'boxes' ? 4 : 8
 
   return (
     <>
@@ -302,25 +367,25 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
           children move (the bubble menu goes to the page), and React inserting beside them failed (the app run). */}
       {createPortal(showing ? (
         <>
-          <div className="deck-block-ring" style={{ left: block.left - 4, top: block.top - 4, width: block.width + 8, height: block.height + 8 }} aria-hidden="true" />
-          <Tooltip label="Drag to move the block on the slide">
+          <div className="deck-block-ring" style={{ left: block.left - ring, top: block.top - ring, width: block.width + ring * 2, height: block.height + ring * 2, ...hidden }} aria-hidden="true" />
+          <Tooltip label="Drag to move the block on the slide" suppressed={!!drag}>
             <Button variant="ghost" className="deck-block-grip" style={handleStyle(grip)} aria-label="Move the block" onPointerDown={startMove} onMouseDown={event => event.preventDefault()}>
               <Icon name="dots-six-vertical" size={14} tone="inherit" />
             </Button>
           </Tooltip>
           {canAdd ? (
-            <Tooltip label={ADD_LABEL[chosen.kind]}>
+            <Tooltip label={ADD_LABEL[chosen.kind]} suppressed={!!drag}>
               <Button variant="outline" className="deck-block-plus" style={handleStyle(plus)} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
                 <Icon name="plus" size={12} tone="inherit" />
               </Button>
             </Tooltip>
           ) : null}
           {placed.lines.map((line, index) => (
-            <Tooltip key={index} label="Drag to change the columns' widths">
+            <Tooltip key={index} label="Drag to change the columns' widths" suppressed={!!drag}>
               <Button
                 variant="ghost"
                 className="deck-block-split"
-                style={{ left: line.x - 6, top: block.top, height: block.height }}
+                style={{ left: line.x - 6, top: block.top, height: block.height, ...hidden }}
                 aria-label="Change the columns' widths"
                 onPointerDown={startSplit(index)}
                 onMouseDown={event => event.preventDefault()}
@@ -368,45 +433,40 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
               {look ? (
                 <>
                   <Sep />
-                  <Segment label="Style">
-                    {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
-                    <Choice on={fill === 'filled'} label="Filled" tip="Boxes filled with the theme's colour" onPick={() => setValue('fill', theme.boxes === 'filled' ? null : 'filled')} />
-                    <Choice on={fill === 'outline'} label="Outline" tip="Boxes drawn as an outline" onPick={() => setValue('fill', theme.boxes === 'outline' ? null : 'outline')} />
-                  </Segment>
+                  {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
+                  <Group label="Style" folded={fold >= 3} options={[
+                    { key: 'filled', on: fill === 'filled', label: 'Filled', tip: "Boxes filled with the theme's colour", pick: () => setValue('fill', theme.boxes === 'filled' ? null : 'filled') },
+                    { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
+                  ]} />
                   <Sep />
-                  <Segment label="Width">
-                    <Choice on={!look.width} icon="columns" label="Auto" tip="One row while every box is at least S wide, else two rows" onPick={() => setValue('width', null)} />
-                    {(['s', 'm', 'l'] as BoxWidth[]).map(width => (
-                      <Choice key={width} on={look.width === width} label={width.toUpperCase()} tip={`Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`} onPick={() => setValue('width', width)} />
-                    ))}
-                  </Segment>
+                  <Group label="Width" folded={fold >= 2} options={[
+                    { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },
+                    ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: width.toUpperCase(), tip: `Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`, pick: () => setValue('width', width) })),
+                  ]} />
                   <Sep />
-                  <Segment label="Text alignment">
-                    <Choice on={!look.align} icon="text-align-left" tip="Text on the left" onPick={() => setValue('align', null)} />
-                    <Choice on={look.align === 'center'} icon="text-align-center" tip="Text in the centre" onPick={() => setValue('align', 'center')} />
-                  </Segment>
+                  <Group label="Text alignment" folded={fold >= 1} options={[
+                    { key: 'left', on: !look.align, icon: 'text-align-left', tip: 'Text on the left', pick: () => setValue('align', null) },
+                    { key: 'center', on: look.align === 'center', icon: 'text-align-center', tip: 'Text in the centre', pick: () => setValue('align', 'center') },
+                  ]} />
                 </>
               ) : null}
               {chosen.kind === 'columns' ? (
                 <>
                   <Sep />
-                  <Segment label="Columns">
-                    {[2, 3, 4].map(count => (
-                      <Choice
-                        key={count}
-                        on={columns === count}
-                        label={String(count)}
-                        tip={count < columns ? `${count} columns: the words of the others go to the last one` : `${count} columns`}
-                        onPick={() => run(act(pos => setColumnCount(editor.state, pos, count)))}
-                      />
-                    ))}
-                  </Segment>
+                  {/* The count is how columns are added and taken away (the lead on #773: no ⋯ for Columns). */}
+                  <Group label="Columns" folded={fold >= 2} options={[2, 3, 4].map(count => ({
+                    key: String(count),
+                    on: columns === count,
+                    label: String(count),
+                    tip: count < columns ? `${count} columns: the words of the others go to the last one` : `${count} columns`,
+                    pick: () => run(act(pos => setColumnCount(editor.state, pos, count))),
+                  }))} />
                   <Sep />
-                  <Segment label="Vertical alignment">
-                    <Choice on={!columnsAlignOf(attrs)} icon="align-top" tip="Columns' words at the top" onPick={() => setValue('valign', null)} />
-                    <Choice on={columnsAlignOf(attrs) === 'middle'} icon="align-center-vertical" tip="Columns' words in the middle" onPick={() => setValue('valign', 'middle')} />
-                    <Choice on={columnsAlignOf(attrs) === 'bottom'} icon="align-bottom" tip="Columns' words at the bottom" onPick={() => setValue('valign', 'bottom')} />
-                  </Segment>
+                  <Group label="Vertical alignment" folded={fold >= 1} options={[
+                    { key: 'top', on: !columnsAlignOf(attrs), icon: 'align-top', tip: "Columns' words at the top", pick: () => setValue('valign', null) },
+                    { key: 'middle', on: columnsAlignOf(attrs) === 'middle', icon: 'align-center-vertical', tip: "Columns' words in the middle", pick: () => setValue('valign', 'middle') },
+                    { key: 'bottom', on: columnsAlignOf(attrs) === 'bottom', icon: 'align-bottom', tip: "Columns' words at the bottom", pick: () => setValue('valign', 'bottom') },
+                  ]} />
                 </>
               ) : null}
               <Sep />
@@ -421,36 +481,6 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                   <Icon name="trash" size={16} tone="inherit" />
                 </Button>
               </Tooltip>
-              {chosen.kind === 'columns' ? (
-                <DropdownMenu modal={false}>
-                  <Tooltip label="More for the columns">
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="toolbar" size="compact" aria-label="More for the columns" onMouseDown={event => event.preventDefault()}>
-                        <Icon name="dots-three" size={16} tone="inherit" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </Tooltip>
-                  <DropdownMenuContent align="end" onCloseAutoFocus={event => { event.preventDefault(); editor.view.focus() }}>
-                    <DropdownMenuItem className="gap-2" disabled={columns >= MAX_COLUMNS} onSelect={() => apply(act(pos => addItem(editor.state, pos)))}>
-                      <Icon name="plus" size={16} tone="inherit" />
-                      Add a column
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2"
-                      disabled={columns <= MIN_COLUMNS || caretColumn === null}
-                      onSelect={() => { if (caretColumn !== null) apply(act(pos => removeColumn(editor.state, pos, caretColumn))) }}
-                    >
-                      <Icon name="minus" size={16} tone="inherit" />
-                      Remove a column
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="gap-2" tone="danger" onSelect={() => apply(act(pos => deleteBlock(editor.state, pos)))}>
-                      <Icon name="trash" size={16} tone="inherit" />
-                      Delete block
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
             </div>,
             document.body,
           )

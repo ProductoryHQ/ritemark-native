@@ -35,7 +35,7 @@ import { SlideSync } from './slideSync'
 import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, HANDLE_SIZE, addItem, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, moveBlock, nearestGap, plusSpot, removeColumn,
+  BAR_KINDS, HANDLE_SIZE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, moveBlock, nearestGap, plusSpot, removeColumn,
   setColumnCount, setColumnSplit, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
@@ -490,6 +490,21 @@ stable(COLUMNS, 'three columns')
   assert.ok(steps.includes('5) Five'), steps)
   const back = stateWith(steps, 'Five')
   assert.equal(after(turnInto(back, blockPos(back), 'numbered')), numbered, 'Numbered → Steps → Numbered: the same bytes')
+}
+
+// ---- The Experience lead on #773: the bar stays in the slide's pane; the + never covers words; the bar clears it.
+{
+  const pane = { left: 200, right: 700 }
+  assert.equal(barLeft(300, 300, pane, 1440), 300, 'under the block when it fits')
+  assert.equal(barLeft(500, 300, pane, 1440), 392, 'moved left to keep 8 px from the divider')
+  assert.equal(barLeft(150, 300, pane, 1440), 208, 'never past the pane\'s left edge')
+  assert.equal(barLeft(300, 490, pane, 1440), null, 'wider than the pane: the group folds')
+  const list = { left: 100, top: 50, width: 400, height: 90 }
+  const plus = plusSpot(list, 'list', 112)
+  assert.equal(plus.left + HANDLE_SIZE / 2, 112, 'a list\'s + under its bullets')
+  assert.equal(plus.top + HANDLE_SIZE / 2, 140, 'on its bottom edge')
+  assert.ok(barGap('list') >= HANDLE_SIZE / 2 + 8 && barGap('steps') === barGap('list'), 'the bar clears the + with a gap')
+  assert.equal(barGap('boxes'), 8)
 }
 
 // ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.
