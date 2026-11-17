@@ -546,8 +546,8 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
 @media (max-width: 599px) {
   /* The bar's blur would hold a fixed child inside the bar; under it on a phone is the slide's white band anyway. */
   .top { -webkit-backdrop-filter: none; backdrop-filter: none; background: #fff; }
-  .restart { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 35; height: 36px; padding: 0 16px; border-radius: 18px; background: #fff; color: var(--ink); font: 600 13.5px/36px 'Sofia Sans', sans-serif; box-shadow: 0 0 0 1px var(--line), 0 10px 26px -10px rgba(28,31,74,.45); }
-  .restart:hover { background: #fff; color: var(--ink); }
+  .restart { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 35; height: 36px; padding: 0 16px; border-radius: 999px; background: #1E1B4B; color: #fff; font: 600 13.5px/36px 'Sofia Sans', sans-serif; box-shadow: 0 0 0 1px var(--line), 0 10px 26px -10px rgba(28,31,74,.45); } /* the page's ink with white words, like a phone toast (the Experience lead) */
+  .restart:hover { background: #1E1B4B; color: #fff; }
 }
 @media (prefers-reduced-motion: reduce) {
   .layer, .layer.on, body.bl .layer, body.bl .layer.on, .bar i, .part, .sect > * { transition: none; }

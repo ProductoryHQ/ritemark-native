@@ -118,7 +118,11 @@ assert.ok(restart.hasAttribute('hidden') && restart.getAttribute('type') === 'bu
   const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS);
   assert.ok(phone, 'the page has a phone rule for the notice');
   const pill = /\.restart \{([^}]*)\}/.exec(phone![1])![1];
-  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(16px + env(safe-area-inset-bottom, 0px))', 'border-radius: 18px']) assert.ok(pill.includes(rule), rule);
+  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(16px + env(safe-area-inset-bottom, 0px))', 'border-radius: 999px']) assert.ok(pill.includes(rule), rule);
+  // The page's ink with white words, like a phone toast, the same shadow; never white on white, hovered or not.
+  for (const rule of ['background: #1E1B4B', 'color: #fff', 'box-shadow: 0 0 0 1px var(--line), 0 10px 26px -10px rgba(28,31,74,.45)']) assert.ok(pill.includes(rule), rule);
+  const hover = /\.restart:hover \{([^}]*)\}/.exec(phone![1])![1];
+  assert.ok(hover.includes('background: #1E1B4B') && hover.includes('color: #fff'), 'the pill stays ink when hovered');
   // The bar's backdrop filter would make it the pill's containing block (the pill would sit in the bar): none there.
   assert.match(phone![1], /\.top \{[^}]*backdrop-filter: none/);
   // At 600 px and up it stays in the bar.
