@@ -33,7 +33,7 @@ const floors = columnFloors(rows, 4, null)
 assert.deepEqual(floors.slice(0, 3), [null, null, null], 'numbers and single words: no floor, only the widest word')
 
 // A text column: about 200 px, capped at its longest note on one line.
-assert.deepEqual(floors[3], { px: TEXT_COLUMN_MIN, share: 0, chars: NOTE.length })
+assert.deepEqual(floors[3], { share: 0, chars: NOTE.length })
 assert.equal(TEXT_COLUMN_MIN, 200)
 assert.equal(floorCss(floors[3]!), `min(200px, calc(${NOTE.length}ch + 2em))`)
 
@@ -42,12 +42,12 @@ assert.equal(floorCss(columnFloors([['New York']], 1, null)[0]!), 'min(200px, ca
 
 // The stored width (a share of the width the table has when it fits) wins when it is larger than 200 px.
 const stored = columnFloors(rows, 4, [10, 10, 20, 60])
-assert.deepEqual(stored[3], { px: 200, share: 60, chars: NOTE.length })
+assert.deepEqual(stored[3], { share: 60, chars: NOTE.length })
 assert.equal(floorCss(stored[3]!), `min(max(200px, 60cqw), calc(${NOTE.length}ch + 2em))`)
 assert.equal(stored[0], null, 'a number column with a stored share still has no floor')
 
 // White space in a cell counts once; an empty column has no floor; a missing cell is empty.
-assert.deepEqual(columnFloors([['  two \n  words  ']], 2, null), [{ px: 200, share: 0, chars: 9 }, null])
+assert.deepEqual(columnFloors([['  two \n  words  ']], 2, null), [{ share: 0, chars: 9 }, null])
 
 // ---- The editor: the node view's floors come from the table's body cells and its stored widths.
 function firstTable(doc: PMNode): PMNode {

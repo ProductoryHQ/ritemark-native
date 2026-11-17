@@ -111,29 +111,41 @@ export class TableHandlesView implements NodeView {
    *
    * Each text column's floor (`tableColumns.ts`) goes on its `<col>` too, as `--rm-col-floor`: a deck's handout, where
    * a wide table scrolls in its own frame, makes it the column's `min-width` (decks.css), so a note wraps into two or
-   * three lines instead of one word per line. It is read from the cells' words, so nothing is measured, and the DOM
-   * changes only when a width or a floor does. Elsewhere (a Text document, a slide) the variable is unused.
+   * three lines instead of one word per line. It is read from the cells' words, so nothing is measured: only when the
+   * table's node changes (an update for its decorations alone keeps the node), and the `<col>`s change in place only
+   * when a width or a floor does. Elsewhere (a Text document, a slide) the variable is unused.
    */
   private drawWidths(): void {
+    if (this.node === this.drawnNode) return
+    this.drawnNode = this.node
     const widths = columnWidths(this.node)
     const floors = columnFloorsCss(this.node, widths)
     const key = `${widths ? widths.join(',') : ''}|${floors.join(';')}`
     if (key === this.widthsKey) return
     this.widthsKey = key
-    this.table.querySelector(':scope > colgroup')?.remove()
     this.table.classList.toggle('has-widths', !!widths)
     // A table with widths takes its container's width, as the slide renderer draws it (`slideRenderer.ts`).
     this.table.style.width = widths ? '100%' : ''
-    if (!widths && !floors.some(Boolean)) return
-    const group = document.createElement('colgroup')
+    let group = this.table.querySelector<HTMLElement>(':scope > colgroup')
+    if (!widths && !floors.some(Boolean)) {
+      group?.remove()
+      return
+    }
+    if (!group || group.children.length !== floors.length) {
+      group?.remove()
+      group = document.createElement('colgroup')
+      for (let col = 0; col < floors.length; col++) group.appendChild(document.createElement('col'))
+      this.table.insertBefore(group, this.contentDOM)
+    }
     floors.forEach((floor, col) => {
-      const element = document.createElement('col')
-      if (widths) element.style.width = `${widths[col]}%`
+      const element = group!.children[col] as HTMLElement
+      element.style.width = widths ? `${widths[col]}%` : ''
       if (floor) element.style.setProperty('--rm-col-floor', floor)
-      group.appendChild(element)
+      else element.style.removeProperty('--rm-col-floor')
     })
-    this.table.insertBefore(group, this.contentDOM)
   }
+
+  private drawnNode: PMNode | null = null
 
   private widthsKey = ''
 

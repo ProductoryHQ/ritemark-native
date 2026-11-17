@@ -348,27 +348,37 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
 }
 
 // A wide table keeps sensible column widths (the Experience lead on #780), by the deck view's own rule
-// (`tableColumns.ts`): a text column's <col> keeps about 200 px, or its stored share when larger, never more than its
-// longest note on one line; a number column has no floor, so it keeps only its widest word.
+// (`tableColumns.ts`): a text column keeps about 200 px, or its stored share when larger, never more than its longest
+// note on one line; a number column has no floor, so it keeps only its widest word. On the page the floor is a spacer
+// at the end of the column's header cell, which every browser keeps (Safari and Firefox ignore a <col>'s min-width).
 {
-  const table = (delimiter: string) => handoutHtml([
+  const table = (delimiter: string, note = 'Most replies needed **one edit** before [sending](https://example.org/a-very-long-address)') => handoutHtml([
     '| Mail drafted | Hours saved | Notes from the pilot week |',
     delimiter,
-    '| 412 | 31 | Most replies needed **one edit** before [sending](https://example.org/a-very-long-address) |',
+    `| 412 | 31 | ${note} |`,
     '| 268 | 1 200 | Fine |',
   ].join('\n'), { partKey: 't', exercise: false, pictureUrl });
-  const cols = (html: string) => parse(html).querySelectorAll('.tw > table > colgroup > col').map(col => col.getAttribute('style') ?? '');
+  const spacers = (html: string) => parse(html).querySelectorAll('.tw > table > thead th').map(th => th.querySelector('i.fl')?.getAttribute('style') ?? '');
   const automatic = table('| --- | --- | --- |');
   // The note's words as read, without its marks or the link's address: "Most replies needed one edit before sending".
-  assert.deepEqual(cols(automatic), ['', '', 'min-width:min(200px, calc(43ch + 2em))'], 'numbers: no floor; the note: 200 px');
-  assert.ok(/<table>\n<colgroup>/.test(automatic), 'the colgroup comes first in the table');
-  // Stored widths (#772's form, 16 + 16 + 48 dashes: 20 %, 20 %, 60 %): the note's share of the frame when larger.
+  assert.deepEqual(spacers(automatic), ['', '', 'width:calc(min(200px, calc(43ch + 2em)) - 20px)'], 'numbers: no floor; the note: 200 px');
+  assert.equal(parse(automatic).querySelectorAll('th')[2].text, 'Notes from the pilot week', 'the header reads as before');
+  assert.ok(!automatic.includes('<colgroup>') && automatic.includes('<div class="tw"><table>\n<thead>'), 'an automatic table is drawn as before');
+  // The cells' words as the editor reads them: a character reference is one character, as the editor's textContent.
+  assert.deepEqual(spacers(table('| --- | --- | --- |', 'Q&A "quoted" sessions here')), ['', '', 'width:calc(min(200px, calc(26ch + 2em)) - 20px)']);
+  // Stored widths (#772's form, 16 + 16 + 48 dashes: 20 %, 20 %, 60 %): drawn as the handout draws them, at the text's
+  // width with those shares, and the note keeps its share of the frame when that is larger than 200 px.
   const stored = table(`|${'-'.repeat(16)}|${'-'.repeat(16)}|${'-'.repeat(48)}|`);
-  assert.deepEqual(cols(stored), ['', '', 'min-width:min(max(200px, 60cqw), calc(43ch + 2em))'], 'the stored share wins when larger');
-  // A table of numbers and single words has no colgroup at all: every column keeps its widest word.
-  assert.ok(!handoutHtml('| A | B |\n| --- | --- |\n| 1 | Yes |\n', { partKey: 't', exercise: false, pictureUrl }).includes('<colgroup>'));
-  // The frame the share counts against: the table's own scrolling frame.
+  assert.deepEqual(spacers(stored), ['', '', 'width:calc(min(max(200px, 60cqw), calc(43ch + 2em)) - 20px)'], 'the stored share wins when larger');
+  assert.deepEqual(parse(stored).querySelectorAll('.tw > table.has-widths > colgroup > col').map(col => col.getAttribute('style')), ['width:20%', 'width:20%', 'width:60%']);
+  assert.ok(stored.includes('<table class="has-widths" style="width:100%">'));
+  // A table of numbers and single words has no floor at all: every column keeps its widest word.
+  assert.ok(!handoutHtml('| A | B |\n| --- | --- |\n| 1 | Yes |\n', { partKey: 't', exercise: false, pictureUrl }).includes('class="fl"'));
+  // The spacer has a width and no height; the frame the share counts against is the table's own scrolling frame; and a
+  // step's words take the step's width, so a table in a step has room (a query container takes no width from inside).
+  assert.ok(/\.tw \.fl \{ display: block; height: 0; \}/.test(html), 'the spacer has no height');
   assert.ok(/\.tw \{ overflow-x: auto;[^}]*container-type: inline-size;[^}]*\}/.test(html), 'the frame is the query container');
+  assert.ok(/\.steps label > span \{ min-width: 0; flex: 1 1 auto; \}/.test(html), "a step's words take its width");
 }
 
 
