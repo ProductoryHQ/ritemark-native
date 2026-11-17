@@ -739,7 +739,9 @@ export function splitBlockSlide(body: string): BlockSlideParts {
       };
     }
     const key = KEY_LINE.exec(line);
-    if (key && (HEADER_KEYS as readonly string[]).includes(key[1])) ownKey = true;
+    // `alt:` and `focus:` come only with a side picture's `picture:`/`image:`: alone they never make a header, so a
+    // slide's words written `---`, `focus: this week`, `---` stay words (review of #774).
+    if (key && (HEADER_KEYS as readonly string[]).includes(key[1]) && key[1] !== 'alt' && key[1] !== 'focus') ownKey = true;
     if (line.trim() === '' || /^\s*#/.test(line) || key) continue;
     return { header: null, head: '', markdown: body };
   }

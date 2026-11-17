@@ -73,7 +73,7 @@ export function drawPicture(attributes: Record<string, unknown>, node: PMNode, c
   const box = document.createElement('span')
   box.className = 'pic-box'
   setStyle(box, boxStyle(look, context === 'slide'))
-  setStyle(image, innerStyle(look))
+  setStyle(image, innerStyle(look, context === 'slide'))
   box.appendChild(image)
   frame.appendChild(box)
   const alt = String(node.attrs.alt ?? '')

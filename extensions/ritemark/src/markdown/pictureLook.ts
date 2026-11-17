@@ -376,16 +376,17 @@ export function boxStyle(look: PictureLook, slide = false): Record<string, strin
   const style: Record<string, string> = { display: 'block', position: 'relative', overflow: 'hidden' };
   const ratio = readRatio(look.crop);
   if (ratio !== null) style['aspect-ratio'] = trimNumber(ratio, 4);
-  if (slide) style['max-height'] = `${SLIDE_PICTURE_HEIGHT}px`;
+  if (slide && ratio !== null) style['max-height'] = `${SLIDE_PICTURE_HEIGHT}px`;
   return style;
 }
 
 /** The picture inside the box: covering the box's shape, at its focus, drawn in by its zoom. */
-export function innerStyle(look: PictureLook): Record<string, string> {
+export function innerStyle(look: PictureLook, slide = false): Record<string, string> {
   const focus = `${trimNumber(look.focus?.x ?? 50, 1)}% ${trimNumber(look.focus?.y ?? 50, 1)}%`;
   const style: Record<string, string> = { display: 'block', width: '100%', 'max-width': 'none', 'max-height': 'none', margin: '0', 'border-radius': '0' };
   if (readRatio(look.crop) !== null) Object.assign(style, { height: '100%', 'max-height': 'none', 'object-fit': 'cover', 'object-position': focus });
-  else Object.assign(style, { height: 'auto' });
+  // On a slide, an uncropped picture in its frame (a caption, a zoom) keeps its shape under the height cap: it shrinks.
+  else Object.assign(style, slide ? { width: 'auto', 'max-width': '100%', height: 'auto', 'max-height': `${SLIDE_PICTURE_HEIGHT}px` } : { height: 'auto' });
   if (look.zoom && look.zoom > 1) Object.assign(style, { transform: `scale(${trimNumber(look.zoom, 3)})`, 'transform-origin': focus });
   return style;
 }
@@ -401,10 +402,10 @@ const escapeHtml = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': 
 export function pictureMarkup(img: string, look: PictureLook, options: { frameClass?: string; caption?: string } = {}): string {
   if (isPlainLook(look) || !/^<img\s/i.test(img) || /\sstyle=/i.test(img)) return img;
   if (!hasFrame(look)) return img.replace(/^<img\s/i, `<img style="${cssText(outerStyle(look))}" `);
-  const inner = img.replace(/^<img\s/i, `<img style="${cssText(innerStyle(look))}" `);
+  const slide = /\bblk-pic\b/.test(options.frameClass ?? '');
+  const inner = img.replace(/^<img\s/i, `<img style="${cssText(innerStyle(look, slide))}" `);
   const classes = ['pic', options.frameClass, look.caption ? 'has-caption' : ''].filter(Boolean).join(' ');
   const caption = look.caption && options.caption ? `<span class="pic-cap">${options.caption}</span>` : '';
-  const slide = /\bblk-pic\b/.test(options.frameClass ?? '');
   const frame = { display: 'block', ...outerStyle(look), ...(slide ? slideFrameStyle(look) : {}) };
   return `<span class="${escapeHtml(classes)}" style="${cssText(frame)}"><span class="pic-box" style="${cssText(boxStyle(look, slide))}">${inner}</span>${caption}</span>`;
 }

@@ -128,7 +128,9 @@ export function leavePicture(state: EditorState): Transaction | null {
   const chosen = chosenPicture(state)
   if (!chosen) return null
   const after = chosen.pos + chosen.node.nodeSize
-  return state.tr.setSelection(TextSelection.near(state.doc.resolve(after), 1))
+  // A picture with no words after it (the last block) is left for a gap cursor after it, never chosen again.
+  const near = TextSelection.near(state.doc.resolve(after), 1)
+  return state.tr.setSelection(near.empty ? near : new GapCursor(state.doc.resolve(after)))
 }
 
 // ---------------------------------------------------------------------------

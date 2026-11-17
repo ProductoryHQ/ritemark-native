@@ -384,8 +384,11 @@ export function Editor({
   // Experience 49: the picture being replaced follows its place through edits made while the host saves the new one.
   useEffect(() => {
     if (!editor) return
-    const follow = ({ transaction }: { transaction: { docChanged: boolean; mapping: { map: (pos: number) => number } } }) => {
-      if (transaction.docChanged && replaceImagePosRef.current !== null) replaceImagePosRef.current = transaction.mapping.map(replaceImagePosRef.current)
+    // A picture deleted meanwhile is no longer replaced: nothing else takes its place (review of #774).
+    const follow = ({ transaction }: { transaction: { docChanged: boolean; mapping: { mapResult: (pos: number, assoc?: number) => { pos: number; deleted: boolean } } } }) => {
+      if (!transaction.docChanged || replaceImagePosRef.current === null) return
+      const mapped = transaction.mapping.mapResult(replaceImagePosRef.current, 1)
+      replaceImagePosRef.current = mapped.deleted ? null : mapped.pos
     }
     editor.on('transaction', follow)
     return () => { editor.off('transaction', follow) }

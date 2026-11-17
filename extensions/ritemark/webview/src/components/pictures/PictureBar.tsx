@@ -185,6 +185,8 @@ export function PictureBar(props: PictureBarProps) {
   if (!anchor) return null
   const size = sizeOf(look.width, context)
   const keys = (event: KeyboardEvent<HTMLDivElement>) => {
+    // A key in the bar's own menu or Description (React hands it on through the portal) is theirs.
+    if ((event.target as HTMLElement).closest?.('[data-radix-popper-content-wrapper]')) return
     if (event.key === 'Escape') {
       event.preventDefault()
       if (crop) props.onCropCancel()

@@ -84,6 +84,9 @@ assert.equal(zoom!.childNodes.length, 0, 'it holds nothing of its own');
 assert.ok(PAGE_SCRIPT.includes('function openZoom(picture)'));
 assert.ok(PAGE_SCRIPT.includes(".part img, .pre img, .stage .deck-sl img, .stage .deck-sl .photo"));
 assert.equal(scriptBuildsReferences(PAGE_SCRIPT), false, 'the full-size view loads nothing and names no file');
+// Review of #774: a picture that is a link's words opens the link; a picture Behind is reachable through the words.
+assert.ok(PAGE_SCRIPT.includes("if (picture.closest('a')) return;"));
+assert.ok(html.includes('.stage .deck-sl.pic-behind .veil, .stage .deck-sl.pic-behind .blk-flow { pointer-events: none; }'));
 
 // Show in Finder: only a picture beside the document and inside the project.
 const posix = path.posix;

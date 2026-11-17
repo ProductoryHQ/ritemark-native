@@ -29,7 +29,7 @@
  */
 import { createHash } from 'node:crypto';
 import { pictureBlockTokenizer } from '../../markdown/pictureLook';
-import { marked, Tokenizer, type Token } from 'marked';
+import { Marked, marked, Tokenizer, type Token } from 'marked';
 import { blockTitleOf, frontMatterLook, isBlockSlide, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
@@ -211,10 +211,7 @@ export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
  * Experience 49: a picture's attribute block (`{width=50% crop=16:9}`, `pictureLook.ts`) is read as the picture's, so it
  * never shows on the page as words; the page draws the picture with its look (`pageHtml.ts`).
  */
-export const PICTURE_EXTENSIONS = {
-  inline: [pictureBlockTokenizer.tokenizer],
-  renderers: { pictureBlock: () => '' },
-} as unknown as NonNullable<Parameters<typeof marked.lexer>[1]>['extensions'];
+export const PICTURE_EXTENSIONS = new Marked().use({ extensions: [pictureBlockTokenizer] }).defaults.extensions;
 
 // ---------------------------------------------------------------------------
 // A handout's Markdown

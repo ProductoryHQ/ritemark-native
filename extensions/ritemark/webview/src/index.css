@@ -33,7 +33,8 @@
   label[for],
   summary,
   select,
-  input[type="radio"]:not(:disabled)
+  input[type="radio"]:not(:disabled),
+  img.is-diagram
 ) {
   cursor: pointer;
 }
@@ -601,9 +602,6 @@ body {
 }
 .ProseMirror .pic-block img {
   margin: 0;
-}
-.ProseMirror .pic-block img.is-diagram {
-  cursor: pointer;
 }
 .pic-box {
   border-radius: 4px;

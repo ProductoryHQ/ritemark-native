@@ -289,6 +289,8 @@ const PAGE_BEHAVIOUR = String.raw`
     if (!target || (zoom && zoom.contains(target))) return;
     var picture = target.closest('.part img, .pre img, .stage .deck-sl img, .stage .deck-sl .photo');
     if (!picture || (picture.classList.contains('photo') && (picture.classList.contains('empty') || !picture.style.backgroundImage))) return;
+    // A picture that is a link's words opens the link, as before.
+    if (picture.closest('a')) return;
     event.preventDefault();
     openZoom(picture);
   });

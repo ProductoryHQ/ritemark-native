@@ -24,11 +24,11 @@ import {
   withLook,
 } from '../../../../src/markdown/pictureLook'
 import { blockSlideHtml, blockSlideMarkup, isCoverSlide, sidePictureOf } from '../../../../src/decks/blocks/slideRenderer'
-import { slideDataOf, withBlockMarkdown, writeSlideData } from '../../../../src/decks/deckFormat'
+import { slideDataOf, splitBlockSlide, withBlockMarkdown, writeSlideData } from '../../../../src/decks/deckFormat'
 import { BUILT_IN_THEME as DEFAULT_THEME } from '../../../../src/decks/deckTheme'
 import { EMPTY_SIDE, flowToSide, sideToText } from '../../components/decks/blocks/slidePicturePlace'
 import { CORNERS, cornerOf, frameBox, localBox, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
-import { caretBeforePicture, chosenPicture, removePicture, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
+import { caretBeforePicture, chosenPicture, leavePicture, removePicture, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
 
 let failures = 0
 function check(name: string, run: () => void) {
@@ -247,6 +247,27 @@ check('two pictures in one paragraph stay a paragraph on a slide, as before', ()
   assert.match(blockSlideHtml('![A](a.png) ![B](b.png)', { pictureUrl }), /^<p>/)
   assert.match(blockSlideHtml('![A](a.png){width=50%} ![B](b.png)', { pictureUrl }), /^<p>/)
   assert.doesNotMatch(blockSlideHtml('![A](a.png){width=50%}', { pictureUrl }), /<p>/)
+})
+
+// ---- review of #774, round two
+
+check('Esc leaves a picture that is the last block: a gap cursor after it, never the picture again', () => {
+  const state = chooseFirst(docState('Before.\n\n![A](a.png)\n'))
+  const tr = leavePicture(state)!
+  assert.ok(tr.selection.empty, 'the picture is left')
+  assert.equal(chosenPicture(state.apply(tr)), null)
+})
+
+check('on a slide, a captioned picture with no crop shrinks under the height cap, never cut', () => {
+  const html = pictureMarkup('<img class="blk-pic" src="a.png" alt="A">', { caption: true }, { frameClass: 'blk-pic', caption: 'A' })
+  assert.match(html, /<span class="pic-box" style="display:block;position:relative;overflow:hidden">/)
+  assert.match(html, /<img style="display:block;width:auto;max-width:100%;max-height:310px;[^"]*height:auto"/)
+})
+
+check('a slide whose words open with ---, focus: …, --- keeps them as words', () => {
+  const words = '---\nfocus: what matters this week\n---\n# Title'
+  assert.equal(splitBlockSlide(words).header, null)
+  assert.equal(splitBlockSlide('---\npicture: left\nfocus: 30,60\n---\n# Title').header, 'picture: left\nfocus: 30,60')
 })
 
 // ---- Place on a slide: the same picture between the words and the slide-wide place

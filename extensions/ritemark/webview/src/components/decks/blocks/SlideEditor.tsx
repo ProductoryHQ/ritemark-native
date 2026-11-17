@@ -382,8 +382,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (!transaction.docChanged) flushHeld(updated)
       // The / menu's Picture goes where the / was, through whatever changes while the host saves it.
       if (transaction.docChanged && pictureAt.current !== null) pictureAt.current = transaction.mapping.map(pictureAt.current)
-      if (transaction.docChanged && replaceAt.current !== null) replaceAt.current = transaction.mapping.map(replaceAt.current)
-      if (transaction.docChanged && pendingReplace.current !== null) pendingReplace.current = transaction.mapping.map(pendingReplace.current)
+      // A picture deleted while its replacement is saved is no longer replaced (review of #774).
+      if (transaction.docChanged && replaceAt.current !== null) { const mapped = transaction.mapping.mapResult(replaceAt.current, 1); replaceAt.current = mapped.deleted ? null : mapped.pos }
+      if (transaction.docChanged && pendingReplace.current !== null) { const mapped = transaction.mapping.mapResult(pendingReplace.current, 1); pendingReplace.current = mapped.deleted ? null : mapped.pos }
       if (transaction.docChanged && lastCaret.current !== null) lastCaret.current = transaction.mapping.map(lastCaret.current)
     },
     // Leaving the slide writes what waited even with the menu still open (its query is words then, as typed): a slide

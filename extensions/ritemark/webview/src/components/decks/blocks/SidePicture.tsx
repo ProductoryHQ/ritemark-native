@@ -48,18 +48,25 @@ export function SidePicture(props: SidePictureProps) {
   const dragging = useRef(false)
   const [, redraw] = useState(0)
 
-  // Esc leaves the picture, Backspace or Delete removes it; a press outside it and its bar leaves it.
+  // The latest callbacks, so the listeners below are set once while the picture is chosen (review of #774).
+  const latest = useRef(props)
+  latest.current = props
+
+  // Esc leaves the picture, Backspace or Delete removes it; a press outside it and its bar leaves it. A key pressed in
+  // the bar's own layers (its Description, its menu) is theirs (review of #774).
   useEffect(() => {
     if (!chosen) return
     const keys = (event: KeyboardEvent) => {
-      const typing = (event.target as Element | null)?.closest?.('input, textarea, [contenteditable="true"]')
-      if (event.key === 'Escape') { event.preventDefault(); props.onLeave() }
-      else if ((event.key === 'Backspace' || event.key === 'Delete') && !typing && path) { event.preventDefault(); props.onRemove() }
+      const target = event.target as Element | null
+      if (target?.closest?.(OWN_LAYERS)) return
+      const typing = target?.closest?.('input, textarea, [contenteditable="true"]')
+      if (event.key === 'Escape') { event.preventDefault(); latest.current.onLeave() }
+      else if ((event.key === 'Backspace' || event.key === 'Delete') && !typing && latest.current.path) { event.preventDefault(); latest.current.onRemove() }
     }
     const press = (event: PointerEvent) => {
       const target = event.target as Element | null
       if (!target || ref.current?.contains(target) || target.closest(OWN_LAYERS)) return
-      props.onLeave()
+      latest.current.onLeave()
     }
     // The bar follows the picture as the window or the deck scrolls (review of #774).
     const again = () => redraw(count => count + 1)
@@ -73,7 +80,7 @@ export function SidePicture(props: SidePictureProps) {
       window.removeEventListener('resize', again)
       window.removeEventListener('scroll', again, true)
     }
-  })
+  }, [chosen])
 
   const written = readSideFocus(focus)
   const point = draft ?? written ?? { x: 50, y: 50 }
