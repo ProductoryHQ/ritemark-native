@@ -1,16 +1,29 @@
-/* Sprint 159 (PR 5; experience 17 frame 2): the wall. The slide at 16:9 on bands of #0E0C24; the bar, the go-to box
-   and the grid of all slides in Ritemark Dark (`.dark`), as drawn (present.html `.pbar`, `.goto`). */
+/* Sprint 159 (PR 5; experience 17 frame 2): the wall. The slide's words, boxes and logo in the 16:9 area, centred;
+   the bar, the go-to box and the grid of all slides in Ritemark Dark (`.dark`), as drawn (present.html `.pbar`, `.goto`).
+   Sprint 162 (step-3-themes.md, "No bands on the wall"; Jarmo, 17 November): no bands. The slide's ground is the
+   wall's own, on the whole screen (DeckWall's `wallGround`), so the slide's canvas is drawn without one, and its
+   picture Behind, Left or Right runs past the 16:9 area to the screen's edges on its side, by --wall-bleed-x and
+   --wall-bleed-y (`wallBleed`, in the canvas's own pixels), framed by its focus point as on the stage. */
 .deck-wall { position: fixed; inset: 0; overflow: hidden; background: #0E0C24; user-select: none; -webkit-user-select: none; }
 .deck-wall.is-idle, .deck-wall.is-idle * { cursor: none !important; }
 
-.wall-frame { position: absolute; overflow: hidden; }
+.wall-frame { position: absolute; overflow: visible; }
 .wall-slide { position: absolute; inset: 0; }
-/* Borderless: the words on white, the bands around them */
-.wall-slide.is-borderless { background: #fff; }
+.wall-slide .deck-slide, .wall-slide .deck-sl { overflow: visible; }
+.wall-slide .deck-sl { background: transparent; }
+.wall-slide .deck-sl.is-blocks .photo { top: calc(-1 * var(--wall-bleed-y, 0px)); bottom: calc(-1 * var(--wall-bleed-y, 0px)); }
+.wall-slide .deck-sl.is-blocks.pic-left .photo { left: calc(-1 * var(--wall-bleed-x, 0px)); width: calc(384px + var(--wall-bleed-x, 0px)); }
+.wall-slide .deck-sl.is-blocks.pic-right .photo { right: calc(-1 * var(--wall-bleed-x, 0px)); width: calc(384px + var(--wall-bleed-x, 0px)); }
+.wall-slide .deck-sl.is-blocks.pic-behind .photo { left: calc(-1 * var(--wall-bleed-x, 0px)); right: calc(-1 * var(--wall-bleed-x, 0px)); }
+.wall-slide .deck-sl.is-blocks.pic-behind .veil { inset: calc(-1 * var(--wall-bleed-y, 0px)) calc(-1 * var(--wall-bleed-x, 0px)); }
+/* A move: the slide before fades out as the next fades in, over the one ground (neither has a ground of its own). */
 .wall-slide.is-entering { animation: wall-fade-in 0.3s ease both; }
+.wall-slide.is-leaving { animation: wall-fade-out 0.3s ease both; }
 @keyframes wall-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .wall-slide.is-entering { animation: none; } }
+@keyframes wall-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .wall-slide.is-entering { animation: none; } .wall-slide.is-leaving { animation: none; visibility: hidden; } }
 .vscode-reduce-motion .wall-slide.is-entering { animation: none; }
+.vscode-reduce-motion .wall-slide.is-leaving { animation: none; visibility: hidden; }
 
 .wall-bar, .wall-goto { font-family: var(--ritemark-ui-font-family); color: #F8FAFC; }
 .wall-bar { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; height: 48px; padding: 0 6px; border-radius: 12px;

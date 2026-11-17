@@ -23,7 +23,7 @@ import { history, redo, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../src/editorSync/frontMatter'
 import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, deckCountLabel, parseTheme, themeEntries, themeKeyOf, themeOfEntry, themePathOf } from '../../../../src/decks/deckTheme'
-import { wallBand } from './theme/themeVars'
+import { themeVars, wallGround } from './theme/themeVars'
 import { DeckLibrary, type DeckFiles } from '../../../../src/decks/DeckLibrary'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { installTestDocument } from '../../utils/markdownFidelity'
@@ -187,17 +187,29 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.ok(sameValue({ present: false }, { present: false }) && !sameValue({ present: true, value: null }, { present: false }))
 }
 
-// ---- The wall's bands follow the theme (step-3-themes.md): the ground's darker end, its plain ground without soft
-// light, a Borderless deck's white. Evening's are its own darkest shade, not step 2's fixed #0E0C24.
+// ---- No bands on the wall (step-3-themes.md; Jarmo, 17 November): the wall's ground is the slide's own, on the whole
+// screen: the theme's soft light where it has one (so it is anchored to the screen's corner), its plain ground
+// without, a Borderless deck's white. The slide's canvas on the wall has no ground of its own, so no edge shows where
+// the 16:9 area ends, and a side picture runs to the screen's edges.
 {
-  assert.equal(wallBand(BUILT_IN_THEME, false), '#13153A')
-  assert.equal(wallBand(BUILT_IN_THEME, true), '#FFFFFF')
+  assert.equal(wallGround(BUILT_IN_THEME, false), themeVars(BUILT_IN_THEME, false).bg, 'the slide\'s own ground')
+  assert.match(wallGround(BUILT_IN_THEME, false), /^radial-gradient\(120% 95% at 88% 8%, /, 'Evening\'s soft light, from the corner')
+  assert.equal(wallGround(BUILT_IN_THEME, true), '#FFFFFF')
   const fern = parseTheme(FERN_TEXT)
-  assert.match(wallBand(fern, false), /^#[0-9A-F]{6}$/)
-  assert.notEqual(wallBand(fern, false), fern.bg, 'the darker end of its soft light')
-  assert.equal(wallBand(parseTheme(PAPER_TEXT), false), '#FAF7F0', 'no soft light: its ground')
+  assert.match(wallGround(fern, false), /^radial-gradient\(/)
+  assert.ok(wallGround(fern, false).includes(fern.bg), 'its own ground in the soft light')
+  assert.equal(wallGround(parseTheme(PAPER_TEXT), false), '#FAF7F0', 'no soft light: its ground')
   const wall = readFileSync(fileURLToPath(new URL('./present/DeckWall.tsx', import.meta.url)), 'utf8')
-  assert.match(wall, /style=\{\{ background: wallBand\(state\.theme, state\.borderless\) \}\}/)
+  assert.match(wall, /style=\{\{ background: wallGround\(state\.theme, state\.borderless\) \}\}/)
+  assert.match(wall, /'--wall-bleed-x': `\$\{bleed\.x\}px`, '--wall-bleed-y': `\$\{bleed\.y\}px`/, 'the frame says how far to run')
+  const css = readFileSync(fileURLToPath(new URL('./present/wall.css', import.meta.url)), 'utf8')
+  assert.match(css, /\.wall-slide \.deck-sl \{ background: transparent; \}/, 'no ground inside the 16:9 area')
+  assert.match(css, /\.wall-frame \{ position: absolute; overflow: visible; \}/, 'nothing clipped at the 16:9 edge')
+  for (const side of ['left', 'right', 'behind']) {
+    assert.match(css, new RegExp(`\\.pic-${side} \\.photo \\{[^}]*var\\(--wall-bleed-x`), `a ${side} picture runs to its edge`)
+  }
+  assert.match(css, /\.is-blocks \.photo \{ top: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); bottom: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); \}/, 'and to the top and bottom')
+  assert.match(css, /\.wall-slide\.is-leaving \{ animation: wall-fade-out/, 'the slide before fades out over the one ground')
 }
 
 // ---- When the bar is short of room, what gives way, in order: the Theme button's name, Publish's word, the notice's
