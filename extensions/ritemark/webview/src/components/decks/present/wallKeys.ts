@@ -6,6 +6,9 @@
  *
  * Typing a number opens the go-to box: "4 · Go to <title> ↵". Return goes there; Esc, or a pause (the wall's timer),
  * closes it; Backspace takes a digit back. Any other key closes the box and then does what it does.
+ *
+ * Small details (decks README, item 1, 17 November): B or "." blanks the wall to the theme's ground, W to white; while
+ * it is blank any key brings the slide back, and that key does nothing else (`blankKeyOf`).
  */
 
 export type WallKey =
@@ -46,6 +49,36 @@ export function wallKeyOf(event: KeyInput): WallKey | null {
       return { type: 'stop' }
     default:
       return /^[0-9]$/.test(event.key) ? { type: 'digit', digit: event.key } : null
+  }
+}
+
+/** What the wall shows instead of the slide: the theme's ground (white on Borderless), or white. */
+export type WallBlank = 'ground' | 'white'
+
+/** What a key does to a blank wall, or to one that isn't. */
+export type BlankStep = { type: 'blank'; to: WallBlank } | { type: 'show' }
+
+/** Keys that are only held with another: pressed alone, they never bring the slide back. */
+const HELD_KEYS = new Set(['Shift', 'Meta', 'Control', 'Alt', 'AltGraph', 'CapsLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'OS', 'NumLock', 'ScrollLock', 'Dead'])
+
+/**
+ * B or "." blanks the wall to the theme's ground, W to white (a clicker's blank button sends B or "."). While the wall
+ * is blank, any key brings the slide back (Esc, a digit and → too), and that key does nothing else. A key with ⌘, Ctrl
+ * or ⌥ is still the app's. Null: the key is not about blanking, and does what it does.
+ */
+export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null
+  if (blank !== null) return HELD_KEYS.has(event.key) ? null : { type: 'show' }
+  switch (event.key) {
+    case 'b':
+    case 'B':
+    case '.':
+      return { type: 'blank', to: 'ground' }
+    case 'w':
+    case 'W':
+      return { type: 'blank', to: 'white' }
+    default:
+      return null
   }
 }
 
@@ -127,4 +160,25 @@ export function clockText(ms: number): string {
   const minutes = Math.floor((total % 3600) / 60)
   const seconds = String(total % 60).padStart(2, '0')
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${seconds}` : `${minutes}:${seconds}`
+}
+
+/** The system's clock: its locale, and its 12- or 24-hour choice when the system makes one (`systemClock.ts`). */
+export interface ClockLocaleInput {
+  locale: string | null
+  hourCycle: 'h12' | 'h23' | null
+}
+
+/**
+ * The presenter view's time of day, hours and minutes in the locale's own format ("14:05", "2:05 PM"), with the
+ * system's 12- or 24-hour choice over the locale's when it has one. A locale the webview can't read falls back to its
+ * own.
+ */
+export function timeOfDayText(date: Date, clock: ClockLocaleInput | null): string {
+  const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
+  if (clock?.hourCycle) options.hourCycle = clock.hourCycle
+  try {
+    return new Intl.DateTimeFormat(clock?.locale ?? undefined, options).format(date)
+  } catch {
+    return new Intl.DateTimeFormat(undefined, options).format(date)
+  }
 }

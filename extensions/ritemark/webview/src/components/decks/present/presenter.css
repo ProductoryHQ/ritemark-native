@@ -55,6 +55,13 @@
 .pv-time { font-size: 32px; font-weight: 600; line-height: 40px; color: #F8FAFC; font-variant-numeric: tabular-nums; }
 .pv-of { font-size: 15px; font-weight: 500; color: #C7D2FE; }
 .pv-grow { flex: 1; }
+/* The time of day, small, beside the elapsed time (decks README, small details item 2). */
+.pv-daytime { padding: 0 14px 0 12px; border-left: 1px solid rgba(248, 250, 252, 0.22); font-size: 15px; font-weight: 500; line-height: 24px; color: #C7D2FE; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The wall is blank: Now shows the room's blank, the slide faint under it, and says so. */
+.pv-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; }
+.pv-blank-ground { position: absolute; inset: 0; border-radius: 8px; opacity: 0.9; }
+.pv-blank-words { position: relative; }
+.pv-blank-words { padding: 0 18px; height: 44px; border-radius: 12px; background: #1E1B4B; box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.45); font-size: 15px; font-weight: 500; line-height: 44px; color: #F8FAFC; white-space: nowrap; }
 .pv-count { margin-right: 4px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
 
 .pv-goto { position: absolute; z-index: 2; top: 24px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; max-width: calc(100% - 48px); height: 52px; padding: 0 18px 0 8px; border-radius: 12px;

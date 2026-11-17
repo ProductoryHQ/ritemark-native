@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/wallKeys.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
+import { blankKeyOf, clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, timeOfDayText, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
 
 // ---- On, back, the ends, stop
 for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter']) assert.deepEqual(wallKeyOf({ key }), { type: 'next' }, key)
@@ -64,5 +64,59 @@ assert.equal(clockText(0), '0:00')
 assert.equal(clockText(-500), '0:00')
 assert.equal(clockText(760_000), '12:40', 'the drawing\'s 12:40')
 assert.equal(clockText(3_725_000), '1:02:05')
+
+// ---- A clicker (small details, item 1): Page Down and Page Up step as → and ← do, on the wall and in the presenter view
+assert.deepEqual(wallKeyOf({ key: 'PageDown' }), wallKeyOf({ key: 'ArrowRight' }), "a clicker's forward is →")
+assert.deepEqual(wallKeyOf({ key: 'PageUp' }), wallKeyOf({ key: 'ArrowLeft' }), "a clicker's back is ←")
+
+// ---- B or "." blanks the wall to the theme's ground, W to white
+for (const key of ['b', 'B', '.']) assert.deepEqual(blankKeyOf({ key }, null), { type: 'blank', to: 'ground' }, key)
+for (const key of ['w', 'W']) assert.deepEqual(blankKeyOf({ key }, null), { type: 'blank', to: 'white' }, key)
+for (const key of ['ArrowRight', 'PageDown', ' ', 'Enter', 'Escape', '4', 'a', 'Shift']) assert.equal(blankKeyOf({ key }, null), null, `${key} is not a blank key`)
+assert.equal(blankKeyOf({ key: 'b', metaKey: true }, null), null, "⌘B is the app's")
+assert.equal(blankKeyOf({ key: 'w', metaKey: true }, null), null, '⌘W closes the window, never blanks')
+assert.equal(blankKeyOf({ key: '.', ctrlKey: true }, null), null)
+// While blank, any key brings the slide back and does nothing else: never a step, a stop or the go-to box.
+for (const blank of ['ground', 'white'] as const) {
+  for (const key of ['b', 'B', '.', 'w', 'W', 'ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp', ' ', 'Enter', 'Escape', 'Home', 'End', '4', 'x', 'F5']) {
+    assert.deepEqual(blankKeyOf({ key }, blank), { type: 'show' }, `${key} on a ${blank} wall shows the slide`)
+  }
+  for (const key of ['Shift', 'Meta', 'Control', 'Alt', 'CapsLock']) assert.equal(blankKeyOf({ key }, blank), null, `${key} alone does nothing`)
+  assert.equal(blankKeyOf({ key: 'q', metaKey: true }, blank), null, "⌘Q is still the app's")
+}
+// The wall and the presenter view ask blankKeyOf first, and a key it takes goes no further: this is their order.
+{
+  const route = (key: string, blank: 'ground' | 'white' | null) => {
+    const step = blankKeyOf({ key }, blank)
+    if (step) return step
+    if (goToKey(null, { key }).handled) return 'go-to box'
+    return wallKeyOf({ key })
+  }
+  assert.deepEqual(route('ArrowRight', 'ground'), { type: 'show' }, '→ on a blank wall does not also step')
+  assert.deepEqual(route('PageDown', 'white'), { type: 'show' }, 'a clicker on a blank wall does not also step')
+  assert.deepEqual(route('Escape', 'ground'), { type: 'show' }, 'Esc on a blank wall does not stop')
+  assert.deepEqual(route('4', 'ground'), { type: 'show' }, 'a digit on a blank wall does not open the box')
+  assert.deepEqual(route('PageDown', null), { type: 'next' }, 'on the slide, Page Down steps')
+  assert.equal(route('4', null), 'go-to box')
+}
+
+// ---- The time of day, in the locale's own format and the system's 12- or 24-hour choice
+{
+  const afternoon = new Date(2026, 10, 17, 14, 5)
+  const morning = new Date(2026, 10, 17, 9, 5)
+  // A 12-hour locale (ICU's space before PM may be a narrow no-break space).
+  assert.match(timeOfDayText(afternoon, { locale: 'en-US', hourCycle: null }), /^2:05\sPM$/u)
+  assert.match(timeOfDayText(morning, { locale: 'en-US', hourCycle: null }), /^9:05\sAM$/u)
+  // A 24-hour locale.
+  assert.equal(timeOfDayText(afternoon, { locale: 'et-EE', hourCycle: null }), '14:05')
+  assert.equal(timeOfDayText(afternoon, { locale: 'de-DE', hourCycle: null }), '14:05')
+  // The system's switch over the locale's own: 24-hour English, 12-hour British.
+  assert.equal(timeOfDayText(afternoon, { locale: 'en-US', hourCycle: 'h23' }), '14:05')
+  assert.match(timeOfDayText(afternoon, { locale: 'en-GB', hourCycle: 'h12' }), /^2:05\s?pm$/iu)
+  // A tag the webview can't read falls back to its own format; no clock yet is its own format too.
+  const own = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(afternoon)
+  assert.equal(timeOfDayText(afternoon, { locale: 'not a locale!', hourCycle: null }), own)
+  assert.equal(timeOfDayText(afternoon, null), own)
+}
 
 console.log('wallKeys: all tests passed')

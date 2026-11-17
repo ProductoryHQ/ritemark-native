@@ -208,6 +208,34 @@ async function main(): Promise<void> {
     assert.equal(reopened.length, 1, 'one presenter view again');
     assert.equal((last(reopened[0], 'present/presenter').current as { title: string }).title, (last(wall, 'present/wall').slide as { title: string }).title);
 
+    // Small details, item 1 (17 November): B, "." or W blanks the wall, and the presenter view says so; the slide
+    // comes back with the webview's next key (`to` null), and a move from a button or the row brings it back too.
+    const presenterView = reopened[0];
+    const onWallNow = (last(wall, 'present/wall').slide as { title: string }).title;
+    presenterView.send({ type: 'present/blank', to: 'white' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').blank, 'white');
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, onWallNow, 'blanking is not a move');
+    assert.equal(last(presenterView, 'present/presenter').blank, 'white', 'the presenter view knows the wall is blank');
+    wall.send({ type: 'present/blank', to: null });
+    await settle();
+    assert.equal(last(wall, 'present/wall').blank, null);
+    assert.equal(last(presenterView, 'present/presenter').blank, null);
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, onWallNow, 'the key that brings it back does not step');
+    wall.send({ type: 'present/blank', to: 'ground' });
+    await settle();
+    assert.equal(last(presenterView, 'present/presenter').blank, 'ground');
+    presenterView.send({ type: 'present/go', number: 1 });
+    await settle();
+    assert.equal(last(wall, 'present/wall').blank, null, 'a move brings the slide back');
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, 'Zero');
+    wall.send({ type: 'present/blank', to: 'black' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').blank, null, 'an unknown colour is not a request');
+    // The presenter view's clock: the system's locale, never missing.
+    const clockSent = last(presenterView, 'present/presenter').clock as { locale: unknown; hourCycle: unknown };
+    assert.ok(clockSent && 'locale' in clockSent && 'hourCycle' in clockSent);
+
     presenter.dispose();
     await settle();
     assert.ok(panels.every(panel => panel.disposed), 'Stop closes both');
