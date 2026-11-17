@@ -76,6 +76,10 @@
    The deck view sets the top and the height of each. */
 .deck-stage.is-above { bottom: auto; align-items: center; }
 .deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
+/* Slide only: the slide fills the room and sits in its middle, both ways (Jarmo, 17 November). The 16 above and under
+   it are the 32 `fullSlideWidthFor` keeps, as above. */
+.deck-stage.is-alone { align-items: center; }
+.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
@@ -386,15 +390,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    closes, and while the field is open, empty, the default word shows faint as its placeholder. */
 .deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover, .deck-sl.is-blocks.is-editing .blk-pill.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
 .deck-sl.is-blocks.is-editing .blk-pill.is-pickable { cursor: text; }
-/* 17 November: the empty place shows only on the box being edited (the caret's, `is-caret`), never on every box. It
-   sits on the box's top edge, over its corner, so it takes no room: the box, the slide's fit and the thumbnail stay as
-   they are while the caret moves from box to box. */
+/* The empty place is never drawn on the slide: the caret's box shows the icon handle instead, the ⋮'s and the +'s
+   size, over its top edge at the right, in the handles' layer (`deck-block-icon`; the lead's follow-up to #773). It
+   takes no room: the box, the slide's fit and the thumbnail stay as they are while the caret moves from box to box. */
 .deck-sl.is-blocks.is-editing .blk-box { position: relative; }
 .deck-sl.is-blocks.is-editing .blk-icon.is-place { display: none; }
-.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place { display: grid; position: absolute; top: -13px; right: 12px; z-index: 1; width: 26px; height: 26px; margin: 0; background: var(--s-nm, #1C1F4A); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.28)); color: var(--s-ph, rgba(255,255,255,.6)); }
-.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place svg { width: 14px; height: 14px; }
-.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place { background: var(--s-nm, #fff); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); color: var(--s-ph, rgba(28,31,74,.45)); }
-.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place:hover { box-shadow: inset 0 0 0 1.5px var(--s-foc, rgba(242,181,68,.7)); }
 .deck-pill-field::placeholder { color: inherit; opacity: .45; }
 /* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
    (the app run: an empty column had none, and was invisible). */
@@ -405,10 +405,14 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-block-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .deck-block-layer > * { pointer-events: auto; }
 .deck-block-ring { position: absolute; z-index: 3; border-radius: 8px; box-shadow: 0 0 0 2px var(--r-accent); pointer-events: none; }
-.deck-slide .deck-block-grip { position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, .3); cursor: grab; touch-action: none; }
+/* Each handle sits in a box of its own at its place, its tooltip's trigger inside it (the trigger had no size while the
+   button was absolute, so the tooltips opened at the layer's corner). */
+.deck-block-at { position: absolute; display: flex; }
+.deck-slide .deck-block-grip { position: relative; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, .3); cursor: grab; touch-action: none; }
 .deck-slide .deck-block-grip:active { cursor: grabbing; }
-.deck-slide .deck-block-plus { position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
-.deck-slide .deck-block-split { position: absolute; z-index: 4; width: 12px; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: col-resize; touch-action: none; }
+.deck-slide .deck-block-plus { position: relative; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
+.deck-slide .deck-block-icon { position: relative; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
+.deck-slide .deck-block-split { position: relative; width: 12px; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: col-resize; touch-action: none; }
 .deck-slide .deck-block-split::after { content: ''; position: absolute; left: 5px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--r-accent); opacity: .45; }
 .deck-slide .deck-block-split:hover::after { opacity: 1; }
 .deck-block-drop { position: absolute; z-index: 6; height: 2px; border-radius: 1px; background: var(--r-accent); pointer-events: none; }
