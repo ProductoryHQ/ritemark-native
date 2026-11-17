@@ -8,6 +8,7 @@ import { isEnabled } from '../features';
 import { DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
+import { ThemePages } from './themePages';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
 import { DeckPublisher } from './deckPublish';
 import { DeckPresenter } from './present/DeckPresenter';
@@ -25,6 +26,8 @@ import * as path from 'path';
 
 export interface DecksHost {
   pages: DeckPages;
+  /** Sprint 162 PR 2: a theme file in its own tab. */
+  themes: ThemePages;
   /** Publish on the deck's bar (Sprint 159 PR 4): connected to 2.2's Publish once that is composed. */
   publisher: DeckPublisher;
   /** The project's Slide library and decks, or null without a project folder on disk. */
@@ -58,6 +61,9 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   };
   const publisher = new DeckPublisher(context.extensionPath);
   const pages = new DeckPages(library, publisher);
+  // Sprint 162 PR 2: the theme's tab, and the Theme menu's Edit <Name> and New theme… that open it
+  const themes = new ThemePages(library, pages);
+  pages.themeEditor = { open: (deck, themePath) => themes.open(deck, themePath), make: (deck, request) => themes.make(deck, request) };
   // The handout's start card (16 November, frame 20) on the decks New made
   const fresh = freshDeckMarks(context.workspaceState, FRESH_DECKS, MAX_FRESH_DECKS);
   pages.startCard = startCardHost(pages, options, fresh);
@@ -82,6 +88,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   context.subscriptions.push(
     publisher,
     pages,
+    themes,
     presenter,
     view,
     vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
@@ -98,7 +105,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
       if (isEnabled('decks')) void rebaseMovedDecks(event.files).catch(error => console.warn('[Decks] Could not follow a move:', error));
     }),
   );
-  return { pages, publisher, library };
+  return { pages, themes, publisher, library };
 }
 
 /** The day a deck was last changed, as the start card shows it: "15 Nov 2026". */

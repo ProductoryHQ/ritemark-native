@@ -114,9 +114,8 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
     assert.deepEqual(decodeWallRequest({ type }), { type });
     assert.equal(decodeWallRequest({ type, extra: 1 }), null);
   }
-  assert.deepEqual(decodeWallRequest({ type: 'present/focus', fullScreen: false }), { type: 'present/focus', fullScreen: false });
-  assert.equal(decodeWallRequest({ type: 'present/focus' }), null);
-  assert.equal(decodeWallRequest({ type: 'present/focus', fullScreen: 'no' }), null);
+  // The focus check of the path without the shell's commands is gone with that path (17 November).
+  assert.equal(decodeWallRequest({ type: 'present/focus', fullScreen: false }), null);
   assert.deepEqual(decodeWallRequest({ type: 'present/go', number: 4 }), { type: 'present/go', number: 4 });
   assert.deepEqual(decodeWallRequest({ type: 'present/peek', number: 12 }), { type: 'present/peek', number: 12 });
   assert.equal(decodeWallRequest({ type: 'present/go' }), null);

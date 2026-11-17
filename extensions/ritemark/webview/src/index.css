@@ -34,6 +34,9 @@
   summary,
   select,
   input[type="radio"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  label:has(input:is([type="checkbox"], [type="radio"]):not(:disabled)),
+  label:has([role="switch"]:not(:disabled)),
   img.is-diagram
 ) {
   cursor: pointer;

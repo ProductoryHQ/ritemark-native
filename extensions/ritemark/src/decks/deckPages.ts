@@ -18,7 +18,7 @@ import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
-import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, themeEntries, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
@@ -90,6 +90,11 @@ export class DeckPages implements vscode.Disposable {
     /** Draft and the copy: true when the card is gone (the row was used), false when it stays (nothing was done). */
     draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
     copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
+  } | null = null;
+  /** Sprint 162 PR 2: the theme's tab, for the Theme menu's Edit <Name> and New theme… (set once at activation). */
+  themeEditor: {
+    open: (deck: vscode.TextDocument, themePath: string) => Promise<void>;
+    make: (deck: vscode.TextDocument, request: { name: string; start: 'copy' | 'paper' | 'ember'; use: boolean }) => Promise<{ ok: true; path: string; name: string } | { ok: false; problem: string }>;
   } | null = null;
 
   /**
@@ -208,6 +213,44 @@ export class DeckPages implements vscode.Disposable {
     };
   }
 
+  /** Sprint 162 PR 2: the open deck view of `fsPath` that reads as a deck, if there is one. */
+  private openViewOf(fsPath: string): DeckView | undefined {
+    const key = path.normalize(fsPath).toLowerCase();
+    return [...this.views].find(view => path.normalize(view.document.uri.fsPath).toLowerCase() === key && this.deckModeFor(view.document, true));
+  }
+
+  /** Sprint 162 PR 2: is the deck at `fsPath` open in a deck view (Save as a new theme… can put the new theme in it)? */
+  hasView(fsPath: string): boolean {
+    return !!this.openViewOf(fsPath);
+  }
+
+  /**
+   * Sprint 162 PR 2: the deck at `fsPath` uses the theme at `themePath` now. Its open view writes the `theme:` line, as
+   * a pick from the Theme menu (one step of its Undo, and the bar says so). False when no view of it is open.
+   */
+  useTheme(fsPath: string, themePath: string, name: string): boolean {
+    const view = this.openViewOf(fsPath);
+    if (!view) return false;
+    void this.post(view.panel.webview, { type: 'deck/use-theme', path: themePath, name });
+    return true;
+  }
+
+  /**
+   * Sprint 162 PR 2: the theme file at this project path was written, made or removed (the theme's Save, an AI, another
+   * program): each open deck that reads it draws its theme again, read from the file as it is now, so the decks that use
+   * it follow at once. A deck reads the file its `theme:` line names, and Evening's file when that one isn't there, so
+   * a change of Evening's file reaches every deck; any other only the decks naming it.
+   */
+  async themeFilesChanged(changed: string): Promise<void> {
+    const key = pathKey;
+    const evening = key(changed) === key(BUILT_IN_THEME_PATH);
+    await Promise.all([...this.views].map(async view => {
+      const named = themePathOf(frontMatterField(view.document.getText().replace(/^﻿/, ''), 'theme'));
+      if (!evening && key(named) !== key(changed)) return;
+      await this.post(view.panel.webview, { type: 'deck/theme', path: named, text: await readTheme(view.document, named) });
+    }));
+  }
+
   /** The active deck's text and the ids it holds (for new copies' ids). */
   activeDocument(): vscode.TextDocument | null {
     return this.activeView()?.document ?? null;
@@ -319,6 +362,24 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/themes':
         await this.post(webview, { type: 'deck/themes', themes: await this.themesFor(document) });
         return;
+      // Sprint 162 PR 2: Edit <Name> and New theme… open the theme's tab; only with the flag on, as the tab opens then.
+      case 'deck/edit-theme':
+        if (isEnabled('decks')) await this.themeEditor?.open(document, request.path);
+        return;
+      case 'deck/new-theme': {
+        let made: { ok: true; path: string; name: string } | { ok: false; problem: string };
+        try {
+          made = this.themeEditor && isEnabled('decks')
+            ? await this.themeEditor.make(document, { name: request.name, start: request.start, use: request.use })
+            : { ok: false, problem: 'Themes are off while Decks are turned off in Settings.' };
+        } catch (error) {
+          // The sheet always gets an answer: it never stays waiting.
+          console.warn('[Decks] New theme failed:', error);
+          made = { ok: false, problem: 'The theme could not be made.' };
+        }
+        await this.post(webview, made.ok ? { type: 'deck/new-theme', ok: true, path: made.path, name: made.name } : { type: 'deck/new-theme', ok: false, problem: made.problem });
+        return;
+      }
       case 'deck/save-image':
         await this.post(webview, await savePicture(document, webview, request.slideId, request.dataUrl, request.filename));
         return;

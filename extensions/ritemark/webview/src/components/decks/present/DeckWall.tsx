@@ -1,20 +1,25 @@
 /**
  * Sprint 159 (PR 5; experience 17 frame 2): the wall, the room's screen while a deck is presented.
  *
- * Only the slide, at 16:9 and as large as fits, with bands on other screen shapes in the theme's ground (`wallBand`). A Card deck shows its
- * card; a Borderless deck its words on white. It is drawn by the deck view's own `SlideCanvas`, so a slide looks the
- * same on the stage and on the wall. Nothing of Ritemark is on it.
+ * Only the slide. Its words, boxes and logo stay in the 16:9 area, as large as fits and centred, so a deck looks the
+ * same on a 16:9 projector and in the editor; its ground runs to the screen's edges on any other shape (step-3-themes.md,
+ * "No bands on the wall"; Jarmo, 17 November). A Card deck's ground, its colour and soft light, is drawn on the whole
+ * screen (`wallGround`), so the soft light is anchored to the screen's corner and no edge shows where the 16:9 area
+ * ends; a picture Behind, Left or Right runs to the screen's edges on its side (`wallBleed`, wall.css). A Borderless
+ * deck is white to the edges. It is drawn by the deck view's own `SlideCanvas`, so a slide looks the same on the stage
+ * and on the wall. Nothing of Ritemark is on it.
  *
  *  - The keys (`wallKeys.ts`); a click goes on.
  *  - The bar shows when the pointer moves and fades after 2 s: back, n of N, next, all slides, "esc to stop". The
  *    pointer hides with it.
  *  - Typing a number opens the go-to box at the top: "4 · Go to <title> ↵". The host names the slide (`present/peek`).
  *  - All slides: a grid of the slides shown; a click (or Return) goes there.
- *  - One 0.3 s fade between slides, none with reduced motion.
+ *  - One 0.3 s fade between slides, the one before fading out as the next fades in (the ground under both stays), none
+ *    with reduced motion.
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WallSlide, WallState } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
@@ -22,8 +27,9 @@ import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
-import { wallBand } from '../theme/themeVars'
-import { countLabel, goToKey, wallKeyOf, wallSlideSize } from './wallKeys'
+import { CANVAS_WIDTH } from '../slide/layoutSlide'
+import { wallGround } from '../theme/themeVars'
+import { countLabel, goToKey, wallBleed, wallKeyOf, wallSlideSize } from './wallKeys'
 import '../decks.css'
 import './wall.css'
 
@@ -53,8 +59,10 @@ function useScreenSize(): { width: number; height: number } {
 
 export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
-  // The slide before the last move, kept under the new one while it fades in.
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number } | null>(null)
+  // The slide before the last move, fading out as the new one fades in, from the opacity it had (a move during a
+  // fade takes the half-shown slide out from where it was, never from full, so nothing flashes).
+  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; from: number } | null>(null)
+  const enteringRef = useRef<HTMLDivElement | null>(null)
   const [serial, setSerial] = useState(0)
   const [barShown, setBarShown] = useState(false)
   const [overBar, setOverBar] = useState(false)
@@ -67,6 +75,12 @@ export function DeckWall() {
   const barTimer = useRef<number | null>(null)
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
+  const bleed = wallBleed(frame, CANVAS_WIDTH)
+
+  // The ground, worked out once per theme and look (the wall draws again at every pointer move).
+  const theme = state?.theme
+  const borderless = state?.borderless ?? false
+  const ground = useMemo(() => (theme ? wallGround(theme, borderless) : ''), [theme, borderless])
 
   usePageDrawn(state !== null)
 
@@ -76,8 +90,10 @@ export function DeckWall() {
       const next = message as unknown as WallState
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
+        const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
+        const from = Number.isFinite(shown) ? shown : 1
         setSerial(value => value + 1)
-        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1 }))
+        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1, from }))
       }
       setState(next)
       return
@@ -85,11 +101,6 @@ export function DeckWall() {
     if (message.type === 'present/peeked' && typeof message.number === 'number') {
       setPeeked({ number: message.number, title: typeof message.title === 'string' ? message.title : null })
       return
-    }
-    // After the move into its own window, the host asks until this window has the focus, then makes it full screen
-    // (a toggle, so it is told whether the window fills its screen already).
-    if (message.type === 'present/focus-check' && document.hasFocus()) {
-      sendToExtension('present/focus', { fullScreen: window.outerWidth >= window.screen.width && window.outerHeight >= window.screen.height })
     }
   }), [])
 
@@ -192,8 +203,13 @@ export function DeckWall() {
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
 
-  const layer = (slide: WallSlide, className: string, key: string) => (
-    <div key={key} className={`wall-slide ${className}${state.borderless ? ' is-borderless' : ''}`}>
+  const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
+    <div
+      key={key}
+      ref={from === undefined ? enteringRef : undefined}
+      className={`wall-slide ${className}`}
+      style={from === undefined ? undefined : ({ '--wall-fade-from': from } as CSSProperties)}
+    >
       <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} />
     </div>
   )
@@ -201,13 +217,18 @@ export function DeckWall() {
   return (
     <div
       className={`deck-wall${barVisible || gridOpen ? '' : ' is-idle'}`}
-      // Sprint 162: the bands follow the deck's theme (its ground's darker end; a Borderless deck's white).
-      style={{ background: wallBand(state.theme, state.borderless) }}
+      // The slide's ground on the whole screen: no band, no edge where the 16:9 area ends (a Borderless deck's white).
+      style={{ background: ground }}
       onPointerMove={showBar}
       onClick={onWallClick}
     >
-      <div className="wall-frame" style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height }} aria-live="polite" aria-label={`Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}>
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`) : null}
+      <div
+        className="wall-frame"
+        style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height, '--wall-bleed-x': `${bleed.x}px`, '--wall-bleed-y': `${bleed.y}px` } as CSSProperties}
+        aria-live="polite"
+        aria-label={`Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
+      >
+        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
       </div>
 
