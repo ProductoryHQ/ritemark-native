@@ -952,9 +952,9 @@ export function isTextHandout(text: string): boolean {
 export const OPEN_IN_KEY = 'open-in';
 export const OPEN_IN_NONE = 'none';
 
-/** Does this deck turn the page's "Open in" links off (`open-in: none`)? */
+/** Does this deck turn the page's "Open in" links off (`open-in: none`)? Read as `isTextHandout` reads its mark. */
 export function isOpenInOff(text: string): boolean {
-  return (frontMatterField(text.replace(/^\uFEFF/, ''), OPEN_IN_KEY) ?? '').trim().toLowerCase() === OPEN_IN_NONE;
+  return frontMatterField(text.replace(/^\uFEFF/, ''), OPEN_IN_KEY) === OPEN_IN_NONE;
 }
 
 /** The deck's text with `handout: text` in its front matter (a front matter made when it has none); else as it was. */

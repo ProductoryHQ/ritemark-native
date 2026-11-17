@@ -179,7 +179,7 @@ class HandoutRenderer extends marked.Renderer {
     const words = code.replace(/\n$/, '');
     // Copy first, then the "Open in" links (left out for a deck with `open-in: none`, or a prompt too long for an address).
     const links = this.openIn && words.trim() ? openInAddresses(words) : [];
-    const open = links.map(link => `<a class="open" href="${esc(link.href)}" target="_blank" rel="noopener noreferrer" aria-label="Open the prompt in ${link.label}, in a new tab">Open in ${link.label}</a>`).join('');
+    const open = links.map(link => `<a class="open" href="${esc(link.href)}" target="_blank" rel="noopener noreferrer" aria-label="Open in ${link.label}, in a new tab">Open in ${link.label}</a>`).join('');
     return `<div class="prompt${links.length ? ' ai' : ''}"><pre><code>${esc(words)}</code></pre>`
       + `<button class="copy" type="button" aria-label="Copy the prompt"><span class="c1">${iconSvg('copy', 14)}Copy</span><span class="c2">${iconSvg('check', 14)}Copied</span></button>${open}</div>\n`;
   }

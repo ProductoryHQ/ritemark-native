@@ -99,6 +99,8 @@ for (const prompt of prompts) {
   const links = prompt.querySelectorAll('a.open');
   assert.deepEqual(links.map(link => link.getAttribute('target')), ['_blank', '_blank']);
   assert.deepEqual(links.map(link => link.getAttribute('rel')), ['noopener noreferrer', 'noopener noreferrer']);
+  // The accessible name starts with the visible words (WCAG 2.5.3), so "click Open in Claude" finds it.
+  assert.deepEqual(links.map(link => link.getAttribute('aria-label')), ['Open in Claude, in a new tab', 'Open in ChatGPT, in a new tab']);
   const hrefs = links.map(link => link.getAttribute('href')!.replace(/&amp;/g, '&').replace(/&#39;/g, "'"));
   assert.deepEqual(hrefs, [`https://claude.ai/new?q=${encodeURIComponent(words)}`, `https://chatgpt.com/?q=${encodeURIComponent(words)}`]);
 }
@@ -390,7 +392,7 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
     'Before the first slide.', '', '```', 'A prompt before the slides', '```', '',
     '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '', '## Welcome', '', '```', 'Help me write instructions.', '```', '',
   ].join('\n');
-  for (const front of ['open-in: none', 'open-in: None', 'open-in: "none"', 'open-in:  none  ']) {
+  for (const front of ['open-in: none', 'open-in: "none"', 'open-in:  none  ']) {
     const off = publicDeck(text(front), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
     assert.equal(off.openInOff, true, front);
     const bytes = pageHtml(off, assets, { digest: deckDigest(off), pictureUrl });
@@ -401,7 +403,8 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
     assert.ok(!/claude\.ai|chatgpt\.com|open-in/.test(bytes), 'neither address, nor the line, is on the page');
   }
   // Without the line, or with any other value, both prompts have them, and the deck's digest is as it was.
-  for (const front of ['', 'open-in: all', 'open-in:']) {
+  // Read as `handout: text` is read: exactly `none` (quoted or padded), so `None` is not it.
+  for (const front of ['', 'open-in: all', 'open-in:', 'open-in: None']) {
     const on = publicDeck(text(front), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
     assert.equal(on.openInOff, undefined, front);
     assert.equal(parse(pageHtml(on, assets, { digest: deckDigest(on), pictureUrl })).querySelectorAll('a.open').length, 4, front);
