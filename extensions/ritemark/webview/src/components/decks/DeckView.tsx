@@ -33,6 +33,9 @@ import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMa
 import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
+import { getUniqueImageFilename, readFileAsBase64 } from '../../lib/pastedImage'
+import { insertPictureSlides, newSlideIds, pictureTitleOf, type SavedPicture } from './stripPictures'
+import { COPY_FAILED_NOTE, copiedNote, copySlidePicture } from './slidePicture'
 import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
@@ -115,6 +118,13 @@ const UPDATED_MS = 4000
 const START_CARD_GAP = 8
 
 /** A notice in the deck's bar, with one action (Undo) when it has one. */
+/** Item 8: one drop of pictures on the strip, before part `at`; each picture's saved path (null: not saved) by its slide id. */
+interface PictureDrop {
+  at: number
+  pictures: Array<{ id: string; title: string }>
+  paths: Map<string, string | null>
+}
+
 interface Notice {
   text: string
   action?: { label: string; tip: string; run: () => void }
@@ -329,6 +339,9 @@ export function DeckView({
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
   // November it was chosen in the Slide settings popover; since Sprint 162 in the Theme menu on the bar (ThemeMenu).
   const borderless = properties.look === 'borderless'
+  // Copy as picture draws the slide in the look the strip shows, read when it is asked for.
+  const lookRef = useRef({ theme, borderless, assets, missing: missingPictures })
+  lookRef.current = { theme, borderless, assets, missing: missingPictures }
   // The deck's front matter as last written from here: a pick, its Undo and its Redo each change it from what it is now.
   const propertiesRef = useRef(properties)
   propertiesRef.current = properties
@@ -732,6 +745,8 @@ export function DeckView({
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
+  const pickRef = useRef(pick)
+  pickRef.current = pick
 
   // Sprint 161: the comments on the slides, for the bar's count and its Previous and Next. Going to one makes its slide
   // the current one and opens its card there, latched under what it is on.
@@ -1095,6 +1110,33 @@ export function DeckView({
     dispatch(sealHistory(editor.state))
     return true
   }, [dispatch, editor])
+  const dispatchStepRef = useRef(dispatchStep)
+  dispatchStepRef.current = dispatchStep
+
+  // Item 8: the pictures dropped on the strip, by the new slide id each was saved for, until all of a drop's are saved.
+  const pictureDrops = useRef(new Map<string, PictureDrop>())
+  const pictureSaved = useCallback((slideId: string, path: string | null): boolean => {
+    const drop = pictureDrops.current.get(slideId)
+    if (!drop) return false
+    pictureDrops.current.delete(slideId)
+    drop.paths.set(slideId, path)
+    if (drop.paths.size < drop.pictures.length) return true
+    const saved: SavedPicture[] = drop.pictures.flatMap(picture => {
+      const at = drop.paths.get(picture.id)
+      return at ? [{ ...picture, path: at }] : []
+    })
+    const failed = drop.pictures.length - saved.length
+    const target = editorRef.current
+    if (saved.length && target && !target.isDestroyed) {
+      // One transaction, an undo step of its own: one Cmd+Z takes every slide of the drop back.
+      if (dispatchStepRef.current(insertPictureSlides(target.state, drop.at, saved, textHandoutRef.current))) {
+        const first = Math.min(drop.at, slidesOf(target.state.doc).length - saved.length)
+        requestAnimationFrame(() => pickRef.current(first))
+      }
+    }
+    if (failed) setNotice({ text: failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.` })
+    return true
+  }, [])
 
   /** Part `from` to stand before part `to`, its slide then current: a drag's drop and Cmd+↑ / Cmd+↓ alike. */
   const moveTo = useCallback((from: number, to: number) => {
@@ -1185,7 +1227,29 @@ export function DeckView({
       const thumb = stripRef.current?.querySelector<HTMLElement>(`[data-thumb="${index}"] .deck-thumb-slide`)
       return thumb ? { anchor: thumb, side: 'right', back: stripRef.current } : null
     }),
-  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo])
+    // Item 15: the slide in the look the strip shows, at 1920 × 1080, on the clipboard; the bar says so.
+    copyPicture: index => {
+      const entry = editor ? slidesOf(editor.state.doc)[index] : undefined
+      if (!entry) return
+      const look = lookRef.current
+      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing })
+        .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
+    },
+    // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
+    dropPictures: (at, files) => {
+      if (!editor || files.length === 0) return
+      const ids = newSlideIds(editor.state.doc, files.length)
+      const pictures = files.map((file, index) => ({ id: ids[index], title: pictureTitleOf(file.name) }))
+      const drop: PictureDrop = { at, pictures, paths: new Map() }
+      for (const id of ids) pictureDrops.current.set(id, drop)
+      files.forEach((file, index) => {
+        void readFileAsBase64(file).then(
+          dataUrl => sendToExtension('deck/save-image', { slideId: ids[index], dataUrl, filename: getUniqueImageFilename(file) }),
+          () => pictureSaved(ids[index], null),
+        )
+      })
+    },
+  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo, pictureSaved])
 
   // Cmd+D, Cmd+↑ and Cmd+↓ (Ctrl on Windows) with a slide chosen on the stage: the focus on the stage outside its words,
   // or on nothing (17 November). The strip takes the same keys itself (stripKeys.ts); words keep their editor's keys.
@@ -1347,6 +1411,8 @@ export function DeckView({
 
   useEffect(() => onMessage(message => {
     if (!editor || editor.isDestroyed) return
+    if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
+      && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null)) return
     if (message.type === 'deck/image-failed') {
       setNotice({ text: typeof message.message === 'string' ? message.message : 'The picture could not be saved.' })
       return
@@ -1371,7 +1437,7 @@ export function DeckView({
     }
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
     dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
-  }), [editor, dispatch])
+  }), [editor, dispatch, pictureSaved])
 
   // ---- the Slide library (PR 4)
 

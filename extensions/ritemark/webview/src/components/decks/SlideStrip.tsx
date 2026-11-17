@@ -6,17 +6,21 @@
  *    Since Sprint 161's PR 3 its first item is New slide: an empty block slide, its title taking the caret; its blocks
  *    come from the slide's / menu (frame 22), so the menu no longer offers a layout (Boxes, Points, New exercise). From
  *    the library and From another deck stay. "New slide" under the last one does the same at the end.
- *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Add to library…, Slide
+ *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Add to library…, Copy as
+ *    picture, Slide
  *    settings… (17 November: the popover beside the thumbnail; the gear left the bar), Delete slide. Delete asks
  *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`). The
  *    handout part number's ⋯ is the same menu (`SlideMenuItems`). Cmd+D duplicates the selected slide, and Cmd+↑ and
  *    Cmd+↓ move it with its handout part (17 November; Ctrl on Windows); its menu has them as Move up and Move down.
  *  - Undo that changes a slide which isn't the current one makes it current, and its thumbnail flashes once.
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
+ *  - Several pictures dragged from the computer onto the strip show the same line, and dropped there make a Picture
+ *    slide each (`stripPictures.ts`, item 8). A single picture is left to whatever took it before.
+ *  - The menu's Copy as picture puts a 1920 × 1080 PNG of the slide on the clipboard (`slidePicture.tsx`, item 15).
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
@@ -29,6 +33,7 @@ import type { DeckSlideEntry } from './deckDocument'
 import { SlideCanvas } from './slide/SlideCanvas'
 import { keyOrigin, stripKeyOf } from './stripKeys'
 import { slideMenuItems, type SlideMenuActions } from './slideMenuItems'
+import { STRIP_PICTURES_MIN, draggedPictureCount, droppedPictures } from './stripPictures'
 
 const THUMB_WIDTH = 96
 /** The key beside the menu's Delete slide, so people can find it. */
@@ -61,6 +66,10 @@ export interface StripActions {
   undo: (redo: boolean) => void
   /** The menu's Slide settings… (17 November): the popover beside the thumbnail it came from. */
   settings: (index: number) => void
+  /** The menu's Copy as picture (item 15). */
+  copyPicture: (index: number) => void
+  /** Item 8: several pictures dropped on the strip, before part `at`, a Picture slide each in the files' order. */
+  dropPictures: (at: number, files: File[]) => void
 }
 
 /** What the strip shows of a copy's source: from a library topic, changed in this deck, or newer in the library. */
@@ -420,7 +429,31 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
     else actions.remove(key.index)
   }
 
-  const dropAt = drag && drag.to !== null && drag.to !== drag.from && drag.to !== drag.from + 1 ? drag.to : null
+  // Item 8: pictures from the computer over the strip. Only a drag of several is the strip's: one picture keeps the way
+  // it went before, so its drag over is left alone and the drop never comes here.
+  const [pictureGap, setPictureGap] = useState<number | null>(null)
+  const onPictureOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (draggedPictureCount(event.dataTransfer) < STRIP_PICTURES_MIN) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    const at = gapAt(event.clientY)
+    if (at !== pictureGap) setPictureGap(at)
+  }
+  const onPictureLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    // Out of the strip, not into one of its thumbnails.
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPictureGap(null)
+  }
+  const onPictureDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    setPictureGap(null)
+    const files = droppedPictures(event.dataTransfer)
+    if (files.length < STRIP_PICTURES_MIN) return
+    event.preventDefault()
+    event.stopPropagation()
+    actions.dropPictures(gapAt(event.clientY), files)
+  }
+
+  const dragAt = drag && drag.to !== null && drag.to !== drag.from && drag.to !== drag.from + 1 ? drag.to : null
+  const dropAt = dragAt ?? pictureGap
 
   return (
     <div
@@ -431,6 +464,9 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
       tabIndex={0}
       onKeyDownCapture={onKeyCapture}
       onKeyDown={onKey}
+      onDragOver={onPictureOver}
+      onDragLeave={onPictureLeave}
+      onDrop={onPictureDrop}
     >
       {slides.map(entry => (
         <div key={entry.index}>
