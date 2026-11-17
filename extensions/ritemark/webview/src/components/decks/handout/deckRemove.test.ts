@@ -17,7 +17,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { history, undo, undoDepth } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { joinedSlideMarkdown, joinsCleanly, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
+import { joinedSlideMarkdown, joinsCleanly, openEndingOf, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
 import { slideCommentsOf } from '../../../../../src/decks/blocks/slideComments'
 import { lexBlockSlide } from '../../../../../src/decks/blocks/slideRenderer'
 import { deckDigest, publicDeck } from '../../../../../src/decks/page/publicDeck'
@@ -474,8 +474,19 @@ const DECK = [
   deck.caret(startOf(deck.state.doc, 'What it taught us'))
   const before = deck.state.doc
   deck.key('Backspace')
-  assert.equal(joinMarkOf(deck.state)?.blocked, 'unclosed')
-  assert.equal(joinNote(3, 'unclosed'), "Slide 4 can't join slide 3: one of them ends in a block that is never closed.")
+  assert.deepEqual(joinMarkOf(deck.state)?.blocked, { open: 'code', upper: true }, 'slide 3 ends inside the open fence')
+  assert.equal(joinNote(3, joinMarkOf(deck.state)?.blocked), "Slide 3 ends inside a code box, so it can't join yet. Close the code box first.")
+  // 17 November: plain words, naming the slide and what to do, never "block" or "fence".
+  assert.equal(joinNote(3, { open: 'code', upper: false }), "Slide 4 ends inside a code box, so it can't join yet. Close the code box first.")
+  assert.equal(joinNote(3, { open: 'code', upper: true }), "Slide 3 ends inside a code box, so it can't join yet. Close the code box first.")
+  assert.equal(joinNote(3, { open: 'note', upper: true }), "Slide 3 ends inside a comment that's never closed, so it can't join yet. Close the comment first.")
+  assert.equal(joinNote(3, { open: 'other', upper: false }), "Slide 4 ends with text that's left open, so it can't join yet. Close it first.")
+  for (const open of ['code', 'note', 'other'] as const) {
+    for (const upper of [true, false]) assert.doesNotMatch(joinNote(3, { open, upper }), /\bblock|fence/i, 'no "block" or "fence"')
+  }
+  assert.equal(openEndingOf('# A\n\n```\ncode'), 'code')
+  assert.equal(openEndingOf('# A\n\n<!-- never closed'), 'note')
+  assert.equal(openEndingOf('# A\n\nWords'), null)
   deck.key('Backspace')
   assert.equal(deck.state.doc, before, 'nothing written')
   const page = JSON.stringify(publicDeck(deck.save(), { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }))

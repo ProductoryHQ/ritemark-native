@@ -131,11 +131,25 @@ function movedBlock(raw: string, token: Token): string {
 
 const PROBE = 'RitemarkJoinProbe';
 
-/** Does a slide's Markdown end where a block may start: no code fence, comment or other block left open at its end? */
-function endsClosed(markdown: string): boolean {
+/** What a slide's Markdown ends inside of, when something is left open at its end. */
+export type OpenEnding = 'code' | 'note' | 'other';
+
+/**
+ * What a slide's Markdown ends inside of: a code box never closed (`code`), a hidden note never closed (`<!--` with no
+ * `-->`, `note`), something else left open (`other`), or null when a block may start after it.
+ */
+export function openEndingOf(markdown: string): OpenEnding | null {
   const tokens = lexBlockSlide(`${markdown.replace(/\r\n?/g, '\n').replace(/\s+$/, '')}\n\n${PROBE}`).filter(token => token.type !== 'space');
   const last = tokens[tokens.length - 1];
-  return !!last && last.type === 'paragraph' && last.raw.trim() === PROBE;
+  if (last && last.type === 'paragraph' && last.raw.trim() === PROBE) return null;
+  if (last?.type === 'code') return 'code';
+  if (last?.type === 'html' && /^\s*<!--/.test(last.raw)) return 'note';
+  return 'other';
+}
+
+/** Does a slide's Markdown end where a block may start: no code fence, comment or other block left open at its end? */
+function endsClosed(markdown: string): boolean {
+  return openEndingOf(markdown) === null;
 }
 
 /**
