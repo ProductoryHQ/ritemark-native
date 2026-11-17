@@ -20,13 +20,14 @@ import type { WallSlide } from './present/presentProtocol';
 
 // ── A deck's theme line ─────────────────────────────────────────────────────
 
-const FRONT = /^(﻿?)---[ \t]*(\r?\n)([\s\S]*?)(\r?\n)---[ \t]*(?:\r?\n|$)/;
+/** The front matter: its opener (BOM, `---`, trailing blanks), the opener's line end, and its inside (none when empty). */
+const FRONT = /^(﻿?---[ \t]*)(\r?\n)(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/;
 const THEME_LINE = /^theme:.*$/;
 
 /** The deck's `theme:` line as written (`theme: Slide library/Themes/Evening.theme.md`), or null when it has none. */
 export function themeLineOf(text: string): string | null {
   const match = FRONT.exec(text);
-  if (!match) return null;
+  if (!match || match[3] === undefined) return null;
   const lines = match[3].split(/\r?\n/);
   // The reader takes the last one, so the last one is the line.
   for (let index = lines.length - 1; index >= 0; index--) if (THEME_LINE.test(lines[index])) return lines[index];
@@ -38,12 +39,18 @@ export function themeLineFor(themePath: string): string {
   return `theme: ${writeScalar(themePath)}`;
 }
 
+/** Does the text open with a front matter (an empty one too)? */
+export function hasFrontMatter(text: string): boolean {
+  return FRONT.test(text);
+}
+
 /**
  * The deck's text with its `theme:` line as `line` (null: no line). Only that line changes: a deck with the line has it
  * replaced where it is; one without gets it after its `deck:` line (or first); one without front matter gets a front
- * matter holding only it. Every other byte stays, so putting the old line back gives the deck back byte for byte.
+ * matter holding only it. `dropEmpty` (Undo of a front matter the change made): a front matter left empty goes too.
+ * Every other byte stays, so putting the old line back gives the deck back byte for byte.
  */
-export function withThemeLine(text: string, line: string | null): string {
+export function withThemeLine(text: string, line: string | null, options: { dropEmpty?: boolean } = {}): string {
   const match = FRONT.exec(text);
   if (!match) {
     if (line === null) return text;
@@ -51,9 +58,8 @@ export function withThemeLine(text: string, line: string | null): string {
     const eol = text.includes('\r\n') ? '\r\n' : '\n';
     return `${bom}---${eol}${line}${eol}---${eol}${text.slice(bom.length)}`;
   }
-  const [, bom, firstEol, inner] = match;
-  const eol = firstEol;
-  const lines = inner.split(/\r?\n/);
+  const [whole, opener, eol, inner] = match;
+  const lines = inner === undefined ? [] : inner.split(/\r?\n/);
   let at = -1;
   for (let index = lines.length - 1; index >= 0; index--) if (THEME_LINE.test(lines[index])) { at = index; break; }
   if (at >= 0) {
@@ -65,8 +71,12 @@ export function withThemeLine(text: string, line: string | null): string {
   } else {
     return text;
   }
-  const start = bom.length + 3 + firstEol.length;
-  return text.slice(0, start) + lines.join(eol) + text.slice(start + inner.length);
+  const rest = text.slice(whole.length);
+  if (lines.length === 0 && options.dropEmpty) return (opener.startsWith('﻿') ? '﻿' : '') + rest;
+  // The closing fence as written (`---`, its trailing blanks and line end)
+  const closing = whole.slice(whole.lastIndexOf('---'));
+  const body = lines.length ? `${lines.join(eol)}${eol}` : '';
+  return `${opener}${eol}${body}${closing}${rest}`;
 }
 
 /** The theme path a `theme:` line names, as the reader takes it (null for none). */
@@ -356,6 +366,8 @@ export interface DeckLineChange {
   themeBefore: string;
   /** A deck only shown by See what changed (it drew the rewritten theme already): Undo never writes it. */
   shownOnly?: boolean;
+  /** The change gave the deck its front matter: Undo takes it away again when nothing else is in it. */
+  madeFrontMatter?: boolean;
 }
 
 /** See what changed's sheet, for a deck view or a theme's tab: two slides, each before and after. */
@@ -391,7 +403,7 @@ export interface ThemeChangeRecord {
 /** What Undo does now, from what the files hold now. Pure: the host reads the files, this decides. */
 export interface UndoPlan {
   /** Each deck whose line is still the change's: put back as it was. */
-  decks: Array<{ path: string; line: string | null }>;
+  decks: Array<{ path: string; line: string | null; dropEmpty?: boolean }>;
   /** Decks someone changed since: left as they are. */
   keptDecks: string[];
   /** The theme file: removed (made by the change, no deck uses it, unchanged since), put back, or kept. */
@@ -412,7 +424,7 @@ export function undoPlan(
   for (const deck of record.decks) {
     const line = now.deckLines[deck.path];
     if (line === undefined) continue; // the deck is gone
-    if (line === deck.after) decks.push({ path: deck.path, line: deck.before });
+    if (line === deck.after) decks.push({ path: deck.path, line: deck.before, ...(deck.madeFrontMatter ? { dropEmpty: true } : {}) });
     else keptDecks.push(deck.path);
   }
   let theme: UndoPlan['theme'] = { action: 'none' };

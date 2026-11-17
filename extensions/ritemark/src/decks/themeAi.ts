@@ -28,12 +28,12 @@ import { slidePicturePaths } from './blocks/slideRenderer';
 import { readPptxTheme } from './pptxTheme';
 import {
   aiThemeText, changeSlideIndexes, checkWords, colourFixes, colourPairs, PAIR_FIELD_NAMES, pairsReport, suggestedFixes, ThemeChangeLedger, themeChangesOf, themeLineFor,
-  themeLineOf, undoPlan, undoWords, withThemeLine, type AiThemeFields, type PairField, type ThemeChangeRecord, type ThemeChangeView,
+  hasFrontMatter, themeLineOf, undoPlan, undoWords, withThemeLine, type AiThemeFields, type PairField, type ThemeChangeRecord, type ThemeChangeView,
 } from './themeChange';
 import { newThemeNameProblem, themeNameProblem, themePathFor, themeTextWith } from './themeFile';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import type { DeckLibrary } from './DeckLibrary';
-import type { ThemePages } from './themePages';
+import { replaceText, type ThemePages } from './themePages';
 
 /** What the chat shows under a reply for one change. */
 export interface ThemeChangeChip {
@@ -62,18 +62,11 @@ function projectPath(root: string, value: string): { relative: string; absolute:
   return { relative, absolute };
 }
 
-/** The document's text becomes `text`: one edit of the stretch that differs, saved when it was clean before. */
+/** The document's text becomes `text` (the theme tab's own minimal edit), saved when it was clean before. */
 async function writeOpen(document: vscode.TextDocument, text: string): Promise<boolean> {
-  const current = document.getText();
-  if (current === text) return true;
-  let start = 0;
-  while (start < current.length && start < text.length && current[start] === text[start]) start++;
-  let end = 0;
-  while (end < current.length - start && end < text.length - start && current[current.length - 1 - end] === text[text.length - 1 - end]) end++;
+  if (document.getText() === text) return true;
   const wasDirty = document.isDirty;
-  const edit = new vscode.WorkspaceEdit();
-  edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(current.length - end)), text.slice(start, text.length - end));
-  if (!(await vscode.workspace.applyEdit(edit))) return false;
+  if (!(await replaceText(document, text))) return false;
   if (!wasDirty) await document.save();
   return true;
 }
@@ -202,7 +195,7 @@ export class ThemeAi implements vscode.Disposable {
       if (before === after || deckChanges.some(deck => deck.path === relative)) continue;
       const named = frontMatterField(text.replace(/^﻿/, ''), 'theme');
       const drew = pathKey(named ?? '') === pathKey(themePath) ? themeBefore : await readThemeOrEvening(root, named);
-      deckChanges.push({ path: relative, before, after, themeBefore: drew ?? BUILT_IN_THEME_TEXT });
+      deckChanges.push({ path: relative, before, after, themeBefore: drew ?? BUILT_IN_THEME_TEXT, ...(hasFrontMatter(text) ? {} : { madeFrontMatter: true }) });
       deckTexts.set(relative, { absolute, text });
     }
     if (themeBefore === themeAfter && deckChanges.length === 0) {
@@ -219,6 +212,19 @@ export class ThemeAi implements vscode.Disposable {
       const files = [themePath, ...deckChanges.map(deck => deck.path)];
       const approved = await approve({ filePath: files.length > 1 ? `${themePath} and ${deckChanges.length} deck${deckChanges.length === 1 ? '' : 's'}` : themePath, diff });
       if (!approved) return { text: 'The user declined the theme change, so nothing was written. Ask what they would like instead.' };
+      // The card may have waited a while: the theme as approved, and each deck as it is now (its own words since kept)
+      const themeNow = existing ? await readProjectTheme(root, themePath) : (fs.existsSync(themeAbsolute) ? '' : null);
+      if (themeNow !== themeBefore || openDocument(themeAbsolute)?.isDirty) {
+        return { text: `${name} changed while the user was asked, so nothing was written. Read it again and ask once more.`, isError: true };
+      }
+      for (const deck of deckChanges) {
+        const entry = deckTexts.get(deck.path)!;
+        const fresh = await deckText(entry.absolute);
+        if (fresh === null) return { text: `${deck.path} is gone, so nothing was written.`, isError: true };
+        entry.text = fresh;
+        deck.before = themeLineOf(fresh);
+        deck.madeFrontMatter = !hasFrontMatter(fresh);
+      }
     }
 
     // The theme file first: a deck never names a file that isn't there.
@@ -426,7 +432,9 @@ export class ThemeAi implements vscode.Disposable {
     const back: Partial<Record<'bg' | 'head' | 'text' | 'accent', string>> = {};
     for (const move of record.moved) if (theme[move.field] === move.to) back[move.field] = move.from;
     const keep = Object.keys(back).length === 0;
-    if (!keep) await this.themes.draftChange(draft, themeTextWith(text, back));
+    if (!keep && !(await this.themes.draftChange(draft, themeTextWith(text, back)))) {
+      return { words: `Couldn't put ${record.themeName}'s colours back: its tab closed. Open it and try Undo again.`, done: false };
+    }
     return { words: undoWords(record, { decks: [], keptDecks: [], theme: keep ? { action: 'keep', reason: 'changed' } : { action: 'none' } }, deckName), done: true };
   }
 
@@ -457,7 +465,9 @@ export class ThemeAi implements vscode.Disposable {
       const text = texts.get(deck.path);
       if (text === undefined) continue;
       try {
-        await writeDeck(path.join(root, ...deck.path.split('/')), withThemeLine(text, deck.line));
+        await writeDeck(path.join(root, ...deck.path.split('/')), withThemeLine(text, deck.line, { dropEmpty: deck.dropEmpty }));
+        // Put back: a second Undo after a failure leaves it out, never "changed since"
+        record.decks = record.decks.filter(entry => entry.path !== deck.path);
       } catch (error) {
         console.warn('[Themes] Undo could not change a deck:', error);
         stuck.push(deck.path);

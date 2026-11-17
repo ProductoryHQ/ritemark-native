@@ -364,6 +364,55 @@ async function main() {
     assert.equal(read('Fernhollow/Talk.deck.md'), DECK);
   });
 
+  await test('review round 2: a front matter with blanks after its opener, an empty one, and one the change made', () => {
+    const line = change.themeLineFor('Slide library/Themes/X.theme.md');
+    const spaced = '--- \ndeck: 2\n---\nbody\n';
+    const pointed = change.withThemeLine(spaced, line);
+    assert.equal(pointed, `--- \ndeck: 2\n${line}\n---\nbody\n`);
+    assert.equal(change.withThemeLine(pointed, null), spaced);
+    const empty = '---\n---\nbody\n';
+    assert.equal(change.withThemeLine(empty, line), `---\n${line}\n---\nbody\n`);
+    assert.equal(change.withThemeLine(change.withThemeLine(empty, line), null), empty, 'an empty front matter stays one');
+    const bare = '# Hi\n';
+    const made = change.withThemeLine(bare, line);
+    assert.equal(change.withThemeLine(made, null, { dropEmpty: true }), bare, 'a front matter the change made goes with Undo');
+    const crlf = '---\r\ndeck: 2\r\n---\r\nbody\r\n';
+    assert.equal(change.withThemeLine(change.withThemeLine(crlf, line), null), crlf);
+  });
+
+  await test('review round 2: Undo gives a deck without front matter back byte for byte', async () => {
+    write('Fernhollow/Bare.deck.md', '```slide\n# Bare\n```\n');
+    await ai.setDeckTheme('chat-11', { name: 'Bare look', fields: FERN, decks: ['Fernhollow/Bare.deck.md'] });
+    assert.ok(read('Fernhollow/Bare.deck.md').startsWith('---\ntheme: Slide library/Themes/Bare look.theme.md\n---\n'));
+    assert.equal(await ai.undo(added.at(-1)!.chip.id), 'Bare has its old theme again. Removed Bare look.');
+    assert.equal(read('Fernhollow/Bare.deck.md'), '```slide\n# Bare\n```\n');
+    fs.unlinkSync(path.join(root, 'Fernhollow/Bare.deck.md'));
+  });
+
+  await test('review round 2: Ask mode reads again after the card: the person\'s words kept, a theme changed meanwhile stops it', async () => {
+    // The person types in the deck while the card waits: their words stay, only the line changes
+    const typed = await ai.setDeckTheme('chat-12', { name: 'Waited', fields: FERN, decks: ['Fernhollow/Talk.deck.md'] }, async () => {
+      write('Fernhollow/Talk.deck.md', DECK + 'A line typed meanwhile.\r\n');
+      return true;
+    });
+    assert.match(typed.text, /^Made /);
+    assert.ok(read('Fernhollow/Talk.deck.md').endsWith('A line typed meanwhile.\r\n'));
+    assert.equal(change.themeLineOf(read('Fernhollow/Talk.deck.md')), 'theme: Slide library/Themes/Waited.theme.md');
+    await ai.undo(added.at(-1)!.chip.id);
+    assert.equal(read('Fernhollow/Talk.deck.md'), DECK + 'A line typed meanwhile.\r\n');
+    write('Fernhollow/Talk.deck.md', DECK);
+    // The theme is changed while the card waits: nothing is written
+    write('Slide library/Themes/Steady.theme.md', change.aiThemeText(null, 'Steady', { bg: '#FFFFFF', head: '#102030', text: '#203040', accent: '#0E7C86' }));
+    const stopped = await ai.setDeckTheme('chat-12', { name: 'Steady', fields: { corners: 'round' }, decks: ['Fernhollow/Talk.deck.md'] }, async () => {
+      write('Slide library/Themes/Steady.theme.md', read('Slide library/Themes/Steady.theme.md').replace('#0E7C86', '#0E7C87'));
+      return true;
+    });
+    assert.ok(stopped.isError);
+    assert.match(stopped.text, /^Steady changed while the user was asked, so nothing was written\./);
+    assert.equal(read('Fernhollow/Talk.deck.md'), DECK);
+    assert.equal(parseTheme(read('Slide library/Themes/Steady.theme.md')).round, 'soft');
+  });
+
   await test('Fix the colours: each failing pair reaches its ratio, its hue kept, and nothing else moves', () => {
     // Text too faint and the accent too dark on Evening's ground; headings pass
     const faint = parseTheme(change.aiThemeText(BUILT_IN_THEME_TEXT, 'Evening', { text: '#5A5F8C', accent: '#4A3A10' }));

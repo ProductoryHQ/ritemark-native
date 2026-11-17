@@ -295,11 +295,9 @@ export class ThemePages implements vscode.Disposable {
       }
       // Sprint 162 PR 5: Check all colours and Fix the colours, Ritemark's own; a fix goes into the draft, one step
       case 'theme/check-colours': {
-        const fix = request.fix;
+        // Not inside `queue`: the fix's own draft change (`draftChange`) takes its place in the document's queue
         if (!this.ai) return;
-        const ai = this.ai;
-        let words = '';
-        await this.queue(document, async () => { words = await ai.checkColours(document, fix); });
+        const words = await this.ai.checkColours(document, request.fix);
         await this.post(webview, { type: 'theme/check-result', text: words });
         return;
       }
@@ -648,7 +646,7 @@ export class ThemePages implements vscode.Disposable {
 }
 
 /** The document's text becomes `text`: one edit, of the span between the first and the last character that differ. */
-async function replaceText(document: vscode.TextDocument, text: string): Promise<boolean> {
+export async function replaceText(document: vscode.TextDocument, text: string): Promise<boolean> {
   const current = document.getText();
   if (current === text) return true;
   let start = 0;

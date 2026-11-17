@@ -1134,7 +1134,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const browserPage = browserTurnPageFor(conversationId);
           // Sprint 162 PR 5: in Ask mode a Ritemark tool's file write (a theme and its decks) asks first, on the same
           // unified approval card as the runtime's own file writes; in Auto mode it goes ahead, as theirs do.
-          browserPage.fileWriteApproval = approvalMode === 'ask'
+          // A plan-first turn asks too, so nothing is written before its plan is approved.
+          browserPage.fileWriteApproval = approvalMode === 'ask' || planFirst
             ? async ({ filePath, diff }) => {
               this._runConversationCheckpoint(conversationId, () => this._conversationController.attentionRuntimeTurn({
                 conversationId,

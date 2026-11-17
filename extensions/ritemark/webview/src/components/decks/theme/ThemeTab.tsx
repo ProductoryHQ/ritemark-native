@@ -36,7 +36,7 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
 import { ThemeChangeSheet, themeChangeFrom } from './ThemeChangeSheet'
-import { changeSlideIndexes, type ThemeChangeView } from '../../../../../src/decks/themeChange'
+import { changeSlideIndexes, colourPairs, type ThemeChangeView } from '../../../../../src/decks/themeChange'
 import '../decks.css'
 import './themeTab.css'
 
@@ -132,7 +132,12 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
 
   useEffect(() => onMessage(message => {
     if (message.type === 'theme/state' && typeof message.text === 'string' && typeof message.path === 'string') {
-      setState({ path: message.path, text: message.text, dirty: message.dirty === true })
+      // A new text (a fix, its Undo, Discard, an AI's draft change) says its own contrast; a fix's words come after it
+      const text = message.text
+      setState(current => {
+        if (current && current.text !== text) setCheckResult(null)
+        return { path: message.path as string, text, dirty: message.dirty === true }
+      })
     } else if (message.type === 'theme/decks') {
       const next = themeDecksFrom(message)
       if (next) setDecks(next)
@@ -185,6 +190,8 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const count = decks?.decks.length ?? 0
   const borderless = (look ?? (decks?.preview.borderless ? 'borderless' : 'card')) === 'borderless'
   const contrast = contrastLine(theme)
+  // Fix the colours whenever a pair a colour of the four can fix fails (the accent and Borderless too, not only the line)
+  const fixable = colourPairs(theme).some(pair => !pair.ok && pair.field !== null)
 
   return (
     <div className="theme-tab">
@@ -278,11 +285,11 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
               {/* Sprint 162 PR 5 (the Experience lead, 17 November): the colour check sits on this line, where a problem
                   shows, and is Ritemark's own. At rest a quiet "Check all colours" measures the five pairs; when the line
                   is amber, "Fix the colours" moves each failing colour's lightness just far enough, into the draft. */}
-              <Tooltip label={contrast.ok
+              <Tooltip label={!fixable
                 ? 'Measure all five colour pairs, on the card and borderless, against 4.5 to 1 for text and 3 to 1 for accents'
                 : 'Move each colour that fails just far enough to read, keeping its hue. It goes into the draft: the decks change when you save'}>
-                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours', { fix: !contrast.ok })}>
-                  {contrast.ok ? 'Check all colours' : 'Fix the colours'}
+                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours', { fix: fixable })}>
+                  {fixable ? 'Fix the colours' : 'Check all colours'}
                 </Button>
               </Tooltip>
             </span>
