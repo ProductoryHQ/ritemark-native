@@ -54,6 +54,11 @@ export function svgProblem(raw: string): string | null {
   if (/<[^>]*[\s/"':]on[a-z]+\s*=/i.test(text)) return unsafe;
   if (/javascript\s*:/i.test(text)) return unsafe;
   if (/@import|image-set\s*\(|\bsrc\s*\(/i.test(text)) return unsafe;
+  // A style written with CSS escapes (`@\69mport`, `u\72l(`) would read as one only in CSS: a backslash in a style
+  // sheet or a style attribute is refused (Codex on #785; a design tool's styles never need one).
+  for (const match of text.matchAll(/<(?:[\w.-]+:)?style\b[^>]*>([\s\S]*?)(?:<\/(?:[\w.-]+:)?style\s*>|$)|\sstyle\s*=\s*("[^"]*"|'[^']*')/gi)) {
+    if ((match[1] ?? match[2] ?? '').includes('\\')) return unsafe;
+  }
   // Every reference stays inside the file: `href="#id"`, `url(#id)`, or a picture as `data:image/…`.
   for (const match of text.matchAll(/(?:^|[\s"':])href\s*=\s*["']?\s*([^"'\s>]*)/gi)) {
     if (!/^(#|data:image\/(png|jpe?g|gif|webp);)/i.test(match[1])) return unsafe;

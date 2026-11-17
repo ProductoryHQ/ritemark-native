@@ -158,7 +158,12 @@ async function main(): Promise<void> {
       '<svg><rect style="fill:image-set(\'https://x.test/a.png\' 1x)"/></svg>',
       '<svg><a href="javascript&#x3a;alert(1)"><text>x</text></a></svg>',
       '<svg><image href="&#104;ttps://tracker.test/p.png"/></svg>',
+      // Codex on #785: a character reference or a CSS escape in a style sheet doesn't hide @import or url().
+      '<svg xmlns="http://www.w3.org/2000/svg"><style>&#64;import "https://attacker.test/x.css";</style></svg>',
+      '<svg><style>@\\69mport "https://attacker.test/x.css";</style></svg>',
+      '<svg><rect style="fill:u\\72l(https://x.test/p.svg#a)"/></svg>',
     ]) assert.match(svgProblem(unsafe) ?? '', /scripts or links/, unsafe);
+    assert.equal(svgProblem('<svg><style>.cls-1{fill:#1f8a5b}</style><rect class="cls-1" style="opacity:.9"/></svg>'), null, 'a design tool\'s plain styles are fine');
     assert.equal(svgProblem('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/><text>Fish &amp; Chips</text></svg>'), null, 'xlink, its own ids and an escaped & are fine');
     assert.equal(svgProblem('<svg><use href="#a"/><rect fill="url(#g)"/><image href="data:image/png;base64,AAAA"/></svg>'), null, 'its own parts and an embedded picture are fine');
     assert.match(svgProblem('<html>not a picture</html>') ?? '', /isn't an SVG/);
