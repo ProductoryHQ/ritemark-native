@@ -15,6 +15,23 @@
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
+/* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
+   swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
+.deck-theme-swatch { position: relative; display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .14); overflow: hidden; }
+.deck-theme-swatch > i { position: absolute; left: 4px; height: 2px; border-radius: 1px; }
+.deck-theme-swatch > i:first-child { top: 4px; width: 7px; }
+.deck-theme-swatch > i:last-child { top: 8px; width: 11px; }
+.deck-bar .deck-theme-button { gap: 7px; }
+.deck-bar .deck-theme-button[data-state="open"] { background: var(--r-surface-muted); color: var(--r-ink-strong); }
+.deck-theme-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-theme-menu .deck-settings-k { margin: 6px 6px 6px; }
+.deck-theme-menu > [role="group"]:first-child { padding: 0 4px; }
+.deck-theme-sep { height: 1px; margin: 10px -8px 4px; background: var(--r-hairline); }
+.deck-theme-menu .deck-theme-row { width: 100%; height: 32px; justify-content: flex-start; gap: 9px; padding: 0 6px; font-size: 13px; font-weight: 400; color: var(--r-ink-strong); }
+.deck-theme-row-name { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; }
+.deck-theme-row-count { font-size: 12px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-theme-row-check { display: inline-flex; width: 14px; justify-content: center; color: var(--r-ink-muted); }
+.deck-theme-wait { padding: 6px; font-size: 12.5px; color: var(--r-ink-muted); }
 /* Slide, both or handout (17 November; the prototype's `.viewseg`): one segment of three small icons right after the
    strip's button, on the ground's colour; the chosen one raised on the desk's white with a hairline (DeckFolds.tsx). */
 .deck-bar .deck-view-switch { display: inline-flex; gap: 1px; margin: 0 2px 0 2px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
@@ -197,8 +214,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings-about .deck-source { flex-wrap: wrap; }
 .deck-settings-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 4px; font-weight: 600; line-height: 24px; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
-/* A deck with no slides: the popup is the deck's section alone, its heading at the top (#764) */
-.deck-settings-only > .deck-settings-k { margin-top: 0; }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }

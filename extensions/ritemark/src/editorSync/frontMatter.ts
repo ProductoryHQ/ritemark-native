@@ -111,6 +111,16 @@ const PLAIN_WORD = /^[A-Za-z][\w-]{0,63}$/;
 const plainValue = (value: unknown) => (typeof value === 'string' && PLAIN_WORD.test(value)) || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
 
 /**
+ * Sprint 162: a deck's theme path (`Slide library/Themes/Fern Hollow.theme.md`), written on its key's line as it is,
+ * or in the quotes the line already has. Letters, digits, spaces and `_ . / ( ) + -` only, so YAML reads it back as the
+ * same string with or without quotes.
+ */
+const THEME_LINE = /^[\p{L}\p{N}][\p{L}\p{N} _./()+-]*\.theme\.md$/u;
+const themeLineValue = (value: unknown): value is string => typeof value === 'string' && THEME_LINE.test(value);
+const lineValue = (value: unknown) => plainValue(value) || themeLineValue(value);
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
  * A front matter's head (`---` … `---`, LF) with only plain keys added, taken out or changed, each a one-word string or a
  * whole number (`handout: text`; Sprint 161's `deck: 1` → `deck: 2` and back), when that is the whole change between
  * `current` and `next`: every other line stays byte for byte, its comments and quoting with it, and so do the blank
@@ -125,12 +135,12 @@ export function headWithPlainKeyChanges(head: string, current: Record<string, un
     const is = Object.prototype.hasOwnProperty.call(next, key);
     if (was && is) {
       if (canonicalJson(asTheViewHoldsThem(current[key])) === canonicalJson(asTheViewHoldsThem(next[key]))) continue;
-      if (!PLAIN_KEY.test(key) || !plainValue(current[key]) || !plainValue(next[key])) return null;
+      if (!PLAIN_KEY.test(key) || !lineValue(current[key]) || !lineValue(next[key])) return null;
       changed.push(key);
       continue;
     }
     const value = is ? next[key] : current[key];
-    if (!PLAIN_KEY.test(key) || !plainValue(value)) return null;
+    if (!PLAIN_KEY.test(key) || !lineValue(value)) return null;
     (is ? added : removed).push(key);
   }
   if (added.length === 0 && removed.length === 0 && changed.length === 0) return null;
@@ -147,10 +157,20 @@ export function headWithPlainKeyChanges(head: string, current: Record<string, un
   for (const key of changed) {
     const at = inner.findIndex(line => new RegExp(`^${key}:[ \\t]`).test(line));
     if (at < 0 || (at + 1 < inner.length && /^[ \t-]/.test(inner[at + 1]))) return null;
-    // The line read back must be the value it held: a quoted or commented line is gray-matter's to write.
-    if (!new RegExp(`^${key}:[ \\t]+${String(current[key])}[ \\t]*$`).test(inner[at])) return null;
-    inner[at] = `${key}: ${String(next[key])}`;
+    // The line read back must be the value it held: a quoted or commented line is gray-matter's to write. A theme path
+    // (Sprint 162) keeps the quotes its line has, so a pick and its Undo give back the same bytes.
+    const quotes = themeLineValue(current[key]) && themeLineValue(next[key]) ? `(["']?)` : '()';
+    const held = new RegExp(`^${key}:[ \\t]+${quotes}${escapeRegExp(String(current[key]))}\\1[ \\t]*$`).exec(inner[at]);
+    if (!held) return null;
+    inner[at] = `${key}: ${held[1]}${String(next[key])}${held[1]}`;
   }
   for (const key of added) inner.push(`${key}: ${String(next[key])}`);
-  return [lines[0], ...inner, ...lines.slice(close)].join('\n');
+  const written = [lines[0], ...inner, ...lines.slice(close)].join('\n');
+  // Read back, the head must hold exactly `next`: anything else is gray-matter's to write.
+  try {
+    if (canonicalJson(asTheViewHoldsThem(matter(`${written}\n`).data)) !== canonicalJson(asTheViewHoldsThem(next))) return null;
+  } catch {
+    return null;
+  }
+  return written;
 }

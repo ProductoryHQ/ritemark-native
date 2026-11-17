@@ -103,5 +103,31 @@ const obsidian = [
   assert.equal(headWithPlainKeyChanges('---\nlook: borderless\n---\n', { look: 'borderless' }, {}), '---\n---\n');
 }
 
+// Sprint 162: picking a deck's theme changes only its `theme:` line, in the quotes it has, and one Undo gives back the
+// same bytes; a deck with no line gets one at the end, and the Undo takes it out again.
+{
+  const quoted = '---\n# client deck\ndeck: 1\ntheme: "Slide library/Themes/Evening.theme.md"\nlook: borderless\n---\n\nThe body.\n';
+  const properties = JSON.parse(JSON.stringify(splitFrontMatter(quoted).properties));
+  const picked = joinFrontMatter({ ...properties, theme: 'Slide library/Themes/Fern Hollow (2).theme.md' }, 'The body.', quoted);
+  assert.equal(picked, '---\n# client deck\ndeck: 1\ntheme: "Slide library/Themes/Fern Hollow (2).theme.md"\nlook: borderless\n---\n\nThe body.\n');
+  assert.equal(joinFrontMatter(properties, 'The body.', picked), quoted, 'undone: the bytes as they were');
+
+  const plain = '---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\n---\n\nThe body.\n';
+  const plainProperties = JSON.parse(JSON.stringify(splitFrontMatter(plain).properties));
+  const evening = joinFrontMatter({ ...plainProperties, theme: 'Slide library/Themes/Õhtu.theme.md' }, 'The body.', plain);
+  assert.equal(evening, '---\ndeck: 2\ntheme: Slide library/Themes/Õhtu.theme.md\n---\n\nThe body.\n');
+  assert.equal(joinFrontMatter(plainProperties, 'The body.', evening), plain);
+
+  const none = '---\ndeck: 1\n---\n\nThe body.\n';
+  const added = joinFrontMatter({ deck: 1, theme: 'Slide library/Themes/Paper.theme.md' }, 'The body.', none);
+  assert.equal(added, '---\ndeck: 1\ntheme: Slide library/Themes/Paper.theme.md\n---\n\nThe body.\n');
+  assert.equal(joinFrontMatter({ deck: 1 }, 'The body.', added), none);
+
+  // A path YAML would read differently (a colon, a hash) is gray-matter's to write, never a line written as it is.
+  assert.equal(headWithPlainKeyChanges('---\ntheme: a.theme.md\n---\n', { theme: 'a.theme.md' }, { theme: 'Slide library/Themes/a: b.theme.md' }), null);
+  assert.equal(headWithPlainKeyChanges('---\ntheme: a.theme.md\n---\n', { theme: 'a.theme.md' }, { theme: 'x #y.theme.md' }), null);
+  // Only theme paths keep quotes: another quoted value is still gray-matter's.
+  assert.equal(headWithPlainKeyChanges('---\na: "one"\n---\n', { a: 'one' }, { a: 'two' }), null);
+}
 
 console.log('frontMatter.test.ts — all assertions passed');

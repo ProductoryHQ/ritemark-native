@@ -2,7 +2,7 @@
  * Sprint 157: the deck view's line to the host, over the editor's own webview channel (`deck/*`, decoded by the host's
  * `decodeDeckRequest`). The host answers only the webview that asked.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../bridge'
 import { BUILT_IN_THEME, isThemePath, parseTheme, type DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DeckSlideEntry } from './deckDocument'
@@ -57,5 +57,9 @@ export function useDeckTheme(themePath: unknown): DeckTheme {
     if (path) sendToExtension('deck/theme', { path })
   }, [path])
 
-  return path && theme?.path === path ? theme.theme : BUILT_IN_THEME
+  // Sprint 162: while a newly picked theme is read, the deck keeps the theme it had, so a pick never flashes Evening.
+  const drawn = useRef<DeckTheme>(BUILT_IN_THEME)
+  if (!path) drawn.current = BUILT_IN_THEME
+  else if (theme?.path === path) drawn.current = theme.theme
+  return drawn.current
 }

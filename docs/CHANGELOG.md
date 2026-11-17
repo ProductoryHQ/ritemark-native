@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.3.0
 
+### Sprint 162: deck themes (Decks, behind its flag)
+
+#### Added
+- **A deck's look is one button on its bar.** The Theme button shows the deck's theme as a small swatch and its name ("Evening ▾"). Its menu has Card | Borderless and the project's themes, each with how many decks use it. Pick one and the deck changes at once; the bar says so, with Undo, and Cmd+Z takes it back too. Card | Borderless is no longer in a slide's settings.
+
 #### Fixed
 - **A page that failed to load opens when you open its file again (#710).** If a web page's `.html` file was missing when Ritemark opened, its tab showed "Failed to Load Page", and opening the file again from Documents once it was back only brought that failed tab forward. Now opening the file loads the page again in the same tab, as the bar's Reload does. A page that loaded fine is only brought forward, as before.
 

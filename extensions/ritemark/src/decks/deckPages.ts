@@ -18,11 +18,11 @@ import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
-import { isThemePath } from './deckTheme';
+import { isThemePath, MAX_THEMES, themeEntries, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
-import { parseFrom } from './deckFormat';
+import { frontMatterField, parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
@@ -316,6 +316,9 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/theme':
         await this.post(webview, { type: 'deck/theme', path: request.path, text: await readTheme(document, request.path) });
         return;
+      case 'deck/themes':
+        await this.post(webview, { type: 'deck/themes', themes: await this.themesFor(document) });
+        return;
       case 'deck/save-image':
         await this.post(webview, await savePicture(document, webview, request.slideId, request.dataUrl, request.filename));
         return;
@@ -381,6 +384,28 @@ export class DeckPages implements vscode.Disposable {
       default:
         await this.handleLibrary(document, webview, request);
     }
+  }
+
+  /**
+   * Sprint 162: the project's themes for the deck's Theme menu: the files in `Slide library/Themes` of the folder the
+   * deck reads its theme from (`readDeckTheme`'s rule), and the built-in theme, each with the number of the project's
+   * decks that draw it. A deck outside the open project counts only itself.
+   */
+  private async themesFor(document: vscode.TextDocument): Promise<ThemeEntry[]> {
+    const root = themeRootOf(document.uri.fsPath);
+    const files = await projectThemeFiles(root);
+    const own = [frontMatterField(document.getText().replace(/^﻿/, ''), 'theme')];
+    const library = this.library();
+    const project = projectRoot();
+    let deckThemes = own;
+    if (library && project && path.resolve(project) === path.resolve(root) && projectRelative(project, document.uri.fsPath)) {
+      try {
+        deckThemes = await library.deckThemes();
+      } catch (error) {
+        console.warn('[Decks] Could not count the decks for the Theme menu:', error);
+      }
+    }
+    return themeEntries(files, deckThemes);
   }
 
   /** The copies' and the library's requests, through the project's library. */
@@ -559,7 +584,32 @@ export async function readTheme(document: vscode.TextDocument, themePath: string
 
 /** The theme file a deck at `deckPath` names, by the same rule: the deck view's, and its page's (Sprint 159 PR 4). */
 export function readDeckTheme(deckPath: string, themePath: string): Promise<string | null> {
-  return readProjectTheme(vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath), themePath);
+  return readProjectTheme(themeRootOf(deckPath), themePath);
+}
+
+/** The folder a deck at `deckPath` reads its theme from: its project folder, or its own folder when it has none. */
+function themeRootOf(deckPath: string): string {
+  return vscode.workspace.getWorkspaceFolder(vscode.Uri.file(deckPath))?.uri.fsPath ?? path.dirname(deckPath);
+}
+
+/**
+ * Sprint 162: the theme files in `Slide library/Themes` of the project at `root`, each read by `readProjectTheme`'s
+ * rule (inside the project once links are followed, small enough to be a theme). None when the folder isn't there.
+ */
+export async function projectThemeFiles(root: string): Promise<Array<{ path: string; text: string }>> {
+  let names: string[];
+  try {
+    names = (await fs.promises.readdir(path.join(root, THEMES_FOLDER))).filter(name => /\.theme\.md$/i.test(name)).sort();
+  } catch {
+    return [];
+  }
+  const files: Array<{ path: string; text: string }> = [];
+  for (const name of names.slice(0, MAX_THEMES)) {
+    const relative = `${THEMES_FOLDER}/${name}`;
+    const text = await readProjectTheme(root, relative);
+    if (text !== null) files.push({ path: relative, text });
+  }
+  return files;
 }
 
 /** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */

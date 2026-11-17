@@ -52,8 +52,6 @@ export interface StripActions {
   undo: (redo: boolean) => void
   /** The menu's Slide settings… (17 November): the popover beside the thumbnail it came from. */
   settings: (index: number) => void
-  /** A deck with no slides has no thumbnail and so no menu: its own look (Card | Borderless) from the + menu at the end. */
-  deckLook: () => void
 }
 
 /** What the strip shows of a copy's source: from a library topic, changed in this deck, or newer in the library. */
@@ -434,17 +432,8 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
         </Tooltip>
         <DropdownMenuContent align="start" side="right" onCloseAutoFocus={keepFocusOnNewSlide}>
           <div className="deck-menu-head">Add at the end</div>
+          {/* A deck with no slides chooses its look on the bar's Theme menu (Sprint 162), so this menu only adds. */}
           <NewSlideItems at={count} actions={actions} />
-          {count === 0 ? (
-            // No slide, so no slide menu: the deck's own look stays reachable here (#764 kept it for an empty deck).
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => actions.deckLook()}>
-                <Icon name="gear" size={14} tone="inherit" />
-                Deck look…
-              </DropdownMenuItem>
-            </>
-          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

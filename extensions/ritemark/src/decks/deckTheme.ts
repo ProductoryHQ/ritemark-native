@@ -146,3 +146,52 @@ export function isThemePath(value: string | null | undefined): value is string {
   if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('/') || path.startsWith('\\')) return false;
   return !path.split(/[\\/]/).includes('..');
 }
+
+/**
+ * One of the project's themes, as the deck's Theme menu lists it (Sprint 162): its path, its file's text (null for the
+ * built-in theme when the project has no file for it), and how many of the project's decks draw it.
+ */
+export interface ThemeEntry {
+  path: string;
+  text: string | null;
+  decks: number;
+}
+
+/** At most this many theme files are listed: a project's library, with room to spare. */
+export const MAX_THEMES = 200;
+
+/**
+ * The theme a deck draws, as a path of the project's list: the file its front matter names when the project has it,
+ * else the built-in theme's (a deck with no `theme:` line, or one naming a file that isn't there, draws the built-in
+ * theme, so it counts there and the menu ticks it there).
+ */
+export function themeKeyOf(named: unknown, paths: ReadonlySet<string>): string {
+  const path = typeof named === 'string' ? named.trim() : '';
+  return isThemePath(path) && paths.has(path) ? path : BUILT_IN_THEME_PATH;
+}
+
+/**
+ * The project's themes for the Theme menu: every theme file in `Slide library/Themes`, and the built-in theme when the
+ * project has no file at its path; each with the number of decks that draw it (`deckThemes`: each deck's `theme:`
+ * value, or null), sorted by name.
+ */
+export function themeEntries(files: ReadonlyArray<{ path: string; text: string }>, deckThemes: ReadonlyArray<string | null>): ThemeEntry[] {
+  const entries: ThemeEntry[] = files.filter(file => isThemePath(file.path)).map(file => ({ path: file.path, text: file.text, decks: 0 }));
+  if (!entries.some(entry => entry.path === BUILT_IN_THEME_PATH)) entries.push({ path: BUILT_IN_THEME_PATH, text: null, decks: 0 });
+  const byPath = new Map(entries.map(entry => [entry.path, entry]));
+  const paths = new Set(byPath.keys());
+  for (const named of deckThemes) byPath.get(themeKeyOf(named, paths))!.decks += 1;
+  const nameOf = (entry: ThemeEntry) => themeOfEntry(entry).name;
+  return entries.sort((a, b) => nameOf(a).localeCompare(nameOf(b)) || a.path.localeCompare(b.path));
+}
+
+/** An entry's theme: its file read, or the built-in theme. */
+export function themeOfEntry(entry: Pick<ThemeEntry, 'text'>): DeckTheme {
+  return entry.text === null ? BUILT_IN_THEME : parseTheme(entry.text);
+}
+
+/** "1 deck", "5 decks", "No decks": a theme's reach in the Theme menu. */
+export function deckCountLabel(count: number): string {
+  if (count === 0) return 'No decks';
+  return count === 1 ? '1 deck' : `${count} decks`;
+}

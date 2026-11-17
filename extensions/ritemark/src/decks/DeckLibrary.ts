@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, exerciseTagOf, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
+import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -167,6 +167,19 @@ export class DeckLibrary {
       });
     }
     return found.sort((a, b) => (a.topic === b.topic ? (a.topic ? a.name.localeCompare(b.name) : b.modified - a.modified) : a.topic ? -1 : 1));
+  }
+
+  /**
+   * Sprint 162: each of the project's decks' `theme:` value (null for a deck without one), read from its front matter
+   * only, for the Theme menu's "N decks". An open deck's unsaved text counts, as everywhere in the library.
+   */
+  async deckThemes(): Promise<Array<string | null>> {
+    const themes: Array<string | null> = [];
+    for (const file of await this.files.list()) {
+      const text = await this.files.read(file.path);
+      if (text !== null) themes.push(frontMatterField(text.replace(/^﻿/, ''), 'theme'));
+    }
+    return themes;
   }
 
   /** A deck's slides as written. */
