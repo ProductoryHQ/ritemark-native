@@ -115,8 +115,8 @@ function rootless(fsPath: string): string {
  * The decks a rename moved: a `.deck.md` file renamed or moved, or each deck inside a folder that was. With where each
  * one was before. Only files Ritemark's rename named (or that are inside a folder it named) are read.
  */
-async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<Array<{ uri: vscode.Uri; before: string }>> {
-  const decks: Array<{ uri: vscode.Uri; before: string }> = [];
+async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<Array<{ uri: vscode.Uri; before: string; inFolder: boolean }>> {
+  const decks: Array<{ uri: vscode.Uri; before: string; inFolder: boolean }> = [];
   for (const { oldUri, newUri } of files) {
     if (newUri.scheme !== 'file') continue;
     let stat: fs.Stats;
@@ -126,12 +126,12 @@ async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vsc
       continue;
     }
     if (stat.isFile()) {
-      if (/\.deck\.md$/i.test(newUri.fsPath)) decks.push({ uri: newUri, before: oldUri.fsPath });
+      if (/\.deck\.md$/i.test(newUri.fsPath)) decks.push({ uri: newUri, before: oldUri.fsPath, inFolder: false });
       continue;
     }
     if (!stat.isDirectory()) continue;
     const inside = await vscode.workspace.findFiles(new vscode.RelativePattern(newUri, '**/*.deck.md'), null, 500);
-    for (const uri of inside) decks.push({ uri, before: path.join(oldUri.fsPath, path.relative(newUri.fsPath, uri.fsPath)) });
+    for (const uri of inside) decks.push({ uri, before: path.join(oldUri.fsPath, path.relative(newUri.fsPath, uri.fsPath)), inFolder: true });
   }
   return decks;
 }
@@ -149,10 +149,11 @@ async function rebaseMovedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUr
     const oldFolder = path.posix.dirname(rootless(deck.before));
     const newFolder = path.posix.dirname(rootless(deck.uri.fsPath));
     const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
-    // A deck that isn't open is read from disk first, and opened only when its text changes (review of #771): a folder
-    // of decks moved never opens the ones that need nothing.
+    // A deck inside a moved folder that isn't open is read from disk first, and opened only when its text changes
+    // (review of #771): a folder of decks moved never opens the ones that need nothing. A deck moved itself is always
+    // read as a document, so unsaved words carried to its new place are rebased too (round two).
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === deck.uri.toString());
-    if (!open) {
+    if (!open && deck.inFolder) {
       let onDisk: string;
       try {
         onDisk = await fs.promises.readFile(deck.uri.fsPath, 'utf8');

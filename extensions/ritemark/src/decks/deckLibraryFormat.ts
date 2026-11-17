@@ -104,11 +104,11 @@ const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCas
 /** An inline picture: `![alt](target "title")`, the alt with one level of brackets, the title in "", '' or (). */
 const INLINE_PICTURE = /(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)(<[^>\n]*>|[^)\s]+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))/g;
 /** An HTML picture's source: `<img … src="target">`. */
-const HTML_PICTURE = /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"'>]*)\2/gi;
+const HTML_PICTURE = /(<img\b[^>]*?(?<![\w-])src\s*=\s*)(["'])([^"'>]*)\2/gi;
 /** A reference picture's use: `![alt][label]`, `![label][]` or `![label]`. */
 const REFERENCE_PICTURE = /!\[((?:[^[\]]|\[[^\]]*\])*)\](?:\[([^\]]*)\])?/g;
-/** A link reference definition: `[label]: target "title"`. */
-const DEFINITION = /^( {0,3}\[([^\]]+)\]:[ \t]*)(<[^>\n]*>|\S+)(.*)$/;
+/** A link reference definition: `[label]: target "title"`, also inside a quote or a list item. */
+const DEFINITION = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\[([^\]]+)\]:[ \t]*)(<[^>\n]*>|\S+)(.*)$/;
 
 /** A target rewritten, in the form it was written: angle brackets kept, or added when the new path has a space. */
 function rewrittenTarget(target: string, rewrite: (target: string) => string): string {
@@ -130,9 +130,11 @@ function codeLines(lines: string[]): boolean[] {
   let indented = false;
   let inList = false;
   for (const line of lines) {
-    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    // A fence at any indent (a list item's own code block is indented too); one that only looks like a fence inside
+    // an indented code block keeps what follows unread, which is never wrong.
+    const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
     if (fence) {
-      if (open && open[1][0] === fence[0] && open[1].length >= fence.length && /^ {0,3}[`~]+\s*$/.test(line)) fence = null;
+      if (open && open[1][0] === fence[0] && open[1].length >= fence.length && /^[ \t]*[`~]+\s*$/.test(line)) fence = null;
       code.push(true);
       continue;
     }
@@ -148,6 +150,8 @@ function codeLines(lines: string[]): boolean[] {
       continue;
     }
     indented = false;
+    // A line at the left edge after a blank, or a heading or a fence there, ends a list.
+    if (!/^\s/.test(line) && (previousBlank || /^#{1,6}(?:\s|$)/.test(line) || open)) inList = false;
     if (open) {
       fence = open[1];
       previousBlank = false;
@@ -155,7 +159,6 @@ function codeLines(lines: string[]): boolean[] {
       continue;
     }
     if (/^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:\s|$)/.test(line)) inList = true;
-    else if (previousBlank && !/^\s/.test(line)) inList = false;
     previousBlank = false;
     code.push(false);
   }
@@ -163,26 +166,36 @@ function codeLines(lines: string[]): boolean[] {
 }
 
 /**
- * The pictures of some Markdown, each target rewritten by `rewrite`: inline pictures (`![…](target)`, any title), HTML
- * pictures (`<img src>`), and the definitions reference pictures use (`![…][label]` and `[label]: target`). Links stay,
- * and nothing inside a code block (fenced or indented) or a code span is touched: a prompt's words are the person's own.
+ * The labels reference pictures use (`![…][label]`, `![label][]`, `![label]`), read outside code. A deck reads its
+ * definitions over the whole text, so a deck's labels are read from all of it (`rewriteDeckPictures`).
  */
-export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string): string {
+export function pictureReferenceLabels(markdown: string): Set<string> {
   const lines = markdown.split('\n');
   const code = codeLines(lines);
-  // The labels reference pictures use, read outside code, so only their definitions are rewritten (a link's stays).
-  const pictureLabels = new Set<string>();
+  const labels = new Set<string>();
   lines.forEach((line, index) => {
     if (code[index]) return;
     for (const part of line.split(/`+[^`]*`+/)) {
       for (const match of part.matchAll(REFERENCE_PICTURE)) {
-        const label = match[2] === undefined || match[2] === '' ? match[1] : match[2];
         // `![alt](…)` is an inline picture, never a reference.
-        if (part[(match.index ?? 0) + match[0].length] === '(' && match[2] === undefined) continue;
-        pictureLabels.add(labelKey(label));
+        if (match[2] === undefined && part[(match.index ?? 0) + match[0].length] === '(') continue;
+        labels.add(labelKey(match[2] === undefined || match[2] === '' ? match[1] : match[2]));
       }
     }
   });
+  return labels;
+}
+
+/**
+ * The pictures of some Markdown, each target rewritten by `rewrite`: inline pictures (`![…](target)`, any title), HTML
+ * pictures (`<img src>`), and the definitions reference pictures use (`![…][label]` and `[label]: target`). Links stay,
+ * and nothing inside a code block (fenced or indented) or a code span is touched: a prompt's words are the person's own.
+ */
+export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string, labels?: Set<string>): string {
+  const lines = markdown.split('\n');
+  const code = codeLines(lines);
+  // Only the definitions reference pictures use are rewritten (a link's stays): this text's own labels, or the deck's.
+  const pictureLabels = labels ?? pictureReferenceLabels(markdown);
   return lines.map((line, index) => {
     if (code[index]) return line;
     const definition = DEFINITION.exec(line);
@@ -204,10 +217,13 @@ export function rewritePictureTargets(markdown: string, rewrite: (target: string
 export function rewriteDeckPictures(text: string, rewrite: (target: string) => string): string {
   const deck = parseDeck(text);
   let out = text;
+  // The handout is one text (a definition at its end serves a picture in any part): its labels are read from all of it
+  // (review of #771). A slide's Markdown is drawn on its own, so it reads its own.
+  const handoutLabels = pictureReferenceLabels(text);
   // From the last slide back, so the places read from the text still hold.
   for (let index = deck.slides.length - 1; index >= 0; index--) {
     const slide = deck.slides[index];
-    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite) + out.slice(slide.handoutEnd);
+    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite, handoutLabels) + out.slice(slide.handoutEnd);
     const bodyStart = out.indexOf('\n', slide.start) + 1;
     if (bodyStart <= 0 || out.slice(bodyStart, bodyStart + slide.body.length) !== slide.body) continue;
     const data = slideDataOf(slide.kind, slide.body);
@@ -222,7 +238,7 @@ export function rewriteDeckPictures(text: string, rewrite: (target: string) => s
   }
   // The words before the first slide, after the front matter.
   const introEnd = deck.slides.length ? deck.slides[0].start : out.length;
-  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite) + out.slice(introEnd);
+  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite, handoutLabels) + out.slice(introEnd);
 }
 
 /** A path as the project knows it, from the folder it was written in; null when it is no relative path. */

@@ -366,6 +366,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       // The / menu's Picture goes where the / was, through whatever changes while the host saves it.
       if (transaction.docChanged && pictureAt.current !== null) pictureAt.current = transaction.mapping.map(pictureAt.current)
       if (transaction.docChanged && replaceAt.current !== null) replaceAt.current = transaction.mapping.map(replaceAt.current)
+      if (transaction.docChanged && pendingReplace.current !== null) pendingReplace.current = transaction.mapping.map(pendingReplace.current)
       if (transaction.docChanged && lastCaret.current !== null) lastCaret.current = transaction.mapping.map(lastCaret.current)
     },
     // Leaving the slide writes what waited even with the menu still open (its query is words then, as typed): a slide
@@ -548,6 +549,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pictureAt = useRef<number | null>(null)
   /** 17 November: the missing picture Replace picture… was chosen on: the saved picture takes its place. */
   const replaceAt = useRef<number | null>(null)
+  /** That picture while its file picker is open: it becomes `replaceAt` only when a file is chosen. */
+  const pendingReplace = useRef<number | null>(null)
 
   const apply = (tr: Transaction | null): boolean => {
     if (!tr || !editor || editor.isDestroyed) return false
@@ -575,19 +578,26 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
    * The / menu's Picture: the computer's file picker, then the host saves the picture beside the deck. `atCaret` false:
    * the slide's own picture beside or behind it (Replace picture… on a missing one).
    */
-  const choosePicture = (atCaret = true) => {
+  const choosePicture = (atCaret = true, replacing = false) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
+    // The / menu's place this picker was opened for, so cancelling it forgets only that (review of #771).
+    const slashAt = replacing || !atCaret ? null : pictureAt.current
     input.addEventListener('change', () => {
       const file = input.files?.[0]
       if (!file) return
+      // Replace picture…: the picture chosen takes the missing one's place once saved; the / menu's waits as it was.
+      if (replacing) {
+        replaceAt.current = pendingReplace.current
+        pendingReplace.current = null
+      }
       void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file), atCaret))
     })
-    // Cancelled: nothing waits for a picture any more, so a later one goes where it is asked for.
+    // Cancelled: only what this picker would have filled stops waiting.
     input.addEventListener('cancel', () => {
-      replaceAt.current = null
-      pictureAt.current = null
+      if (replacing) pendingReplace.current = null
+      else if (slashAt !== null && pictureAt.current === slashAt) pictureAt.current = null
     })
     input.click()
   }
@@ -619,9 +629,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (found === null && node.type.name === 'image' && imagePathOf(node.attrs) === spot.path) found = pos
     })
     if (found === null) return
-    replaceAt.current = found
-    pictureAt.current = null
-    choosePicture(true)
+    // Waits for the picker: only a picture chosen there replaces it, never the / menu's next one.
+    pendingReplace.current = found
+    choosePicture(true, true)
   }
 
   /** The deck's last pill label up to this slide, for a new Steps block (`lastPillLabel`). */
@@ -662,8 +672,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         case 'picture':
           chain().run()
           pictureAt.current = range.from
-          // A Replace picture… whose picker was cancelled never takes this picture (review of #771).
-          replaceAt.current = null
           choosePicture()
           return
         case 'webPage':
@@ -759,7 +767,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     replaceAt.current = null
     const old = replacing === null ? null : editor.state.doc.nodeAt(replacing)
     if (replacing !== null && old?.type.name === 'image') {
-      pictureAt.current = null
+      // A / menu picture still on its way keeps its place (review of #771).
       apply(editor.state.tr.setNodeMarkup(replacing, undefined, { ...old.attrs, src: picture.url, title: picture.path }))
       return
     }

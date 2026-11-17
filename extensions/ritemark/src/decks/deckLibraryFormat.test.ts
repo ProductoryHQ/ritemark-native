@@ -161,7 +161,16 @@ assert.equal(
   check('[notes][n]\n\n[n]: images/notes.md', '[notes][n]\n\n[n]: images/notes.md', "a link's definition stays");
   check('Words.\n\n    ![](images/code.png)\n\nMore.', 'Words.\n\n    ![](images/code.png)\n\nMore.', 'an indented code block stays');
   check('- An item\n\n    ![](images/in-item.png)', '- An item\n\n    ![](../images/in-item.png)', "a list item's own picture is followed");
-  check('Words\n    ![](images/lazy.png)', 'Words\n    ../images/lazy.png'.replace('../images/lazy.png', '![](../images/lazy.png)'), 'an indented line inside a paragraph is no code');
+  check('Words\n    ![](images/lazy.png)', 'Words\n    ![](../images/lazy.png)', 'an indented line inside a paragraph is no code');
+  // Round two: a list item's own fenced code, a list ended by a fence or a heading, data-src, a quoted definition.
+  check('1. Step\n\n    ```\n    ![](images/code.png)\n    ```', '1. Step\n\n    ```\n    ![](images/code.png)\n    ```', "a list item's fenced code stays");
+  check('- a\n\n```\nx\n```\n\n    ![](images/code.png)', '- a\n\n```\nx\n```\n\n    ![](images/code.png)', 'a fence ends the list: the indented code after it stays');
+  check('- a\n# H\n\n    ![](images/code.png)', '- a\n# H\n\n    ![](images/code.png)', 'a heading ends the list too');
+  check('<img data-src="images/a.png" src="images/b.png">', '<img data-src="images/a.png" src="../images/b.png">', 'the real src, not data-src');
+  check('![x][c]\n\n> [c]: images/c.png', '![x][c]\n\n> [c]: ../images/c.png', 'a definition in a quote');
+  // A deck: a reference picture in one part, its definition at the handout's end, in another part.
+  const DECK = ['```slide', '# One', '```', '', '![chart][c]', '', '```slide', '# Two', '```', '', '[c]: images/c.png', ''].join('\n');
+  assert.ok(rewriteDeckPictures(DECK, target => movedTarget(target, 'P/Koolitus', 'P/Koolitus/Arhiiv')).includes('[c]: ../images/c.png'), "the handout's labels are read over all of it");
 }
 
 console.log('deckLibraryFormat: passed');

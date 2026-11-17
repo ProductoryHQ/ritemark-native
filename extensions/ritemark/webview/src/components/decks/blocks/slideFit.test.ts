@@ -108,8 +108,14 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(/clearStageFit\(fitOwner\.current\)/.test(stage), 'the stage takes away only its own step')
   // Review of #771: a cancelled Replace picture… never takes the / menu's next picture.
   const pictureItem = stage.slice(stage.indexOf("case 'picture':"), stage.indexOf("case 'webPage':"))
-  assert.ok(pictureItem.includes('replaceAt.current = null'), "the / menu's Picture never replaces")
-  assert.ok(/addEventListener\('cancel', \(\) => \{\s*replaceAt\.current = null/.test(stage), 'a cancelled picker forgets what it would replace')
+  // Round two: the missing picture waits for the picker (`pendingReplace`) and is replaced only when a file is chosen
+  // there; the / menu never touches a replace in flight, and a cancelled picker forgets only its own.
+  assert.ok(!pictureItem.includes('replaceAt'), "the / menu's Picture leaves a replace in flight alone")
+  const replaceFn = stage.slice(stage.indexOf('const replacePicture ='), stage.indexOf('const replacePicture =') + 900)
+  assert.ok(replaceFn.includes('pendingReplace.current = found') && !replaceFn.includes('replaceAt.current ='), 'Replace picture… only waits')
+  const picker = stage.slice(stage.indexOf('const choosePicture ='), stage.indexOf('// 17 November: Replace picture… over each missing picture'))
+  assert.ok(/if \(replacing\) \{\s*replaceAt\.current = pendingReplace\.current/.test(picker), 'a chosen file makes it the one replaced')
+  assert.ok(/addEventListener\('cancel', \(\) => \{\s*if \(replacing\) pendingReplace\.current = null\s*else if \(slashAt !== null && pictureAt\.current === slashAt\) pictureAt\.current = null/.test(picker), 'a cancel forgets only its own')
 }
 
 // The renderer: a title over a picture is no cover slide (the picture pushed the title up and off the slide); a title
