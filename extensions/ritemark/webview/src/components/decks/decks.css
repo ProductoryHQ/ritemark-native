@@ -193,7 +193,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    text ends in an ellipsis; an action keeps its whole word. */
 .deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 0; overflow: hidden; }
 .deck-notice > .deck-notice-act { flex: none; }
-/* A join's line and the full slide's line side by side: a hairline between them. */
+/* A join's line and the full slide's line side by side: a hairline between them. The pair gives way before the bar's
+   own controls (Present, which folds to its icon), its words first, its actions never. */
+.deck-notice:has(> .deck-notice-gap) { flex-shrink: 1000; }
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the

@@ -110,6 +110,8 @@ interface Notice {
 }
 
 const NO_SLOTS: PartMenuSlot[] = []
+/** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
+const JOIN_NOTE_ROOM = 12
 
 /** What the Slide settings popover is anchored to: a thumbnail, a part number's ⋯, or a point (the slide's right-click). */
 type SettingsAnchor = { getBoundingClientRect: () => DOMRect }
@@ -779,6 +781,18 @@ export function DeckView({
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
   }, [editor, makeCurrent])
+  // The first press of a join shows its line and note: a part scrolled to the top keeps its line just out of view, so
+  // the handout moves down by what it takes to show them, holding the current slide as writing holds it.
+  useEffect(() => {
+    if (joinAt === null || !editor) return
+    const container = editor.view.dom.closest('.wysiwyg-editor') as HTMLElement | null
+    const head = editor.view.dom.querySelector<HTMLElement>('.deck-part-head.is-join')
+    if (!container || !head) return
+    const top = head.getBoundingClientRect().top - container.getBoundingClientRect().top
+    if (top >= JOIN_NOTE_ROOM) return
+    lockUntil.current = Date.now() + WRITE_LOCK_MS
+    container.scrollTop = Math.max(0, container.scrollTop - (JOIN_NOTE_ROOM - top))
+  }, [joinAt, editor])
   // The part numbers' ⋯ (one menu in each part head's slot, the strip's own items and actions).
   const partSlots = useSyncExternalStore(
     useCallback((listener: () => void) => (editor ? partMenuSlots.subscribe(editor, listener) : () => {}), [editor]),
@@ -925,9 +939,11 @@ export function DeckView({
       setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
     }))
   }, [pick, editor])
-  /** From a part number's ⋯: beside the number, the focus back to its ⋯. */
+  /** From a part number's ⋯: beside the number (on its left, so the number stays in view), the focus back to its ⋯. */
   const partSettings = useCallback((index: number, slot: PartMenuSlot) => openSettings(index, () => (
-    slot.element.isConnected ? { anchor: slot.element, side: 'left', back: slot.element.querySelector('button') } : null
+    slot.element.isConnected
+      ? { anchor: slot.element.parentElement?.querySelector<HTMLElement>('.deck-part-number') ?? slot.element, side: 'left', back: slot.element.querySelector('button') }
+      : null
   )), [openSettings])
   /** From the slide's own right-click menu: at the point it was opened, the focus back to the slide's words. */
   const stageSettings = useCallback((at: { x: number; y: number }) => openSettings(currentRef.current, () => ({
