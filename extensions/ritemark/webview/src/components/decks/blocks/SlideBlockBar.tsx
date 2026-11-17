@@ -95,6 +95,16 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
   const [drag, setDrag] = useState<{ kind: 'move'; y: number; width: number; left: number } | { kind: 'split'; x: number; top: number; height: number } | null>(null)
   const barRef = useRef<HTMLDivElement | null>(null)
   const chosenKey = useRef<string | null>(null)
+  // The handles' layer, the frame's last child while the frame is there.
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!frame) return
+    const element = document.createElement('div')
+    element.className = 'deck-block-layer'
+    frame.append(element)
+    setLayer(element)
+    return () => { element.remove(); setLayer(null) }
+  }, [frame])
 
   /** The chosen block now, and where it and its parts are. */
   const measure = useCallback(() => {
@@ -172,7 +182,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     // Again only when the block moves or the bar's contents change (its width): never on its own update.
   }, [showing, placed, chosen?.node, chosen?.kind])
 
-  if (!editor || !chosen || !placed) return <div className="deck-block-layer" />
+  if (!editor || !chosen || !placed || !layer) return null
 
   const run = (tr: Transaction | null) => { apply(tr); editor.view.focus() }
   const state = editor.state
@@ -276,9 +286,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
 
   return (
     <>
-      {/* A layer of its own, always there: the frame's other children move (the bubble menu goes to the page), so
-          React never inserts the handles before a node that has left the frame (the app run: insertBefore failed). */}
-      <div className="deck-block-layer">{showing ? (
+      {/* The handles go in a layer of their own, put in the frame by this component (a portal): the frame's other
+          children move (the bubble menu goes to the page), and React inserting beside them failed (the app run). */}
+      {createPortal(showing ? (
         <>
           <div className="deck-block-ring" style={{ left: block.left - 4, top: block.top - 4, width: block.width + 8, height: block.height + 8 }} aria-hidden="true" />
           <Tooltip label="Drag to move the block on the slide">
@@ -308,7 +318,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
           {drag?.kind === 'move' ? <div className="deck-block-drop" style={{ left: drag.left, top: drag.y - 1, width: drag.width }} aria-hidden="true" /> : null}
           {drag?.kind === 'split' ? <div className="deck-block-guide" style={{ left: drag.x - 1, top: drag.top, height: drag.height }} aria-hidden="true" /> : null}
         </>
-      ) : null}</div>
+      ) : null, layer)}
       {showing
         ? createPortal(
             <div

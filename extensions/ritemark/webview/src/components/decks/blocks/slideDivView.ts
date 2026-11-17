@@ -253,7 +253,10 @@ function slideCaretBox(): Plugin {
   let marked: HTMLElement | null = null
   const mark = (view: EditorView) => {
     const pos = caretBoxPos(view.state)
-    const dom = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
+    const found = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
+    // Only a box this view draws (`blk-box`): a class put on any other element is a change ProseMirror reads back and
+    // draws again, and the mark put back, without end (the block bar's app run: the deck hung on changing slides).
+    const dom = found && found.isConnected && found.classList?.contains('blk-box') ? found : null
     if (dom === marked && dom?.classList.contains(CARET_CLASS)) return
     marked?.classList.remove(CARET_CLASS)
     marked = dom
