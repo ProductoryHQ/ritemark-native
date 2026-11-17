@@ -44,11 +44,15 @@ interface Layers {
 export function playStep(step: MotionStep, direction: MotionDirection, layers: Layers, pairs: readonly MotionPair<HTMLElement>[] = []): MotionDrawing {
   const animations: Animation[] = []
   const undo: Array<() => void> = []
+  const { leaving, entering, distance } = layers
   const animate = (element: HTMLElement, keyframes: Keyframe[], ms: number, easing: string) => {
     if (typeof element.animate !== 'function') return
-    animations.push(element.animate(keyframes, { duration: ms, easing, fill: 'both' }))
+    const animation = element.animate(keyframes, { duration: ms, easing, fill: 'both' })
+    animations.push(animation)
+    // The new slide's end is how it is drawn anyway: its animation is taken off at the end, so nothing lingers on the
+    // slide now shown. The slide before keeps its end (gone) until it is taken away.
+    if (element !== leaving) undo.push(() => animation.cancel())
   }
-  const { leaving, entering, distance } = layers
   switch (step) {
     case 'fade':
       animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOTION_MS.fade, 'ease')

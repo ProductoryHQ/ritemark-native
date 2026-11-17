@@ -143,11 +143,11 @@ class FakeClock implements MotionClock {
 
 // ---- The drawing: every animation of a step is put at its end by one jump; None hides the slide before at once
 {
-  const made: Array<{ keyframes: Keyframe[]; options: KeyframeAnimationOptions; finished: number }> = []
+  const made: Array<{ keyframes: Keyframe[]; options: KeyframeAnimationOptions; finished: number; cancelled: number }> = []
   const element = () => ({
     style: {} as Record<string, string>,
     animate(keyframes: Keyframe[], options: KeyframeAnimationOptions) {
-      const animation = { keyframes, options, finished: 0, finish() { this.finished += 1 } }
+      const animation = { keyframes, options, finished: 0, cancelled: 0, finish() { this.finished += 1 }, cancel() { this.cancelled += 1 } }
       made.push(animation)
       return animation as unknown as Animation
     },
@@ -160,6 +160,7 @@ class FakeClock implements MotionClock {
     drawing.finish()
     drawing.finish()
     assert.ok(made.every(animation => animation.finished === 1), `${step}: one jump puts each at its end, once`)
+    assert.deepEqual(made.map(animation => animation.cancelled), [1, 0], `${step}: nothing lingers on the slide now shown; the slide before stays at its end until it is taken away`)
   }
   made.length = 0
   playStep('push', 'next', { leaving: element(), entering: element(), distance: 1440 })
