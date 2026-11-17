@@ -19,8 +19,11 @@ export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
 /** The webview panel that is the presenter view (Sprint 159, PR 6). */
 export const DECK_PRESENTER_VIEW_TYPE = 'ritemark.deckPresenter';
 
-/** What the wall shows instead of the slide (B or "." the theme's ground, W white), or null: the slide. */
-export type WallBlank = 'ground' | 'white';
+/**
+ * What the wall shows instead of the slide (B or "." the theme's ground, W white; Q the published page's QR code, small
+ * details item 3), or null: the slide.
+ */
+export type WallBlank = 'ground' | 'white' | 'page';
 
 /** The system's clock for the presenter view's time of day (`systemClock.ts`). */
 export interface ClockLocale {
@@ -58,8 +61,10 @@ export interface WallState {
   assets: Record<string, string>;
   /** The bar offers the presenter view (a second display, or a dev build's windowed mode), and whether it is on. */
   presenter: { available: boolean; on: boolean };
-  /** The wall is blank (to the theme's ground, or white), or null. */
+  /** The wall is blank (to the theme's ground, or white), shows the page's QR code (`page`), or null. */
   blank: WallBlank | null;
+  /** The deck's published page, by its address, for Q's QR code; null while the deck isn't published. */
+  page: string | null;
 }
 
 /**
@@ -89,8 +94,10 @@ export interface PresenterState {
   length: number | null;
   /** When the presentation started (ms since the epoch), for the clock. */
   startedAt: number;
-  /** The wall is blank: "The wall is blank · B to show it". */
+  /** The wall is blank: "The wall is blank · B to show it"; or it shows the page's QR code. */
   blank: WallBlank | null;
+  /** The deck's published page, by its address: "Show the page" shows its QR code on the wall. Null: no button. */
+  page: string | null;
   /** The system's clock, for the time of day beside the elapsed time. */
   clock: ClockLocale;
 }
@@ -120,7 +127,7 @@ export type WallRequest =
   | { type: 'present/swap' }
   /** The presenter view's clock: ask the session's length and keep it in the deck's front matter. */
   | { type: 'present/set-length' }
-  /** B, "." or W blanks the wall; any key brings the slide back (`to` null). */
+  /** B, "." or W blanks the wall, Q shows the page's QR code; any key brings the slide back (`to` null). */
   | { type: 'present/blank'; to: WallBlank | null };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
@@ -180,7 +187,9 @@ export function wallStateOf(
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
+  page: string | null = null,
 ): WallState {
+  const address = pageAddressOf(page);
   return {
     type: 'present/wall',
     slide: wallSlideOf(view.current),
@@ -192,7 +201,8 @@ export function wallStateOf(
     theme: look.theme,
     assets,
     presenter: { available: presenter.available, on: presenter.on },
-    blank: blankOf(blank),
+    blank: shownBlank(blank, address),
+    page: address,
   };
 }
 
@@ -213,9 +223,10 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null },
   onWall?: WallSlide,
 ): PresenterState {
+  const address = pageAddressOf(session.page ?? null);
   return {
     type: 'present/presenter',
     current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
@@ -232,13 +243,28 @@ export function presenterStateOf(
     canSwap: session.canSwap,
     length: session.length,
     startedAt: session.startedAt,
-    blank: blankOf(session.blank ?? null),
+    blank: shownBlank(session.blank ?? null, address),
+    page: address,
     clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
   };
 }
 
 function blankOf(value: unknown): WallBlank | null {
-  return value === 'ground' || value === 'white' ? value : null;
+  return value === 'ground' || value === 'white' || value === 'page' ? value : null;
+}
+
+/** The longest page address the wall is sent. */
+const MAX_ADDRESS = 2048;
+
+/** A published page's address as the wall may show it: an https address, or null. */
+export function pageAddressOf(value: unknown): string | null {
+  return typeof value === 'string' && value.length <= MAX_ADDRESS && /^https:\/\/[^\s/]+/.test(value) ? value : null;
+}
+
+/** The blank the wall shows: the page's QR code only while the deck has a published page. */
+function shownBlank(value: unknown, page: string | null): WallBlank | null {
+  const blank = blankOf(value);
+  return blank === 'page' && page === null ? null : blank;
 }
 
 function exactKeys(input: Record<string, unknown>, keys: readonly string[]): boolean {

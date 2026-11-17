@@ -67,6 +67,15 @@ async function realPathOf(file: string): Promise<string> {
   return fs.promises.realpath(file).catch(() => file);
 }
 
+/**
+ * A page's address while it is online: published (an Update going up keeps it), and only an address Cloudflare gave
+ * (`WORKERS_DEV_ADDRESS`, the one rule for opening one). Null otherwise.
+ */
+export function publishedAddress(bar: PageBarState | undefined): string | null {
+  if (!bar || (bar.kind !== 'published' && bar.kind !== 'publishing')) return null;
+  return bar.address && WORKERS_DEV_ADDRESS.test(bar.address) ? bar.address : null;
+}
+
 export class DeckPublisher implements vscode.Disposable {
   private readonly seats = new Set<DeckSeat>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -143,6 +152,23 @@ export class DeckPublisher implements vscode.Disposable {
     let changed = bar?.changed === true;
     if (kind === 'published' && !changed) changed = await this.deckChanged(document, pagePath);
     return { state: { ready: true, kind, changed }, bar };
+  }
+
+  /**
+   * Small details item 3: the deck's published page, by its address, for Present's QR code; null while it isn't
+   * published (or Publish can't be reached). 2.2's last answer for an open deck view, else 2.2 asked.
+   */
+  async pageAddressOf(document: vscode.TextDocument): Promise<string | null> {
+    if (!this.ready()) return null;
+    let bar = [...this.seats].find(seat => seat.document === document && seat.bar)?.bar;
+    if (!bar) {
+      try {
+        bar = await vscode.commands.executeCommand<PageBarState | undefined>(PAGE_STATE_COMMAND, vscode.Uri.file(pagePathFor(document.uri.fsPath)));
+      } catch {
+        bar = undefined;
+      }
+    }
+    return publishedAddress(bar);
   }
 
   /** Whether the deck's public content is no longer what its page was written from. */

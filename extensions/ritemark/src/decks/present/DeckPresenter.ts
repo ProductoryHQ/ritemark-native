@@ -45,6 +45,7 @@ import {
   decodeWallRequest,
   frontMatterEdit,
   lengthMinutesOf,
+  pageAddressOf,
   MAX_LENGTH_MINUTES,
   presenterPicturePaths,
   presenterStateOf,
@@ -110,6 +111,8 @@ interface Running {
   blank: WallBlank | null;
   /** The system's clock, read once at the start, for the presenter view's time of day (the webview's own until then). */
   clock: ClockLocale;
+  /** The deck's published page, by its address (Q shows its QR code), or null while it isn't published. */
+  page: string | null;
 }
 
 /** The shell's commands (patch 018). */
@@ -145,6 +148,12 @@ export class DeckPresenter implements vscode.Disposable {
   private running: Running | null = null;
   /** Each start takes a number; a later start, or a Stop, makes an earlier one that is still waiting give up. */
   private starts = 0;
+
+  /**
+   * Small details item 3: the deck's published page's address, or null (Publish's page state, `deckPublish.ts`). Set
+   * once at activation; without it no deck is published here, and Q and "Show the page" are not offered.
+   */
+  pageAddress: ((document: vscode.TextDocument) => Promise<string | null>) | null = null;
 
   constructor(private readonly extensionUri: vscode.Uri, private readonly state: vscode.Memento) {}
 
@@ -221,8 +230,11 @@ export class DeckPresenter implements vscode.Disposable {
       presenterSerial: 0,
       blank: null,
       clock: { locale: null, hourCycle: null },
+      page: null,
     };
     this.running = running;
+    // Whether the deck is published, and where: the wall and the presenter view get it once it is known.
+    void this.readPage(running);
     // The system's clock comes a moment later (macOS's `defaults`): the presenter view gets it then.
     void readSystemClock().then(clock => {
       running.clock = clock;
@@ -404,6 +416,9 @@ export class DeckPresenter implements vscode.Disposable {
         if (screen === running.presenter) await this.setLength(running);
         return;
       case 'present/blank':
+        // Q: the page's QR code, only for a deck that is published now (asked again, never an old address).
+        if (request.to === 'page' && !(await this.readPage(running))) return;
+        if (running.ended) return;
         running.blank = request.to;
         await this.showBlank(running);
         return;
@@ -454,7 +469,7 @@ export class DeckPresenter implements vscode.Disposable {
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
-    const state = wallStateOf(view, look, assets, presenter, running.blank);
+    const state = wallStateOf(view, look, assets, presenter, running.blank, running.page);
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -470,7 +485,8 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: running.blank };
+    const blank = running.blank === 'page' && !running.page ? null : running.blank;
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank, page: running.page };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -500,7 +516,29 @@ export class DeckPresenter implements vscode.Disposable {
       startedAt: running.startedAt,
       blank: running.blank,
       clock: running.clock,
+      page: running.page,
     }, onWall?.slide));
+  }
+
+  /**
+   * The deck's published page, asked again: kept for the wall and the presenter view, and sent to both when it changed
+   * (not a move: the wall keeps the slide it last got). A page gone takes its QR code off the wall.
+   */
+  private async readPage(running: Running): Promise<string | null> {
+    let page: string | null = null;
+    try {
+      page = pageAddressOf(this.pageAddress ? await this.pageAddress(running.origin.document) : null);
+    } catch {
+      page = null;
+    }
+    if (running.ended) return null;
+    if (page !== running.page) {
+      running.page = page;
+      if (!page && running.blank === 'page') running.blank = null;
+      // Before the wall's first state, that state carries it.
+      if (running.wallState) await this.showBlank(running);
+    }
+    return page;
   }
 
   /**

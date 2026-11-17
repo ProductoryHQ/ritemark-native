@@ -244,9 +244,59 @@ async function main(): Promise<void> {
     const clockSent = last(presenterView, 'present/presenter').clock as { locale: unknown; hourCycle: unknown };
     assert.ok(clockSent && 'locale' in clockSent && 'hourCycle' in clockSent);
 
+    // Small details item 3: this deck isn't published (no page address), so Q does nothing and no button shows.
+    assert.equal(last(wall, 'present/wall').page, null)
+    assert.equal(last(presenterView, 'present/presenter').page, null, 'no "Show the page" for an unpublished deck')
+    wall.send({ type: 'present/blank', to: null });
+    await settle();
+    wall.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').blank, null, "an unpublished deck's Q does nothing");
+
     presenter.dispose();
     await settle();
     assert.ok(panels.every(panel => panel.disposed), 'Stop closes both');
+
+    // ---- A published deck: Q and "Show the page" put the page's QR code on the wall; any key returns without a step.
+    let address: string | null = 'https://talk.example.workers.dev/';
+    const published = new DeckPresenter({ fsPath: '/extension' } as never, state as never);
+    const asked: unknown[] = [];
+    published.pageAddress = async askedFor => { asked.push(askedFor); return address; };
+    const panelsBefore = panels.length;
+    await published.start(origin as never, { type: 'deck/present', from: 'here', index: 1 } as never);
+    await settle(50);
+    const wall2 = panels.slice(panelsBefore).find(panel => panel.viewType === DECK_WALL_VIEW_TYPE);
+    const laptop2 = panels.slice(panelsBefore).find(panel => panel.viewType === DECK_PRESENTER_VIEW_TYPE);
+    assert.ok(wall2 && laptop2, 'both windows open again');
+    assert.equal(asked[0], document, "the deck's own document is asked");
+    assert.equal(last(wall2, 'present/wall').page, address, 'the wall knows the page');
+    assert.equal(last(laptop2, 'present/presenter').page, address, 'the presenter view offers "Show the page"');
+    const onWall2 = (last(wall2, 'present/wall').slide as { title: string }).title;
+    laptop2.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    assert.equal(last(wall2, 'present/wall').blank, 'page', 'the QR code is on the wall');
+    assert.equal(last(laptop2, 'present/presenter').blank, 'page', 'the presenter view says so');
+    assert.equal((last(wall2, 'present/wall').slide as { title: string }).title, onWall2, 'showing the page is not a move');
+    // Any key (the webview sends `to` null) returns to the same slide.
+    wall2.send({ type: 'present/blank', to: null });
+    await settle();
+    assert.equal(last(wall2, 'present/wall').blank, null);
+    assert.equal((last(wall2, 'present/wall').slide as { title: string }).title, onWall2, 'the key that returns does not step');
+    // A move from a button returns too, on the slide it moves to.
+    wall2.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    laptop2.send({ type: 'present/next' });
+    await settle();
+    assert.equal(last(wall2, 'present/wall').blank, null, 'a move takes the code away');
+    // Unpublished meanwhile: Q asks again, shows nothing, and the button goes.
+    address = null;
+    wall2.send({ type: 'present/blank', to: 'page' });
+    await settle();
+    assert.equal(last(wall2, 'present/wall').blank, null, 'no code for a page that is gone');
+    assert.equal(last(wall2, 'present/wall').page, null);
+    assert.equal(last(laptop2, 'present/presenter').page, null, 'the button goes with the page');
+    published.dispose();
+    await settle();
   } finally {
     if (before.dev === undefined) delete process.env.VSCODE_DEV;
     else process.env.VSCODE_DEV = before.dev;

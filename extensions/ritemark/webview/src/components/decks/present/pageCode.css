@@ -1,0 +1,5 @@
+/* Small details item 3: the page's QR code (Q), centred on the theme's ground, its short address under it. Shared with
+   the presenter view's Now. */
+.page-code { display: flex; flex-direction: column; align-items: center; }
+.page-code-svg { display: block; flex: none; }
+.page-code-address { font-weight: 600; line-height: 1.2; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; -webkit-user-select: text; }

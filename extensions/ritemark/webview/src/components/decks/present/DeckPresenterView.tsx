@@ -9,6 +9,8 @@
  *    has one; a click on it asks for the length. Pause and Reset are this view's own. Beside it, small, the time of day
  *    in the system's 12- or 24-hour format (`timeOfDayText`), for lunch.
  *  - While the wall is blank (B, "." or W), Now says "The wall is blank · B to show it".
+ *  - Small details item 3: for a published deck, "Show the page" (or Q) puts the page's QR code on the wall; Now shows
+ *    it too and says "The page’s QR code is on the wall · Q to show the slide". An unpublished deck has no button.
  *  - Back, Next (the one bright button), Swap displays (with two displays) and Stop.
  *  - "Claude and notices wait until you stop.": the main window, with the AI and the notices, stays behind.
  *
@@ -24,6 +26,7 @@ import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { wallGround } from '../theme/themeVars'
+import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, clockText, countLabel, goToKey, settleAsked, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
 import '../decks.css'
 import './presenter.css'
@@ -120,7 +123,7 @@ export function DeckPresenterView() {
       // B, "." or W blanks the wall; while it is blank, any key brings the slide back and does nothing else (Return and
       // space on one of this view's buttons still press that button).
       const onButton = (event.key === 'Enter' || event.key === ' ') && !!(event.target as Element | null)?.closest?.('button')
-      const blankStep = blankKeyOf(event, blankNow(state.blank, askedBlank.current))
+      const blankStep = blankKeyOf(event, blankNow(state.blank, askedBlank.current), state.page !== null)
       if (blankStep && !(blankStep.type === 'show' && onButton)) {
         take()
         heldKey.current = event.key
@@ -169,6 +172,13 @@ export function DeckPresenterView() {
   const gotoNumber = digits === null ? null : Number(digits)
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
+  const nowHeight = Math.round(nowWidth * 9 / 16)
+  const pageShown = state.blank === 'page' && state.page !== null
+  const togglePage = () => {
+    const to = blankNow(state.blank, askedBlank.current) === 'page' ? null : 'page'
+    askedBlank.current = { to }
+    send('present/blank', { to })
+  }
   const canvas = (slide: WallSlide, width: number) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
       <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} />
@@ -181,7 +191,14 @@ export function DeckPresenterView() {
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
         <div className="pv-now">
           {canvas(state.current, nowWidth)}
-          {state.blank ? (
+          {pageShown && state.page ? (
+            // What the room sees: the page's QR code on the theme's ground (any key brings the slide back).
+            <div className="pv-blank is-page">
+              <div className="pv-blank-ground" style={{ background: wallGround(state.theme, state.borderless) }} />
+              <PageCode address={state.page} theme={state.theme} borderless={state.borderless} height={Math.round(nowHeight * 0.8)} width={nowWidth} />
+              <span className="pv-blank-words" role="status">The page’s QR code is on the wall · Q to show the slide</span>
+            </div>
+          ) : state.blank && state.blank !== 'page' ? (
             // What the room sees: the wall's blank, with the slide faintly under it (it comes back with any key).
             <div className="pv-blank">
               <div className="pv-blank-ground" style={{ background: state.blank === 'white' ? '#FFFFFF' : wallGround(state.theme, state.borderless) }} />
@@ -279,6 +296,14 @@ export function DeckPresenterView() {
             <Icon name="caret-right" size={16} tone="inherit" />
           </Button>
         </Tooltip>
+        {state.page ? (
+          <Tooltip label={pageShown ? 'Show the slide on the wall again (Q)' : 'Show the page’s QR code on the wall, so phones in the room open it (Q)'}>
+            <Button variant="outline" aria-pressed={pageShown} data-state={pageShown ? 'active' : undefined} onClick={togglePage}>
+              <Icon name="qr-code" size={16} tone="inherit" />
+              Show the page
+            </Button>
+          </Tooltip>
+        ) : null}
         {state.canSwap ? (
           <Tooltip label="Show the slides on the other display, and this view here">
             <Button variant="outline" onClick={() => send('present/swap')}>

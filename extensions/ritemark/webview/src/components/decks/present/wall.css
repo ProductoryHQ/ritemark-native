@@ -29,7 +29,7 @@
 .vscode-reduce-motion .wall-slide.is-leaving { animation: none; visibility: hidden; }
 
 /* The blank wall (B, ".", W): over the slide, under the bar and the go-to box; it fades as a move does. */
-.wall-blank { position: absolute; z-index: 1; inset: 0; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+.wall-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
 .wall-blank.is-shown { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .wall-blank { transition: none; } }
 .vscode-reduce-motion .wall-blank { transition: none; }
@@ -60,3 +60,4 @@
 .wall-grid-item.is-picked .wall-grid-slide { box-shadow: 0 0 0 2px #0E0C24, 0 0 0 5px #818CF8; }
 .wall-grid-number { display: block; margin-top: 8px; font-family: var(--ritemark-ui-font-family); font-size: 13px; font-weight: 500; line-height: 16px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
 .wall-grid-item.is-current .wall-grid-number { color: #818CF8; font-weight: 700; }
+

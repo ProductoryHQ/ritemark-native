@@ -78,6 +78,8 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   // Present (Sprint 159): the wall, a window of its own over the main window.
   const presenter = new DeckPresenter(context.extensionUri, context.globalState);
   pages.presenter = presenter;
+  // Small details item 3: Q and "Show the page" put the published page's QR code on the wall.
+  presenter.pageAddress = document => publisher.pageAddressOf(document);
   // The AI's deck tools (PR 5): the same library, and an open deck's view to insert through as one undo step.
   setDeckToolHost(() => (isEnabled('decks') ? {
     library,
