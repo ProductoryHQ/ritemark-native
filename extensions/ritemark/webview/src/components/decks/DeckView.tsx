@@ -25,7 +25,7 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -69,6 +69,8 @@ import { DeckPublish } from './DeckPublish'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
+import { slideOrderKeyOf } from './stripKeys'
+import { isMac } from '../../hooks/usePlatform'
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
@@ -98,6 +100,14 @@ const keepAboveRatio = (ratio: number) => keepDeckViewState({ deckAboveRatio: ra
 /** How long a thumbnail's scroll holds the slide, and how long writing does (the prototype's `syncLock`). */
 const PICK_LOCK_MS = 500
 const WRITE_LOCK_MS = 1200
+/** How long a thumbnail an undo changed keeps its flash (decks.css plays it once, in less). */
+const FLASH_MS = 900
+
+/** Where a key on the stage comes from (slideNav.ts), or null while a dialog or sheet over the deck keeps its keys. */
+function stageKeyFrom(event: KeyboardEvent): 'page' | 'button' | null {
+  if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return null
+  return slideKeyTarget(event.target as KeyTargetElement | null, document.body)
+}
 /** The copies' sources are asked again this long after the deck stops changing; "Updated in the library" stays this long. */
 const SOURCES_MS = 700
 const UPDATED_MS = 4000
@@ -944,8 +954,7 @@ export function DeckView({
     if (!fullSlide) return
     const onKey = (event: KeyboardEvent) => {
       // A dialog or sheet over the deck keeps its keys.
-      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return
-      const index = slideKeyOf(event, slideKeyTarget(event.target as KeyTargetElement | null, document.body), countRef.current, currentRef.current)
+      const index = slideKeyOf(event, stageKeyFrom(event), countRef.current, currentRef.current)
       if (index === null) return
       event.preventDefault()
       goTo(index)
@@ -1077,6 +1086,21 @@ export function DeckView({
     return !!tr
   }, [editor])
 
+  /**
+   * A strip operation that is an undo step of its own, before and after: words typed at once next to the copy or the
+   * moved part start a step of their own too (review of #784), so one Cmd+Z takes back the operation alone.
+   */
+  const dispatchStep = useCallback((tr: Transaction | null) => {
+    if (!dispatch(tr) || !editor) return false
+    dispatch(sealHistory(editor.state))
+    return true
+  }, [dispatch, editor])
+
+  /** Part `from` to stand before part `to`, its slide then current: a drag's drop and Cmd+↑ / Cmd+↓ alike. */
+  const moveTo = useCallback((from: number, to: number) => {
+    if (editor && dispatchStep(moveSlide(editor.state, from, to))) requestAnimationFrame(() => pick(to > from ? to - 1 : to))
+  }, [editor, dispatchStep, pick])
+
   const stripActions = useMemo<StripActions>(() => ({
     pick,
     insert: (at, kind) => {
@@ -1097,7 +1121,7 @@ export function DeckView({
       })
     },
     duplicate: index => {
-      if (editor && dispatch(duplicateSlide(editor.state, index))) requestAnimationFrame(() => pick(index + 1))
+      if (editor && dispatchStep(duplicateSlide(editor.state, index))) requestAnimationFrame(() => pick(index + 1))
     },
     toggleSkip: index => {
       if (!editor) return
@@ -1128,8 +1152,10 @@ export function DeckView({
       const left = slidesOf(editor.state.doc).length
       requestAnimationFrame(() => pick(Math.min(index, left - 1)))
     },
-    move: (from, to) => {
-      if (editor && dispatch(moveSlide(editor.state, from, to))) requestAnimationFrame(() => pick(to > from ? to - 1 : to))
+    move: moveTo,
+    nudge: (index, step) => {
+      const to = editor ? nudgeTarget(index, step, slidesOf(editor.state.doc).length) : null
+      if (to !== null) moveTo(index, to)
     },
     undo: redo => {
       if (!editor) return
@@ -1159,7 +1185,62 @@ export function DeckView({
       const thumb = stripRef.current?.querySelector<HTMLElement>(`[data-thumb="${index}"] .deck-thumb-slide`)
       return thumb ? { anchor: thumb, side: 'right', back: stripRef.current } : null
     }),
-  }), [editor, dispatch, pick, idOf, openSettings])
+  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo])
+
+  // Cmd+D, Cmd+↑ and Cmd+↓ (Ctrl on Windows) with a slide chosen on the stage: the focus on the stage outside its words,
+  // or on nothing (17 November). The strip takes the same keys itself (stripKeys.ts); words keep their editor's keys.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const key = slideOrderKeyOf(event, isMac)
+      // With the slide folded away there is no slide on the stage to choose: the keys are the handout's view's. A button
+      // with the focus (the view switch just pressed, a tool on the stage) keeps them too (Codex on #784).
+      if (!key || countRef.current === 0 || !slideShownRef.current || stageKeyFrom(event) !== 'page') return
+      event.preventDefault()
+      const index = Math.min(currentRef.current, countRef.current - 1)
+      if (key.type === 'duplicate') stripActions.duplicate(index)
+      else stripActions.nudge(index, key.step)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [stripActions])
+
+  // Undo shows what it undid (17 November, Keynote and Google Slides): an undo or a redo that changes a slide which
+  // isn't the current one makes it current, the handout scrolled to its part, and its thumbnail flashes once. With the
+  // caret in the handout in that part, the editor keeps it in view itself, and the part only becomes current.
+  const [flash, setFlash] = useState<{ index: number; serial: number } | null>(null)
+  // Never reset, so a flash always has a key of its own and plays again (review of #784).
+  const flashSerial = useRef(0)
+  useEffect(() => {
+    if (!editor) return
+    let frame: number | null = null
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (!transaction.docChanged || !isHistoryTransaction(transaction)) return
+      const index = partChangedBy(transaction)
+      if (index === null || index === currentRef.current) return
+      flashSerial.current += 1
+      const shown = { index, serial: flashSerial.current }
+      if (frame !== null) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        frame = null
+        if (editor.isDestroyed || index >= slidesOf(editor.state.doc).length) return
+        if (editor.isFocused && partIndexAt(editor.state.doc, editor.state.selection.from) === index) {
+          lockUntil.current = Date.now() + WRITE_LOCK_MS
+          makeCurrent(index)
+        } else pick(index)
+        setFlash(shown)
+      })
+    }
+    editor.on('transaction', onTransaction)
+    return () => {
+      editor.off('transaction', onTransaction)
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [editor, pick, makeCurrent])
+  useEffect(() => {
+    if (!flash) return
+    const timer = window.setTimeout(() => setFlash(null), FLASH_MS)
+    return () => window.clearTimeout(timer)
+  }, [flash])
 
   // A notice in the bar fades after a while.
   useEffect(() => {
@@ -1711,6 +1792,7 @@ export function DeckView({
             marks={marks}
             commentCounts={!!commentCallouts}
             joinAt={joinAt}
+            flash={flash}
           />
         ) : null}
         {editor ? partSlots.map(slot => {
