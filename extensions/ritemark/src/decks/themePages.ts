@@ -30,6 +30,7 @@ import { projectThemeFiles, readThemeOrEvening, resolveAssetsIn, type DeckPages 
 import { newThemeNameProblem, newThemeText, themePathFor, themeTextWith, type ThemeStart } from './themeFile';
 import { decodeThemeRequest, ThemeProtocolError, type ThemeDeck, type ThemeHostMessage, type ThemePreview, type ThemeRequest } from './themeProtocol';
 import { deckPreview, SAMPLE_DECK_TEXT } from './themePreview';
+import type { ThemeChangeView } from './themeChange';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 
 /** The project's decks and themes, read once for an answer (`ThemePages.snapshot`). */
@@ -138,7 +139,11 @@ export class ThemePages implements vscode.Disposable {
     return started !== undefined && Date.now() - started < SAVE_MARK_MS;
   }
 
-  private hasView(document: vscode.TextDocument): boolean {
+  /** Sprint 162 PR 5: the AI's theme work (`themeAi.ts`): the colour check's request and See what changed's Undo. */
+  ai: { askColourCheck: (themePath: string, name: string) => void; undo: (id: string) => Promise<string> } | null = null;
+
+  /** Is this document open in a theme's tab? */
+  hasView(document: vscode.TextDocument): boolean {
     return [...this.views].some(view => view.document === document);
   }
 
@@ -288,7 +293,41 @@ export class ThemePages implements vscode.Disposable {
         await this.queue(document, () => this.undoSave(view, token));
         return;
       }
+      // Sprint 162 PR 5: the colour check goes to the open chat, as a comment's task does; no question first.
+      case 'theme/check-colours': {
+        const root = rootOf(document.uri.fsPath);
+        const relative = root ? projectRelative(root, document.uri.fsPath) : null;
+        if (relative) this.ai?.askColourCheck(relative, parseTheme(document.getText()).name);
+        return;
+      }
+      case 'theme/change-undo':
+        await this.ai?.undo(request.id);
+        return;
     }
+  }
+
+  /**
+   * Sprint 162 PR 5: the AI's colour check moves colours in the draft: one change of the document, a step of the tab's own
+   * Undo, never saved. False when no tab of it is open.
+   */
+  async draftChange(document: vscode.TextDocument, text: string): Promise<boolean> {
+    const view = [...this.views].find(entry => entry.document === document);
+    if (!view) return false;
+    await this.queue(document, () => this.change(view, text, 'edit'));
+    return document.getText() === text;
+  }
+
+  /** Sprint 162 PR 5: See what changed for a draft: the sheet over the tab's preview. False when no tab of it is open. */
+  async showChange(fsPath: string, build: (webview: vscode.Webview) => ThemeChangeView): Promise<boolean> {
+    const view = [...this.views].find(entry => keyOf(entry.document.uri.fsPath) === keyOf(fsPath));
+    if (!view) return false;
+    view.panel.reveal(view.panel.viewColumn, false);
+    return this.post(view.panel.webview, { type: 'theme/change', change: build(view.panel.webview) });
+  }
+
+  /** Sprint 162 PR 5: a change was undone: every theme tab's sheet for it loses its Undo. */
+  changeUndone(id: string): void {
+    for (const view of this.views) void this.post(view.panel.webview, { type: 'theme/change-undone', id });
   }
 
   /**

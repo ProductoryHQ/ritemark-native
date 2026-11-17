@@ -35,6 +35,8 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
+import { ThemeChangeSheet, themeChangeFrom } from './ThemeChangeSheet'
+import type { ThemeChangeView } from '../../../../../src/decks/themeChange'
 import '../decks.css'
 import './themeTab.css'
 
@@ -124,6 +126,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const [notice, setNotice] = useState<{ text: string; token?: string } | null>(null)
   const [look, setLook] = useState<'card' | 'borderless' | null>(null)
   const [saveAs, setSaveAs] = useState(false)
+  const [themeChange, setThemeChange] = useState<ThemeChangeView | null>(null)
 
   useEffect(() => onMessage(message => {
     if (message.type === 'theme/state' && typeof message.text === 'string' && typeof message.path === 'string') {
@@ -133,6 +136,13 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
       if (next) setDecks(next)
     } else if (message.type === 'theme/notice' && typeof message.text === 'string') {
       setNotice({ text: message.text, token: typeof message.token === 'string' ? message.token : undefined })
+    } else if (message.type === 'theme/change') {
+      // Sprint 162 PR 5: See what changed for the AI's colour check, over the preview
+      const change = themeChangeFrom(message.change)
+      if (change) setThemeChange(change)
+    } else if (message.type === 'theme/change-undone' && typeof message.id === 'string') {
+      const id = message.id
+      setThemeChange(current => (current && current.id === id ? { ...current, undone: true } : current))
     }
   }), [])
   useEffect(() => { sendToExtension('theme/ready') }, [])
@@ -259,7 +269,18 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
           </label>
           <div className={`theme-contrast${contrast.ok ? '' : ' is-low'}`} role="status">
             <Icon name={contrast.ok ? 'check-circle' : 'warning'} size={14} tone="inherit" />
-            <span>{contrast.words}</span>
+            <span>
+              {contrast.words}{' '}
+              {/* Sprint 162 PR 5 (17 November): Claude's colour check sits on this line, where a problem shows. At rest a
+                  quiet "Check all colours"; when the line is amber, "Fix with Claude". It goes to the open chat. */}
+              <Tooltip label={contrast.ok
+                ? 'Ask the AI in the open chat to measure all five colour pairs, on the card and borderless'
+                : 'Ask the AI in the open chat to move only the colours that fail, into this draft'}>
+                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours')}>
+                  {contrast.ok ? 'Check all colours' : 'Fix with Claude'}
+                </Button>
+              </Tooltip>
+            </span>
           </div>
 
           <div className="deck-settings-k">Fonts</div>
@@ -288,6 +309,14 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
         </section>
 
         <Preview theme={theme} preview={decks?.preview ?? null} borderless={borderless} onLook={value => setLook(value === 'borderless' ? 'borderless' : 'card')} />
+        {themeChange ? (
+          <ThemeChangeSheet
+            change={themeChange}
+            style={{ left: 340 }}
+            onUndo={() => sendToExtension('theme/change-undo', { id: themeChange.id })}
+            onClose={() => setThemeChange(null)}
+          />
+        ) : null}
       </div>
 
       {saveAs && decks ? (

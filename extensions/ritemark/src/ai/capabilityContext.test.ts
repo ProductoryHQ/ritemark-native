@@ -186,6 +186,35 @@ test('deck guidance says what "this slide" means', () => {
   }
 });
 
+// ── Sprint 162 PR 5: themes, taught the same way to every AI with the deck tools ──
+test('deck guidance teaches themes: the folder, the fields, the six fonts and the contrast rule', () => {
+  const renders = (['claude-code', 'codex', 'opencode'] as const).map((runtime) => renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true })));
+  const themeLines = (text: string) => text.split('\n').filter((line) => line.startsWith('- ') && /set_deck_theme|`theme:` line|brand|this deck or all/.test(line));
+  for (const text of renders) {
+    for (const needle of [
+      '`<Name>.theme.md` file in `Slide library/Themes/`', '`theme:` line',
+      '`background`', '`headings`', '`text`', '`accent`', '`soft-light`', '`heading-font`', '`text-font`', '`corners` (square, soft or round)', '`boxes` (filled or outline)',
+      'Sofia Sans, Inter, IBM Plex Sans, Space Grotesk, Source Serif 4, Fraunces',
+      '4.5 : 1', '3 : 1', 'change the theme file, never individual slides',
+      'only with set_deck_theme: never write a theme file', 'read_pptx_theme', 'check_theme_colours', 'set_theme_draft_colours',
+      '"Fernhollow\'s guide uses Futura; the closest here is Space Grotesk."', '"this deck or all of them?"',
+    ]) {
+      assert.ok(text.includes(needle), needle);
+    }
+  }
+  // The same words for every runtime, and short: four lines, under 1,700 characters
+  const lines = themeLines(renders[0]);
+  assert.ok(renders.every((text) => themeLines(text).join('\n') === lines.join('\n')), 'the same theme lines for every runtime');
+  assert.strictEqual(lines.length, 4, 'four theme lines');
+  assert.ok(lines.join('\n').length < 1700, `theme lines are short (${lines.join('\n').length} characters)`);
+  if (process.env.PRINT) console.log(lines.join('\n'));
+  // Every field named is one the parser reads
+  const parser = fs.readFileSync(path.join(__dirname, '../decks/deckTheme.ts'), 'utf8');
+  for (const key of ['background', 'headings', 'text', 'accent', 'soft-light', 'heading-font', 'text-font', 'corners', 'boxes']) {
+    assert.ok(parser.includes(`top['${key}']`) || parser.includes(`top.${key}`), `the parser reads ${key}`);
+  }
+});
+
 // ── R7: per-runtime edit-tool binding, not per-capability content ────────────
 test('edit-tool naming is bound per runtime', () => {
   assert.ok(claude.includes('Write/Edit'), 'Claude edit tool');

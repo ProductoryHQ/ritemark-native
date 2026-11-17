@@ -56,6 +56,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore, type ShareWaitResult } from '../browser/BrowserContextStore';
+import type { ThemeAi } from '../decks/themeAi';
 import { browserTurnPageFor, chooseTurnPage, contextAfterShareWait } from '../browser/BrowserActionTools';
 import {
   decodeBrowserShareAnswer,
@@ -814,6 +815,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)),
           });
           void this._view?.webview.postMessage(reportResult(outcome, request.body));
+          break;
+        }
+
+        // Sprint 162 PR 5: a theme change's See what changed, Undo and Open the theme under the AI's reply
+        case 'theme-change/see':
+        case 'theme-change/undo':
+        case 'theme-change/open': {
+          const id = typeof message.id === 'string' && message.id.length <= 64 ? message.id : null;
+          const themes = this._themeChanges;
+          if (!id || !themes) break;
+          if (message.type === 'theme-change/undo') await themes.undo(id);
+          else if (message.type === 'theme-change/open') await themes.openTheme(id);
+          else {
+            const problem = await themes.show(id);
+            if (problem) void vscode.window.showInformationMessage(problem);
+          }
           break;
         }
 
@@ -4070,6 +4087,27 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * (`connectCurrentSlide`); none before that.
    */
   private _currentSlideOf: ((fsPath: string) => CurrentSlide | null) | null = null;
+
+  /** Sprint 162 PR 5: the AI's theme changes (`decks/themeAi.ts`), once decks are composed. */
+  private _themeChanges: Pick<ThemeAi, 'undo' | 'show' | 'openTheme'> | null = null;
+
+  /**
+   * Sprint 162 PR 5 (step-3-themes.md, frame 13): a theme change the AI made is shown under its reply in the chat it came
+   * from (See what changed, Undo, Open the theme), and what Undo did is said there. The theme tab's colour check goes to
+   * the open chat as the person's message, as a comment's task does: no question first.
+   */
+  public connectThemeChanges(source: ThemeAi): vscode.Disposable {
+    this._themeChanges = source;
+    const subscriptions = [
+      source.onDidAdd(({ conversationId, chip }) => { void this._view?.webview.postMessage({ type: 'theme-change/add', conversationId, change: chip }); }),
+      source.onDidUndo(({ id, words }) => { void this._view?.webview.postMessage({ type: 'theme-change/undone', id, words }); }),
+      source.onDidAsk(({ text }) => {
+        this.show();
+        void this._view?.webview.postMessage({ type: 'chat/ask-open', text });
+      }),
+    ];
+    return { dispose: () => { for (const subscription of subscriptions) subscription.dispose(); this._themeChanges = null; } };
+  }
 
   /**
    * Decks (17 November): the active file's context names the slide the person is on when the file is an open deck,

@@ -257,8 +257,21 @@ export interface InstallProgress {
 
 // ── Agent conversation types ──
 
+/**
+ * Sprint 162 PR 5: a theme change an AI made in this turn (`decks/themeAi.ts`), shown under its reply with See what
+ * changed, Undo and Open the theme. `undone` holds what Undo said, once it ran.
+ */
+export interface ThemeChangeChipView {
+  id: string;
+  kind: 'theme' | 'draft';
+  themeName: string;
+  undone?: string;
+}
+
 export interface AgentConversationTurn {
   id: string;
+  /** Sprint 162 PR 5: the theme changes this turn made. */
+  themeChanges?: ThemeChangeChipView[];
   /**
    * Sprint 128: 'background-task' when Claude opened this turn itself after
    * background work finished. It has no user prompt; the transcript shows a
@@ -382,6 +395,8 @@ export interface CodexSidebarStatus {
 
 export interface CodexConversationTurn {
   id: string;
+  /** Sprint 162 PR 5: the theme changes this turn made. */
+  themeChanges?: ThemeChangeChipView[];
   /**
    * Sprint 99 (R5): the conversation this turn belongs to. Optional so
    * pre-Sprint-99 saved conversations still load.
@@ -492,6 +507,10 @@ export type ExtensionMessage =
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
   | { type: 'starting-place'; place: string; hasAbout: boolean }
+  // Sprint 162 PR 5: an AI's theme change under its reply, what Undo did, and the theme tab's colour check for the open chat
+  | { type: 'theme-change/add'; conversationId: string; change: ThemeChangeChipView }
+  | { type: 'theme-change/undone'; id: string; words: string }
+  | { type: 'chat/ask-open'; text: string }
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)

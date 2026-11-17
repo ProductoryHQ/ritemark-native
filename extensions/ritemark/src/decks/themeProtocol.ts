@@ -5,6 +5,7 @@
  */
 import type { WallSlide } from './present/presentProtocol';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
+import type { ThemeChangeView } from './themeChange';
 
 export type ThemeRequest =
   /** The tab is drawn: the host sends the theme's state and its decks. */
@@ -23,7 +24,14 @@ export type ThemeRequest =
   /** "Used by N decks": open this deck (a project path). */
   | { type: 'theme/open-deck'; path: string }
   /** The Save notice's Undo: the decks go back, and the changes stay in the tab, not saved. */
-  | { type: 'theme/undo-save'; token: string };
+  | { type: 'theme/undo-save'; token: string }
+  /**
+   * Sprint 162 PR 5: the contrast line's "Check all colours" or "Fix with Claude": the AI's colour check goes to the
+   * open chat, and its changes land in this tab's draft.
+   */
+  | { type: 'theme/check-colours' }
+  /** See what changed's sheet: its Undo, for the change with this id. */
+  | { type: 'theme/change-undo'; id: string };
 
 /** A deck that uses the theme, as "Used by N decks" lists it. */
 export interface ThemeDeck {
@@ -51,7 +59,11 @@ export type ThemeHostMessage =
   /** A line for the tab's bar; with `token`, its Undo takes back a Save. */
   | { type: 'theme/notice'; text: string; token?: string }
   /** Save as a new theme…'s answer: done (the tab moves to the new theme), or why not (the sheet stays and says so). */
-  | { type: 'theme/save-as'; ok: boolean; problem?: string };
+  | { type: 'theme/save-as'; ok: boolean; problem?: string }
+  /** Sprint 162 PR 5: See what changed for an AI's change to the draft: the sheet over the preview. */
+  | { type: 'theme/change'; change: ThemeChangeView }
+  /** The change with this id is undone (from the chat or the sheet): the sheet's Undo goes. */
+  | { type: 'theme/change-undone'; id: string };
 
 export class ThemeProtocolError extends Error {}
 
@@ -97,6 +109,12 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/undo-save':
       exactKeys(input, ['type', 'token']);
       return { type: 'theme/undo-save', token: stringOf(input.token, 64) };
+    case 'theme/check-colours':
+      exactKeys(input, ['type']);
+      return { type: 'theme/check-colours' };
+    case 'theme/change-undo':
+      exactKeys(input, ['type', 'id']);
+      return { type: 'theme/change-undo', id: stringOf(input.id, 64) };
     default:
       throw new ThemeProtocolError('Unknown theme request');
   }

@@ -9,6 +9,7 @@ import { Icon } from '../ui/Icon';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { FilesSummary } from './FilesSummary';
+import { ThemeChangeActions } from './ThemeChangeActions';
 import { ActivityDetails } from './ActivityDetails';
 import { chatFontStyle } from './ChatBubbles';
 import { extractPlanDisplayText, planTurnNeedsApproval } from './planText';
@@ -307,6 +308,8 @@ export function AgentResponse({ turn }: AgentResponseProps) {
       {/* Sprint 103 design pass: the old "Modified N files · Xs" summary row is
           gone — it triple-duplicated FilesSummary (files), ActivityDetails
           (duration), and the ActivityStatusLine (both). One fact, one place. */}
+      {/* Sprint 162 PR 5: a theme change's See what changed, Undo and Open the theme (frame 13) */}
+      <ThemeChangeActions changes={turn.themeChanges} />
       <FilesSummary files={result.filesModified} />
       <ActivityDetails activities={activities} metrics={result.metrics} />
     </div>

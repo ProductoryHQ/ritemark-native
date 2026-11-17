@@ -43,6 +43,8 @@ import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrar
 import { normalizePath } from '../decks/deckLibraryFormat';
 import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from '../decks/deckFormat';
 import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
+import { DECK_FONT_LIST } from '../decks/deckTheme';
+import type { AiThemeFields } from '../decks/themeChange';
 
 export interface ToolResult {
   text: string;
@@ -444,7 +446,21 @@ export interface DeckToolHost {
   viewInsert(deckPath: string): ((parts: CopiedPart[], afterIndex: number) => Promise<boolean>) | undefined;
   /** The open view of a deck, which sets a copy's `from:` line; undefined when closed. */
   viewSetFrom?(deckPath: string): ((id: string, from: string) => Promise<boolean>) | undefined;
+  /** Sprint 162 PR 5: the theme tools' host (`decks/themeAi.ts`). */
+  themes?: ThemeToolHost;
 }
+
+/** Sprint 162 PR 5: what the theme tools need: the same calls for every runtime, by the chat they came from. */
+export interface ThemeToolHost {
+  readPptx(file: string): Promise<ToolResult>;
+  setDeckTheme(conversationId: string | null, input: { name: string; fields: AiThemeFields; decks: string[] }): Promise<ToolResult>;
+  checkColours(theme: string): Promise<ToolResult>;
+  setDraftColours(conversationId: string | null, theme: string, colours: Partial<Record<'text' | 'headings' | 'accent', string>>): Promise<ToolResult>;
+}
+
+const colourInput = (what: string) => z.string().regex(/^#?[0-9a-fA-F]{6}$/).describe(`${what}, as #RRGGBB.`);
+const fontInput = (what: string) => z.enum(DECK_FONT_LIST.map(font => font.name) as [string, ...string[]]).describe(`${what}: one of the six fonts Ritemark ships, by its exact name.`);
+const themeFileInput = z.string().min(1).max(1024).describe("The theme file's path from the project's top: `Slide library/Themes/<Name>.theme.md`.");
 
 const deckPathInput = (what: string) =>
   z.string().min(1).max(1024).describe(`${what}: its path from the project's top, as list_decks gives it, ending in .deck.md.`);
@@ -476,6 +492,11 @@ function slideWords(kind: string, data: SlideData): string {
 }
 
 export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkToolGroup {
+  const themeHost = (): ThemeToolHost => {
+    const themes = host()?.themes;
+    if (!themes) throw new Error('Themes need a project folder in this window (and decks turned on).');
+    return themes;
+  };
   const library = (): { host: DeckToolHost; library: DeckLibrary } => {
     const current = host();
     const project = current?.library();
@@ -599,8 +620,77 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           return { text: `Added the slide to the library under ${deckName(write.path)}${write.previous === null ? ' (a new topic)' : ''}.` };
         },
       },
+      // Sprint 162 PR 5 (step-3-themes.md): themes, the same four tools for every runtime
+      {
+        name: 'read_pptx_theme',
+        description:
+          "Read a PowerPoint file's (.pptx) theme: its name, its twelve colours (dk1, lt1, dk2, lt2, accent1–6, hlink, folHlink) and its heading and text fonts, as JSON. Nothing else of the file is read.",
+        input: { file: z.string().min(1).max(1024).describe("The .pptx file's path from the project's top.") },
+        run: async (args) => themeHost().readPptx(String(args.file)),
+      },
+      {
+        name: 'set_deck_theme',
+        description:
+          "Make or change a theme (a `.theme.md` file in `Slide library/Themes`, named after the theme) and point decks at it (their `theme:` line). Always use this for themes: never write a theme file or a deck's `theme:` line yourself. A theme the project has (by name) is changed in place: give only the fields to change. A new theme needs its four colours. Changes the theme file, never a slide. Answers with the five colour pairs measured. Ritemark offers See what changed and Undo under your reply.",
+        input: {
+          name: z.string().min(1).max(60).describe('The theme\'s name, which is its file\'s name too (for example "Fernhollow Bank").'),
+          background: colourInput('The background').optional(),
+          headings: colourInput('The headings\' colour').optional(),
+          text: colourInput('The text\'s colour').optional(),
+          accent: colourInput('The accent: numbers, icons, the line under a title').optional(),
+          soft_light: z.boolean().optional().describe('A soft light in one corner of the background.'),
+          heading_font: fontInput('The headings\' font').optional(),
+          text_font: fontInput('The text\'s font').optional(),
+          corners: z.enum(['square', 'soft', 'round']).optional().describe('Corners of boxes and pictures.'),
+          boxes: z.enum(['filled', 'outline']).optional().describe('Boxes filled, or drawn as an outline.'),
+          decks: z.array(deckPathInput('A deck to use the theme')).max(200).optional().describe('The decks whose `theme:` line should name this theme. Ask the user first when the project has more than one deck.'),
+        },
+        run: async (args, context) => themeHost().setDeckTheme(conversationOf(context), {
+          name: String(args.name),
+          fields: {
+            ...(args.background !== undefined ? { background: String(args.background) } : {}),
+            ...(args.headings !== undefined ? { headings: String(args.headings) } : {}),
+            ...(args.text !== undefined ? { text: String(args.text) } : {}),
+            ...(args.accent !== undefined ? { accent: String(args.accent) } : {}),
+            ...(args.soft_light !== undefined ? { soft_light: Boolean(args.soft_light) } : {}),
+            ...(args.heading_font !== undefined ? { heading_font: String(args.heading_font) } : {}),
+            ...(args.text_font !== undefined ? { text_font: String(args.text_font) } : {}),
+            ...(args.corners !== undefined ? { corners: args.corners as AiThemeFields['corners'] } : {}),
+            ...(args.boxes !== undefined ? { boxes: args.boxes as AiThemeFields['boxes'] } : {}),
+          },
+          decks: ((args.decks as string[] | undefined) ?? []).map(deckPathOf),
+        }),
+      },
+      {
+        name: 'check_theme_colours',
+        description:
+          "Measure a theme's five colour pairs, on the card and borderless (Ritemark's white), against 4.5 to 1 for text and 3 to 1 for accents: text, headings and the accent as words on the background; text and accent on white. An open theme tab's draft is measured as it is. For each failing pair it gives the nearest colour that passes.",
+        input: { theme: themeFileInput },
+        run: async (args) => themeHost().checkColours(String(args.theme)),
+      },
+      {
+        name: 'set_theme_draft_colours',
+        description:
+          "Move colours in a theme's draft, in its open tab: never saved (the user presses Save, and the decks change then). For the colour check: move only the colours that fail, just far enough to pass. Ritemark offers See what changed and Undo under your reply.",
+        input: {
+          theme: themeFileInput,
+          text: colourInput('The text\'s new colour').optional(),
+          headings: colourInput('The headings\' new colour').optional(),
+          accent: colourInput('The accent\'s new colour').optional(),
+        },
+        run: async (args, context) => themeHost().setDraftColours(conversationOf(context), String(args.theme), {
+          ...(args.text !== undefined ? { text: String(args.text) } : {}),
+          ...(args.headings !== undefined ? { headings: String(args.headings) } : {}),
+          ...(args.accent !== undefined ? { accent: String(args.accent) } : {}),
+        }),
+      },
     ],
   };
+}
+
+/** The chat a tool call came from: its conversation's turn holder knows it (all three runtimes pass it). */
+function conversationOf(context: ToolContext): string | null {
+  return context.browserPage?.conversationId ?? null;
 }
 
 // ── Which groups a turn gets ────────────────────────────────────────────────

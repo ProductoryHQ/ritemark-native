@@ -957,6 +957,22 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     return () => window.removeEventListener('ritemark:files-dropped', handler);
   }, []);
 
+  // Sprint 162 PR 5: the theme tab's colour check sends its words in this chat, as the person's message: at once, or
+  // queued behind a turn that runs (as a comment's task is). The person's own words in the box stay as they are.
+  const askOpen = useRef<(text: string) => void>(() => undefined);
+  askOpen.current = (text: string) => {
+    if (isLoading) enqueueComposerItem(text, text);
+    else handleSend(text);
+  };
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const text = (event as CustomEvent<unknown>).detail;
+      if (typeof text === 'string' && text.trim()) askOpen.current(text);
+    };
+    window.addEventListener('ritemark:ask-open', handler);
+    return () => window.removeEventListener('ritemark:ask-open', handler);
+  }, []);
+
   // Reset "hide active file" when the active file changes
   useEffect(() => {
     setHideActiveFile(false);
