@@ -116,7 +116,7 @@ function BarButton({ tip, active, onClick, children, disabled, label }: { tip: s
 }
 
 /** The Description: its words, and whether they show under the picture. */
-function DescriptionField({ alt, caption, onWords, withCaption }: { alt: string; caption: boolean; onWords: (alt: string, caption: boolean) => void; withCaption: boolean }) {
+function DescriptionField({ alt, caption, onWords, withCaption, compact }: { alt: string; caption: boolean; onWords: (alt: string, caption: boolean) => void; withCaption: boolean; compact: boolean }) {
   const [open, setOpen] = useState(false)
   const [words, setWords] = useState(alt)
   const [shown, setShown] = useState(caption)
@@ -137,9 +137,9 @@ function DescriptionField({ alt, caption, onWords, withCaption }: { alt: string;
     >
       <Tooltip label="The words a screen reader and a published page read">
         <PopoverTrigger asChild>
-          <Button type="button" variant="toolbar" size="compact" data-state={open ? 'active' : undefined}>
+          <Button type="button" variant="toolbar" size="compact" aria-label="Description" data-state={open ? 'active' : undefined}>
             <Icon name="text-t" size={14} tone="inherit" />
-            Description
+            {compact ? null : 'Description'}
           </Button>
         </PopoverTrigger>
       </Tooltip>
@@ -175,12 +175,21 @@ export function PictureBar(props: PictureBarProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [left, setLeft] = useState<number | null>(null)
   const [top, setTop] = useState(0)
+  /** Too wide for the slide's side: the words of Crop, Place and Description go, their icons and tooltips stay. */
+  const [compact, setCompact] = useState(false)
+  const fullWidth = useRef(0)
 
   // Under the picture, centred on it, inside the window; over the picture's lower edge when there is no room below.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
     const width = bar.offsetWidth
+    if (!compact) fullWidth.current = width
+    const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
+    if ((fullWidth.current > room) !== compact) {
+      setCompact(!compact)
+      return
+    }
     const height = bar.offsetHeight
     const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
     const maxX = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - width - 8
@@ -261,9 +270,9 @@ export function PictureBar(props: PictureBarProps) {
                 </BarButton>
               ))}
               <Divider />
-              <BarButton tip={canCrop ? 'Crop the picture: its file stays as it is' : 'The picture is still loading'} disabled={!canCrop} onClick={props.onCrop}>
+              <BarButton label="Crop" tip={canCrop ? 'Crop the picture: its file stays as it is' : 'The picture is still loading'} disabled={!canCrop} onClick={props.onCrop}>
                 <Icon name="crop" size={14} tone="inherit" />
-                Crop
+                {compact ? null : 'Crop'}
               </BarButton>
             </>
           ) : null}
@@ -272,9 +281,9 @@ export function PictureBar(props: PictureBarProps) {
               {kind === 'flow' ? <Divider /> : null}
               <Group label="Place">
                 {PLACES.map(option => (
-                  <BarButton key={option.value} tip={option.tip} active={place === option.value} onClick={() => props.onPlace?.(option.value)}>
+                  <BarButton key={option.value} label={option.label} tip={option.tip} active={place === option.value} onClick={() => props.onPlace?.(option.value)}>
                     <Icon name={option.icon} size={14} tone="inherit" className={option.mirrored ? '-scale-x-100' : undefined} />
-                    {option.label}
+                    {compact ? null : option.label}
                   </BarButton>
                 ))}
               </Group>
@@ -284,7 +293,7 @@ export function PictureBar(props: PictureBarProps) {
           {empty ? null : (
             <>
               <Divider />
-              <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} withCaption={kind === 'flow'} />
+              <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} withCaption={kind === 'flow'} compact={compact} />
             </>
           )}
           {comments && props.onComment ? (
