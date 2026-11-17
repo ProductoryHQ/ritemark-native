@@ -16,6 +16,9 @@
  *  - **The chip** reads 2.2's state for the page file (`_ritemark.publish.pageState`) and says "Published · changed"
  *    when 2.2 finds a change, or when the deck's digest is no longer the page's (an edit to notes or a skipped slide
  *    isn't one: `publicDeck`). Typing in the deck asks only the digest again; 2.2 is asked when its state changes.
+ *    Since Sprint 162 PR 6 the digest counts the theme the deck draws as its file on disk has it (its fields, fonts and
+ *    logo, `pageReadsChanged`), and a theme or logo file written asks it again (`lookChanged`), so a theme's Save reads
+ *    "Published · changed" at once and an Undo back reads "Published". The page keeps its theme until Update the page.
  *  - **Copy link, See online and Unpublish** are 2.2's commands on the page file.
  *  - **The sheet's What goes and What stays rows** for a page made from a deck come from here (`pageRows`), wherever
  *    the page is published from, and only while they describe that page: its digest is the one written with them, or
@@ -36,7 +39,7 @@ import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckT
 import { deckThemeAndLogo } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
-import { buildDeckPage, currentPageDigest, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoFile, pagePathFor, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type PageFile, type PageFontFile } from './page/pageFile';
+import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoFile, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
@@ -52,6 +55,11 @@ interface DeckSeat {
   document: vscode.TextDocument;
   post: (message: DeckHostMessage) => Promise<boolean>;
   bar?: PageBarState;
+  /**
+   * The seat's refreshes, one after another (the review of #791): a theme's Save and its Undo, or an AI's write and
+   * the watcher's, each ask again, and an older answer must never be posted after a newer one, nor its 2.2 state kept.
+   */
+  queue?: Promise<void>;
 }
 
 /**
@@ -173,22 +181,31 @@ export class DeckPublisher implements vscode.Disposable {
     }
   }
 
-  /** Whether the deck's public content is no longer what its page was written from. */
+  /**
+   * Whether the deck's public content, or its theme with its fonts and logo (Sprint 162 PR 6), is no longer what its
+   * page was written from (`pageReadsChanged`).
+   */
   private async deckChanged(document: vscode.TextDocument, pagePath: string): Promise<boolean> {
     try {
+      // A page without Ritemark's digest is never "changed": known before the theme and its files are read.
       const written = readPageMeta(await readHead(pagePath)).digest;
       if (!written) return false;
-      const { theme, logo } = await this.lookFor(document.uri.fsPath, document.getText());
-      return written !== await currentPageDigest(document.uri.fsPath, document.getText(), theme, nodePageFs, [...await this.fontAddresses(theme), ...(logo ? [logo.address] : [])]);
+      return await pageReadsChanged(written, await this.pageNow(document.uri.fsPath, document.getText()));
     } catch {
       return false;
     }
   }
 
-  private async refresh(seat: DeckSeat, ask = true): Promise<void> {
-    const { state, bar } = await this.readState(seat.document, ask, seat.bar);
-    seat.bar = bar;
-    await seat.post({ type: 'deck/page-state', state });
+  private refresh(seat: DeckSeat, ask = true): Promise<void> {
+    const run = async () => {
+      // Read when its turn comes, so a refresh that doesn't ask 2.2 keeps the newest answer an earlier one got.
+      const { state, bar } = await this.readState(seat.document, ask, seat.bar);
+      seat.bar = bar;
+      await seat.post({ type: 'deck/page-state', state });
+    };
+    const next = (seat.queue ?? Promise.resolve()).then(run, run);
+    seat.queue = next.catch(() => undefined);
+    return next;
   }
 
   private refreshAll(): void {
@@ -209,6 +226,15 @@ export class DeckPublisher implements vscode.Disposable {
 
   private refreshDocument(document: vscode.TextDocument): void {
     for (const seat of this.seats) if (seat.document === document) void this.refresh(seat);
+  }
+
+  /**
+   * Sprint 162 PR 6: the theme this deck draws was saved, its logo's file changed, or another program wrote either: the
+   * chip asks the digest again (the page file 2.2 compares didn't change), so it says "Published · changed" at once, and
+   * "Published" again once the theme is back as the page has it. The page itself is left as it is until Update the page.
+   */
+  lookChanged(document: vscode.TextDocument): void {
+    for (const seat of this.seats) if (seat.document === document) void this.refresh(seat, false);
   }
 
   // ------------------------------------------------------------------ Publish, Update the page
@@ -374,10 +400,9 @@ export class DeckPublisher implements vscode.Disposable {
       const open = await this.openDocumentAt(besidePath);
       const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
-      const { theme, logo } = await this.lookFor(deckPath, text);
-      const fontFiles = await this.fontFilesFor(theme);
-      if (await currentPageDigest(deckPath, text, theme, nodePageFs, [...fontFiles.map(file => file.address), ...(logo ? [logo.address] : [])]) !== meta.digest) return undefined;
-      return deckSheetRows(deckCounts(text, theme, fontFiles, !!logo));
+      const now = await this.pageNow(deckPath, text);
+      if (await pageReadsChanged(meta.digest, now)) return undefined;
+      return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
     } catch {
       return undefined;
     }
@@ -410,8 +435,10 @@ export class DeckPublisher implements vscode.Disposable {
     });
   }
 
-  private async fontAddresses(theme: DeckTheme): Promise<string[]> {
-    return (await this.fontFilesFor(theme)).map(file => file.address);
+  /** What the deck would put on its page now (`DeckPageNow`): its text, its theme as the file on disk has it, and the theme's files. */
+  private async pageNow(deckPath: string, text: string): Promise<DeckPageNow & { fonts: PageFontFile[] }> {
+    const { theme, logo } = await this.lookFor(deckPath, text);
+    return { deckPath, text, theme, fonts: await this.fontFilesFor(theme), logo };
   }
 
   /** Hold font files beside a page while a Publish uses them; the returned function lets go, once. */
