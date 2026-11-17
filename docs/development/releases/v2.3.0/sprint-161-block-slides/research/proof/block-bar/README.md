@@ -31,8 +31,16 @@ The workbench was held at 1440 × 900 CSS px (the files are 2880 × 1800). "AI f
 | `09-columns-more-menu-…` | Frame 23's ⋯: Add a column, Remove a column and Delete block. The split from shot 08 is drawn (22 / 44 / 33). |
 | `10-steps-bar-…`, `11-list-bar-…` | Steps and a list: the type, Add and Delete only. |
 | `12-plus-adds-a-list-item-…` | The + on the list's bottom edge added an empty item, with the caret in it. |
-| `13-grip-drag-…` | The ⋮ dragged: a line shows where the list lands. In this shot the bar still showed; it is now hidden while a handle drags. |
+| `13-grip-drag-bar-hidden-…` | The ⋮ dragged (final run): a line under "Next steps for the team" shows where the list lands, and the bar is hidden while it drags. |
+| `04-style-outline-borderless-…` | Final run: Outline on a Borderless deck, with the outline's own line, visible on white. |
 | `14-turned-into-steps-…` | Boxes turned into Steps: each box's heading is a step and its line sits under it. |
+
+**The final run (17 November, on f8656975, one launch, stopped with `LEFT=0` and its folder deleted)**
+- The untouched deck opened byte for byte (`cmp`).
+- Changing the slide with the caret in a box: the deck stayed responsive.
+- Turn into Steps and one ⌘Z, and the ⋮ drag and one ⌘Z: each gave the file back byte for byte (`cmp`).
+- A second fixture deck (Borderless) opened byte for byte. Its Outline boxes are shot.
+- The run's driver didn't reach that deck's other slides, so a Boxes block inside a box and fourteen boxes were not shot on the stage. They are covered by `blockBar.test.ts` (the CSS rules and `data-many`), and the strip's thumbnails in shot 04 show them drawn.
 
 **Found and fixed in the run**
 - The deck hung when the slide changed with the caret in a box. The caret's box mark (`slideCaretBox`, PR 3) had landed on an element that wasn't a box. ProseMirror read the class back and drew it again, without end. The mark now goes only on a box the slide draws. The same run was then repeated, and it held.
