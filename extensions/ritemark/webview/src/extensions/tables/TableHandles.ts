@@ -20,6 +20,27 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { EditorView, NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { cellAtPos, cellAtSelection, cellPos, columnWidths, nextCellOrNewRow, previousCell, tableTintPlugin, wholeTableChosen } from './tableOps'
+import { columnFloors, floorCss } from '../../../../src/markdown/tableColumns'
+
+/** The words of a table's body cells (every row under the header), one string per cell. */
+export function bodyTexts(table: PMNode): string[][] {
+  const rows: string[][] = []
+  table.forEach((row, _offset, index) => {
+    if (index === 0) return
+    const cells: string[] = []
+    row.forEach(cell => { cells.push(cell.textContent) })
+    rows.push(cells)
+  })
+  return rows
+}
+
+/**
+ * Each column's floor as the CSS its `<col>` carries (`tableColumns.ts`), '' for a column that keeps only its widest
+ * word. A table with widths gives its stored shares to the floors.
+ */
+export function columnFloorsCss(table: PMNode, widths: number[] | null): string[] {
+  return columnFloors(bodyTexts(table), table.firstChild?.childCount ?? 0, widths).map(floor => floor ? floorCss(floor) : '')
+}
 
 export type TableMenuKind = 'column' | 'row' | 'cell' | 'table'
 
@@ -87,25 +108,44 @@ export class TableHandlesView implements NodeView {
   /**
    * The columns' widths (experience 48), as a `<colgroup>` the table's layout follows: shares of the table's width, a
    * column never narrower than its longest word (the browser's own rule for a table's columns). None: automatic.
+   *
+   * Each text column's floor (`tableColumns.ts`) goes on its `<col>` too, as `--rm-col-floor`: a deck's handout, where
+   * a wide table scrolls in its own frame, makes it the column's `min-width` (decks.css), so a note wraps into two or
+   * three lines instead of one word per line. It is read from the cells' words, so nothing is measured: only when the
+   * table's node changes (an update for its decorations alone keeps the node), and the `<col>`s change in place only
+   * when a width or a floor does. Elsewhere (a Text document, a slide) the variable is unused.
    */
   private drawWidths(): void {
+    if (this.node === this.drawnNode) return
+    this.drawnNode = this.node
     const widths = columnWidths(this.node)
-    const key = widths ? widths.join(',') : ''
+    const floors = columnFloorsCss(this.node, widths)
+    const key = `${widths ? widths.join(',') : ''}|${floors.join(';')}`
     if (key === this.widthsKey) return
     this.widthsKey = key
-    this.table.querySelector(':scope > colgroup')?.remove()
     this.table.classList.toggle('has-widths', !!widths)
     // A table with widths takes its container's width, as the slide renderer draws it (`slideRenderer.ts`).
     this.table.style.width = widths ? '100%' : ''
-    if (!widths) return
-    const group = document.createElement('colgroup')
-    for (const width of widths) {
-      const col = document.createElement('col')
-      col.style.width = `${width}%`
-      group.appendChild(col)
+    let group = this.table.querySelector<HTMLElement>(':scope > colgroup')
+    if (!widths && !floors.some(Boolean)) {
+      group?.remove()
+      return
     }
-    this.table.insertBefore(group, this.contentDOM)
+    if (!group || group.children.length !== floors.length) {
+      group?.remove()
+      group = document.createElement('colgroup')
+      for (let col = 0; col < floors.length; col++) group.appendChild(document.createElement('col'))
+      this.table.insertBefore(group, this.contentDOM)
+    }
+    floors.forEach((floor, col) => {
+      const element = group!.children[col] as HTMLElement
+      element.style.width = widths ? `${widths[col]}%` : ''
+      if (floor) element.style.setProperty('--rm-col-floor', floor)
+      else element.style.removeProperty('--rm-col-floor')
+    })
   }
+
+  private drawnNode: PMNode | null = null
 
   private widthsKey = ''
 
