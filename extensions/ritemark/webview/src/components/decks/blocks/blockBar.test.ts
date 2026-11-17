@@ -18,6 +18,8 @@ import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync
 import { slideDataOf, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
 import { BOX_AUTO_MIN, BOX_GAP, boxesLookOf, columnWidthOf, columnsAlignOf, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
+import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
+import { themeVars } from '../theme/themeVars'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from '../handout/deckSchema'
@@ -33,7 +35,7 @@ import { SlideSync } from './slideSync'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, addItem, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, moveBlock, nearestGap, plusSpot, removeColumn,
-  setColumnCount, setColumnSplit, slideDelta, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
+  setColumnCount, setColumnSplit, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
 installTestDocument()
@@ -434,11 +436,48 @@ stable(COLUMNS, 'three columns')
     const right = left + 400 * scale
     const drawnAt = left + (right - left) / 3
     assert.ok(Math.abs(splitPlace(drawnAt, left, right) - 1 / 3) < 1e-9, `scale ${scale}: the split under the pointer`)
-    assert.equal(slideDelta(96 * scale, scale), 96, `scale ${scale}: a drag is divided by the scale`)
     // The drop line nearest the pointer is the gap under it.
     const lines = new Map([[1, 100 * scale], [3, 300 * scale], [4, 400 * scale]])
     assert.equal(nearestGap(310 * scale, [1, 3, 4], lines), 3)
   }
+}
+
+// ---- Review of #773: the fixes, each failing before.
+{
+  // Remove a column keeps its comments (they are words), in the column that takes the caret.
+  const doc = loadSlideWithComments(COLUMNS)
+  const note = doc.type.schema.nodes.commentNode
+  let column = -1
+  doc.descendants((node, pos) => { if (column < 0 && node.type.name === 'heading' && node.textContent === 'Cursor') column = pos })
+  const withNote = EditorState.create({ doc }).tr.insert(column, note.create({ note: 'Name the plan too' }))
+  const state = EditorState.create({ doc: withNote.doc, selection: caretAt(withNote.doc, 'Cursor') })
+  const pos = blockPos(state)
+  const removed = removeColumn(state, pos, columnIndexAt(state, pos)!)!
+  let notes = 0
+  removed.doc.descendants(node => { if (node.type.name === 'commentNode') notes++ })
+  assert.equal(notes, 1, 'Remove a column keeps its comment')
+  assert.ok(!removed.doc.textContent.includes('Cursor'), 'the column itself is gone')
+
+  // Steps with a line before its list: Turn into keeps it before the new block.
+  const intro = '# S\n\n::: steps\nBefore the steps\n\n1. One\n2. Two\n:::'
+  const steps = stateWith(intro, 'One')
+  const boxes = after(turnInto(steps, blockPos(steps), 'boxes'))
+  assert.ok(boxes.indexOf('Before the steps') < boxes.indexOf(':::: boxes'), boxes)
+
+  // 13 boxes and more: drawn as many, in rows of boxes at least 180 px wide (no Auto rule counts them).
+  const many = ['# M', '', ':::: boxes', ...Array.from({ length: 14 }, (_unused, n) => [`::: box`, `B${n}`, ':::', '']).flat(), '::::'].join('\n')
+  assert.ok(blockSlideHtml(many).includes('data-count="14" data-many=""'), 'fourteen boxes are many')
+  const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
+  assert.ok(css.includes('.blk-boxes[data-many]:not([data-width]) > .blk-box { flex: 1 1 180px; }'))
+  // A Boxes block in a box takes the box's width on the stage too, where a box's blocks are in its `.blk-inner`.
+  assert.ok(css.includes('.blk-box > .blk-inner > .blk-boxes { align-self: stretch; }'))
+  // Columns aligned: a table or a picture keeps its own width.
+  assert.ok(css.includes('.blk-columns[data-valign] > .blk-column > :is(table, .tableWrapper, img, .blk-pic) { align-self: flex-start; }'))
+
+  // Borderless Outline: a filled theme's own (faint) line is not the outline's.
+  const vars = themeVars(BUILT_IN_THEME, true)
+  assert.equal(BUILT_IN_THEME.boxes, 'filled')
+  assert.notEqual(vars.boxo, vars.boxl, 'the outline line is stronger than the filled theme\'s box line')
 }
 
 console.log('blockBar: Turn into, Width, Style, alignment, Columns, the split, Add, Delete, the drag, Tab and the handles pass')

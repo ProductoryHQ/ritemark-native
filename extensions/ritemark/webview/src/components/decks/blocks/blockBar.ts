@@ -22,10 +22,10 @@
  *  - **Tab** in a box or a column goes to the start of the next one (Shift+Tab the one before); in the last it stays.
  *    In a list item, a code box or a table cell, Tab is theirs (indent, the next cell).
  */
-import { Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model'
+import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { OPEN_FENCE, columnWidthOf, parseFenceAttributes, slideBlockClassOf, withFenceValue, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { SLIDE_COMMAND } from './slideCommands'
+import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
 
 /** The kinds of block the bar is for, in the order its type menu lists them. */
 export type BarKind = 'boxes' | 'steps' | 'columns' | 'list' | 'numbered'
@@ -88,11 +88,8 @@ function blockAt(state: EditorState, pos: number): ChosenBlock | null {
   return node && kind ? { pos, node, kind } : null
 }
 
-/** A `:::` block with its lines, as the conversion writes one. */
-function div(schema: Schema, open: string, close: string, content: PMNode[] | Fragment): PMNode {
-  const attrs = parseFenceAttributes(OPEN_FENCE.exec(open)![2])!
-  return schema.nodes.slideDiv.create({ open, close, gapOpen: 'false', gapClose: 'false', class: attrs.classes.join(' ') }, content)
-}
+/** A `:::` block with its lines, as the / menu's blocks are made (`slideDivNode`). */
+const div = slideDivNode
 
 const emptyColumn = (schema: Schema) => div(schema, '::: column', ':::', [schema.nodes.heading.create({ level: 3 }), schema.nodes.paragraph.create()])
 
@@ -120,8 +117,9 @@ function partsOf(block: ChosenBlock): Parts {
   if (block.kind === 'steps') {
     let listed = false
     block.node.forEach(child => {
+      // What stands before the list stays before the block, and what follows it after: the reading order holds.
       if (!listed && child.type.name === 'orderedList') { fromList(child); listed = true }
-      else if (isNote(child) && !listed) parts.before.push(child)
+      else if (!listed) parts.before.push(child)
       else parts.after.push(child)
     })
     return parts
@@ -426,8 +424,13 @@ export function removeColumn(state: EditorState, pos: number, index: number): Tr
   if (!column || columns.length <= MIN_COLUMNS) return null
   const tr = state.tr.delete(column.pos, column.pos + column.node.nodeSize)
   withoutWidths(tr, pos)
-  const into = columns[Math.min(index, columns.length - 2)]
-  tr.setSelection(Selection.near(tr.doc.resolve(tr.mapping.map(into.pos) + 1)))
+  const into = columns[index + 1] ?? columns[index - 1]
+  // The column's comments are words: they stay, at the start of the column that takes the caret, as Delete keeps a
+  // block's.
+  const notes = notesIn(column.node)
+  if (notes.length) tr.insert(tr.mapping.map(into.pos) + 1, notes)
+  const start = tr.doc.resolve(tr.mapping.map(into.pos) + 1)
+  tr.setSelection(Selection.findFrom(start, 1, true) ?? Selection.near(start))
   return tr.setMeta(SLIDE_COMMAND, true)
 }
 
@@ -592,11 +595,6 @@ export function splitPlace(x: number, left: number, right: number): number {
   const width = right - left
   if (!(width > 0)) return 0.5
   return Math.max(0, Math.min(1, (x - left) / width))
-}
-
-/** A drag's distance on the screen in the slide's own pixels (960 wide): divided by the stage's scale. */
-export function slideDelta(screen: number, scale: number): number {
-  return scale > 0 ? screen / scale : screen
 }
 
 /** The gap a pointer at `y` drops a block into: the allowed gap whose line is nearest. `lines` maps a gap to its y. */

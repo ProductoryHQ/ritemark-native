@@ -17,7 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { Transaction } from '@tiptap/pm/state'
-import { boxesLookOf, columnsAlignOf, type BoxWidth } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOX_WIDTH_PX, boxesLookOf, columnsAlignOf, type BoxWidth } from '../../../../../src/decks/blocks/fencedDiv'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
@@ -180,7 +180,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     const left = Math.max(8, Math.min(placed.screen.left, window.innerWidth - width - 8))
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves or the bar's contents change (its width): never on its own update.
-  }, [showing, placed, chosen?.node, chosen?.kind])
+  }, [showing, placed, chosen?.node, chosen?.kind, drag])
 
   if (!editor || !chosen || !placed || !layer) return null
 
@@ -191,8 +191,16 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
   const fill = look?.fill ?? theme.boxes
   const columns = chosen.kind === 'columns' ? columnCount(chosen.node) : 0
   const caretColumn = chosen.kind === 'columns' ? columnIndexAt(state, chosen.pos) : null
-  const setValue = (key: string, value: string | null) => run(setBlockValue(editor.state, chosen.pos, key, value))
-  const add = () => run(addItem(editor.state, chosen.pos))
+  /**
+   * A change on the chosen block as it is now: found again from the caret, so a change that came in meanwhile (an AI's
+   * edit, an undo) never makes the bar act on another block's place. Nothing when the block is gone.
+   */
+  const act = (make: (pos: number) => Transaction | null): Transaction | null => {
+    const now = chosenBlockAt(editor.state)
+    return now && now.kind === chosen.kind ? make(now.pos) : null
+  }
+  const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
+  const add = () => run(act(pos => addItem(editor.state, pos)))
   const canAdd = chosen.kind !== 'columns' || columns < MAX_COLUMNS
 
   // ---- The ⋮ drag: where the block lands, by the lines between the slide's blocks.
@@ -202,7 +210,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     const handle = event.currentTarget
     handle.setPointerCapture(event.pointerId)
     const doc = editor.state.doc
-    const index = doc.resolve(chosen.pos).index(0)
+    const start = chosenBlockAt(editor.state)
+    if (!start) return
+    const index = doc.resolve(start.pos).index(0)
     const gaps = dropGaps(doc, index)
     const origin = frame.getBoundingClientRect()
     const flow = (editor.view.dom as HTMLElement).getBoundingClientRect()
@@ -236,7 +246,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
       handle.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKey, true)
       setDrag(null)
-      if (drop && target !== null) run(moveBlock(editor.state, chosen.pos, target))
+      if (drop && target !== null && editor.state.doc === doc) run(act(pos => moveBlock(editor.state, pos, target!)))
     }
     const onUp = () => end(true)
     const onCancel = () => end(false)
@@ -254,6 +264,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     const handle = event.currentTarget
     handle.setPointerCapture(event.pointerId)
     const edges = placed.lines[line]
+    // A drop on a document that changed meanwhile is no drop: the line's place was read from the one before.
+    const startDoc = editor.state.doc
     const origin = frame.getBoundingClientRect()
     let fraction = splitPlace(event.clientX, edges.left, edges.right)
     const show = () => {
@@ -268,7 +280,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
       handle.removeEventListener('pointercancel', onCancel)
       window.removeEventListener('keydown', onKey, true)
       setDrag(null)
-      if (drop) run(setColumnSplit(editor.state, chosen.pos, line, fraction))
+      if (drop && editor.state.doc === startDoc) run(act(pos => setColumnSplit(editor.state, pos, line, fraction)))
     }
     const onUp = () => end(true)
     const onCancel = () => end(false)
@@ -344,7 +356,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                     <DropdownMenuItem
                       key={kind}
                       className="gap-2"
-                      onSelect={() => { if (kind !== chosen.kind) apply(turnInto(editor.state, chosen.pos, kind, kind === 'steps' ? stepsLabel() : null)) }}
+                      onSelect={() => { if (kind !== chosen.kind) apply(act(pos => turnInto(editor.state, pos, kind, kind === 'steps' ? stepsLabel() : null))) }}
                     >
                       <Icon name={KIND_ICON[kind]} size={16} tone="inherit" />
                       <span className="flex-1">{BAR_KIND_LABEL[kind]}</span>
@@ -365,7 +377,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                   <Segment label="Width">
                     <Choice on={!look.width} icon="columns" label="Auto" tip="One row while every box is at least S wide, else two rows" onPick={() => setValue('width', null)} />
                     {(['s', 'm', 'l'] as BoxWidth[]).map(width => (
-                      <Choice key={width} on={look.width === width} label={width.toUpperCase()} tip={`Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${{ s: 180, m: 260, l: 400 }[width]} px on the slide), wrapping to rows`} onPick={() => setValue('width', width)} />
+                      <Choice key={width} on={look.width === width} label={width.toUpperCase()} tip={`Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`} onPick={() => setValue('width', width)} />
                     ))}
                   </Segment>
                   <Sep />
@@ -385,7 +397,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                         on={columns === count}
                         label={String(count)}
                         tip={count < columns ? `${count} columns: the words of the others go to the last one` : `${count} columns`}
-                        onPick={() => run(setColumnCount(editor.state, chosen.pos, count))}
+                        onPick={() => run(act(pos => setColumnCount(editor.state, pos, count)))}
                       />
                     ))}
                   </Segment>
@@ -405,7 +417,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                 </Button>
               </Tooltip>
               <Tooltip label="Delete this block">
-                <Button variant="toolbar" size="compact" aria-label="Delete this block" onMouseDown={event => event.preventDefault()} onClick={() => run(deleteBlock(editor.state, chosen.pos))}>
+                <Button variant="toolbar" size="compact" aria-label="Delete this block" onMouseDown={event => event.preventDefault()} onClick={() => run(act(pos => deleteBlock(editor.state, pos)))}>
                   <Icon name="trash" size={16} tone="inherit" />
                 </Button>
               </Tooltip>
@@ -419,20 +431,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
                     </DropdownMenuTrigger>
                   </Tooltip>
                   <DropdownMenuContent align="end" onCloseAutoFocus={event => { event.preventDefault(); editor.view.focus() }}>
-                    <DropdownMenuItem className="gap-2" disabled={columns >= MAX_COLUMNS} onSelect={() => apply(addItem(editor.state, chosen.pos))}>
+                    <DropdownMenuItem className="gap-2" disabled={columns >= MAX_COLUMNS} onSelect={() => apply(act(pos => addItem(editor.state, pos)))}>
                       <Icon name="plus" size={16} tone="inherit" />
                       Add a column
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       className="gap-2"
                       disabled={columns <= MIN_COLUMNS || caretColumn === null}
-                      onSelect={() => { if (caretColumn !== null) apply(removeColumn(editor.state, chosen.pos, caretColumn)) }}
+                      onSelect={() => { if (caretColumn !== null) apply(act(pos => removeColumn(editor.state, pos, caretColumn))) }}
                     >
                       <Icon name="minus" size={16} tone="inherit" />
                       Remove a column
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="gap-2" tone="danger" onSelect={() => apply(deleteBlock(editor.state, chosen.pos))}>
+                    <DropdownMenuItem className="gap-2" tone="danger" onSelect={() => apply(act(pos => deleteBlock(editor.state, pos)))}>
                       <Icon name="trash" size={16} tone="inherit" />
                       Delete block
                     </DropdownMenuItem>

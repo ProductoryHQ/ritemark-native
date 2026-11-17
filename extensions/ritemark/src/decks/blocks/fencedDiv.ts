@@ -243,6 +243,8 @@ export function columnTemplateOf(widths: ReadonlyArray<number | null>): string |
 export function boxesDrawnAttributes(attrs: FenceAttributes, count: number): Record<string, string> {
   const look = boxesLookOf(attrs);
   const out: Record<string, string> = { 'data-count': String(Math.max(0, Math.min(99, Math.floor(count)))) };
+  // slide.css counts Auto's two rows up to 12 boxes; more go in rows of boxes at least 180 px wide.
+  if (count > 12) out['data-many'] = '';
   if (look.width) out['data-width'] = look.width;
   if (look.fill) out['data-fill'] = look.fill;
   if (look.align) out['data-align'] = look.align;

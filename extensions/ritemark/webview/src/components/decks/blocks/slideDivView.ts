@@ -15,11 +15,12 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
-import { OPEN_FENCE, OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, parseFenceAttributes, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg, isPageIconName } from '../slide/pageIcons'
 import { slideIcon } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
+import { divAttributesOf } from './blockBar'
 
 /** What the stage does when a box's icon or the Steps pill is used (SlideEditor gives them; they read its latest state). */
 export interface SlideDivHandlers {
@@ -30,10 +31,7 @@ export interface SlideDivHandlers {
 }
 
 /** The block's attributes, read from its opening line as written. */
-function attributesOf(node: PMNode): FenceAttributes {
-  const open = OPEN_FENCE.exec(String(node.attrs.open ?? ''))
-  return (open ? parseFenceAttributes(open[2]) : null) ?? { classes: [], id: null, values: {} }
-}
+const attributesOf: (node: PMNode) => FenceAttributes = divAttributesOf
 
 /** The Boxes look a box is drawn under: its parent's, or Boxes. */
 function lookAround(getPos: () => number | undefined, doc: () => PMNode): string {
@@ -45,7 +43,7 @@ function lookAround(getPos: () => number | undefined, doc: () => PMNode): string
 }
 
 /** The attributes the block bar's values are drawn with (`boxesDrawnAttributes`, `columnsDrawnAttributes`). */
-const DRAWN = ['data-count', 'data-width', 'data-fill', 'data-align', 'data-valign', 'style'] as const
+const DRAWN = ['data-count', 'data-many', 'data-width', 'data-fill', 'data-align', 'data-valign', 'style'] as const
 
 /** A block's child blocks of one class (`box`, `column`), in order. */
 export function childDivs(node: PMNode, kind: string): PMNode[] {

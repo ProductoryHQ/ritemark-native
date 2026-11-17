@@ -190,7 +190,11 @@
    400 px, start at the left, wrap, and keep their width in the last row. */
 .deck-sl.is-blocks .blk-boxes { display: flex; flex-wrap: wrap; align-items: stretch; container: blk-boxes / inline-size; }
 .deck-sl.is-blocks .blk-boxes > .blk-box { flex: 1 1 0; box-sizing: border-box; }
-.deck-sl.is-blocks .blk-box > .blk-boxes { align-self: stretch; }
+/* A Boxes block inside a box takes the box's width (inline-size containment would make a shrink-to-fit one 0 wide);
+   on the stage a box's blocks sit in its `.blk-inner`. */
+.deck-sl.is-blocks .blk-box > .blk-boxes, .deck-sl.is-blocks .blk-box > .blk-inner > .blk-boxes { align-self: stretch; }
+/* More boxes than the rules below count (13 and up): rows of boxes at least 180 px wide. */
+.deck-sl.is-blocks .blk-boxes[data-many]:not([data-width]) > .blk-box { flex: 1 1 180px; }
 @container blk-boxes (width < 376px) { .deck-sl.is-blocks .blk-boxes[data-count="2"]:not([data-width]) > .blk-box { flex-basis: calc(100% - .5px); } }
 @container blk-boxes (width < 572px) { .deck-sl.is-blocks .blk-boxes[data-count="3"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 16px) / 2 - .5px); } }
 @container blk-boxes (width < 768px) { .deck-sl.is-blocks .blk-boxes[data-count="4"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 16px) / 2 - .5px); } }
@@ -209,7 +213,10 @@
 .deck-sl.is-blocks .blk-boxes[data-align="center"] > .blk-box { align-items: center; text-align: center; }
 .deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="filled"] > .blk-box { background: var(--s-boxf, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxfl, rgba(255,255,255,.13)); }
 .deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="outline"] > .blk-box { background: transparent; box-shadow: inset 0 0 0 1.5px var(--s-boxo, rgba(255,255,255,.34)); }
-.deck-sl.is-blocks .blk-columns[data-valign] > .blk-column { display: flex; flex-direction: column; }
+/* A column's blocks keep their own width when it is a flex column: a table and a picture never stretch (the slide's
+   blocks have bottom margins only, so none collapse that would here). */
+.deck-sl.is-blocks .blk-columns[data-valign] > .blk-column { display: flex; flex-direction: column; align-items: stretch; }
+.deck-sl.is-blocks .blk-columns[data-valign] > .blk-column > :is(table, .tableWrapper, img, .blk-pic) { align-self: flex-start; }
 .deck-sl.is-blocks .blk-columns[data-valign="middle"] > .blk-column { justify-content: center; }
 .deck-sl.is-blocks .blk-columns[data-valign="bottom"] > .blk-column { justify-content: flex-end; }
 /* A slide that is only a title, with a line under it or a short line over it: big and low, as the old Title slide. */

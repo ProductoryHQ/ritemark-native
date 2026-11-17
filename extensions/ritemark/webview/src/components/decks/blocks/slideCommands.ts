@@ -55,7 +55,7 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
 export type SlideBlockKind = 'columns' | 'boxes' | 'steps' | 'table'
 
 /** A `:::` block with its lines, as the slide editor loads one (`slideDiv`'s attributes). */
-const div = (schema: Schema, open: string, close: string, content: PMNode[]) =>
+export const slideDivNode = (schema: Schema, open: string, close: string, content: PMNode[]) =>
   schema.nodes.slideDiv.create({ open, close, gapOpen: 'false', gapClose: 'false', class: parseFenceAttributes(OPEN_FENCE.exec(open)![2])!.classes.join(' ') }, content)
 
 /** A new block, empty, as the conversion writes one: two columns, three boxes, Steps with one step, a 3 × 3 table. */
@@ -64,12 +64,12 @@ export function slideBlockNode(schema: Schema, kind: SlideBlockKind, tag: string
   switch (kind) {
     case 'columns':
       // Each column an empty heading over an empty line: "Heading" over "Text" faint, nothing written (the lead on #769).
-      return div(schema, ':::: columns', '::::', [0, 1].map(() => div(schema, '::: column', ':::', [schema.nodes.heading.create({ level: 3 }), paragraph()])))
+      return slideDivNode(schema, ':::: columns', '::::', [0, 1].map(() => slideDivNode(schema, '::: column', ':::', [schema.nodes.heading.create({ level: 3 }), paragraph()])))
     case 'boxes':
-      return div(schema, ':::: boxes', '::::', [0, 1, 2].map(() => div(schema, '::: box', ':::', [paragraph()])))
+      return slideDivNode(schema, ':::: boxes', '::::', [0, 1, 2].map(() => slideDivNode(schema, '::: box', ':::', [paragraph()])))
     case 'steps':
       // A label carried from the deck's earlier pill is written as its own tag (the lead on #769).
-      return div(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
+      return slideDivNode(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
     case 'table': {
       const row = (header: boolean) => schema.nodes.tableRow.create(null, [0, 1, 2].map(() => (header ? schema.nodes.tableHeader : schema.nodes.tableCell).create(null, [paragraph()])))
       return schema.nodes.table.create(null, [row(true), row(false), row(false)])
