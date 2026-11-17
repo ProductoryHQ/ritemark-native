@@ -308,9 +308,11 @@ export class DeckPages implements vscode.Disposable {
       throw error;
     }
     switch (request.type) {
-      case 'deck/assets':
-        await this.post(webview, { type: 'deck/assets', assets: resolveAssets(document, webview, request.paths) });
+      case 'deck/assets': {
+        const assets = resolveAssets(document, webview, request.paths);
+        await this.post(webview, { type: 'deck/assets', assets, missing: missingPictures(request.paths, assets) });
         return;
+      }
       case 'deck/theme':
         await this.post(webview, { type: 'deck/theme', path: request.path, text: await readTheme(document, request.path) });
         return;
@@ -514,6 +516,14 @@ async function pickTopic(library: DeckLibrary): Promise<string | null> {
 
 function resolveAssets(document: vscode.TextDocument, webview: vscode.Webview, paths: string[]): Record<string, string> {
   return resolveAssetsIn(path.dirname(document.uri.fsPath), webview, paths);
+}
+
+/**
+ * 17 November: the relative pictures asked for that `resolveAssetsIn` found no file for. The deck view draws them as
+ * missing, with their names, instead of an empty place; only paths the slides themselves name are ever asked.
+ */
+export function missingPictures(paths: string[], assets: Record<string, string>): string[] {
+  return [...new Set(paths.filter(relative => isRelativeImagePath(relative) && !assets[relative]))];
 }
 
 /**

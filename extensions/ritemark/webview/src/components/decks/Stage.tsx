@@ -30,6 +30,8 @@ interface StageProps {
   theme: DeckTheme
   borderless: boolean
   assets: Record<string, string>
+  /** 17 November: pictures the host found no file for (drawn as missing, with Replace picture…). */
+  missing?: ReadonlySet<string>
   /** The slide's width on the stage. */
   width: number
   /** The person is writing on this slide: the handout keeps it the current one. */
@@ -66,7 +68,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, missing, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -78,6 +80,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         theme={theme}
         borderless={borderless}
         assets={assets}
+        missing={missing}
         commentCallouts={commentCallouts}
         onWriting={onWriting}
         focusTitle={focusTitle}
