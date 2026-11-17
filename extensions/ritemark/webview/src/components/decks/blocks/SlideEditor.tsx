@@ -49,12 +49,15 @@ import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
+import { slideAgendaWithView, type AgendaSource } from './slideAgendaView'
+import { onDocChanged } from '../../../lib/docChange'
+import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabAcross } from './blockBar'
@@ -295,6 +298,16 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     pickIcon: (pos, anchor, current) => toolsRef.current?.pickIcon(pos, anchor, current),
     editPill: (pos, anchor) => toolsRef.current?.editPill(pos, anchor),
   }), [])
+  // Small details 14: the Agenda reads the deck's sections from the handout's editor, and draws again as they change.
+  const agendaSource = useMemo<AgendaSource>(() => ({
+    current: () => {
+      const deck = outerRef.current
+      if (deck.isDestroyed) return { entries: [], hint: true }
+      return { entries: agendaOf(slidesOf(deck.state.doc).map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 }))), hint: true }
+    },
+    // Every change to the deck, the host's too (a section renamed by an AI while the slide is open).
+    subscribe: listener => onDocChanged(outerRef.current, listener),
+  }), [])
   const SlideKeys = useMemo(() => Extension.create({
     name: 'slideKeys',
     priority: 900,
@@ -333,12 +346,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     afterImage: [OuterHistory, SlideKeys, SlideSlash, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
-    deck: [slideDivWithView(divHandlers)],
+    deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource)],
   }).map(extension => {
     if (extension.name === 'starterKit') return extension.configure({ history: false })
     if (extension.name === 'commentNode') return SlideCommentNode.extend()
     return extension
-  }), [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles, divHandlers, commentCallouts])
+  }), [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles, divHandlers, agendaSource, commentCallouts])
 
   const editor = useEditor({
     extensions,
@@ -707,6 +720,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind, tag)); return true }).run()
           return
         }
+        case 'agenda':
+          // One block line pair, an undo step of its own; the list is the deck's, drawn where it stands.
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, agendaNode(editor.schema)); return true }).run()
+          return
         case 'picture':
           chain().run()
           pictureAt.current = range.from

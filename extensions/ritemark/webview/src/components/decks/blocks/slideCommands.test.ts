@@ -34,7 +34,7 @@ import { derivedHeadings, insertSlide, slidesOf, starterMarkdown } from '../deck
 import { loadSlide, loadSlideWithComments, saveSlide, slideSchema } from './slideEditorHarness'
 import { saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { SlideSync } from './slideSync'
-import { SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { splitSlide } from './slideSplit'
 import { webPageAddress } from './SlideBlockTools'
 import { isFullAt, nextFitStep } from './slideFit'
@@ -139,7 +139,7 @@ const DECK = [
 {
   assert.deepEqual(SLIDE_ITEMS.map(item => `${item.group}: ${item.title}${item.shortcut ? ` ${item.shortcut}` : ''}`), [
     'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.',
-    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table',
+    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Agenda',
     'Media: Picture', 'Media: Web page',
     'Slides: New slide below', 'Slides: Split slide here ***',
   ])
@@ -636,6 +636,31 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   const converted = convertDeckText(['```slide section', 'id: s1', 'title: Intro', 'subtitle: SECRETSUB', '```', '', 'Text.', ''].join('\n'))
   const out = JSON.stringify(publicDeck(converted, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }))
   assert.ok(!out.includes('SECRETSUB') && !out.includes('"s1"'), out)
+}
+
+// ---- Small details 14: /Agenda writes one block, `::: agenda` and `:::`, where the / was, as one undo step; the
+// list is never written, and the file reads back byte for byte.
+{
+  const deck = openDeck(DECK)
+  const stage = stageOn(deck, 0)
+  stage.caretAfter('Three jobs every week')
+  stage.apply(stage.inner.tr.split(stage.inner.selection.from))
+  const from = stage.inner.selection.from
+  stage.apply(stage.inner.tr.insertText('/agen'), true)
+  const tr = stage.inner.tr.delete(from, from + 5)
+  insertSlideBlock(tr, from, agendaNode(stage.inner.schema))
+  assert.equal(tr.getMeta(SLIDE_COMMAND), true, 'the Agenda is an undo step of its own')
+  stage.apply(tr)
+  const saved = stage.save()
+  const markdown = slideDataOf('', slidesOf(stage.outer.doc)[0].node.attrs.body).markdown!
+  assert.equal(markdown, '# Where assistants help\n\nThree jobs every week\n\n::: agenda\n:::', 'only the block\'s lines are written')
+  assert.ok(!saved.includes('/agen'), 'the query never reaches the file')
+  // Everything else in the file is as it was: only the block's two lines (and the blank line before them) are new.
+  assert.equal(saved, DECK.replace('Three jobs every week\n```', 'Three jobs every week\n\n::: agenda\n:::\n```'))
+  assert.equal(saveSlide(loadSlide(markdown)), markdown, "the slide's Markdown reads back as written")
+  assertStable(saved, 'Agenda')
+  stage.undo()
+  assert.equal(stage.save(), DECK, 'one Undo takes the Agenda back')
 }
 
 console.log('slideCommands: passed')

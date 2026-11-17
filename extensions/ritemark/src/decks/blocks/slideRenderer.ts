@@ -14,7 +14,7 @@
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
-import { EXERCISE_TAG, sidePictureOf, type SlideData } from '../deckFormat';
+import { EXERCISE_TAG, isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import type { DeckTheme, LogoOn, LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
@@ -23,6 +23,7 @@ import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/s
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
+import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
 
 export { sidePictureOf };
 
@@ -70,9 +71,12 @@ interface RenderState {
   /** 17 November: a picture whose file the host didn't find: drawn as missing, with its file's name. */
   missing: (path: string) => boolean;
   looks: string[];
+  /** The decks README, small details 14: the deck's sections an Agenda block lists, and the slide's place for Present. */
+  agenda: AgendaDrawing | null;
+  at: number | null;
 }
 
-let state: RenderState = { pictureUrl: () => null, missing: () => false, looks: [] };
+let state: RenderState = { pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null };
 
 /** A picture's file name, from the path the slide names. */
 export function pictureFileName(path: string): string {
@@ -112,6 +116,8 @@ function columnChildren(token: SlideDivToken): FenceAttributes[] | null {
 }
 
 function divHtml(token: SlideDivToken, inner: () => string): string {
+  // The Agenda (small details 14): drawn from the deck, never from what the block holds (nothing, as `/Agenda` writes it).
+  if (isAgendaClasses(token.attrs.classes)) return agendaHtml(state.agenda, state.at);
   const kind = slideBlockClassOf(token.attrs);
   switch (kind) {
     case 'columns':
@@ -378,10 +384,67 @@ export function blockStepsTagOf(markdown: string): string | null {
   return found;
 }
 
+const agendaCache = new Map<string, boolean>();
+
+/** Does a block slide hold an Agenda block (at any level, outside code)? Read once per Markdown. */
+export function blockHasAgenda(markdown: string): boolean {
+  if (!markdown.includes(':::')) return false;
+  const cached = agendaCache.get(markdown);
+  if (cached !== undefined) return cached;
+  if (agendaCache.size > 500) agendaCache.clear();
+  let found = false;
+  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
+    if (token.type === 'slideDiv' && isAgendaClasses((token as unknown as SlideDivToken).attrs.classes)) found = true;
+  });
+  agendaCache.set(markdown, found);
+  return found;
+}
+
+/**
+ * A section slide, as the page draws its band: an old Section slide, or a block slide whose header says
+ * `section: true` or that is drawn as one (a short number over its title, `blockSectionNumberOf`).
+ */
+export function isSectionSlide(kind: string, data: SlideData): boolean {
+  if (kind === 'section') return true;
+  if (!isBlockSlide(kind)) return false;
+  return data.section === true || blockSectionNumberOf(data.markdown ?? '') !== null;
+}
+
+/**
+ * The Agenda's list (small details 14): the deck's section slides that aren't skipped, in order, by title (a section
+ * with no title by its number, "Section 2"), each with its slide's place in the deck (from 1, skipped slides counted
+ * unless `number` says otherwise). The deck view, the wall and the page each give it the slides they draw.
+ */
+export function agendaOf(slides: ReadonlyArray<{ kind: string; data: SlideData; number?: number }>): AgendaEntry[] {
+  const entries: AgendaEntry[] = [];
+  slides.forEach((slide, index) => {
+    if (slide.data.skip === true || !isSectionSlide(slide.kind, slide.data)) return;
+    const title = (slide.data.title ?? '').trim();
+    const sectionNumber = isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') : (slide.data.number ?? '').trim();
+    entries.push({ title: title || `Section${sectionNumber ? ` ${sectionNumber}` : ''}`, number: slide.number ?? index + 1 });
+  });
+  return entries;
+}
+
+/** One key for an agenda's list, so a view draws again only when the list itself changes. */
+export function agendaKey(entries: readonly AgendaEntry[]): string {
+  return entries.map(entry => `${entry.number}\u0000${entry.title}`).join('\u0001');
+}
+
+/** What a block slide is drawn with besides its words: its pictures, and the deck around an Agenda block. */
+export interface BlockDrawingContext {
+  pictureUrl?: (path: string) => string | null;
+  missing?: (path: string) => boolean;
+  /** The deck's sections, for an Agenda block (none: an Agenda draws nothing). */
+  agenda?: AgendaDrawing | null;
+  /** The slide's place in the deck (from 1), in Present only: an Agenda marks the sections passed and the next one. */
+  at?: number | null;
+}
+
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
-export function blockSlideHtml(markdown: string, options: { pictureUrl?: (path: string) => string | null; missing?: (path: string) => boolean } = {}): string {
+export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
-  state = { pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), looks: [] };
+  state = { pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), looks: [], agenda: options.agenda ?? null, at: options.at ?? null };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -405,6 +468,9 @@ export interface BlockSlideMarkupOptions {
   inlineTheme?: boolean;
   /** Sprint 162 PR 4: the theme's logo; `blockSlideMarkup` takes it from the theme when it isn't given. */
   logo?: SlideLogo | null;
+  /** Small details 14: the deck's sections, for an Agenda block, and the slide's place in Present. */
+  agenda?: AgendaDrawing | null;
+  at?: number | null;
 }
 
 const kebab = (key: string) => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
@@ -499,7 +565,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo'>): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'>): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -523,7 +589,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div>`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

@@ -18,6 +18,14 @@
  *
  * The theme's logo is a file beside the page too (`logos/`, Sprint 162 PR 4), drawn as an `<img>`, never as markup.
  *
+ * An Agenda block (the decks README, small details 14) lists the page's section slides, with no progress.
+ *
+ * **The page prints as a handout** (small details 13), by its print rules alone (`PRINT_CSS`, `printOrderCss`): each
+ * part's slide above its text, in the theme's fonts and colours, a part kept off two pages where it fits, prompts in
+ * their box, and none of the bar, the arrows, Contents, Copy or the Open in links; the page's address in the footer.
+ * The slides are the same layers the screen shows one at a time; print lays them out between the parts, so nothing of
+ * the page is drawn twice.
+ *
  * Pure: the slide CSS and the fonts come in as `PageAssets` (the host reads them, `pageAssets.ts`), and whether a
  * picture is there comes in as `pictureUrl`. The same input always gives the same bytes.
  */
@@ -26,7 +34,7 @@ import { Marked, marked, type Tokens } from 'marked';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { columnFloors, floorCss } from '../../markdown/tableColumns';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
-import { blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
+import { agendaOf, blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
@@ -561,6 +569,68 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
 }
 `;
 
+/**
+ * The decks README, small details 13: **the page prints as a handout**. Print rules only, after the page's own and the
+ * slide's (so they win):
+ *
+ *  - The page's bar, Contents, the arrows under the slide, Copy, the Open in links, the toast and the picture view are
+ *    left out. Each slide (its layer, shown one at a time on screen) is laid out above its part's text, at 576 × 324
+ *    (about 152 mm, inside A4's and Letter's printed width at these margins, two to a page where their text is short), in the theme's fonts and colours: the
+ *    slide alone may print its colours exactly (`print-color-adjust`), the rest prints as the browser sets it.
+ *  - A slide stays with its text (`break-after: avoid`), and a part is kept off two pages where it fits
+ *    (`break-inside: avoid`; a part longer than a page breaks as it must).
+ *  - A prompt keeps its box as a line around it (backgrounds may not print); a step's tick box likewise.
+ *  - The page's address (`#paddr`, written by the script) goes in the handout's footer, under the client and the session.
+ *
+ * The order (`printOrderCss`): the stage, its slide box and the text column give their children to the page's one
+ * column, and each slide and part is given its place there: slide 1, part 1, slide 2, part 2, then the foot.
+ */
+export const PRINT_CSS = `
+.paddr, .foot.addr-only { display: none; }
+@media print {
+  @page { margin: 14mm 15mm 18mm; }
+  html, body { background: #FFFFFF; }
+  body { font-size: 10.5pt; line-height: 1.5; }
+  .top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open { display: none !important; }
+  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0; gap: 0; }
+  .stage, .slidebox, .text { display: contents; }
+  .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
+  .layer { position: relative; inset: auto; width: 576px; height: 324px; margin: 0 0 4mm; opacity: 1; visibility: visible; transition: none; border-radius: 8px; overflow: hidden; background: var(--slidebg); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body.bl .layer { border-radius: 0; background: transparent; }
+  /* In the flow and zoomed, not scaled: a transformed 960 x 540 canvas keeps its full height in the layout, and a page
+     break below a slide drew a sliver of it at the foot of the page. */
+  .layer > .deck-slide { position: relative; inset: auto; display: block; width: 576px; height: 324px; }
+  .layer .deck-sl { transform: none; zoom: 0.6; }
+  .part, .part.dim, .sect.dim > * { opacity: 1; transition: none; }
+  .part { padding: 0 0 7mm; margin: 0; border-top: 0; break-inside: avoid; page-break-inside: avoid; }
+  .part.only { height: auto; padding: 0 0 4mm; }
+  .sect { margin: 0; padding: 0 0 7mm; border-radius: 0; background: none; }
+  .part h2 { font-size: 15pt; }
+  .sect h2 { font-size: 17pt; }
+  .part img, .pre img, .part .pic, .tw { break-inside: avoid; page-break-inside: avoid; }
+  .prompt, .prompt.ai { display: block; margin: 0 0 4mm; padding: 0; border-radius: 0; background: none; break-inside: avoid; page-break-inside: avoid; }
+  .prompt pre, .prompt.ai pre { padding: 3mm 4mm; border: 1px solid #C9CBD6; border-radius: 8px; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .steps label { background: none; box-shadow: none; border: 1px solid #DADCE4; break-inside: avoid; page-break-inside: avoid; }
+  .steps input { box-shadow: none; border: 1.5px solid #8A8DA3; }
+  .foot { order: 2147483647; margin-top: 2mm; padding-top: 3mm; break-inside: avoid; page-break-inside: avoid; }
+  .foot.addr-only { display: block; border-top: 0; }
+  .paddr { display: block; overflow-wrap: anywhere; }
+  .paddr:empty { display: none; }
+}
+`;
+
+/**
+ * Each slide and part's place in the printed column (`PRINT_CSS`): slide n before part n (`#s<n>`), after the
+ * preamble. Only numbers reach it.
+ */
+export function printOrderCss(count: number): string {
+  const rules: string[] = [];
+  for (let index = 0; index < count; index++) {
+    rules.push(`.slidebox>.layer:nth-child(${index + 1}){order:${index * 2 + 1}}#s${index + 1}{order:${index * 2 + 2}}`);
+  }
+  return rules.length ? `@media print{${rules.join('')}}` : '';
+}
+
 /** The page's colours: the theme's words and accent as they read on white (its Borderless look), Ritemark's nowhere. */
 function pageColours(deck: PublicDeck): string {
   const onWhite = themeVars(deck.theme, true);
@@ -709,12 +779,15 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // The logo's address is the file beside the page; a theme whose logo isn't there draws none (Sprint 162 PR 4).
   const theme = deck.theme.logo && assets.logo ? { ...deck.theme, logoUrl: assets.logo.address, ...(assets.logo.aspect ? { logoAspect: assets.logo.aspect } : {}) } : deck.theme;
   const count = deck.slides.length;
+  // Small details 14: an Agenda lists the page's sections as they are, with no progress and no hint when there are none.
+  const agenda = { entries: agendaOf(deck.slides.map((slide, index) => ({ kind: slide.kind, data: slide.data, number: index + 1 }))), hint: false };
   const layers = deck.slides.map((slide, index) => {
     const drawing = {
       theme,
       borderless,
       step: slide.step,
       pictureUrl: (picture: string) => options.pictureUrl(picture, 'slide'),
+      agenda,
     };
     // A block slide through the one block renderer (Sprint 161), a v1 slide through its layout, as the deck view draws them.
     const markup = isBlockSlide(slide.kind) ? blockSlideMarkup(slide.data, drawing) : slideMarkup(slide.kind, slide.data as SlideData, drawing);
@@ -738,6 +811,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   const pageKey = shortHash(`${deck.client}\u0000${deck.title}`);
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
+  // Small details 13: the printed handout's footer carries the page's address (the script writes it; never on screen).
+  const footer = `<div class="foot${foot ? '' : ' addr-only'}">${foot ? `<span>${foot}</span>` : ''}<span class="paddr" id="paddr"></span></div>`;
   return [
     '<!doctype html>',
     '<html lang="en">',
@@ -748,7 +823,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title)}</title>`,
-    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${PRINT_CSS}\n${printOrderCss(count)}\n</style>`,
     '</head>',
     `<body class="${borderless ? 'bl' : 'card'}">`,
     // "Start from the beginning" (small details 7): shown by the script for 5 s when the page returns to a reader's place.
@@ -766,7 +841,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<section class="text" id="text" data-store="ritemark-ticks-${pageKey}" data-place="ritemark-place-${pageKey}">`,
     preamble ? `<div class="pre">\n${preamble}</div>` : '',
     count ? parts.join('\n') : '<p class="empty">This deck has no slides to show.</p>',
-    foot ? `<div class="foot">${foot}</div>` : '',
+    footer,
     '</section>',
     '</main>',
     '<div class="toast" id="toast" role="status" hidden></div>',

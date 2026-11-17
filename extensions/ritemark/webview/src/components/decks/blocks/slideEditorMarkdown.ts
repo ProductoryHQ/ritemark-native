@@ -20,6 +20,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { Marked } from 'marked'
 import type TurndownService from 'turndown'
 import { fencedDivStart, scanFencedDiv, type FenceScan } from '../../../../../src/decks/blocks/fencedDiv'
+import { AGENDA_CLOSE, AGENDA_OPEN, isAgendaClasses } from '../../../../../src/decks/blocks/agenda'
 import { asWrittenMarkedExtension } from '../../../utils/markdownAsWritten'
 import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtension'
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
@@ -50,10 +51,16 @@ export const slideDivMarkedExtension = {
       tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: unknown[]) => unknown[] } }, src: string): SlideDivToken | undefined {
         const scan = scanFencedDiv(src)
         if (!scan) return undefined
+        // The Agenda draws from the deck: what it holds is kept as written, never edited (`SlideAgenda`).
+        if (isAgendaClasses(scan.attrs.classes)) return { type: 'slideDiv', raw: scan.raw, scan, tokens: [] }
         return { type: 'slideDiv', raw: scan.raw, scan, tokens: this.lexer.blockTokens(scan.inner.replace(/^\n+/, ''), []) }
       },
       renderer(this: { parser: { parse: (tokens: unknown[]) => string } }, token: SlideDivToken): string {
         const scan = token.scan
+        if (isAgendaClasses(scan.attrs.classes)) {
+          const written = token.raw.replace(/\n$/, '')
+          return `<div data-agenda="" data-raw="${escapeAttribute(written)}"${token.rmTight ? ' data-md-tight="true"' : ''}></div>\n`
+        }
         return `<div data-fdiv="" data-open="${escapeAttribute(scan.openLine)}" data-close="${escapeAttribute(scan.closeLine)}" data-gap-open="${scan.gapOpen}" data-gap-close="${scan.gapClose}" data-class="${escapeAttribute(scan.attrs.classes.join(' '))}"${token.rmTight ? ' data-md-tight="true"' : ''}>${this.parser.parse(token.tokens)}</div>\n`
       },
       childTokens: ['tokens'],
@@ -136,6 +143,50 @@ export const SlideDiv = Node.create({
 })
 
 /**
+ * The decks README, small details 14: the Agenda block. One line pair in the file (`::: agenda`, `:::`), and its list
+ * drawn from the deck's section slides, never written. An atom on the stage: it is chosen, moved, deleted and undone
+ * whole, and its lines (with anything someone wrote between them) are written back exactly as they were read.
+ */
+export const SlideAgenda = Node.create({
+  name: 'slideAgenda',
+  group: 'block',
+  atom: true,
+  selectable: true,
+  draggable: false,
+  addAttributes() {
+    return {
+      raw: {
+        default: `${AGENDA_OPEN}\n${AGENDA_CLOSE}`,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-raw') ?? `${AGENDA_OPEN}\n${AGENDA_CLOSE}`,
+        renderHTML: (attrs: Record<string, unknown>) => ({ 'data-raw': String(attrs.raw ?? '') }),
+      },
+      mdTight: {
+        default: null,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-md-tight'),
+        renderHTML: (attrs: Record<string, unknown>) => (attrs.mdTight === null || attrs.mdTight === undefined ? {} : { 'data-md-tight': String(attrs.mdTight) }),
+      },
+    }
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-agenda]' }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes({ 'data-agenda': '' }, HTMLAttributes)]
+  },
+})
+
+const isAgenda = (node: DomNode) => node.nodeName === 'DIV' && (node as HTMLElement).hasAttribute('data-agenda')
+
+/** The Agenda as Markdown: its lines as read (a new one's `::: agenda` and `:::`), apart from its neighbours as a div. */
+function agendaMarkdown(element: HTMLElement): string {
+  const raw = (element.getAttribute('data-raw') ?? `${AGENDA_OPEN}\n${AGENDA_CLOSE}`).replace(/\n+$/, '')
+  const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
+  const next = element.nextElementSibling
+  const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
+  return `${lead}${raw}${trail}`
+}
+
+/**
  * A `:::` block as Markdown: its lines as written around its blocks as Turndown wrote them. An empty block (a new Boxes
  * slide's box, a column not yet typed in) keeps its two lines, with its blank line after the opening one only when it
  * had one, so it reads back as the same empty block (PR 3: empty boxes were dropped on save).
@@ -171,6 +222,10 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
     filter: node => isSlideDiv(node),
     replacement: (content, node) => slideDivMarkdown(content, node as HTMLElement),
   })
+  service.addRule('slideAgenda', {
+    filter: node => isAgenda(node),
+    replacement: (_content, node) => agendaMarkdown(node as HTMLElement),
+  })
   // Turndown gives an element with no words (a `:::` block of empty boxes, a Steps block's first empty step) its blank
   // rule, never its own, so the block and its list dropped out of the file. A slide's empty block keeps its lines, and
   // an empty list inside one its markers (`1.`, `-`), which read back as the same empty list. Anything else blank stays
@@ -181,6 +236,8 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
   rules.blankRule = {
     replacement: (content, node, options) => {
       if (isSlideDiv(node)) return slideDivMarkdown(content, node as HTMLElement)
+      // The Agenda holds no words of its own: Turndown's blank rule would drop it.
+      if (isAgenda(node)) return agendaMarkdown(node as HTMLElement)
       if ((node.nodeName === 'OL' || node.nodeName === 'UL') && isInsideSlideDiv(node)) {
         const items = Array.from((node as HTMLElement).children).filter(child => child.nodeName === 'LI')
         const start = Number((node as HTMLElement).getAttribute('start') ?? '1') || 1
