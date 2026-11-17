@@ -147,9 +147,14 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   // A node decoration's attributes (prosemirror-view keeps them on its `type`).
   const attrsOf = (found: unknown) => (found as { type: { attrs: Record<string, string> } }).type.attrs
   const marks = (current: number | null) => deckDecorations(deck, current).find().map(found => attrsOf(found)['data-deck-placeholder'] ?? attrsOf(found).class)
-  assert.deepEqual(marks(1).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
+  // Part A has no heading and no text: a slide with no handout (17 November), folded to its row while it isn't the
+  // current part, and open with its placeholders while it is.
+  assert.deepEqual(marks(1).filter(Boolean).sort(), ['deck-only-fold', 'deck-only-fold', 'is-only', 'Write here. *** starts a new slide.', 'is-current'].sort())
   assert.deepEqual(marks(0).filter(Boolean).sort(), ['Heading', 'Write here. *** starts a new slide.', 'is-current'].sort())
-  assert.deepEqual(marks(null).filter(Boolean), ['Heading'], 'no current part: only the empty heading says so')
+  assert.deepEqual(marks(null).filter(Boolean).sort(), ['deck-only-fold', 'deck-only-fold', 'is-only'], 'no current part: the empty part folds')
+  // A part with words but an empty heading is no slide-only one: its empty heading says "Heading".
+  const headless = schema.nodes.doc.create(null, [slide('aaaa', 'A'), heading(2, ''), paragraph('Words.')])
+  assert.deepEqual(deckDecorations(headless, null).find().map(found => attrsOf(found)['data-deck-placeholder'] ?? attrsOf(found).class), ['Heading'])
   const written = schema.nodes.doc.create(null, [slide('aaaa', 'A'), heading(2, 'A'), paragraph('Words.')])
   assert.deepEqual(deckDecorations(written, 0).find().length, 1, 'a written part: only its current mark')
 }

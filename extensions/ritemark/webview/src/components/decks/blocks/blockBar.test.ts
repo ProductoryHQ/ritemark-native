@@ -19,7 +19,7 @@ import { slideDataOf, withBlockMarkdown } from '../../../../../src/decks/deckFor
 import { BOX_AUTO_MIN, BOX_GAP, boxesLookOf, columnWidthOf, columnsAlignOf, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
-import { themeVars } from '../theme/themeVars'
+import { contrast, themeVars } from '../theme/themeVars'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from '../handout/deckSchema'
@@ -519,6 +519,26 @@ stable(COLUMNS, 'three columns')
   const vars = themeVars(BUILT_IN_THEME, true)
   assert.equal(BUILT_IN_THEME.boxes, 'filled')
   assert.notEqual(vars.boxo, vars.boxl, 'the outline line is stronger than the filled theme\'s box line')
+
+  // Space, not lines (17 November): a filled box is its fill only, so on white the fill reads alone (Evening's is
+  // #EFF0F8), and a theme file with the older, fainter shade gets a stronger one; only an outline theme's box has an edge.
+  assert.equal(vars.box, '#EFF0F8')
+  assert.equal(vars.boxf, '#EFF0F8')
+  assert.equal(vars.boxe, 'transparent')
+  assert.equal(themeVars(BUILT_IN_THEME, false).boxe, 'transparent')
+  const older = themeVars({ ...BUILT_IN_THEME, borderless: { ...BUILT_IN_THEME.borderless, box: '#F6F6FB' } }, true)
+  assert.notEqual(older.box, '#F6F6FB', 'too faint to read alone')
+  assert.ok(contrast(older.box, '#FFFFFF') >= 1.13 && contrast(older.box, '#FFFFFF') < 1.2, older.box)
+  const outlined = themeVars({ ...BUILT_IN_THEME, boxes: 'outline' }, true)
+  assert.equal(outlined.box, 'transparent')
+  assert.notEqual(outlined.boxe, 'transparent', 'an outline keeps its line')
+  assert.notEqual(themeVars({ ...BUILT_IN_THEME, boxes: 'outline' }, false).boxe, 'transparent')
+  // On a light Card ground the fill reads alone too (review of #780): white on cream, or a faint tint on paper.
+  for (const bg of ['#F5F1E8', '#FDFDFD']) {
+    const light = themeVars({ ...BUILT_IN_THEME, bg, head: '#2B2B2B', text: '#333333', glow: false, card: undefined }, false)
+    assert.ok(contrast(light.box, bg) >= 1.13 && light.box === light.boxf, `${bg}: ${light.box}`)
+  }
+  assert.ok(!/\.blk-column \{[^}]*box-shadow/.test(css) && !/\.blk-box \{[^}]*var\(--s-boxl/.test(css), 'no column line and no box hairline at rest')
 }
 
 // ---- Codex on #773: a numbered list keeps its start and `)` between Numbered and Steps, both ways, byte for byte.

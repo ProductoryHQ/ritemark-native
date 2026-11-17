@@ -331,6 +331,10 @@ svg { flex: none; }
 .pre { padding: 0 0 18px; }
 .part { padding: 26px 0 18px; border-top: 1px solid var(--line); scroll-margin-top: 80px; transition: opacity .3s; }
 .text > .part:first-child, .pre + .part { border-top: 0; padding-top: 8px; }
+/* A slide with no handout (17 November): nothing of it in the text, only its place, so scrolling past the gap between
+   its neighbours still brings its slide up for a moment, as when presenting. */
+.part.only { height: 0; padding: 0; border-top: 0; overflow: hidden; }
+.text > .part.only:first-child + .part, .pre + .part.only + .part { border-top: 0; padding-top: 8px; }
 .part.dim { opacity: .5; }
 /* A section that isn't the current part keeps its grey band; its words dim as every other part's text does. */
 .sect.dim { opacity: 1; }
@@ -369,7 +373,7 @@ svg { flex: none; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .part hr, .pre hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
-.tw { overflow-x: auto; margin: 0 0 14px; }
+.tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta") */
 .tw table { border-collapse: collapse; font-size: 14.5px; }
 .tw th, .tw td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .tw th { color: var(--ink); font-weight: 700; }
@@ -492,9 +496,30 @@ function pillHtml(slide: PublicSlide): string {
   return words ? `<span class="tag">${esc(words)}</span>` : '';
 }
 
+/** Words or a picture, a table, a code block or a line: anything a viewer would see of a handout drawn as HTML. */
+function showsAnything(html: string): boolean {
+  if (/<(img|table|pre|hr|svg|iframe|video|audio)\b/i.test(html)) return true;
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;|\u00a0/g, ' ').trim() !== '';
+}
+
+/**
+ * A slide with no handout (Jarmo, 17 November: "Kui teeme Publish siis ärme näita seda vaatajale"): its part has no
+ * heading and no text, so the page shows nothing of it in the text and Contents leaves it out; the slide keeps its
+ * place in the slide order. A part of a deck written before 16 November shows its slide's title as its heading until
+ * the first edit (no `handout: text` mark), so it is one only when its slide has no title either: a part is
+ * slide-only once the person has emptied it.
+ */
+export function isSlideOnly(slide: Pick<PublicSlide, 'handout' | 'data'>, textHandout: boolean): boolean {
+  const { html } = handoutParts(slide.handout, { partKey: 'slide-only', exercise: false, pictureUrl: () => 'picture', partHeading: true });
+  if (showsAnything(html)) return false;
+  return textHandout || titleOf(slide as PublicSlide) === '';
+}
+
 /** The text column's part for one shown slide. */
-function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean): string {
+function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean): string {
   const number = index + 1;
+  // A slide with no handout: its place only, with nothing in it (the page's script still finds it in the slide order).
+  if (slideOnly) return `<div class="part only" data-i="${index}" id="s${number}" aria-hidden="true"></div>`;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const exerciseSlide = isExercise(slide);
@@ -510,8 +535,10 @@ function partHtml(slide: PublicSlide, index: number, options: PageOptions, partK
   return `<article class="part"${exercise} data-i="${index}" id="s${number}"><div class="lab">Slide ${number}${pillHtml(slide)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</article>`;
 }
 
-function contentsHtml(slides: PublicSlide[]): string {
+function contentsHtml(slides: PublicSlide[], slideOnly: readonly boolean[]): string {
   const rows = slides.map((slide, index) => {
+    // A slide with no handout has no entry: Contents lists the text's parts.
+    if (slideOnly[index]) return '';
     const title = titleOf(slide) || `Slide ${index + 1}`;
     const mark = isExercise(slide)
       ? `${pillHtml(slide)}<span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
@@ -559,11 +586,13 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // A tick's id is its part's title (with which part of that title it is) and the step's words, never the part's place:
   // a slide added before an exercise keeps its ticks, and two exercises with one title keep theirs apart.
   const titles = new Map<string, number>();
+  // Which slides have no handout: read once, for the text and for Contents.
+  const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));
   const parts = deck.slides.map((slide, index) => {
     const title = titleOf(slide);
     const nth = (titles.get(title) ?? 0) + 1;
     titles.set(title, nth);
-    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true);
+    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true, slideOnly[index]);
   });
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
@@ -583,7 +612,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<header class="top"><div class="in">${who}<span class="grow"></span><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`
       + `<button class="cbtn" id="tocbtn" type="button" aria-expanded="false" aria-controls="toc">${iconSvg('list', 16)}Contents</button></div>`
       + `<div class="bar"><i id="bar" style="width:${count ? (100 / count).toFixed(4) : 0}%"></i></div></header>`,
-    contentsHtml(deck.slides),
+    contentsHtml(deck.slides, slideOnly),
     '<main class="wrap">',
     `<aside class="stage" aria-label="The slide"><div class="slidebox" id="slidebox">\n${layers.join('\n')}\n</div>`
       + `<div class="under"><span class="t" id="stitle">${first ? esc(`1 · ${titleOf(first)}`) : ''}</span><span class="nav">`
