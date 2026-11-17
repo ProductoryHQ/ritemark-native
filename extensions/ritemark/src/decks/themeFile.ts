@@ -12,7 +12,7 @@
  * for a new theme's name and file. Pure: the host, the webview and the tests read the same rules.
  */
 import { writeScalar } from './deckFormat';
-import { DECK_FONT_LIST, deckFont, parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
+import { DECK_FONT_LIST, deckFont, isDeckFontName, parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
 
 /** The fields the theme's tab changes, as `DeckTheme` names them. */
 export interface ThemeChanges {
@@ -90,9 +90,10 @@ export function changedFields(theme: DeckTheme, changes: ThemeChanges): ThemeCha
       const colour = normalColour(String(value));
       if (colour && colour !== theme[field]) (out as Record<string, unknown>)[field] = colour;
     } else if (field === 'fh' || field === 'fb') {
-      // A font is the one the slide draws: "inter" in the file is Inter already, and needs no new line.
+      // A font is the one the slide draws: "inter" in the file is Inter already, and needs no new line. A name that
+      // isn't one of the six ("Futura", drawn in Sofia Sans) is replaced by any pick, Sofia Sans too.
       const font = deckFont(value);
-      if (font.name === String(value) && font.name !== deckFont(theme[field]).name) out[field] = font.name;
+      if (font.name === String(value) && (font.name !== deckFont(theme[field]).name || !isDeckFontName(theme[field]))) out[field] = font.name;
     } else if (field === 'name') {
       const name = String(value).trim();
       if (name && name !== theme.name) out.name = name;

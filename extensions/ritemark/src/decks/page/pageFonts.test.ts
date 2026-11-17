@@ -247,9 +247,11 @@ async function main(): Promise<void> {
     // Where the system gives no second names, the fonts are written create-only: all of them, and a file arriving at a
     // font's name between the last check and the write is never replaced (Codex on #777).
     {
-      const noLinks = { ...nodeFontFs, link: async () => { throw Object.assign(new Error('no links here'), { code: 'EPERM' }); } };
+      let linkTries = 0;
+      const noLinks = { ...nodeFontFs, link: async () => { linkTries++; throw Object.assign(new Error('no links here'), { code: 'EPERM' }); } };
       const result = await writePageFonts(noLinks, deckPath, files);
       assert.ok(result.kind === 'written' && result.created.length === 4, 'all four, without second names');
+      assert.equal(linkTries, 1, 'once a link fails so, the rest are written at once, without a copy');
       for (const file of files) assert.ok(fs.readFileSync(path.join(folder, ...file.address.split('/'))).equals(file.bytes));
       fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
       const arriving = { ...noLinks, writeFile: async (target: string, data: Buffer) => {
@@ -259,6 +261,18 @@ async function main(): Promise<void> {
       assert.deepEqual(await writePageFonts(arriving, deckPath, files), { kind: 'refused', line: foreignFontLine('fonts/Inter-4.001-latin.woff2') });
       assert.equal(fs.readFileSync(path.join(folder, 'fonts', 'Inter-4.001-latin.woff2'), 'utf8'), 'arrived meanwhile', 'never replaced');
       fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
+    }
+
+    // A create-only write that fails after making its file takes the file back (the review of #777): a half font never
+    // stops the next Publish.
+    {
+      const half = path.join(folder, 'half.woff2');
+      await assert.rejects(nodeFontFs.writeFile(half, 42 as unknown as Buffer));
+      assert.ok(!fs.existsSync(half), 'nothing left at the name');
+      fs.writeFileSync(half, 'someone else');
+      await assert.rejects(nodeFontFs.writeFile(half, Buffer.from('x')), /EEXIST/);
+      assert.equal(fs.readFileSync(half, 'utf8'), 'someone else', 'a file that was there stays');
+      fs.rmSync(half);
     }
 
     // The digest counts the font files the page names: a page written without them reads as changed once they can go.

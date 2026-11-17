@@ -16,7 +16,7 @@
  * decks keep their look until Save. What the tab shows is always the document as the host last sent it.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
-import { DECK_FONT_LIST, deckFont, deckFontStack, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { DECK_FONT_LIST, deckFont, deckFontStack, isDeckFontName, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { newThemeNameProblem, nextThemeName, normalColour, type ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeDeck, ThemePreview } from '../../../../../src/decks/themeProtocol'
 import type { DocumentApplyTarget } from '../../../types/documentSync'
@@ -413,18 +413,21 @@ function ColourRow({ label, note, value, onChange }: { label: string; note?: str
 }
 
 /**
- * A font row: the six fonts, each named in its own face. A name the file holds that isn't one of the six shows as
- * Sofia Sans, which is what the slide draws (`deckFont`); picking writes the one line.
+ * A font row: the six fonts, each named in its own face. A name the file holds that isn't one of the six ("Futura")
+ * shows as itself, drawn in Sofia Sans as the slide draws it (`deckFont`), with no font ticked, so any pick, Sofia Sans
+ * too, writes the one line.
  */
 function FontRow({ label, tip, value, onChange }: { label: string; tip: string; value: string; onChange: (value: string) => void }) {
+  const known = isDeckFontName(value)
   const current = deckFont(value).name
   return (
     <div className="theme-row theme-font">
       <span className="theme-row-label">{label}</span>
-      <Select value={current} onValueChange={next => { if (next !== current) onChange(next) }}>
-        <Tooltip label={tip} className="theme-font-select">
+      <Select value={known ? current : ''} onValueChange={next => { if (!known || next !== current) onChange(next) }}>
+        {/* On hover only: the focus a closing choice gives back to its button opens no tooltip over the pick */}
+        <Tooltip label={known ? tip : `${value} doesn't come with Ritemark, so it draws in Sofia Sans. Choose one of the six.`} className="theme-font-select" hoverOnly>
           <SelectTrigger aria-label={`${label} font`} className="w-full" style={{ fontFamily: deckFontStack(current) }}>
-            <SelectValue />
+            <SelectValue placeholder={`${value} (Sofia Sans)`} />
           </SelectTrigger>
         </Tooltip>
         <SelectContent>

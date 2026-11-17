@@ -262,6 +262,8 @@ test('Sprint 162 PR 3: a font pick is one line, one of the six by its own name; 
   assert.ok(isThemeChanges({ fh: 'Fraunces', fb: 'Inter' }));
   for (const bad of ['Futura', 'fraunces', '', 42, null]) assert.equal(isThemeChanges({ fh: bad }), false, `not a font the tab sends: ${String(bad)}`);
   assert.deepEqual(changedFields(parseTheme(text), { fh: 'Sofia Sans' }), {}, 'the same font is no change');
+  const futura = text.replace('heading-font: Sofia Sans', 'heading-font: Futura');
+  assert.ok(themeTextWith(futura, { fh: 'Sofia Sans' }).includes('heading-font: Sofia Sans\n'), 'a name not of the six gives way to any pick, Sofia Sans too');
   assert.deepEqual(decodeThemeRequest({ type: 'theme/set', changes: { fb: 'IBM Plex Sans' } }), { type: 'theme/set', changes: { fb: 'IBM Plex Sans' } });
 });
 

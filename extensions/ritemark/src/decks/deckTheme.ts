@@ -92,6 +92,11 @@ export function deckFont(name: unknown): DeckFont {
   return found ?? FONTS_BY_KEY.get(fontKey(DEFAULT_DECK_FONT))!;
 }
 
+/** Is this one of the six fonts' names (whatever its case and spacing)? A theme file may hold any name. */
+export function isDeckFontName(name: unknown): boolean {
+  return typeof name === 'string' && FONTS_BY_KEY.has(fontKey(name));
+}
+
 /** The CSS font list a slide draws a font name with: the font, Sofia Sans while it loads (or if it can't), its kind. */
 export function deckFontStack(name: unknown): string {
   const font = deckFont(name);
