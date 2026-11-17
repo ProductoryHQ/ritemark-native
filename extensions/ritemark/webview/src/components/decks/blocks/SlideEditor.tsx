@@ -49,7 +49,11 @@ import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
-import { contentHeightOf, fitValue, isFullAt, nextFitStep } from './slideFit'
+import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
+import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
+import { missingHtml } from '../../../../../src/decks/blocks/slideRenderer'
+import { Button } from '../../ui/button'
+import { Tooltip } from '../../ui/tooltip'
 import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
@@ -68,6 +72,8 @@ export interface SlideEditorProps {
   borderless: boolean
   /** The slide's pictures as webview URIs, by the paths the slide names. */
   assets: Record<string, string>
+  /** 17 November: the pictures the host looked for and didn't find: drawn as missing, with Replace picture…. */
+  missing?: ReadonlySet<string>
   commentCallouts?: boolean
   /** The person wrote on the slide: the handout keeps it the current one. */
   onWriting: () => void
@@ -179,7 +185,9 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: SlideEditorProps) {
+const NO_MISSING: ReadonlySet<string> = new Set()
+
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -187,6 +195,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   slideRef.current = slide
   const assetsRef = useRef(assets)
   assetsRef.current = assets
+  const missingRef = useRef(missing)
+  missingRef.current = missing
   const onWritingRef = useRef(onWriting)
   onWritingRef.current = onWriting
   const onPictureRef = useRef(onPicture)
@@ -211,6 +221,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   // The Markdown the slide shows now: for its cover look while it is being typed.
   const [shownMarkdown, setShownMarkdown] = useState(nodeMarkdown)
   if (commentCallouts) ensureSlideCommentPipeline()
+  // What the stage's step belongs to, as the strip and the wall draw this slide (`fitKeyOf`); none while words wait
+  // unwritten (the / menu's query), since the slide drawn elsewhere doesn't have them yet.
+  const header = isBlockSlide(slide.kind) ? slide.data : blockDataOf(slide.kind, slide.data)
+  const fitKeyRef = useRef<string | null>(null)
+  /** This stage, as the owner of the step it tells (`clearStageFit`). */
+  const fitOwner = useRef({})
+  fitKeyRef.current = shownMarkdown === nodeMarkdown ? fitKeyOf(nodeMarkdown, header.image, header.picture, fitLookOf(borderless, theme)) : null
+  /** Lays Replace picture… over each missing picture (set below, once the editor is made). */
+  const placeMissingRef = useRef<() => void>(() => {})
 
   /**
    * Write the stage's Markdown to the slide's node: one transaction, converting the deck first when it holds v1 slides.
@@ -293,7 +312,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       showOnlyCurrent: false,
       includeChildren: true,
     })],
-    afterImage: [OuterHistory, SlideKeys, SlideSlash],
+    // 17 November: a picture whose file is gone is drawn as missing, with its name.
+    image: SlidePicture,
+    afterImage: [OuterHistory, SlideKeys, SlideSlash, slideMissingPictures(() => missingRef.current)],
     commentCallouts,
     deck: [slideDivWithView(divHandlers)],
   }).map(extension => {
@@ -344,6 +365,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       if (!transaction.docChanged) flushHeld(updated)
       // The / menu's Picture goes where the / was, through whatever changes while the host saves it.
       if (transaction.docChanged && pictureAt.current !== null) pictureAt.current = transaction.mapping.map(pictureAt.current)
+      if (transaction.docChanged && replaceAt.current !== null) replaceAt.current = transaction.mapping.map(replaceAt.current)
+      if (transaction.docChanged && pendingReplace.current !== null) pendingReplace.current = transaction.mapping.map(pendingReplace.current)
       if (transaction.docChanged && lastCaret.current !== null) lastCaret.current = transaction.mapping.map(lastCaret.current)
     },
     // Leaving the slide writes what waited even with the menu still open (its query is words then, as typed): a slide
@@ -445,53 +468,74 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
 
   // The fit: the words step down while they overflow, and up only with room to spare (slideFit.ts). Measured after
   // every change, at a new width or look, and once the fonts have loaded.
-  const refit = useCallback(() => {
+  // 17 November: the one measure the strip, the wall and the page use too (`fitFlow`): words past the top, the bottom or
+  // a right edge (a word is never split) step it down. The step is told to them (`setStageFit`), by what the stage
+  // draws, so the slide drawn anywhere else is this one scaled. Only typing keeps the step it had (the 3 % that stops it
+  // swinging at the edge); a slide coming onto the stage, a new size or look, the fonts or a picture loading measure from
+  // the top, as the strip does, so a step taken before a picture had its height never stays.
+  const refit = useCallback((fresh: boolean) => {
     if (!editor || editor.isDestroyed) return
     const flow = editor.view.dom as HTMLElement
-    const measure = (step: number) => {
-      flow.style.setProperty('--fit', String(fitValue(step)))
-      return { content: contentHeightOf(flow), room: flow.clientHeight }
-    }
-    const step = nextFitStep(fitStepRef.current, measure)
-    const at = measure(step)
+    const { step, full } = fitFlow(flow, fresh ? 0 : fitStepRef.current)
     fitStepRef.current = step
     frameRef.current?.setAttribute('data-step', String(step))
+    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step, owner: fitOwner.current })
     // PR 3 (frame 24): at the floor with words still past the slide's edge, the deck's bar says the slide is full.
-    const full = isFullAt(step, at)
     if (full !== fullRef.current) {
       fullRef.current = full
       actionsRef.current.onFull?.(full)
     }
+    placeMissingRef.current()
   }, [editor])
-  // A slide that leaves the stage is no longer the full one.
-  useEffect(() => () => { if (fullRef.current) actionsRef.current.onFull?.(false) }, [])
+  // A slide that leaves the stage is no longer the full one, and its step is no longer the stage's.
+  useEffect(() => () => {
+    if (fullRef.current) actionsRef.current.onFull?.(false)
+    // Only this stage's own: a new stage with the same words has told its step already (review of #771).
+    clearStageFit(fitOwner.current)
+  }, [])
   // Once per change of the words (the editor's update), and when the size, the look or the cover look change.
   const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}`
-  useLayoutEffect(() => { refit() }, [refit, lookKey])
+  useLayoutEffect(() => { refit(true) }, [refit, lookKey])
+  // The words just written reach the slide's node, and its thumbnail, after the update that measured them: the step is
+  // told again under their key.
+  useLayoutEffect(() => {
+    if (fitKeyRef.current) setStageFit({ key: fitKeyRef.current, step: fitStepRef.current, owner: fitOwner.current })
+  })
+  // The host said which pictures it didn't find: they are drawn as missing (17 November). Nothing in the slide changes.
+  const missingKey = [...missing].sort().join('\n')
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+    editor.view.dispatch(editor.state.tr.setMeta(SLIDE_MISSING_PICTURES, true))
+    refit(true)
+  }, [editor, missingKey, refit])
+  // Replace picture… follows its picture as the slide is drawn again (a new size, a missing picture beside).
+  useLayoutEffect(() => { placeMissingRef.current() })
   useEffect(() => {
     if (!editor) return
     // A slide that comes onto the stage full is said full, whatever the slide it replaced said: that slide's stage leaves
     // with "no longer full" (the cleanup above), and React runs that cleanup after this stage's layout effect has
     // measured, so the line went from a full slide to a full one (the join of a slide into a full one above it). Fitted
     // again here and once more after the frame, and the state told as it is.
-    refit()
+    const fresh = () => refit(true)
+    const typed = () => refit(false)
+    fresh()
     actionsRef.current.onFull?.(fullRef.current)
-    const settle = requestAnimationFrame(refit)
-    editor.on('update', refit)
+    const settle = requestAnimationFrame(fresh)
+    editor.on('update', typed)
     const fonts = document.fonts
-    fonts?.addEventListener?.('loadingdone', refit)
+    fonts?.addEventListener?.('loadingdone', fresh)
     // A picture takes its height once it has loaded, after the update that put it in (PR 3's app run: a picture from
     // the / menu left the slide at its first step, overflowing, until the next key).
     const flow = editor.view.dom
-    flow.addEventListener('load', refit, true)
+    flow.addEventListener('load', fresh, true)
     // The browser keeps a caret in view by scrolling the clipped flow itself: it is put back, so the title stays whole.
     const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
     flow.addEventListener('scroll', unscroll)
     return () => {
       cancelAnimationFrame(settle)
-      editor.off('update', refit)
-      fonts?.removeEventListener?.('loadingdone', refit)
-      flow.removeEventListener('load', refit, true)
+      editor.off('update', typed)
+      fonts?.removeEventListener?.('loadingdone', fresh)
+      flow.removeEventListener('load', fresh, true)
       flow.removeEventListener('scroll', unscroll)
     }
   }, [editor, refit])
@@ -503,6 +547,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const [webPageAt, setWebPageAt] = useState<number | null>(null)
   /** Where the / menu's Picture goes once the host has saved it. */
   const pictureAt = useRef<number | null>(null)
+  /** 17 November: the missing picture Replace picture… was chosen on: the saved picture takes its place. */
+  const replaceAt = useRef<number | null>(null)
+  /** That picture while its file picker is open: it becomes `replaceAt` only when a file is chosen. */
+  const pendingReplace = useRef<number | null>(null)
 
   const apply = (tr: Transaction | null): boolean => {
     if (!tr || !editor || editor.isDestroyed) return false
@@ -526,17 +574,74 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     return true
   }
 
-  /** The / menu's Picture: the computer's file picker, then the host saves the picture beside the deck. */
-  const choosePicture = () => {
+  /**
+   * The / menu's Picture: the computer's file picker, then the host saves the picture beside the deck. `atCaret` false:
+   * the slide's own picture beside or behind it (Replace picture… on a missing one).
+   */
+  const choosePicture = (atCaret = true, replacing = false) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
+    // The / menu's place this picker was opened for, so cancelling it forgets only that (review of #771).
+    const slashAt = replacing || !atCaret ? null : pictureAt.current
     input.addEventListener('change', () => {
       const file = input.files?.[0]
       if (!file) return
-      void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file), true))
+      // Replace picture…: the picture chosen takes the missing one's place once saved; the / menu's waits as it was.
+      if (replacing) {
+        replaceAt.current = pendingReplace.current
+        pendingReplace.current = null
+      }
+      void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file), atCaret))
+    })
+    // Cancelled: only what this picker would have filled stops waiting.
+    input.addEventListener('cancel', () => {
+      if (replacing) pendingReplace.current = null
+      else if (slashAt !== null && pictureAt.current === slashAt) pictureAt.current = null
     })
     input.click()
+  }
+
+  // 17 November: Replace picture… over each missing picture, in the frame (unscaled, so the button is its own size).
+  const [missingSpots, setMissingSpots] = useState<{ left: number; top: number; side: boolean; path: string; nth: number }[]>([])
+  placeMissingRef.current = () => {
+    const frameElement = frameRef.current
+    if (!frameElement) return
+    const origin = frameElement.getBoundingClientRect()
+    // The same missing picture may stand twice on a slide: each button knows which one it is (Codex on #771).
+    const seen = new Map<string, number>()
+    const spots = Array.from(frameElement.querySelectorAll<HTMLElement>('.blk-flow > .blk-pic.is-missing, .photo.is-missing')).map(place => {
+      const box = place.getBoundingClientRect()
+      const words = place.querySelector('.blk-missing')?.getBoundingClientRect()
+      const side = place.classList.contains('photo')
+      const path = place.getAttribute('data-picture') ?? ''
+      const nth = side ? 0 : seen.get(path) ?? 0
+      if (!side) seen.set(path, nth + 1)
+      return {
+        left: Math.round(box.left + box.width / 2 - origin.left),
+        top: Math.round((words ? words.bottom : box.top + box.height / 2) - origin.top + 4),
+        side,
+        path,
+        nth,
+      }
+    })
+    setMissingSpots(current => (JSON.stringify(current) === JSON.stringify(spots) ? current : spots))
+  }
+  /** Replace picture… on a missing picture: the file picker; the picture saved beside the deck takes its place. */
+  const replacePicture = (spot: { side: boolean; path: string; nth: number }) => {
+    if (!editor || editor.isDestroyed) return
+    if (spot.side) { choosePicture(false); return }
+    // The picture the button stands over: the nth with its path, in the slide's order (as the places are drawn).
+    let found: number | null = null
+    let count = 0
+    editor.state.doc.descendants((node, pos) => {
+      if (found !== null || node.type.name !== 'image' || imagePathOf(node.attrs) !== spot.path) return
+      if (count++ === spot.nth) found = pos
+    })
+    if (found === null) return
+    // Waits for the picker: only a picture chosen there replaces it, never the / menu's next one.
+    pendingReplace.current = found
+    choosePicture(true, true)
   }
 
   /** The deck's last pill label up to this slide, for a new Steps block (`lastPillLabel`). */
@@ -667,6 +772,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   useEffect(() => {
     if (!picture || picture.serial === pictureSeen.current || !editor || editor.isDestroyed) return
     pictureSeen.current = picture.serial
+    // Replace picture… on a missing picture: the new one in its place, as one step (⌘Z brings the old path back).
+    const replacing = replaceAt.current
+    replaceAt.current = null
+    const old = replacing === null ? null : editor.state.doc.nodeAt(replacing)
+    if (replacing !== null && old?.type.name === 'image') {
+      // A / menu picture still on its way keeps its place (review of #771).
+      apply(editor.state.tr.setNodeMarkup(replacing, undefined, { ...old.attrs, src: picture.url, title: picture.path }))
+      return
+    }
     const at = Math.min(pictureAt.current ?? editor.state.doc.content.size, editor.state.doc.content.size)
     pictureAt.current = null
     apply(insertSlideBlock(editor.state.tr, at, pictureNode(editor.schema, picture.path, picture.url)))
@@ -704,9 +818,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     })
   }
 
-  const header = isBlockSlide(slide.kind) ? slide.data : blockDataOf(slide.kind, slide.data)
   const side = sidePictureOf(header)
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
+  const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
   const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : ''].filter(Boolean).join(' ')
   return (
     <>
@@ -733,12 +847,32 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
             {side ? (
               <>
-                <div className={`photo${sideUrl ? '' : ' empty'}`} style={sideUrl ? { backgroundImage: `url("${sideUrl.replace(/"/g, '%22')}")` } : undefined} />
+                {sideMissing && header.image ? (
+                  // The renderer's own words for a missing picture (escaped there), so the stage and its thumbnail agree.
+                  <div className="photo empty is-missing" data-picture={header.image.trim()} dangerouslySetInnerHTML={{ __html: missingHtml(header.image.trim()) }} />
+                ) : (
+                  <div className={`photo${sideUrl ? '' : ' empty'}`} style={sideUrl ? { backgroundImage: `url("${sideUrl.replace(/"/g, '%22')}")` } : undefined} />
+                )}
                 {side === 'behind' ? <div className="veil" /> : null}
               </>
             ) : null}
             <EditorContent editor={editor} />
           </div>
+          {missingSpots.map(spot => (
+            <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="deck-replace-picture absolute -translate-x-1/2"
+                style={{ left: spot.left, top: spot.top }}
+                // The slide's words keep the caret: the press never moves it into the missing place.
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => replacePicture(spot)}
+              >
+                Replace picture…
+              </Button>
+            </Tooltip>
+          ))}
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />

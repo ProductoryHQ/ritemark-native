@@ -50,12 +50,197 @@ export function rebasePath(target: string, fromFolder: string, toFolder: string)
   const [path, rest] = splitSuffix(target);
   const absolute = normalizePath(`${fromFolder}/${decodeSafe(path)}`);
   if (absolute === null) return target;
-  const from = toFolder ? toFolder.split('/') : [];
-  const to = absolute.split('/');
+  return encodeLike(path, relativeFrom(toFolder, absolute)) + rest;
+}
+
+/** The path from `folder` to `file` (both from the same root), with `..` where it climbs out. */
+function relativeFrom(folder: string, file: string): string {
+  const from = folder ? folder.split('/') : [];
+  const to = file.split('/');
   let common = 0;
   while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
-  const relative = [...from.slice(common).map(() => '..'), ...to.slice(common)].join('/');
-  return encodeLike(path, relative) + rest;
+  return [...from.slice(common).map(() => '..'), ...to.slice(common)].join('/');
+}
+
+// ---------------------------------------------------------------------------
+// A deck moved or renamed (17 November)
+// ---------------------------------------------------------------------------
+
+/**
+ * A picture's target as written in a deck that was in `oldFolder` and is now in `newFolder` (paths from one root, posix,
+ * such as `Users/me/Project/Koolitus`). `moved` gives a file's place after the move: a picture that moved along (its
+ * folder was moved, or it was moved in the same step) keeps pointing at itself, and one that stayed is pointed at where
+ * it is. A target that still points right is left exactly as written; one that can't be written from the new folder
+ * (another drive) too.
+ */
+export function movedTarget(target: string, oldFolder: string, newFolder: string, moved: (path: string) => string = path => path): string {
+  if (!isRelativeTarget(target)) return target;
+  const [path, rest] = splitSuffix(target);
+  const before = normalizePath(`${oldFolder}/${decodeSafe(path)}`);
+  if (before === null) return target;
+  const after = moved(before);
+  // Still right from the new folder: nothing to change, not even its spelling.
+  if (normalizePath(`${newFolder}/${decodeSafe(path)}`) === after) return target;
+  // A relative path never crosses from one drive to another (C: and D:).
+  const rootOf = (value: string) => value.split('/')[0] ?? '';
+  if (newFolder && rootOf(newFolder) !== rootOf(after) && /:$/.test(rootOf(newFolder) + rootOf(after))) return target;
+  return encodeLike(path, relativeFrom(newFolder, after)) + rest;
+}
+
+/** A file's place after some moves (each `from` to `to`: a file, or a folder and everything in it); else where it was. */
+export function placeAfterMoves(moves: Array<{ from: string; to: string }>): (path: string) => string {
+  return path => {
+    for (const move of moves) {
+      if (path === move.from) return move.to;
+      if (path.startsWith(`${move.from}/`)) return move.to + path.slice(move.from.length);
+    }
+    return path;
+  };
+}
+
+/** A link label as Markdown matches it: case and runs of space don't count. */
+const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** An inline picture: `![alt](target "title")`, the alt with one level of brackets, the title in "", '' or (). */
+const INLINE_PICTURE = /(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)(<[^>\n]*>|(?:[^()\s]|\([^()\s]*\))+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))/g;
+/** An HTML picture's source: `<img … src="target">`. */
+const HTML_PICTURE = /(<img\b[^>]*?(?<![\w-])src\s*=\s*)(["'])([^"'>]*)\2/gi;
+/** A reference picture's use: `![alt][label]`, `![label][]` or `![label]`. */
+const REFERENCE_PICTURE = /!\[((?:[^[\]]|\[[^\]]*\])*)\](?:\[([^\]]*)\])?/g;
+/** A link reference definition: `[label]: target "title"`, also inside a quote or a list item. */
+const DEFINITION = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\[([^\]]+)\]:[ \t]*)(<[^>\n]*>|\S+)(.*)$/;
+
+/** A target rewritten, in the form it was written: angle brackets kept, or added when the new path has a space. */
+function rewrittenTarget(target: string, rewrite: (target: string) => string): string {
+  const angled = target.startsWith('<') && target.endsWith('>');
+  const inner = angled ? target.slice(1, -1) : target;
+  const next = rewrite(inner);
+  if (next === inner) return target;
+  return angled || /\s/.test(next) ? `<${next}>` : next;
+}
+
+/**
+ * The lines of some Markdown with whether each is code: inside a fenced block, or an indented code block (four spaces
+ * or a tab after a blank line, outside a list, whose lines indent their own words).
+ */
+function codeLines(lines: string[]): boolean[] {
+  const code: boolean[] = [];
+  let fence: string | null = null;
+  let previousBlank = true;
+  let indented = false;
+  let inList = false;
+  for (const line of lines) {
+    // A fence at any indent (a list item's own code block is indented too); one that only looks like a fence inside
+    // an indented code block keeps what follows unread, which is never wrong.
+    const open = /^[ \t]*(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (open && open[1][0] === fence[0] && open[1].length >= fence.length && /^[ \t]*[`~]+\s*$/.test(line)) fence = null;
+      code.push(true);
+      continue;
+    }
+    if (!line.trim()) {
+      code.push(indented);
+      previousBlank = true;
+      continue;
+    }
+    // Indented code: four spaces (or a tab) at the top level, eight (or two tabs) inside a list item, after a blank.
+    const codeIndent = inList ? /^(?: {8}|\t\t| {4}\t|\t {4})/ : /^(?: {4}|\t)/;
+    if (codeIndent.test(line) && (previousBlank || indented)) {
+      indented = true;
+      previousBlank = false;
+      code.push(true);
+      continue;
+    }
+    indented = false;
+    // A line at the left edge after a blank, or a heading or a fence there, ends a list.
+    if (!/^\s/.test(line) && (previousBlank || /^#{1,6}(?:\s|$)/.test(line) || open)) inList = false;
+    if (open) {
+      fence = open[1];
+      previousBlank = false;
+      code.push(true);
+      continue;
+    }
+    if (/^ {0,3}(?:[-*+]|\d{1,9}[.)])(?:\s|$)/.test(line)) inList = true;
+    previousBlank = false;
+    code.push(false);
+  }
+  return code;
+}
+
+/**
+ * The labels reference pictures use (`![…][label]`, `![label][]`, `![label]`), read outside code. A deck reads its
+ * definitions over the whole text, so a deck's labels are read from all of it (`rewriteDeckPictures`).
+ */
+export function pictureReferenceLabels(markdown: string): Set<string> {
+  const lines = markdown.split('\n');
+  const code = codeLines(lines);
+  const labels = new Set<string>();
+  lines.forEach((line, index) => {
+    if (code[index]) return;
+    for (const part of line.split(/`+[^`]*`+/)) {
+      for (const match of part.matchAll(REFERENCE_PICTURE)) {
+        // `![alt](…)` is an inline picture, never a reference.
+        if (match[2] === undefined && part[(match.index ?? 0) + match[0].length] === '(') continue;
+        labels.add(labelKey(match[2] === undefined || match[2] === '' ? match[1] : match[2]));
+      }
+    }
+  });
+  return labels;
+}
+
+/**
+ * The pictures of some Markdown, each target rewritten by `rewrite`: inline pictures (`![…](target)`, any title), HTML
+ * pictures (`<img src>`), and the definitions reference pictures use (`![…][label]` and `[label]: target`). Links stay,
+ * and nothing inside a code block (fenced or indented) or a code span is touched: a prompt's words are the person's own.
+ */
+export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string, labels?: Set<string>): string {
+  const lines = markdown.split('\n');
+  const code = codeLines(lines);
+  // Only the definitions reference pictures use are rewritten (a link's stays): this text's own labels, or the deck's.
+  const pictureLabels = labels ?? pictureReferenceLabels(markdown);
+  return lines.map((line, index) => {
+    if (code[index]) return line;
+    const definition = DEFINITION.exec(line);
+    if (definition && pictureLabels.has(labelKey(definition[2]))) {
+      return `${definition[1]}${rewrittenTarget(definition[3], rewrite)}${definition[4]}`;
+    }
+    // Code spans stay as written: only the text between them is read.
+    return line.split(/(`+[^`]*`+)/).map((part, at) => (at % 2 === 1 ? part : part
+      .replace(INLINE_PICTURE, (_match, open: string, target: string, close: string) => `${open}${rewrittenTarget(target, rewrite)}${close}`)
+      .replace(HTML_PICTURE, (_match, open: string, quote: string, target: string) => `${open}${quote}${rewrite(target)}${quote}`))).join('');
+  }).join('\n');
+}
+
+/**
+ * A deck's text with every picture's target rewritten by `rewrite`: each slide's `image:` line and the pictures in a
+ * block slide's Markdown, and the pictures in the handout. Everything else, byte for byte. Used when a deck is moved or
+ * renamed in Ritemark, so its pictures still show (17 November); the picture files themselves are never touched.
+ */
+export function rewriteDeckPictures(text: string, rewrite: (target: string) => string): string {
+  const deck = parseDeck(text);
+  let out = text;
+  // The handout is one text (a definition at its end serves a picture in any part): its labels are read from all of it
+  // (review of #771). A slide's Markdown is drawn on its own, so it reads its own.
+  const handoutLabels = pictureReferenceLabels(text);
+  // From the last slide back, so the places read from the text still hold.
+  for (let index = deck.slides.length - 1; index >= 0; index--) {
+    const slide = deck.slides[index];
+    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite, handoutLabels) + out.slice(slide.handoutEnd);
+    const bodyStart = out.indexOf('\n', slide.start) + 1;
+    if (bodyStart <= 0 || out.slice(bodyStart, bodyStart + slide.body.length) !== slide.body) continue;
+    const data = slideDataOf(slide.kind, slide.body);
+    const image = data.image ? rewrite(data.image) : data.image;
+    // Through the slide writer only when the picture's path changes, so an unchanged header stays byte for byte.
+    let body = image !== data.image ? writeSlideData(slide.kind, slide.body, { ...data, image }) : slide.body;
+    if (isBlockSlide(slide.kind)) {
+      const parts = splitBlockSlide(body);
+      body = parts.head + rewritePictureTargets(parts.markdown, rewrite);
+    }
+    if (body !== slide.body) out = out.slice(0, bodyStart) + body + out.slice(bodyStart + slide.body.length);
+  }
+  // The words before the first slide, after the front matter.
+  const introEnd = deck.slides.length ? deck.slides[0].start : out.length;
+  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite, handoutLabels) + out.slice(introEnd);
 }
 
 /** A path as the project knows it, from the folder it was written in; null when it is no relative path. */

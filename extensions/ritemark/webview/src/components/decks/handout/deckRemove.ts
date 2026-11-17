@@ -27,7 +27,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
 import { isBlockSlide, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
 import { blockDataOf, convertsToBlocks, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
-import { joinedSlideMarkdown, joinsCleanly, slideHasNothing } from '../../../../../src/decks/blocks/joinSlides'
+import { joinedSlideMarkdown, openEndingOf, slideHasNothing, type OpenEnding } from '../../../../../src/decks/blocks/joinSlides'
 import { DECK_OPERATION, isSlideNode, partIndexAt, partRange, slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto, writeDrawnHeadings } from './deckConvert'
 
@@ -43,8 +43,8 @@ export type DeckRemoval = { what: 'deleted'; number: number } | { what: 'joined'
 export interface JoinMark {
   index: number
   id: string | undefined
-  /** The join can't be made, and the note says why: the lower slide is skipped and the upper one isn't, or a code block
-   *  in one of them is never closed. */
+  /** The join can't be made, and the note says why: the lower slide is skipped and the upper one isn't, or one of them
+   *  ends inside a code box (or another part) that is never closed. */
   blocked?: JoinBlock
 }
 
@@ -53,13 +53,21 @@ export function removalNotice(removal: DeckRemoval): string {
   return removal.what === 'deleted' ? `Slide ${removal.number} is deleted.` : `Slide ${removal.number} is joined to slide ${removal.into}.`
 }
 
-/** Why a join isn't made. */
-export type JoinBlock = 'skipped' | 'unclosed'
+/** Why a join isn't made: the lower slide is skipped, or a slide (the upper one, or the lower) ends inside something open. */
+export type JoinBlock = 'skipped' | { open: OpenEnding; upper: boolean }
 
-/** The note at the line on the first press (the numbers are the slides' own, from 1). */
+/**
+ * The note at the line on the first press (the numbers are the slides' own, from 1). In plain words (17 November): the
+ * slide that ends inside something open is named, and what to do; never "block" or "fence".
+ */
 export function joinNote(index: number, blocked?: JoinBlock): string {
   if (blocked === 'skipped') return `Slide ${index + 1} is skipped, so it can't join slide ${index}. Show it first, from its ⋯.`
-  if (blocked === 'unclosed') return `Slide ${index + 1} can't join slide ${index}: one of them ends in a block that is never closed.`
+  if (blocked) {
+    const slide = `Slide ${blocked.upper ? index : index + 1}`
+    if (blocked.open === 'code') return `${slide} ends inside a code box, so it can't join yet. Close the code box first.`
+    if (blocked.open === 'note') return `${slide} ends inside a comment that's never closed, so it can't join yet. Close the comment first.`
+    return `${slide} ends with text that's left open, so it can't join yet. Close it first.`
+  }
   return `Backspace again joins slide ${index + 1} into slide ${index}. Nothing is lost.`
 }
 
@@ -131,7 +139,10 @@ export function joinBlocked(doc: PMNode, index: number): JoinBlock | null {
   if (!upper || !lower) return null
   if (lower.data.skip === true && upper.data.skip !== true) return 'skipped'
   // A code fence left open would take the other slide's words, comments too, into code, which the page shows as written.
-  return joinsCleanly(drawnMarkdownOf(upper) ?? '', drawnMarkdownOf(lower) ?? '') ? null : 'unclosed'
+  const above = openEndingOf(drawnMarkdownOf(upper) ?? '')
+  if (above) return { open: above, upper: true }
+  const below = openEndingOf(drawnMarkdownOf(lower) ?? '')
+  return below ? { open: below, upper: false } : null
 }
 
 /** What Backspace means where the caret is: remove the empty part, mark or make a join, or nothing of the deck's. */

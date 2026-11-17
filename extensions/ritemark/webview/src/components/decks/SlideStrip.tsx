@@ -155,6 +155,8 @@ interface ThumbnailProps {
   theme: DeckTheme
   borderless: boolean
   assets: Record<string, string>
+  /** 17 November: pictures the host found no file for, drawn as missing with their names. */
+  missing?: ReadonlySet<string>
   actions: StripActions
   dragging: boolean
   onDragStart: (index: number, event: ReactPointerEvent<HTMLDivElement>) => void
@@ -173,7 +175,7 @@ interface ThumbnailProps {
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -194,7 +196,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
     >
       <span className="deck-thumb-no">{index + 1}</span>
       <div className="deck-thumb-slide">
-        <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
+        <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} missing={missing} />
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       {comments > 0 ? (
@@ -246,6 +248,7 @@ interface SlideStripProps {
   theme: DeckTheme
   borderless: boolean
   assets: Record<string, string>
+  missing?: ReadonlySet<string>
   actions: StripActions
   stripRef: React.RefObject<HTMLDivElement>
   /** Each copy's source marks, by the slide's id. */
@@ -256,7 +259,7 @@ interface SlideStripProps {
   joinAt?: number | null
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks, commentCounts, joinAt = null }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -405,6 +408,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             theme={theme}
             borderless={borderless}
             assets={assets}
+            missing={missing}
             actions={pickUnlessDragged}
             dragging={drag?.from === entry.index}
             onDragStart={onDragStart}

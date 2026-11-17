@@ -88,7 +88,7 @@ export interface DeckPageState {
 /** The host's answers. */
 export type DeckHostMessage =
   /** Each path the host could resolve to a picture beside the deck, mapped to its webview URI. */
-  | { type: 'deck/assets'; assets: Record<string, string> }
+  | { type: 'deck/assets'; assets: Record<string, string>; /** 17 November: the paths it looked for and found no file at. */ missing?: string[] }
   /** The theme file's text, or null when the deck names none the project has (the view draws the built-in theme). */
   | { type: 'deck/theme'; path: string; text: string | null }
   /** The picture is saved: its path relative to the deck, and its webview URI; or it could not be. */
