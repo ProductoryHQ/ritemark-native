@@ -180,7 +180,17 @@ export const PRIVATE_BLOCK_WORDS = {
   v1Notes: 'VONENOTESQXI',
   v1HiddenColumn: 'VONECOLUMNQXJ',
   rawHtml: 'RAWHTMLQXK',
+  // Sprint 161, comments on the slide for Claude, written as the stage writes them: a note before the block it is on,
+  // a note on the whole slide (at its end, on a cover slide), a note on the title, and a request on words, with ids.
+  slideBlockNote: 'SLIDEBLOCKNOTEQXL',
+  slideWholeNote: 'SLIDEWHOLENOTEQXM',
+  slideTitleNote: 'SLIDETITLENOTEQXN',
+  slideRequest: 'SLIDEREQUESTQXO',
+  slideMarkId: 'slidemarkidqxp',
 } as const;
+
+/** The ids of the slide comments above (`{id:…}` carriers): they never go public either. */
+export const PRIVATE_BLOCK_IDS = ['44444444-4444-4444-8444-444444444444', '55555555-5555-4555-8555-555555555555', '66666666-6666-4666-8666-666666666666'] as const;
 
 /** Words of the block deck that must reach the page and the wall. */
 export const PUBLIC_BLOCK_WORDS = ['Copilot or Cursor?', 'Documents and mail', 'Building things', 'Pick a question', 'Harjutus', 'Block cover', 'the anchored words', 'pilot.png'] as const;
@@ -195,6 +205,8 @@ deck: 2
 # Block cover
 
 A line under it
+
+<!-- {id:${PRIVATE_BLOCK_IDS[0]}} @claude ${B.slideWholeNote} -->
 \`\`\`
 
 The cover's handout.
@@ -205,7 +217,11 @@ id: ${B.headerId}
 from: Slide library/${B.headerFrom}.deck.md#a1 @abc123
 kept: true
 ---
+<!-- {id:${PRIVATE_BLOCK_IDS[1]}} ${B.slideTitleNote} -->
+
 # Copilot or Cursor?
+
+<!-- {id:${PRIVATE_BLOCK_IDS[2]}} @chatgpt ${B.slideBlockNote} -->
 
 :::: columns
 ::: column
@@ -236,7 +252,7 @@ The handout of the columns.
 # Steps
 
 ::: {.steps tag="Harjutus"}
-1. Pick a question
+1. <mark data-comment="@claude ${B.slideRequest}" data-comment-id="${B.slideMarkId}">Pick a question</mark>
 2. Write it down
 :::
 

@@ -12,6 +12,7 @@ import { Tooltip } from '../ui/tooltip';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { queueFor, isQueuePaused, QUEUE_CAP } from './promptQueue';
 import { deriveActivityState } from './activityState';
+import { currentSlideChipLabel } from '../../../../src/decks/currentSlide';
 
 export function QueuePanel({
   stackedUnderSelection,
@@ -110,6 +111,13 @@ export function QueuePanel({
                 {item.displayText}
               </span>
             )}
+            {/* Sprint 161: a comment on a deck's slide names its slide, in the composer's chip look. */}
+            {editingId !== item.id && item.slideAtSend ? (
+              <span className="inline-flex min-w-0 max-w-[45%] shrink items-center gap-1 rounded-md border border-[var(--r-hairline)] px-1.5 text-[10px] leading-[16px] text-[var(--r-ink-muted)]">
+                <Icon name="presentation" size={12} className="shrink-0" />
+                <span className="min-w-0 truncate">{currentSlideChipLabel(item.slideAtSend.slide)}</span>
+              </span>
+            ) : null}
             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               {item.status === 'failed' ? (
                 <Tooltip label="Retry">

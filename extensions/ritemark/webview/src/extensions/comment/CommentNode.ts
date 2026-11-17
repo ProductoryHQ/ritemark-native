@@ -128,6 +128,51 @@ export function decideNewBox(box: OpenCommentBox | null): NewBoxDecision {
   return box.dirty ? 'bring-forward' : 'replace'
 }
 
+/**
+ * Sprint 161: the open boxes of every editor in this webview with comments (a
+ * deck's handout and the slide on its stage), so the one-box rule holds across
+ * them: each keeps its own storage, and registers its open box here too, with
+ * the editor it is in.
+ */
+const openBoxes = new Map<OpenCommentBox, Pick<Editor, 'state' | 'view'>>()
+
+/**
+ * Register a surface's open box (the margin rail's, a slide's): it is its
+ * editor's `openBox`, and the other editors see it. Returns the unregister.
+ */
+export function registerOpenBox(editor: Pick<Editor, 'state' | 'view' | 'storage'>, box: OpenCommentBox): () => void {
+  const storage = commentBoxStorage(editor)
+  if (storage) storage.openBox = box
+  openBoxes.set(box, editor)
+  return () => {
+    openBoxes.delete(box)
+    if (storage && storage.openBox === box) storage.openBox = null
+  }
+}
+
+/**
+ * Another editor's open box gives way before this editor opens one (#687,
+ * across a deck's handout and its slide): one with unsaved words comes forward
+ * and the answer is false (nothing new opens); a clean one closes as Cancel
+ * closes it, in its own editor. True when nothing else stands in the way.
+ */
+export function otherBoxesGiveWay(editor: Pick<Editor, 'storage'>): boolean {
+  const own = commentBoxStorage(editor)?.openBox ?? null
+  for (const [box, other] of [...openBoxes]) {
+    if (box === own) continue
+    if (box.dirty) {
+      box.bringForward()
+      return false
+    }
+    const tr = other.state.tr
+    removeEmptyComment(tr, box)
+    if (tr.docChanged) other.view.dispatch(tr)
+    box.close()
+    openBoxes.delete(box)
+  }
+  return true
+}
+
 /** The comment extension's storage, or undefined when comments are off. */
 export function commentBoxStorage(editor: Pick<Editor, 'storage'> | null | undefined): CommentNodeStorage | undefined {
   return editor?.storage?.commentNode as CommentNodeStorage | undefined
@@ -314,8 +359,13 @@ function finishStart(
  * brings back the old empty comment and never two boxes. Returns false only
  * when no comment can be made here (the document is then untouched), so ⌘/
  * falls through as it did before.
+ *
+ * `placeNote` (Sprint 161, a comment on a slide): where an empty selection's
+ * margin note goes, instead of at the cursor. The slide puts it before the
+ * block it is on, or at the slide's end for the whole slide.
  */
-export function startComment(editor: Editor): boolean {
+export function startComment(editor: Editor, placeNote?: (tr: Transaction, id: string) => void): boolean {
+  if (!otherBoxesGiveWay(editor)) return true
   const box = commentBoxStorage(editor)?.openBox ?? null
   const decision = decideNewBox(box)
   if (decision === 'bring-forward' && box) {
@@ -331,7 +381,8 @@ export function startComment(editor: Editor): boolean {
     return true
   }
   const id = newCommentId()
-  addEmptyComment(tr, id)
+  if (placeNote && tr.selection.empty) placeNote(tr, id)
+  else addEmptyComment(tr, id)
   if (!hasComment(tr.doc, id)) return false
   finishStart(editor, tr, closing, { key: `c:${id}`, as: 'box' })
   return true
@@ -365,7 +416,13 @@ export function liftCommentLine(editor: Editor): boolean {
   if (hasCommentTerminator(m[1])) return false
   const note = m[1].trim()
 
-  // A saved note opens no box, so only the empty lift asks the open box.
+  // A saved note opens no box, so only the empty lift asks the open box (another editor's first, Sprint 161).
+  if (!note) {
+    if (!otherBoxesGiveWay(editor)) return true
+    // Closing another editor's box may have changed this document (a slide's note is written into the deck's
+    // handout): read it again, so the lift is built on the document as it is now (review of #766, round 2).
+    if (editor.state !== state) return liftCommentLine(editor)
+  }
   const box = note ? null : (commentBoxStorage(editor)?.openBox ?? null)
   const decision = decideNewBox(box)
   if (decision === 'bring-forward' && box) {
@@ -492,6 +549,7 @@ export function leastScrollDelta(view: ScreenSpan, box: ScreenSpan, line: Screen
  * comes back mapped through the removal: the rescan finds the comment under it.
  */
 export function yieldOpenBox(editor: Editor, key: string): string | null {
+  if (!otherBoxesGiveWay(editor)) return null
   const box = commentBoxStorage(editor)?.openBox ?? null
   const decision = decideNewBox(box)
   if (!box || decision === 'open') return key

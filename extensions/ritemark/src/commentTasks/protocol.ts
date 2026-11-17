@@ -25,6 +25,7 @@ import {
   type CommentTaskSurface,
   COMMENT_TASK_ALIASES,
 } from './types';
+import type { SlideAtSend } from '../decks/currentSlide';
 
 /** Largest inbound message we will even parse. A comment task is text; anything
  *  approaching this is a bug or an attack, and reading it costs the host. */
@@ -187,6 +188,12 @@ export interface CommentTaskEnqueueMessage {
    * which sends a comment to its document's chat, open or not).
    */
   sourceKind?: 'comment' | 'card';
+  /**
+   * Sprint 161: a comment on a deck's slide names that slide, as the composer's
+   * chip names the slide a message is sent on: the queued message carries it,
+   * so its chip says "Slide 6 · <title>" and the AI reads "this slide" as it.
+   */
+  slideAtSend?: SlideAtSend;
 }
 
 export type CommentTaskEnqueueOutcome = 'queued' | 'full' | 'no-conversation';

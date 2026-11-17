@@ -36,7 +36,15 @@ export const MARKER_PRESERVATION_GUARD =
  *   (`workspace.asRelativePath`), never a placeholder.
  * @param comments the task's frozen comments, already in document order.
  */
-export function buildCommentTaskPrompt(displayPath: string, comments: CommentTaskCommentV1[]): string {
+export function buildCommentTaskPrompt(
+  displayPath: string,
+  comments: CommentTaskCommentV1[],
+  /**
+   * Sprint 161: where a comment on a deck's slide is, by comment id, as one line (`commentPlaceLine`): the slide it is
+   * on and what on it. A comment without one is the document's, as before.
+   */
+  places?: ReadonlyMap<string, string>,
+): string {
   const single = comments.length === 1;
   const lines: string[] = [
     `The user assigned you ${single ? 'this comment' : `these ${comments.length} comments`} in ${displayPath}. `
@@ -51,8 +59,10 @@ export function buildCommentTaskPrompt(displayPath: string, comments: CommentTas
     // predates that guarantee still says something real.
     lines.push(`${index + 1}. ${comment.instruction || comment.note}`);
     lines.push(`   Comment id: ${comment.commentId}`);
+    const place = places?.get(comment.commentId);
+    if (place) lines.push(`   ${place}`);
     if (comment.anchoredText) lines.push(`   Anchored to: "${comment.anchoredText}"`);
-    if (comment.kind === 'node') lines.push('   (standalone note — not anchored to specific text)');
+    else if (comment.kind === 'node' && !place) lines.push('   (standalone note — not anchored to specific text)');
     lines.push('');
   });
 

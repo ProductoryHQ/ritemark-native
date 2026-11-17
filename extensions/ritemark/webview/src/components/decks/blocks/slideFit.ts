@@ -48,14 +48,16 @@ export function fitValue(step: number): number {
  */
 export function contentHeightOf(flow: HTMLElement): number {
   const children = Array.from(flow.children) as HTMLElement[]
-  if (!children.length) return 0
   let top = Infinity
   let bottom = 0
   for (const child of children) {
     const style = getComputedStyle(child)
+    // A comment on the slide (Sprint 161) is never drawn: it takes no room.
+    if (style.display === 'none') continue
     top = Math.min(top, child.offsetTop - (parseFloat(style.marginTop) || 0))
     bottom = Math.max(bottom, child.offsetTop + child.offsetHeight + (parseFloat(style.marginBottom) || 0))
   }
+  if (top === Infinity) return 0
   // A cover slide's words sit at the bottom (flex-end): they overflow upwards, past the top, where scrollHeight
   // doesn't see them; the blocks' own extent does.
   return Math.max(bottom - top, flow.scrollHeight > flow.clientHeight + 1 ? flow.scrollHeight : 0)

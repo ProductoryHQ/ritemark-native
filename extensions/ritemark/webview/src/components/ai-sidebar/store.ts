@@ -74,7 +74,7 @@ import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
 import type { SheetSignInAi, SheetSignInRequest, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
-import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
+import { slideAtSendOf, type CurrentSlide, type SlideAtSend } from '../../../../src/decks/currentSlide';
 import type {
   AgentId,
   AgentInfo,
@@ -998,6 +998,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       taskId: message.taskId,
       conversationTurnId: message.conversationTurnId,
       ...(message.sourceDisplayPath ? { sourceDisplayPath: message.sourceDisplayPath } : {}),
+      // Sprint 161: a comment on a deck's slide names its slide, as the composer's chip names one (checked field by field).
+      ...(message.slideAtSend ? { slideAtSend: slideAtSendOf(message.slideAtSend) } : {}),
     });
 
     // Audit F17: the queue's `full` answer used to be dropped on the floor and

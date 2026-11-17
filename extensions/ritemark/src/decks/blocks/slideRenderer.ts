@@ -177,6 +177,22 @@ export function lexBlockSlide(markdown: string): Token[] {
   return slideMarked.lexer(markdown);
 }
 
+/**
+ * An HTML block that holds only comments (and space): a standalone comment note, which the slide never draws. A slide
+ * comment on a block or on the whole slide is one (Sprint 161, `slideComments.ts`).
+ */
+export function isCommentBlock(token: Token): boolean {
+  return token.type === 'html' && /^\s*(?:<!--[\s\S]*?-->\s*)+$/.test(token.raw);
+}
+
+/**
+ * The blocks a slide draws, at its top level: no blank space, and no comment note, so a comment never changes how a
+ * slide is drawn (a title-only slide with a comment is still drawn big and low).
+ */
+function drawnBlocksOf(markdown: string): Token[] {
+  return lexBlockSlide(markdown).filter(token => token.type !== 'space' && !isCommentBlock(token));
+}
+
 const picturePathsCache = new Map<string, string[]>();
 
 /** The relative pictures a block slide's Markdown names, as the renderer asks `pictureUrl` for them. */
@@ -219,7 +235,7 @@ export function isCoverSlide(markdown: string): boolean {
 }
 
 function coverOf(markdown: string): boolean {
-  const blocks = lexBlockSlide(markdown).filter(token => token.type !== 'space');
+  const blocks = drawnBlocksOf(markdown);
   const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
   const isLine = (token: Token | undefined) => token?.type === 'paragraph' || (token?.type === 'heading' && (token as Tokens.Heading).depth === 2);
   if (blocks.length === 1) return isTitle(blocks[0]);
@@ -233,7 +249,7 @@ function coverOf(markdown: string): boolean {
  * such a slide's part as a divider, as it drew a Section slide's.
  */
 export function blockSectionNumberOf(markdown: string): string | null {
-  const blocks = lexBlockSlide(markdown).filter(token => token.type !== 'space');
+  const blocks = drawnBlocksOf(markdown);
   if (blocks.length !== 2 || blocks[0].type !== 'paragraph' || blocks[1].type !== 'heading' || (blocks[1] as Tokens.Heading).depth !== 1) return null;
   const number = (blocks[0] as Tokens.Paragraph).text.replace(/\\(.)/g, '$1').trim();
   // A section's number: digits (1, 2.1), a letter or a Roman numeral, never a word over a title ("Productory").

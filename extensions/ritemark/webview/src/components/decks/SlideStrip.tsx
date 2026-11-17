@@ -11,7 +11,8 @@
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
-import type { SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
+import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MoreActionsTrigger } from '../ui/dropdown-menu'
@@ -63,6 +64,11 @@ export function libraryBadge(mark: StripMark | undefined): { label: string; ambe
 
 /** A new slide takes the caret in its title: the menu doesn't hand the focus back to its + when it closes. */
 const keepFocusOnNewSlide = (event: Event) => event.preventDefault()
+
+/** Sprint 161: a slide's comment count for its dot: a block slide's comments with words (an old slide has none). */
+export function stripCommentCount(entry: Pick<DeckSlideEntry, 'kind' | 'data'>): number {
+  return isBlockSlide(entry.kind) ? slideCommentCount(entry.data.markdown ?? '') : 0
+}
 
 /** The prototype's small menu for a new slide (the Experience lead's answer 5: it opens a menu, it adds nothing by itself). */
 function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
@@ -137,10 +143,12 @@ interface ThumbnailProps {
   /** A copy of a library slide: its badge's tooltip (its menu then has Show in the library), and whether it is amber. */
   badgeLabel: string | null
   badgeAmber: boolean
+  /** Sprint 161: how many comments are on the slide (its amber dot); 0 for none. */
+  comments: number
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -164,6 +172,12 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} />
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
+      {comments > 0 ? (
+        // Sprint 161: the slide's comments, counted on the strip only (the thumbnails people see draw none).
+        <Tooltip label={comments === 1 ? '1 comment on this slide' : `${comments} comments on this slide`} className="deck-thumb-comments">
+          <span>{comments}</span>
+        </Tooltip>
+      ) : null}
       {badgeLabel ? (
         // The tooltip's own wrapper is placed (absolute), so the badge never joins the thumbnail's row.
         <Tooltip label={badgeLabel} className={`deck-thumb-badge${badgeAmber ? ' is-amber' : ''}`}>
@@ -235,9 +249,11 @@ interface SlideStripProps {
   stripRef: React.RefObject<HTMLDivElement>
   /** Each copy's source marks, by the slide's id. */
   marks: Record<string, StripMark>
+  /** Sprint 161: count each slide's comments in its dot (the comment flag on). */
+  commentCounts?: boolean
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks, commentCounts }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -394,6 +410,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             onMenuCloseFocus={onMenuCloseFocus}
             badgeLabel={(entry.data.id && libraryBadge(marks[entry.data.id])?.label) || null}
             badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
+            comments={commentCounts ? stripCommentCount(entry) : 0}
           />
         </div>
       ))}

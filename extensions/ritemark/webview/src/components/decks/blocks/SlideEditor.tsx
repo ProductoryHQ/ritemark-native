@@ -40,6 +40,12 @@ import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { SlideDivWithView } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown } from './slideEditorMarkdown'
 import { contentHeightOf, fitValue, nextFitStep } from './slideFit'
+import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
+import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
+import { Icon } from '../../ui/Icon'
+import { isMac } from '../../../hooks/usePlatform'
+import { readClipboard } from '../../../lib/clipboard'
 
 export interface SlideEditorProps {
   /** The handout's editor, which holds the deck: the slide is written to its node there, and its history is the undo. */
@@ -58,7 +64,16 @@ export interface SlideEditorProps {
   onFocusTaken?: () => void
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
+  /** Sprint 161: open one of the slide's saved comments (the deck's bar, Prev and Next), by its place; a new serial asks again. */
+  commentOpen?: { ordinal: number; serial: number } | null
+  /** The comment asked for in `commentOpen` was opened: the asker forgets the request. */
+  onCommentOpened?: (serial: number) => void
 }
+
+/** The right-click menu's shortcuts, as the platform writes them. */
+const KEYS = isMac
+  ? { cut: '⌘X', copy: '⌘C', paste: '⌘V', comment: '⌘/' }
+  : { cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', comment: 'Ctrl+/' }
 
 /** The slide's Markdown as the stage edits it: a block slide's, or a v1 slide's as blocks (converted in memory). */
 export function stageMarkdownOf(kind: string, data: SlideData): string {
@@ -109,7 +124,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened }: SlideEditorProps) {
   const slideRef = useRef(slide)
   slideRef.current = slide
   const assetsRef = useRef(assets)
@@ -121,7 +136,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const syncRef = useRef<SlideSync | null>(null)
   // The editor the sync was made for: a new editor (its extensions changed) gets a new sync, on its own schema.
   const syncEditor = useRef<TipTapEditor | null>(null)
-  const frameRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement | null>(null)
   const stepRef = useRef(0)
   const outerRef = useRef(outer)
   outerRef.current = outer
@@ -151,22 +166,41 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     onWritingRef.current()
   }, [])
 
-  // Undo and redo are the deck's, as on the rest of the stage: this editor keeps no history of its own.
+  // Undo and redo are the deck's, as on the rest of the stage: this editor keeps no history of its own. ⌘/ comments on
+  // the selected words, or on the caret's block (Sprint 161).
   const OuterHistory = useMemo(() => Extension.create({
     name: 'slideOuterHistory',
+    // Before the editor's own Backspace and Delete, which would otherwise take a comment hidden next to the caret.
+    priority: 1000,
     addKeyboardShortcuts() {
       const undo = () => { outerRef.current.commands.undo(); return true }
       const redo = () => { outerRef.current.commands.redo(); return true }
-      return { 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo, 'Shift-Mod-z': redo }
+      const comment = () => (commentCallouts ? startSlideComment(this.editor as TipTapEditor, caretTarget(this.editor as TipTapEditor)) : false)
+      // A comment on a block is a hidden note before it: Backspace and Delete join the blocks around it and keep it.
+      // The notes move only when the ordinary key then joins (`keyPastNotes` tries it first); it runs next, as always.
+      // A block it can't join is selected instead, and the notes stay.
+      const pastNotes = (direction: 'backward' | 'forward') => () => {
+        const step = keyPastNotes(this.editor.state, direction)
+        if (step === 'stop') return true
+        if (!step) return false
+        this.editor.view.dispatch(step.tr)
+        return step.done
+      }
+      return { 'Mod-z': undo, 'Mod-Shift-z': redo, 'Mod-y': redo, 'Shift-Mod-z': redo, 'Mod-/': comment, Backspace: pastNotes('backward'), Delete: pastNotes('forward') }
     },
-  }), [])
+  }), [commentCallouts])
 
+  // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
     beforeLink: [Placeholder.configure({ placeholder: ({ node, pos }) => (pos === 0 && node.type.name === 'heading' ? 'Title' : ''), showOnlyCurrent: false })],
     afterImage: [OuterHistory],
     commentCallouts,
     deck: [SlideDivWithView],
-  }).map(extension => (extension.name === 'starterKit' ? extension.configure({ history: false }) : extension)), [OuterHistory, commentCallouts])
+  }).map(extension => {
+    if (extension.name === 'starterKit') return extension.configure({ history: false })
+    if (extension.name === 'commentNode') return SlideCommentNode.extend()
+    return extension
+  }), [OuterHistory, commentCallouts])
 
   const editor = useEditor({
     extensions,
@@ -293,28 +327,117 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     }
   }, [editor, refit])
 
+  // Sprint 161 (frame 27): Ritemark's own right-click menu on the slide. What a comment from it is on is read when the
+  // menu opens: the words under the click when they are selected, the block clicked, or the whole slide.
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null)
+  const setFrameRef = useCallback((element: HTMLDivElement | null) => {
+    frameRef.current = element
+    setFrame(element)
+  }, [])
+  const menuTarget = useRef<SlideTarget>({ kind: 'slide' })
+  /** The menu's Comment, waiting for the menu to close. */
+  const pendingComment = useRef<SlideTarget | null>(null)
+  /** The menu closed on a press outside it: the focus stays where that press put it. */
+  const closedOutside = useRef(false)
+  const startPendingComment = () => {
+    const target = pendingComment.current
+    pendingComment.current = null
+    if (target && editor && !editor.isDestroyed) startSlideComment(editor, target)
+  }
+  const [hasSelection, setHasSelection] = useState(false)
+  const runEdit = (command: 'cut' | 'copy' | 'paste') => {
+    if (!editor || editor.isDestroyed) return
+    editor.view.focus()
+    // The webview's own Cut, Copy and Paste, as ⌘X, ⌘C and ⌘V do them; a paste the webview refuses comes from the
+    // host's clipboard as text.
+    if (document.execCommand(command) || command !== 'paste') return
+    void readClipboard().then(text => {
+      if (text && !editor.isDestroyed) editor.view.pasteText(text)
+    })
+  }
+
   const header = isBlockSlide(slide.kind) ? slide.data : blockDataOf(slide.kind, slide.data)
   const side = sidePictureOf(header)
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : ''].filter(Boolean).join(' ')
   return (
-    <div
-      ref={frameRef}
-      className={`deck-slide${borderless ? ' is-borderless' : ''}`}
-      data-step={stepRef.current}
-      style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
-    >
-      <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
-        {side ? (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          ref={setFrameRef}
+          className={`deck-slide${borderless ? ' is-borderless' : ''}`}
+          data-step={stepRef.current}
+          style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
+          // A right press keeps the selection as it is (the Mac would select the word under it), so "with a selection,
+          // it's on the words" means the words the person chose.
+          onMouseDown={event => { if (event.button === 2) event.preventDefault() }}
+          onContextMenu={event => {
+            if (!editor || editor.isDestroyed) return
+            closedOutside.current = false
+            pendingComment.current = null
+            menuTarget.current = clickTarget(editor, event)
+            setHasSelection(!editor.state.selection.empty)
+          }}
+        >
+          <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
+            {side ? (
+              <>
+                <div className={`photo${sideUrl ? '' : ' empty'}`} style={sideUrl ? { backgroundImage: `url("${sideUrl.replace(/"/g, '%22')}")` } : undefined} />
+                {side === 'behind' ? <div className="veil" /> : null}
+              </>
+            ) : null}
+            <EditorContent editor={editor} />
+          </div>
+          {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
+          {commentCallouts && editor ? (
+            <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
+          ) : null}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        className="deck-slide-menu"
+        // A press outside closes it and the focus stays where that press put it (the handout, a card, the strip).
+        onInteractOutside={() => { closedOutside.current = true }}
+        // Otherwise the focus goes back to the slide's words (the app run: after Paste the caret was lost, and ⌘Z did
+        // nothing), and Comment starts here, once the menu has handed the focus back, so the card's box keeps it.
+        onCloseAutoFocus={event => {
+          event.preventDefault()
+          if (!editor || editor.isDestroyed) return
+          if (pendingComment.current) startPendingComment()
+          else if (!closedOutside.current) editor.view.focus()
+        }}
+      >
+        <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('cut')}>
+          Cut
+          <ContextMenuShortcut>{KEYS.cut}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('copy')}>
+          Copy
+          <ContextMenuShortcut>{KEYS.copy}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => runEdit('paste')}>
+          Paste
+          <ContextMenuShortcut>{KEYS.paste}</ContextMenuShortcut>
+        </ContextMenuItem>
+        {commentCallouts ? (
           <>
-            <div className={`photo${sideUrl ? '' : ' empty'}`} style={sideUrl ? { backgroundImage: `url("${sideUrl.replace(/"/g, '%22')}")` } : undefined} />
-            {side === 'behind' ? <div className="veil" /> : null}
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="gap-2"
+              onSelect={() => {
+                // Started once the menu has closed and handed the focus back (`onCloseAutoFocus`), one path only, so the
+                // card's box keeps the caret (the app run: the box opened without it).
+                pendingComment.current = menuTarget.current
+              }}
+            >
+              <Icon name="chat-text" size={14} tone="inherit" />
+              Comment
+              <ContextMenuShortcut>{KEYS.comment}</ContextMenuShortcut>
+            </ContextMenuItem>
           </>
         ) : null}
-        <EditorContent editor={editor} />
-      </div>
-      {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
-    </div>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

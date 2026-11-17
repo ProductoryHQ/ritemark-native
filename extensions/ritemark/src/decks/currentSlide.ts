@@ -55,7 +55,7 @@ export function slideTitleLine(title: unknown): string {
  * The person's words inside the AI's bracketed line: quoted, with its quotes and backslashes escaped, and its square
  * brackets as round ones, so a title can never end the line or read as another context line (`] [Selected text: …`).
  */
-function quoted(text: string): string {
+export function quotedForAI(text: string): string {
   return JSON.stringify(text.replace(/\[/g, '(').replace(/\]/g, ')'));
 }
 
@@ -93,7 +93,7 @@ export function currentSlideChipTooltip(slide: CurrentSlide, ai: string): string
 /** What the AI's line says about one slide: `"Agenda", id k3f9`, `id k3f9`, or nothing. */
 function slideFacts(entry: CurrentSlideEntry): string {
   const title = slideTitleLine(entry.title);
-  return [title ? quoted(title) : null, entry.id ? `id ${entry.id}` : null].filter(Boolean).join(', ');
+  return [title ? quotedForAI(title) : null, entry.id ? `id ${entry.id}` : null].filter(Boolean).join(', ');
 }
 
 /** One slide in a list: `5 ("Agenda", id k3f9)`, or `5`. */
@@ -108,7 +108,7 @@ function slideInLine(entry: CurrentSlideEntry): string {
  */
 export function currentSlideContextLine(slide: CurrentSlide): string {
   const { slides, count } = slide;
-  const deck = quoted(slideTitleLine(slide.deck));
+  const deck = quotedForAI(slideTitleLine(slide.deck));
   if (slides.length === 1) {
     const facts = slideFacts(slides[0]);
     return `The person is on slide ${slides[0].number} of ${count}${facts ? ` (${facts})` : ''} in ${deck}.`;

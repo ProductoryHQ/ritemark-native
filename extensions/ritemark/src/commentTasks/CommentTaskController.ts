@@ -19,6 +19,7 @@
 
 import { createHash, randomUUID } from 'crypto';
 import type { ProjectScopeDescriptorV1 } from '../conversations/types';
+import type { SlideAtSend } from '../decks/currentSlide';
 import { CommentTaskStore, CommentTaskStoreError } from './CommentTaskStore';
 import {
   chatNameFromComment,
@@ -172,6 +173,12 @@ export interface CommentTaskControllerDependencies {
   runtimeSettings(conversationId: string, runtimeId: string): CommentTaskRuntimeSettings;
   /** One prompt builder for both surfaces, given the REAL document label. */
   buildPrompt(document: CommentTaskDocument, comments: CommentTaskCommentV1[]): string;
+  /**
+   * Sprint 161: the deck slide a task's comments are on, read from the
+   * document as it is when the task is handed to the queue (a retry too), for
+   * the message's chip. Absent, or null: the message names no slide.
+   */
+  slideAtSend?(record: CommentTaskRecordV1): SlideAtSend | null;
   /** Hand the accepted task to the sidebar queue and wait for its verdict.
    *  Sprint 155: the answer may name the chat it was queued in, and says
    *  `unreachable` when the sheet gave no verdict at all (not ready, not
@@ -1065,6 +1072,13 @@ export class CommentTaskController {
     // Review 2: the settings frozen at acceptance. Asking again would read the
     // sidebar's one-entry cache after it emptied, and answer "auto".
     const settings = record.runtime;
+    let slideAtSend: SlideAtSend | null = null;
+    try {
+      slideAtSend = this.dependencies.slideAtSend?.(record) ?? null;
+    } catch {
+      // The chip is a courtesy: a document that can't be read names no slide, and the task still goes.
+      slideAtSend = null;
+    }
     const answer = await this.dependencies.enqueue({
       type: 'comment-task/enqueue',
       taskId: record.taskId,
@@ -1078,6 +1092,8 @@ export class CommentTaskController {
       thinkingEffort: settings.thinkingEffort,
       sourceDisplayPath: displayPath ?? record.source.displayPath,
       ...(newConversation ? { newConversation } : {}),
+      // The chip's path is the message's own file, so the turn's active file and the slide agree (`withSlideAtSend`).
+      ...(slideAtSend ? { slideAtSend: { ...slideAtSend, path: displayPath ?? record.source.displayPath } } : {}),
     });
     return typeof answer === 'string' ? { outcome: answer } : answer;
   }

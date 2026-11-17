@@ -7,7 +7,7 @@
 import type { AgentSidebarProtocolMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
-import type { CurrentSlide } from '../../../../src/decks/currentSlide';
+import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
 
 export type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 
@@ -480,7 +480,7 @@ export type ExtensionMessage =
   // an accepted comment task. This replaced Sprint 94's `comment:submit`, where
   // the editor relayed a prompt and the sidebar picked a thread of its own
   // (audit F20). The sidebar answers with `comment-task/enqueue-result`.
-  | { type: 'comment-task/enqueue'; taskId: string; conversationId: string; conversationTurnId: string; runtimeId: 'claude-code' | 'codex' | 'opencode'; prompt: string; displayText: string; modelId: string | null; autonomy: 'auto' | 'ask'; thinkingEffort: string; sourceDisplayPath: string }
+  | { type: 'comment-task/enqueue'; taskId: string; conversationId: string; conversationTurnId: string; runtimeId: 'claude-code' | 'codex' | 'opencode'; prompt: string; displayText: string; modelId: string | null; autonomy: 'auto' | 'ask'; thinkingEffort: string; sourceDisplayPath: string; slideAtSend?: SlideAtSend }
   // Sprint 130 (W13): a card stopped while its prompt still waits in a queue.
   // The sidebar drops it, so a later Give does not run the old prompt too.
   | { type: 'comment-task/drop'; taskId: string }
