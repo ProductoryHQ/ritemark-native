@@ -267,8 +267,9 @@ export function newThemeNameProblem(value: string, taken: { names: readonly stri
   if (problem) return problem;
   const name = value.trim().toLowerCase();
   const file = `${name}.theme.md`;
-  if (taken.names.some(other => other.trim().toLowerCase() === name) || taken.files.some(other => other.toLowerCase() === file)) {
-    return `There's a theme called ${value.trim()} already. Give this one another name.`;
+  const same = taken.names.find(other => other.trim().toLowerCase() === name);
+  if (same !== undefined || taken.files.some(other => other.toLowerCase() === file)) {
+    return `There's a theme called ${same?.trim() ?? value.trim()} already. Give this one another name.`;
   }
   return null;
 }

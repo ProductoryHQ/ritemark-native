@@ -56,6 +56,21 @@ export function usedByWords(count: number): string {
   return count === 1 ? 'Used by 1 deck' : `Used by ${count} decks`
 }
 
+/** Which step a key asks for: Cmd/Ctrl+Z undo, Cmd/Ctrl+Shift+Z and Ctrl+Y redo. */
+export function themeUndoKey(event: { key: string; metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): 'undo' | 'redo' | null {
+  const mod = event.metaKey || event.ctrlKey
+  if (!mod) return null
+  const key = event.key.toLowerCase()
+  if (key === 'z') return event.shiftKey ? 'redo' : 'undo'
+  if (key === 'y' && event.ctrlKey && !event.metaKey) return 'redo'
+  return null
+}
+
+/** "1 deck", "2 decks": the draft bar's count. */
+export function decksWords(count: number): string {
+  return count === 1 ? '1 deck' : `${count} decks`
+}
+
 /** The note at the foot of the settings (frame 11). */
 export function themeFileNote(name: string): string {
   return `${name} is a file in Slide library › Themes. Nothing changes in the decks until you save; then every deck that uses it changes, and a published page keeps its look until you update it.`
@@ -113,6 +128,22 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
     }
   }), [])
   useEffect(() => { sendToExtension('theme/ready') }, [])
+  // Cmd+Z and Cmd+Shift+Z (Ctrl on Windows; Ctrl+Y too) outside a text field: the draft's own Undo and Redo. In the
+  // capture phase, as the deck's bar does: the webview's own script marks an undo outside a field handled first.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.altKey) return
+      const target = event.target as HTMLElement | null
+      if (target && (target.closest('input, textarea, [contenteditable="true"]'))) return
+      const step = themeUndoKey(event)
+      if (!step) return
+      event.preventDefault()
+      event.stopPropagation()
+      sendToExtension(step === 'undo' ? 'theme/undo' : 'theme/redo')
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
   // The tab draws the host's own state, so every document payload is shown as soon as it comes.
   useEffect(() => { if (syncTarget) onExternalApplied(syncTarget) }, [syncTarget, onExternalApplied])
   // A Save's line stays a while; any later line takes its place.
@@ -154,7 +185,17 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
         ) : null}
         {dirty ? (
           <>
-            <span className="deck-saved theme-not-saved">Not saved</span>
+            <span className="deck-saved theme-not-saved">
+              {/* The Experience lead, 17 November: the draft's bar says what Save will do; the count opens the same list. */}
+              Not saved.
+              {count ? (
+                <>
+                  {' Saving changes '}
+                  <UsedBy decks={decks?.decks ?? null} words={decksWords(count)} className="theme-saving-count" caret={false} tip="The decks that change when you save" />
+                  .
+                </>
+              ) : null}
+            </span>
             <Tooltip label="Throw the changes away; the theme stays as it was">
               <Button variant="ghost" size="bar" onClick={discard}>Discard</Button>
             </Tooltip>
@@ -251,17 +292,17 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
 }
 
 /** "Used by N decks", which lists them; a deck in the list opens. */
-function UsedBy({ decks }: { decks: ThemeDeck[] | null }) {
+function UsedBy({ decks, words, className = 'theme-used-by', caret = true, tip = 'The decks that use this theme' }: { decks: ThemeDeck[] | null; words?: string; className?: string; caret?: boolean; tip?: string }) {
   const [open, setOpen] = useState(false)
-  const words = decks === null ? 'Reading the decks…' : usedByWords(decks.length)
-  if (!decks || decks.length === 0) return <span className="theme-used-by is-none">{words}</span>
+  const shown = words ?? (decks === null ? 'Reading the decks…' : usedByWords(decks.length))
+  if (!decks || decks.length === 0) return <span className={`${className} is-none`}>{shown}</span>
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip label="The decks that use this theme">
+      <Tooltip label={tip}>
         <PopoverTrigger asChild>
-          <Button variant="toolbar" size="bar" className="theme-used-by">
-            {words}
-            <Icon name="caret-down" size={12} tone="inherit" />
+          <Button variant="toolbar" size="bar" className={className}>
+            {shown}
+            {caret ? <Icon name="caret-down" size={12} tone="inherit" /> : null}
           </Button>
         </PopoverTrigger>
       </Tooltip>
@@ -288,6 +329,8 @@ function ColourRow({ label, note, value, onChange }: { label: string; note?: str
   const [text, setText] = useState(value)
   const [open, setOpen] = useState(false)
   const editing = useRef(false)
+  // The colour as it was when the field took the focus: Escape puts it back, though a whole code typed was sent at once
+  const before = useRef(value)
   // The field follows the theme, except while it is being typed in.
   useEffect(() => { if (!editing.current) setText(value) }, [value])
   const typed = normalColour(text)
@@ -332,7 +375,7 @@ function ColourRow({ label, note, value, onChange }: { label: string; note?: str
         maxLength={7}
         aria-label={`${label}, as a hex code`}
         aria-invalid={!typed}
-        onFocus={() => { editing.current = true }}
+        onFocus={() => { editing.current = true; before.current = value }}
         onChange={event => {
           editing.current = true
           const next = event.target.value
@@ -344,7 +387,12 @@ function ColourRow({ label, note, value, onChange }: { label: string; note?: str
         onBlur={commit}
         onKeyDown={event => {
           if (event.key === 'Enter') { event.preventDefault(); commit(); (event.target as HTMLInputElement).blur() }
-          if (event.key === 'Escape') { editing.current = false; setText(value); (event.target as HTMLInputElement).blur() }
+          if (event.key === 'Escape') {
+            editing.current = false
+            if (before.current !== value) onChange(before.current)
+            setText(before.current)
+            ;(event.target as HTMLInputElement).blur()
+          }
         }}
       />
     </div>
@@ -424,7 +472,7 @@ function SaveAsSheet({ from, count, useIn, taken, onClose }: { from: string; cou
     setProblem(null)
     sendToExtension('theme/save-as', { name: name.trim(), use: !!useIn && use })
   }
-  const shown = problem ?? (name.trim() ? local : null)
+  const shown = problem ?? local
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent

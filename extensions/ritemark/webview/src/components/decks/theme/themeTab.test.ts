@@ -22,7 +22,7 @@ register(`data:text/javascript,${encodeURIComponent(
 Object.assign(globalThis, { acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }) })
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
-const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, themeDecksFrom, themeFileNote, usedByWords } = await import('./ThemeTab')
+const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, decksWords, themeDecksFrom, themeFileNote, themeUndoKey, usedByWords } = await import('./ThemeTab')
 
 // ---- The ratio: WCAG's own pairs, and Evening's as frame 11 reads them (text 12.6, headings 15.6).
 {
@@ -71,7 +71,7 @@ const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, themeDecksFrom,
     assert.doesNotMatch(shown, /Fonts|Heading font|Drop a logo|Logo|Ask Claude/, 'nothing of a later part shows')
   }
   // The draft's bar (frame 18): Not saved, Discard, Save ▾ with Save as a new theme… and Discard the changes.
-  assert.match(tab, /<span className="deck-saved theme-not-saved">Not saved<\/span>/)
+  assert.match(tab, /<span className="deck-saved theme-not-saved">/)
   assert.match(tab, />Discard<\/Button>/)
   assert.match(tab, /Save as a new theme…/)
   assert.match(tab, /Discard the changes/)
@@ -94,6 +94,26 @@ const { COLOUR_ROWS, CORNER_OPTIONS, BOX_OPTIONS, THEME_PALETTE, themeDecksFrom,
   assert.equal(themeDecksFrom({ ...good, taken: null }), null)
   assert.equal(themeDecksFrom({ ...good, decks: 'x' }), null)
   assert.equal(themeDecksFrom({ ...good, preview: { slides: 'x' } }), null)
+}
+
+// ---- Round two and the Experience lead (17 November): the draft bar says what Save will do, Cmd+Z is the draft's own
+// Undo, Escape in a hex field puts the colour back, a refused name says why as it is typed, and a theme file's icon.
+{
+  const tab = readFileSync(fileURLToPath(new URL('./ThemeTab.tsx', import.meta.url)), 'utf8')
+  assert.match(tab, /Not saved\.\s+\{count \? \(/)
+  assert.match(tab, /\{' Saving changes '\}\s+<UsedBy decks=\{decks\?\.decks \?\? null\} words=\{decksWords\(count\)\}/, 'the count opens the same list')
+  assert.deepEqual([decksWords(1), decksWords(2)], ['1 deck', '2 decks'])
+  const key = (key: string, mods: Partial<{ metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {}) => themeUndoKey({ key, metaKey: false, ctrlKey: false, shiftKey: false, ...mods })
+  assert.deepEqual([key('z', { metaKey: true }), key('Z', { metaKey: true, shiftKey: true }), key('y', { ctrlKey: true }), key('y', { metaKey: true }), key('z')], ['undo', 'redo', 'redo', null, null])
+  assert.match(tab, /window\.addEventListener\('keydown', onKey, true\)/)
+  assert.match(tab, /if \(before\.current !== value\) onChange\(before\.current\)/, 'Escape sends the colour it had back')
+  const sheet = readFileSync(fileURLToPath(new URL('./NewThemeSheet.tsx', import.meta.url)), 'utf8')
+  for (const source of [sheet, tab]) assert.match(source, /const shown = problem \?\? local/, 'the reason shows as the name is typed, an empty one too')
+  assert.match(sheet, /<Tooltip label=\{local \?\? `Write \$\{name\.trim\(\)\} in Slide library › Themes and open it`\}>\s+<Button size="sm" disabled=\{!!local \|\| busy\}/)
+  const icons = JSON.parse(readFileSync(fileURLToPath(new URL('../../../../../fileicons/ritemark-icon-theme.json', import.meta.url)), 'utf8'))
+  assert.equal(icons.fileExtensions['theme.md'], '_file_theme_dark')
+  assert.equal(icons.light.fileExtensions['theme.md'], '_file_theme')
+  assert.match(readFileSync(fileURLToPath(new URL('../../../../../fileicons/icons/palette.svg', import.meta.url)), 'utf8'), /M12 22a1 1 0 0 1 0-20/)
 }
 
 console.log('themeTab.test.ts — all assertions passed')

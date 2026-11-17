@@ -18,7 +18,7 @@ import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
-import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, themeEntries, themePathOf, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
@@ -242,7 +242,7 @@ export class DeckPages implements vscode.Disposable {
    * a change of Evening's file reaches every deck; any other only the decks naming it.
    */
   async themeFilesChanged(changed: string): Promise<void> {
-    const key = (value: string) => value.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '').toLowerCase();
+    const key = pathKey;
     const evening = key(changed) === key(BUILT_IN_THEME_PATH);
     await Promise.all([...this.views].map(async view => {
       const named = themePathOf(frontMatterField(view.document.getText().replace(/^﻿/, ''), 'theme'));
@@ -367,9 +367,16 @@ export class DeckPages implements vscode.Disposable {
         if (isEnabled('decks')) await this.themeEditor?.open(document, request.path);
         return;
       case 'deck/new-theme': {
-        const made = this.themeEditor && isEnabled('decks')
-          ? await this.themeEditor.make(document, { name: request.name, start: request.start, use: request.use })
-          : { ok: false as const, problem: 'Themes are off while Decks are turned off in Settings.' };
+        let made: { ok: true; path: string; name: string } | { ok: false; problem: string };
+        try {
+          made = this.themeEditor && isEnabled('decks')
+            ? await this.themeEditor.make(document, { name: request.name, start: request.start, use: request.use })
+            : { ok: false, problem: 'Themes are off while Decks are turned off in Settings.' };
+        } catch (error) {
+          // The sheet always gets an answer: it never stays waiting.
+          console.warn('[Decks] New theme failed:', error);
+          made = { ok: false, problem: 'The theme could not be made.' };
+        }
         await this.post(webview, made.ok ? { type: 'deck/new-theme', ok: true, path: made.path, name: made.name } : { type: 'deck/new-theme', ok: false, problem: made.problem });
         return;
       }

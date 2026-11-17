@@ -67,7 +67,7 @@ export function NewThemeSheet({ deckTheme, deckName, slide, assets, borderless, 
     setProblem(null)
     sendToExtension('deck/new-theme', { name: name.trim(), start, use })
   }
-  const shown = problem ?? (name.trim() ? local : null)
+  const shown = problem ?? local
   return (
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DialogContent

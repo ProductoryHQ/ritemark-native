@@ -178,7 +178,7 @@ test('the name rule: what a file name holds, no duplicate, nothing a deck\'s lin
   assert.ok(themeNameProblem('x'.repeat(61)));
   assert.equal(themeNameProblem('x'.repeat(60)), null);
   const taken = { names: ['Evening', 'Fernhollow Bank'], files: ['Fern.theme.md'] };
-  assert.match(newThemeNameProblem('evening', taken) ?? '', /There's a theme called evening already/);
+  assert.match(newThemeNameProblem('evening', taken) ?? '', /There's a theme called Evening already/, 'named as the project has it');
   assert.ok(newThemeNameProblem('FERN', taken), 'a file of that name, in any case');
   assert.equal(newThemeNameProblem('Harbour', taken), null);
   assert.equal(nextThemeName('Evening', taken), 'Evening 2');
@@ -202,6 +202,8 @@ test('colours: #RRGGBB in capitals from what is typed; the tab sends only fields
 
 test('the tab\'s requests: exact fields, or dropped', () => {
   assert.deepEqual(decodeThemeRequest({ type: 'theme/ready' }), { type: 'theme/ready' });
+  assert.deepEqual(decodeThemeRequest({ type: 'theme/undo' }), { type: 'theme/undo' });
+  assert.deepEqual(decodeThemeRequest({ type: 'theme/redo' }), { type: 'theme/redo' });
   assert.deepEqual(decodeThemeRequest({ type: 'theme/set', changes: { round: 'soft' } }), { type: 'theme/set', changes: { round: 'soft' } });
   assert.deepEqual(decodeThemeRequest({ type: 'theme/save-as', name: 'Evening 2', use: true }), { type: 'theme/save-as', name: 'Evening 2', use: true });
   assert.deepEqual(decodeThemeRequest({ type: 'theme/open-deck', path: 'Talks/Harbour.deck.md' }), { type: 'theme/open-deck', path: 'Talks/Harbour.deck.md' });

@@ -27,7 +27,13 @@
 .theme-bar > .theme-notice { flex: 0 1 auto; margin-left: 0; margin-right: 8px; }
 .theme-bar .deck-saved { margin-right: 4px; }
 /* The prototype's `.saved.no`: amber ink, as the draft's mark (frame 18) */
-.theme-tab .theme-bar .theme-not-saved { color: #92400E; font-weight: 500; }
+.theme-tab .theme-bar .theme-not-saved { display: inline-flex; align-items: baseline; white-space: nowrap; color: #92400E; font-weight: 500; }
+/* "Not saved. Saving changes 2 decks." (the Experience lead, 17 November): the count is a link in the line's own ink that
+   opens the decks' list */
+.theme-tab .theme-bar .theme-saving-count { height: auto; margin: 0 0 0 .3em; padding: 0; gap: 0; border: 0; font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 2px; background: transparent; }
+/* In a dark Ritemark the prototype's amber ink is too dark to read: a lighter amber */
+body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contrast .theme-tab .theme-bar .theme-not-saved { color: #FBBF24; }
+.theme-tab .theme-bar .theme-saving-count:hover, .theme-tab .theme-bar .theme-saving-count[data-state="open"] { background: transparent; color: inherit; text-decoration-thickness: 2px; }
 
 .theme-menu-two { display: flex; flex-direction: column; gap: 1px; }
 .theme-menu-two > span { font-size: 12px; color: var(--r-ink-muted); }
@@ -83,8 +89,9 @@
   margin: 10px 0 0;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--r-success-soft);
-  color: var(--r-success);
+  /* In ink on a quiet surface: green is only the ready dot (the Experience lead's framework §3, greenIsTheReadyDot) */
+  background: var(--r-surface-muted);
+  color: var(--r-ink-body);
   font-size: 12.5px;
   line-height: 18px;
 }

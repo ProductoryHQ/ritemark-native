@@ -42,7 +42,8 @@ PR 1 goes first, because it moves "This deck" and touches the bar. After it, PR 
 - **In the tab:** the four colours (a palette swatch and a hex code each), Soft light in a corner, the contrast line (text and headings against the background, 4.5 to 1), Corners and Boxes, and six of the deck's slides as Card or Borderless. No fonts or logo yet (PR 3, PR 4).
 - **The Theme menu** has Edit <Name> (not for the built-in Evening while the project has no Evening file) and New theme… (a copy of the deck's theme, Paper or Ember, "Use it in this deck" ticked).
 - **The name rule** (for the Experience lead): a new theme's name is its file's name. It may not be a name or file another theme in the project has (Evening included), in any case; it holds no / \ : * ? " < > | #, starts with a letter or digit, doesn't end with a full stop, and has at most 60 characters. A name that breaks it is refused with the reason; nothing is renamed for you. Save as a new theme… offers "<Name> 2".
-- **Not in it:** the close question lists no decks (VS Code's own question; a list needs a patch, so a shell change). The tab's icon is the document's.
+- **The Experience lead (17 November):** the draft bar says what Save will do ("Not saved. Saving changes 2 decks.", the count opens the decks' list); a theme file and its tab show Lucide's palette (the file icon theme's `theme.md`); a refused name says why under the field as it is typed, and Make the theme stays disabled with the reason as its tooltip. Cmd+Z in the tab steps the draft back.
+- **The close question** is VS Code's own, without the list of decks: accepted for 2.3 (the Experience lead, 17 November), no patch.
 
 ## Not in the sprint
 Charts, image styles, custom CSS, per-slide themes, type sizes per level, a library shared across projects, and Gamma import (a Gamma look comes via a PDF or screenshots).

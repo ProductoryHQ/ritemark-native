@@ -15,6 +15,9 @@ export type ThemeRequest =
   | { type: 'theme/save' }
   /** Discard: the draft goes, and the tab shows the file as it is. */
   | { type: 'theme/discard' }
+  /** Cmd+Z and Cmd+Shift+Z in the tab: the draft's own last change taken back, or put back. */
+  | { type: 'theme/undo' }
+  | { type: 'theme/redo' }
   /** Save as a new theme…: the draft goes into a new file by this name; this theme and its decks stay as they were. */
   | { type: 'theme/save-as'; name: string; use: boolean }
   /** "Used by N decks": open this deck (a project path). */
@@ -73,6 +76,8 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/ready':
     case 'theme/save':
     case 'theme/discard':
+    case 'theme/undo':
+    case 'theme/redo':
       exactKeys(input, ['type']);
       return { type: input.type };
     case 'theme/set':

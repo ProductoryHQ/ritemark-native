@@ -53,6 +53,10 @@ interface SavedTheme {
 }
 
 const RITEMARK_EDITOR = 'ritemark.editor';
+/** How long a theme's Save mark holds (a Save that failed never ends it). */
+const SAVE_MARK_MS = 5000;
+/** At most this many steps of a draft's own Undo. */
+const MAX_UNDO = 100;
 
 /** The folder a theme or a deck at `fsPath` belongs to: its project folder, or null outside one. */
 function rootOf(fsPath: string): string | null {
@@ -77,11 +81,17 @@ export class ThemePages implements vscode.Disposable {
   private readonly pendingNotice = new Map<string, string>();
   /** Theme documents whose Save is the Undo of a Save, by URI. */
   private readonly undoing = new Set<string>();
-  /** Theme documents being saved, by URI, from VS Code's will-save to its did-save. */
-  private readonly saving = new Set<string>();
+  /**
+   * Theme documents being saved, by URI, from VS Code's will-save to its did-save, with the time it started: a Save that
+   * fails never says it's done, so a mark older than a few seconds no longer counts.
+   */
+  private readonly saving = new Map<string, number>();
+  /** The draft's own Undo and Redo (Cmd+Z in the tab): the texts it had, by URI. */
+  private readonly history = new Map<string, { undo: string[]; redo: string[] }>();
   /** Each theme document's requests, one after another, by URI. */
   private readonly queues = new Map<string, Promise<void>>();
   private readonly subscriptions: vscode.Disposable[] = [];
+  private decksTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly library: () => DeckLibrary | null, private readonly decks: DeckPages) {
     this.subscriptions.push(
@@ -95,10 +105,12 @@ export class ThemePages implements vscode.Disposable {
       // A Save of a theme is `saved`'s: the file's text before it is what the notice's Undo puts back, so the watcher
       // leaves the file's text alone until `saved` has taken it.
       vscode.workspace.onWillSaveTextDocument(event => {
-        if (this.hasView(event.document)) this.saving.add(event.document.uri.toString());
+        if (this.hasView(event.document)) this.saving.set(event.document.uri.toString(), Date.now());
       }),
       vscode.workspace.onDidSaveTextDocument(document => {
         this.saving.delete(document.uri.toString());
+        // A deck saved (its `theme:` line, New theme…'s pick): the open themes' "Used by" and preview follow.
+        if (document.uri.scheme === 'file' && /\.deck\.md$/i.test(document.uri.fsPath)) this.decksChanged();
         const views = [...this.views].filter(view => view.document === document);
         if (views.length > 0) void this.saved(document, views);
       }),
@@ -119,6 +131,11 @@ export class ThemePages implements vscode.Disposable {
     this.subscriptions.push(watcher, watcher.onDidChange(changed), watcher.onDidCreate(changed), watcher.onDidDelete(changed), {
       dispose: () => { for (const timer of timers.values()) clearTimeout(timer); },
     });
+  }
+
+  private isSaving(key: string): boolean {
+    const started = this.saving.get(key);
+    return started !== undefined && Date.now() - started < SAVE_MARK_MS;
   }
 
   private hasView(document: vscode.TextDocument): boolean {
@@ -142,13 +159,19 @@ export class ThemePages implements vscode.Disposable {
   private async fileChanged(uri: vscode.Uri): Promise<void> {
     const key = uri.toString();
     const document = [...this.views].find(view => view.document.uri.toString() === key)?.document;
-    if (document && !this.saving.has(key)) {
+    if (document && !this.isSaving(key)) {
       const text = await this.readDisk(document);
-      if (text !== null && !this.saving.has(key)) this.diskTexts.set(key, text);
+      if (text !== null && !this.isSaving(key)) this.diskTexts.set(key, text);
     }
     const root = rootOf(uri.fsPath);
     const relative = root ? projectRelative(root, uri.fsPath) : null;
     if (relative) await this.decks.themeFilesChanged(relative);
+  }
+
+  /** The open theme tabs read their decks again, once the decks' saves have settled. */
+  private decksChanged(): void {
+    clearTimeout(this.decksTimer);
+    this.decksTimer = setTimeout(() => { for (const view of this.views) void this.postDecks(view); }, 200);
   }
 
   /**
@@ -186,6 +209,7 @@ export class ThemePages implements vscode.Disposable {
         if (![...this.views].some(other => other.document === document)) {
           this.diskTexts.delete(uri);
           this.saves.delete(uri);
+          this.history.delete(uri);
         }
       },
     };
@@ -225,7 +249,20 @@ export class ThemePages implements vscode.Disposable {
       // Each of these changes the document or the file: one at a time, each from the text the one before left.
       case 'theme/set': {
         const changes = request.changes;
-        await this.queue(document, () => this.change(view, themeTextWith(document.getText(), changes)));
+        await this.queue(document, () => this.change(view, themeTextWith(document.getText(), changes), 'edit'));
+        return;
+      }
+      // Cmd+Z and Cmd+Shift+Z in the tab: the draft's own steps (the editor's Undo keys do nothing in a theme's tab).
+      case 'theme/undo':
+      case 'theme/redo': {
+        const back = request.type === 'theme/undo';
+        await this.queue(document, async () => {
+          const steps = this.stepsOf(document);
+          const text = (back ? steps.undo : steps.redo).pop();
+          if (text === undefined) return;
+          (back ? steps.redo : steps.undo).push(document.getText());
+          await this.change(view, text, 'history');
+        });
         return;
       }
       case 'theme/save':
@@ -258,13 +295,26 @@ export class ThemePages implements vscode.Disposable {
    * The draft becomes `text`: one edit of the document, for the lines that differ. A draft changed back to the file's
    * own text is no draft: the document goes back to the file, and its dot goes.
    */
-  private async change(view: ThemeView, text: string): Promise<void> {
+  private async change(view: ThemeView, text: string, kind: 'edit' | 'history'): Promise<void> {
     const document = view.document;
     const current = document.getText();
     if (text === current) return;
+    if (kind === 'edit') {
+      const steps = this.stepsOf(document);
+      steps.undo.push(current);
+      if (steps.undo.length > MAX_UNDO) steps.undo.shift();
+      steps.redo.length = 0;
+    }
     // The file as it is now, not as it was when the tab opened: a writer may have changed it since.
     if (document.isDirty && text === (await this.readDisk(document)) && (await this.revert(view))) return;
     await replaceText(document, text);
+  }
+
+  private stepsOf(document: vscode.TextDocument): { undo: string[]; redo: string[] } {
+    const key = document.uri.toString();
+    let steps = this.history.get(key);
+    if (!steps) this.history.set(key, steps = { undo: [], redo: [] });
+    return steps;
   }
 
   /** Discard: the document goes back to the file. */
@@ -281,8 +331,16 @@ export class ThemePages implements vscode.Disposable {
    * is the active editor (the command reverts the active one), which it is while the person works in it.
    */
   private async revert(view: ThemeView): Promise<boolean> {
-    const active = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-    if (!(active instanceof vscode.TabInputCustom) || active.uri.toString() !== view.document.uri.toString() || !view.panel.active) return false;
+    const isActive = () => {
+      const active = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+      return active instanceof vscode.TabInputCustom && active.uri.toString() === view.document.uri.toString() && view.panel.active;
+    };
+    // The focus may have moved meanwhile (a sheet, another group): the tab is brought forward first.
+    if (!isActive()) {
+      view.panel.reveal(view.panel.viewColumn, false);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!isActive()) return false;
     await vscode.commands.executeCommand('workbench.action.files.revert');
     return !view.document.isDirty;
   }
@@ -457,7 +515,12 @@ export class ThemePages implements vscode.Disposable {
     this.origins.set(keyOf(made.absolute), deck.uri.fsPath);
     if (request.use) this.decks.useTheme(deck.uri.fsPath, made.relative, made.name);
     this.pendingNotice.set(keyOf(made.absolute), `${made.name} is in Slide library › Themes.${request.use ? ` ${deckName(projectRelative(root, deck.uri.fsPath)!)} uses it.` : ''}`);
-    await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(made.absolute), RITEMARK_EDITOR, { preview: false });
+    try {
+      await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(made.absolute), RITEMARK_EDITOR, { preview: false });
+    } catch (error) {
+      // The theme is made either way; its tab can be opened from Documents or the menu's Edit.
+      console.warn('[Themes] Could not open the new theme:', error);
+    }
     return { ok: true, path: made.relative, name: made.name };
   }
 
@@ -486,7 +549,7 @@ export class ThemePages implements vscode.Disposable {
     let source: { path: string | null; text: string; folder: string | null } | null = null;
     if (originPath && root) {
       const relative = projectRelative(root, originPath);
-      const open = vscode.workspace.textDocuments.find(entry => keyOf(entry.uri.fsPath) === keyOf(originPath));
+      const open = vscode.workspace.textDocuments.find(entry => entry.uri.scheme === 'file' && keyOf(entry.uri.fsPath) === keyOf(originPath));
       const text = open?.getText() ?? (relative && library ? await library.readDeckText(relative) : null);
       if (relative && text !== null) source = { path: relative, text, folder: path.dirname(originPath) };
     }
@@ -536,6 +599,7 @@ export class ThemePages implements vscode.Disposable {
   }
 
   dispose(): void {
+    clearTimeout(this.decksTimer);
     for (const subscription of this.subscriptions) subscription.dispose();
     this.views.clear();
   }
