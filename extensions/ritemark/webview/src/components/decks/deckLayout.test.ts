@@ -26,7 +26,7 @@ Object.assign(globalThis, {
 
 const {
   ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_STAGE_ROOM, rowsUnder, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
-  BIG_MAX, ORIENTATION_HYSTERESIS, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, slideWidthFor,
+  BIG_MAX, ORIENTATION_HYSTERESIS, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, slideWidthFor,
 } = await import('./deckLayout')
 const { deckViewState, keepDeckViewState, keepFold } = await import('./DeckFolds')
 const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
@@ -104,6 +104,13 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(slideWidthFor(1000, 20, true), 0, 'never negative')
   // A row still under the slide (today the speaker notes', 48 px with its margin), measured from the stage as drawn:
   // the slide shrinks so the stage fits its pane, never overflowing it. With no row, it is the pane less 32 again.
+  // Slide only fills the room (Jarmo, 17 November: "align slide to center... and fill the space"): his ~2000 px
+  // window, the AI folded, the strip open: no 900 cap; bound by the height on a wide room, by the width on a tall one.
+  assert.equal(fullSlideWidthFor(1810, 860), Math.floor(((860 - ABOVE_STAGE_ROOM) * 16) / 9), 'a wide room: the height binds')
+  assert.ok(fullSlideWidthFor(1810, 860) > BIG_MAX, 'past the side-by-side cap')
+  assert.equal(fullSlideWidthFor(700, 900), 700 - 48, 'a tall room: the width binds')
+  assert.equal(fullSlideWidthFor(1810, 860, 40), Math.floor(((860 - ABOVE_STAGE_ROOM - 40) * 16) / 9), 'a row under it')
+  assert.equal(fullSlideWidthFor(30, 20), 0, 'never negative')
   assert.equal(rowsUnder(16 + 358 + 48 + 16, 358), 48, 'the notes row, measured')
   assert.equal(rowsUnder(16 + 358 + 16, 358), 0, 'no row')
   assert.equal(rowsUnder(300, 358), 0, 'never negative')

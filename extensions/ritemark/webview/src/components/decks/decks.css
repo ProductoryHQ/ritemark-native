@@ -60,6 +60,10 @@
    The deck view sets the top and the height of each. */
 .deck-stage.is-above { bottom: auto; align-items: center; }
 .deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
+/* Slide only: the slide fills the room and sits in its middle, both ways (Jarmo, 17 November). The 16 above and under
+   it are the 32 `fullSlideWidthFor` keeps, as above. */
+.deck-stage.is-alone { align-items: center; }
+.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }

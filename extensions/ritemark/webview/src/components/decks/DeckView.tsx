@@ -62,7 +62,7 @@ import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, type DeckFold, type DeckViewMode } from './DeckFolds'
-import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import './decks.css'
 
@@ -510,9 +510,12 @@ export function DeckView({
   // Above, the slide takes its pane's height less 32 and less whatever row is still under it (today the speaker notes'),
   // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
   const [aboveUnder, setAboveUnder] = useState(0)
-  const bigWidth = slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  // Slide only gives the slide the whole room (the design; Jarmo, 17 November: "align slide to center... and fill the
+  // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap.
+  const slideAlone = slideShown && !handoutShown
+  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, aboveUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
   useLayoutEffect(() => {
-    if (!above) return
+    if (!above && !slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
     const big = group?.querySelector<HTMLElement>('.deck-big')
     if (!group || !big) return
@@ -1535,11 +1538,12 @@ export function DeckView({
         {slideShown ? (
           <div
             ref={stageRef}
-            className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}`}
+            className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}${slideAlone ? ' is-alone' : ''}`}
             style={above ? { left: stripWidth, width: stageWidth, height: stageHeight } : { left: stripWidth, width: stageWidth }}
           >
-            {/* Above, the slide is centred over the handout's column: the group is the slide's own width. */}
-            <div className="deck-stage-group" style={above ? { width: bigWidth + STAGE_MARGIN * 2 } : undefined}>
+            {/* Above, the slide is centred over the handout's column, and alone in the room: the group is the slide's
+                own width. */}
+            <div className="deck-stage-group" style={above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 } : undefined}>
               {editor && slide && bigWidth > 0 ? (
                 <Stage
                   // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
