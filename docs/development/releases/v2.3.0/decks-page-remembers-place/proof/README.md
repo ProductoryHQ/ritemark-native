@@ -10,7 +10,7 @@ A screenshot doesn't include the browser's address bar, so each shot has a black
 | `2-fresh-open-returns-to-part-4-1440x900` | The bare address opened again: the page returns to part 4, the address becomes `#4`, and "Start from the beginning" shows in the bar. |
 | `3-link-opens-part-2-1440x900` | A `#2` link opened while part 4 was kept: part 2 opens, with no notice, and part 2 is now the kept place. |
 | `4-address-follows-part-4-390x844` | Shot 1 on a phone. |
-| `5-fresh-open-returns-to-part-4-390x844` | Shot 2 on a phone. The client's name gets an ellipsis while the notice shows. |
+| `5-fresh-open-returns-to-part-4-390x844` | Shot 2 on a phone (under 600 px): the notice is a pill at the bottom centre, above the safe area, and the bar keeps the client's name whole. The proof strip is at the top in this shot, so the pill can be seen. |
 | `6-link-opens-part-2-390x844` | Shot 3 on a phone. |
 
 Also checked in the same browser, without shots:

@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, PAGE_CSP, handoutHtml, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, PAGE_CSP, PAGE_CSS, handoutHtml, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -101,6 +101,17 @@ assert.equal(root.querySelector('#text')!.getAttribute('data-place')!.replace('r
 const restart = root.querySelector('.top #restart')!;
 assert.equal(restart.text, 'Start from the beginning');
 assert.ok(restart.hasAttribute('hidden') && restart.getAttribute('type') === 'button');
+// Under 600 px the notice leaves the bar (the client's name stays whole): a pill at the bottom centre, above the safe area.
+{
+  const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS);
+  assert.ok(phone, 'the page has a phone rule for the notice');
+  const pill = /\.restart \{([^}]*)\}/.exec(phone![1])![1];
+  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(16px + env(safe-area-inset-bottom, 0px))', 'border-radius: 18px']) assert.ok(pill.includes(rule), rule);
+  // The bar's backdrop filter would make it the pill's containing block (the pill would sit in the bar): none there.
+  assert.match(phone![1], /\.top \{[^}]*backdrop-filter: none/);
+  // At 600 px and up it stays in the bar.
+  assert.ok(!/\.restart \{[^}]*position: fixed/.test(PAGE_CSS.replace(phone![0], '')), 'only the phone rule takes it out of the bar');
+}
 // A prompt that shows a comment shows it as words.
 assert.ok(html.includes('&lt;!-- a prompt that shows a comment stays as written --&gt;'));
 

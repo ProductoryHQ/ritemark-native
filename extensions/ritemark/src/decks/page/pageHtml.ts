@@ -508,6 +508,14 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
   .toc { top: 60px; }
   body.bl .stage { border-right: 0; padding-right: 16px; }
 }
+/* On a phone (the decks README, small details 7): the notice leaves the bar, so the client's name stays whole, and is a
+   small pill at the bottom centre, above the safe area. Same 5 s, same hold. */
+@media (max-width: 599px) {
+  /* The bar's blur would hold a fixed child inside the bar; under it on a phone is the slide's white band anyway. */
+  .top { -webkit-backdrop-filter: none; backdrop-filter: none; background: #fff; }
+  .restart { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 35; height: 36px; padding: 0 16px; border-radius: 18px; background: #fff; color: var(--ink); font: 600 13.5px/36px 'Sofia Sans', sans-serif; box-shadow: 0 0 0 1px var(--line), 0 10px 26px -10px rgba(28,31,74,.45); }
+  .restart:hover { background: #fff; color: var(--ink); }
+}
 @media (prefers-reduced-motion: reduce) {
   .layer, .layer.on, body.bl .layer, body.bl .layer.on, .bar i, .part, .sect > * { transition: none; }
 }
