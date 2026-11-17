@@ -27,8 +27,10 @@ import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, moveBlock, nearestGap, plusSpot, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box, type ChosenBlock,
+  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, ringGap, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box,
+  type ChosenBlock,
 } from './blockBar'
+import { caretBoxPos, markableBox } from './slideDivView'
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers' }
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item' }
@@ -42,6 +44,8 @@ export interface SlideBlockBarProps {
   apply: (tr: Transaction | null) => boolean
   /** A new Steps block's label: the deck's last (as the / menu's Steps). */
   stepsLabel: () => string | null
+  /** The icon handle was pressed: open the grid of icons for the box at `pos`, under `anchor` (as a click on an icon). */
+  pickIcon?: (pos: number, anchor: HTMLElement, current: string | null) => void
 }
 
 /** Where the chosen block and its parts are, in the frame. */
@@ -55,12 +59,15 @@ interface Placed {
   markerX: number | null
   /** The slide's pane on the screen: the bar stays inside it. */
   pane: { left: number; right: number }
+  /** The icon handle: on the caret's box while it has no icon (its empty place is drawn), at its spot in the frame. */
+  icon: { pos: number; left: number; top: number } | null
 }
 
 function samePlace(a: Placed, b: Placed): boolean {
   const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
   return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
     && a.markerX === b.markerX && a.pane.left === b.pane.left && a.pane.right === b.pane.right && JSON.stringify(a.lines) === JSON.stringify(b.lines)
+    && JSON.stringify(a.icon) === JSON.stringify(b.icon)
 }
 
 function boxIn(rect: DOMRect, origin: DOMRect): Box {
@@ -132,7 +139,25 @@ function Group({ label, options, folded }: { label: string; options: Option[]; f
   )
 }
 
-export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: SlideBlockBarProps) {
+/**
+ * Lucide's `smile-plus` (ISC licence, © Lucide Contributors; portions © Cole Bemis, Feather, MIT), drawn inline: the
+ * icon handle says "add an icon", not "add an item" (the Experience lead's follow-up to #773). Phosphor has no such
+ * glyph, and the app has no Lucide package.
+ */
+function SmilePlusGlyph() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 11v1a10 10 0 1 1-9-10" />
+      <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      <line x1="9" x2="9.01" y1="9" y2="9" />
+      <line x1="15" x2="15.01" y1="9" y2="9" />
+      <path d="M16 5h6" />
+      <path d="M19 2v6" />
+    </svg>
+  )
+}
+
+export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIcon }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
@@ -185,7 +210,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     }
     const paneRect = (frame.closest('.deck-stage') as HTMLElement | null)?.getBoundingClientRect()
     const pane = paneRect ? { left: paneRect.left, right: paneRect.right } : { left: 0, right: window.innerWidth }
-    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane }
+    // The caret's box shows the icon handle while it has no icon: its view draws the empty place (hidden on the stage)
+    // only then, and only under the looks that draw icons.
+    let icon: Placed['icon'] = null
+    const boxPos = block.kind === 'boxes' ? caretBoxPos(editor.state) : null
+    const box = boxPos === null ? null : markableBox(editor.view.nodeDOM(boxPos) as HTMLElement | null)
+    if (boxPos !== null && box && dom.contains(box) && box.querySelector(':scope > .blk-icon.is-place')) {
+      const rect = box.getBoundingClientRect()
+      const scale = box.offsetWidth ? rect.width / box.offsetWidth : 1
+      icon = { pos: boxPos, ...iconSpot(boxIn(rect, origin), scale) }
+    }
+    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, icon }
     // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
     setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
@@ -359,7 +394,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
   const hidden: CSSProperties = drag ? { visibility: 'hidden' } : {}
   const handleStyle = (spot: { left: number; top: number }): CSSProperties => ({ left: spot.left, top: spot.top, width: HANDLE_SIZE, height: HANDLE_SIZE, ...hidden })
   // The ring keeps 8 px from the words: a box has its own padding, so a Boxes block's ring sits closer.
-  const ring = chosen.kind === 'boxes' ? 4 : 8
+  const ring = ringGap(chosen.kind)
 
   return (
     <>
@@ -377,6 +412,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
             <Tooltip label={ADD_LABEL[chosen.kind]} suppressed={!!drag}>
               <Button variant="outline" className="deck-block-plus" style={handleStyle(plus)} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
                 <Icon name="plus" size={12} tone="inherit" />
+              </Button>
+            </Tooltip>
+          ) : null}
+          {placed.icon && pickIcon ? (
+            <Tooltip label="Add an icon" suppressed={!!drag}>
+              <Button
+                variant="outline"
+                className="deck-block-icon"
+                style={handleStyle(placed.icon)}
+                aria-label="Add an icon"
+                onMouseDown={event => event.preventDefault()}
+                onClick={event => { if (placed.icon) pickIcon(placed.icon.pos, event.currentTarget, null) }}
+              >
+                <SmilePlusGlyph />
               </Button>
             </Tooltip>
           ) : null}

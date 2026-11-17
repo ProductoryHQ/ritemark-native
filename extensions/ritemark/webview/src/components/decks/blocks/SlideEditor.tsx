@@ -885,7 +885,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             </Tooltip>
           ))}
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
-          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} />
+          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} pickIcon={divHandlers.pickIcon} />
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />

@@ -172,7 +172,12 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.equal(caretBoxPos(EditorState.create({ doc, selection: TextSelection.create(doc, inTitle + 1) })), null, 'in the title: no box')
   const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(css.includes('.deck-sl.is-blocks.is-editing .blk-icon.is-place { display: none; }'), 'hidden on every box')
-  assert.ok(new RegExp(`\\.blk-box\\.${CARET_CLASS} > \\.blk-icon\\.is-place \\{ display: grid; position: absolute;`).test(css), 'shown on the edited box, over its edge, taking no room')
+  // The lead's follow-up to #773: the place is never drawn on the slide; the caret's box shows the icon handle in the
+  // handles' layer (SlideBlockBar), so the box takes no room for it.
+  assert.ok(!new RegExp(`\\.blk-box\\.${CARET_CLASS} > \\.blk-icon\\.is-place \\{ display: grid`).test(css), 'never drawn on the edited box either')
+  assert.ok(/\.deck-slide \.deck-block-icon \{ position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 50%; background: var\(--r-surface\);/.test(css), 'a white handle like the +')
+  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  assert.ok(bar.includes('<Tooltip label="Add an icon"') && bar.includes('<SmilePlusGlyph />') && bar.includes("querySelector(':scope > .blk-icon.is-place')"), 'the handle: its tooltip, its glyph, only while the box has no icon')
 }
 
 // Words are never split mid-word on a slide, in boxes, steps, columns and cells; a web address may still break. A

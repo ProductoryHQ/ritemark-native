@@ -13,8 +13,8 @@
  *    that kind: ⌘Z brings it back. A comment on an item stays with it, or with the block where the kind has no room.
  *  - **Boxes:** Width (`width`), Style (`fill`), alignment (`align`): one value each on the block's own line
  *    (`setBlockValue`, `withFenceValue`), none is the default.
- *  - **Columns:** the count (2, 3, 4): a new column comes empty; a column taken away gives its words to the last column
- *    kept, so nothing typed is lost. Remove a column (frame 23) takes the caret's column and its words away, as Delete
+ *  - **Columns:** the count (2, 3, 4): a new column comes empty; a lower count takes an empty column first, wherever it
+ *    stands, and with none empty the last column's words join the one before it, so nothing typed is lost. Remove a column (frame 23) takes the caret's column and its words away, as Delete
  *    block takes the block's. The split: the line between two columns snaps to ⅓, ½ and ⅔ of the two, and is written as
  *    each column's `width` on its own line (`::: {.column width="33%"}`, Pandoc's and Quarto's form).
  *  - **Add, the +, Delete and the ⋮ drag.** A comment note before the block moves with it; Delete keeps the block's
@@ -379,9 +379,18 @@ function withoutWidths(tr: Transaction, pos: number): void {
   }
 }
 
+/** A column with no words in it: every line empty. A comment is words, so a column holding one is not empty. */
+function isEmptyColumn(column: PMNode): boolean {
+  let empty = true
+  column.forEach(child => { if (!isEmptyText(child)) empty = false })
+  return empty
+}
+
 /**
- * The count (2, 3, 4): new columns come empty; columns taken away give their words to the last column kept (an
- * empty column gives nothing, so no empty places pile up). The split goes back to even. Null when nothing changes.
+ * The count (2, 3, 4): new columns come empty. A lower count takes an empty column first, wherever it stands (the last
+ * empty one when there are several); with none empty, the last column's words join the one before it, so nothing typed
+ * is lost. So removing one particular column is: delete its words, then lower the count (the Experience lead,
+ * 17 November). The split goes back to even. Null when nothing changes.
  */
 export function setColumnCount(state: EditorState, pos: number, count: number): Transaction | null {
   const block = blockAt(state, pos)
@@ -394,14 +403,22 @@ export function setColumnCount(state: EditorState, pos: number, count: number): 
     const end = pos + block.node.nodeSize - 1
     tr.insert(end, Array.from({ length: count - columns.length }, () => emptyColumn(schema)))
   } else {
-    const kept = columns[count - 1]
-    const moved: PMNode[] = []
-    for (const column of columns.slice(count)) column.node.forEach(child => { if (!isEmptyText(child)) moved.push(child) })
-    // From the last column back, so the places before them stay as they are.
-    for (const column of columns.slice(count).reverse()) tr.delete(column.pos, column.pos + column.node.nodeSize)
-    if (moved.length) {
+    // One column at a time, on the document as it is now.
+    for (let left = columns.length - count; left > 0; left -= 1) {
+      const now = columnsOf(tr.doc.nodeAt(pos)!, pos)
+      const empty = now.map(column => isEmptyColumn(column.node)).lastIndexOf(true)
+      if (empty >= 0) {
+        tr.delete(now[empty].pos, now[empty].pos + now[empty].node.nodeSize)
+        continue
+      }
+      const last = now[now.length - 1]
+      const kept = now[now.length - 2]
+      const moved: PMNode[] = []
+      last.node.forEach(child => { if (!isEmptyText(child)) moved.push(child) })
       const own: PMNode[] = []
       kept.node.forEach(child => { if (!isEmptyText(child)) own.push(child) })
+      // The last column first, so the place of the one before it stays as it is.
+      tr.delete(last.pos, last.pos + last.node.nodeSize)
       tr.replaceWith(kept.pos, kept.pos + kept.node.nodeSize, kept.node.type.create(kept.node.attrs, [...own, ...moved]))
     }
   }
@@ -586,20 +603,37 @@ export function gripSpot(block: Box): { left: number; top: number } {
   return { left: Math.max(0, block.left - HANDLE_SIZE - 4), top: Math.max(0, block.top) }
 }
 
+/** The accent ring's line, drawn just outside the ring's box (a 2 px box-shadow). */
+export const RING_LINE = 2
+
+/** How far the ring stands off the block: 8 px from the words; a box has its own padding, so Boxes' ring sits closer. */
+export function ringGap(kind: BarKind): number {
+  return kind === 'boxes' ? 4 : 8
+}
+
 /**
  * The round + (the Experience lead on #773: it never covers words): on the right edge's middle of a row of boxes or
- * columns; on a list's or Steps' bottom edge, under its numbers or bullets (`markerX`, their middle), where the new
- * item appears.
+ * columns; on a list's or Steps' bottom, under its numbers or bullets (`markerX`, their middle), where the new item
+ * appears, centred on the ring's bottom line (the lead's follow-up to #773), so it clears the last bullet.
  */
 export function plusSpot(block: Box, kind: BarKind, markerX: number | null = null): { left: number; top: number } {
   if (kind === 'boxes' || kind === 'columns') return { left: block.left + block.width - HANDLE_SIZE / 2, top: block.top + block.height / 2 - HANDLE_SIZE / 2 }
   const x = markerX ?? block.left
-  return { left: Math.max(0, x - HANDLE_SIZE / 2), top: block.top + block.height - HANDLE_SIZE / 2 }
+  return { left: Math.max(0, x - HANDLE_SIZE / 2), top: block.top + block.height + ringGap(kind) + RING_LINE / 2 - HANDLE_SIZE / 2 }
 }
 
-/** How far under the block the bar starts: clear of a + on its bottom edge (lists and Steps), with a gap. */
+/** How far under the block the bar starts: clear of a + on the ring's bottom line (lists and Steps), with a gap. */
 export function barGap(kind: BarKind): number {
-  return kind === 'boxes' || kind === 'columns' ? 8 : HANDLE_SIZE / 2 + 8
+  return kind === 'boxes' || kind === 'columns' ? 8 : ringGap(kind) + RING_LINE / 2 + HANDLE_SIZE / 2 + 8
+}
+
+/**
+ * A box's icon handle (frame 4; the lead's follow-up to #773): a handle the ⋮'s and the +'s size, centred on the box's
+ * top edge, its right side 12 px of the slide in from the box's right, where the icon place was. `scale` is the
+ * slide's on the screen.
+ */
+export function iconSpot(box: Box, scale: number): { left: number; top: number } {
+  return { left: box.left + box.width - 12 * scale - HANDLE_SIZE, top: box.top - HANDLE_SIZE / 2 }
 }
 
 /**
