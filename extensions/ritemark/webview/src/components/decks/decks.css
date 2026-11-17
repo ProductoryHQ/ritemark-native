@@ -378,6 +378,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 
 /* The block's bar (experience 46, 17 November; `blocks/SlideBlockBar.tsx`). The handles sit over the slide in its
    frame, at the chosen block's place, the page's size at any stage size; the bar is in the page (frame 29). */
+.deck-block-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.deck-block-layer > * { pointer-events: auto; }
 .deck-block-ring { position: absolute; z-index: 3; border-radius: 8px; box-shadow: 0 0 0 2px var(--r-accent); pointer-events: none; }
 .deck-slide .deck-block-grip { position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, .3); cursor: grab; touch-action: none; }
 .deck-slide .deck-block-grip:active { cursor: grabbing; }

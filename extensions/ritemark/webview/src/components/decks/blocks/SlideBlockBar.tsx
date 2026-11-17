@@ -53,6 +53,12 @@ interface Placed {
   lines: { x: number; left: number; right: number }[]
 }
 
+function samePlace(a: Placed, b: Placed): boolean {
+  const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
+  return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
+    && JSON.stringify(a.lines) === JSON.stringify(b.lines)
+}
+
 function boxIn(rect: DOMRect, origin: DOMRect): Box {
   return { left: rect.left - origin.left, top: rect.top - origin.top, width: rect.width, height: rect.height }
 }
@@ -101,7 +107,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
       chosenKey.current = key
       if (block && editor.isFocused) setOpen(true)
     }
-    setChosen(block)
+    setChosen(current => (current && block && current.pos === block.pos && current.node === block.node ? current : block))
     const dom = block ? (editor.view.nodeDOM(block.pos) as HTMLElement | null) : null
     if (!block || !dom || typeof dom.getBoundingClientRect !== 'function') { setPlaced(null); return }
     const origin = frame.getBoundingClientRect()
@@ -115,7 +121,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
         lines.push({ x: b.left - origin.left, left: a.left, right: b.right })
       }
     }
-    setPlaced({ block: boxIn(screen, origin), screen, lines })
+    const next: Placed = { block: boxIn(screen, origin), screen, lines }
+    // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
+    setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
 
   useEffect(() => {
@@ -161,9 +169,11 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
     const left = Math.max(8, Math.min(placed.screen.left, window.innerWidth - width - 8))
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
-  })
+    // Again only when the block moves or the bar's contents change (its width): never on its own update.
+  }, [showing, placed, chosen?.node, chosen?.kind])
 
-  if (!editor || !chosen || !placed) return null
+  if (!editor || !chosen || !placed) return <div className="deck-block-layer" />
+
   const run = (tr: Transaction | null) => { apply(tr); editor.view.focus() }
   const state = editor.state
   const attrs = divAttributesOf(chosen.node)
@@ -266,7 +276,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
 
   return (
     <>
-      {showing ? (
+      {/* A layer of its own, always there: the frame's other children move (the bubble menu goes to the page), so
+          React never inserts the handles before a node that has left the frame (the app run: insertBefore failed). */}
+      <div className="deck-block-layer">{showing ? (
         <>
           <div className="deck-block-ring" style={{ left: block.left - 4, top: block.top - 4, width: block.width + 8, height: block.height + 8 }} aria-hidden="true" />
           <Tooltip label="Drag to move the block on the slide">
@@ -296,7 +308,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel }: Slide
           {drag?.kind === 'move' ? <div className="deck-block-drop" style={{ left: drag.left, top: drag.y - 1, width: drag.width }} aria-hidden="true" /> : null}
           {drag?.kind === 'split' ? <div className="deck-block-guide" style={{ left: drag.x - 1, top: drag.top, height: drag.height }} aria-hidden="true" /> : null}
         </>
-      ) : null}
+      ) : null}</div>
       {showing
         ? createPortal(
             <div
