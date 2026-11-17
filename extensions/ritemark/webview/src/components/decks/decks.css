@@ -186,10 +186,20 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 
 /* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
 .deck-notice { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
-/* A notice in the bar (PR 2): the bar's controls keep their size, but Present, which folds to its icon when its word
-   doesn't fit (`iconWhenNarrow`), gives way first, as it does for the bar's other notices; the notice's words go last. */
-.deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present) { flex-shrink: 0; }
-.deck-bar > .deck-present { flex-shrink: 100; }
+/* When the bar is short of room (a notice with the AI open), what gives way, in order (Sprint 162, step-3-themes.md):
+   1. the Theme button's name (its swatch and ▾ stay; the name is in its tooltip);
+   2. Publish's word (it folds to its icon, `iconWhenNarrow`);
+   3. the notice's words (an ellipsis; its actions keep their words);
+   4. Present's word, last: the bar's main action.
+   Flex weights far apart give that order; everything else on the bar keeps its size. */
+.deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present):not(.deck-theme-slot):not(.deck-publish-slot) { flex-shrink: 0; }
+.deck-bar > .deck-theme-slot { flex-shrink: 100000; min-width: 0; }
+.deck-bar > .deck-publish-slot { flex-shrink: 10000; min-width: 0; }
+.deck-bar > .deck-notice { flex-shrink: 100; }
+.deck-bar > .deck-present { flex-shrink: 1; }
+.deck-bar .deck-theme-slot > .deck-theme-button { min-width: 0; flex-shrink: 1; }
+.deck-bar .deck-theme-button > .deck-theme-swatch, .deck-bar .deck-theme-button > svg { flex: none; }
+.deck-bar .deck-theme-button > .deck-theme-name { flex: 0 1 auto; min-width: 0; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */

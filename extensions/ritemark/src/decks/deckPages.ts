@@ -18,7 +18,7 @@ import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
-import { isThemePath, MAX_THEMES, themeEntries, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, themeEntries, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
@@ -584,7 +584,17 @@ export async function readTheme(document: vscode.TextDocument, themePath: string
 
 /** The theme file a deck at `deckPath` names, by the same rule: the deck view's, and its page's (Sprint 159 PR 4). */
 export function readDeckTheme(deckPath: string, themePath: string): Promise<string | null> {
-  return readProjectTheme(themeRootOf(deckPath), themePath);
+  return readThemeOrEvening(themeRootOf(deckPath), themePath);
+}
+
+/**
+ * Sprint 162 (step-3-themes.md, "A project's own file takes a built-in's place"): the theme file named, or, when the
+ * project has no such file (or none is named), the project's own `Evening.theme.md`; null when it has neither, and the
+ * reader draws the built-in theme.
+ */
+export async function readThemeOrEvening(root: string, themePath: string | null | undefined): Promise<string | null> {
+  const named = themePath && isThemePath(themePath) ? await readProjectTheme(root, themePath) : null;
+  return named ?? readProjectTheme(root, BUILT_IN_THEME_PATH);
 }
 
 /** The folder a deck at `deckPath` reads its theme from: its project folder, or its own folder when it has none. */

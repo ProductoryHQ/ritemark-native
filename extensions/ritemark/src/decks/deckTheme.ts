@@ -169,10 +169,10 @@ function pathKey(path: string): string {
 }
 
 /**
- * The entry a deck draws, by its `theme:` value: the theme file it names when the project has it; else, when the
- * built-in theme is listed (the project has no file at its path), the built-in theme, which a deck with no line, or one
- * naming a file that isn't there, draws. Null when the deck draws the built-in theme but the project has its own file
- * at that path: the deck isn't linked to that file, so no row is ticked and picking the file links it.
+ * The entry a deck draws, by its `theme:` value: the theme file it names when the project has it; else Evening, which a
+ * deck with no line, or one naming a file that isn't there, draws. Evening is the project's own `Evening.theme.md` when
+ * it has one (step-3-themes.md: "A project's own file takes a built-in's place"), else the built-in theme. Null only for
+ * a list with no Evening at all, which `themeEntries` never makes.
  */
 export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntry, 'path' | 'text'>>): string | null {
   const path = typeof named === 'string' ? named.trim() : '';
@@ -181,7 +181,16 @@ export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntr
     const file = entries.find(entry => entry.text !== null && pathKey(entry.path) === key);
     if (file) return file.path;
   }
-  return entries.some(entry => entry.text === null && entry.path === BUILT_IN_THEME_PATH) ? BUILT_IN_THEME_PATH : null;
+  return entries.find(entry => pathKey(entry.path) === pathKey(BUILT_IN_THEME_PATH))?.path ?? null;
+}
+
+/**
+ * The theme file a deck's view, wall, page and thumbnails read, by its `theme:` value: the file it names, or Evening's
+ * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`readDeckTheme`).
+ */
+export function themePathOf(named: unknown): string {
+  const path = typeof named === 'string' ? named.trim() : '';
+  return isThemePath(path) ? path : BUILT_IN_THEME_PATH;
 }
 
 /**

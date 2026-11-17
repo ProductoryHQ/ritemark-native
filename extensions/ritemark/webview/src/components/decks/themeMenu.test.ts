@@ -22,7 +22,8 @@ import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
 import { history, redo, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../src/editorSync/frontMatter'
-import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, deckCountLabel, parseTheme, themeEntries, themeKeyOf, themeOfEntry } from '../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, deckCountLabel, parseTheme, themeEntries, themeKeyOf, themeOfEntry, themePathOf } from '../../../../src/decks/deckTheme'
+import { wallBand } from './theme/themeVars'
 import { DeckLibrary, type DeckFiles } from '../../../../src/decks/DeckLibrary'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { installTestDocument } from '../../utils/markdownFidelity'
@@ -186,6 +187,33 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.ok(sameValue({ present: false }, { present: false }) && !sameValue({ present: true, value: null }, { present: false }))
 }
 
+// ---- The wall's bands follow the theme (step-3-themes.md): the ground's darker end, its plain ground without soft
+// light, a Borderless deck's white. Evening's are its own darkest shade, not step 2's fixed #0E0C24.
+{
+  assert.equal(wallBand(BUILT_IN_THEME, false), '#13153A')
+  assert.equal(wallBand(BUILT_IN_THEME, true), '#FFFFFF')
+  const fern = parseTheme(FERN_TEXT)
+  assert.match(wallBand(fern, false), /^#[0-9A-F]{6}$/)
+  assert.notEqual(wallBand(fern, false), fern.bg, 'the darker end of its soft light')
+  assert.equal(wallBand(parseTheme(PAPER_TEXT), false), '#FAF7F0', 'no soft light: its ground')
+  const wall = readFileSync(fileURLToPath(new URL('./present/DeckWall.tsx', import.meta.url)), 'utf8')
+  assert.match(wall, /style=\{\{ background: wallBand\(state\.theme, state\.borderless\) \}\}/)
+}
+
+// ---- When the bar is short of room, what gives way, in order: the Theme button's name, Publish's word, the notice's
+// words, Present's word last (step-3-themes.md).
+{
+  const css = readFileSync(fileURLToPath(new URL('./decks.css', import.meta.url)), 'utf8')
+  const weight = (selector: string) => Number(new RegExp(`\\n${selector.replace(/[.>]/g, m => `\\${m}`)} \\{ flex-shrink: (\\d+);`).exec(css)?.[1])
+  const order = ['.deck-bar > .deck-theme-slot', '.deck-bar > .deck-publish-slot', '.deck-bar > .deck-notice', '.deck-bar > .deck-present'].map(weight)
+  assert.ok(order.every(Number.isFinite), String(order))
+  assert.ok(order[0] > order[1] && order[1] > order[2] && order[2] > order[3], String(order))
+  const menu = readFileSync(fileURLToPath(new URL('./ThemeMenu.tsx', import.meta.url)), 'utf8')
+  assert.match(menu, /<Tooltip label=\{`\$\{theme\.name\}: the deck's look and theme`\} className="deck-theme-slot">/, 'the name is in its tooltip')
+  const publish = readFileSync(fileURLToPath(new URL('./DeckPublish.tsx', import.meta.url)), 'utf8')
+  assert.match(publish, /className="deck-publish-slot">\s+<Button variant="outline" size="bar" className="deck-publish" iconWhenNarrow onClick=\{publish\}>/)
+}
+
 // ---- The step itself: it changes nothing in the document, maps through anything, and inverts to the value before.
 {
   const step = new DeckPropertyStep('theme', { present: false }, { present: true, value: FERN })
@@ -207,14 +235,18 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
     ['Paper', PAPER, 0],
   ], 'Evening counts the deck naming it, the one with no line, the missing file and the path outside; sorted by name')
   assert.equal(entries.reduce((sum, entry) => sum + entry.decks, 0), decks.length)
-  // The project's own Evening file is listed as itself, once, with its own text. A deck with no line draws the built-in
-  // theme, not that file: it isn't counted there, and no row is ticked for it, so picking Evening links it to the file.
+  // A project's own Evening file is Evening in that project (step-3-themes.md): listed once, with its own text; a deck
+  // with no line, or naming a file that isn't there, draws it, is counted under it and has its row ticked.
   const ownFile = { path: EVENING, text: '---\nname: Evening\naccent: "#FF8800"\n---\n' }
-  const own = themeEntries([ownFile], [null, EVENING])
-  assert.deepEqual(own.map(entry => [entry.path, entry.decks, themeOfEntry(entry).accent]), [[EVENING, 1, '#FF8800']])
-  assert.equal(themeKeyOf(null, own), null)
-  assert.equal(themeKeyOf('Slide library/Themes/Gone.theme.md', own), null)
+  const own = themeEntries([ownFile], [null, EVENING, 'Slide library/Themes/Gone.theme.md'])
+  assert.deepEqual(own.map(entry => [entry.path, entry.decks, themeOfEntry(entry).accent]), [[EVENING, 3, '#FF8800']])
+  assert.equal(themeKeyOf(null, own), EVENING)
+  assert.equal(themeKeyOf('Slide library/Themes/Gone.theme.md', own), EVENING)
   assert.equal(themeKeyOf(EVENING, own), EVENING)
+  // Every reader asks for the file a deck names, or Evening's path when it names none (and falls back to Evening's file).
+  assert.equal(themePathOf(undefined), EVENING)
+  assert.equal(themePathOf('https://example.com/x.theme.md'), EVENING)
+  assert.equal(themePathOf(` ${FERN} `), FERN)
   // A hand-written line names its file whatever its slashes, a leading ./ or its case.
   const listed = themeEntries([{ path: FERN, text: FERN_TEXT }], [])
   for (const named of ['Slide library\\Themes\\Fern Hollow.theme.md', './Slide library//Themes/Fern Hollow.theme.md', 'slide library/themes/fern hollow.theme.md'])
@@ -252,6 +284,12 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   // The deck view's own reading (`useDeckTheme`): no text from the host is the built-in theme.
   const bridge = readFileSync(fileURLToPath(new URL('./deckBridge.ts', import.meta.url)), 'utf8')
   assert.match(bridge, /theme: text === null \? BUILT_IN_THEME : parseTheme\(text\)/)
+  assert.match(bridge, /const path: string \| null = themePathOf\(themePath\)/, 'a deck naming no theme asks for Evening\'s file')
+  // The host's readers all fall back to the project's own Evening file, then to the built-in theme.
+  const pages = readFileSync(fileURLToPath(new URL('../../../../src/decks/deckPages.ts', import.meta.url)), 'utf8')
+  assert.match(pages, /return named \?\? readProjectTheme\(root, BUILT_IN_THEME_PATH\)/)
+  for (const reader of ['deckPublish.ts', 'present/DeckPresenter.ts', 'SlideLibraryViewProvider.ts'])
+    assert.match(readFileSync(fileURLToPath(new URL(`../../../../src/decks/${reader}`, import.meta.url)), 'utf8'), /themePathOf\(/, reader)
   assert.equal(parseTheme('not a theme').name, 'Evening', 'a file that is no theme reads as Evening too')
 }
 

@@ -142,8 +142,9 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
 
   if (state.kind === 'unpublished') {
     return (
-      <Tooltip label="Publish the slides and their handout as a web page">
-        <Button variant="outline" size="bar" className="deck-publish" onClick={publish}>
+      // When the bar is short of room, Publish folds to its icon after the Theme button's name (decks.css).
+      <Tooltip label="Publish the slides and their handout as a web page" className="deck-publish-slot">
+        <Button variant="outline" size="bar" className="deck-publish" iconWhenNarrow onClick={publish}>
           <Icon name="globe" size={14} tone="inherit" />
           Publish
         </Button>

@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../bridge'
-import { BUILT_IN_THEME, isThemePath, parseTheme, type DeckTheme } from '../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DeckSlideEntry } from './deckDocument'
 import { slidePicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
@@ -44,7 +44,8 @@ export function useDeckAssets(slides: DeckSlideEntry[]): { assets: Record<string
  * none, or one the project doesn't have (a deck is never changed for it).
  */
 export function useDeckTheme(themePath: unknown): DeckTheme {
-  const path = typeof themePath === 'string' && isThemePath(themePath) ? themePath : null
+  // A deck naming no theme asks for Evening's path: the project's own Evening file, when it has one, is its Evening.
+  const path: string | null = themePathOf(themePath)
   const [theme, setTheme] = useState<{ path: string; theme: DeckTheme } | null>(null)
 
   useEffect(() => onMessage(message => {

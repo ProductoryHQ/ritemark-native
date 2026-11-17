@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
-import { BUILT_IN_THEME, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import '../decks.css'
@@ -140,9 +140,11 @@ export function SlideLibraryPanel() {
   // Each theme read once per state.
   const themeOf = useMemo(() => {
     const parsed = new Map<string, DeckTheme>()
-    return (path: string | null): DeckTheme => {
-      const text = path ? state?.themes?.[path] : null
-      if (!path || !text) return BUILT_IN_THEME
+    return (named: string | null): DeckTheme => {
+      // The host reads each deck's theme by `themePathOf` (Evening's path for none), falling back to Evening's file.
+      const path = themePathOf(named)
+      const text = state?.themes?.[path]
+      if (!text) return BUILT_IN_THEME
       let theme = parsed.get(path)
       if (!theme) {
         theme = parseTheme(text)
