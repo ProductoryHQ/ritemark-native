@@ -422,8 +422,8 @@ function FontRow({ label, tip, value, onChange }: { label: string; tip: string; 
     <div className="theme-row theme-font">
       <span className="theme-row-label">{label}</span>
       <Select value={current} onValueChange={next => { if (next !== current) onChange(next) }}>
-        <Tooltip label={tip}>
-          <SelectTrigger aria-label={`${label} font`} className="theme-font-select" style={{ fontFamily: deckFontStack(current) }}>
+        <Tooltip label={tip} className="theme-font-select">
+          <SelectTrigger aria-label={`${label} font`} className="w-full" style={{ fontFamily: deckFontStack(current) }}>
             <SelectValue />
           </SelectTrigger>
         </Tooltip>
