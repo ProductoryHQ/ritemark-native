@@ -14,7 +14,7 @@ import { Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { TableMap } from '@tiptap/pm/tables'
 import { editorHTMLToMarkdown } from '../../utils/editorMarkdown'
-import { writeClipboard } from '../../lib/clipboard'
+import { readClipboard, writeClipboard } from '../../lib/clipboard'
 import { Icon, type PhosphorIconName } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { cn } from '../../lib/utils'
@@ -53,6 +53,19 @@ export function tableMarkdown(table: PMNode, schema: Schema): string {
 }
 
 const ITEM = 'gap-2.5 text-[13px] [&_svg]:shrink-0'
+
+/**
+ * Cut, Copy and Paste from a table's menu, as the webview's own menu did them in a cell (review of #772: the cell's menu
+ * replaced it there): the editor's own copy and paste, through the host's clipboard when the webview refuses a paste.
+ */
+export function runClipboardEdit(editor: Editor, command: 'cut' | 'copy' | 'paste'): void {
+  if (editor.isDestroyed) return
+  editor.view.focus()
+  if (document.execCommand(command) || command !== 'paste') return
+  void readClipboard().then(text => {
+    if (text && !editor.isDestroyed) editor.view.pasteText(text)
+  })
+}
 const DANGER = 'text-[var(--r-error)] focus:text-[var(--r-error)] [&_svg]:text-[var(--r-error)]'
 
 const ALIGNS: { align: Exclude<ColumnAlign, null>; icon: PhosphorIconName; label: string }[] = [
@@ -61,10 +74,12 @@ const ALIGNS: { align: Exclude<ColumnAlign, null>; icon: PhosphorIconName; label
   { align: 'right', icon: 'text-align-right', label: 'Align right' },
 ]
 
-export function TableMenuItems({ editor, target, kit, sortDescending, onActed }: {
+export function TableMenuItems({ editor, target, kit, sortDescending, onActed, edits = false }: {
   editor: Editor
   target: TableMenuTarget
   kit: MenuKit
+  /** Cut, Copy and Paste first: the cell's menu where it takes the place of the webview's own (the Text editor's). */
+  edits?: boolean
   /** ⌥ is held: Sort A to Z reads, and sorts, Z to A. */
   sortDescending: boolean
   /** An item ran (the menu closes after, except for the alignment, which stays to show its choice). */
@@ -101,6 +116,25 @@ export function TableMenuItems({ editor, target, kit, sortDescending, onActed }:
     )
   }
 
+  const hasSelection = !editor.state.selection.empty
+  const clipboard = edits ? (
+    <>
+      <Item className={ITEM} disabled={!hasSelection} onSelect={() => runClipboardEdit(editor, 'cut')}>
+        <Icon name="scissors" size={14} tone="inherit" />
+        Cut
+      </Item>
+      <Item className={ITEM} disabled={!hasSelection} onSelect={() => runClipboardEdit(editor, 'copy')}>
+        <Icon name="copy" size={14} tone="inherit" />
+        Copy
+      </Item>
+      <Item className={ITEM} onSelect={() => runClipboardEdit(editor, 'paste')}>
+        <Icon name="clipboard" size={14} tone="inherit" />
+        Paste
+      </Item>
+      <Separator />
+    </>
+  ) : null
+
   const withRow = kind === 'row' || kind === 'cell'
   const withColumn = kind === 'column' || kind === 'cell'
   // GFM's first row is the header: it has no Move and no Delete.
@@ -132,6 +166,7 @@ export function TableMenuItems({ editor, target, kit, sortDescending, onActed }:
   ]
   return (
     <>
+      {clipboard}
       {inserts}
       {moves.length && kind === 'cell' ? <Separator /> : null}
       {moves}

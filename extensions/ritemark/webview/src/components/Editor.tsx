@@ -26,7 +26,7 @@ import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
-import { TableHandles } from '../extensions/tables/TableHandles'
+import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
 import { BlockMenu } from './BlockMenu'
 import type { EditorSelection } from '../types/editor'
@@ -171,8 +171,8 @@ export function Editor({
         }),
         // Sprint 138 (#481): writing and editing equations.
         MathEditing,
-        // Tables you can change (experience 48): the grips, menus, + bars and keys of a table.
-        TableHandles,
+        // Tables you can change (experience 48): the grips, menus, + bars and keys of a table, unless its kill switch is off.
+        ...(tableHandlesEnabled() ? [TableHandles] : []),
       ],
       commentCallouts,
       // Sprint 138 (#481): the equation nodes with their typesetting views.
@@ -257,10 +257,12 @@ export function Editor({
         // so the header row stays first and the delimiter row (alignment, column widths) follows the change.
         const tableCell = cellAtSelection(view.state)
         if (tableCell && isMod) {
+          // A key whose operation does nothing here (Cmd+Backspace in the header row) stays the editor's own.
           const tableKey = (make: (state: typeof view.state) => ReturnType<typeof insertRow>) => {
-            event.preventDefault()
             const tr = make(view.state)
-            if (tr) view.dispatch(tr)
+            if (!tr) return false
+            event.preventDefault()
+            view.dispatch(tr)
             return true
           }
           const { pos: tablePos, row, col } = tableCell
@@ -768,7 +770,7 @@ export function Editor({
           {commentCallouts && (
             <MarginCommentRail editor={editor} container={scrollContainer} />
           )}
-          <TableHandlesLayer editor={editor} />
+          {tableHandlesEnabled() ? <TableHandlesLayer editor={editor} /> : null}
           {/* Block insertion menu (triggered by + button) */}
           {showBlockMenu && (
             <div
@@ -1463,6 +1465,13 @@ export function Editor({
           overflow-wrap: normal !important;
           word-break: normal !important;
           hyphens: manual !important;
+        }
+
+        /* A link or code in a cell (an address, a path, a hash) may break anywhere, so a long one never pushes the table
+           past the page; words stay whole (review of #772). */
+        .wysiwyg-editor .ProseMirror :is(td.tiptap-table-cell, th.tiptap-table-header) :is(a, code) {
+          overflow-wrap: anywhere !important;
+          word-break: break-all !important;
         }
 
         /* A column's alignment as the file writes it (\`:---:\`, \`---:\`), shown as it reads. */

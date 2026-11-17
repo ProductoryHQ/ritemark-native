@@ -70,7 +70,9 @@ export type FlagId =
   // Sprint 157 (experience 46): a `.deck.md` opens as a deck, with the Slide library and the AI's deck tools
   | 'decks'
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
-  | 'excel-editing';
+  | 'excel-editing'
+  // Experience 48: a table's grips, menus, + bars and column widths, in a Text document and on a slide; the kill switch
+  | 'table-handles';
 
 /**
  * Feature flag registry
@@ -343,6 +345,17 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   // (the Development manager, 15 November, answering Codex on #726). Off: an .xlsx opens read-only in the sheet grid,
   // as an .xls does, and the host refuses every cell edit. It is not 'disabled' code: reverting Sprint 158 would bring
   // back the save that strips a workbook's formatting, so read-only is the safe off-state.
+  // Experience 48 (Codex on #772): kill switch for the table's own handles. ON ('stable', HARD RULE #2); a code-level
+  // switch an extension release can flip, not in Settings. 'disabled': tables are plain tables again, with no grips,
+  // menus, + bars or column lines (Tab, Shift+Tab and the Cmd+Shift+arrow keys still work; column widths in a file are
+  // still drawn and kept).
+  'table-handles': {
+    id: 'table-handles',
+    label: 'Table Handles',
+    description: 'Change a table with its own handles: grips to move and edit rows and columns, + bars, and column widths.',
+    status: 'stable',
+    platforms: ['darwin', 'win32', 'linux'],
+  },
   'excel-editing': {
     id: 'excel-editing',
     label: 'Excel Editing',

@@ -25,7 +25,8 @@ import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import type { TableHandlesStorage, TableHandlesView, TableMenuRequest, TableRegistry, Rect } from '../../extensions/tables/TableHandles'
 import { cellAtSelection, columnWidths, insertColumn, insertRow, moveColumn, moveRow, setColumnWidths, setTint, tableAt, tableTintKey } from '../../extensions/tables/tableOps'
-import { measuredPercents, minPercent, resizePair } from './columnResize'
+import { minPercent, resizePair } from './columnResize'
+import { MAX_WIDTH_COLUMNS, snapPercents } from '../../../../src/markdown/tableWidths'
 import { TableMenuItems, type MenuKit } from './TableMenuItems'
 import { dropTarget } from './dropTarget'
 
@@ -98,13 +99,18 @@ function registryOf(editor: Editor | null): TableRegistry | null {
   return storage?.registry ?? null
 }
 
-/** The nearest ancestor that clips its content. */
+const clipAncestors = new WeakMap<HTMLElement, HTMLElement | null>()
+
+/** The nearest ancestor that clips its content, looked up once per table element (a table doesn't move between them). */
 function clipAncestor(element: HTMLElement): HTMLElement | null {
+  if (clipAncestors.has(element)) return clipAncestors.get(element) ?? null
+  let found: HTMLElement | null = null
   for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
     const style = getComputedStyle(node)
-    if (style.overflowX !== 'visible' || style.overflowY !== 'visible') return node
+    if (style.overflowX !== 'visible' || style.overflowY !== 'visible') { found = node; break }
   }
-  return null
+  clipAncestors.set(element, found)
+  return found
 }
 
 /** The table's rows, header cells and clip, in the table element's own (unscaled) coordinates. */
@@ -338,7 +344,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
     if (event.button !== 0 || event.detail > 1) return
     event.currentTarget.setPointerCapture(event.pointerId)
     const node = tableAt(editor.state.doc, tablePos)?.node
-    const start = (node && columnWidths(node)) ?? measuredPercents(cols.map(c => c.width))
+    const start = (node && columnWidths(node)) ?? snapPercents(cols.map(c => c.width))
     const firstRow = view.table.rows[0]
     const mins = cols.map((_, index) => {
       let widest = 0
@@ -459,7 +465,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           </Tooltip>
         </div>
       ) : null}
-      {!drag ? cols.slice(1).map((column, index) => {
+      {!drag && cols.length <= MAX_WIDTH_COLUMNS ? cols.slice(1).map((column, index) => {
         const boundary = index + 1
         return (
           <div
@@ -601,7 +607,7 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
         onInteractOutside={() => { outside.current = true }}
         onCloseAutoFocus={event => event.preventDefault()}
       >
-        <TableMenuItems editor={editor} target={menu} kit={dropdownKit} sortDescending={alt} />
+        <TableMenuItems editor={editor} target={menu} kit={dropdownKit} sortDescending={alt} edits={menu.kind === 'cell'} />
       </DropdownMenuContent>
     </DropdownMenu>
   )

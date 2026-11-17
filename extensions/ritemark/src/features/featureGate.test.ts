@@ -127,5 +127,10 @@ assert.strictEqual(canEditWorkbook('/w/Budget.xlsx', false), false, 'flag off: a
 assert.strictEqual(canEditWorkbook('/w/Old.xls', true), false, 'an .xls is read-only with the flag on');
 assert.strictEqual(canEditWorkbook('/w/Old.xls', false), false);
 assert.strictEqual(isEnabledPure('excel-editing', { ...FLAGS, 'excel-editing': { ...FLAGS['excel-editing'], status: 'disabled' } } as Record<string, FeatureFlag>, 'darwin', {}), false, 'the switch turns it off');
+// Experience 48: the table handles are ON everywhere, and the kill switch turns them off.
+for (const platform of ['darwin', 'win32', 'linux'] as const) {
+  assert.strictEqual(isEnabledPure('table-handles', FLAGS as Record<string, FeatureFlag>, platform, {}), true, `table-handles on ${platform}`);
+}
+assert.strictEqual(isEnabledPure('table-handles', { ...FLAGS, 'table-handles': { ...FLAGS['table-handles'], status: 'disabled' } } as Record<string, FeatureFlag>, 'darwin', {}), false, 'the table switch turns them off');
 
 console.log('All feature gate tests passed.');

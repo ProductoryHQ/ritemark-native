@@ -20,7 +20,7 @@ import { type EditorState, Plugin, PluginKey, Selection, TextSelection, type Tra
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
 import { CellSelection, TableMap, moveTableColumn, moveTableRow } from '@tiptap/pm/tables'
-import { automaticUnits, delimiterCellOf, delimiterRowWithWidths, snapPercents, widthsOf } from '../../../../src/markdown/tableWidths'
+import { DELIM_CELL, MAX_WIDTH_COLUMNS, automaticUnits, delimiterCellOf, delimiterRowWithWidths, rowCells, snapPercents, widthsOf } from '../../../../src/markdown/tableWidths'
 
 /** On every table transaction: one undo step, written by the slide editor as one. */
 export const TABLE_COMMAND = 'rmTableCommand'
@@ -116,13 +116,11 @@ export function columnAlign(table: PMNode, col: number): ColumnAlign {
 // The delimiter row as written
 // ---------------------------------------------------------------------------
 
-const DELIM_CELL = /^(\s*)(:?-+:?)(\s*)$/
-
 /** The delimiter row's cells as written (`| :-- | --: |` → `[' :-- ', ' --: ']`); null when there is none to keep. */
 export function delimiterCells(delims: unknown, columns: number): string[] | null {
-  if (typeof delims !== 'string' || !delims.startsWith('|') || !delims.endsWith('|') || delims.length < 2) return null
-  const cells = delims.slice(1, -1).split('|')
-  return cells.length === columns && cells.every(cell => DELIM_CELL.test(cell)) ? cells : null
+  if (typeof delims !== 'string') return null
+  const cells = rowCells(delims)
+  return cells && cells.length === columns && cells.every(cell => DELIM_CELL.test(cell)) ? cells : null
 }
 
 /** The marker GFM writes for an alignment. */
@@ -155,8 +153,13 @@ function withDelims(tr: Transaction, tablePos: number, before: PMNode, change: (
   let hasWidths = false
   if (cells) {
     const changed = change(cells)
-    if (percents && widths) {
-      next = delimiterRowWithWidths(changed, snapPercents(widths(percents)))
+    const shares = percents && widths && changed.length <= MAX_WIDTH_COLUMNS ? snapPercents(widths(percents)) : null
+    if (percents && widths && (!shares || shares.every(value => value === shares[0]))) {
+      // Past 20 columns no width holds a 5 % step, and equal shares are automatic: the table goes back to automatic
+      // widths (Codex on #772).
+      next = delimiterRowWithWidths(changed, null)
+    } else if (shares) {
+      next = delimiterRowWithWidths(changed, shares)
       hasWidths = true
     } else {
       next = '|' + changed.join('|') + '|'
@@ -187,7 +190,10 @@ export function setColumnWidths(state: EditorState, tablePos: number, percents: 
       const marker = alignMarker(columnAlign(table.node, col))
       return spaced ? ` ${marker} ` : marker
     })
-  const snapped = percents ? snapPercents(percents) : null
+  if (percents && width > MAX_WIDTH_COLUMNS) return null
+  const shares = percents ? snapPercents(percents) : null
+  // Equal shares are automatic widths: equal dashes say so in the file (review of #772).
+  const snapped = shares && shares.some(value => value !== shares[0]) ? shares : null
   if (!snapped && !columnWidths(table.node)) return null
   const mdDelims = delimiterRowWithWidths(cells, snapped)
   const mdWidths = snapped ? 'true' : null

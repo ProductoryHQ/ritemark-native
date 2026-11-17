@@ -5,14 +5,16 @@
  *
  * Which tables have widths. People line tables up by eye, and AIs write a header's dashes as long as its words
  * (`| Name | Description |` over `|------|-------------|`), so unequal dashes in a file are mostly not widths. Read as
- * widths, they would change how a person's untouched tables look. So a table has widths only when all of these hold:
- *  - its dash counts are not all equal
+ * widths, they would change how a person's untouched tables look. So a table has widths only in the form Ritemark
+ * writes them, and only when all of these hold:
+ *  - its runs (dashes and colons) add up to 80, each a multiple of 4 (4 for every 5 %): Ritemark's own form, which a
+ *    table lined up by eye or written by an AI almost never has;
+ *  - its runs are not all equal (equal is automatic);
  *  - Pandoc's own condition: a line of the table is longer than 72 characters (Pandoc's default `--columns`), so Pandoc
- *    reads the same widths from it
- *  - the line under the header isn't lined up by eye: its pipes are not where the header row's, or the first body
- *    row's, are.
- * Ritemark writes widths as 80 dashes in all (4 for every 5 %), so the line it writes is always longer than 72 and
- * (but for a header written to the same lengths, which the writer avoids) never lined up with the rows.
+ *    reads the same widths from it (80 dashes always make the line longer);
+ *  - the line under the header isn't lined up by eye with the header row or the first body row.
+ * The form, not the lining up, is what holds through a save: the editor writes rows without the spaces that lined
+ * them up, so a table lined up by eye would no longer look lined up on its next open (review of #772).
  *
  * Pure, with no imports: the slide renderer (host) and the editors (webview) read widths with these same functions.
  */
@@ -23,8 +25,11 @@ export const PANDOC_COLUMNS = 72
 export const WIDTH_UNITS = 80
 /** Widths snap to 5 % steps. */
 export const WIDTH_STEP = 5
+/** A table can have widths with at most 20 columns: each column is at least one 5 % step. */
+export const MAX_WIDTH_COLUMNS = 100 / WIDTH_STEP
 
-const DELIM_CELL = /^(\s*)(:?)(-+)(:?)(\s*)$/
+/** A delimiter row's cell: spacing, an optional colon, dashes, an optional colon, spacing. */
+export const DELIM_CELL = /^(\s*)(:?)(-+)(:?)(\s*)$/
 
 /** A pipe table line's cells as written (outer pipes required), split on unescaped pipes. */
 export function rowCells(line: string): string[] | null {
@@ -102,9 +107,16 @@ export function tableHasWidths(raw: string): boolean {
   const [header, delimiter, firstBody] = lines
   if (!header || !delimiter) return false
   const units = delimiterUnits(delimiter)
-  if (!units || units.length < 2 || units.every(unit => unit === units[0])) return false
+  if (!units || units.length < 2 || units.length > MAX_WIDTH_COLUMNS || units.every(unit => unit === units[0])) return false
+  if (!isWidthForm(units)) return false
   if (!lines.some(line => line.length > PANDOC_COLUMNS)) return false
   return !linedUp(delimiter, header) && !(firstBody && linedUp(delimiter, firstBody))
+}
+
+/** Ritemark's form of widths: runs adding up to 80, each a multiple of 4. */
+export function isWidthForm(units: number[]): boolean {
+  const unit = WIDTH_UNITS / (100 / WIDTH_STEP)
+  return units.reduce((sum, value) => sum + value, 0) === WIDTH_UNITS && units.every(value => value > 0 && value % unit === 0)
 }
 
 /** Are a row's pipes where the delimiter row's are (the row lined up with it by eye)? */
@@ -122,7 +134,7 @@ export function widthsOf(delimiterRow: unknown, hasWidths: unknown, columns: num
   if (hasWidths !== true && hasWidths !== 'true') return null
   if (typeof delimiterRow !== 'string') return null
   const units = delimiterUnits(delimiterRow)
-  return units && units.length === columns ? percentsOf(units) : null
+  return units && units.length === columns && isWidthForm(units) ? percentsOf(units) : null
 }
 
 /**

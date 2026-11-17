@@ -3,7 +3,7 @@
  * the table's width (percent), so it is the same at any scale: the pointer's place is divided by the slide's scale
  * before it gets here.
  */
-import { WIDTH_STEP, snapPercents } from '../../../../src/markdown/tableWidths'
+import { WIDTH_STEP } from '../../../../src/markdown/tableWidths'
 
 /**
  * The widths after the line before column `boundary` (1 to columns − 1) is dragged so the column on its left is
@@ -22,11 +22,6 @@ export function resizePair(percents: number[], mins: number[], boundary: number,
   next[left] = Math.min(Math.max(snapped, lowest), highest)
   next[right] = pair - next[left]
   return next
-}
-
-/** The shares a table's columns have now, from their drawn widths, in 5 % steps adding to 100. */
-export function measuredPercents(widths: number[]): number[] {
-  return snapPercents(widths)
 }
 
 /** A column's smallest share: its longest word (with the cell's padding) of the table's width, up to the next 5 %. */

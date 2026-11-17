@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useReducer, useRef } from 'react'
+import { setTableHandlesEnabled } from './extensions/tables/TableHandles'
 import {
   getDocumentSyncBootstrap,
   onMessage,
@@ -69,6 +70,8 @@ interface Features {
   markdownExport: boolean
   saveAsMarkdownFromPreview: boolean
   commentCallouts?: boolean
+  /** Experience 48: the table's own handles (the `table-handles` kill switch). */
+  tableHandles?: boolean
 }
 
 function App() {
@@ -204,11 +207,14 @@ function App() {
       setHasProperties(payload.hasProperties)
       setImageMappings(payload.imageMappings)
       setDictationSystemLanguage(payload.systemLanguage)
+      // Before the editor is made: it reads the switch then.
+      setTableHandlesEnabled(payload.features.tableHandles !== false)
       setFeatures({
         voiceDictation: payload.features.voiceDictation,
         markdownExport: payload.features.markdownExport,
         saveAsMarkdownFromPreview: payload.features.saveAsMarkdownFromPreview ?? false,
         commentCallouts: payload.features.commentCallouts,
+        tableHandles: payload.features.tableHandles,
       })
       const nextCard = payload.cardMode ?? null
       setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))
@@ -322,6 +328,7 @@ function App() {
           setProperties((message.properties as DocumentProperties) || {})
           setHasProperties(message.hasProperties as boolean || false)
           setImageMappings((message.imageMappings as Record<string, string>) || {})
+          setTableHandlesEnabled((message.features as Features | undefined)?.tableHandles !== false)
           setFeatures((message.features as Features) || {
             voiceDictation: false,
             markdownExport: false,

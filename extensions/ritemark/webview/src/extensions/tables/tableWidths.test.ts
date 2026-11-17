@@ -81,6 +81,12 @@ for (const [index, table] of CORPUS.entries()) {
     assert.equal(saved.split('\n')[3], table.split('\n')[1], `corpus ${index}, ${surface.name}: the delimiter row as written`)
     assert.equal(surface.save(surface.open(saved)), saved, `corpus ${index}, ${surface.name}: byte-stable`)
     if (!/\|[^|\n]*  \|/.test(table)) assert.equal(saved, source, `corpus ${index}, ${surface.name}: back byte for byte`)
+    // Saved with an edit elsewhere (the save writes the rows without the spaces that lined them up) and opened again:
+    // still no widths (review of #772: a wide table lined up by eye read as 5/60/35 % after one save).
+    const edited = surface.name === 'slide' ? saved.replace(`# Table ${index}`, `# Table ${index}!`) : `${saved}\nMore words.\n`
+    const again = surface.open(surface.save(surface.open(edited)))
+    assert.equal(columnWidths(tableAt(again, tablePos(again))!.node), null, `corpus ${index}, ${surface.name}: no widths after a save`)
+    assert.equal(tableHasWidths(tablesOf(surface.save(again))[0].raw), false, `corpus ${index}, ${surface.name}: the saved table reads without widths`)
     assert.equal(columnWidths(tableAt(doc, tablePos(doc))!.node), null, `corpus ${index}, ${surface.name}: drawn with automatic widths`)
   }
   assert.ok(!blockSlideHtml(`# T\n\n${table}`).includes('<colgroup'), `corpus ${index}: the slide renderer draws no widths`)
@@ -132,6 +138,46 @@ for (const surface of surfaces) {
   assert.deepEqual(percentsOf(delimiterUnits(deleted.split('\n')[3])!), [65, 35], `${surface.name}: the others share a deleted column's width, in proportion`)
   const aligned = surface.save(state.apply(alignColumn(state, pos, 1, 'center')!).doc)
   assert.equal(aligned.split('\n')[3], '| ---------------- | :--------------------------------------: | -----------------------: |', `${surface.name}: alignment keeps the width\n${aligned}`)
+}
+
+// ---- Equal shares are automatic widths (review of #772: [50, 50] was written as equal dashes, then read as automatic);
+// a table of more than 20 columns has no widths (each column is at least 5 %).
+{
+  const doc = surfaces[0].open('| a | b |\n| --- | --- |\n| 1 | 2 |\n')
+  const state = EditorState.create({ doc })
+  assert.equal(setColumnWidths(state, tablePos(doc), [50, 50]), null, 'equal shares on an automatic table: nothing to do')
+  const set = state.apply(setColumnWidths(state, tablePos(doc), [30, 70])!)
+  const equal = set.apply(setColumnWidths(set, tablePos(doc), [50, 50])!)
+  assert.equal(surfaces[0].save(equal.doc).split('\n')[1], '| --- | --- |', 'equal shares write the automatic row')
+  const wide = '| ' + Array.from({ length: 22 }, (_, i) => `c${i}`).join(' | ') + ' |\n|' + Array.from({ length: 22 }, () => ' --- ').join('|') + '|\n'
+  const wideDoc = surfaces[0].open(wide)
+  const wideState = EditorState.create({ doc: wideDoc })
+  assert.equal(setColumnWidths(wideState, tablePos(wideDoc), Array.from({ length: 22 }, (_, i) => (i === 0 ? 30 : 70 / 21))), null, '22 columns: no widths')
+  assert.equal(snapPercents(Array.from({ length: 20 }, () => 1)).reduce((a, b) => a + b, 0), 100, '20 columns still add to 100')
+}
+
+// ---- A column added to a table with widths at 19 columns (Codex on #772): 20 columns of one step each, so the table is
+// automatic again, and its widths never add up past 100.
+{
+  const header = '| ' + Array.from({ length: 19 }, (_, i) => `c${i}`).join(' | ') + ' |'
+  const delimiter = '|' + Array.from({ length: 19 }, () => ' --- ').join('|') + '|'
+  const doc = surfaces[0].open(`${header}\n${delimiter}\n`)
+  let state = EditorState.create({ doc })
+  state = state.apply(setColumnWidths(state, tablePos(doc), [10, ...Array.from({ length: 18 }, () => 5)])!)
+  assert.equal(columnWidths(tableAt(state.doc, tablePos(doc))!.node)!.reduce((a, b) => a + b, 0), 100)
+  state = state.apply(insertColumn(state, tablePos(doc), 19, 0)!)
+  const saved = surfaces[0].save(state.doc)
+  assert.equal(tableHasWidths(tablesOf(saved)[0].raw), false, '20 columns: automatic')
+  assert.equal(columnWidths(tableAt(state.doc, tablePos(doc))!.node), null)
+}
+
+// ---- Only Ritemark's own form is read as widths: 80 units, each a multiple of 4. A long, unequal delimiter row that
+// is not lined up but isn't in that form (a hand-written one) stays automatic.
+{
+  const handWritten = '| A | B |\n|' + '-'.repeat(50) + '|' + '-'.repeat(31) + '|\n| 1 | 2 |'
+  assert.equal(tableHasWidths(tablesOf(handWritten)[0].raw), false)
+  const ritemark = '| A | B |\n| ' + '-'.repeat(24) + ' | ' + '-'.repeat(56) + ' |\n| 1 | 2 |'
+  assert.equal(tableHasWidths(tablesOf(ritemark)[0].raw), true)
 }
 
 // ---- The slide renderer draws the widths: the table at the slide's width, a column per share.

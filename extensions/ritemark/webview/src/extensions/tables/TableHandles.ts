@@ -23,6 +23,20 @@ import { cellAtPos, cellAtSelection, cellPos, columnWidths, nextCellOrNewRow, pr
 
 export type TableMenuKind = 'column' | 'row' | 'cell' | 'table'
 
+/**
+ * The `table-handles` flag (the kill switch), as the host sent it with the document. The editors read it when they are
+ * made: off, a table has no handles, menus or column lines (`Editor.tsx`, `SlideEditor.tsx`).
+ */
+let handlesEnabled = true
+
+export function setTableHandlesEnabled(enabled: boolean): void {
+  handlesEnabled = enabled
+}
+
+export function tableHandlesEnabled(): boolean {
+  return handlesEnabled
+}
+
 export interface Rect {
   left: number
   top: number
@@ -65,8 +79,8 @@ export class TableHandlesView implements NodeView {
   update(node: PMNode): boolean {
     if (node.type !== this.node.type) return false
     this.node = node
+    // The layer draws again on the editor's transaction that brought the change: no second render from here.
     this.drawWidths()
-    this.registry.changed()
     return true
   }
 

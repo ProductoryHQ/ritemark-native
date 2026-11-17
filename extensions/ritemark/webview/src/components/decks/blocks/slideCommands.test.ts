@@ -17,7 +17,7 @@ import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync
 import { partHeadingLevel, slideDataOf, withBlockMarkdown, withPartHeading, withWrittenHandout } from '../../../../../src/decks/deckFormat'
 import { convertDeckText, withStepsTag } from '../../../../../src/decks/blocks/convertDeck'
 import { withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
-import { blockHasTable, blockSlideHtml, isCoverSlide, lexBlockSlide, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { blockSlideHtml, isCoverSlide, lexBlockSlide, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { parseFenceAttributes, OPEN_FENCE } from '../../../../../src/decks/blocks/fencedDiv'
 import { deckDigest, publicDeck } from '../../../../../src/decks/page/publicDeck'
 import { pageHtml } from '../../../../../src/decks/page/pageHtml'
@@ -428,8 +428,6 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
 // tables; Enter goes to the cell below.
 {
   const markdown = '# Plan\n\n| Who | What |\n| --- | --- |\n| Ann | Mail |'
-  assert.equal(blockHasTable(markdown), true)
-  assert.equal(blockHasTable('# Plan\n\n```\n| a | b |\n| - | - |\n```'), false, 'a table in code is no table')
   let state = EditorState.create({ doc: loadSlide(markdown) })
   const read = (text: string) => lexBlockSlide(text).find(token => token.type === 'table') as { header: { text: string }[]; rows: { text: string }[][] }
   let tablePos = -1

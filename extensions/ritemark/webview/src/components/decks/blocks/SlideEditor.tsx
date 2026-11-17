@@ -57,10 +57,9 @@ import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
 import { Icon } from '../../ui/Icon'
 import { isMac } from '../../../hooks/usePlatform'
-import { TableHandles, tableMenuTargetAt } from '../../../extensions/tables/TableHandles'
+import { TableHandles, tableHandlesEnabled, tableMenuTargetAt } from '../../../extensions/tables/TableHandles'
 import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
-import { TableMenuItems, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
-import { readClipboard } from '../../../lib/clipboard'
+import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 
 export interface SlideEditorProps {
   /** The handout's editor, which holds the deck: the slide is written to its node there, and its history is the undo. */
@@ -287,7 +286,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   }), [])
   // Experience 48: the table's handles and keys. A right-click in a cell opens the slide's own menu, with the cell's
   // table items first (below), so Comment and Slide settings stay where they are.
-  const SlideTableHandles = useMemo(() => TableHandles.configure({ contextMenu: false }), [])
+  const SlideTableHandles = useMemo(() => (tableHandlesEnabled() ? TableHandles.configure({ contextMenu: false }) : null), [])
 
   // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
@@ -298,7 +297,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       includeChildren: true,
     })],
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles],
+    afterImage: [OuterHistory, SlideKeys, SlideSlash, ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers)],
   }).map(extension => {
@@ -695,15 +694,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   /** Experience 48: the table cell (or the whole table) the right-click was on; its items lead the menu. */
   const [tableTarget, setTableTarget] = useState<TableMenuTarget | null>(null)
   const altHeld = useAltHeld()
+  // The webview's own Cut, Copy and Paste, as ⌘X, ⌘C and ⌘V do them; a paste the webview refuses comes from the host's
+  // clipboard as text (the one helper a table's menu uses too).
   const runEdit = (command: 'cut' | 'copy' | 'paste') => {
-    if (!editor || editor.isDestroyed) return
-    editor.view.focus()
-    // The webview's own Cut, Copy and Paste, as ⌘X, ⌘C and ⌘V do them; a paste the webview refuses comes from the
-    // host's clipboard as text.
-    if (document.execCommand(command) || command !== 'paste') return
-    void readClipboard().then(text => {
-      if (text && !editor.isDestroyed) editor.view.pasteText(text)
-    })
+    if (editor) runClipboardEdit(editor, command)
   }
 
   const header = isBlockSlide(slide.kind) ? slide.data : blockDataOf(slide.kind, slide.data)
@@ -730,7 +724,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
             menuPoint.current = { x: event.clientX, y: event.clientY }
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
-            setTableTarget(tableMenuTargetAt(editor.view, event.target))
+            setTableTarget(SlideTableHandles ? tableMenuTargetAt(editor.view, event.target) : null)
           }}
         >
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})` }}>
@@ -813,7 +807,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       </ContextMenuContent>
     </ContextMenu>
     {/* Experience 48: the table's grips, + bars and menus, drawn in the table's own element. */}
-    <TableHandlesLayer editor={editor} />
+    {SlideTableHandles ? <TableHandlesLayer editor={editor} /> : null}
     {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
     <PillField
       edit={pillEdit}
