@@ -36,7 +36,7 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
 import { ThemeChangeSheet, themeChangeFrom } from './ThemeChangeSheet'
-import type { ThemeChangeView } from '../../../../../src/decks/themeChange'
+import { changeSlideIndexes, type ThemeChangeView } from '../../../../../src/decks/themeChange'
 import '../decks.css'
 import './themeTab.css'
 
@@ -311,7 +311,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
         <Preview theme={theme} preview={decks?.preview ?? null} borderless={borderless} onLook={value => setLook(value === 'borderless' ? 'borderless' : 'card')} />
         {themeChange ? (
           <ThemeChangeSheet
-            change={themeChange}
+            change={withPreviewSlides(themeChange, decks?.preview ?? null)}
             style={{ left: 340 }}
             onUndo={() => sendToExtension('theme/change-undo', { id: themeChange.id })}
             onClose={() => setThemeChange(null)}
@@ -487,6 +487,15 @@ function useWidth<T extends HTMLElement>(): [RefObject<T>, number] {
     return () => observer.disconnect()
   }, [])
   return [ref, width]
+}
+
+/**
+ * Sprint 162 PR 5: See what changed for the colour check shows the slides this tab previews on (the host sends none for
+ * a draft): the first, and the first with Boxes, Steps or Columns, as for a deck.
+ */
+function withPreviewSlides(change: ThemeChangeView, preview: ThemePreview | null): ThemeChangeView {
+  if (change.slides.length || !preview) return change
+  return { ...change, slides: changeSlideIndexes(preview.slides).map(index => preview.slides[index]), borderless: preview.borderless, assets: preview.assets }
 }
 
 /** The preview gap between slides: Card's and Borderless's (prototype). */

@@ -448,10 +448,12 @@ export class ThemeAi implements vscode.Disposable {
       const pictures = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))];
       if (folder && pictures.length) assets = resolveAssetsIn(folder, webview, pictures);
     }
+    // A draft's before and after are the same theme: the after is named as the tab shows it, not saved
+    const afterName = record.kind === 'draft' ? `${parseTheme(record.themeAfter).name}, not saved` : parseTheme(record.themeAfter).name;
     return {
       id: record.id,
       before: { name: parseTheme(beforeText).name, text: beforeText },
-      after: { name: parseTheme(record.themeAfter).name, text: record.themeAfter },
+      after: { name: afterName, text: record.themeAfter },
       slides,
       borderless,
       assets,

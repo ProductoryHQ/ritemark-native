@@ -201,7 +201,7 @@ export function suggestedFixes(theme: DeckTheme): Array<{ field: PairField; from
 /** The check as the tool answers it: a line per pair, and the fixes. */
 export function pairsReport(theme: DeckTheme): string {
   return colourPairs(theme)
-    .map(pair => `- ${pair.label} (${pair.look}): ${pair.fg} on ${pair.bg}, ${ratioWords(pair.ratio)} to 1, needs ${pair.min} to 1: ${pair.ok ? 'passes' : 'FAILS'}`)
+    .map(pair => `- ${pair.label}${pair.look === 'card' ? ' (card)' : ''}: ${pair.fg} on ${pair.bg}, ${ratioWords(pair.ratio)} to 1, needs ${pair.min} to 1: ${pair.ok ? 'passes' : 'FAILS'}`)
     .join('\n');
 }
 
