@@ -52,7 +52,7 @@ const DECK = [
 const converted = convertDeckText(DECK);
 assert.equal(converted, [
   '---', 'deck: 2', '---', '',
-  '```slide', '---', 'id: s1', '---', '1', '', '# Why agents?', '```', '',
+  '```slide', '---', 'id: s1', 'section: true', '---', '1', '', '# Why agents?', '```', '',
   '## Why agents?', '', 'Section text.', '',
   '<!-- NOTESWORD --› still notes', 'Hidden by the old layout: SECTIONSUBTITLE -->', '',
   '```slide', '---', 'id: e2', '---', '# Try it', '', '::: {.steps tag="Harjutus"}', '1. Open', '2. Ask', ':::', '```', '',
@@ -159,7 +159,7 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
 {
   const markdown = '# Try\n\n```\n::: steps\n```\n\n:::: {.steps look="x"}\n1. A\n::::\n\n::: steps\n1. B\n:::';
   const tagged = withStepsTag(markdown, 'Harjutus');
-  assert.equal(tagged, markdown.replace(':::: {.steps look="x"}', ':::: {.steps tag="Harjutus" look="x"}'), 'a ::: line in code is no block');
+  assert.equal(tagged, markdown.replace(':::: {.steps look="x"}', ':::: {.steps look="x" tag="Harjutus"}'), 'a ::: line in code is no block; the other values keep their order (withFenceValue)');
   assert.equal(blockStepsTagOf(tagged), 'Harjutus');
   assert.equal(blockStepsTagOf(withStepsTag(tagged, '')), '', 'emptied: no pill');
   assert.equal(withStepsTag(tagged, 'Harjutus'), tagged, 'the same words: the same text');

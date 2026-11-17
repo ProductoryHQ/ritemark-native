@@ -5,6 +5,7 @@
  */
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, splitBlockSlide, withBlockMarkdown, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import { blockSlideBody, drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import { legacyDataToBlocks } from '../../../../src/decks/blocks/legacyToBlocks'
@@ -126,10 +127,22 @@ export function partHeadingAt(doc: PMNode, slidePos: number): { node: PMNode; po
  */
 export function derivedHeadings(state: EditorState, textHandout = false): Transaction | null {
   const { doc, schema } = state
-  // A deck marked `handout: text` is written with its own headings: nothing is drawn, a heading deleted stays deleted.
-  if (!schema.nodes.heading || textHandout) return null
+  if (!schema.nodes.heading) return null
   const tr = state.tr
   const slides = slidesOf(doc)
+  // A deck marked `handout: text` is written with its own headings: nothing is drawn, a heading deleted stays deleted.
+  // A part with nothing in it at all (a new slide's, saved before its words: the file holds no empty line) gets only
+  // its empty line back, so it shows "Write here." and can be written in; on main and before Sprint 161's PR 3 it had
+  // no height, its number sitting on the line between parts (the Development manager, #769).
+  if (textHandout) {
+    for (let index = slides.length - 1; index >= 0; index--) {
+      const after = slides[index].pos + slides[index].node.nodeSize
+      const next = doc.nodeAt(after)
+      if (!next || isSlideNode(next)) tr.insert(after, schema.nodes.paragraph.create())
+    }
+    if (!tr.docChanged) return null
+    return tr.setMeta(DECK_DERIVED, true).setMeta('addToHistory', false).setMeta('preventUpdate', true)
+  }
   // From the last part to the first, so each slide's position still holds.
   for (let index = slides.length - 1; index >= 0; index--) {
     const slide = slides[index]
@@ -138,7 +151,7 @@ export function derivedHeadings(state: EditorState, textHandout = false): Transa
     const text = derivedHeading(slide.data)
     // Marked as drawn where the deck's schema has the mark (the deck view's always does).
     const drawn = schema.nodes.heading.spec.attrs?.deckDrawn ? { deckDrawn: true } : {}
-    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind), ...drawn }, text ? schema.text(text) : null)
+    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind, slide.data), ...drawn }, text ? schema.text(text) : null)
     const next = doc.nodeAt(after)
     const nodes = [heading]
     if (!next || isSlideNode(next)) nodes.push(schema.nodes.paragraph.create())
@@ -287,7 +300,8 @@ export function insertSlide(state: EditorState, at: number, kind: string, random
   // writes in the handout (handout/drawnHeadings.ts); in a deck marked `handout: text`, where nothing is drawn, the part
   // opens with an empty heading of its own, which gives the slide its title once written (`firstHeadingTitlePlugin`).
   const heading = textHandout ? emptyPartHeading(state, kind) : null
-  return operation(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()]))
+  // An undo step of its own (the slide's New slide below follows typing on the same slide; Codex on #769).
+  return operation(closeHistory(state.tr.insert(point, [slide, ...(heading ? [heading] : []), state.schema.nodes.paragraph.create()])))
 }
 
 /** Change part `index`'s slide: its data (written line by line), and its kind when given. */

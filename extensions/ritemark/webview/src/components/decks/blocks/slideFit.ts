@@ -37,6 +37,14 @@ export function nextFitStep(current: number, measure: (step: number) => FitMeasu
   return step
 }
 
+/**
+ * PR 3 (frame 24): is the slide full at this step: its words at the floor (60 %) and still more than the slide holds.
+ * Only then does the deck's bar say "This slide is full"; a slide that fits at any step never does.
+ */
+export function isFullAt(step: number, measure: FitMeasure, max = BLOCK_MAX_STEP): boolean {
+  return step >= max && overflows(measure)
+}
+
 /** The `--fit` value of a step. */
 export function fitValue(step: number): number {
   return BLOCK_FIT_STEPS[Math.max(0, Math.min(BLOCK_MAX_STEP, step))]

@@ -304,9 +304,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .tableWrapper { overflow: visible; margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
 .deck-sl.is-blocks.is-editing .blk-flow img.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); }
-/* An empty slide's title waits for its words. */
-.deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
-.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+/* An empty line waits for its words: the title's, an empty column's heading and text. Only a line: an empty block (a new
+   Columns block's, PR 3) is marked empty too, and a ::before on its grid would take a column of its own (the app run). */
+.deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
 
 /* Sprint 161 (experience 46, "Comments on the slide, for Claude"; frames 27 and 28). A comment on a block or on the
    whole slide is a standalone note (`ritemark-comment`) in the slide editor: never drawn, and taking no place, so the
@@ -345,3 +346,16 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* The deck's bar: the comments button with its count, and Previous and Next across the slides. */
 .deck-bar .deck-comments { display: inline-flex; align-items: center; gap: 2px; }
 .deck-bar .deck-comments-count { min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; border-radius: 8px; background: #F2B544; color: #1C1F4A; font: 700 10px/16px 'Sofia Sans', sans-serif; text-align: center; box-sizing: border-box; }
+
+/* Sprint 161 (PR 3; README frame 4 and "The 'Exercise' pill is the person's own word"). A box's icon is clicked to
+   choose another, and a box with none shows a faint place for one (on the stage only). The Steps pill's words are
+   typed in place, in a field drawn over the pill in its look (`PillField`): emptied, the pill hides once the field
+   closes, and while the field is open, empty, the default word shows faint as its placeholder. */
+.deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover, .deck-sl.is-blocks.is-editing .blk-pill.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+.deck-sl.is-blocks.is-editing .blk-pill.is-pickable { cursor: text; }
+.deck-sl.is-blocks.is-editing .blk-icon.is-place { background: transparent; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.28)); color: var(--s-ph, rgba(255,255,255,.45)); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .blk-icon.is-place { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); color: var(--s-ph, rgba(28,31,74,.35)); }
+.deck-pill-field::placeholder { color: inherit; opacity: .45; }
+/* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
+   (the app run: an empty column had none, and was invisible). */
+.deck-sl.is-blocks.is-editing th, .deck-sl.is-blocks.is-editing td { min-width: 4em; }

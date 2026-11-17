@@ -172,6 +172,8 @@ export function publicSlide(kind: string, data: SlideData): { kind: string; data
       out.picture = data.picture;
       if (data.image !== undefined) out.image = data.image;
     }
+    // A section (PR 3: the header's mark, no words): the page keeps its band, with or without a number.
+    if (data.section === true) out.section = true;
     return { kind: '', data: out };
   }
   // A kind this build doesn't know (the nine kinds went out as blocks above): its title alone.
