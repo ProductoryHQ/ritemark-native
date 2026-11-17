@@ -30,7 +30,7 @@ const React = await import('react')
 const { caretTarget, leaveHiddenNote, startSlideComment } = await import('../SlideComments')
 const { liftCommentLine, registerOpenBox, startComment, yieldOpenBox } = await import('../../../extensions/comment/CommentNode')
 const { stripCommentCount } = await import('../SlideStrip')
-const { DeckComments, deckCommentStops, nextCommentStop, deckCommentsLabel } = await import('../DeckComments')
+const { DeckComments, deckCommentStops, nextCommentStop, deckCommentsLabel, stopIndexOf } = await import('../DeckComments')
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 
@@ -196,6 +196,13 @@ function fill(tr: Transaction, id: string, note: string): Transaction {
   assert.deepEqual(markers[1].target, { kind: 'block', pos: blockOf(doc, 'Instructions') })
   assert.deepEqual(markers[2].target, { kind: 'slide' })
   assert.equal(markers[0].target.kind, 'words')
+  // Codex on #766: an anchored comment without an id carries its whole range, which Edit and Delete use (the shared
+  // operations read `from` and `to` when there is no id).
+  const legacy = load('# T\n\nA <mark data-comment="no id">kept words</mark> line.')
+  const [old] = slideMarkersOf(legacy)
+  assert.equal(old.commentId, undefined)
+  assert.equal(old.key, `m:${old.from}-${old.to}`)
+  assert.equal(legacy.textBetween(old.from!, old.to!), 'kept words', 'from and to are the words')
   console.log('slideComments (stage): words, a block and the whole slide, read the same way on the stage and in the file')
 }
 
@@ -439,7 +446,14 @@ const requestedId = (storage: Storage) => {
   ]
   assert.deepEqual(slides.map(slide => stripCommentCount(slide as never)), [0, 3, 0, 1], 'an empty note (a box still open) is not counted')
   const stops = deckCommentStops(slides as never)
-  assert.deepEqual(stops, [{ slide: 1, ordinal: 0 }, { slide: 1, ordinal: 1 }, { slide: 1, ordinal: 2 }, { slide: 3, ordinal: 0 }])
+  assert.deepEqual(stops.map(stop => [stop.slide, stop.ordinal, stop.key]), [[1, 0, `c:${ID_A}`], [1, 1, `c:${ID_B}`], [1, 2, `c:${ID_C}`], [3, 0, `c:${ID_A}`]])
+  // Codex on #766: the open comment is kept by its key, so one added or deleted before it never moves Next and
+  // Previous. With the comment on the words deleted, the open one (the boxes' note) is still found, now at 0.
+  const fewer = deckCommentStops([slides[0], { kind: '', data: { markdown: COMMENTED.replace(/<mark[^>]*>(once and used every day)<\/mark>/, '$1') } }] as never)
+  assert.equal(stopIndexOf(fewer, `c:${ID_B}`), 0)
+  assert.equal(nextCommentStop(fewer, stopIndexOf(fewer, `c:${ID_B}`), 1, 1), 1, 'Next goes to the note on the whole slide, not past it')
+  assert.equal(stopIndexOf(fewer, `c:${ID_A}`), null, 'a deleted comment is no longer open')
+  assert.equal(deckCommentStops([{ kind: '', data: { id: 'k3f9', markdown: '# T\n\n<!-- legacy, no id -->' } }] as never)[0].key, 's:k3f9#0', 'a comment without an id by its slide and place')
   // With none open: Next is the first on this slide or after; Previous the last before it.
   assert.equal(nextCommentStop(stops, null, 0, 1), 0)
   assert.equal(nextCommentStop(stops, null, 2, 1), 3)

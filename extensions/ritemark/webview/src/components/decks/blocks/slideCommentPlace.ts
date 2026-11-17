@@ -206,6 +206,12 @@ export interface SlideMarker {
   kind: 'mark' | 'node'
   /** An anchored comment: every range of its words. */
   ranges?: { from: number; to: number }[]
+  /**
+   * An anchored comment: its whole range, from its first word to its last, which the shared operations
+   * (`applyCommentNote`, `removeComment`) use for a comment without an id (Codex on #766).
+   */
+  from?: number
+  to?: number
   /** A standalone note: its position. */
   nodePos?: number
   /** What it is on, in the document: its words, a block (its position), or the whole slide. */
@@ -268,7 +274,9 @@ export function slideMarkersOf(doc: PMNode): SlideMarker[] {
   })
   for (const marker of out) {
     if (marker.kind !== 'mark' || !marker.ranges) continue
-    marker.anchor = { kind: 'words', words: marker.ranges.map(range => doc.textBetween(range.from, range.to, ' ')).join(' ') }
+    marker.from = marker.ranges[0].from
+    marker.to = marker.ranges[marker.ranges.length - 1].to
+    marker.anchor ={ kind: 'words', words: marker.ranges.map(range => doc.textBetween(range.from, range.to, ' ')).join(' ') }
   }
   return out.sort((a, b) => firstPos(a) - firstPos(b))
 }

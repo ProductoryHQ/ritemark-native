@@ -55,7 +55,7 @@ import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { DeckLines } from './handout/deckLines'
 import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
-import { DeckComments, deckCommentStops } from './DeckComments'
+import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
@@ -210,7 +210,8 @@ export function DeckView({
   // A slide whose title takes the caret once its stage is drawn (a new slide's), or is selected whole (a deck New made)
   const [focusTitleOf, setFocusTitleOf] = useState<{ index: number; select: boolean } | null>(null)
   // Sprint 161: the slide comment the bar's Previous and Next stand on, and the one it asked the stage to open.
-  const [commentAt, setCommentAt] = useState<number | null>(null)
+  // By its key (Codex on #766): a comment added or deleted before it never moves Previous and Next.
+  const [commentAtKey, setCommentAtKey] = useState<string | null>(null)
   const [commentOpen, setCommentOpen] = useState<{ slide: number; slideId?: string; ordinal: number; serial: number } | null>(null)
   // Once the stage has opened it, the request is forgotten: a slide shown again later opens nothing by itself.
   const commentOpened = useCallback((serial: number) => setCommentOpen(open => (open?.serial === serial ? null : open)), [])
@@ -632,7 +633,7 @@ export function DeckView({
   const goToComment = useCallback((index: number) => {
     const stop = commentStops[index]
     if (!stop) return
-    setCommentAt(index)
+    setCommentAtKey(stop.key)
     if (stop.slide !== currentRef.current) pick(stop.slide)
     commentSerial.current += 1
     setCommentOpen({ slide: stop.slide, slideId: slides[stop.slide]?.data.id, ordinal: stop.ordinal, serial: commentSerial.current })
@@ -1322,7 +1323,7 @@ export function DeckView({
         </span>
         <span className="flex-1" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
-        {slideShown ? <DeckComments stops={commentStops} at={commentAt} current={shown} onGo={goToComment} /> : null}
+        {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />

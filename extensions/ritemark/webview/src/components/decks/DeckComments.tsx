@@ -17,6 +17,11 @@ import { Tooltip } from '../ui/tooltip'
 export interface DeckCommentStop {
   slide: number
   ordinal: number
+  /**
+   * The comment's identity across edits (Codex on #766): its id, or for one without an id its slide and place. The bar
+   * keeps the one open by this, so a comment added or deleted before it never moves Previous and Next.
+   */
+  key: string
 }
 
 /** Every slide comment with words, slide by slide, in the order they are written. */
@@ -25,9 +30,16 @@ export function deckCommentStops(slides: ReadonlyArray<{ kind: string; data: Sli
   slides.forEach((slide, index) => {
     if (!isBlockSlide(slide.kind)) return
     const comments = slideCommentsOf(slide.data.markdown ?? '').filter(comment => comment.note.trim())
-    comments.forEach((_comment, ordinal) => stops.push({ slide: index, ordinal }))
+    comments.forEach((comment, ordinal) => stops.push({ slide: index, ordinal, key: comment.id ? `c:${comment.id}` : `s:${slide.data.id ?? index}#${ordinal}` }))
   })
   return stops
+}
+
+/** The stop open now, by its key, as an index into `stops`; null when it is gone. */
+export function stopIndexOf(stops: DeckCommentStop[], key: string | null): number | null {
+  if (!key) return null
+  const index = stops.findIndex(stop => stop.key === key)
+  return index >= 0 ? index : null
 }
 
 /**
