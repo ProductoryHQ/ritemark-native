@@ -48,7 +48,8 @@ import { DeckGuard } from './handout/deckGuard'
 import { DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
-import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { blockHasTable, blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead } from './handout/SlidePartHead'
@@ -71,6 +72,8 @@ const STRIP_WIDTH = 132
 /** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
 const NOTICE_MS = 8000
+/** Sprint 161 (PR 3, frame 24): the bar's line while the slide on the stage is full. */
+export const SLIDE_FULL = 'This slide is full: its words are at their smallest size.'
 /** The handout is never narrower than this (the Experience lead's answer 4). */
 const HANDOUT_MIN = 300
 const STAGE_MIN = 300
@@ -966,10 +969,17 @@ export function DeckView({
 
   // A picture pasted or dropped on a slide: saved beside the deck by the host, then the slide shows it. A slide that
   // places no picture beside or behind its words becomes a Picture slide.
-  const onPicture = useCallback((dataUrl: string, filename: string) => {
+  // Sprint 161 (PR 3): a picture the slide's / menu chose goes where the / was: the slide editor puts it there once the
+  // host has saved it (`stagePicture`), while that slide is still on the stage; otherwise as a pasted one.
+  const caretPictureFor = useRef<string | null>(null)
+  const [stagePicture, setStagePicture] = useState<{ slideId: string; path: string; url: string; serial: number } | null>(null)
+  const stageSlideId = useRef<string | undefined>(undefined)
+  const onPicture = useCallback((dataUrl: string, filename: string, atCaret?: boolean) => {
     if (!editor) return
     const id = idOf(shown)
-    if (id) sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
+    if (!id) return
+    caretPictureFor.current = atCaret ? id : null
+    sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
   }, [editor, idOf, shown])
 
   useEffect(() => onMessage(message => {
@@ -979,6 +989,13 @@ export function DeckView({
       return
     }
     if (message.type !== 'deck/image-saved' || typeof message.slideId !== 'string' || typeof message.path !== 'string') return
+    if (caretPictureFor.current === message.slideId) {
+      caretPictureFor.current = null
+      if (stageSlideId.current === message.slideId && typeof message.url === 'string') {
+        setStagePicture({ slideId: message.slideId, path: message.path, url: message.url, serial: Date.now() })
+        return
+      }
+    }
     const index = slidesOf(editor.state.doc).findIndex(entry => entry.data.id === message.slideId)
     if (index < 0) return
     const entry = slidesOf(editor.state.doc)[index]
@@ -1219,6 +1236,25 @@ export function DeckView({
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
 
+  // ---- Sprint 161 (PR 3): the slide's Slides items, "This slide is full", and a block table's rows in Settings
+
+  /** The slide on the stage is full (its words at their smallest and still past its edge): the bar says so. */
+  const [slideFull, setSlideFull] = useState(false)
+  /** The bar's Split at the cursor, and Settings' Add a row / Add a column, asked of the slide editor. */
+  const [splitRequest, setSplitRequest] = useState(0)
+  const [tableRequest, setTableRequest] = useState<{ what: 'row' | 'column'; serial: number } | null>(null)
+  stageSlideId.current = slideShown && slide ? slide.data.id : undefined
+  // The / menu's New slide below: an empty block slide after this one's part, its title taking the caret.
+  const onNewSlideBelow = useCallback(() => stripActions.insert(shown + 1, ''), [stripActions, shown])
+  // Split slide here: the words after the caret go to a new slide below, which takes the caret.
+  const onSplit = useCallback((before: string, after: string) => {
+    if (!editor || !dispatch(splitSlide(editor.state, shown, before, after, Math.random, textHandoutRef.current))) return
+    setFocusTitleOf({ index: shown + 1, select: false })
+    requestAnimationFrame(() => pick(shown + 1))
+  }, [editor, dispatch, shown, pick])
+  /** A block slide with a table: Settings' Add a row and Add a column act on it through the slide editor. */
+  const blockTable = slideShown && !!slide && isBlockSlide(slide.kind) && blockHasTable(slide.data.markdown ?? '')
+
   return (
     <div className="deck-view h-screen bg-surface flex flex-col">
       <header className="deck-bar">
@@ -1284,7 +1320,11 @@ export function DeckView({
                     hidden={drawsAsBlocks(slide.kind)
                       ? (!isBlockSlide(slide.kind) && hiddenWords(slide.kind, slide.data).length > 0 ? 'Words its old layout hid become a comment in the handout when you first edit this deck.' : '')
                       : hiddenNote(slide.kind, slide.data)}
-                    table={slide.kind === 'table' ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) } : undefined}
+                    table={slide.kind === 'table'
+                      ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) }
+                      : blockTable
+                        ? { addRow: () => setTableRequest({ what: 'row', serial: Date.now() }), addColumn: () => setTableRequest({ what: 'column', serial: Date.now() }) }
+                        : undefined}
                   />
                 )}
                 onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
@@ -1318,6 +1358,19 @@ export function DeckView({
                   </Button>
                 </Tooltip>
               ) : null}
+            </>
+          ) : slideFull && slideShown ? (
+            // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is
+            // current). Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
+            <>
+              <Tooltip label={SLIDE_FULL}>
+                <span className="deck-notice-text">{SLIDE_FULL}</span>
+              </Tooltip>
+              <Tooltip label="Move the words after the cursor to a new slide below this one">
+                <Button variant="link" className="deck-line-action" onClick={() => setSplitRequest(value => value + 1)}>
+                  Split at the cursor
+                </Button>
+              </Tooltip>
             </>
           ) : null}
         </span>
@@ -1376,6 +1429,12 @@ export function DeckView({
                   // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
                   commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
                   onCommentOpened={commentOpened}
+                  onNewSlideBelow={onNewSlideBelow}
+                  onSplit={onSplit}
+                  onFull={setSlideFull}
+                  splitRequest={splitRequest}
+                  tableRequest={tableRequest}
+                  picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
                 />
               ) : null}
             </div>

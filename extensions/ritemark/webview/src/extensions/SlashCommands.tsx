@@ -1,5 +1,6 @@
-import { Extension } from '@tiptap/core'
+import { Extension, type Editor } from '@tiptap/core'
 import { ReactRenderer } from '@tiptap/react'
+import type { PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import { CommandsList } from './CommandsList'
@@ -7,28 +8,48 @@ import { executeSlashCommand, slashItemsFor, type BlockItemDef } from './blockIt
 
 export type { BlockItemDef as Command }
 
-export const SlashCommands = Extension.create({
+export interface SlashCommandsOptions {
+  suggestion: Record<string, unknown>
+  /**
+   * Sprint 161 (PR 3): the items for this editor, in their order; the Text editor's (`slashItemsFor`) when not given.
+   * The slide on the stage passes its own list (frame 22).
+   */
+  itemsFor: ((editor: Editor) => BlockItemDef[]) | null
+  /** Sprint 161 (PR 3): what choosing an item does; `executeSlashCommand` when not given. */
+  run: ((editor: Editor, range: { from: number; to: number }, item: BlockItemDef) => void) | null
+  /** Sprint 161 (PR 3): the suggestion's own key, so its editor can tell when the menu is open. */
+  pluginKey: PluginKey | null
+}
+
+export const SlashCommands = Extension.create<SlashCommandsOptions>({
   name: 'slashCommands',
 
   addOptions() {
     return {
       suggestion: {
         char: '/',
-        command: ({ editor, range, props }: any) => {
-          executeSlashCommand(editor, range, props)
-        },
       },
+      itemsFor: null,
+      run: null,
+      pluginKey: null,
     }
   },
 
   addProseMirrorPlugins() {
+    const { itemsFor, run, pluginKey } = this.options
     return [
       Suggestion({
         editor: this.editor,
         ...this.options.suggestion,
+        ...(pluginKey ? { pluginKey } : {}),
+        command: ({ editor, range, props }: any) => {
+          if (run) run(editor, range, props)
+          else executeSlashCommand(editor, range, props)
+        },
         items: ({ query, editor }: any) => {
           // A deck's handout has the slide node in its schema (Sprint 157): its Divider starts a new slide.
-          return slashItemsFor(!!editor?.schema?.nodes?.deckSlide).filter((item) =>
+          const items = itemsFor ? itemsFor(editor) : slashItemsFor(!!editor?.schema?.nodes?.deckSlide)
+          return items.filter((item) =>
             item.title.toLowerCase().startsWith(query.toLowerCase())
           )
         },

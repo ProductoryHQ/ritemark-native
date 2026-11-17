@@ -435,13 +435,16 @@ function blockStepsTag(slide: PublicSlide): string | null {
 }
 
 /**
- * A section: an old Section slide, or a block slide drawn as one (its number over its title, PR 2: how a Section slide
- * converts). Its number ('' for none), or null for any other slide.
+ * A section: an old Section slide, or a block slide drawn as one (its number over its title, PR 2; or its header's
+ * `section: true`, PR 3: how a Section slide converts). Its number ('' for none), or null for any other slide.
  */
 function sectionNumberOf(slide: PublicSlide): string | null {
   if (slide.section !== undefined) return slide.section;
   if (slide.kind === 'section') return (slide.data.number ?? '').trim();
-  return isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') : null;
+  if (!isBlockSlide(slide.kind)) return null;
+  const number = blockSectionNumberOf(slide.data.markdown ?? '');
+  // PR 3: a header that says `section: true` is a section with or without a number over its title.
+  return slide.data.section === true ? number ?? '' : number;
 }
 
 /** An Exercise slide, or a block slide with Steps: its numbered steps get ticks, and Contents ticks it when done. */

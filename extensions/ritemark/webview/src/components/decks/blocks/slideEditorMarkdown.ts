@@ -115,24 +115,61 @@ export const SlideDiv = Node.create({
   },
 })
 
+/**
+ * A `:::` block as Markdown: its lines as written around its blocks as Turndown wrote them. An empty block (a new Boxes
+ * slide's box, a column not yet typed in) keeps its two lines, with its blank line after the opening one only when it
+ * had one, so it reads back as the same empty block (PR 3: empty boxes were dropped on save).
+ */
+function slideDivMarkdown(content: string, element: HTMLElement): string {
+  const open = element.getAttribute('data-open') ?? ':::'
+  const close = element.getAttribute('data-close') ?? ':::'
+  const gapOpen = element.getAttribute('data-gap-open') === 'true' ? '\n' : ''
+  const gapClose = element.getAttribute('data-gap-close') === 'true' ? '\n' : ''
+  const inside = content.replace(/^\n+/, '').replace(/\n+$/, '')
+  // Tight with a neighbour only as written (`data-md-tight`); a fence line never merges with the block beside it.
+  const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
+  const next = element.nextElementSibling
+  const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
+  if (!inside) return `${lead}${open}\n${gapOpen}${close}${trail}`
+  return `${lead}${open}\n${gapOpen}${inside}\n${gapClose}${close}${trail}`
+}
+
+/** A DOM node (this file's `Node` is TipTap's). */
+type DomNode = globalThis.Node
+
+const isSlideDiv = (node: DomNode) => node.nodeName === 'DIV' && (node as HTMLElement).hasAttribute('data-fdiv')
+
+/** Is this list inside a `:::` block (a Steps block's steps): only there does an empty list keep its markers. */
+function isInsideSlideDiv(node: DomNode): boolean {
+  for (let up = node.parentNode; up; up = up.parentNode) if (isSlideDiv(up)) return true
+  return false
+}
+
 /** The div's save rule: its lines as written around its blocks as Turndown wrote them. */
 export function addSlideDivTurndownRule(service: TurndownService): void {
   service.addRule('slideDiv', {
-    filter: node => node.nodeName === 'DIV' && (node as HTMLElement).hasAttribute('data-fdiv'),
-    replacement: (content, node) => {
-      const element = node as HTMLElement
-      const open = element.getAttribute('data-open') ?? ':::'
-      const close = element.getAttribute('data-close') ?? ':::'
-      const gapOpen = element.getAttribute('data-gap-open') === 'true' ? '\n' : ''
-      const gapClose = element.getAttribute('data-gap-close') === 'true' ? '\n' : ''
-      const inside = content.replace(/^\n+/, '').replace(/\n+$/, '')
-      // Tight with a neighbour only as written (`data-md-tight`); a fence line never merges with the block beside it.
-      const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
-      const next = element.nextElementSibling
-      const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
-      return `${lead}${open}\n${gapOpen}${inside}\n${gapClose}${close}${trail}`
-    },
+    filter: node => isSlideDiv(node),
+    replacement: (content, node) => slideDivMarkdown(content, node as HTMLElement),
   })
+  // Turndown gives an element with no words (a `:::` block of empty boxes, a Steps block's first empty step) its blank
+  // rule, never its own, so the block and its list dropped out of the file. A slide's empty block keeps its lines, and
+  // an empty list inside one its markers (`1.`, `-`), which read back as the same empty list. Anything else blank stays
+  // as the document editor writes it.
+  // The service reads its blank rule once, when it is made (`rules.blankRule`), so the rule itself is replaced.
+  const rules = (service as unknown as { rules: { blankRule: { replacement: (content: string, node: DomNode, options: unknown) => string } } }).rules
+  const blank = rules.blankRule.replacement
+  rules.blankRule = {
+    replacement: (content, node, options) => {
+      if (isSlideDiv(node)) return slideDivMarkdown(content, node as HTMLElement)
+      if ((node.nodeName === 'OL' || node.nodeName === 'UL') && isInsideSlideDiv(node)) {
+        const items = Array.from((node as HTMLElement).children).filter(child => child.nodeName === 'LI')
+        const start = Number((node as HTMLElement).getAttribute('start') ?? '1') || 1
+        const marker = (index: number) => (node.nodeName === 'OL' ? `${start + index}.` : '-')
+        return `\n\n${Array.from({ length: Math.max(1, items.length) }, (_unused, index) => marker(index)).join('\n')}\n\n`
+      }
+      return blank(content, node, options)
+    },
+  }
 }
 
 /** The slide editor's Turndown: the document editor's rules on a service of its own, and the div's rule. */

@@ -2,8 +2,10 @@
  * Sprint 157 (README frame 2): the strip of numbered thumbnails on the left.
  *
  *  - A click (or ↑ ↓) makes a slide the current one; the handout scrolls to its part.
- *  - Pointing between two thumbnails shows a +; it opens the prototype's small menu: New slide (Boxes or Points) and
- *    New exercise (the Experience lead's answer 5). "New slide" under the last one does the same at the end.
+ *  - Pointing between two thumbnails shows a +; it opens the prototype's small menu (the Experience lead's answer 5).
+ *    Since Sprint 161's PR 3 its first item is New slide: an empty block slide, its title taking the caret; its blocks
+ *    come from the slide's / menu (frame 22), so the menu no longer offers a layout (Boxes, Points, New exercise). From
+ *    the library and From another deck stay. "New slide" under the last one does the same at the end.
  *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Delete slide. Delete asks
  *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`).
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
@@ -70,23 +72,16 @@ export function stripCommentCount(entry: Pick<DeckSlideEntry, 'kind' | 'data'>):
   return isBlockSlide(entry.kind) ? slideCommentCount(entry.data.markdown ?? '') : 0
 }
 
-/** The prototype's small menu for a new slide (the Experience lead's answer 5: it opens a menu, it adds nothing by itself). */
+/**
+ * The prototype's small menu for a new slide (the Experience lead's answer 5: it opens a menu, it adds nothing by
+ * itself). Sprint 161 (PR 3): New slide, an empty block slide whose blocks come from its / menu; no layout to choose.
+ */
 function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
   return (
     <>
-      <DropdownMenuItem onSelect={() => actions.insert(at, 'boxes')}>
-        <Icon name="squares-four" size={14} tone="inherit" />
-        <span className="flex-1">New slide</span>
-        <span className="deck-menu-sub">Boxes</span>
-      </DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => actions.insert(at, 'points')}>
-        <Icon name="list" size={14} tone="inherit" />
-        <span className="flex-1">New slide</span>
-        <span className="deck-menu-sub">Points</span>
-      </DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => actions.insert(at, 'exercise')}>
-        <Icon name="list-checks" size={14} tone="inherit" />
-        New exercise
+      <DropdownMenuItem onSelect={() => actions.insert(at, '')}>
+        <Icon name="plus-square" size={14} tone="inherit" />
+        New slide
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onSelect={() => actions.fromLibrary(at, 'topics')}>

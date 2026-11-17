@@ -52,7 +52,7 @@ const DECK = [
 const converted = convertDeckText(DECK);
 assert.equal(converted, [
   '---', 'deck: 2', '---', '',
-  '```slide', '---', 'id: s1', '---', '1', '', '# Why agents?', '```', '',
+  '```slide', '---', 'id: s1', 'section: true', '---', '1', '', '# Why agents?', '```', '',
   '## Why agents?', '', 'Section text.', '',
   '<!-- NOTESWORD --› still notes', 'Hidden by the old layout: SECTIONSUBTITLE -->', '',
   '```slide', '---', 'id: e2', '---', '# Try it', '', '::: {.steps tag="Harjutus"}', '1. Open', '2. Ask', ':::', '```', '',

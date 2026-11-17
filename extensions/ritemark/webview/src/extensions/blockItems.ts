@@ -12,6 +12,10 @@ export interface BlockItemDef {
   icon: PhosphorIconName
   nodeType: string
   attrs?: Record<string, unknown>
+  /** Sprint 161 (PR 3): the menu's group heading this item stands under (the slide's / menu, frame 22). */
+  group?: string
+  /** Sprint 161 (PR 3): the Markdown shortcut shown at the item's right (`#`, `1.`, `***`). */
+  shortcut?: string
 }
 
 export const blockItems: BlockItemDef[] = [

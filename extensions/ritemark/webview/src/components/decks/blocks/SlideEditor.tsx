@@ -18,28 +18,40 @@
  * The slide is scaled with `transform: scale`, never CSS `zoom` (spike §1: ProseMirror's coordinates, the caret, the
  * / menu and IME are right under a transform), and the bubble menu goes in `document.body`, outside the scaled frame.
  * The words fit the slide in steps (`slideFit.ts`), measured again as they change.
+ *
+ * PR 3 (frames 22, 24 and 26; `slideCommands.ts`): the slide's own / menu with its blocks and its Slides items, a box's
+ * icon from the grid, the Steps pill edited in place, Enter moving down a table, and "This slide is full" told to the
+ * deck's bar (`onFull`) with Split at the cursor. While the / menu is open the words typed after the / are not written
+ * to the deck (they are the menu's query), so a block chosen from it is one undo step that leaves the file as it was
+ * before the /. A block, an icon, a row or a column is written as an undo step of its own (`SLIDE_COMMAND`).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { EditorContent, useEditor, type Editor as TipTapEditor } from '@tiptap/react'
-import { Extension, createNodeFromContent, getHTMLFromFragment } from '@tiptap/core'
+import { Extension, createNodeFromContent, getHTMLFromFragment, type Editor as CoreEditor } from '@tiptap/core'
 import type { Schema } from '@tiptap/pm/model'
 import Placeholder from '@tiptap/extension-placeholder'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { TextSelection } from '@tiptap/pm/state'
+import { PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { closeHistory } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, withBlockMarkdown, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, sidePictureOf, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { takeImageFile } from '../../../lib/pastedImage'
+import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
+import { SlashCommands } from '../../../extensions/SlashCommands'
+import type { BlockItemDef } from '../../../extensions/blockItems'
 import { FormattingBubbleMenu } from '../../FormattingBubbleMenu'
 import { themeStyle } from '../theme/themeVars'
 import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
-import { SlideDivWithView } from './slideDivView'
+import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown } from './slideEditorMarkdown'
-import { contentHeightOf, fitValue, nextFitStep } from './slideFit'
+import { contentHeightOf, fitValue, isFullAt, nextFitStep } from './slideFit'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, addToTable, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
@@ -62,12 +74,51 @@ export interface SlideEditorProps {
   /** Put the caret in the slide's title once it is drawn (a new slide's), or select it whole (a deck New made). */
   focusTitle?: { select: boolean } | null
   onFocusTaken?: () => void
-  /** A picture pasted or dropped on the slide, read as a data URL. */
-  onPicture: (dataUrl: string, filename: string) => void
+  /**
+   * A picture pasted or dropped on the slide, read as a data URL. `atCaret`: the / menu's Picture chose it, so it goes
+   * where the / was (`picture` brings it back once saved).
+   */
+  onPicture: (dataUrl: string, filename: string, atCaret?: boolean) => void
   /** Sprint 161: open one of the slide's saved comments (the deck's bar, Prev and Next), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for in `commentOpen` was opened: the asker forgets the request. */
   onCommentOpened?: (serial: number) => void
+  /** PR 3: the / menu's New slide below. */
+  onNewSlideBelow?: () => void
+  /** PR 3: Split slide here: the slide's Markdown before the caret stays, the Markdown after it is a new slide below. */
+  onSplit?: (before: string, after: string) => void
+  /** PR 3: the slide is full (its words at their smallest step and still more than the slide holds), or no longer. */
+  onFull?: (full: boolean) => void
+  /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
+  splitRequest?: number
+  /** PR 3: Settings' Add a row or Add a column, on the slide's table; each new serial adds one. */
+  tableRequest?: { what: 'row' | 'column'; serial: number } | null
+  /** PR 3: the picture the / menu's Picture asked for, saved beside the deck: it goes where the / was. */
+  picture?: { path: string; url: string; serial: number } | null
+}
+
+/** The slide's / menu's suggestion, by its own key: while it is open, the words after the / are its query. */
+const slideSlashKey = new PluginKey('slideSlash')
+
+/** Is the slide's / menu open (its query being typed)? */
+function slashOpen(state: EditorState): boolean {
+  return !!(slideSlashKey.getState(state) as { active?: boolean } | undefined)?.active
+}
+
+/** What the slide's blocks, its / menu and its keys do (PR 3), as the editor's extensions call them. */
+interface SlideTools {
+  runItem: (range: { from: number; to: number }, item: BlockItemDef) => void
+  enter: () => boolean
+  splitLine: () => boolean
+  pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
+  editPill: (pos: number, anchor: HTMLElement) => void
+}
+
+/** A paragraph that holds only `***`, the caret at its end: Split slide here's shortcut (frame 22). */
+function splitLineAt(state: EditorState): { from: number; to: number } | null {
+  const { $from, empty } = state.selection
+  if (!empty || $from.parent.type.name !== 'paragraph' || $from.parent.textContent !== '***' || $from.parentOffset !== 3) return null
+  return { from: $from.before(), to: $from.after() }
 }
 
 /** The right-click menu's shortcuts, as the platform writes them. */
@@ -124,7 +175,10 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, splitRequest, tableRequest, picture }: SlideEditorProps) {
+  // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
+  const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull })
+  actionsRef.current = { onNewSlideBelow, onSplit, onFull }
   const slideRef = useRef(slide)
   slideRef.current = slide
   const assetsRef = useRef(assets)
@@ -137,7 +191,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   // The editor the sync was made for: a new editor (its extensions changed) gets a new sync, on its own schema.
   const syncEditor = useRef<TipTapEditor | null>(null)
   const frameRef = useRef<HTMLDivElement | null>(null)
-  const stepRef = useRef(0)
+  const fitStepRef = useRef(0)
+  /** PR 3: the next write is an undo step of its own: a block's ('command'), then the typing after it ('after'). */
+  const stepRef = useRef<'none' | 'command' | 'after'>('none')
+  /** PR 3: words not yet written because the / menu was open (or an input method composing). */
+  const heldRef = useRef(false)
+  /** Is the slide full: its words at the smallest step and still more than it holds (told to the deck's bar). */
+  const fullRef = useRef(false)
   const outerRef = useRef(outer)
   outerRef.current = outer
 
@@ -146,13 +206,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const [shownMarkdown, setShownMarkdown] = useState(nodeMarkdown)
   if (commentCallouts) ensureSlideCommentPipeline()
 
-  /** Write the stage's Markdown to the slide's node: one transaction, converting the deck first when it holds v1 slides. */
-  const write = useCallback((markdown: string, doc: PMNode) => {
+  /**
+   * Write the stage's Markdown to the slide's node: one transaction, converting the deck first when it holds v1 slides.
+   * `ownStep`: an undo step of its own (a block from the / menu, an icon, a row, and the first typing after one).
+   */
+  const write = useCallback((markdown: string, doc: PMNode, ownStep = false) => {
     const editorOuter = outerRef.current
     if (editorOuter.isDestroyed) return
     const entry = freshEntry(editorOuter, slideRef.current)
     if (!entry) return
     const tr = editorOuter.state.tr
+    if (ownStep) closeHistory(tr)
     convertDeckInto(tr)
     // The conversion puts comments at the ends of parts: this slide's place moves past any put before it.
     const pos = tr.mapping.map(entry.pos)
@@ -190,17 +254,42 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     },
   }), [commentCallouts])
 
+  // PR 3: what the slide's blocks, its / menu and its keys do, read at the moment they are used (`tools` is set below,
+  // on every render), so the editor's extensions are made once.
+  const toolsRef = useRef<SlideTools | null>(null)
+  const divHandlers = useMemo<SlideDivHandlers>(() => ({
+    pickIcon: (pos, anchor, current) => toolsRef.current?.pickIcon(pos, anchor, current),
+    editPill: (pos, anchor) => toolsRef.current?.editPill(pos, anchor),
+  }), [])
+  const SlideKeys = useMemo(() => Extension.create({
+    name: 'slideKeys',
+    priority: 900,
+    addKeyboardShortcuts() {
+      return {
+        // In a table, Enter goes on to the cell below (a new row under the last), as Tab goes on to the next cell.
+        Enter: () => toolsRef.current?.enter() ?? false,
+        // `***` alone on a line, then Space or Enter: Split slide here's shortcut.
+        Space: () => toolsRef.current?.splitLine() ?? false,
+      }
+    },
+  }), [])
+  const SlideSlash = useMemo(() => SlashCommands.configure({
+    itemsFor: () => SLIDE_ITEMS,
+    run: (_editor, range, item) => toolsRef.current?.runItem(range, item),
+    pluginKey: slideSlashKey,
+  }), [])
+
   // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
     beforeLink: [Placeholder.configure({ placeholder: ({ node, pos }) => (pos === 0 && node.type.name === 'heading' ? 'Title' : ''), showOnlyCurrent: false })],
-    afterImage: [OuterHistory],
+    afterImage: [OuterHistory, SlideKeys, SlideSlash],
     commentCallouts,
-    deck: [SlideDivWithView],
+    deck: [slideDivWithView(divHandlers)],
   }).map(extension => {
     if (extension.name === 'starterKit') return extension.configure({ history: false })
     if (extension.name === 'commentNode') return SlideCommentNode.extend()
     return extension
-  }), [OuterHistory, commentCallouts])
+  }), [OuterHistory, SlideKeys, SlideSlash, divHandlers, commentCallouts])
 
   const editor = useEditor({
     extensions,
@@ -224,10 +313,18 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     onUpdate: ({ editor: updated, transaction }) => {
       if (transaction.getMeta(SLIDE_SYNC)) return
       syncRef.current?.track(transaction)
-      // An input method's word is written once it is composed (the composition's end), never mid-word.
-      if (updated.view.composing) return
+      if (transaction.getMeta(SLIDE_COMMAND)) stepRef.current = 'command'
+      // An input method's word is written once it is composed (the composition's end), never mid-word; the / menu's
+      // query once the menu has closed (PR 3).
+      if (updated.view.composing || slashOpen(updated.state)) {
+        heldRef.current = true
+        return
+      }
       writeNow(updated)
     },
+    // The / menu closed without a change (Esc, the caret moved away): what waited is written now.
+    onTransaction: ({ editor: updated }) => flushHeld(updated),
+    onBlur: ({ editor: updated }) => flushHeld(updated),
   }, [extensions])
   // The slide's sync, made with the editor from the Markdown it was made with.
   if (editor && syncEditor.current !== editor) {
@@ -237,12 +334,30 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   }
 
   /** Write the stage's words to the node when the node lacks them. */
-  function writeNow(current: TipTapEditor) {
+  function writeNow(current: TipTapEditor | CoreEditor) {
     const sync = syncRef.current
     if (!sync || current.isDestroyed) return
     const markdown = sync.toWrite(current.state.doc)
-    if (markdown === null) sync.settled(current.state.doc)
-    else write(markdown, current.state.doc)
+    if (markdown === null) {
+      sync.settled(current.state.doc)
+      return
+    }
+    // A block from the / menu is an undo step of its own, and so is the first typing after it (else it would join it).
+    const step = stepRef.current
+    write(markdown, current.state.doc, step !== 'none')
+    stepRef.current = step === 'command' ? 'after' : 'none'
+  }
+
+  /** Words held while the / menu was open (or an input method composed): written once neither is so. */
+  function flushHeld(current: TipTapEditor | CoreEditor) {
+    if (!heldRef.current || current.isDestroyed || current.view.composing || slashOpen(current.state)) return
+    heldRef.current = false
+    const sync = syncRef.current
+    if (!sync) return
+    // A change of the node that waited meanwhile is laid over them first, as after a composition.
+    const tr = sync.compositionEnded(current.state)
+    if (tr) current.view.dispatch(tr)
+    writeNow(current)
   }
 
   /** A picture from the computer onto the slide: pasted (unless words are being pasted) or dropped. */
@@ -254,7 +369,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   useEffect(() => {
     const sync = syncRef.current
     if (!editor || editor.isDestroyed || !sync) return
-    const tr = sync.incoming(nodeMarkdown, editor.state, editor.view.composing)
+    // It waits while an input method composes, or while the / menu's query is typed (PR 3: `flushHeld` takes it in).
+    const holding = editor.view.composing || slashOpen(editor.state)
+    const tr = sync.incoming(nodeMarkdown, editor.state, holding)
+    if (holding) heldRef.current = true
     if (tr) editor.view.dispatch(tr)
     setShownMarkdown(nodeMarkdown)
   }, [editor, nodeMarkdown])
@@ -308,11 +426,19 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       flow.style.setProperty('--fit', String(fitValue(step)))
       return { content: contentHeightOf(flow), room: flow.clientHeight }
     }
-    const step = nextFitStep(stepRef.current, measure)
-    flow.style.setProperty('--fit', String(fitValue(step)))
-    stepRef.current = step
+    const step = nextFitStep(fitStepRef.current, measure)
+    const at = measure(step)
+    fitStepRef.current = step
     frameRef.current?.setAttribute('data-step', String(step))
+    // PR 3 (frame 24): at the floor with words still past the slide's edge, the deck's bar says the slide is full.
+    const full = isFullAt(step, at)
+    if (full !== fullRef.current) {
+      fullRef.current = full
+      actionsRef.current.onFull?.(full)
+    }
   }, [editor])
+  // A slide that leaves the stage is no longer the full one.
+  useEffect(() => () => { if (fullRef.current) actionsRef.current.onFull?.(false) }, [])
   // Once per change of the words (the editor's update), and when the size, the look or the cover look change.
   const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}`
   useLayoutEffect(() => { refit() }, [refit, lookKey])
@@ -321,11 +447,170 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     editor.on('update', refit)
     const fonts = document.fonts
     fonts?.addEventListener?.('loadingdone', refit)
+    // A picture takes its height once it has loaded, after the update that put it in (PR 3's app run: a picture from
+    // the / menu left the slide at its first step, overflowing, until the next key).
+    const flow = editor.view.dom
+    flow.addEventListener('load', refit, true)
     return () => {
       editor.off('update', refit)
       fonts?.removeEventListener?.('loadingdone', refit)
+      flow.removeEventListener('load', refit, true)
     }
   }, [editor, refit])
+
+  // ---- PR 3: the slide's / menu, its blocks' own tools, and the bar's and Settings' requests
+
+  const [iconPick, setIconPick] = useState<IconPick | null>(null)
+  const [pillEdit, setPillEdit] = useState<PillEdit | null>(null)
+  const [webPageAt, setWebPageAt] = useState<number | null>(null)
+  /** Where the / menu's Picture goes once the host has saved it. */
+  const pictureAt = useRef<number | null>(null)
+
+  const apply = (tr: Transaction | null): boolean => {
+    if (!tr || !editor || editor.isDestroyed) return false
+    editor.view.dispatch(tr)
+    return true
+  }
+
+  /** One part of the slide as its Markdown, saved the stage's way. */
+  const markdownOfDoc = (doc: PMNode): string => {
+    const schema = doc.type.schema
+    return saveSlideMarkdown(doc, getHTMLFromFragment(doc.content, schema), markdown => loadSlideDoc(schema, markdown, assetsRef.current))
+  }
+
+  /** Split slide here, at `pos` in `state`: the deck keeps the words before it on this slide and makes a new one below. */
+  const splitAt = (state: EditorState, pos: number) => {
+    const halves = splitSlideHalves(state, pos)
+    actionsRef.current.onSplit?.(markdownOfDoc(halves.before), markdownOfDoc(halves.after))
+  }
+
+  /** The / menu's Picture: the computer's file picker, then the host saves the picture beside the deck. */
+  const choosePicture = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.addEventListener('change', () => {
+      const file = input.files?.[0]
+      if (!file) return
+      void readFileAsBase64(file).then(dataUrl => onPictureRef.current(dataUrl, getUniqueImageFilename(file), true))
+    })
+    input.click()
+  }
+
+  toolsRef.current = {
+    runItem: (range, item) => {
+      if (!editor || editor.isDestroyed) return
+      const ownStep = ({ tr }: { tr: Transaction }) => { tr.setMeta(SLIDE_COMMAND, true); return true }
+      // The / and its query go first; what was never written (the menu held it) is never written.
+      const chain = () => editor.chain().focus().deleteRange(range)
+      switch (item.nodeType) {
+        case 'heading':
+          chain().setNode('heading', item.attrs).command(ownStep).run()
+          return
+        case 'bulletList':
+          chain().toggleBulletList().command(ownStep).run()
+          return
+        case 'orderedList':
+          chain().toggleOrderedList().command(ownStep).run()
+          return
+        case 'columns':
+        case 'boxes':
+        case 'steps':
+        case 'table': {
+          const kind = item.nodeType as SlideBlockKind
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind)); return true }).run()
+          return
+        }
+        case 'picture':
+          chain().run()
+          pictureAt.current = range.from
+          choosePicture()
+          return
+        case 'webPage':
+          chain().run()
+          setWebPageAt(range.from)
+          return
+        case 'newSlideBelow':
+          chain().run()
+          actionsRef.current.onNewSlideBelow?.()
+          return
+        case 'splitSlide':
+          chain().run()
+          splitAt(editor.state, editor.state.selection.from)
+          return
+      }
+    },
+    enter: () => {
+      if (!editor || editor.isDestroyed || slashOpen(editor.state)) return false
+      if (apply(cellBelow(editor.state))) return true
+      return toolsRef.current?.splitLine() ?? false
+    },
+    splitLine: () => {
+      if (!editor || editor.isDestroyed || slashOpen(editor.state)) return false
+      const line = splitLineAt(editor.state)
+      if (!line) return false
+      // The `***` is the shortcut, not words: the slide is split where its line stood, and the line goes.
+      splitAt(editor.state.apply(editor.state.tr.delete(line.from, line.to)), line.from)
+      return true
+    },
+    pickIcon: (pos, anchor, current) => {
+      const rect = anchor.getBoundingClientRect()
+      setIconPick({ pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current })
+    },
+    editPill: (pos, anchor) => {
+      const rect = anchor.getBoundingClientRect()
+      const style = getComputedStyle(anchor)
+      const node = editor && !editor.isDestroyed ? editor.state.doc.nodeAt(pos) : null
+      const open = node ? OPEN_FENCE.exec(String(node.attrs.open ?? '')) : null
+      const attrs = open ? parseFenceAttributes(open[2]) : null
+      setPillEdit({
+        pos,
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        scale: width / BLOCK_CANVAS_WIDTH,
+        words: attrs ? stepsTagOf(attrs) : '',
+        serial: Date.now(),
+        look: { background: style.backgroundColor, color: style.color, font: style.font, radius: style.borderRadius },
+      })
+    },
+  }
+
+  /** The pill's words typed in its field (#752's rule: words it shows already write nothing). */
+  const setPillWords = (pos: number, words: string) => {
+    if (editor && !editor.isDestroyed) apply(setStepsTag(editor.state, pos, words))
+  }
+  /** The field closed: with Enter or Esc, the caret back on the slide at the start of the block's first step. */
+  const endPill = (refocus: boolean) => {
+    const edit = pillEdit
+    setPillEdit(null)
+    if (!refocus || !edit || !editor || editor.isDestroyed) return
+    const at = Math.min(edit.pos + 1, editor.state.doc.content.size)
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(at))))
+    editor.view.focus()
+  }
+
+  // The deck bar's Split at the cursor: split at the caret the slide still has (the bar took the focus).
+  const splitSeen = useRef(splitRequest)
+  useEffect(() => {
+    if (splitRequest === undefined || splitRequest === splitSeen.current) return
+    splitSeen.current = splitRequest
+    if (editor && !editor.isDestroyed) splitAt(editor.state, editor.state.selection.from)
+  })
+  // Settings' Add a row or Add a column, on the slide's table.
+  const tableSeen = useRef(tableRequest?.serial)
+  useEffect(() => {
+    if (!tableRequest || tableRequest.serial === tableSeen.current) return
+    tableSeen.current = tableRequest.serial
+    if (editor && !editor.isDestroyed) apply(addToTable(editor.state, tableRequest.what))
+  })
+  // The / menu's picture, saved: where the / was (the slide's end when that place is gone).
+  const pictureSeen = useRef(picture?.serial)
+  useEffect(() => {
+    if (!picture || picture.serial === pictureSeen.current || !editor || editor.isDestroyed) return
+    pictureSeen.current = picture.serial
+    const at = Math.min(pictureAt.current ?? editor.state.doc.content.size, editor.state.doc.content.size)
+    pictureAt.current = null
+    apply(insertSlideBlock(editor.state.tr, at, pictureNode(editor.schema, picture.path, picture.url)))
+  })
 
   // Sprint 161 (frame 27): Ritemark's own right-click menu on the slide. What a comment from it is on is read when the
   // menu opens: the words under the click when they are selected, the block clicked, or the whole slide.
@@ -361,12 +646,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : ''].filter(Boolean).join(' ')
   return (
+    <>
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={setFrameRef}
           className={`deck-slide${borderless ? ' is-borderless' : ''}`}
-          data-step={stepRef.current}
+          data-step={fitStepRef.current}
           style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
           // A right press keeps the selection as it is (the Mac would select the word under it), so "with a selection,
           // it's on the words" means the words the person chose.
@@ -438,6 +724,39 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
         ) : null}
       </ContextMenuContent>
     </ContextMenu>
+    {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
+    <PillField
+      edit={pillEdit}
+      placeholder={PILL_PLACEHOLDER}
+      onWords={setPillWords}
+      onDone={endPill}
+      onUndo={redo => { if (redo) outerRef.current.commands.redo(); else outerRef.current.commands.undo() }}
+    />
+    <SlideIconPicker
+      pick={iconPick}
+      onPick={(pos, name) => {
+        setIconPick(null)
+        if (!editor || editor.isDestroyed) return
+        apply(setBlockValue(editor.state, pos, 'icon', name))
+        editor.view.focus()
+      }}
+      onClose={() => setIconPick(null)}
+    />
+    <WebPageDialog
+      open={webPageAt !== null}
+      onClose={() => {
+        setWebPageAt(null)
+        editor?.view.focus()
+      }}
+      onAdd={address => {
+        const at = webPageAt
+        setWebPageAt(null)
+        if (!editor || editor.isDestroyed || at === null) return
+        apply(insertSlideBlock(editor.state.tr, Math.min(at, editor.state.doc.content.size), webPageNode(editor.schema, address)))
+        editor.view.focus()
+      }}
+    />
+    </>
   )
 }
 

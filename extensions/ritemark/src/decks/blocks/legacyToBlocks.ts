@@ -6,7 +6,7 @@
  * | v1 kind            | blocks                                                                         |
  * | ------------------ | ------------------------------------------------------------------------------ |
  * | title, statement   | `# title`, its subtitle as a paragraph (the cover look)                        |
- * | section            | its number as a short first line, then `# title`                               |
+ * | section            | `section: true` in its header; its number (when it has one) as a short first line, then `# title` |
  * | points             | `# title`, an ordered list; an item's text is a second line                    |
  * | boxes              | `# title`, `:::: {.boxes look="…"}` of `::: {.box icon="…"}` with `### heading` |
  * | columns            | `# title`, `:::: columns` of two `::: column` with `### heading` and its lines  |
@@ -22,7 +22,7 @@
  * Pure and dependency-free but for the deck format: the host and the webview use this one converter.
  */
 import { HEADER_KEYS, isSlideKind, parseSlideBody, sidePictureOf, type SlideData, type SlideItem } from '../deckFormat';
-import { OWN_MARK_LOOKS } from './fencedDiv';
+import { OWN_MARK_LOOKS, fenceAttributeValue } from './fencedDiv';
 
 /** A v1 slide as blocks: the header's data, the Markdown, and the comment its hidden words and notes make. */
 export interface LegacyBlocks {
@@ -75,16 +75,8 @@ export function pictureTarget(path: string): string {
   return /[\s()<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
 }
 
-/**
- * An attribute value in a div's `{…}`, which has no escapes: in double quotes, or in single quotes when it holds a
- * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
- */
-export function attributeValue(value: string): string {
-  const words = value.replace(/[\r\n]+/g, ' ');
-  if (!words.includes('"')) return `"${words}"`;
-  if (!words.includes("'")) return `'${words}'`;
-  return `"${words.replace(/"/g, '\u201d')}"`;
-}
+/** An attribute value in a div's `{…}` (`fenceAttributeValue`: quoted, no escapes). */
+export const attributeValue = fenceAttributeValue;
 
 const has = (value: string | undefined): value is string => typeof value === 'string' && value.trim() !== '';
 
@@ -241,6 +233,9 @@ export function legacyDataToBlocks(kind: string, data: SlideData, notes?: string
     if (key === 'picture' || key === 'image') continue;
     if (data[key] !== undefined) (header as Record<string, unknown>)[key] = data[key];
   }
+  // PR 3 (the Experience lead, 17 November): a Section slide stays a section, with or without a number: its header says
+  // so, so the page keeps its band and the handout its H1 even when no number is drawn over its title.
+  if (kind === 'section') header.section = true;
   const side = sidePictureOf(data);
   if (kind !== 'picture' && side) {
     header.picture = side;

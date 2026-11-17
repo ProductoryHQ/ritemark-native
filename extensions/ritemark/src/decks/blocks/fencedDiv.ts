@@ -121,6 +121,39 @@ export function fencedDivStart(src: string): number | undefined {
   return match ? match.index + match[1].length : undefined;
 }
 
+/**
+ * An attribute value in a `{…}` block, which has no escapes: in double quotes, or in single quotes when it holds a
+ * double quote; a value with both keeps its words with a typographic quote. A line break is a space.
+ */
+export function fenceAttributeValue(value: string): string {
+  const words = value.replace(/[\r\n]+/g, ' ');
+  if (!words.includes('"')) return `"${words}"`;
+  if (!words.includes("'")) return `'${words}'`;
+  return `"${words.replace(/"/g, '”')}"`;
+}
+
+/**
+ * Sprint 161 (PR 3): an opening line with one value set (`icon`, `tag`) or taken out (null), as the box's icon picker
+ * and the Steps pill write it. Only this line changes: its indent and colon count stay, its id, classes and other values
+ * stay in their order, and it is written in the canonical form (`::: {.box icon="x"}`); a line left with one class and
+ * nothing else goes back to the bare form (`::: box`). Null for a line that isn't an opening line this reader reads.
+ */
+export function withFenceValue(openLine: string, key: string, value: string | null): string | null {
+  const open = OPEN_FENCE.exec(openLine);
+  const attrs = open ? parseFenceAttributes(open[2]) : null;
+  if (!open || !attrs) return null;
+  const current = attrs.values[key];
+  if (value === null ? current === undefined : current === value) return openLine;
+  const indent = /^ */.exec(openLine)?.[0] ?? '';
+  const values = { ...attrs.values };
+  if (value === null) delete values[key];
+  else values[key] = value;
+  const entries = Object.entries(values);
+  if (!attrs.id && attrs.classes.length === 1 && entries.length === 0) return `${indent}${open[1]} ${attrs.classes[0]}`;
+  const parts = [...(attrs.id ? [`#${attrs.id}`] : []), ...attrs.classes.map(name => `.${name}`), ...entries.map(([name, text]) => `${name}=${fenceAttributeValue(text)}`)];
+  return `${indent}${open[1]} {${parts.join(' ')}}`;
+}
+
 /** The Boxes looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go. */
 export const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(['steps', 'line', 'arrows']);
 

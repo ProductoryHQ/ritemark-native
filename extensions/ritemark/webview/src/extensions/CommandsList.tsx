@@ -3,7 +3,7 @@
  * Renders a list of block items with icons, keyboard navigation, and selection.
  */
 
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { Fragment, useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Icon } from '../components/ui/Icon'
 import type { BlockItemDef } from './blockItems'
 
@@ -18,6 +18,12 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
   useEffect(() => {
     setSelectedIndex(0)
   }, [props.items])
+
+  // The chosen item stays in view as the arrows move through a menu taller than its box (Sprint 161: the slide's).
+  const listRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>('[data-selected]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [selectedIndex])
 
   useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }: any) => {
@@ -48,7 +54,7 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
   }))
 
   return (
-    <div
+    <div ref={listRef}
       className="slash-command-menu rounded-lg border shadow-lg p-1 min-w-[320px] max-h-[400px] overflow-y-auto"
       style={{
         background: 'var(--vscode-editor-background, #ffffff)',
@@ -58,9 +64,20 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
     >
       {props.items.length > 0 ? (
         props.items.map((item, index) => (
+          <Fragment key={index}>
+          {/* Sprint 161 (PR 3): the slide's / menu stands in groups (frame 22); the Text editor's items have none. */}
+          {item.group && item.group !== props.items[index - 1]?.group ? (
+            <div
+              className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide${index > 0 ? ' mt-1 pt-2 border-t' : ' pt-1'}`}
+              style={{ color: 'var(--vscode-descriptionForeground, #666666)', borderColor: 'var(--vscode-panel-border, #e0e0e0)' }}
+              role="presentation"
+            >
+              {item.group}
+            </div>
+          ) : null}
           <button
-            key={index}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm rounded-md transition-colors cursor-pointer border-none"
+            data-selected={index === selectedIndex ? '' : undefined}
+            className={`flex items-center gap-3 w-full px-3 ${item.group ? 'py-1.5' : 'py-2'} text-sm rounded-md transition-colors cursor-pointer border-none`}
             style={{
               background: index === selectedIndex
                 ? 'var(--vscode-list-activeSelectionBackground, #e8e8e8)'
@@ -83,21 +100,32 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
             onMouseDown={(e) => e.preventDefault()}
           >
             <span
-              className="flex items-center justify-center w-8 h-8"
+              className={`flex items-center justify-center ${item.group ? 'w-5 h-5' : 'w-8 h-8'}`}
               style={{ color: 'var(--vscode-descriptionForeground, #666666)' }}
             >
-              <Icon name={item.icon} size={20} />
+              <Icon name={item.icon} size={item.group ? 16 : 20} />
             </span>
-            <div className="flex flex-col items-start flex-1">
-              <div className="font-medium">{item.title}</div>
-              <div
-                className="text-xs"
+            <div className="flex flex-col items-start flex-1 min-w-0">
+              <div className={item.group ? 'whitespace-nowrap' : 'font-medium'}>{item.title}</div>
+              {item.description ? (
+                <div
+                  className="text-xs"
+                  style={{ color: 'var(--vscode-descriptionForeground, #666666)' }}
+                >
+                  {item.description}
+                </div>
+              ) : null}
+            </div>
+            {item.shortcut ? (
+              <kbd
+                className="font-mono text-xs"
                 style={{ color: 'var(--vscode-descriptionForeground, #666666)' }}
               >
-                {item.description}
-              </div>
-            </div>
+                {item.shortcut}
+              </kbd>
+            ) : null}
           </button>
+          </Fragment>
         ))
       ) : (
         <div

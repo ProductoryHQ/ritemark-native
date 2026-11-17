@@ -70,6 +70,11 @@ export interface SlideData {
   kept?: boolean;
   /** `<project-relative path>#<source id> @<stamp>`: where a copy came from. */
   from?: string;
+  /**
+   * A block slide's header says it is a section (Sprint 161, PR 3: how an old Section slide converts, with or without a
+   * number): its band on the page and its H1 in the handout, drawn big and low as a title-only slide.
+   */
+  section?: boolean;
   items?: SlideItem[];
   rows?: string[][];
   /**
@@ -97,9 +102,9 @@ export function isDefaultExerciseTag(data: SlideData): boolean {
 }
 
 /** The scalar keys, in the order the writer puts a new key. */
-const SCALAR_KEYS = ['id', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
+const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'skip', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];
-const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept']);
+const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept', 'section']);
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
 
 // ---------------------------------------------------------------------------
@@ -694,7 +699,7 @@ export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | nu
 }
 
 /** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
-export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'kept'] as const;
+export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'kept', 'section'] as const;
 
 /** A block slide's body in its two parts, as written. */
 export interface BlockSlideParts {
@@ -856,9 +861,12 @@ export function withBlockMarkdown(body: string, markdown: string): string {
 /** The words a new deck's title slide starts with (New → Deck), selected so they are typed over. */
 export const EMPTY_DECK_TITLE = "The deck's title";
 
-/** The heading a part opens with: an H1 for a section slide, an H2 for every other kind. */
-export function partHeadingLevel(kind: string): 1 | 2 {
-  return kind === 'section' ? 1 : 2;
+/**
+ * The heading a part opens with: an H1 for a section slide (an old Section slide, or a block slide whose header says
+ * `section: true`, PR 3), an H2 for every other kind.
+ */
+export function partHeadingLevel(kind: string, data?: SlideData): 1 | 2 {
+  return kind === 'section' || (isBlockSlide(kind) && data?.section === true) ? 1 : 2;
 }
 
 /** A part's own heading: an H1 or H2 as the handout's first block (ATX or setext), and where it ends in the handout. */
@@ -971,7 +979,7 @@ export function withPartHeading(kind: string, data: SlideData, handout: string):
   if (partHeadingOf(handout)) return handout;
   const text = derivedHeading(data);
   if (!text) return handout;
-  const heading = `${'#'.repeat(partHeadingLevel(kind))} ${headingMarkdown(text)}`;
+  const heading = `${'#'.repeat(partHeadingLevel(kind, data))} ${headingMarkdown(text)}`;
   const rest = handout.replace(/^\s+/, '');
   return rest ? `${heading}\n\n${rest}` : heading;
 }

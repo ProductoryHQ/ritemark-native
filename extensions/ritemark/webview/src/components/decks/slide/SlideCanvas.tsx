@@ -15,10 +15,10 @@ import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, BLOCK_MAX_STEP, blockCanvasMar
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../ui/dropdown-menu'
-import { Tooltip } from '../../ui/tooltip'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
-import { SLIDE_ICONS, slideIcon } from './iconSet'
+import { slideIcon } from './iconSet'
+import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, editedItemWords, layoutSlide, pastedItemWords, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
@@ -258,25 +258,7 @@ function IconPicker({ box, glyph, editing }: { box: MarkBox; glyph: ReactNode; e
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-auto max-w-none">
-        <div className="deck-icon-grid" role="group" aria-label="Icons">
-          {SLIDE_ICONS.map(icon => (
-            <Tooltip key={icon.name} label={icon.label}>
-              <DropdownMenuItem
-                aria-label={icon.label}
-                data-state={icon.name === current ? 'on' : undefined}
-                className="deck-icon-choice"
-                onSelect={() => editing.onSetIcon(index, icon.name)}
-              >
-                <Icon name={icon.phosphor} size={16} tone="inherit" />
-              </DropdownMenuItem>
-            </Tooltip>
-          ))}
-        </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={!current} onSelect={() => editing.onSetIcon(index, null)}>
-          <Icon name="x" size={14} tone="inherit" />
-          No icon
-        </DropdownMenuItem>
+        <IconGridItems current={current} onPick={name => editing.onSetIcon(index, name)} />
       </DropdownMenuContent>
     </DropdownMenu>
   )

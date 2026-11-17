@@ -41,12 +41,19 @@ interface StageProps {
   selectOnFocus?: boolean
   /** The words asked for took the caret (or the selection). */
   onFocusTaken?: () => void
-  /** A picture pasted or dropped on the slide, read as a data URL. */
-  onPicture: (dataUrl: string, filename: string) => void
+  /** A picture pasted or dropped on the slide, read as a data URL (`atCaret`: the / menu's Picture, PR 3). */
+  onPicture: (dataUrl: string, filename: string, atCaret?: boolean) => void
   /** Sprint 161: open one of the slide's saved comments (the deck's bar), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for was opened: the asker forgets the request. */
   onCommentOpened?: (serial: number) => void
+  /** Sprint 161 (PR 3): the slide editor's Slides items, its "full" state, and the bar's and Settings' requests. */
+  onNewSlideBelow?: () => void
+  onSplit?: (before: string, after: string) => void
+  onFull?: (full: boolean) => void
+  splitRequest?: number
+  tableRequest?: { what: 'row' | 'column'; serial: number } | null
+  picture?: { path: string; url: string; serial: number } | null
 }
 
 export function Stage(props: StageProps) {
@@ -55,7 +62,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, splitRequest, tableRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -74,6 +81,12 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         onPicture={onPicture}
         commentOpen={commentOpen}
         onCommentOpened={onCommentOpened}
+        onNewSlideBelow={onNewSlideBelow}
+        onSplit={onSplit}
+        onFull={onFull}
+        splitRequest={splitRequest}
+        tableRequest={tableRequest}
+        picture={picture}
       />
     </div>
   )

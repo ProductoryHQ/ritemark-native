@@ -91,7 +91,7 @@ export function drawnHeadingsFollow(transactions: readonly Transaction[], state:
     const heading = partHeadingAt(state.doc, slide.pos)
     if (!heading || !isDrawn(heading.node)) continue
     const text = derivedHeading(slide.data)
-    const level = partHeadingLevel(slide.kind)
+    const level = partHeadingLevel(slide.kind, slide.data)
     if (heading.node.attrs.level !== level) tr.setNodeMarkup(heading.pos, undefined, { ...heading.node.attrs, level })
     if (heading.node.textContent === text) continue
     tr.replaceWith(heading.pos + 1, heading.pos + heading.node.nodeSize - 1, text ? state.schema.text(text) : [])

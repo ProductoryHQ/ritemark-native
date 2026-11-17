@@ -256,6 +256,15 @@ export function blockSectionNumberOf(markdown: string): string | null {
   return /^(?:\d{1,3}(?:\.\d{1,3})*|[A-Za-z]|[IVXLC]{1,6})[.)]?$/.test(number) ? number : null;
 }
 
+/** PR 3: does a block slide hold a table (outside code and comments): Settings then offers Add a row and Add a column. */
+export function blockHasTable(markdown: string): boolean {
+  let found = false;
+  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
+    if (token.type === 'table') found = true;
+  });
+  return found;
+}
+
 const stepsCache = new Map<string, string | null>();
 
 /**

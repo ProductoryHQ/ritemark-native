@@ -35,7 +35,8 @@ assert.equal(deck.theme, BUILT_IN_THEME);
 // third column, no Exercise step's line, no icon under a Line look (those are the conversion's comment, never public).
 const [title, section, exercise, columns, boxes] = deck.slides;
 assert.deepEqual(title.data, { title: 'Harbour title', markdown: '# Harbour title\n\nHarbour Logistics · 3 hours' });
-assert.deepEqual(section.data, { title: 'Why agents?', markdown: '1\n\n# Why agents?' });
+// PR 3: a section's header mark goes out with it (no words), so the page keeps its band with or without a number.
+assert.deepEqual(section.data, { title: 'Why agents?', markdown: '1\n\n# Why agents?', section: true });
 assert.deepEqual(exercise.data, { title: 'Build an assistant for one task', markdown: '# Build an assistant for one task\n\n::: steps\n1. Choose a task\n2. Write it down\n:::' });
 assert.equal(columns.data.markdown, '# Assistant or agent?\n\n:::: columns\n::: column\n### Left column\nAnswers when you ask\n:::\n::: column\n### Right column\nWorks on a goal\n:::\n::::');
 assert.deepEqual(boxes.data, { title: 'Read the room', markdown: '# Read the room\n\n:::: {.boxes look="line"}\n::: box\n### When\nEvery Monday\n:::\n::::' });

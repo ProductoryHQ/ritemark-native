@@ -138,7 +138,7 @@ export function derivedHeadings(state: EditorState, textHandout = false): Transa
     const text = derivedHeading(slide.data)
     // Marked as drawn where the deck's schema has the mark (the deck view's always does).
     const drawn = schema.nodes.heading.spec.attrs?.deckDrawn ? { deckDrawn: true } : {}
-    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind), ...drawn }, text ? schema.text(text) : null)
+    const heading = schema.nodes.heading.create({ level: partHeadingLevel(slide.kind, slide.data), ...drawn }, text ? schema.text(text) : null)
     const next = doc.nodeAt(after)
     const nodes = [heading]
     if (!next || isSlideNode(next)) nodes.push(schema.nodes.paragraph.create())
