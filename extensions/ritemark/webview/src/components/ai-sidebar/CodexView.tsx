@@ -16,6 +16,7 @@ import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { StartingPoints } from './StartingPoints';
 import { extractPlanDisplayText } from './planText';
+import { ThemeChangeActions } from './ThemeChangeActions';
 import { TurnFailureCard } from './TurnFailureCard';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
 import { Tooltip } from '../ui/tooltip';
@@ -248,6 +249,9 @@ export function CodexTurn({
           <span>{turn.rpcProgressMessage}</span>
         </div>
       )}
+
+      {/* Sprint 162 PR 5: a theme change's See what changed, Undo and Open the theme (frame 13), as under Claude's */}
+      {!turn.isRunning ? <ThemeChangeActions changes={turn.themeChanges} /> : null}
 
       {/* Sprint 139 (#376): the failure as one sentence, or its card, once — never the provider's JSON. */}
       {turn.result?.error && (

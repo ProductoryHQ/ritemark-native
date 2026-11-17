@@ -56,6 +56,7 @@ import {
   traceClaude,
 } from '../agent';
 import { BrowserContextStore, type ShareWaitResult } from '../browser/BrowserContextStore';
+import type { ThemeAi } from '../decks/themeAi';
 import { browserTurnPageFor, chooseTurnPage, contextAfterShareWait } from '../browser/BrowserActionTools';
 import {
   decodeBrowserShareAnswer,
@@ -817,6 +818,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
+        // Sprint 162 PR 5: a theme change's See what changed, Undo and Open the theme under the AI's reply
+        case 'theme-change/see':
+        case 'theme-change/undo':
+        case 'theme-change/open': {
+          const id = typeof message.id === 'string' && message.id.length <= 64 ? message.id : null;
+          const themes = this._themeChanges;
+          if (!id || !themes) break;
+          if (message.type === 'theme-change/undo') await themes.undo(id);
+          else if (message.type === 'theme-change/open') await themes.openTheme(id);
+          else {
+            const problem = await themes.show(id);
+            if (problem) void vscode.window.showInformationMessage(problem);
+          }
+          break;
+        }
+
         case 'comment-task/enqueue-result':
         case 'comment-task/dequeued':
         case 'comment-task/dispatch-failed': {
@@ -1115,6 +1132,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // else the browser page in front now (none with a document in front). Found by id from here on, so a tab or
           // desk brought to the front during the turn never moves the AI's actions.
           const browserPage = browserTurnPageFor(conversationId);
+          // Sprint 162 PR 5: in Ask mode a Ritemark tool's file write (a theme and its decks) asks first, on the same
+          // unified approval card as the runtime's own file writes; in Auto mode it goes ahead, as theirs do.
+          // A plan-first turn asks too, so nothing is written before its plan is approved.
+          browserPage.fileWriteApproval = approvalMode === 'ask' || planFirst
+            ? async ({ filePath, diff }) => {
+              this._runConversationCheckpoint(conversationId, () => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'approval',
+                prompt: filePath,
+              }), hostConversationEnabled);
+              const answer = await this._approvalGate.request({ requestId: `ritemark-tool-${randomUUID()}`, agentId: agentId as AgentId, kind: 'file-write', filePath, diff, conversationId });
+              return answer.approved;
+            }
+            : undefined;
           if (browserEnabled) {
             browserPage.startTurn(await chooseTurnPage({
               contextPageId,
@@ -1763,7 +1796,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const { requestId, approved, alwaysAllow, agentId: approveAgentId } = message;
           this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
           this._applyTaskResumed(message.conversationId);
-          if (approveAgentId) {
+          // Sprint 162 PR 5: a Ritemark tool's own approval is the host's alone; the runtime never asked for it
+          if (approveAgentId && !(typeof requestId === 'string' && requestId.startsWith('ritemark-tool-'))) {
             const session = this._findRuntimeSession(message.conversationId, approveAgentId as AgentId);
             // Sprint 103 R2: optional feedback rides plan rejections ("Keep planning").
             session?.respondToApproval(
@@ -4070,6 +4104,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * (`connectCurrentSlide`); none before that.
    */
   private _currentSlideOf: ((fsPath: string) => CurrentSlide | null) | null = null;
+
+  /** Sprint 162 PR 5: the AI's theme changes (`decks/themeAi.ts`), once decks are composed. */
+  private _themeChanges: Pick<ThemeAi, 'undo' | 'show' | 'openTheme'> | null = null;
+
+  /**
+   * Sprint 162 PR 5 (step-3-themes.md, frame 13): a theme change the AI made is shown under its reply in the chat it came
+   * from (See what changed, Undo, Open the theme), and what Undo did is said there.
+   */
+  public connectThemeChanges(source: ThemeAi): vscode.Disposable {
+    this._themeChanges = source;
+    const subscriptions = [
+      source.onDidAdd(({ conversationId, chip }) => { void this._view?.webview.postMessage({ type: 'theme-change/add', conversationId, change: chip }); }),
+      source.onDidUndo(({ id, words }) => { void this._view?.webview.postMessage({ type: 'theme-change/undone', id, words }); }),
+    ];
+    return { dispose: () => { for (const subscription of subscriptions) subscription.dispose(); this._themeChanges = null; } };
+  }
 
   /**
    * Decks (17 November): the active file's context names the slide the person is on when the file is an open deck,

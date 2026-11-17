@@ -78,6 +78,7 @@ import { slideAtSendOf, type CurrentSlide, type SlideAtSend } from '../../../../
 import type {
   AgentId,
   AgentInfo,
+  ThemeChangeChipView,
   ModelOption,
   ChatMessage,
   EditorSelection,
@@ -134,7 +135,15 @@ export function refillOnReopen(box: string, request: { text: string; cursor?: nu
 }
 
 /** Sprint 140 (R8): the empty sheet's places, as the host names them (`src/guidance/startingPlace.ts`). */
-const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample'];
+/** Sprint 162 PR 5: a theme change's chip as the host sends it, checked field by field. */
+function themeChipOf(value: unknown): ThemeChangeChipView | null {
+  if (!value || typeof value !== 'object') return null;
+  const chip = value as Partial<ThemeChangeChipView>;
+  if (typeof chip.id !== 'string' || (chip.kind !== 'theme' && chip.kind !== 'draft') || typeof chip.themeName !== 'string') return null;
+  return { id: chip.id, kind: chip.kind, themeName: chip.themeName };
+}
+
+const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample', 'theme'];
 
 let msgCounter = 0;
 function nextId(): string {
@@ -3187,6 +3196,37 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             ...(typeof message.conversationId === 'string' && message.conversationId ? { conversationId: message.conversationId } : {}),
             ...(message.fill === 'if-empty' ? { fill: 'if-empty' as const } : {}),
           });
+          break;
+        }
+
+        // Sprint 162 PR 5: a theme change an AI made goes under that chat's newest reply (Claude's, or ChatGPT's and
+        // OpenCode's, which share a transcript); what Undo did replaces its actions wherever it shows.
+        case 'theme-change/add': {
+          const chip = themeChipOf(message.change);
+          const targetId = typeof message.conversationId === 'string' ? message.conversationId : null;
+          const conversation = targetId ? get().conversations[targetId] : undefined;
+          if (!chip || !conversation) break;
+          const agentLast = conversation.agentConversation[conversation.agentConversation.length - 1];
+          const codexLast = conversation.codexConversation[conversation.codexConversation.length - 1];
+          const add = <T extends { themeChanges?: ThemeChangeChipView[] }>(turn: T): T => (turn.themeChanges?.some((entry) => entry.id === chip.id) ? turn : { ...turn, themeChanges: [...(turn.themeChanges ?? []), chip] });
+          const codexNewer = codexLast && (!agentLast || codexLast.isRunning || (!agentLast.isRunning && codexLast.timestamp >= agentLast.timestamp));
+          if (codexNewer) patchLastCodexTurn(targetId, add, { requireRunning: false });
+          else if (agentLast) patchLastAgentTurn(targetId, add, { requireRunning: false });
+          break;
+        }
+
+        case 'theme-change/undone': {
+          if (typeof message.id !== 'string' || typeof message.words !== 'string') break;
+          const { id, words } = message;
+          const mark = <T extends { themeChanges?: ThemeChangeChipView[] }>(turn: T): T => (turn.themeChanges?.some((entry) => entry.id === id)
+            ? { ...turn, themeChanges: turn.themeChanges.map((entry) => (entry.id === id ? { ...entry, undone: words } : entry)) }
+            : turn);
+          const next = Object.fromEntries(Object.entries(get().conversations).map(([key, conversation]) => [key, {
+            ...conversation,
+            agentConversation: conversation.agentConversation.map(mark),
+            codexConversation: conversation.codexConversation.map(mark),
+          }]));
+          set({ conversations: next });
           break;
         }
 

@@ -88,7 +88,7 @@ export interface EventPayloads {
     provider: WelcomeProvider;
   };
   starting_point_used: {
-    place: 'project' | 'empty_project' | 'word_or_pdf' | 'short_text' | 'long_text' | 'table' | 'sample';
+    place: 'project' | 'empty_project' | 'word_or_pdf' | 'short_text' | 'long_text' | 'table' | 'sample' | 'theme';
     edited: boolean;
     provider: WelcomeProvider;
   };

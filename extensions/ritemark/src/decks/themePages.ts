@@ -30,6 +30,7 @@ import { projectThemeFiles, readThemeOrEvening, resolveAssetsIn, type DeckPages 
 import { newThemeNameProblem, newThemeText, themePathFor, themeTextWith, type ThemeStart } from './themeFile';
 import { decodeThemeRequest, ThemeProtocolError, type ThemeDeck, type ThemeHostMessage, type ThemePreview, type ThemeRequest } from './themeProtocol';
 import { deckPreview, SAMPLE_DECK_TEXT } from './themePreview';
+import type { ThemeChangeView } from './themeChange';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 
 /** The project's decks and themes, read once for an answer (`ThemePages.snapshot`). */
@@ -138,7 +139,11 @@ export class ThemePages implements vscode.Disposable {
     return started !== undefined && Date.now() - started < SAVE_MARK_MS;
   }
 
-  private hasView(document: vscode.TextDocument): boolean {
+  /** Sprint 162 PR 5: the AI's theme work (`themeAi.ts`): the colour check's request and See what changed's Undo. */
+  ai: { checkColours: (document: vscode.TextDocument, fix: boolean) => Promise<string>; undo: (id: string) => Promise<string> } | null = null;
+
+  /** Is this document open in a theme's tab? */
+  hasView(document: vscode.TextDocument): boolean {
     return [...this.views].some(view => view.document === document);
   }
 
@@ -288,7 +293,42 @@ export class ThemePages implements vscode.Disposable {
         await this.queue(document, () => this.undoSave(view, token));
         return;
       }
+      // Sprint 162 PR 5: Check all colours and Fix the colours, Ritemark's own; a fix goes into the draft, one step
+      case 'theme/check-colours': {
+        // Not inside `queue`: the fix's own draft change (`draftChange`) takes its place in the document's queue
+        if (!this.ai) return;
+        const words = await this.ai.checkColours(document, request.fix);
+        await this.post(webview, { type: 'theme/check-result', text: words });
+        return;
+      }
+      case 'theme/change-undo':
+        await this.ai?.undo(request.id);
+        return;
     }
+  }
+
+  /**
+   * Sprint 162 PR 5: the AI's colour check moves colours in the draft: one change of the document, a step of the tab's own
+   * Undo, never saved. False when no tab of it is open.
+   */
+  async draftChange(document: vscode.TextDocument, text: string): Promise<boolean> {
+    const view = [...this.views].find(entry => entry.document === document);
+    if (!view) return false;
+    await this.queue(document, () => this.change(view, text, 'edit'));
+    return document.getText() === text;
+  }
+
+  /** Sprint 162 PR 5: See what changed for a draft: the sheet over the tab's preview. False when no tab of it is open. */
+  async showChange(fsPath: string, build: (webview: vscode.Webview) => ThemeChangeView): Promise<boolean> {
+    const view = [...this.views].find(entry => keyOf(entry.document.uri.fsPath) === keyOf(fsPath));
+    if (!view) return false;
+    view.panel.reveal(view.panel.viewColumn, false);
+    return this.post(view.panel.webview, { type: 'theme/change', change: build(view.panel.webview) });
+  }
+
+  /** Sprint 162 PR 5: a change was undone: every theme tab's sheet for it loses its Undo. */
+  changeUndone(id: string): void {
+    for (const view of this.views) void this.post(view.panel.webview, { type: 'theme/change-undone', id });
   }
 
   /**
@@ -606,7 +646,7 @@ export class ThemePages implements vscode.Disposable {
 }
 
 /** The document's text becomes `text`: one edit, of the span between the first and the last character that differ. */
-async function replaceText(document: vscode.TextDocument, text: string): Promise<boolean> {
+export async function replaceText(document: vscode.TextDocument, text: string): Promise<boolean> {
   const current = document.getText();
   if (current === text) return true;
   let start = 0;

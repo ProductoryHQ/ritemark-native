@@ -15,10 +15,11 @@
  *   - OpenCode: one stdio MCP adapter process per group (the same adapter
  *     file), which asks the host over IPC for the group's tools and calls.
  *
- * No tool here asks for approval: the browser tools act on a tab the user
- * shared, and the board tools change only the board, each change a history
- * line the user sees. Documents are changed only by the runtime's own (gated)
- * file tools.
+ * The browser tools act on a tab the user shared, and the board tools change
+ * only the board, each change a history line the user sees: they never ask.
+ * Sprint 162 PR 5: `set_deck_theme` writes documents (a theme and decks' theme
+ * lines), so in Ask mode it asks on the unified approval card first, through the
+ * turn holder (`BrowserTurnPage.fileWriteApproval`).
  */
 
 import * as path from 'path';

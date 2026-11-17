@@ -176,6 +176,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.equal(startingPlaceOf(null, 'files'), 'project', 'S33');
   assert.equal(startingPlaceOf(null, 'empty'), 'empty_project', 'S34');
   assert.equal(startingPlaceOf(null, 'sample'), 'sample', 'S38');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', { word: true, pdf: false }), 'word_or_pdf', 'S35: gate open');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: true, pdf: false }), 'project', 'a PDF follows its own kind');
@@ -200,7 +201,7 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 assert.equal(startingPlaceFrom('table'), 'table');
 assert.equal(startingPlaceFrom('anything else'), undefined, 'an unknown place is dropped');
 assert.equal(startingPlaceFrom(7), undefined);
-assert.equal(STARTING_PLACES.length, 7);
+assert.equal(STARTING_PLACES.length, 8, 'Sprint 162 PR 5: a theme tab is a place of its own');
 
 // Sprint 142 (R5b, Q1): the ready request's press never needs a disabled button for the folder or the empty project
 assert.deepEqual(readyPressAction({ kind: 'sample', sentChat: null, sinceLastPressMs: null, pendingChat: null, filledChat: null }), { action: 'give' }, 'the sample through the board');
