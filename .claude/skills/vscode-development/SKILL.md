@@ -328,6 +328,7 @@ npm run test:integration  # Live executor tests (API keys / Claude login); not i
 ```
 - Ritemark does not use Mocha or the Extension Development Host test runner. Each test file is a standalone `npx tsx <file>.test.ts` script that exits non-zero on failure, chained with `&&` in `package.json` (`pretest` first, then `test`).
 - `npm test` must stay hermetic: no login, API key, network or real `vscode` module. A test that needs any of those goes in `test:integration`. One file that always fails in the `&&` chain hides every file after it.
+- A test removes every temp folder it makes, pass or fail (17–18 Nov 2026: left-behind folders filled the disk twice). In a plain `main()` test, make them with `makeTempDir(prefix)` from `src/testing/tempDir.ts` (removed when the process exits); in a `node:test` file, use `after`/`t.after` or `try/finally`. `npm run test:temp-leftovers` runs the whole chain with a temp folder of its own and fails if anything is left in it (`scripts/qa/test-temp-leftovers.mjs`; it also takes `-- <command>` for one file).
 - Flow and integration-tier details: `.claude/skills/flow-testing/SKILL.md`.
 
 ### Debugging Extensions

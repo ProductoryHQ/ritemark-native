@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   CommentTaskController,
@@ -16,6 +15,7 @@ import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome, CommentTaskR
 import { safeFailureMessage, type CommentTaskProjectionV1, type CommentTaskRecordV1 } from './types';
 import type { SlideAtSend } from '../decks/currentSlide';
 import { slideAtSendForComments } from '../decks/blocks/slideComments';
+import { makeTempDir } from '../testing/tempDir';
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 const COMMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -89,7 +89,7 @@ function harness(): Harness {
   const cancelled: Array<[string, string]> = [];
   let counter = 0;
 
-  const store = new CommentTaskStore(commentTaskStoreDir(fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-ctc-'))), {
+  const store = new CommentTaskStore(commentTaskStoreDir(makeTempDir('ritemark-ctc-')), {
     now: () => new Date('2026-09-14T12:00:00.000Z'),
   });
 

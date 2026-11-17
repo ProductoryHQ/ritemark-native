@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import * as zlib from 'zlib';
 import type { GoogleAccountService } from './GoogleAccountService';
@@ -8,6 +7,7 @@ import type { DocsDocument, DriveFileMeta, DocsTabOutline } from './GoogleApiCli
 import type { GoogleDocsBindingStore } from './GoogleDocsBindingStore';
 import { GoogleDocsPublisher, type PublishPrompts } from './GoogleDocsPublisher';
 import { GOOGLE_DOC_MIME, GoogleDocsError, RITEMARK_APP_PROPERTY, type GoogleDocsBindingV1, type GoogleTemplateChoice } from './types';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── A small, honest fake of the parts of Drive and Docs the publisher uses ─────
 
@@ -340,7 +340,7 @@ async function main(): Promise<void> {
 
   // ── Images: staged, inserted, then unshared and deleted ─────────────────────
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-gdocs-'));
+    const dir = makeTempDir('ritemark-gdocs-');
     const png = (() => {
       const crc = (b: Buffer) => { let c = ~0; for (const x of b) { c ^= x; for (let i = 0; i < 8; i++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); } return ~c >>> 0; };
       const chunk = (t: string, d: Buffer) => { const len = Buffer.alloc(4); len.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([len, td, c]); };

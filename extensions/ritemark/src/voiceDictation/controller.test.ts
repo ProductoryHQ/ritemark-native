@@ -5,7 +5,6 @@
  */
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   BACKLOG_NOTICE,
@@ -19,6 +18,7 @@ import {
   type AudioLevel,
 } from './controller';
 import type { DictationMode, TranscriptionResult } from './whisperCpp';
+import { makeTempDir } from '../testing/tempDir';
 
 const BYTES_PER_SECOND = 32000;
 /** Clearly voiced audio, and silence, for tests that are not about the level check. */
@@ -233,7 +233,7 @@ async function run(): Promise<void> {
   // dictation now stops and says why.
   {
     const messages: Array<Record<string, unknown>> = [];
-    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'dictation-no-engine-'));
+    const empty = makeTempDir('dictation-no-engine-');
     const model = path.join(empty, 'model.bin');
     fs.writeFileSync(model, 'x');
     const controller = new DictationController(
