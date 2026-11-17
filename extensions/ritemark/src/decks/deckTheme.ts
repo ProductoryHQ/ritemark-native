@@ -161,13 +161,27 @@ export interface ThemeEntry {
 export const MAX_THEMES = 200;
 
 /**
- * The theme a deck draws, as a path of the project's list: the file its front matter names when the project has it,
- * else the built-in theme's (a deck with no `theme:` line, or one naming a file that isn't there, draws the built-in
- * theme, so it counts there and the menu ticks it there).
+ * A theme path as a key: `/` separators, no `./` or doubled slashes, and one case (the project folders Ritemark runs
+ * on, macOS and Windows, find a file whatever its case), so a hand-written `theme:` line names the file it draws.
  */
-export function themeKeyOf(named: unknown, paths: ReadonlySet<string>): string {
+function pathKey(path: string): string {
+  return path.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '').toLowerCase();
+}
+
+/**
+ * The entry a deck draws, by its `theme:` value: the theme file it names when the project has it; else, when the
+ * built-in theme is listed (the project has no file at its path), the built-in theme, which a deck with no line, or one
+ * naming a file that isn't there, draws. Null when the deck draws the built-in theme but the project has its own file
+ * at that path: the deck isn't linked to that file, so no row is ticked and picking the file links it.
+ */
+export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntry, 'path' | 'text'>>): string | null {
   const path = typeof named === 'string' ? named.trim() : '';
-  return isThemePath(path) && paths.has(path) ? path : BUILT_IN_THEME_PATH;
+  if (isThemePath(path)) {
+    const key = pathKey(path);
+    const file = entries.find(entry => entry.text !== null && pathKey(entry.path) === key);
+    if (file) return file.path;
+  }
+  return entries.some(entry => entry.text === null && entry.path === BUILT_IN_THEME_PATH) ? BUILT_IN_THEME_PATH : null;
 }
 
 /**
@@ -177,12 +191,15 @@ export function themeKeyOf(named: unknown, paths: ReadonlySet<string>): string {
  */
 export function themeEntries(files: ReadonlyArray<{ path: string; text: string }>, deckThemes: ReadonlyArray<string | null>): ThemeEntry[] {
   const entries: ThemeEntry[] = files.filter(file => isThemePath(file.path)).map(file => ({ path: file.path, text: file.text, decks: 0 }));
-  if (!entries.some(entry => entry.path === BUILT_IN_THEME_PATH)) entries.push({ path: BUILT_IN_THEME_PATH, text: null, decks: 0 });
+  if (!entries.some(entry => pathKey(entry.path) === pathKey(BUILT_IN_THEME_PATH))) entries.push({ path: BUILT_IN_THEME_PATH, text: null, decks: 0 });
   const byPath = new Map(entries.map(entry => [entry.path, entry]));
-  const paths = new Set(byPath.keys());
-  for (const named of deckThemes) byPath.get(themeKeyOf(named, paths))!.decks += 1;
-  const nameOf = (entry: ThemeEntry) => themeOfEntry(entry).name;
-  return entries.sort((a, b) => nameOf(a).localeCompare(nameOf(b)) || a.path.localeCompare(b.path));
+  for (const named of deckThemes) {
+    const key = themeKeyOf(named, entries);
+    if (key !== null) byPath.get(key)!.decks += 1;
+  }
+  // Each name read once, not at every comparison.
+  const names = new Map(entries.map(entry => [entry, themeOfEntry(entry).name]));
+  return entries.sort((a, b) => names.get(a)!.localeCompare(names.get(b)!) || a.path.localeCompare(b.path));
 }
 
 /** An entry's theme: its file read, or the built-in theme. */

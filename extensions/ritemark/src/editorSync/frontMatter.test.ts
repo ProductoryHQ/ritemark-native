@@ -126,6 +126,16 @@ const obsidian = [
   // A path YAML would read differently (a colon, a hash) is gray-matter's to write, never a line written as it is.
   assert.equal(headWithPlainKeyChanges('---\ntheme: a.theme.md\n---\n', { theme: 'a.theme.md' }, { theme: 'Slide library/Themes/a: b.theme.md' }), null);
   assert.equal(headWithPlainKeyChanges('---\ntheme: a.theme.md\n---\n', { theme: 'a.theme.md' }, { theme: 'x #y.theme.md' }), null);
+  // Names with other characters a theme file can have are written on their line too, and read back the same.
+  for (const name of ['Black & Gold', "Client's", 'Q1, 2026', 'Brand.Theme']) {
+    const theme = `Slide library/Themes/${name}.theme.md`;
+    const picked = joinFrontMatter({ ...plainProperties, theme }, 'The body.', plain);
+    assert.equal(picked, `---\ndeck: 2\ntheme: ${theme}\n---\n\nThe body.\n`, name);
+    assert.equal(splitFrontMatter(picked).properties.theme, theme, name);
+    assert.equal(joinFrontMatter(plainProperties, 'The body.', picked), plain, name);
+  }
+  // A single quote inside a single-quoted line would read back differently: gray-matter's to write.
+  assert.equal(headWithPlainKeyChanges("---\ntheme: 'a.theme.md'\n---\n", { theme: 'a.theme.md' }, { theme: "Client's.theme.md" }), null);
   // Only theme paths keep quotes: another quoted value is still gray-matter's.
   assert.equal(headWithPlainKeyChanges('---\na: "one"\n---\n', { a: 'one' }, { a: 'two' }), null);
 }

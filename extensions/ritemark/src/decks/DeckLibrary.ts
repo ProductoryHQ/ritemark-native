@@ -147,7 +147,8 @@ export class DeckLibrary {
       const hits = query ? slides.filter(slide => words(slide).includes(query) || deckName(file.path).toLowerCase().includes(query)) : slides;
       if (query && hits.length === 0) continue;
       const frontMatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
-      const theme = /^theme:\s*(.+)$/m.exec(frontMatter)?.[1]?.trim() ?? null;
+      // Read as the deck view and the Theme menu read it (Sprint 162): its quotes taken off, so the path is the file's.
+      const theme = frontMatterField(text.replace(/^\uFEFF/, ''), 'theme')?.trim() || null;
       const borderless = /^look:\s*borderless\s*$/m.test(frontMatter);
       found.push({
         path: file.path,
@@ -174,12 +175,9 @@ export class DeckLibrary {
    * only, for the Theme menu's "N decks". An open deck's unsaved text counts, as everywhere in the library.
    */
   async deckThemes(): Promise<Array<string | null>> {
-    const themes: Array<string | null> = [];
-    for (const file of await this.files.list()) {
-      const text = await this.files.read(file.path);
-      if (text !== null) themes.push(frontMatterField(text.replace(/^﻿/, ''), 'theme'));
-    }
-    return themes;
+    // Read side by side: the menu waits on them each time it opens.
+    const texts = await Promise.all((await this.files.list()).map(file => this.files.read(file.path)));
+    return texts.filter((text): text is string => text !== null).map(text => frontMatterField(text.replace(/^\uFEFF/, ''), 'theme'));
   }
 
   /** A deck's slides as written. */

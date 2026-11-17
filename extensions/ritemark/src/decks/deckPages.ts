@@ -603,13 +603,12 @@ export async function projectThemeFiles(root: string): Promise<Array<{ path: str
   } catch {
     return [];
   }
-  const files: Array<{ path: string; text: string }> = [];
-  for (const name of names.slice(0, MAX_THEMES)) {
+  // Read side by side: the Theme menu waits on them each time it opens.
+  const read = await Promise.all(names.slice(0, MAX_THEMES).map(async name => {
     const relative = `${THEMES_FOLDER}/${name}`;
-    const text = await readProjectTheme(root, relative);
-    if (text !== null) files.push({ path: relative, text });
-  }
-  return files;
+    return { path: relative, text: await readProjectTheme(root, relative) };
+  }));
+  return read.filter((file): file is { path: string; text: string } => file.text !== null);
 }
 
 /** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */

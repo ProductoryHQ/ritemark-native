@@ -31,7 +31,7 @@ import { DeckDrawnHeadings } from './handout/drawnHeadings'
 import { deckGuardPlugin } from './handout/deckGuard'
 import { deckLinesPlugin } from './handout/deckLines'
 import { conversionStateOf, deckConvertPlugin } from './handout/deckConvert'
-import { DeckPropertyStep, THEME_PICKED, propertyChangesOf, propertyTransaction, propertyValue, withPropertyChanges } from './theme/themePick'
+import { DeckPropertyStep, applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 
 // ThemeMenu imports style sheets through its controls, which Node cannot load: for this run, a sheet is an empty module.
 register(`data:text/javascript,${encodeURIComponent(
@@ -78,9 +78,10 @@ function openDeck(text: string) {
     state = result.state
     applied.push(result.transactions)
     for (const each of result.transactions) {
-      const changes = propertyChangesOf(each)
-      if (changes.length === 0) continue
-      properties = withPropertyChanges(properties, changes)
+      // As DeckView's listener: a change whose key was changed since by someone else is left as it is now.
+      const { apply } = applicableChanges(properties, propertyChangesOf(each))
+      if (apply.length === 0) continue
+      properties = withPropertyChanges(properties, apply)
       file = joinFrontMatter(properties, body, file)
     }
   }
@@ -90,6 +91,10 @@ function openDeck(text: string) {
     get properties() { return properties },
     applied,
     pick: (path: string) => dispatch(propertyTransaction(state, 'theme', propertyValue(properties, 'theme'), { present: true, value: path })),
+    // The Theme menu's look, as DeckView's setLook writes it.
+    look: (look: 'card' | 'borderless') => dispatch(propertyTransaction(state, 'look', propertyValue(properties, 'look'), look === 'borderless' ? { present: true, value: 'borderless' } : { present: false })),
+    /** Someone else (the host, an AI) changes a property outside the history. */
+    external: (key: string, value: unknown) => { properties = { ...properties, [key]: value }; file = joinFrontMatter(properties, body, file) },
     undo: () => undo(state, dispatch),
     redo: () => redo(state, dispatch),
     type: (words: string) => {
@@ -117,7 +122,6 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(deck.state.doc, before, 'the document itself is the same')
   assert.equal(deck.applied[deck.applied.length - 1].length, 1, 'nothing is appended to the pick: no conversion, no lines, no guard fix')
   assert.equal(conversionStateOf(deck.state).count, 0, 'a v1 deck is not converted by a pick')
-  assert.equal(deck.applied[deck.applied.length - 1][0].getMeta(THEME_PICKED), true)
   assert.equal(deck.applied[deck.applied.length - 1][0].getMeta('preventUpdate'), true, 'no Markdown change to publish')
 
   deck.undo()
@@ -155,6 +159,33 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(deck.file, text, 'the second Undo takes back the pick')
 }
 
+// ---- The look in the same menu is a step of the same Undo: Borderless writes `look: borderless`, Undo takes it out.
+{
+  const text = `---\ndeck: 2\ntheme: ${EVENING}\n---\n\n${SLIDE}`
+  const deck = openDeck(text)
+  deck.pick(FERN)
+  deck.look('borderless')
+  assert.equal(deck.file, `---\ndeck: 2\ntheme: ${FERN}\nlook: borderless\n---\n\n${SLIDE}`)
+  deck.undo()
+  assert.equal(deck.properties.look, undefined, 'the first Undo takes back the look only')
+  assert.equal(deck.properties.theme, FERN)
+  deck.undo()
+  assert.equal(deck.file, text, 'and the second the pick: the bytes as they were')
+}
+
+// ---- An Undo never writes over a change someone else made since: the newer value stays.
+{
+  const text = `---\ndeck: 2\ntheme: ${EVENING}\n---\n\n${SLIDE}`
+  const deck = openDeck(text)
+  deck.pick(FERN)
+  deck.external('theme', PAPER)
+  deck.undo()
+  assert.equal(deck.properties.theme, PAPER, 'the AI\'s Paper stays')
+  const { apply, stale } = applicableChanges({ theme: PAPER }, [{ key: 'theme', from: { present: true, value: FERN }, to: { present: true, value: EVENING } }])
+  assert.deepEqual([apply.length, stale.length], [0, 1])
+  assert.ok(sameValue({ present: false }, { present: false }) && !sameValue({ present: true, value: null }, { present: false }))
+}
+
 // ---- The step itself: it changes nothing in the document, maps through anything, and inverts to the value before.
 {
   const step = new DeckPropertyStep('theme', { present: false }, { present: true, value: FERN })
@@ -176,9 +207,18 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
     ['Paper', PAPER, 0],
   ], 'Evening counts the deck naming it, the one with no line, the missing file and the path outside; sorted by name')
   assert.equal(entries.reduce((sum, entry) => sum + entry.decks, 0), decks.length)
-  // The project's own Evening file is listed as itself, once, with its own text.
-  const own = themeEntries([{ path: EVENING, text: '---\nname: Evening\naccent: "#FF8800"\n---\n' }], [null, EVENING])
-  assert.deepEqual(own.map(entry => [entry.path, entry.decks, themeOfEntry(entry).accent]), [[EVENING, 2, '#FF8800']])
+  // The project's own Evening file is listed as itself, once, with its own text. A deck with no line draws the built-in
+  // theme, not that file: it isn't counted there, and no row is ticked for it, so picking Evening links it to the file.
+  const ownFile = { path: EVENING, text: '---\nname: Evening\naccent: "#FF8800"\n---\n' }
+  const own = themeEntries([ownFile], [null, EVENING])
+  assert.deepEqual(own.map(entry => [entry.path, entry.decks, themeOfEntry(entry).accent]), [[EVENING, 1, '#FF8800']])
+  assert.equal(themeKeyOf(null, own), null)
+  assert.equal(themeKeyOf('Slide library/Themes/Gone.theme.md', own), null)
+  assert.equal(themeKeyOf(EVENING, own), EVENING)
+  // A hand-written line names its file whatever its slashes, a leading ./ or its case.
+  const listed = themeEntries([{ path: FERN, text: FERN_TEXT }], [])
+  for (const named of ['Slide library\\Themes\\Fern Hollow.theme.md', './Slide library//Themes/Fern Hollow.theme.md', 'slide library/themes/fern hollow.theme.md'])
+    assert.equal(themeKeyOf(named, listed), FERN, named)
   assert.deepEqual([deckCountLabel(0), deckCountLabel(1), deckCountLabel(5)], ['No decks', '1 deck', '5 decks'])
 }
 
@@ -195,17 +235,20 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
     async read(path) { return files[path] ?? null },
     async write() { throw new Error('nothing is written') },
   }
-  const themes = await new DeckLibrary(project).deckThemes()
-  assert.deepEqual(themes, [EVENING, FERN, null, PAPER])
+  const library = new DeckLibrary(project)
+  assert.deepEqual(await library.deckThemes(), [EVENING, FERN, null, PAPER])
+  // The library's listing reads the line the same way (its quotes were kept before, so the thumbnails drew Evening).
+  assert.deepEqual((await library.listDecks()).map(deck => deck.theme).sort(), [EVENING, FERN, PAPER, null].sort())
 }
 
 // ---- A missing theme file draws the built-in theme: the host reads none (null), the view draws Evening, and the menu
 // ticks Evening for that deck.
 {
   assert.equal(themeOfEntry({ text: null }), BUILT_IN_THEME)
-  assert.equal(themeKeyOf('Slide library/Themes/Gone.theme.md', new Set([FERN, EVENING])), EVENING)
-  assert.equal(themeKeyOf(undefined, new Set([FERN, EVENING])), EVENING)
-  assert.equal(themeKeyOf(FERN, new Set([FERN, EVENING])), FERN)
+  const list = themeEntries([{ path: FERN, text: FERN_TEXT }], [])
+  assert.equal(themeKeyOf('Slide library/Themes/Gone.theme.md', list), EVENING)
+  assert.equal(themeKeyOf(undefined, list), EVENING)
+  assert.equal(themeKeyOf(FERN, list), FERN)
   // The deck view's own reading (`useDeckTheme`): no text from the host is the built-in theme.
   const bridge = readFileSync(fileURLToPath(new URL('./deckBridge.ts', import.meta.url)), 'utf8')
   assert.match(bridge, /theme: text === null \? BUILT_IN_THEME : parseTheme\(text\)/)

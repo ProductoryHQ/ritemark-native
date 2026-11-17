@@ -112,11 +112,12 @@ const plainValue = (value: unknown) => (typeof value === 'string' && PLAIN_WORD.
 
 /**
  * Sprint 162: a deck's theme path (`Slide library/Themes/Fern Hollow.theme.md`), written on its key's line as it is,
- * or in the quotes the line already has. Letters, digits, spaces and `_ . / ( ) + -` only, so YAML reads it back as the
- * same string with or without quotes.
+ * or in the quotes the line already has: one line that starts with a letter or digit, ends `.theme.md`, and holds no
+ * double quote, backslash, ": " or " #". Whatever the head then reads back as is checked below, so a name YAML would
+ * read differently (a single quote inside single quotes, say) is gray-matter's to write.
  */
-const THEME_LINE = /^[\p{L}\p{N}][\p{L}\p{N} _./()+-]*\.theme\.md$/u;
-const themeLineValue = (value: unknown): value is string => typeof value === 'string' && THEME_LINE.test(value);
+const THEME_LINE = /^[\p{L}\p{N}][^\n\r"\\]*\.theme\.md$/iu;
+const themeLineValue = (value: unknown): value is string => typeof value === 'string' && THEME_LINE.test(value) && !/: | #/.test(value);
 const lineValue = (value: unknown) => plainValue(value) || themeLineValue(value);
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -168,7 +169,8 @@ export function headWithPlainKeyChanges(head: string, current: Record<string, un
   const written = [lines[0], ...inner, ...lines.slice(close)].join('\n');
   // Read back, the head must hold exactly `next`: anything else is gray-matter's to write.
   try {
-    if (canonicalJson(asTheViewHoldsThem(matter(`${written}\n`).data)) !== canonicalJson(asTheViewHoldsThem(next))) return null;
+    // With options, gray-matter keeps no copy of the text in its cache.
+    if (canonicalJson(asTheViewHoldsThem(matter(`${written}\n`, {}).data)) !== canonicalJson(asTheViewHoldsThem(next))) return null;
   } catch {
     return null;
   }

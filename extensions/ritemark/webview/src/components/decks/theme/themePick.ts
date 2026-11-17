@@ -9,7 +9,8 @@
  * (`propertyChangesOf`) to the front matter, so the pick, its Undo and its Redo all reach the file the same way.
  *
  * The transaction is marked `preventUpdate` (its Markdown is unchanged, so there is nothing to publish) and so the
- * deck's own plugins never read it as the person's first edit (no conversion, no drawn headings written).
+ * deck's own plugins never read it as the person's first edit (no conversion, no drawn headings written). An Undo or
+ * Redo whose key was changed since by someone else leaves the newer value (`applicableChanges`).
  */
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
@@ -17,8 +18,6 @@ import type { EditorState, Transaction } from '@tiptap/pm/state'
 import { Step, StepMap, StepResult, type Mappable } from '@tiptap/pm/transform'
 
 const STEP_ID = 'ritemarkDeckProperty'
-/** The pick's own transaction, so the view can say "This deck uses … now" for it and not for its Undo. */
-export const THEME_PICKED = 'ritemarkThemePicked'
 
 /** A front-matter value: whether the key is there, and its value (any JSON value the properties held). */
 export interface PropertyValue {
@@ -72,12 +71,44 @@ try {
 /** The pick: one history step of its own (never joined to typing before or after it) setting `key` from `before` to `after`. */
 export function propertyTransaction(state: EditorState, key: string, before: PropertyValue, after: PropertyValue): Transaction {
   const tr = state.tr.step(new DeckPropertyStep(key, before, after))
-  return closeHistory(tr).setMeta(THEME_PICKED, true).setMeta('preventUpdate', true)
+  return closeHistory(tr).setMeta('preventUpdate', true)
 }
 
-/** The property values a transaction sets, in order (a pick, or its Undo or Redo). */
-export function propertyChangesOf(tr: Transaction): Array<{ key: string; to: PropertyValue }> {
-  return tr.steps.filter((step): step is DeckPropertyStep => step instanceof DeckPropertyStep).map(step => ({ key: step.key, to: step.after }))
+/** A property change a transaction carries: the value it expects the key to hold, and the value it sets. */
+export interface PropertyChange {
+  key: string
+  from: PropertyValue
+  to: PropertyValue
+}
+
+/** The property changes a transaction carries, in order (a pick, or its Undo or Redo). */
+export function propertyChangesOf(tr: Transaction): PropertyChange[] {
+  return tr.steps.filter((step): step is DeckPropertyStep => step instanceof DeckPropertyStep).map(step => ({ key: step.key, from: step.before, to: step.after }))
+}
+
+/** The same front-matter value: both absent, or both there with the same JSON value. */
+export function sameValue(a: PropertyValue, b: PropertyValue): boolean {
+  if (a.present !== b.present) return false
+  return !a.present || JSON.stringify(a.value) === JSON.stringify(b.value)
+}
+
+/**
+ * The changes that still apply to these properties: an Undo or Redo whose key was changed since by someone else (the
+ * host, an AI, another program) leaves that key as it is now rather than write over the newer value.
+ */
+export function applicableChanges(properties: Record<string, unknown>, changes: readonly PropertyChange[]): { apply: PropertyChange[]; stale: PropertyChange[] } {
+  const apply: PropertyChange[] = []
+  const stale: PropertyChange[] = []
+  let current = properties
+  for (const change of changes) {
+    if (sameValue(propertyValue(current, change.key), change.from)) {
+      apply.push(change)
+      current = withPropertyChanges(current, [change])
+    } else {
+      stale.push(change)
+    }
+  }
+  return { apply, stale }
 }
 
 /** The properties with those changes made: a value that isn't there takes its key out. */

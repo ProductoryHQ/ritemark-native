@@ -163,7 +163,9 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(view, /const count = slides\.length/)
   // Card | Borderless is in the Theme menu on the bar, and writes the front matter through the same `setLook`.
   assert.match(bar, /<ThemeMenu theme=\{theme\} named=\{properties\.theme\} look=\{borderless \? 'borderless' : 'card'\} onLook=\{setLook\} onPick=\{pickTheme\} \/>/)
-  assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
+  // Since Sprint 162 the look is a step of the deck's Undo (themeMenu.test.ts writes it through the same join).
+  assert.match(view, /const after = look === 'borderless' \? \{ present: true, value: 'borderless' \} : \{ present: false \}/, 'the same `look: borderless` line, or none')
+  assert.match(view, /editor\.view\.dispatch\(propertyTransaction\(editor\.state, 'look', before, after\)\)/)
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
   // Review, #764: the popup never grows past the room it has; it scrolls, so its last section stays reachable.
   assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)

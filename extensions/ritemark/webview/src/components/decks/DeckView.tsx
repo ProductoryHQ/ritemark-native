@@ -37,7 +37,7 @@ import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
 import { ThemeMenu, themePickedNotice } from './ThemeMenu'
-import { propertyChangesOf, propertyTransaction, propertyValue, withPropertyChanges } from './theme/themePick'
+import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
@@ -294,12 +294,24 @@ export function DeckView({
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
   // November it was chosen in the Slide settings popover; since Sprint 162 in the Theme menu on the bar (ThemeMenu).
   const borderless = properties.look === 'borderless'
+  // The deck's front matter as last written from here: a pick, its Undo and its Redo each change it from what it is now.
+  const propertiesRef = useRef(properties)
+  propertiesRef.current = properties
+  // Sprint 162: the look is a step of the deck's Undo too, as a theme pick is (theme/themePick.ts), so Cmd+Z on the bar
+  // after a change in the Theme menu takes back that change and nothing else. It writes the same `look: borderless` line.
   const setLook = useCallback((look: string) => {
-    const next: DocumentProperties = { ...properties }
+    const before = propertyValue(propertiesRef.current, 'look')
+    const after = look === 'borderless' ? { present: true, value: 'borderless' } : { present: false }
+    if (sameValue(before, after)) return
+    if (editor && !editor.isDestroyed) {
+      editor.view.dispatch(propertyTransaction(editor.state, 'look', before, after))
+      return
+    }
+    const next: DocumentProperties = { ...propertiesRef.current }
     if (look === 'borderless') next.look = 'borderless'
     else delete next.look
     onPropertiesChange(next)
-  }, [properties, onPropertiesChange])
+  }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
   const publishNotice = useCallback((text: string) => setNotice({ text }), [])
@@ -1397,15 +1409,17 @@ export function DeckView({
 
   // ---- Sprint 162 (step-3-themes.md): the Theme menu's pick, one step of the deck's Undo (theme/themePick.ts)
 
-  // The deck's front matter as last written from here: a pick, its Undo and its Redo each change it from what it is now.
-  const propertiesRef = useRef(properties)
-  propertiesRef.current = properties
+  // A pick or a look, and its Undo and Redo, write the front matter. An Undo or Redo whose line was changed since by
+  // someone else (the host, an AI, another program) leaves the newer value, and the bar says so.
   useEffect(() => {
     if (!editor) return
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
       const changes = propertyChangesOf(transaction)
       if (changes.length === 0) return
-      const next = withPropertyChanges(propertiesRef.current, changes)
+      const { apply, stale } = applicableChanges(propertiesRef.current, changes)
+      if (stale.length > 0) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
+      if (apply.length === 0) return
+      const next = withPropertyChanges(propertiesRef.current, apply)
       propertiesRef.current = next
       onPropertiesChange(next)
     }

@@ -14,7 +14,7 @@
  * A popover (shadcn's, on Radix), not a dropdown menu: the look's segmented control is a radio group, which a menu's
  * own arrow keys would take over. It closes on a press outside and on Esc and gives the focus back to the button.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { deckCountLabel, themeKeyOf, themeOfEntry, type DeckTheme, type ThemeEntry } from '../../../../src/decks/deckTheme'
 import { onMessage, sendToExtension } from '../../bridge'
 import { Button } from '../ui/button'
@@ -116,7 +116,9 @@ interface ThemeMenuBodyProps {
 
 /** The menu's two sections: LOOK, then THEME with the project's themes, the one the deck draws ticked. */
 export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent }: ThemeMenuBodyProps) {
-  const current = entries ? themeKeyOf(named, new Set(entries.map(entry => entry.path))) : null
+  const current = entries ? themeKeyOf(named, entries) : null
+  // Each theme file read once per list, not at every render of the open menu.
+  const themes = useMemo(() => new Map((entries ?? []).map(entry => [entry.path, themeOfEntry(entry)])), [entries])
   return (
     <>
       <div role="group" aria-labelledby="deck-theme-look">
@@ -137,7 +139,7 @@ export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent 
         {entries === null ? (
           <div className="deck-theme-wait">Reading the project's themes…</div>
         ) : entries.map(entry => {
-          const entryTheme = themeOfEntry(entry)
+          const entryTheme = themes.get(entry.path) ?? themeOfEntry(entry)
           const chosen = entry.path === current
           return (
             <Tooltip
