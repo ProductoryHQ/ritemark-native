@@ -183,7 +183,13 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    grips (the Text editor's), 24 px on the right for the + column bar, and 8 px above and under for the column grip and
    the + row bar, so a table that fits never scrolls and no handle is cut. What scrolls under the left room stops 6 px
    in, clear of the number's rail. */
-.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-right: -24px; padding-right: 24px; margin-top: -8px; margin-bottom: -8px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-right: -24px; padding-right: 24px; margin-top: -8px; margin-bottom: -8px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); container-type: inline-size; }
+/* Now that a wide table scrolls, no column squeezes (the Experience lead on #780): each column keeps its widest word
+   (the browser's own minimum), and a text column keeps about 200 px, or its stored share of the frame when larger, but
+   never more than its longest note on one line, so a note wraps into two or three lines. The node view puts each
+   column's floor on its <col> (TableHandles.ts, tableColumns.ts); the frame is the query container its share counts
+   against (the handout's text width, the frame's padding left out). The published page draws the same floors. */
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table > table > colgroup > col { min-width: var(--rm-col-floor, 0); }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
 .deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
