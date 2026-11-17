@@ -336,6 +336,7 @@ export function undoWords(record: ThemeChangeRecord, plan: UndoPlan, deckName: (
 export class ThemeChangeLedger {
   private readonly records = new Map<string, ThemeChangeRecord>();
   private next = 1;
+  private readonly session = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
   constructor(private readonly max = 50) {}
 
@@ -351,7 +352,8 @@ export class ThemeChangeLedger {
   }
 
   add(record: Omit<ThemeChangeRecord, 'id' | 'undone'>): ThemeChangeRecord {
-    const made: ThemeChangeRecord = { ...record, id: `theme-change-${this.next++}`, undone: false };
+    // Unique across window reloads: a chat keeps its buttons, so an old one must never name a newer change
+    const made: ThemeChangeRecord = { ...record, id: `theme-change-${this.session}-${this.next++}`, undone: false };
     this.records.set(made.id, made);
     while (this.records.size > this.max) this.records.delete(this.records.keys().next().value!);
     return made;

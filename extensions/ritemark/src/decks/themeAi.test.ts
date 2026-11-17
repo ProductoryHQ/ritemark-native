@@ -286,6 +286,69 @@ async function main() {
     assert.equal(read(relative), fileText);
   });
 
+  await test('review round 1: names, case, ids, a second press and a change from before a reload', async () => {
+    // A theme found by the name it holds, not only its file's name: changed in place, never a second file
+    write('Slide library/Themes/Brand.theme.md', change.aiThemeText(null, 'Harbour Bank', { bg: '#FFFFFF', head: '#102030', text: '#203040', accent: '#0E7C86' }));
+    const inPlace = await ai.setDeckTheme('chat-6', { name: 'harbour bank', fields: { corners: 'round' }, decks: [] });
+    assert.match(inPlace.text, /^Changed Slide library\/Themes\/Brand\.theme\.md\./);
+    assert.equal(parseTheme(read('Slide library/Themes/Brand.theme.md')).round, 'round');
+    assert.equal(exists('Slide library/Themes/harbour bank.theme.md'), false);
+    // Evening is the built-in theme: never a project file made by the AI
+    const evening = await ai.setDeckTheme('chat-6', { name: 'Evening', fields: FERN, decks: [] });
+    assert.ok(evening.isError);
+    assert.match(evening.text, /Evening is Ritemark's built-in theme/);
+    // A deck named in another case is recorded in its real case: Undo finds it and removes the theme
+    const before = read('Fernhollow/Talk.deck.md');
+    const cased = await ai.setDeckTheme('chat-7', { name: 'Cased', fields: FERN, decks: ['fernhollow/talk.deck.md'] });
+    assert.match(cased.text, /Talk uses it now\./);
+    assert.doesNotMatch(cased.text, /keep their themes: [^.]*Talk/, 'the changed deck is not listed as one that keeps its theme');
+    const casedId = added.at(-1)!.chip.id;
+    assert.match(casedId, /^theme-change-[0-9a-z]+-\d+$/, 'ids carry the window\'s own mark, so an old button never names a newer change');
+    // Two presses at once: one Undo, the same answer twice
+    const [first, second] = await Promise.all([ai.undo(casedId), ai.undo(casedId)]);
+    assert.equal(first, second);
+    assert.equal(first, 'Talk has its old theme again. Removed Cased.');
+    assert.equal(read('Fernhollow/Talk.deck.md'), before);
+    assert.equal(undone.filter(event => event.id === casedId).length, 1, 'one answer in the chat');
+    // A button from before a window reload: said in the chat, nothing touched
+    const stale = await ai.undo('theme-change-old-1');
+    assert.equal(stale, 'This change can no longer be undone here: the window was reloaded since.');
+    assert.deepEqual(undone.at(-1), { id: 'theme-change-old-1', words: stale });
+  });
+
+  await test('review round 1: a deck only shown becomes a change of its own when a later write points it', async () => {
+    // Made in one chat; Talk then names it in another spelling, as a person might write it
+    await ai.setDeckTheme('chat-8a', { name: 'Shown', fields: FERN, decks: [] });
+    const spelled = change.withThemeLine(DECK, "theme: './Slide library/Themes/Shown.theme.md'");
+    write('Fernhollow/Talk.deck.md', spelled);
+    const shownBefore = read('Slide library/Themes/Shown.theme.md');
+    // Another chat changes the theme with no deck: its record only shows Talk, which draws it already
+    await ai.setDeckTheme('chat-8b', { name: 'Shown', fields: { corners: 'round' }, decks: [] });
+    const id = added.at(-1)!.chip.id;
+    // The same chat then points Talk at it: joined, and Talk is a change of its own now
+    await ai.setDeckTheme('chat-8b', { name: 'Shown', fields: {}, decks: ['Fernhollow/Talk.deck.md'] });
+    assert.equal(added.at(-1)!.chip.id, id, 'joined');
+    assert.equal(await ai.undo(id), 'Talk has its old theme again. Shown is as it was before.');
+    assert.equal(read('Fernhollow/Talk.deck.md'), spelled, 'Talk\'s own spelling is back');
+    assert.equal(read('Slide library/Themes/Shown.theme.md'), shownBefore);
+    write('Fernhollow/Talk.deck.md', DECK);
+  });
+
+  await test('review round 1: a colour check\'s Undo with the tab closed says to open it, and can run later', async () => {
+    const relative = 'Slide library/Themes/Faint.theme.md';
+    const fileText = change.aiThemeText(null, 'Faint', { bg: '#1C1F4A', head: '#FFFFFF', text: '#5A5F8C', accent: '#F2B544' });
+    write(relative, fileText);
+    const document = { uri: { scheme: 'file', fsPath: path.join(root, ...relative.split('/')) }, text: fileText, isDirty: false, getText() { return this.text; } };
+    textDocuments.push(document);
+    await ai.setDraftColours('chat-9', relative, { text: '#868AAA' });
+    const id = added.at(-1)!.chip.id;
+    textDocuments.splice(textDocuments.indexOf(document), 1);
+    assert.equal(await ai.undo(id), "Open Faint's tab to undo the colour check: its draft isn't open.");
+    textDocuments.push(document);
+    assert.equal(await ai.undo(id), "Put Faint's colours back as they were. The draft is as it was before the check.");
+    assert.equal(parseTheme(document.text).text, '#5A5F8C');
+  });
+
   await test('the colour check asks the open chat in the person\'s words', () => {
     let asked = '';
     ai.onDidAsk(event => { asked = event.text; });

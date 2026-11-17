@@ -356,6 +356,9 @@ interface AISidebarState {
   startingPlace: { place: StartingPlace; hasAbout: boolean } | null;
   /** Sprint 140 (R8, D4): a fill for the composer of one chat, with where the cursor waits; ChatInput takes it. */
   composerFill: { conversationId: string; text: string; cursor: number; nonce: number } | null;
+  /** Sprint 162 PR 5: the theme tab's colour check, for the open chat; the composer takes it (`takePendingAsk`). */
+  pendingAsk: { text: string; nonce: number } | null;
+  takePendingAsk: () => void;
   /** Put words in the open chat's box, focused, the cursor at `cursor`; `origin` tells the host where they came from. */
   fillComposer: (text: string, cursor: number, origin?: { readyRequest?: 'what_is_here' | 'what_for'; startingPoint?: StartingPlace }) => void;
   /**
@@ -1127,6 +1130,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     landingPlaceholder: null,
     pendingLanding: null,
     startingPlace: null,
+    pendingAsk: null,
+    takePendingAsk: () => set({ pendingAsk: null }),
     composerFill: null,
     composerEmpty: true,
     conversationRolloutMode: 'unknown',
@@ -3233,9 +3238,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         // The theme tab's colour check: the words go to the open chat as the person's message (ChatInput sends them, or
         // queues them while a turn runs), as a comment's task does; no question first.
         case 'chat/ask-open':
-          if (typeof message.text === 'string' && message.text.trim()) {
-            window.dispatchEvent(new CustomEvent('ritemark:ask-open', { detail: message.text }));
-          }
+          if (typeof message.text === 'string' && message.text.trim()) set({ pendingAsk: { text: message.text, nonce: Date.now() } });
           break;
 
         case 'starting-place': {

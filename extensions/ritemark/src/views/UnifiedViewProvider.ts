@@ -768,6 +768,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._pendingChatStart = null;
             void webviewView.webview.postMessage({ type: 'chat/start', ...start });
           }
+          if (this._pendingAskOpen) {
+            const text = this._pendingAskOpen;
+            this._pendingAskOpen = null;
+            void webviewView.webview.postMessage({ type: 'chat/ask-open', text });
+          }
           break;
 
         case 'guidance/origin': {
@@ -4101,12 +4106,23 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     const subscriptions = [
       source.onDidAdd(({ conversationId, chip }) => { void this._view?.webview.postMessage({ type: 'theme-change/add', conversationId, change: chip }); }),
       source.onDidUndo(({ id, words }) => { void this._view?.webview.postMessage({ type: 'theme-change/undone', id, words }); }),
-      source.onDidAsk(({ text }) => {
-        this.show();
-        void this._view?.webview.postMessage({ type: 'chat/ask-open', text });
-      }),
+      source.onDidAsk(({ text }) => { void this._askOpenChat(text); }),
     ];
     return { dispose: () => { for (const subscription of subscriptions) subscription.dispose(); this._themeChanges = null; } };
+  }
+
+  /** Sprint 162 PR 5: the colour check's words, waiting for the AI's sheet when it isn't drawn yet. */
+  private _pendingAskOpen: string | null = null;
+
+  /** The colour check goes to the open chat: the sheet is shown (never focused), and the words wait until it is ready. */
+  private async _askOpenChat(text: string): Promise<void> {
+    if (this._view && this._sidebarReady) {
+      this.show();
+      void this._view.webview.postMessage({ type: 'chat/ask-open', text });
+      return;
+    }
+    this._pendingAskOpen = text;
+    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }
 
   /**

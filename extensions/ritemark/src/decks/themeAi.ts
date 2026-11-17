@@ -21,7 +21,7 @@ import { deckName } from './DeckLibrary';
 import { frontMatterField, frontMatterLook } from './deckFormat';
 import { projectRelative, projectRoot } from './deckDocuments';
 import { projectThemeFiles, readProjectTheme, readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
-import { BUILT_IN_THEME_TEXT, parseTheme, pathKey, themeEntries, themeKeyOf, THEMES_FOLDER } from './deckTheme';
+import { BUILT_IN_THEME, BUILT_IN_THEME_TEXT, parseTheme, pathKey, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER } from './deckTheme';
 import { presentSlidesOf } from './present/presentSession';
 import { wallSlideOf } from './present/presentProtocol';
 import { slidePicturePaths } from './blocks/slideRenderer';
@@ -30,7 +30,7 @@ import {
   aiThemeText, changeSlideIndexes, colourPairs, PAIR_FIELD_NAMES, pairsReport, suggestedFixes, ThemeChangeLedger, themeChangesOf, themeLineFor,
   themeLineOf, undoPlan, undoWords, withThemeLine, type AiThemeFields, type PairField, type ThemeChangeRecord, type ThemeChangeView,
 } from './themeChange';
-import { themeNameProblem, themePathFor, themeTextWith } from './themeFile';
+import { newThemeNameProblem, themeNameProblem, themePathFor, themeTextWith } from './themeFile';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import type { DeckLibrary } from './DeckLibrary';
 import type { ThemePages } from './themePages';
@@ -156,9 +156,21 @@ export class ThemeAi implements vscode.Disposable {
     if (problem) return { text: problem, isError: true };
     const parsed = themeChangesOf(input.fields);
     if (!parsed.ok) return { text: parsed.problem, isError: true };
-    // The file by this name, whatever its case: a theme the project has is changed in place.
+    // The theme by this name, whatever its case: its file's name or the name it holds. A theme the project has is changed
+    // in place; a new one follows the tab's naming rule (one name is one look in a project, Evening included).
     const files = await projectThemeFiles(root);
-    const existing = files.find(file => pathKey(file.path) === pathKey(themePathFor(name))) ?? null;
+    const lower = name.toLowerCase();
+    const existing = files.find(file => pathKey(file.path) === pathKey(themePathFor(name)))
+      ?? files.find(file => parseTheme(file.text).name.trim().toLowerCase() === lower)
+      ?? null;
+    if (!existing) {
+      if (lower === BUILT_IN_THEME.name.toLowerCase()) {
+        return { text: `${BUILT_IN_THEME.name} is Ritemark's built-in theme, which every deck without a theme draws. Make a new theme with a name of its own.`, isError: true };
+      }
+      const folderFiles = await fs.promises.readdir(path.join(root, THEMES_FOLDER)).catch(() => [] as string[]);
+      const taken = newThemeNameProblem(name, { names: themeEntries(files, []).map(entry => themeOfEntry(entry).name), files: folderFiles });
+      if (taken) return { text: taken, isError: true };
+    }
     const themePath = existing?.path ?? themePathFor(name);
     const themeAbsolute = path.join(root, ...themePath.split('/'));
     const openTheme = openDocument(themeAbsolute);
@@ -172,11 +184,15 @@ export class ThemeAi implements vscode.Disposable {
     const themeBefore = existing?.text ?? null;
     const themeAfter = aiThemeText(themeBefore, name, parsed.changes);
 
-    // The decks: each a `.deck.md` in the project; its line before and after.
+    // The decks: each a `.deck.md` in the project, by its path as the project writes it (the case the AI typed may
+    // differ); its line before and after.
     const deckChanges: ThemeChangeRecord['decks'] = [];
     const deckTexts = new Map<string, { absolute: string; text: string }>();
+    const known = input.decks.length ? (await this.library()?.deckThemeList().catch(() => []) ?? []).map(deck => deck.path) : [];
     for (const value of input.decks) {
-      const { relative, absolute } = projectPath(root, value);
+      const given = projectPath(root, value);
+      const relative = known.find(entry => entry.toLowerCase() === given.relative.toLowerCase()) ?? given.relative;
+      const absolute = path.join(root, ...relative.split('/'));
       if (!/\.deck\.md$/i.test(relative)) return { text: `${value} is not a deck. Use list_decks to find one.`, isError: true };
       const text = await deckText(absolute);
       if (text === null) return { text: `There is no deck at ${relative}. Use list_decks to find one.`, isError: true };
@@ -209,16 +225,20 @@ export class ThemeAi implements vscode.Disposable {
       }
     }
     const written: string[] = [];
+    let failed: string | null = null;
     for (const deck of deckChanges) {
       const entry = deckTexts.get(deck.path)!;
       try {
         await writeDeck(entry.absolute, withThemeLine(entry.text, deck.after));
         written.push(deck.path);
       } catch (error) {
-        return { text: `Wrote ${themePath}, but ${deck.path} could not be changed: ${String(error)}. ${written.length ? `Changed: ${written.join(', ')}.` : ''}`, isError: true };
+        // What was written stays recorded below, so its Undo is there; the decks after this one are left alone.
+        failed = `${deck.path} could not be changed: ${error instanceof Error ? error.message : String(error)}`;
+        break;
       }
     }
     void this.decks.themeFilesChanged(themePath);
+    const changedDecks = deckChanges.filter(deck => written.includes(deck.path));
 
     // The record: joined to this chat's last one for the same theme, so one Undo takes the whole change back.
     const joined = this.ledger.joinable(conversationId, 'theme', themePath, themeBefore);
@@ -226,17 +246,19 @@ export class ThemeAi implements vscode.Disposable {
     if (joined) {
       joined.themeAfter = themeAfter;
       joined.themeName = name;
-      for (const deck of deckChanges) {
-        const earlier = joined.decks.find(entry => entry.path === deck.path);
-        if (earlier) earlier.after = deck.after;
+      for (const deck of changedDecks) {
+        const at = joined.decks.findIndex(entry => entry.path === deck.path);
+        // A deck that was only shown is a change of its own now: its line before this write is the one Undo puts back.
+        if (at >= 0 && joined.decks[at].shownOnly) joined.decks[at] = deck;
+        else if (at >= 0) joined.decks[at].after = deck.after;
         else joined.decks.push(deck);
       }
       record = joined;
     } else {
-      const shown = deckChanges[0]?.path ?? (await this.firstDeckUsing(root, themePath));
+      const shown = changedDecks[0]?.path ?? (await this.firstDeckUsing(root, themePath));
       record = this.ledger.add({
         conversationId, kind: 'theme', themePath, themeName: name, themeBefore, themeAfter,
-        decks: deckChanges.length ? deckChanges : shown ? [{ path: shown, before: null, after: '', themeBefore: themeBefore ?? BUILT_IN_THEME_TEXT, shownOnly: true }] : [],
+        decks: changedDecks.length ? changedDecks : shown ? [{ path: shown, before: null, after: '', themeBefore: themeBefore ?? BUILT_IN_THEME_TEXT, shownOnly: true }] : [],
         moved: [],
       });
       if (conversationId) this.added.fire({ conversationId, chip: { id: record.id, kind: 'theme', themeName: name } });
@@ -245,6 +267,12 @@ export class ThemeAi implements vscode.Disposable {
     const pairs = colourPairs(parseTheme(themeAfter));
     const failing = pairs.filter(pair => !pair.ok);
     const others = await this.otherDecks(new Set(written));
+    if (failed) {
+      return {
+        text: `${existing ? 'Changed' : 'Made'} ${themePath}${written.length ? ` and pointed ${written.map(deckName).join(', ')} at it` : ''}, but ${failed}. Tell the user; Undo under your reply takes back what was written.`,
+        isError: true,
+      };
+    }
     return {
       text: [
         `${existing ? 'Changed' : 'Made'} ${themePath}.`,
@@ -346,31 +374,50 @@ export class ThemeAi implements vscode.Disposable {
 
   // ── Undo, See what changed, Open the theme ───────────────────────────────
 
-  async undo(id: string): Promise<string> {
-    const record = this.ledger.get(id);
-    if (!record) return 'This change can no longer be undone here (the window was reloaded since).';
-    if (record.undone) return 'Already undone.';
-    const root = projectRoot();
-    if (!root) return 'This change can no longer be undone here.';
-    let words: string;
-    if (record.kind === 'draft') words = await this.undoDraft(root, record);
-    else words = await this.undoTheme(root, record);
-    record.undone = true;
-    this.undone.fire({ id, words });
-    return words;
+  /** Undos running, by change: a second press while one runs gets the same answer, never a second Undo. */
+  private readonly undoing = new Map<string, Promise<string>>();
+
+  undo(id: string): Promise<string> {
+    const running = this.undoing.get(id);
+    if (running) return running;
+    const run = this.runUndo(id).finally(() => this.undoing.delete(id));
+    this.undoing.set(id, run);
+    return run;
   }
 
-  private async undoDraft(root: string, record: ThemeChangeRecord): Promise<string> {
+  private async runUndo(id: string): Promise<string> {
+    const record = this.ledger.get(id);
+    const root = projectRoot();
+    if (!record || !root) {
+      // A change from before a window reload (the record is in memory only): said where the press was, nothing touched
+      const words = 'This change can no longer be undone here: the window was reloaded since.';
+      this.undone.fire({ id, words });
+      return words;
+    }
+    if (record.undone) return 'Already undone.';
+    const result = record.kind === 'draft' ? await this.undoDraft(root, record) : await this.undoTheme(root, record);
+    if (result.done) {
+      record.undone = true;
+      this.undone.fire({ id, words: result.words });
+    } else {
+      void vscode.window.showInformationMessage(result.words);
+    }
+    return result.words;
+  }
+
+  private async undoDraft(root: string, record: ThemeChangeRecord): Promise<{ words: string; done: boolean }> {
     const { text, draft } = await this.themeTextNow(root, record.themePath);
+    // Its tab is closed: the draft is gone (discarded or saved), so there is nothing here to put back yet
+    if (!draft) return { words: `Open ${record.themeName}'s tab to undo the colour check: its draft isn't open.`, done: false };
     const theme = parseTheme(text);
     const back: Partial<Record<'bg' | 'head' | 'text' | 'accent', string>> = {};
     for (const move of record.moved) if (theme[move.field] === move.to) back[move.field] = move.from;
-    const keep = Object.keys(back).length === 0 || !draft;
-    if (!keep && draft) await this.themes.draftChange(draft, themeTextWith(text, back));
-    return undoWords(record, { decks: [], keptDecks: [], theme: keep ? { action: 'keep', reason: 'changed' } : { action: 'none' } }, deckName);
+    const keep = Object.keys(back).length === 0;
+    if (!keep) await this.themes.draftChange(draft, themeTextWith(text, back));
+    return { words: undoWords(record, { decks: [], keptDecks: [], theme: keep ? { action: 'keep', reason: 'changed' } : { action: 'none' } }, deckName), done: true };
   }
 
-  private async undoTheme(root: string, record: ThemeChangeRecord): Promise<string> {
+  private async undoTheme(root: string, record: ThemeChangeRecord): Promise<{ words: string; done: boolean }> {
     const changed = record.decks.filter(deck => !deck.shownOnly);
     const deckLines: Record<string, string | null | undefined> = {};
     const texts = new Map<string, string>();
@@ -392,10 +439,21 @@ export class ThemeAi implements vscode.Disposable {
       themeText,
       decksUsingAfter: reverted => list.filter(deck => !reverted.has(deck.path) && themeKeyOf(deck.theme, entries) === key).length,
     });
+    const stuck: string[] = [];
     for (const deck of plan.decks) {
       const text = texts.get(deck.path);
       if (text === undefined) continue;
-      await writeDeck(path.join(root, ...deck.path.split('/')), withThemeLine(text, deck.line)).catch(error => console.warn('[Themes] Undo could not change a deck:', error));
+      try {
+        await writeDeck(path.join(root, ...deck.path.split('/')), withThemeLine(text, deck.line));
+      } catch (error) {
+        console.warn('[Themes] Undo could not change a deck:', error);
+        stuck.push(deck.path);
+      }
+    }
+    if (stuck.length) {
+      // A deck still names the theme: it stays, and the change can be undone again once the deck can be written
+      void this.decks.themeFilesChanged(record.themePath);
+      return { words: `Couldn't put ${stuck.map(deckName).join(', ')} back, so ${record.themeName} stays. Try Undo again.`, done: false };
     }
     if (plan.theme.action === 'remove') {
       if (openTheme) {
@@ -412,7 +470,7 @@ export class ThemeAi implements vscode.Disposable {
       await writeWhole(themeAbsolute, plan.theme.text);
     }
     void this.decks.themeFilesChanged(record.themePath);
-    return undoWords({ ...record, decks: changed }, plan, deckName);
+    return { words: undoWords({ ...record, decks: changed }, plan, deckName), done: true };
   }
 
   /** See what changed: the sheet over the deck's stage (a theme) or the theme tab's preview (a draft). */
