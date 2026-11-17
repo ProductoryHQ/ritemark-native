@@ -194,7 +194,7 @@ test('colours: #RRGGBB in capitals from what is typed; the tab sends only fields
   assert.deepEqual(['#abc', 'abcdef', ' #A1B2C3 ', '#12345', 'red', '#GGGGGG'].map(normalColour), ['#AABBCC', '#ABCDEF', '#A1B2C3', null, null, null]);
   assert.ok(isThemeChanges({ accent: '#FF7A45' }));
   assert.ok(isThemeChanges({ glow: false, round: 'round', boxes: 'outline' }));
-  for (const bad of [{}, { accent: '#ff7a45' }, { accent: 'red' }, { glow: 'yes' }, { round: 'circle' }, { name: 'Other' }, { fh: 'Inter' }, null, []]) {
+  for (const bad of [{}, { accent: '#ff7a45' }, { accent: 'red' }, { glow: 'yes' }, { round: 'circle' }, { name: 'Other' }, { fh: 'Futura' }, null, []]) {
     assert.ok(!isThemeChanges(bad), JSON.stringify(bad));
   }
   assert.deepEqual(changedFields(BUILT_IN_THEME, { accent: '#f2b544', bg: '#000000', glow: true }), { bg: '#000000' });
@@ -244,6 +244,25 @@ test('the preview: six of the deck\'s slides, one of each kind first, skipped on
   assert.deepEqual([preview.deck, preview.borderless, preview.slides.length], ['Harbour', true, 6]);
   const sample = deckPreview(null, SAMPLE_DECK_TEXT);
   assert.deepEqual([sample.deck, sample.borderless, sample.slides.length, sample.pictures.length], [null, false, 4, 0]);
+});
+
+test('Sprint 162 PR 3: a font pick is one line, one of the six by its own name; a name in another case is no change', () => {
+  const text = BUILT_IN_THEME_TEXT;
+  const fraunces = themeTextWith(text, { fh: 'Fraunces' });
+  const changed = fraunces.split('\n').filter((line, index) => line !== text.split('\n')[index]);
+  assert.deepEqual(changed, ['heading-font: Fraunces'], 'one line, and the hand-picked shades stay (a font is no colour)');
+  assert.equal(parseTheme(fraunces).fh, 'Fraunces');
+  assert.equal(parseTheme(themeTextWith(text, { fb: 'Source Serif 4' })).fb, 'Source Serif 4');
+  assert.ok(themeTextWith(text, { fb: 'Source Serif 4' }).includes('\ntext-font: Source Serif 4\n'));
+  const lower = text.replace('heading-font: Sofia Sans', 'heading-font: inter');
+  assert.equal(themeTextWith(lower, { fh: 'Inter' }), lower, '"inter" is Inter already: no new line');
+  assert.ok(themeTextWith(lower, { fh: 'Space Grotesk' }).includes('heading-font: Space Grotesk'));
+  const missing = text.replace('heading-font: Sofia Sans\n', '');
+  assert.ok(themeTextWith(missing, { fh: 'IBM Plex Sans' }).includes('heading-font: IBM Plex Sans'), 'a theme without the line gets it');
+  assert.ok(isThemeChanges({ fh: 'Fraunces', fb: 'Inter' }));
+  for (const bad of ['Futura', 'fraunces', '', 42, null]) assert.equal(isThemeChanges({ fh: bad }), false, `not a font the tab sends: ${String(bad)}`);
+  assert.deepEqual(changedFields(parseTheme(text), { fh: 'Sofia Sans' }), {}, 'the same font is no change');
+  assert.deepEqual(decodeThemeRequest({ type: 'theme/set', changes: { fb: 'IBM Plex Sans' } }), { type: 'theme/set', changes: { fb: 'IBM Plex Sans' } });
 });
 
 console.log(`themeFile: ${passed} passed`);

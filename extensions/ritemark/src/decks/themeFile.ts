@@ -2,7 +2,7 @@
  * Sprint 162 PR 2 (step-3-themes.md; README "Themes (15 November)" and "Saving a theme"): writing a theme file.
  *
  * The theme's tab changes a theme file's front matter one field at a time: its name, its four colours, the soft light,
- * the corners and the boxes, the fields the engine reads (`parseTheme`). A change rewrites only the lines of the fields
+ * the heading and text fonts (Sprint 162 PR 3), the corners and the boxes, the fields the engine reads (`parseTheme`). A change rewrites only the lines of the fields
  * that changed, in the quotes they had, so a theme opened and saved without a change stays byte for byte, and a colour
  * change is one line. One more thing goes with a colour change, as the prototype's `setThemeField` has it: the theme's
  * hand-picked shades (`card:` and `borderless:`) were picked for its old colours, so they go and the engine works the
@@ -12,7 +12,7 @@
  * for a new theme's name and file. Pure: the host, the webview and the tests read the same rules.
  */
 import { writeScalar } from './deckFormat';
-import { parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
+import { DECK_FONT_LIST, deckFont, parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
 
 /** The fields the theme's tab changes, as `DeckTheme` names them. */
 export interface ThemeChanges {
@@ -22,6 +22,9 @@ export interface ThemeChanges {
   text?: string;
   accent?: string;
   glow?: boolean;
+  /** The heading and text fonts (Sprint 162 PR 3): one of the six, by its own name. */
+  fh?: string;
+  fb?: string;
   round?: DeckTheme['round'];
   boxes?: DeckTheme['boxes'];
 }
@@ -36,6 +39,8 @@ export const THEME_KEYS: Record<ThemeField, string> = {
   text: 'text',
   accent: 'accent',
   glow: 'soft-light',
+  fh: 'heading-font',
+  fb: 'text-font',
   round: 'corners',
   boxes: 'boxes',
 };
@@ -54,7 +59,7 @@ export function normalColour(value: string): string | null {
 }
 
 /**
- * Is this a change the theme's tab may send? Its colours, soft light, corners and boxes, each of its own kind. The name
+ * Is this a change the theme's tab may send? Its colours, soft light, fonts (one of the six, by name), corners and boxes, each of its own kind. The name
  * isn't changed in the tab (it is the file's name too): only a new theme is named.
  */
 export function isThemeChanges(value: unknown): value is ThemeChanges {
@@ -68,6 +73,8 @@ export function isThemeChanges(value: unknown): value is ThemeChanges {
       case 'glow': return typeof field === 'boolean';
       case 'round': return field === 'square' || field === 'soft' || field === 'round';
       case 'boxes': return field === 'filled' || field === 'outline';
+      case 'fh':
+      case 'fb': return typeof field === 'string' && DECK_FONT_LIST.some(font => font.name === field);
       default: return typeof field === 'string' && COLOUR.test(field);
     }
   });
@@ -82,6 +89,10 @@ export function changedFields(theme: DeckTheme, changes: ThemeChanges): ThemeCha
     if (COLOUR_FIELDS.includes(field)) {
       const colour = normalColour(String(value));
       if (colour && colour !== theme[field]) (out as Record<string, unknown>)[field] = colour;
+    } else if (field === 'fh' || field === 'fb') {
+      // A font is the one the slide draws: "inter" in the file is Inter already, and needs no new line.
+      const font = deckFont(value);
+      if (font.name === String(value) && font.name !== deckFont(theme[field]).name) out[field] = font.name;
     } else if (field === 'name') {
       const name = String(value).trim();
       if (name && name !== theme.name) out.name = name;
@@ -200,8 +211,8 @@ function themeFileText(theme: DeckTheme): string {
 
 /**
  * Ritemark's starting points for a new theme (prototype `STARTERS`; frame 14): Paper, light with a serif for headings,
- * and Ember, dark and warm with round corners. Their fonts are the design's; until the fonts ship, a font the slide
- * can't draw is drawn in Sofia Sans (`DECK_FONTS`).
+ * and Ember, dark and warm with round corners. Their fonts are the design's, and ship with Ritemark (`media/fonts/`,
+ * Sprint 162 PR 3).
  */
 export const PAPER_THEME_TEXT = themeFileText({
   name: 'Paper', bg: '#FFFFFF', head: '#14213D', text: '#3A4660', accent: '#0E7C86', glow: false,
