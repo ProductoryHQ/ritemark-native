@@ -470,6 +470,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   useLayoutEffect(() => { refit() }, [refit, lookKey])
   useEffect(() => {
     if (!editor) return
+    // A slide that comes onto the stage full is said full, whatever the slide it replaced said: that slide's stage leaves
+    // with "no longer full" (the cleanup above), and React runs that cleanup after this stage's layout effect has
+    // measured, so the line went from a full slide to a full one (the join of a slide into a full one above it). Fitted
+    // again here and once more after the frame, and the state told as it is.
+    refit()
+    actionsRef.current.onFull?.(fullRef.current)
+    const settle = requestAnimationFrame(refit)
     editor.on('update', refit)
     const fonts = document.fonts
     fonts?.addEventListener?.('loadingdone', refit)
@@ -481,6 +488,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
     flow.addEventListener('scroll', unscroll)
     return () => {
+      cancelAnimationFrame(settle)
       editor.off('update', refit)
       fonts?.removeEventListener?.('loadingdone', refit)
       flow.removeEventListener('load', refit, true)
