@@ -12,7 +12,8 @@
  * once with reduced motion. Nothing grows or moves. Only siblings on the way up from the item dim, so nothing is dimmed
  * twice and the item's own blocks keep their look.
  */
-import { useLayoutEffect, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useRef, type RefObject } from 'react'
+import { blankNow, settleAsked } from './wallKeys'
 
 export interface SpotRect {
   left: number
@@ -81,24 +82,33 @@ export function spotDimmed(item: HTMLElement): HTMLElement[] {
   const title = titleOf(slide.querySelector('.blk-flow'))
   const behind = slide.classList.contains('pic-behind')
   const dimmed: HTMLElement[] = []
+  // A block that holds the title (the flow, beside a side picture that is spotlit) dims all but the title.
+  const dim = (element: HTMLElement) => {
+    if (title && element.contains(title)) {
+      for (const child of Array.from(element.children) as HTMLElement[]) if (child !== title) dim(child)
+    } else dimmed.push(element)
+  }
   let node: HTMLElement = item
   while (node !== slide && node.parentElement) {
     const parent: HTMLElement = node.parentElement
     for (const sibling of Array.from(parent.children) as HTMLElement[]) {
       if (sibling === node || sibling === title || sibling.classList.contains('veil')) continue
       if (behind && sibling.classList.contains('photo')) continue
-      dimmed.push(sibling)
+      dim(sibling)
     }
     node = parent
   }
   return dimmed
 }
 
-/** The item a click hit in a view's drawn slide, and whether it is a picture; null outside any item. */
+/**
+ * The item a click hit in a view's drawn slide, and whether it is a picture that can fill the wall (one drawn, with its
+ * address); null outside any item.
+ */
 export function spotHit(root: ParentNode | null, x: number, y: number): { item: number; picture: boolean } | null {
   const items = spotItems(root)
   const index = itemAt(items.map(item => item.getBoundingClientRect()), x, y)
-  return index === null ? null : { item: index, picture: isPictureItem(items[index]) }
+  return index === null ? null : { item: index, picture: pictureUrlOf(items[index]) !== null }
 }
 
 /** A picture item's address as the slide draws it (its `<img>`, or a side picture's background), or null. */
@@ -123,9 +133,12 @@ export function useSpotlight(container: RefObject<HTMLElement | null>, scope: st
   useLayoutEffect(() => {
     const root = container.current
     if (!root) return
+    const clear = () => { for (const element of Array.from(root.querySelectorAll('.is-spot-dim'))) element.classList.remove('is-spot-dim') }
+    clear()
+    // No spotlight: nothing to keep, so nothing watches the slide draw.
+    if (spot === null) return
     const apply = () => {
-      for (const element of Array.from(root.querySelectorAll('.is-spot-dim'))) element.classList.remove('is-spot-dim')
-      if (spot === null) return
+      clear()
       const item = spotItems(root.querySelector(scope))[spot]
       if (!item) return
       for (const element of spotDimmed(item)) element.classList.add('is-spot-dim')
@@ -136,4 +149,34 @@ export function useSpotlight(container: RefObject<HTMLElement | null>, scope: st
     observer.observe(root, { childList: true, subtree: true })
     return () => observer.disconnect()
   }, [container, scope, spot])
+}
+
+/**
+ * The spotlight and the filled wall this window last asked for, until the host's state carries them (`blankNow`), the
+ * same in the wall and the presenter view. A move clears both on the host, so a window lets its asks go when it sends
+ * one (`letGo`) and when the host's state is of another slide.
+ */
+export function useFocusAsks() {
+  const askedSpot = useRef<{ to: number | null } | null>(null)
+  const askedFill = useRef<{ to: number | null } | null>(null)
+  const letGo = useCallback(() => { askedSpot.current = null; askedFill.current = null }, [])
+  const askSpot = useCallback((item: number | null, send: (type: string, data: Record<string, unknown>) => void) => {
+    askedSpot.current = { to: item }
+    askedFill.current = { to: null }
+    send('present/spot', { item })
+  }, [])
+  const askFill = useCallback((item: number | null, send: (type: string, data: Record<string, unknown>) => void) => {
+    askedFill.current = { to: item }
+    send('present/fill', { item })
+  }, [])
+  /** A state from the host: an ask it carries is settled; on another slide, every ask is let go. */
+  const settle = useCallback((host: { spot: number | null; fill: number | null }, sameSlide: boolean) => {
+    if (!sameSlide) { askedSpot.current = null; askedFill.current = null; return }
+    askedSpot.current = settleAsked(askedSpot.current, host.spot)
+    askedFill.current = settleAsked(askedFill.current, host.fill)
+  }, [])
+  const spotNow = useCallback((hostSpot: number | null) => blankNow(hostSpot, askedSpot.current), [])
+  /** The filled wall now: an ask still waiting, else the host's, only while the picture is shown (`shown`). */
+  const fillNow = useCallback((hostFill: number | null, shown: boolean) => (askedFill.current ? askedFill.current.to : shown ? hostFill : null), [])
+  return { letGo, askSpot, askFill, settle, spotNow, fillNow }
 }

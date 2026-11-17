@@ -37,7 +37,7 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
-import { fillUrlIn, spotHit, spotItems, useSpotlight } from './spotlight'
+import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
 import './wall.css'
 
@@ -91,11 +91,12 @@ export function DeckWall() {
   // The colour the wall last blanked to, kept while the blank fades out.
   const lastBlank = useRef<WallBlank>('ground')
   // Items 11 and 16: the spotlight and the filled wall this window last asked for, until the host's state carries them.
-  const askedSpot = useRef<{ to: number | null } | null>(null)
-  const askedFill = useRef<{ to: number | null } | null>(null)
+  const focus = useFocusAsks()
   const frameRef = useRef<HTMLDivElement | null>(null)
   // The picture filling the wall (its address in the slide on the wall), kept while it fades out.
   const [fillUrl, setFillUrl] = useState<string | null>(null)
+  const fillShown = useRef(false)
+  fillShown.current = fillUrl !== null
   const lastFillUrl = useRef<string | null>(null)
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
@@ -113,11 +114,9 @@ export function DeckWall() {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
       askedBlank.current = settleAsked(askedBlank.current, next.blank)
-      askedSpot.current = settleAsked(askedSpot.current, next.spot)
-      askedFill.current = settleAsked(askedFill.current, next.fill)
       const previous = stateRef.current
       // Another slide has no spotlight: an ask made on the one before is let go.
-      if (previous && previous.slide.number !== next.slide.number) { askedSpot.current = null; askedFill.current = null }
+      focus.settle(next, !previous || previous.slide.number === next.slide.number)
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
         const from = Number.isFinite(shown) ? shown : 1
@@ -145,29 +144,21 @@ export function DeckWall() {
   }, [leaving])
 
   // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
+  const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
   const send = useCallback((type: Move) => {
-    askedSpot.current = null
-    askedFill.current = null
+    letGo()
     sendToExtension(type)
-  }, [])
+  }, [letGo])
   const askBlank = useCallback((to: WallBlank | null) => {
     askedBlank.current = { to }
     sendToExtension('present/blank', { to })
   }, [])
-  const askSpot = useCallback((item: number | null) => {
-    askedSpot.current = { to: item }
-    askedFill.current = { to: null }
-    sendToExtension('present/spot', { item })
-  }, [])
-  const askFill = useCallback((item: number | null) => {
-    askedFill.current = { to: item }
-    sendToExtension('present/fill', { item })
-  }, [])
+  const askSpot = useCallback((item: number | null) => askSpotWith(item, sendToExtension), [askSpotWith])
+  const askFill = useCallback((item: number | null) => askFillWith(item, sendToExtension), [askFillWith])
   const goTo = useCallback((number: number) => {
-    askedSpot.current = null
-    askedFill.current = null
+    letGo()
     sendToExtension('present/go', { number })
-  }, [])
+  }, [letGo])
   const actOnClick = useCallback((click: SpotClick) => {
     if (!click) return
     if (click.type === 'spot') askSpot(click.item)
@@ -222,7 +213,7 @@ export function DeckWall() {
       if (event.repeat && heldKey.current === event.key) { take(); return }
       // A picture fills the wall (item 11): any key returns to the slide and does nothing else (not while it is blank:
       // that key brings the slide back first).
-      if (!gridOpen && !blankNow(current.blank, askedBlank.current) && fillKeyOf(event, blankNow(current.fill, askedFill.current))) {
+      if (!gridOpen && !blankNow(current.blank, askedBlank.current) && fillKeyOf(event, fillNow(current.fill, fillShown.current))) {
         take()
         heldKey.current = event.key
         if (digits !== null) { setDigits(null); setPeeked(null) }
@@ -268,7 +259,7 @@ export function DeckWall() {
       }
       if (digits !== null) { setDigits(null); setPeeked(null) }
       // The spotlight (item 16): F, Tab and Shift+Tab, and Esc while one is on. → and a clicker go on, which clears it.
-      const spotStep = spotKeyOf(event, blankNow(current.spot, askedSpot.current), spotItems(frameRef.current?.querySelector(SLIDE_NOW) ?? null).length)
+      const spotStep = spotKeyOf(event, spotNow(current.spot), spotItems(frameRef.current?.querySelector(SLIDE_NOW) ?? null).length)
       if (spotStep) {
         take()
         askSpot(spotStep.type === 'spot' ? spotStep.item : null)
@@ -287,7 +278,7 @@ export function DeckWall() {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, screen.width])
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width])
 
   // A click acts on what it hits (not on the bar, the box or the grid): an item spotlights, the spotlit picture fills
   // the wall, outside any item it clears the spotlight or, with none, goes on. On a blank or filled wall it only
@@ -298,10 +289,10 @@ export function DeckWall() {
     const current = stateRef.current
     if (!current) return
     if (blankNow(current.blank, askedBlank.current)) { askBlank(null); return }
-    if (blankNow(current.fill, askedFill.current) !== null) { askFill(null); return }
+    if (fillNow(current.fill, fillShown.current) !== null) { askFill(null); return }
     const hit = spotHit(frameRef.current?.querySelector(SLIDE_NOW) ?? null, event.clientX, event.clientY)
-    actOnClick(spotClickOf(hit, blankNow(current.spot, askedSpot.current), 'next'))
-  }, [askBlank, askFill, actOnClick])
+    actOnClick(spotClickOf(hit, spotNow(current.spot), 'next'))
+  }, [askBlank, askFill, actOnClick, spotNow, fillNow])
 
   if (!state) return <div className="deck-wall" />
 

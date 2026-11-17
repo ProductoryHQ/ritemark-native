@@ -278,6 +278,23 @@ async function main(): Promise<void> {
     assert.equal(last(presenterView, 'present/presenter').spot, null);
     assert.notEqual((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'and goes on');
     assert.equal(wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length, spotStates + 1, 'in one press');
+    // The wall drawn again without a move keeps the spotlight on the same slide, and lets it go when the slide comes
+    // in another form (an edit since): an item's place would name another item (review of #790).
+    wall.send({ type: 'present/spot', item: 1 });
+    await settle();
+    wall.send({ type: 'present/ready' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').spot, 1, 'the same slide drawn again keeps it');
+    const spotTitle = (last(wall, 'present/wall').slide as { title: string }).title;
+    document.text = document.text.replace(`title: ${spotTitle}\n`, `title: ${spotTitle}, moved\n`);
+    document.version = 5;
+    changeListener({ document });
+    await settle(400);
+    wall.send({ type: 'present/ready' });
+    await settle();
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, `${spotTitle}, moved`);
+    assert.equal(last(wall, 'present/wall').spot, null, 'an edited slide drawn again has no spotlight');
+    assert.equal(last(presenterView, 'present/presenter').spot, null);
     wall.send({ type: 'present/spot', item: 'x' });
     await settle();
     assert.equal(last(wall, 'present/wall').spot, null, 'a place that is not one is not a request');

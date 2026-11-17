@@ -61,6 +61,7 @@ import {
   type ClockLocale,
   type WallBlank,
   type WallFocus,
+  NO_FOCUS,
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
@@ -223,7 +224,7 @@ export class DeckPresenter implements vscode.Disposable {
       refresh: null,
       presenterSerial: 0,
       blank: null,
-      focus: { spot: null, fill: null },
+      focus: NO_FOCUS,
       clock: { locale: null, hourCycle: null },
     };
     this.running = running;
@@ -430,7 +431,7 @@ export class DeckPresenter implements vscode.Disposable {
         // A move (a button, the row, the grid) brings the slide back too, on the slide it moves to.
         running.blank = null;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
-        running.focus = { spot: null, fill: null };
+        running.focus = NO_FOCUS;
         running.session.move(running.origin.document.getText(), moveOf(request));
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
         // wall and then in the presenter view.
@@ -469,7 +470,14 @@ export class DeckPresenter implements vscode.Disposable {
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
-    const state = wallStateOf(view, look, assets, presenter, running.blank, running.focus);
+    // An item's place names an item of the slide the wall has: when this draw brings the slide in another form (an edit
+    // since, drawn now by a reload, the presenter view turned on or off), the spotlight and a filled wall go, rather
+    // than land on another item (review of #790).
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.focus);
+    if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
+      running.focus = NO_FOCUS;
+      state = { ...state, spot: null, fill: null };
+    }
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);

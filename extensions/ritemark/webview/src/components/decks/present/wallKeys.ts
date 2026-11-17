@@ -92,13 +92,13 @@ export function blankKeyOf(event: KeyInput, blank: WallBlank | null): BlankStep 
  * The blank a window's next key is read against: the one it last asked for (`asked`) until the host's state says so,
  * else the host's. A clicker's second press (Page Down right after ".") then never reads the wall as not yet blank.
  */
-export function blankNow<T>(hostBlank: T, asked: { to: T } | null): T {
-  return asked ? asked.to : hostBlank
+export function blankNow<T>(host: T, asked: { to: T } | null): T {
+  return asked ? asked.to : host
 }
 
 /** The ask kept until a state from the host carries it (the blank, the spotlight, a filled wall). */
-export function settleAsked<T>(asked: { to: T } | null, hostBlank: T): { to: T } | null {
-  return asked && asked.to === hostBlank ? null : asked
+export function settleAsked<T>(asked: { to: T } | null, host: T): { to: T } | null {
+  return asked && asked.to === host ? null : asked
 }
 
 /** What a key does to the spotlight: an item spotlit (its place among the slide's items), or the spotlight cleared. */

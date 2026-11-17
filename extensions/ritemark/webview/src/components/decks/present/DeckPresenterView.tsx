@@ -28,7 +28,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { wallGround } from '../theme/themeVars'
 import { blankKeyOf, blankNow, clockText, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
-import { fillUrlIn, spotHit, spotItems, useSpotlight } from './spotlight'
+import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
 import './presenter.css'
 
@@ -88,11 +88,13 @@ export function DeckPresenterView() {
   // The blank this window last asked for, until the host's state carries it (`blankNow`).
   const askedBlank = useRef<{ to: WallBlank | null } | null>(null)
   // Items 11 and 16: the spotlight and the filled wall this window last asked for, until the host's state carries them.
-  const askedSpot = useRef<{ to: number | null } | null>(null)
-  const askedFill = useRef<{ to: number | null } | null>(null)
+  const focus = useFocusAsks()
+  const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
   const nowRef = useRef<HTMLDivElement | null>(null)
   const shownNumber = useRef<number | null>(null)
   const [fillUrl, setFillUrl] = useState<string | null>(null)
+  const fillShown = useRef(false)
+  fillShown.current = fillUrl !== null
   // The time of day's format, made again only when the system's clock changes.
   const clockLocale = state?.clock.locale ?? null
   const hourCycle = state?.clock.hourCycle ?? null
@@ -104,10 +106,8 @@ export function DeckPresenterView() {
     if (message.type === 'present/presenter') {
       const next = message as unknown as PresenterState
       askedBlank.current = settleAsked(askedBlank.current, next.blank)
-      askedSpot.current = settleAsked(askedSpot.current, next.spot)
-      askedFill.current = settleAsked(askedFill.current, next.fill)
       // Another slide has no spotlight: an ask made on the one before is let go.
-      if (shownNumber.current !== null && shownNumber.current !== next.current.number) { askedSpot.current = null; askedFill.current = null }
+      focus.settle(next, shownNumber.current === null || shownNumber.current === next.current.number)
       shownNumber.current = next.current.number
       setState(next)
     }
@@ -118,22 +118,13 @@ export function DeckPresenterView() {
   useEffect(() => { sendToExtension('present/ready') }, [])
 
   const send = useCallback((type: string, data: Record<string, unknown> = {}) => {
-    // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
-    if (type === 'present/next' || type === 'present/back' || type === 'present/first' || type === 'present/last' || type === 'present/go') {
-      askedSpot.current = null
-      askedFill.current = null
-    }
+    // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go, as the
+    // wall does for every request but the blank.
+    if (type !== 'present/blank') letGo()
     sendToExtension(type, data)
-  }, [])
-  const askSpot = useCallback((item: number | null) => {
-    askedSpot.current = { to: item }
-    askedFill.current = { to: null }
-    sendToExtension('present/spot', { item })
-  }, [])
-  const askFill = useCallback((item: number | null) => {
-    askedFill.current = { to: item }
-    sendToExtension('present/fill', { item })
-  }, [])
+  }, [letGo])
+  const askSpot = useCallback((item: number | null) => askSpotWith(item, sendToExtension), [askSpotWith])
+  const askFill = useCallback((item: number | null) => askFillWith(item, sendToExtension), [askFillWith])
 
   // Now shows the wall's spotlight, and the picture that fills the wall (read from Now's own drawing of the slide).
   useSpotlight(nowRef, NOW_SLIDE, state?.spot ?? null)
@@ -159,7 +150,7 @@ export function DeckPresenterView() {
       const take = () => { event.preventDefault(); event.stopPropagation() }
       if (event.repeat && heldKey.current === event.key) { take(); return }
       // A picture fills the wall (item 11): any key returns to the slide and does nothing else.
-      if (!blankNow(state.blank, askedBlank.current) && fillKeyOf(event, blankNow(state.fill, askedFill.current))) {
+      if (!blankNow(state.blank, askedBlank.current) && fillKeyOf(event, fillNow(state.fill, fillShown.current))) {
         take()
         heldKey.current = event.key
         if (digits !== null) { setDigits(null); setPeeked(null) }
@@ -190,7 +181,7 @@ export function DeckPresenterView() {
       if (digits !== null) { setDigits(null); setPeeked(null) }
       // The spotlight (item 16): F, Tab and Shift+Tab, and Esc while one is on. Without one, Tab reaches this view's
       // buttons as usual.
-      const spotStep = spotKeyOf(event, blankNow(state.spot, askedSpot.current), spotItems(nowRef.current?.querySelector(NOW_SLIDE) ?? null).length)
+      const spotStep = spotKeyOf(event, spotNow(state.spot), spotItems(nowRef.current?.querySelector(NOW_SLIDE) ?? null).length)
       if (spotStep) {
         take()
         askSpot(spotStep.type === 'spot' ? spotStep.item : null)
@@ -210,7 +201,7 @@ export function DeckPresenterView() {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [state, digits, send, askSpot, askFill])
+  }, [state, digits, send, askSpot, askFill, spotNow, fillNow])
 
   // A click on Now acts on what it hits, on the wall (`spotClickOf`); on a blank or filled wall it brings the slide back.
   const onNowClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -221,13 +212,13 @@ export function DeckPresenterView() {
       sendToExtension('present/blank', { to: null })
       return
     }
-    if (blankNow(state.fill, askedFill.current) !== null) { askFill(null); return }
+    if (fillNow(state.fill, fillShown.current) !== null) { askFill(null); return }
     const hit = spotHit(nowRef.current?.querySelector(NOW_SLIDE) ?? null, event.clientX, event.clientY)
-    const click = spotClickOf(hit, blankNow(state.spot, askedSpot.current), 'none')
+    const click = spotClickOf(hit, spotNow(state.spot), 'none')
     if (!click || click.type === 'next') return
     if (click.type === 'fill') askFill(click.item)
     else askSpot(click.type === 'spot' ? click.item : null)
-  }, [state, askSpot, askFill])
+  }, [state, askSpot, askFill, spotNow, fillNow])
 
   // The row keeps the current slide in view.
   useLayoutEffect(() => {
@@ -255,11 +246,11 @@ export function DeckPresenterView() {
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
         <div ref={nowRef} className="pv-now deck-spot" onClick={onNowClick}>
           {canvas(state.current, nowWidth)}
-          {state.fill !== null && !state.blank ? (
+          {fillUrl && !state.blank ? (
             // Item 11: what the room sees, the picture whole on the theme's ground, and how to return.
             <div className="pv-blank">
               <div className="pv-blank-ground pv-fill" style={{ background: wallGround(state.theme, state.borderless) }}>
-                {fillUrl ? <img src={fillUrl} alt="" draggable={false} /> : null}
+                <img src={fillUrl} alt="" draggable={false} />
               </div>
               <span className="pv-blank-words" role="status">The picture fills the wall · any key to return</span>
             </div>
