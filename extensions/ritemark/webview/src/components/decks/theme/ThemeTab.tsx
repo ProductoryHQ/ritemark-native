@@ -127,6 +127,8 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const [look, setLook] = useState<'card' | 'borderless' | null>(null)
   const [saveAs, setSaveAs] = useState(false)
   const [themeChange, setThemeChange] = useState<ThemeChangeView | null>(null)
+  // Sprint 162 PR 5: what Check all colours or Fix the colours found, on the contrast line until the next change
+  const [checkResult, setCheckResult] = useState<string | null>(null)
 
   useEffect(() => onMessage(message => {
     if (message.type === 'theme/state' && typeof message.text === 'string' && typeof message.path === 'string') {
@@ -140,6 +142,8 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
       // Sprint 162 PR 5: See what changed for the AI's colour check, over the preview
       const change = themeChangeFrom(message.change)
       if (change) setThemeChange(change)
+    } else if (message.type === 'theme/check-result' && typeof message.text === 'string') {
+      setCheckResult(message.text || null)
     } else if (message.type === 'theme/change-undone' && typeof message.id === 'string') {
       const id = message.id
       setThemeChange(current => (current && current.id === id ? { ...current, undone: true } : current))
@@ -172,7 +176,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   }, [notice])
 
   const theme = useMemo(() => (state ? parseTheme(state.text) : null), [state])
-  const set = useCallback((changes: ThemeChanges) => sendToExtension('theme/set', { changes }), [])
+  const set = useCallback((changes: ThemeChanges) => { setCheckResult(null); sendToExtension('theme/set', { changes }) }, [])
   const save = useCallback(() => sendToExtension('theme/save'), [])
   const discard = useCallback(() => sendToExtension('theme/discard'), [])
 
@@ -270,14 +274,15 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
           <div className={`theme-contrast${contrast.ok ? '' : ' is-low'}`} role="status">
             <Icon name={contrast.ok ? 'check-circle' : 'warning'} size={14} tone="inherit" />
             <span>
-              {contrast.words}{' '}
-              {/* Sprint 162 PR 5 (17 November): Claude's colour check sits on this line, where a problem shows. At rest a
-                  quiet "Check all colours"; when the line is amber, "Fix with Claude". It goes to the open chat. */}
+              {checkResult ?? contrast.words}{' '}
+              {/* Sprint 162 PR 5 (the Experience lead, 17 November): the colour check sits on this line, where a problem
+                  shows, and is Ritemark's own. At rest a quiet "Check all colours" measures the five pairs; when the line
+                  is amber, "Fix the colours" moves each failing colour's lightness just far enough, into the draft. */}
               <Tooltip label={contrast.ok
-                ? 'Ask the AI in the open chat to measure all five colour pairs, on the card and borderless'
-                : 'Ask the AI in the open chat to move only the colours that fail, into this draft'}>
-                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours')}>
-                  {contrast.ok ? 'Check all colours' : 'Fix with Claude'}
+                ? 'Measure all five colour pairs, on the card and borderless, against 4.5 to 1 for text and 3 to 1 for accents'
+                : 'Move each colour that fails just far enough to read, keeping its hue. It goes into the draft: the decks change when you save'}>
+                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours', { fix: !contrast.ok })}>
+                  {contrast.ok ? 'Check all colours' : 'Fix the colours'}
                 </Button>
               </Tooltip>
             </span>

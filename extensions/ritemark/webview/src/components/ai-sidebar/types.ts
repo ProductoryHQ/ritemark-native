@@ -507,10 +507,9 @@ export type ExtensionMessage =
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
   | { type: 'starting-place'; place: string; hasAbout: boolean }
-  // Sprint 162 PR 5: an AI's theme change under its reply, what Undo did, and the theme tab's colour check for the open chat
+  // Sprint 162 PR 5: an AI's theme change under its reply, and what Undo did
   | { type: 'theme-change/add'; conversationId: string; change: ThemeChangeChipView }
   | { type: 'theme-change/undone'; id: string; words: string }
-  | { type: 'chat/ask-open'; text: string }
   | { type: 'agent:config'; agenticEnabled: boolean; /** Sprint 99 kill-switch (R15); absent on an older host means enabled. */ parallelChatsEnabled?: boolean; durableAgentConversations?: boolean; composerThinkingEffortEnabled?: boolean; codexEnabled?: boolean; selectedAgent: string; selectedModel: string; agents: AgentInfo[]; models: ModelOption[]; codexModels?: ModelOption[]; codexStatus?: CodexSidebarStatus; setupStatus?: SetupStatus; environmentStatus?: AgentEnvironmentStatus; hasSeenWelcome?: boolean; discoveredAgents?: DiscoveredAgent[]; discoveredCommands?: DiscoveredCommand[]; workspacePath?: string; claudeSdkVersion?: string | null; opencodeEnabled?: boolean; acpProviders?: AcpProviderFlags; byokProviderModels?: Record<string, ByokModelOption[]>; /** Sprint 103/112: per-runtime capability map. */ runtimeCapabilities?: Record<string, RuntimeCapabilityFlags> }
   | ({ type: 'thinking-effort/capability'; runtimeId: AgentId; capability: ThinkingEffortCapability } & ConversationScopedMessage)
   | ({ type: 'thinking-effort/status'; runtimeId: AgentId; requested: ThinkingEffort; applied: ThinkingEffort | null; message?: string } & ConversationScopedMessage)

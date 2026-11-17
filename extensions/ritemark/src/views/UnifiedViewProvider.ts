@@ -768,11 +768,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._pendingChatStart = null;
             void webviewView.webview.postMessage({ type: 'chat/start', ...start });
           }
-          if (this._pendingAskOpen) {
-            const text = this._pendingAskOpen;
-            this._pendingAskOpen = null;
-            void webviewView.webview.postMessage({ type: 'chat/ask-open', text });
-          }
           break;
 
         case 'guidance/origin': {
@@ -1137,6 +1132,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // else the browser page in front now (none with a document in front). Found by id from here on, so a tab or
           // desk brought to the front during the turn never moves the AI's actions.
           const browserPage = browserTurnPageFor(conversationId);
+          // Sprint 162 PR 5: in Ask mode a Ritemark tool's file write (a theme and its decks) asks first, on the same
+          // unified approval card as the runtime's own file writes; in Auto mode it goes ahead, as theirs do.
+          browserPage.fileWriteApproval = approvalMode === 'ask'
+            ? async ({ filePath, diff }) => {
+              this._runConversationCheckpoint(conversationId, () => this._conversationController.attentionRuntimeTurn({
+                conversationId,
+                bindingGeneration,
+                runtimeId: agentId as AgentId,
+                attentionKind: 'approval',
+                prompt: filePath,
+              }), hostConversationEnabled);
+              const answer = await this._approvalGate.request({ requestId: `ritemark-tool-${randomUUID()}`, agentId: agentId as AgentId, kind: 'file-write', filePath, diff, conversationId });
+              return answer.approved;
+            }
+            : undefined;
           if (browserEnabled) {
             browserPage.startTurn(await chooseTurnPage({
               contextPageId,
@@ -1785,7 +1795,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const { requestId, approved, alwaysAllow, agentId: approveAgentId } = message;
           this._approvalGate.respond(requestId, approved === true, alwaysAllow === true);
           this._applyTaskResumed(message.conversationId);
-          if (approveAgentId) {
+          // Sprint 162 PR 5: a Ritemark tool's own approval is the host's alone; the runtime never asked for it
+          if (approveAgentId && !(typeof requestId === 'string' && requestId.startsWith('ritemark-tool-'))) {
             const session = this._findRuntimeSession(message.conversationId, approveAgentId as AgentId);
             // Sprint 103 R2: optional feedback rides plan rejections ("Keep planning").
             session?.respondToApproval(
@@ -4098,31 +4109,15 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   /**
    * Sprint 162 PR 5 (step-3-themes.md, frame 13): a theme change the AI made is shown under its reply in the chat it came
-   * from (See what changed, Undo, Open the theme), and what Undo did is said there. The theme tab's colour check goes to
-   * the open chat as the person's message, as a comment's task does: no question first.
+   * from (See what changed, Undo, Open the theme), and what Undo did is said there.
    */
   public connectThemeChanges(source: ThemeAi): vscode.Disposable {
     this._themeChanges = source;
     const subscriptions = [
       source.onDidAdd(({ conversationId, chip }) => { void this._view?.webview.postMessage({ type: 'theme-change/add', conversationId, change: chip }); }),
       source.onDidUndo(({ id, words }) => { void this._view?.webview.postMessage({ type: 'theme-change/undone', id, words }); }),
-      source.onDidAsk(({ text }) => { void this._askOpenChat(text); }),
     ];
     return { dispose: () => { for (const subscription of subscriptions) subscription.dispose(); this._themeChanges = null; } };
-  }
-
-  /** Sprint 162 PR 5: the colour check's words, waiting for the AI's sheet when it isn't drawn yet. */
-  private _pendingAskOpen: string | null = null;
-
-  /** The colour check goes to the open chat: the sheet is shown (never focused), and the words wait until it is ready. */
-  private async _askOpenChat(text: string): Promise<void> {
-    if (this._view && this._sidebarReady) {
-      this.show();
-      void this._view.webview.postMessage({ type: 'chat/ask-open', text });
-      return;
-    }
-    this._pendingAskOpen = text;
-    await vscode.commands.executeCommand('ritemark.unifiedView.focus');
   }
 
   /**

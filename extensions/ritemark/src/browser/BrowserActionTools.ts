@@ -207,6 +207,13 @@ export class BrowserTurnPage {
    * Ritemark's tools, so a tool knows the chat it was called from (the theme tools record their changes under it).
    */
   constructor(readonly conversationId?: string) {}
+
+  /**
+   * Sprint 162 PR 5: this turn's approval for a file write by one of Ritemark's tools (`set_deck_theme`), set at each
+   * turn's start: in Ask mode the unified approval gate's card, as the runtime's own file writes get; in Auto mode none,
+   * and the write goes ahead.
+   */
+  fileWriteApproval: ((request: { filePath: string; diff?: string }) => Promise<boolean>) | undefined;
   private knownPageIds: string[] | undefined;
 
   /**

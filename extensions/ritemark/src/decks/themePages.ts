@@ -140,7 +140,7 @@ export class ThemePages implements vscode.Disposable {
   }
 
   /** Sprint 162 PR 5: the AI's theme work (`themeAi.ts`): the colour check's request and See what changed's Undo. */
-  ai: { askColourCheck: (themePath: string, name: string) => void; undo: (id: string) => Promise<string> } | null = null;
+  ai: { checkColours: (document: vscode.TextDocument, fix: boolean) => Promise<string>; undo: (id: string) => Promise<string> } | null = null;
 
   /** Is this document open in a theme's tab? */
   hasView(document: vscode.TextDocument): boolean {
@@ -293,11 +293,14 @@ export class ThemePages implements vscode.Disposable {
         await this.queue(document, () => this.undoSave(view, token));
         return;
       }
-      // Sprint 162 PR 5: the colour check goes to the open chat, as a comment's task does; no question first.
+      // Sprint 162 PR 5: Check all colours and Fix the colours, Ritemark's own; a fix goes into the draft, one step
       case 'theme/check-colours': {
-        const root = rootOf(document.uri.fsPath);
-        const relative = root ? projectRelative(root, document.uri.fsPath) : null;
-        if (relative) this.ai?.askColourCheck(relative, parseTheme(document.getText()).name);
+        const fix = request.fix;
+        if (!this.ai) return;
+        const ai = this.ai;
+        let words = '';
+        await this.queue(document, async () => { words = await ai.checkColours(document, fix); });
+        await this.post(webview, { type: 'theme/check-result', text: words });
         return;
       }
       case 'theme/change-undo':

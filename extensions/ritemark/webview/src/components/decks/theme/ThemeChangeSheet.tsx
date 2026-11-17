@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { parseTheme } from '../../../../../src/decks/deckTheme'
-import type { ThemeChangeView } from '../../../../../src/decks/themeChange'
+import { ratioWords, type ThemeChangeView } from '../../../../../src/decks/themeChange'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
@@ -31,7 +31,24 @@ export function themeChangeFrom(value: unknown): ThemeChangeView | null {
     borderless: change.borderless === true,
     assets: change.assets && typeof change.assets === 'object' ? change.assets : {},
     undone: change.undone === true,
+    ...(movedFrom(change.moved) ? { moved: movedFrom(change.moved)! } : {}),
   }
+}
+
+const HEX = /^#[0-9A-F]{6}$/i
+
+/** A colour fix's moved pairs, checked field by field; null when there are none. */
+function movedFrom(value: unknown): ThemeChangeView['moved'] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const moved = value.filter((entry): entry is NonNullable<ThemeChangeView['moved']>[number] => !!entry
+    && typeof entry.label === 'string' && typeof entry.from === 'string' && HEX.test(entry.from) && typeof entry.to === 'string' && HEX.test(entry.to)
+    && typeof entry.fromRatio === 'number' && typeof entry.toRatio === 'number')
+  return moved.length ? moved.slice(0, 5) : null
+}
+
+/** A colour, as a small swatch before its code. */
+function Swatch({ colour }: { colour: string }) {
+  return <span className="theme-change-swatch" style={{ background: colour }} aria-hidden="true" />
 }
 
 /** The space between the two columns and around them. */
@@ -61,8 +78,21 @@ export function ThemeChangeSheet({ change, onUndo, onClose, style }: { change: T
     <div ref={ref} className="theme-change-sheet" role="dialog" aria-label="What changed" tabIndex={-1} style={style}>
       <div className="theme-change-head">
         <span className="theme-change-title">What changed</span>
-        <span className="theme-change-what">{change.before.name} → {change.after.name}</span>
+        {change.moved ? null : <span className="theme-change-what">{change.before.name} → {change.after.name}</span>}
       </div>
+      {/* A colour fix names each pair it moved (the Experience lead, 17 November): "Text #5A5F8C → #868AAA (2.5 → 4.6 to 1)" */}
+      {change.moved ? (
+        <ul className="theme-change-moved">
+          {change.moved.map(entry => (
+            <li key={entry.label}>
+              <span className="theme-change-pair">{entry.label}</span>
+              <Swatch colour={entry.from} /><code>{entry.from}</code> → <Swatch colour={entry.to} /><code>{entry.to}</code>
+              <span className="theme-change-ratio">({ratioWords(entry.fromRatio)} → {ratioWords(entry.toRatio)} to 1)</span>
+            </li>
+          ))}
+          <li className="theme-change-unsaved">{change.undone ? 'Undone.' : 'Not saved yet.'}</li>
+        </ul>
+      ) : null}
       <div className="theme-change-rows">
         {change.slides.length === 0 ? <p className="theme-change-empty">The deck has no slides to show it on.</p> : null}
         {change.slides.map(slide => (

@@ -27,7 +27,7 @@ import { wallSlideOf } from './present/presentProtocol';
 import { slidePicturePaths } from './blocks/slideRenderer';
 import { readPptxTheme } from './pptxTheme';
 import {
-  aiThemeText, changeSlideIndexes, colourPairs, PAIR_FIELD_NAMES, pairsReport, suggestedFixes, ThemeChangeLedger, themeChangesOf, themeLineFor,
+  aiThemeText, changeSlideIndexes, checkWords, colourFixes, colourPairs, PAIR_FIELD_NAMES, pairsReport, suggestedFixes, ThemeChangeLedger, themeChangesOf, themeLineFor,
   themeLineOf, undoPlan, undoWords, withThemeLine, type AiThemeFields, type PairField, type ThemeChangeRecord, type ThemeChangeView,
 } from './themeChange';
 import { newThemeNameProblem, themeNameProblem, themePathFor, themeTextWith } from './themeFile';
@@ -113,9 +113,6 @@ export class ThemeAi implements vscode.Disposable {
   private readonly undone = new vscode.EventEmitter<{ id: string; words: string }>();
   /** A change was undone (from the chat or a sheet): the chat says what Undo did. */
   readonly onDidUndo = this.undone.event;
-  private readonly askOpen = new vscode.EventEmitter<{ text: string }>();
-  /** The theme tab's colour check: these words go to the open chat, as the person's message. */
-  readonly onDidAsk = this.askOpen.event;
 
   constructor(private readonly library: () => DeckLibrary | null, private readonly decks: DeckPages, private readonly themes: ThemePages) {}
 
@@ -149,7 +146,11 @@ export class ThemeAi implements vscode.Disposable {
 
   // ── set_deck_theme ───────────────────────────────────────────────────────
 
-  async setDeckTheme(conversationId: string | null, input: { name: string; fields: AiThemeFields; decks: string[] }): Promise<{ text: string; isError?: boolean }> {
+  async setDeckTheme(
+    conversationId: string | null,
+    input: { name: string; fields: AiThemeFields; decks: string[] },
+    approve?: (request: { filePath: string; diff?: string }) => Promise<boolean>,
+  ): Promise<{ text: string; isError?: boolean }> {
     const root = this.rootOrThrow();
     const name = input.name.trim();
     const problem = themeNameProblem(name);
@@ -206,6 +207,18 @@ export class ThemeAi implements vscode.Disposable {
     }
     if (themeBefore === themeAfter && deckChanges.length === 0) {
       return { text: `${name} already has these settings${input.decks.length ? ' and the decks already use it' : ''}. Nothing changed.` };
+    }
+
+    // Ask mode: the person approves the whole change first, on the unified approval card (what the theme file will hold,
+    // and each deck's line before and after); a no writes nothing.
+    if (approve) {
+      const diff = [
+        themeBefore === themeAfter ? `${themePath}: unchanged` : `${themePath}${existing ? '' : ' (new)'}:\n${themeAfter.trimEnd()}`,
+        ...deckChanges.map(deck => `${deck.path}:\n- ${deck.before ?? '(no theme line)'}\n+ ${deck.after}`),
+      ].join('\n\n');
+      const files = [themePath, ...deckChanges.map(deck => deck.path)];
+      const approved = await approve({ filePath: files.length > 1 ? `${themePath} and ${deckChanges.length} deck${deckChanges.length === 1 ? '' : 's'}` : themePath, diff });
+      if (!approved) return { text: 'The user declined the theme change, so nothing was written. Ask what they would like instead.' };
     }
 
     // The theme file first: a deck never names a file that isn't there.
@@ -508,6 +521,13 @@ export class ThemeAi implements vscode.Disposable {
     }
     // A draft's before and after are the same theme: the after is named as the tab shows it, not saved
     const afterName = record.kind === 'draft' ? `${parseTheme(record.themeAfter).name}, not saved` : parseTheme(record.themeAfter).name;
+    // A colour change names each pair it moved, with its ratios before and after, in the sheet's header
+    const pairsBefore = colourPairs(parseTheme(beforeText));
+    const pairsAfter = colourPairs(parseTheme(record.themeAfter));
+    const moved = record.moved.flatMap(move => {
+      const at = pairsBefore.findIndex(pair => pair.field === move.field);
+      return at < 0 ? [] : [{ label: pairsBefore[at].label, from: move.from, to: move.to, fromRatio: pairsBefore[at].ratio, toRatio: pairsAfter[at].ratio }];
+    });
     return {
       id: record.id,
       before: { name: parseTheme(beforeText).name, text: beforeText },
@@ -516,6 +536,7 @@ export class ThemeAi implements vscode.Disposable {
       borderless,
       assets,
       undone: record.undone,
+      ...(moved.length ? { moved } : {}),
     };
   }
 
@@ -534,17 +555,32 @@ export class ThemeAi implements vscode.Disposable {
     else await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.file(absolute), RITEMARK_EDITOR, { preview: false });
   }
 
-  /** The theme tab's "Check all colours" or "Fix with Claude": the request goes to the open chat. */
-  askColourCheck(themePath: string, name: string): void {
-    this.askOpen.fire({
-      text: `Check that the colours of ${name} (${themePath}) are easy to read: measure the five pairs with check_theme_colours, and move only the colours that fail into the theme's draft with set_theme_draft_colours, just far enough to pass. Tell me each pair you moved, from what to what.`,
+  /**
+   * The theme tab's contrast line (the Experience lead, 17 November): Check all colours measures the five pairs; Fix the
+   * colours moves each failing colour's lightness by the least amount that passes, its hue kept, into the draft (never
+   * saved), with See what changed over the preview and Undo. Ritemark's own: no AI. Answers the line's words.
+   */
+  async checkColoursInTab(document: vscode.TextDocument, fix: boolean): Promise<string> {
+    const root = projectRoot();
+    const themePath = root ? projectRelative(root, document.uri.fsPath) : null;
+    const before = document.getText();
+    const theme = parseTheme(before);
+    if (!fix || !themePath) return checkWords(theme, null);
+    const fixes = colourFixes(theme);
+    if (!fixes.moved.length) return checkWords(theme, fixes);
+    const after = themeTextWith(before, fixes.changes);
+    if (!(await this.themes.draftChange(document, after))) return 'The draft could not be changed.';
+    const record = this.ledger.add({
+      conversationId: null, kind: 'draft', themePath, themeName: theme.name, themeBefore: before, themeAfter: after, decks: [],
+      moved: fixes.moved.map(entry => ({ field: entry.field, from: entry.from, to: entry.to })),
     });
+    await this.show(record.id);
+    return checkWords(parseTheme(after), fixes);
   }
 
   dispose(): void {
     this.added.dispose();
     this.undone.dispose();
-    this.askOpen.dispose();
   }
 }
 

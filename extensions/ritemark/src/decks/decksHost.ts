@@ -70,7 +70,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   // Sprint 162 PR 5: the AI's theme tools and their change records; an Undo from anywhere takes every sheet's Undo away
   const themeAi = new ThemeAi(library, pages, themes);
   pages.themeChanges = { undo: id => themeAi.undo(id) };
-  themes.ai = { askColourCheck: (themePath, name) => themeAi.askColourCheck(themePath, name), undo: id => themeAi.undo(id) };
+  themes.ai = { checkColours: (document, fix) => themeAi.checkColoursInTab(document, fix), undo: id => themeAi.undo(id) };
   const undoneSheets = themeAi.onDidUndo(({ id }) => { pages.themeChangeUndone(id); themes.changeUndone(id); });
   // The handout's start card (16 November, frame 20) on the decks New made
   const fresh = freshDeckMarks(context.workspaceState, FRESH_DECKS, MAX_FRESH_DECKS);

@@ -207,6 +207,127 @@ export function pairsReport(theme: DeckTheme): string {
 
 export const PAIR_FIELD_NAMES: Record<PairField, string> = { text: 'text', head: 'headings', accent: 'accent' };
 
+// ── Fix the colours (the Experience lead, 17 November): Ritemark's own fix, no AI ──
+
+type Hsl = [number, number, number];
+
+function hexToHsl(colour: string): Hsl {
+  const [r, g, b] = [1, 3, 5].map(index => parseInt(colour.slice(index, index + 2), 16) / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const hue = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [hue / 6, sat, l];
+}
+
+function hslToHex([h, sat, l]: Hsl): string {
+  const channel = (t: number) => {
+    const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
+    const p = 2 * l - q;
+    let x = t;
+    if (x < 0) x += 1;
+    if (x > 1) x -= 1;
+    const v = x < 1 / 6 ? p + (q - p) * 6 * x : x < 1 / 2 ? q : x < 2 / 3 ? p + (q - p) * (2 / 3 - x) * 6 : p;
+    return Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+  };
+  if (sat === 0) {
+    const grey = Math.round(l * 255).toString(16).padStart(2, '0');
+    return `#${grey}${grey}${grey}`.toUpperCase();
+  }
+  return `#${channel(h + 1 / 3)}${channel(h)}${channel(h - 1 / 3)}`.toUpperCase();
+}
+
+/** A colour's hue, as `hexToHsl` reads it (0 to 1): the fix keeps it. */
+export function hueOf(colour: string): number {
+  return hexToHsl(colour)[0];
+}
+
+/**
+ * The colour with its lightness moved by the least amount that reads on `ground` at `min` to 1, its hue and saturation
+ * kept: lighter or darker, whichever needs the smaller move (a direction that can't reach the ratio doesn't count).
+ * Null when neither reaches it.
+ */
+export function lightnessFix(colour: string, ground: string, min: number): string | null {
+  if (contrast(colour, ground) >= min) return colour;
+  const [h, sat, l] = hexToHsl(colour);
+  const reach = (towards: 1 | 0): { colour: string; move: number } | null => {
+    if (contrast(hslToHex([h, sat, towards]), ground) < min) return null;
+    // The least lightness between `l` and the end that reaches the ratio
+    let near = l;
+    let far: number = towards;
+    for (let step = 0; step < 40; step++) {
+      const mid = (near + far) / 2;
+      if (contrast(hslToHex([h, sat, mid]), ground) >= min) far = mid;
+      else near = mid;
+    }
+    // The hex rounding can land a hair under: step on, one 1/255 at a time, until it reads
+    let value = far;
+    let hex = hslToHex([h, sat, value]);
+    for (let step = 0; step < 255 && contrast(hex, ground) < min; step++) {
+      value = towards === 1 ? Math.min(1, value + 1 / 255) : Math.max(0, value - 1 / 255);
+      hex = hslToHex([h, sat, value]);
+    }
+    return contrast(hex, ground) >= min ? { colour: hex, move: Math.abs(value - l) } : null;
+  };
+  const options = [reach(1), reach(0)].filter((option): option is { colour: string; move: number } => option !== null);
+  if (!options.length) return null;
+  return options.sort((a, b) => a.move - b.move)[0].colour;
+}
+
+/** One pair Fix the colours moved: its label, the colour from and to, and the ratio before and after. */
+export interface MovedPair {
+  label: string;
+  field: PairField;
+  from: string;
+  to: string;
+  fromRatio: number;
+  toRatio: number;
+}
+
+/**
+ * Fix the colours: each failing pair's own colour (text, headings, the accent) moved by the least lightness that passes,
+ * its hue kept, measured as the pairs are. A pair no lightness of its colour can fix is left as it is (`unreachable`),
+ * and a Borderless pair that fails on the theme's hand-picked shades is named (`shades`): no field of the four moves it.
+ * The changes are the theme's own fields, for the draft (`themeTextWith`).
+ */
+export function colourFixes(theme: DeckTheme): { changes: ThemeChanges; moved: MovedPair[]; unreachable: string[]; shades: string[] } {
+  const changes: ThemeChanges = {};
+  const moved: MovedPair[] = [];
+  const unreachable: string[] = [];
+  const shades: string[] = [];
+  let current = theme;
+  for (const pair of colourPairs(theme)) {
+    if (pair.ok) continue;
+    if (!pair.field) { shades.push(pair.label); continue; }
+    if (moved.some(entry => entry.field === pair.field)) continue;
+    // The accent as words is drawn from the accent: the accent itself moves, measured as the pair is
+    const from = current[pair.field];
+    const fixed = lightnessFix(from, current.bg, pair.min);
+    const after = fixed ? { ...current, [pair.field]: fixed } : null;
+    const reached = after ? colourPairs(after).find(entry => entry.label === pair.label) : undefined;
+    if (!fixed || !after || !reached || !reached.ok) { unreachable.push(pair.label); continue; }
+    changes[pair.field] = fixed;
+    moved.push({ label: pair.label, field: pair.field, from, to: fixed, fromRatio: pair.ratio, toRatio: reached.ratio });
+    current = after;
+  }
+  return { changes, moved, unreachable, shades };
+}
+
+/** The contrast line after a check or a fix, in plain words. */
+export function checkWords(theme: DeckTheme, fix: ReturnType<typeof colourFixes> | null): string {
+  const failing = colourPairs(theme).filter(pair => !pair.ok);
+  const parts: string[] = [];
+  if (fix && fix.moved.length) parts.push(`Moved ${fix.moved.map(entry => `${entry.label.toLowerCase()} ${entry.from} → ${entry.to}`).join(', ')}. Not saved yet.`);
+  if (!fix && failing.length === 0) parts.push('All five pairs pass, on the card and borderless.');
+  if (!fix && failing.length) parts.push(`${failing.length === 1 ? 'One pair fails' : `${failing.length} pairs fail`}: ${failing.map(pair => `${pair.label.toLowerCase()} ${ratioWords(pair.ratio)} to 1`).join(', ')}.`);
+  const left = fix ? [...fix.unreachable, ...fix.shades] : [];
+  if (left.length) parts.push(`Left as ${left.length === 1 ? 'it is' : 'they are'}: ${left.map(label => label.toLowerCase()).join(', ')}${fix && fix.unreachable.length ? ' (no lightness of that colour reads on this background)' : ''}${fix && fix.shades.length ? ' (the theme\'s own borderless shades; change a colour to have them worked out again)' : ''}.`);
+  return parts.join(' ');
+}
+
 // ── See what changed ─────────────────────────────────────────────────────────
 
 /** A slide with Boxes, Steps or Columns: an older slide of those kinds, or a block slide holding such a block. */
@@ -246,6 +367,8 @@ export interface ThemeChangeView {
   borderless: boolean;
   assets: Record<string, string>;
   undone: boolean;
+  /** A colour fix: each pair that moved, named in the sheet's header with its swatches and ratios. */
+  moved?: Array<{ label: string; from: string; to: string; fromRatio: number; toRatio: number }>;
 }
 
 /** A theme change by an AI, as Undo and See what changed need it. */

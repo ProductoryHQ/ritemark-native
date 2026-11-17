@@ -500,7 +500,7 @@ async function main(): Promise<void> {
       viewInsert: () => undefined,
       themes: {
         readPptx: async (file) => { themeCalls.push(['readPptx', file]); return { text: '{}' }; },
-        setDeckTheme: async (conversationId, input) => { themeCalls.push(['setDeckTheme', conversationId, input]); return { text: 'made' }; },
+        setDeckTheme: async (conversationId, input, approve) => { themeCalls.push(['setDeckTheme', conversationId, input, typeof approve]); return { text: 'made' }; },
         checkColours: async (theme) => { themeCalls.push(['checkColours', theme]); return { text: 'pairs' }; },
         setDraftColours: async (conversationId, theme, colours) => { themeCalls.push(['setDraftColours', conversationId, theme, colours]); return { text: 'moved' }; },
       },
@@ -508,12 +508,14 @@ async function main(): Promise<void> {
     const themeTool = (name: string) => themeGroup.tools.find((item) => item.name === name)!;
     const { BrowserTurnPage } = await import('../browser/BrowserActionTools');
     const chat = { runtimeId: 'codex' as const, browserPage: new BrowserTurnPage('chat-7') };
+    // Ask mode: the turn's approval goes with the write (UnifiedViewProvider sets it at the turn's start)
+    chat.browserPage.fileWriteApproval = async () => true;
     await runTool(themeTool('set_deck_theme'), { name: 'Fernhollow Bank', background: '#F4F7F2', heading_font: 'Source Serif 4', decks: ['Clients/Harbour.deck.md'] }, chat);
     await runTool(themeTool('set_theme_draft_colours'), { theme: 'Slide library/Themes/Evening.theme.md', text: '#C9CBE6' }, chat);
     await runTool(themeTool('check_theme_colours'), { theme: 'Slide library/Themes/Evening.theme.md' }, context);
     await runTool(themeTool('read_pptx_theme'), { file: 'Brand/Template.pptx' }, context);
     assert.deepEqual(themeCalls, [
-      ['setDeckTheme', 'chat-7', { name: 'Fernhollow Bank', fields: { background: '#F4F7F2', heading_font: 'Source Serif 4' }, decks: ['Clients/Harbour.deck.md'] }],
+      ['setDeckTheme', 'chat-7', { name: 'Fernhollow Bank', fields: { background: '#F4F7F2', heading_font: 'Source Serif 4' }, decks: ['Clients/Harbour.deck.md'] }, 'function'],
       ['setDraftColours', 'chat-7', 'Slide library/Themes/Evening.theme.md', { text: '#C9CBE6' }],
       ['checkColours', 'Slide library/Themes/Evening.theme.md'],
       ['readPptx', 'Brand/Template.pptx'],

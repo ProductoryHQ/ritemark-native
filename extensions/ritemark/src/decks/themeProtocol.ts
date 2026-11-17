@@ -29,7 +29,7 @@ export type ThemeRequest =
    * Sprint 162 PR 5: the contrast line's "Check all colours" or "Fix with Claude": the AI's colour check goes to the
    * open chat, and its changes land in this tab's draft.
    */
-  | { type: 'theme/check-colours' }
+  | { type: 'theme/check-colours'; fix: boolean }
   /** See what changed's sheet: its Undo, for the change with this id. */
   | { type: 'theme/change-undo'; id: string };
 
@@ -63,7 +63,9 @@ export type ThemeHostMessage =
   /** Sprint 162 PR 5: See what changed for an AI's change to the draft: the sheet over the preview. */
   | { type: 'theme/change'; change: ThemeChangeView }
   /** The change with this id is undone (from the chat or the sheet): the sheet's Undo goes. */
-  | { type: 'theme/change-undone'; id: string };
+  | { type: 'theme/change-undone'; id: string }
+  /** Check all colours or Fix the colours: what the contrast line says now. */
+  | { type: 'theme/check-result'; text: string };
 
 export class ThemeProtocolError extends Error {}
 
@@ -110,8 +112,9 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
       exactKeys(input, ['type', 'token']);
       return { type: 'theme/undo-save', token: stringOf(input.token, 64) };
     case 'theme/check-colours':
-      exactKeys(input, ['type']);
-      return { type: 'theme/check-colours' };
+      exactKeys(input, ['type', 'fix']);
+      if (typeof input.fix !== 'boolean') throw new ThemeProtocolError('fix must be a boolean');
+      return { type: 'theme/check-colours', fix: input.fix };
     case 'theme/change-undo':
       exactKeys(input, ['type', 'id']);
       return { type: 'theme/change-undo', id: stringOf(input.id, 64) };

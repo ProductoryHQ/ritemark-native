@@ -23,3 +23,10 @@
 .theme-change-empty { margin: 0; font-size: 13px; color: var(--r-ink-muted); }
 .theme-change-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 12px 24px 16px; border-top: 1px solid var(--r-hairline); }
 .theme-change-done { margin-right: auto; font-size: 13px; color: var(--r-ink-muted); }
+.theme-change-moved { list-style: none; margin: 0; padding: 4px 24px 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; line-height: 20px; color: var(--r-ink-body); }
+.theme-change-moved li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.theme-change-moved code { font-family: inherit; font-variant-numeric: tabular-nums; }
+.theme-change-pair { font-weight: 600; color: var(--r-ink-strong); margin-right: 2px; }
+.theme-change-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .18); flex: none; }
+.theme-change-ratio { color: var(--r-ink-muted); }
+.theme-change-unsaved { color: var(--r-ink-muted); }

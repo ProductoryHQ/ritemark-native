@@ -957,38 +957,6 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     return () => window.removeEventListener('ritemark:files-dropped', handler);
   }, []);
 
-  // Sprint 162 PR 5: the theme tab's colour check goes to this chat as the person's message: a queue item of its own,
-  // run at once when the chat is free, else after the turn that runs (as a comment's task is). The person's words,
-  // files and chips in the box stay where they are: none of them goes with it.
-  const pendingAsk = useAISidebarStore((s) => s.pendingAsk);
-  const takePendingAsk = useAISidebarStore((s) => s.takePendingAsk);
-  const maybeDrainQueue = useAISidebarStore((s) => s.maybeDrainQueue);
-  useEffect(() => {
-    if (!pendingAsk || !activeConversationId) return;
-    takePendingAsk();
-    const policy = policyOf(pendingRuntime);
-    const outcome = enqueuePrompt({
-      conversationId: activeConversationId,
-      runtimeId: pendingRuntime.runtimeId,
-      autonomy: policy.autonomy,
-      planFirst: false,
-      modelId: pendingRuntime.runtimeId === 'codex'
-        ? codexSelectedModel
-        : pendingRuntime.runtimeId === 'opencode'
-          ? opencodeSelectedModel
-          : (pendingRuntime.modelId ?? selectedModel),
-      thinkingEffort: composerThinkingEffort,
-      prompt: pendingAsk.text,
-      displayText: pendingAsk.text,
-      source: 'composer',
-    });
-    if (outcome === 'full') {
-      setQueueFullNotice(true);
-      setTimeout(() => setQueueFullNotice(false), 4000);
-      return;
-    }
-    maybeDrainQueue(activeConversationId);
-  }, [pendingAsk, activeConversationId, takePendingAsk, pendingRuntime, codexSelectedModel, opencodeSelectedModel, selectedModel, composerThinkingEffort, enqueuePrompt, maybeDrainQueue]);
 
   // Reset "hide active file" when the active file changes
   useEffect(() => {

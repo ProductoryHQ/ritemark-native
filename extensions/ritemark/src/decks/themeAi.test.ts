@@ -349,11 +349,85 @@ async function main() {
     assert.equal(parseTheme(document.text).text, '#5A5F8C');
   });
 
-  await test('the colour check asks the open chat in the person\'s words', () => {
-    let asked = '';
-    ai.onDidAsk(event => { asked = event.text; });
-    ai.askColourCheck('Slide library/Themes/Dim.theme.md', 'Dim');
-    assert.match(asked, /^Check that the colours of Dim \(Slide library\/Themes\/Dim\.theme\.md\) are easy to read: measure the five pairs with check_theme_colours, and move only the colours that fail into the theme's draft with set_theme_draft_colours/);
+  await test('Ask mode: set_deck_theme asks on the approval card first, and a no writes nothing', async () => {
+    const asked: Array<{ filePath: string; diff?: string }> = [];
+    const declined = await ai.setDeckTheme('chat-10', { name: 'Asked', fields: FERN, decks: ['Fernhollow/Talk.deck.md'] }, async request => { asked.push(request); return false; });
+    assert.equal(declined.text, 'The user declined the theme change, so nothing was written. Ask what they would like instead.');
+    assert.equal(asked[0].filePath, 'Slide library/Themes/Asked.theme.md and 1 deck');
+    assert.match(asked[0].diff!, /^Slide library\/Themes\/Asked\.theme\.md \(new\):\n---\nname: Asked/);
+    assert.match(asked[0].diff!, /Fernhollow\/Talk\.deck\.md:\n- theme: 'Slide library\/Themes\/Evening\.theme\.md' # the default\n\+ theme: Slide library\/Themes\/Asked\.theme\.md$/);
+    assert.equal(exists('Slide library/Themes/Asked.theme.md'), false);
+    assert.equal(read('Fernhollow/Talk.deck.md'), DECK);
+    const approved = await ai.setDeckTheme('chat-10', { name: 'Asked', fields: FERN, decks: ['Fernhollow/Talk.deck.md'] }, async () => true);
+    assert.match(approved.text, /^Made Slide library\/Themes\/Asked\.theme\.md\./);
+    await ai.undo(added.at(-1)!.chip.id);
+    assert.equal(read('Fernhollow/Talk.deck.md'), DECK);
+  });
+
+  await test('Fix the colours: each failing pair reaches its ratio, its hue kept, and nothing else moves', () => {
+    // Text too faint and the accent too dark on Evening's ground; headings pass
+    const faint = parseTheme(change.aiThemeText(BUILT_IN_THEME_TEXT, 'Evening', { text: '#5A5F8C', accent: '#4A3A10' }));
+    const fix = change.colourFixes(faint);
+    assert.deepEqual(fix.moved.map(entry => entry.field), ['text', 'accent'], 'only the failing colours move');
+    assert.equal(fix.changes.head, undefined);
+    assert.equal(fix.changes.bg, undefined);
+    const fixed = parseTheme(change.aiThemeText(BUILT_IN_THEME_TEXT, 'Evening', { text: '#5A5F8C', accent: '#4A3A10', ...fix.changes }));
+    assert.ok(change.colourPairs(fixed).every(pair => pair.ok), 'every pair passes after the fix');
+    for (const entry of fix.moved) {
+      assert.ok(entry.toRatio >= (entry.field === 'accent' ? 3 : 4.5) && entry.fromRatio < entry.toRatio);
+      assert.ok(Math.abs(change.hueOf(entry.from) - change.hueOf(entry.to)) < 0.02, `${entry.field}'s hue kept (${entry.from} → ${entry.to})`);
+    }
+    // The least move: one step less lightness would not pass
+    const text = fix.moved[0];
+    assert.ok(text.toRatio < 4.8, `just far enough (${text.toRatio.toFixed(2)})`);
+    // Light ground: the text goes darker, not lighter
+    const paper = parseTheme(change.aiThemeText(null, 'Paper', { bg: '#FFFFFF', head: '#14213D', text: '#9AA3B5', accent: '#0E7C86' }));
+    const darker = change.colourFixes(paper).moved.find(entry => entry.field === 'text')!;
+    assert.ok(change.colourPairs(paper)[0].ratio < 4.5);
+    assert.ok(parseInt(darker.to.slice(1, 3), 16) < parseInt(darker.from.slice(1, 3), 16), `darker on white (${darker.from} → ${darker.to})`);
+    // A theme that passes moves nothing
+    assert.deepEqual(change.colourFixes(BUILT_IN_THEME).moved, []);
+  });
+
+  await test('Fix the colours leaves a pair it can\'t fix as it is, and says so', () => {
+    // On any ground black or white reaches 4.5 : 1 (the worst ground gives 4.58), so with these rules a colour of the four
+    // can always be fixed by its lightness; a ratio no lightness reaches gives no fix
+    assert.equal(change.lightnessFix('#9A9A9A', '#777777', 7), null, 'neither white nor black reads at 7 : 1 on #777777');
+    // What no field of the four moves: a hand-picked borderless shade that fails. It is left, and the line says why
+    const shaded = parseTheme(BUILT_IN_THEME_TEXT.replace('  tx: "#33365A"', '  tx: "#C0C2D8"'));
+    const fix = change.colourFixes(shaded);
+    assert.deepEqual(fix.moved, []);
+    assert.deepEqual(fix.shades, ['Text, borderless']);
+    assert.match(change.checkWords(shaded, fix), /Left as it is: text, borderless \(the theme's own borderless shades; change a colour to have them worked out again\)\./);
+  });
+
+  await test('Fix the colours in the tab: into the draft only, with its sheet naming what moved; Check all colours only measures', async () => {
+    const relative = 'Slide library/Themes/Muted.theme.md';
+    const fileText = change.aiThemeText(null, 'Muted', { bg: '#1C1F4A', head: '#FFFFFF', text: '#5A5F8C', accent: '#F2B544' });
+    write(relative, fileText);
+    const document = { uri: { scheme: 'file', fsPath: path.join(root, ...relative.split('/')) }, text: fileText, isDirty: false, getText() { return this.text; } };
+    textDocuments.push(document);
+    const shown: unknown[] = [];
+    themes.showChange = async (_fsPath: string, build: (webview: unknown) => unknown) => { shown.push(build({ asWebviewUri: () => '' })); return true; };
+    // Check all colours: measures, changes nothing
+    const checked = await ai.checkColoursInTab(document as never, false);
+    assert.equal(checked, 'One pair fails: text 2.5 to 1.');
+    assert.equal(document.text, fileText);
+    // Fix the colours: the draft only, never the file, and nothing to the chat
+    const before = added.length;
+    const words = await ai.checkColoursInTab(document as never, true);
+    assert.match(words, /^Moved text #5A5F8C → #[0-9A-F]{6}\. Not saved yet\.$/);
+    assert.ok(document.isDirty);
+    assert.equal(read(relative), fileText, 'the file is untouched until Save');
+    assert.equal(added.length, before, 'nothing goes to a chat');
+    const sheet = shown.at(-1) as { moved: Array<{ label: string; from: string; to: string; fromRatio: number; toRatio: number }>; id: string };
+    assert.equal(sheet.moved.length, 1);
+    assert.equal(sheet.moved[0].label, 'Text');
+    assert.equal(sheet.moved[0].from, '#5A5F8C');
+    assert.ok(sheet.moved[0].fromRatio < 4.5 && sheet.moved[0].toRatio >= 4.5);
+    // The sheet's Undo puts the draft back
+    assert.equal(await ai.undo(sheet.id), "Put Muted's colours back as they were. The draft is as it was before the check.");
+    assert.equal(parseTheme(document.text).text, '#5A5F8C');
   });
 
   fs.rmSync(root, { recursive: true, force: true });

@@ -453,7 +453,8 @@ export interface DeckToolHost {
 /** Sprint 162 PR 5: what the theme tools need: the same calls for every runtime, by the chat they came from. */
 export interface ThemeToolHost {
   readPptx(file: string): Promise<ToolResult>;
-  setDeckTheme(conversationId: string | null, input: { name: string; fields: AiThemeFields; decks: string[] }): Promise<ToolResult>;
+  /** `approve`: the turn's Ask-mode approval for the write (`BrowserTurnPage.fileWriteApproval`); none in Auto mode. */
+  setDeckTheme(conversationId: string | null, input: { name: string; fields: AiThemeFields; decks: string[] }, approve?: (request: { filePath: string; diff?: string }) => Promise<boolean>): Promise<ToolResult>;
   checkColours(theme: string): Promise<ToolResult>;
   setDraftColours(conversationId: string | null, theme: string, colours: Partial<Record<'text' | 'headings' | 'accent', string>>): Promise<ToolResult>;
 }
@@ -659,7 +660,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
             ...(args.boxes !== undefined ? { boxes: args.boxes as AiThemeFields['boxes'] } : {}),
           },
           decks: ((args.decks as string[] | undefined) ?? []).map(deckPathOf),
-        }),
+        }, context.browserPage?.fileWriteApproval),
       },
       {
         name: 'check_theme_colours',
