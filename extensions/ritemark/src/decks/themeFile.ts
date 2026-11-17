@@ -12,7 +12,7 @@
  * for a new theme's name and file. Pure: the host, the webview and the tests read the same rules.
  */
 import { writeScalar } from './deckFormat';
-import { BUILT_IN_THEME, parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
+import { parseTheme, THEMES_FOLDER, type DeckTheme } from './deckTheme';
 
 /** The fields the theme's tab changes, as `DeckTheme` names them. */
 export interface ThemeChanges {
@@ -278,11 +278,20 @@ export function themePathFor(name: string): string {
   return `${THEMES_FOLDER}/${name.trim()}.theme.md`;
 }
 
-/** "Save as a new theme…"'s first name: the theme's name and the first number that's free ("Evening 2"). */
+/**
+ * "Save as a new theme…"'s first name: the theme's name and the first number that's free ("Evening 2"). A name that is
+ * itself a numbered copy of a theme the project has ("Evening 2" beside "Evening") counts on ("Evening 3"); any other
+ * name keeps its own digits ("Q3 2026 2"). Characters a name can't hold are left out; with nothing left, "New theme".
+ */
 export function nextThemeName(name: string, taken: { names: readonly string[]; files: readonly string[] }): string {
-  const base = name.trim().replace(/\s+\d+$/, '') || BUILT_IN_THEME.name;
+  // eslint-disable-next-line no-control-regex
+  let base = name.replace(/[\\/:*?"<>|#\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[^\p{L}\p{N}]+/u, '').replace(/\.+$/, '').trim();
+  const numbered = /^(.*\S)\s+\d+$/.exec(base);
+  if (numbered && taken.names.some(other => other.trim().toLowerCase() === numbered[1].toLowerCase())) base = numbered[1];
+  base = base.slice(0, MAX_THEME_NAME - 4).trim();
+  if (!base || themeNameProblem(`${base} 2`)) base = 'New theme';
   for (let index = 2; index < 1000; index++) {
-    const candidate = `${base.slice(0, MAX_THEME_NAME - 4)} ${index}`;
+    const candidate = `${base} ${index}`;
     if (newThemeNameProblem(candidate, taken) === null) return candidate;
   }
   return '';

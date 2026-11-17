@@ -75,7 +75,6 @@
 }
 .theme-palette .theme-palette-colour.is-on { box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 
-.theme-glow { cursor: pointer; }
 
 .theme-contrast {
   display: flex;
@@ -119,7 +118,7 @@
 .theme-sheet-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; }
 .theme-sheet-k { color: var(--r-ink-muted); }
 .theme-sheet-problem { margin: -6px 0 0 108px; font-size: 12px; color: var(--r-error, #DC2626); }
-.theme-sheet-use { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.theme-sheet-use { display: inline-flex; align-items: center; gap: 8px; }
 .theme-starts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .theme-start { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 0; text-align: left; height: auto; white-space: normal; background: transparent; font-weight: 500; }
 .theme-start:hover { background: transparent; }

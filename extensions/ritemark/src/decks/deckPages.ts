@@ -236,12 +236,17 @@ export class DeckPages implements vscode.Disposable {
   }
 
   /**
-   * Sprint 162 PR 2: a theme file was written (the theme's Save, an AI, another program): every open deck draws its
-   * theme again, read from the file as it is now, so the decks that use it follow at once.
+   * Sprint 162 PR 2: the theme file at this project path was written, made or removed (the theme's Save, an AI, another
+   * program): each open deck that reads it draws its theme again, read from the file as it is now, so the decks that use
+   * it follow at once. A deck reads the file its `theme:` line names, and Evening's file when that one isn't there, so
+   * a change of Evening's file reaches every deck; any other only the decks naming it.
    */
-  async themeFilesChanged(): Promise<void> {
+  async themeFilesChanged(changed: string): Promise<void> {
+    const key = (value: string) => value.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '').toLowerCase();
+    const evening = key(changed) === key(BUILT_IN_THEME_PATH);
     await Promise.all([...this.views].map(async view => {
       const named = themePathOf(frontMatterField(view.document.getText().replace(/^﻿/, ''), 'theme'));
+      if (!evening && key(named) !== key(changed)) return;
       await this.post(view.panel.webview, { type: 'deck/theme', path: named, text: await readTheme(view.document, named) });
     }));
   }

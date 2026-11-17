@@ -183,6 +183,11 @@ test('the name rule: what a file name holds, no duplicate, nothing a deck\'s lin
   assert.equal(newThemeNameProblem('Harbour', taken), null);
   assert.equal(nextThemeName('Evening', taken), 'Evening 2');
   assert.equal(nextThemeName('Evening 2', { names: ['Evening', 'Evening 2'], files: [] }), 'Evening 3');
+  // A name's own digits stay (review, round 1); a name holding what a file name can't gets a clean one.
+  assert.equal(nextThemeName('Q3 2026', { names: ['Evening', 'Q3 2026'], files: [] }), 'Q3 2026 2');
+  assert.equal(nextThemeName('Fernhollow: brand', { names: ['Fernhollow: brand'], files: [] }), 'Fernhollow brand 2');
+  assert.equal(nextThemeName('###', { names: [], files: [] }), 'New theme 2');
+  assert.equal(nextThemeName('x'.repeat(80), { names: [], files: [] }), `${'x'.repeat(56)} 2`);
 });
 
 test('colours: #RRGGBB in capitals from what is typed; the tab sends only fields of their own kind', () => {
