@@ -45,6 +45,7 @@ const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 const { DECK_LOOKS, DECK_LOOK_TIP, ThemeMenuBody, ThemeSwatch, themeEntriesFrom, themePickedNotice } = await import('./ThemeMenu')
+const { DECK_TRANSITION_TIP, transitionValue } = await import('./present/wallMotion')
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -94,6 +95,8 @@ function openDeck(text: string) {
     pick: (path: string) => dispatch(propertyTransaction(state, 'theme', propertyValue(properties, 'theme'), { present: true, value: path })),
     // The Theme menu's look, as DeckView's setLook writes it.
     look: (look: 'card' | 'borderless') => dispatch(propertyTransaction(state, 'look', propertyValue(properties, 'look'), look === 'borderless' ? { present: true, value: 'borderless' } : { present: false })),
+    // README item 19: the Theme menu's transition, as DeckView's setTransition writes it (Fade: no line).
+    transition: (value: 'fade' | 'push' | 'zoom' | 'none') => dispatch(propertyTransaction(state, 'transition', propertyValue(properties, 'transition'), transitionValue(value))),
     /** Someone else (the host, an AI) changes a property outside the history. */
     external: (key: string, value: unknown) => { properties = { ...properties, [key]: value }; file = joinFrontMatter(properties, body, file) },
     undo: () => undo(state, dispatch),
@@ -174,6 +177,52 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(deck.file, text, 'and the second the pick: the bytes as they were')
 }
 
+// ---- README item 19: TRANSITION in the same menu, a step of the same Undo. Push writes `transition: push` at the front
+// matter's end and nothing else; one Undo gives the file back byte for byte; Fade writes nothing (the line taken out).
+{
+  const text = `---\n# the client's deck\ndeck: 2\ntheme: "${EVENING}"\nlook: borderless\n---\n\n${SLIDE}`
+  const deck = openDeck(text)
+  const before = deck.state.doc
+  deck.transition('push')
+  assert.equal(deck.file, `---\n# the client's deck\ndeck: 2\ntheme: "${EVENING}"\nlook: borderless\ntransition: push\n---\n\n${SLIDE}`, 'one line added, every other byte kept')
+  assert.equal(deck.state.doc, before, 'the document itself is the same')
+  assert.equal(deck.applied[deck.applied.length - 1].length, 1, 'nothing appended: no conversion, no lines')
+  assert.equal(conversionStateOf(deck.state).count, 0, 'a v1 deck is not converted by a transition')
+  deck.undo()
+  assert.equal(deck.file, text, 'one Undo: the file byte for byte')
+  deck.redo()
+  assert.equal(splitFrontMatter(deck.file).properties.transition, 'push', 'Redo writes it again')
+  // Push, then Zoom: the line changes in place; Undo goes back to Push, then to no line.
+  deck.transition('zoom')
+  assert.equal(deck.file.split('\n').filter(line => line.startsWith('transition:')).join('|'), 'transition: zoom')
+  deck.undo()
+  assert.equal(splitFrontMatter(deck.file).properties.transition, 'push')
+  deck.undo()
+  assert.equal(deck.file, text, 'and the bytes as they were')
+  // None writes `none`; Fade takes the line out again, with its Undo putting it back.
+  deck.transition('none')
+  assert.equal(splitFrontMatter(deck.file).properties.transition, 'none')
+  const withNone = deck.file
+  deck.transition('fade')
+  assert.equal(deck.file, text, 'Fade writes nothing: the line is gone and the rest as it was')
+  deck.undo()
+  assert.equal(deck.file, withNone, 'its Undo, byte for byte')
+}
+{
+  // A deck with no front-matter lines but its own: Fade from the start writes nothing at all.
+  const text = `---\ndeck: 2\n---\n\n${SLIDE}`
+  const deck = openDeck(text)
+  const steps = deck.applied.length
+  assert.equal(sameValue(propertyValue(deck.properties, 'transition'), transitionValue('fade')), true, 'Fade is what the deck has: nothing to write')
+  assert.equal(deck.applied.length, steps)
+  deck.transition('zoom')
+  deck.type(' More.')
+  deck.undo()
+  assert.equal(deck.properties.transition, 'zoom', 'its own Undo step: the typing is undone alone')
+  deck.undo()
+  assert.equal(deck.file, text)
+}
+
 // ---- An Undo never writes over a change someone else made since: the newer value stays.
 {
   const text = `---\ndeck: 2\ntheme: ${EVENING}\n---\n\n${SLIDE}`
@@ -210,8 +259,11 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
     assert.match(css, new RegExp(`\\.pic-${side} \\.photo \\{[^}]*var\\(--wall-bleed-x`), `a ${side} picture runs to its edge`)
   }
   assert.match(css, /\.is-blocks \.photo \{ top: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); bottom: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); \}/, 'and to the top and bottom')
-  assert.match(css, /\.wall-slide\.is-leaving \{ animation: wall-fade-out/, 'the slide before fades out over the one ground')
-  assert.match(css, /wall-fade-out \{ from \{ opacity: var\(--wall-fade-from, 1\); \}/, 'from where it was, so a quick move never flashes')
+  // README item 19 (18 November): the fade is the deck's Fade, drawn by playMotion.ts; a move during it first jumps it to
+  // its end (a press never waits), so the slide going is always the whole one and nothing flashes half-shown.
+  const play = readFileSync(fileURLToPath(new URL('./present/playMotion.ts', import.meta.url)), 'utf8')
+  assert.match(play, /animate\(leaving, \[\{ opacity: 1 \}, \{ opacity: 0 \}\], MOTION_MS\.fade, 'ease'\)/, 'the slide before fades out over the one ground')
+  assert.match(wall, /motion\.current\?\.finish\(\)\n\s+const direction = directionOf/, 'a move during a step jumps it to its end first')
   assert.match(css, /\.wall-slide \.deck-sl\.is-blocks \{ overflow: visible; \}/, 'only a block canvas lets its picture out')
 }
 
@@ -332,6 +384,17 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   ])
   assert.equal(rows.filter(row => row.querySelector('.deck-theme-row-check svg')).length, 1, 'one tick')
   assert.equal(rows[1].querySelector('.deck-theme-swatch')!.getAttribute('style'), 'background:#0F2A1E', "the row's swatch is its theme's ground")
+  // README item 19: TRANSITION under THEME, Fade · Push · Zoom · None, the deck's own checked (Fade without a line).
+  const withTransition = (transition?: 'fade' | 'push' | 'zoom' | 'none') => parse(renderToStaticMarkup(createElement(ThemeMenuBody, {
+    entries, named: FERN, look: 'card', transition, onLook: () => {}, onTransition: () => {}, onPick: () => {}, onCurrent: () => {},
+  })))
+  assert.deepEqual(withTransition().querySelectorAll('.deck-settings-k').map(label => label.textContent), ['Look', 'Theme', 'Transition'])
+  const transitionInputs = (transition?: 'fade' | 'push' | 'zoom' | 'none') => withTransition(transition).querySelectorAll('[aria-label="How one slide becomes the next"] input').map(input => [input.getAttribute('value'), input.hasAttribute('checked')])
+  assert.deepEqual(transitionInputs(), [['fade', true], ['push', false], ['zoom', false], ['none', false]])
+  assert.deepEqual(transitionInputs('zoom').map(([, checked]) => checked), [false, false, true, false])
+  assert.deepEqual(withTransition('push').querySelectorAll('[aria-label="How one slide becomes the next"] label').map(label => label.textContent), ['Fade', 'Push', 'Zoom', 'None'])
+  assert.match(DECK_TRANSITION_TIP, /plays it/, 'its tooltip says a choice plays it')
+  assert.ok(!labels.includes('Transition'), 'only where the deck view gives it')
   // A deck naming no theme, or a missing one, has Evening ticked.
   assert.equal(body(undefined).querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')
   assert.equal(body('Slide library/Themes/Gone.theme.md').querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')

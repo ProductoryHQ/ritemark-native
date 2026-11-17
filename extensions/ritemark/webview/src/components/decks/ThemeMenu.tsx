@@ -10,6 +10,9 @@
  *     its name and how many of the project's decks draw it, the current one ticked. The host lists them each time the
  *     menu opens (`deck/themes`), so a deck saved elsewhere or a theme file added since counts at once.
  * A pick writes the deck's `theme:` line as one step of the deck's Undo (`theme/themePick.ts`) and closes the menu.
+ *   - TRANSITION (README item 19): Fade | Push | Zoom | None, how the wall goes from one slide to the next. Fade is the
+ *     default and writes nothing; any other writes `transition: <it>` in the front matter, as one step of the same Undo.
+ *     Choosing one plays it once on the stage (`TransitionPreview`). The menu stays open, as for LOOK.
  *
  * A popover (shadcn's, on Radix), not a dropdown menu: the look's segmented control is a radio group, which a menu's
  * own arrow keys would take over. It closes on a press outside and on Esc and gives the focus back to the button.
@@ -24,6 +27,7 @@ import { SegmentedControl } from '../ui/segmented-control'
 import { Tooltip } from '../ui/tooltip'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { NewThemeSheet } from './theme/NewThemeSheet'
+import { DECK_TRANSITIONS, DECK_TRANSITION_TIP, type DeckTransition } from './present/wallMotion'
 
 /** Card or Borderless, with the words and the tooltip they have had since the bar's segment (16 November). */
 export const DECK_LOOKS = [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]
@@ -60,6 +64,9 @@ interface ThemeMenuProps {
   named: unknown
   look: 'card' | 'borderless'
   onLook: (look: string) => void
+  /** README 19: the deck's transition, and a choice of one (written, then played on the stage). */
+  transition?: DeckTransition
+  onTransition?: (transition: string) => void
   /** A theme picked: its path and name. Never called for the theme the deck already draws. */
   onPick: (path: string, name: string) => void
   /**
@@ -77,7 +84,7 @@ export function takenThemeNames(entries: readonly ThemeEntry[]): { names: string
   }
 }
 
-export function ThemeMenu({ theme, named, look, onLook, onPick, newTheme }: ThemeMenuProps) {
+export function ThemeMenu({ theme, named, look, onLook, transition, onTransition, onPick, newTheme }: ThemeMenuProps) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<ThemeEntry[] | null>(null)
   const [making, setMaking] = useState(false)
@@ -109,6 +116,8 @@ export function ThemeMenu({ theme, named, look, onLook, onPick, newTheme }: Them
           named={named}
           look={look}
           onLook={onLook}
+          transition={transition}
+          onTransition={onTransition}
           onPick={(path, name) => {
             setOpen(false)
             onPick(path, name)
@@ -139,6 +148,9 @@ interface ThemeMenuBodyProps {
   named: unknown
   look: 'card' | 'borderless'
   onLook: (look: string) => void
+  /** README 19: TRANSITION, under THEME, when the deck view gives it. */
+  transition?: DeckTransition
+  onTransition?: (transition: string) => void
   onPick: (path: string, name: string) => void
   /** The theme the deck already draws, picked: the menu closes and nothing is written. */
   onCurrent: () => void
@@ -153,7 +165,7 @@ interface ThemeMenuBodyProps {
  * frame 12) Edit <Name> for the theme the deck draws, and New theme…. Edit shows only for a theme the project has a file
  * for: the built-in Evening has none to open until the project makes one (a copy, from New theme…).
  */
-export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent, onEdit, onNew }: ThemeMenuBodyProps) {
+export function ThemeMenuBody({ entries, named, look, onLook, transition, onTransition, onPick, onCurrent, onEdit, onNew }: ThemeMenuBodyProps) {
   const current = entries ? themeKeyOf(named, entries) : null
   // Each theme file read once per list, not at every render of the open menu.
   const themes = useMemo(() => new Map((entries ?? []).map(entry => [entry.path, themeOfEntry(entry)])), [entries])
@@ -202,6 +214,23 @@ export function ThemeMenuBody({ entries, named, look, onLook, onPick, onCurrent,
           )
         })}
       </div>
+      {onTransition ? (
+        <>
+          <div className="deck-theme-sep" />
+          <div role="group" aria-labelledby="deck-theme-transition">
+            <div id="deck-theme-transition" className="deck-settings-k">Transition</div>
+            <Tooltip label={DECK_TRANSITION_TIP} className="flex w-full">
+              <SegmentedControl
+                aria-label="How one slide becomes the next"
+                className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center [&>label>span]:px-1"
+                value={transition ?? 'fade'}
+                onValueChange={onTransition}
+                options={DECK_TRANSITIONS as Array<{ value: string; label: string }>}
+              />
+            </Tooltip>
+          </div>
+        </>
+      ) : null}
       {entries !== null && (onEdit || onNew) ? (
         <>
           <div className="deck-theme-sep" />

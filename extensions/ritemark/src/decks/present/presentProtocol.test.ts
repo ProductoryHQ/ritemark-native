@@ -80,8 +80,12 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'theme', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'theme', 'transition', 'type']);
   assert.deepEqual(state.presenter, { available: false, on: false });
+  // README item 19: the deck's transition, Fade without one; only the four the wall knows.
+  assert.equal(state.transition, 'fade');
+  for (const transition of ['push', 'zoom', 'none', 'fade'] as const) assert.equal(wallStateOf(session.view(), { ...look, transition }, {}).transition, transition);
+  assert.equal(wallStateOf(session.view(), { ...look, transition: 'spin' as never }, {}).transition, 'fade', 'only the known transitions');
   assert.equal(state.blank, null, 'the slide, not a blank wall');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'white').blank, 'white');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'ground').blank, 'ground');

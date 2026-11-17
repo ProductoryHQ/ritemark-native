@@ -105,6 +105,18 @@ export function deckLookOf(text: string): 'card' | 'borderless' {
   return frontMatterValue(text, 'look') === 'borderless' ? 'borderless' : 'card';
 }
 
+/** The deck's transition between slides on the wall (README item 19): Fade, the default, when the line is anything else. */
+export type DeckTransition = 'fade' | 'push' | 'zoom' | 'none';
+
+/**
+ * The deck's one transition, from its front matter (`transition: push`, `zoom` or `none`); Fade when there is no line
+ * or it holds anything else. The deck view's own rule (`transitionOf` in the wall's `wallMotion.ts`).
+ */
+export function deckTransitionOf(text: string): DeckTransition {
+  const value = frontMatterValue(text, 'transition');
+  return value === 'push' || value === 'zoom' || value === 'none' ? value : 'fade';
+}
+
 /** Why a presentation can't start: the deck has no slide to show. */
 export class PresentStartError extends Error {}
 

@@ -12,7 +12,7 @@ import { publicSlide } from '../page/publicDeck';
 import { slidePicturePaths } from '../blocks/slideRenderer';
 import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
-import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
+import { presentTitleOf, type DeckTransition, type PresentSlide, type PresentView } from './presentSession';
 
 /** The webview panel that is the wall. */
 export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
@@ -65,6 +65,11 @@ export interface WallState {
   blank: WallBlank | null;
   /** The deck's published page, by its address, for Q's QR code; null while the deck isn't published. */
   page: string | null;
+  /**
+   * README item 19: how the wall goes from one slide to the next (`transition:` in the deck's front matter, Fade without
+   * it). Only the wall moves: the presenter view's state has none.
+   */
+  transition: DeckTransition;
 }
 
 /**
@@ -183,7 +188,7 @@ export function wallPicturePaths(view: PresentView): string[] {
 /** The wall's state after a move. */
 export function wallStateOf(
   view: PresentView,
-  look: { borderless: boolean; theme: DeckTheme },
+  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition },
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
@@ -203,7 +208,13 @@ export function wallStateOf(
     presenter: { available: presenter.available, on: presenter.on },
     blank: shownBlank(blank, address),
     page: address,
+    transition: transitionOf(look.transition),
   };
+}
+
+/** A transition the wall knows, or Fade. */
+function transitionOf(value: unknown): DeckTransition {
+  return value === 'push' || value === 'zoom' || value === 'none' ? value : 'fade';
 }
 
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */

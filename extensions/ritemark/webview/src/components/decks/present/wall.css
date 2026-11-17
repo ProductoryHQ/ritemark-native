@@ -19,14 +19,14 @@
 .wall-slide .deck-sl.is-blocks.pic-right .photo { right: calc(-1 * var(--wall-bleed-x, 0px)); width: calc(384px + var(--wall-bleed-x, 0px)); }
 .wall-slide .deck-sl.is-blocks.pic-behind .photo { left: calc(-1 * var(--wall-bleed-x, 0px)); right: calc(-1 * var(--wall-bleed-x, 0px)); }
 .wall-slide .deck-sl.is-blocks.pic-behind .veil { inset: calc(-1 * var(--wall-bleed-y, 0px)) calc(-1 * var(--wall-bleed-x, 0px)); }
-/* A move: the slide before fades out as the next fades in, over the one ground (neither has a ground of its own). */
-.wall-slide.is-entering { animation: wall-fade-in 0.3s ease both; }
-.wall-slide.is-leaving { animation: wall-fade-out 0.3s ease both; }
-@keyframes wall-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes wall-fade-out { from { opacity: var(--wall-fade-from, 1); } to { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .wall-slide.is-entering { animation: none; } .wall-slide.is-leaving { animation: none; visibility: hidden; } }
-.vscode-reduce-motion .wall-slide.is-entering { animation: none; }
-.vscode-reduce-motion .wall-slide.is-leaving { animation: none; visibility: hidden; }
+/* A move: the slide before goes as the next comes, over the one ground (neither has a ground of its own). The deck's
+   transition and the smooth move are drawn by playMotion.ts (Web Animations, so a press can jump them to their end);
+   with reduced motion the slide before is hidden at once. The smooth move's copy of the new slide (`.is-ghost`) shows
+   only the elements that glide. */
+.wall-slide.is-leaving { pointer-events: none; }
+.wall-slide.is-ghost { pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .wall-slide.is-leaving { visibility: hidden; } }
+.vscode-reduce-motion .wall-slide.is-leaving { visibility: hidden; }
 
 /* The blank wall (B, ".", W): over the slide, under the bar and the go-to box; it fades as a move does. */
 .wall-blank { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
