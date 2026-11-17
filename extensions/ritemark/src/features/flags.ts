@@ -341,14 +341,10 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
-  // Sprint 158 (#711): ON by default (HARD RULE #2); a kill switch for the save that writes people's workbooks
-  // (the Development manager, 15 November, answering Codex on #726). Off: an .xlsx opens read-only in the sheet grid,
-  // as an .xls does, and the host refuses every cell edit. It is not 'disabled' code: reverting Sprint 158 would bring
-  // back the save that strips a workbook's formatting, so read-only is the safe off-state.
   // Experience 48 (Codex on #772): kill switch for the table's own handles. ON ('stable', HARD RULE #2); a code-level
-  // switch an extension release can flip, not in Settings. 'disabled': tables are plain tables again, with no grips,
-  // menus, + bars or column lines (Tab, Shift+Tab and the Cmd+Shift+arrow keys still work; column widths in a file are
-  // still drawn and kept).
+  // switch an extension release can flip, not in Settings. 'disabled': the editors draw tables as before this work, with
+  // no grips, menus, + bars, column lines or column widths (a file's widths are kept as written, and a presented slide
+  // still draws them); Tab, Shift+Tab and the Cmd+Shift+arrow keys still work.
   'table-handles': {
     id: 'table-handles',
     label: 'Table Handles',
@@ -356,6 +352,10 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
+  // Sprint 158 (#711): ON by default (HARD RULE #2); a kill switch for the save that writes people's workbooks
+  // (the Development manager, 15 November, answering Codex on #726). Off: an .xlsx opens read-only in the sheet grid,
+  // as an .xls does, and the host refuses every cell edit. It is not 'disabled' code: reverting Sprint 158 would bring
+  // back the save that strips a workbook's formatting, so read-only is the safe off-state.
   'excel-editing': {
     id: 'excel-editing',
     label: 'Excel Editing',

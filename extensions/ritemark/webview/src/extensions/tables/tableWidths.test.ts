@@ -18,7 +18,7 @@ import { history, undo } from '@tiptap/pm/history'
 import { openDocument, saveDocument, installTestDocument } from '../../utils/markdownFidelity'
 import { loadSlide, saveSlide } from '../../components/decks/blocks/slideEditorHarness'
 import { blockSlideHtml } from '../../../../src/decks/blocks/slideRenderer'
-import { PANDOC_COLUMNS, WIDTH_UNITS, delimiterUnits, percentsOf, snapPercents, tableHasWidths } from '../../../../src/markdown/tableWidths'
+import { PANDOC_COLUMNS, WIDTH_UNITS, delimiterUnits, heldWidths, percentsOf, snapPercents, tableHasWidths } from '../../../../src/markdown/tableWidths'
 import { alignColumn, columnWidths, deleteColumn, insertColumn, moveColumn, setColumnWidths, tableAt } from './tableOps'
 import { minPercent, resizePair } from '../../components/tables/columnResize'
 
@@ -202,6 +202,13 @@ for (const surface of surfaces) {
   assert.deepEqual(resizePair([20, 50, 30], [5, 5, 5], 2, 61), [20, 60, 20])
   assert.deepEqual(resizePair([20, 50, 30], [15, 40, 5], 1, 2), [15, 55, 30], 'never under the longest word on the left')
   assert.deepEqual(resizePair([20, 50, 30], [15, 40, 5], 1, 60), [30, 40, 30], 'never under the longest word on the right')
+  // A drag never lands on all-equal shares (the file says equal as automatic): one step to the side it came from
+  // (review of #772, round 2).
+  assert.deepEqual(resizePair([20, 80], [5, 5], 1, 50), [45, 55], 'dragged up to half: one step short')
+  assert.deepEqual(resizePair([70, 30], [5, 5], 1, 50), [55, 45], 'dragged down to half: one step short')
+  assert.deepEqual(heldWidths([50, 50]), null, 'equal shares are automatic')
+  assert.deepEqual(heldWidths([45, 55]), [45, 55])
+  assert.equal(heldWidths(Array.from({ length: 21 }, () => 1)), null, 'more than 20 columns: automatic')
   assert.equal(minPercent(90, 600), 15, 'a 90 px word in a 600 px table: 15 %')
   assert.equal(minPercent(1, 600), 5, 'never under one step')
   assert.deepEqual(snapPercents([1, 1, 1]), [35, 35, 30], 'equal thirds in 5 % steps add to 100')

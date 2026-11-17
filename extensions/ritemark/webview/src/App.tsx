@@ -70,7 +70,7 @@ interface Features {
   markdownExport: boolean
   saveAsMarkdownFromPreview: boolean
   commentCallouts?: boolean
-  /** Experience 48: the table's own handles (the `table-handles` kill switch). */
+  /** Experience 48: the table's own handles (the `table-handles` kill switch), read once into `setTableHandlesEnabled`. */
   tableHandles?: boolean
 }
 
@@ -214,7 +214,6 @@ function App() {
         markdownExport: payload.features.markdownExport,
         saveAsMarkdownFromPreview: payload.features.saveAsMarkdownFromPreview ?? false,
         commentCallouts: payload.features.commentCallouts,
-        tableHandles: payload.features.tableHandles,
       })
       const nextCard = payload.cardMode ?? null
       setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))

@@ -426,8 +426,18 @@ html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-
 .rm-table-ui button.rm-table-add { width: 100%; height: 100%; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface-muted); color: var(--r-ink-muted); box-shadow: 0 0 0 1px var(--r-hairline); }
 .rm-table-ui button.rm-table-add:hover { background: var(--r-accent-soft); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-accent); }
 .rm-table-ui button.rm-table-add:active { transform: none; }
-.deck-sl .rm-table-ui button.rm-table-grip:not(.is-on), .deck-sl .rm-table-ui button.rm-table-add { background: #fff; color: #64748B; }
-.deck-sl .rm-table-ui button.rm-table-add:hover { color: #1C1F4A; box-shadow: 0 0 0 1px var(--rm-table-accent); }
+/* Quiet on any surface (experience 48; Jarmo: "handles should probly be semitransparent"). On a slide the grips and
+   + bars are see-through in the slide's own ink (its heading colour: white on a dark slide, the ink on Borderless or a
+   light theme), never the brightest thing on it. Grips: fill 12 %, hairline 20 %, icon 65 %; on hover fill 22 % and the
+   icon whole; a chosen grip takes the slide's accent. + bars: a faint track (8 %) and a faint +, the hover values on
+   hover. In a document they keep the ground grey above. */
+.deck-sl .rm-table { --rm-ink: var(--s-hd, #fff); }
+.deck-slide.is-borderless .deck-sl .rm-table { --rm-ink: var(--s-hd, #1C1F4A); }
+.deck-sl .rm-table-ui button.rm-table-grip:not(.is-on) { background: color-mix(in srgb, var(--rm-ink) 12%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rm-ink) 20%, transparent); color: color-mix(in srgb, var(--rm-ink) 65%, transparent); }
+.deck-sl .rm-table-ui button.rm-table-grip:not(.is-on):hover { background: color-mix(in srgb, var(--rm-ink) 22%, transparent); color: var(--rm-ink); }
+.deck-sl .rm-table-ui button.rm-table-grip.is-on { color: #1C1F4A; }
+.deck-sl .rm-table-ui button.rm-table-add { background: color-mix(in srgb, var(--rm-ink) 8%, transparent); box-shadow: none; color: color-mix(in srgb, var(--rm-ink) 35%, transparent); }
+.deck-sl .rm-table-ui button.rm-table-add:hover { background: color-mix(in srgb, var(--rm-ink) 22%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rm-ink) 20%, transparent); color: var(--rm-ink); }
 .rm-table-drop { position: absolute; border-radius: 2px; background: var(--rm-table-accent); pointer-events: none; }
 /* The line between two columns (Column widths): the resize cursor, and the accent line on it while pointed at. */
 .rm-table-resize { position: absolute; cursor: col-resize; touch-action: none; }

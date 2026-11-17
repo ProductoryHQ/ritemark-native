@@ -17,7 +17,7 @@
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { EditorView, NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { cellAtPos, cellAtSelection, cellPos, columnWidths, nextCellOrNewRow, previousCell, tableTintPlugin, wholeTableChosen } from './tableOps'
 
@@ -277,6 +277,21 @@ export const TableHandles = Extension.create<TableHandlesOptions, TableHandlesSt
               if (!target) return false
               event.preventDefault()
               event.stopPropagation()
+              // The caret goes where the person right-clicked, unless what they chose is there already, so the menu's
+              // Paste and Cut act on that cell, as the webview's own menu did (the app run on #772: Paste went to the
+              // caret left at the top of the document).
+              if (target.kind === 'cell') {
+                const at = view.posAtCoords({ left: event.clientX, top: event.clientY })
+                const chosen = cellAtSelection(view.state)
+                const sameCell = chosen && chosen.pos === target.tablePos && chosen.row === target.row && chosen.col === target.col
+                if (at && !(sameCell && !view.state.selection.empty)) {
+                  const $at = view.state.doc.resolve(at.pos)
+                  const cell = cellAtPos($at)
+                  if (cell && cell.pos === target.tablePos && cell.row === target.row && cell.col === target.col) {
+                    view.dispatch(view.state.tr.setSelection(TextSelection.near($at)))
+                  }
+                }
+              }
               return registry.requestMenu({ ...target, anchor: { left: event.clientX, top: event.clientY, width: 0, height: 0 } })
             },
           },

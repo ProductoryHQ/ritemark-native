@@ -49,7 +49,10 @@ interface ResizeState {
 
 let measureCanvas: HTMLCanvasElement | null = null
 
-/** The widest word of a cell, with the cell's side padding, in the table's own (unscaled) pixels. */
+/**
+ * The widest word of a cell, with the cell's side padding, in the table's own (unscaled) pixels. A link's or code's text
+ * may break anywhere in a cell (Editor.tsx), so it doesn't count.
+ */
 function longestWordOf(cell: HTMLTableCellElement): number {
   measureCanvas ??= document.createElement('canvas')
   const context = measureCanvas.getContext('2d')
@@ -58,8 +61,12 @@ function longestWordOf(cell: HTMLTableCellElement): number {
   if (!context) return padding
   context.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
   let widest = 0
-  for (const word of (cell.textContent ?? '').split(/\s+/)) {
-    if (word) widest = Math.max(widest, context.measureText(word).width)
+  const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node.parentElement?.closest('a, code')) continue
+    for (const word of (node.nodeValue ?? '').split(/\s+/)) {
+      if (word) widest = Math.max(widest, context.measureText(word).width)
+    }
   }
   return widest + padding + 2
 }
@@ -286,6 +293,19 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
     return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
   }
 
+  /** A grip's drag or a column line's drag that lost its press: everything back as it was, nothing written. */
+  const cancelDrag = () => {
+    const current = dragRef.current
+    dragRef.current = null
+    setDrag(null)
+    setPressing(false)
+    if (current?.moved && !editor.isDestroyed) editor.view.dispatch(setTint(editor.state, null))
+  }
+  const cancelResize = () => {
+    resizeRef.current = null
+    setResize(null)
+  }
+
   const startDrag = (kind: 'column' | 'row', index: number) => (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     // Not prevented: the grip's tooltip closes on the press, as any tooltip's does (the mouse-down is, below, so the
@@ -297,6 +317,11 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const moveDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const current = dragRef.current
     if (!current) return
+    // The button is no longer down (its release went elsewhere): the drag ends here, moving nothing.
+    if ((event.buttons & 1) === 0) {
+      cancelDrag()
+      return
+    }
     if (!current.moved && Math.hypot(event.clientX - current.startX, event.clientY - current.startY) < DRAG_THRESHOLD) return
     // The header row isn't moved: its grip only opens its menu.
     if (current.kind === 'row' && current.from === 0) return
@@ -361,6 +386,11 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const moveResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     const current = resizeRef.current
     if (!current) return
+    // The button is no longer down (its release went elsewhere): the drag ends here, and no width is written.
+    if ((event.buttons & 1) === 0) {
+      cancelResize()
+      return
+    }
     const fresh = measureTable(view)
     if (!fresh || !fresh.cols.length) return
     // The pointer in the table's own coordinates (divided by the slide's scale), as a share of the table's width.
@@ -420,6 +450,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
               onPointerMove={moveDrag}
               onPointerUp={endDrag(false)}
               onPointerCancel={endDrag(true)}
+              onLostPointerCapture={cancelDrag}
               onKeyDown={event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return
                 event.preventDefault()
@@ -454,6 +485,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
               onPointerMove={moveDrag}
               onPointerUp={endDrag(false)}
               onPointerCancel={endDrag(true)}
+              onLostPointerCapture={cancelDrag}
               onKeyDown={event => {
                 if (event.key !== 'Enter' && event.key !== ' ') return
                 event.preventDefault()
@@ -465,7 +497,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           </Tooltip>
         </div>
       ) : null}
-      {!drag && cols.length <= MAX_WIDTH_COLUMNS ? cols.slice(1).map((column, index) => {
+      {!drag && cols.length < MAX_WIDTH_COLUMNS ? cols.slice(1).map((column, index) => {
         const boundary = index + 1
         return (
           <div
@@ -480,6 +512,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
             onPointerMove={moveResize}
             onPointerUp={endResize(false)}
             onPointerCancel={endResize(true)}
+            onLostPointerCapture={cancelResize}
             onDoubleClick={() => run(setColumnWidths(editor.state, tablePos, null))}
           />
         )
@@ -603,7 +636,8 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
       <DropdownMenuContent
         align="start"
         side="bottom"
-        className="rm-table-menu w-[236px] max-w-none"
+        // A long menu (a cell's, with Cut, Copy and Paste) scrolls inside the room the window has (the app run on #772).
+        className="rm-table-menu w-[236px] max-w-none max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
         onInteractOutside={() => { outside.current = true }}
         onCloseAutoFocus={event => event.preventDefault()}
       >

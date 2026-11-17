@@ -113,6 +113,16 @@ export function tableHasWidths(raw: string): boolean {
   return !linedUp(delimiter, header) && !(firstBody && linedUp(delimiter, firstBody))
 }
 
+/**
+ * Shares a table can hold as widths: in 5 % steps adding to 100, for 2 to 20 columns, and not all equal (equal is
+ * automatic). Null: automatic widths. The one place the writers (a drag, a column added or deleted) apply the rule.
+ */
+export function heldWidths(percents: number[] | null): number[] | null {
+  if (!percents || percents.length < 2 || percents.length > MAX_WIDTH_COLUMNS) return null
+  const shares = snapPercents(percents)
+  return shares.some(value => value !== shares[0]) ? shares : null
+}
+
 /** Ritemark's form of widths: runs adding up to 80, each a multiple of 4. */
 export function isWidthForm(units: number[]): boolean {
   const unit = WIDTH_UNITS / (100 / WIDTH_STEP)

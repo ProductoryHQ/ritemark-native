@@ -1471,7 +1471,6 @@ export function Editor({
            past the page; words stay whole (review of #772). */
         .wysiwyg-editor .ProseMirror :is(td.tiptap-table-cell, th.tiptap-table-header) :is(a, code) {
           overflow-wrap: anywhere !important;
-          word-break: break-all !important;
         }
 
         /* A column's alignment as the file writes it (\`:---:\`, \`---:\`), shown as it reads. */

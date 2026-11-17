@@ -20,7 +20,7 @@ import { type EditorState, Plugin, PluginKey, Selection, TextSelection, type Tra
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { closeHistory } from '@tiptap/pm/history'
 import { CellSelection, TableMap, moveTableColumn, moveTableRow } from '@tiptap/pm/tables'
-import { DELIM_CELL, MAX_WIDTH_COLUMNS, automaticUnits, delimiterCellOf, delimiterRowWithWidths, rowCells, snapPercents, widthsOf } from '../../../../src/markdown/tableWidths'
+import { DELIM_CELL, MAX_WIDTH_COLUMNS, automaticUnits, delimiterCellOf, delimiterRowWithWidths, heldWidths, rowCells, widthsOf } from '../../../../src/markdown/tableWidths'
 
 /** On every table transaction: one undo step, written by the slide editor as one. */
 export const TABLE_COMMAND = 'rmTableCommand'
@@ -153,8 +153,8 @@ function withDelims(tr: Transaction, tablePos: number, before: PMNode, change: (
   let hasWidths = false
   if (cells) {
     const changed = change(cells)
-    const shares = percents && widths && changed.length <= MAX_WIDTH_COLUMNS ? snapPercents(widths(percents)) : null
-    if (percents && widths && (!shares || shares.every(value => value === shares[0]))) {
+    const shares = percents && widths ? heldWidths(widths(percents)) : null
+    if (percents && widths && !shares) {
       // Past 20 columns no width holds a 5 % step, and equal shares are automatic: the table goes back to automatic
       // widths (Codex on #772).
       next = delimiterRowWithWidths(changed, null)
@@ -191,9 +191,8 @@ export function setColumnWidths(state: EditorState, tablePos: number, percents: 
       return spaced ? ` ${marker} ` : marker
     })
   if (percents && width > MAX_WIDTH_COLUMNS) return null
-  const shares = percents ? snapPercents(percents) : null
   // Equal shares are automatic widths: equal dashes say so in the file (review of #772).
-  const snapped = shares && shares.some(value => value !== shares[0]) ? shares : null
+  const snapped = heldWidths(percents)
   if (!snapped && !columnWidths(table.node)) return null
   const mdDelims = delimiterRowWithWidths(cells, snapped)
   const mdWidths = snapped ? 'true' : null

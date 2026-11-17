@@ -21,6 +21,15 @@ export function resizePair(percents: number[], mins: number[], boundary: number,
   const next = percents.slice()
   next[left] = Math.min(Math.max(snapped, lowest), highest)
   next[right] = pair - next[left]
+  // All equal is automatic in the file (equal dashes), so a drag never lands there: one step to the side of the drag
+  // it came from, so what is drawn is what is saved (review of #772).
+  if (next.length > 1 && next.every(value => value === next[0])) {
+    const toward = percents[left] > next[left] ? WIDTH_STEP : -WIDTH_STEP
+    const shifted = next[left] + toward
+    const other = next[left] - toward
+    next[left] = shifted >= lowest && shifted <= highest ? shifted : other >= lowest && other <= highest ? other : next[left]
+    next[right] = pair - next[left]
+  }
   return next
 }
 
