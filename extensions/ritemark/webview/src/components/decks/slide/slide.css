@@ -167,7 +167,7 @@
 .deck-sl.is-blocks .blk-column:first-child { padding-left: 0; box-shadow: none; }
 .deck-sl.is-blocks .blk-column > :last-child, .deck-sl.is-blocks .blk-box > :last-child { margin-bottom: 0; }
 /* Boxes: a row of cards, with an icon or the look's own mark. */
-.deck-sl.is-blocks .blk-boxes { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 16px; margin: .3em 0 .5em; counter-reset: blk-box; }
+.deck-sl.is-blocks .blk-boxes { gap: 16px; margin: .3em 0 .5em; counter-reset: blk-box; }
 .deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 18px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); font-size: .86em; }
 .deck-sl.is-blocks .blk-box > * { margin-bottom: 0; }
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
@@ -180,6 +180,45 @@
 .deck-sl.is-blocks .blk-steps ol { list-style: none; padding: 0; counter-reset: blk-step; }
 .deck-sl.is-blocks .blk-steps ol > li { position: relative; counter-increment: blk-step; padding-left: 2.1em; margin-bottom: .55em; font-weight: 600; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks .blk-steps ol > li::before { content: counter(blk-step); position: absolute; left: 0; top: .05em; width: 1.45em; height: 1.45em; border-radius: 50%; display: grid; place-items: center; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font-weight: 700; font-size: .8em; }
+/* A step's line under its heading (frame 30: a box turned into a step keeps its line), in the text's weight. */
+.deck-sl.is-blocks .blk-steps ol > li > :not(:first-child) { margin: .1em 0 0; font-weight: 400; font-size: .82em; color: var(--s-tx, #C7CAEB); }
+
+/* The block bar (experience 46, 17 November). Boxes: Width, Style and alignment; Columns: the split and alignment.
+   Boxes lay out as a wrapping row: Auto keeps one row while every box can be 180 px wide (a box's width plus the
+   16 px gap: one row while the block is at least 196 × n − 16 wide), else two even rows (5 boxes: 3 and 2), measured
+   against the block's own width, so a side picture or a column narrows it too. S, M and L are about 180, 260 and
+   400 px, start at the left, wrap, and keep their width in the last row. */
+.deck-sl.is-blocks .blk-boxes { display: flex; flex-wrap: wrap; align-items: stretch; container: blk-boxes / inline-size; }
+.deck-sl.is-blocks .blk-boxes > .blk-box { flex: 1 1 0; box-sizing: border-box; }
+/* A Boxes block inside a box takes the box's width (inline-size containment would make a shrink-to-fit one 0 wide);
+   on the stage a box's blocks sit in its `.blk-inner`. */
+.deck-sl.is-blocks .blk-box > .blk-boxes, .deck-sl.is-blocks .blk-box > .blk-inner > .blk-boxes { align-self: stretch; }
+/* More boxes than the rules below count (13 and up): rows of boxes at least 180 px wide. */
+.deck-sl.is-blocks .blk-boxes[data-many]:not([data-width]) > .blk-box { flex: 1 1 180px; }
+@container blk-boxes (width < 376px) { .deck-sl.is-blocks .blk-boxes[data-count="2"]:not([data-width]) > .blk-box { flex-basis: calc(100% - .5px); } }
+@container blk-boxes (width < 572px) { .deck-sl.is-blocks .blk-boxes[data-count="3"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 16px) / 2 - .5px); } }
+@container blk-boxes (width < 768px) { .deck-sl.is-blocks .blk-boxes[data-count="4"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 16px) / 2 - .5px); } }
+@container blk-boxes (width < 964px) { .deck-sl.is-blocks .blk-boxes[data-count="5"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 32px) / 3 - .5px); } }
+@container blk-boxes (width < 1160px) { .deck-sl.is-blocks .blk-boxes[data-count="6"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 32px) / 3 - .5px); } }
+@container blk-boxes (width < 1356px) { .deck-sl.is-blocks .blk-boxes[data-count="7"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 48px) / 4 - .5px); } }
+@container blk-boxes (width < 1552px) { .deck-sl.is-blocks .blk-boxes[data-count="8"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 48px) / 4 - .5px); } }
+@container blk-boxes (width < 1748px) { .deck-sl.is-blocks .blk-boxes[data-count="9"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 64px) / 5 - .5px); } }
+@container blk-boxes (width < 1944px) { .deck-sl.is-blocks .blk-boxes[data-count="10"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 64px) / 5 - .5px); } }
+@container blk-boxes (width < 2140px) { .deck-sl.is-blocks .blk-boxes[data-count="11"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 80px) / 6 - .5px); } }
+@container blk-boxes (width < 2336px) { .deck-sl.is-blocks .blk-boxes[data-count="12"]:not([data-width]) > .blk-box { flex-basis: calc((100% - 80px) / 6 - .5px); } }
+.deck-sl.is-blocks .blk-boxes[data-width="s"] { --blk-w: 180px; }
+.deck-sl.is-blocks .blk-boxes[data-width="m"] { --blk-w: 260px; }
+.deck-sl.is-blocks .blk-boxes[data-width="l"] { --blk-w: 400px; }
+.deck-sl.is-blocks .blk-boxes[data-width] > .blk-box { flex: 0 0 min(var(--blk-w), 100%); }
+.deck-sl.is-blocks .blk-boxes[data-align="center"] > .blk-box { align-items: center; text-align: center; }
+.deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="filled"] > .blk-box { background: var(--s-boxf, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxfl, rgba(255,255,255,.13)); }
+.deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="outline"] > .blk-box { background: transparent; box-shadow: inset 0 0 0 1.5px var(--s-boxo, rgba(255,255,255,.34)); }
+/* A column's blocks keep their own width when it is a flex column: a table and a picture never stretch (the slide's
+   blocks have bottom margins only, so none collapse that would here). */
+.deck-sl.is-blocks .blk-columns[data-valign] > .blk-column { display: flex; flex-direction: column; align-items: stretch; }
+.deck-sl.is-blocks .blk-columns[data-valign] > .blk-column > :is(table, .tableWrapper, img, .blk-pic) { align-self: flex-start; }
+.deck-sl.is-blocks .blk-columns[data-valign="middle"] > .blk-column { justify-content: center; }
+.deck-sl.is-blocks .blk-columns[data-valign="bottom"] > .blk-column { justify-content: flex-end; }
 /* A slide that is only a title, with a line under it or a short line over it: big and low, as the old Title slide. */
 .deck-sl.is-blocks.is-cover .blk-flow { display: flex; flex-direction: column; justify-content: flex-end; justify-content: safe flex-end; padding-bottom: 40px; }
 .deck-sl.is-blocks.is-cover h1 { font-size: 2.45em; line-height: 1.08; }

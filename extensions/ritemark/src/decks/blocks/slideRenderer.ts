@@ -20,7 +20,7 @@ import type { DeckTheme } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
-import { OWN_MARK_LOOKS, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 
@@ -91,17 +91,39 @@ export function stepsTagOf(attrs: FenceAttributes): string {
   return tag.trim() ? tag : '';
 }
 
+/** Drawn attributes as HTML, escaped. */
+function drawnAttributes(attributes: Record<string, string>): string {
+  return Object.entries(attributes).map(([name, value]) => ` ${name}="${esc(value)}"`).join('');
+}
+
+/**
+ * A Columns block's columns' attributes, for its grid (a column's `width`), or null when it holds anything drawn other
+ * than columns (the widths would then fall on the wrong tracks; it is drawn even).
+ */
+function columnChildren(token: SlideDivToken): FenceAttributes[] | null {
+  const columns: FenceAttributes[] = [];
+  for (const child of token.tokens) {
+    if (child.type === 'space' || isCommentBlock(child)) continue;
+    const div = child as unknown as SlideDivToken;
+    if (child.type !== 'slideDiv' || slideBlockClassOf(div.attrs) !== 'column') return null;
+    columns.push(div.attrs);
+  }
+  return columns;
+}
+
 function divHtml(token: SlideDivToken, inner: () => string): string {
   const kind = slideBlockClassOf(token.attrs);
   switch (kind) {
     case 'columns':
+      return `<div class="blk-columns"${drawnAttributes(columnsDrawnAttributes(token.attrs, columnChildren(token)))}>${inner()}</div>\n`;
     case 'column':
       return `<div class="blk-${kind}">${inner()}</div>\n`;
     case 'boxes': {
       const look = token.attrs.values.look ?? 'boxes';
       state.looks.push(look);
       try {
-        return `<div class="blk-boxes" data-look="${esc(look)}">${inner()}</div>\n`;
+        const boxes = token.tokens.filter(child => child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box').length;
+        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes))}>${inner()}</div>\n`;
       } finally {
         state.looks.pop();
       }

@@ -182,6 +182,9 @@ import {
   EnvelopeSimple,
   OpenAiLogo,
   PencilSimpleLine,
+  AlignTop,
+  AlignCenterVertical,
+  AlignBottom,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -227,6 +230,10 @@ const iconMap = {
   'columns': Columns,
   'plus-square': PlusSquare,
   'scissors': Scissors,
+  // 17 November: the block's bar on a slide, the Columns' vertical alignment (its text alignment and ⋮ are the table's).
+  'align-top': AlignTop,
+  'align-center-vertical': AlignCenterVertical,
+  'align-bottom': AlignBottom,
   'folder-simple': FolderSimple,
   'file-pdf': FilePdf,
   'book-open-text': BookOpenText,
