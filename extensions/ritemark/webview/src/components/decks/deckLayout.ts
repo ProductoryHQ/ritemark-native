@@ -8,7 +8,7 @@
  *  - **above** (the slide centred on top, the handout below it in the Text editor's column) when the room is narrower.
  *
  * The room is the deck view's own width less the strip: what's left of the window after every panel (the left column,
- * the strip and the AI column). There's no setting; the fold control covers the two focus needs.
+ * the strip and the AI column). There's no setting; the view switch on the bar covers the two focus needs.
  *
  * Pure functions, so the rule can be tested without a window.
  */
