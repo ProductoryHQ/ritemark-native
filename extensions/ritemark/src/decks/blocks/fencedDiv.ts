@@ -167,3 +167,94 @@ export function slideBlockClassOf(attrs: FenceAttributes): SlideBlockClass | nul
   for (const name of SLIDE_BLOCK_CLASSES) if (attrs.classes.includes(name)) return name;
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// The block bar's values (experience 46, 17 November: "The block's bar has one shape for every block", "How wide a
+// box is"). Each is one value on the block's own opening line, in the attribute style above; a missing value is the
+// default, so an untouched block's line never changes. The renderer and the stage read them with these, and anything
+// they can't read is the default (never an error, and never written into the page as typed).
+// ---------------------------------------------------------------------------
+
+/** A Boxes block's Width: S, M or L, about 180, 260 and 400 px on the 960 slide, the same for every box. None is Auto. */
+export type BoxWidth = 's' | 'm' | 'l';
+export const BOX_WIDTH_PX: Readonly<Record<BoxWidth, number>> = { s: 180, m: 260, l: 400 };
+/** Auto keeps one row while every box can be at least this wide; otherwise two even rows. */
+export const BOX_AUTO_MIN = 180;
+/** The gap between boxes (slide.css's `.blk-boxes` gap). */
+export const BOX_GAP = 16;
+
+/** A Boxes block's own look: its Width (`width`), Style (`fill`) and text alignment (`align`); null is the default. */
+export interface BoxesLook {
+  width: BoxWidth | null;
+  /** Filled or Outline; null is the theme's own (the theme's `boxes:`). */
+  fill: 'filled' | 'outline' | null;
+  /** Centred text; null is left, as the slide's text. */
+  align: 'center' | null;
+}
+
+export function boxesLookOf(attrs: FenceAttributes): BoxesLook {
+  const width = attrs.values.width?.trim().toLowerCase();
+  const fill = attrs.values.fill?.trim().toLowerCase();
+  const align = attrs.values.align?.trim().toLowerCase();
+  return {
+    width: width === 's' || width === 'm' || width === 'l' ? width : null,
+    fill: fill === 'filled' || fill === 'outline' ? fill : null,
+    align: align === 'center' || align === 'centre' ? 'center' : null,
+  };
+}
+
+/** A Columns block's vertical alignment (`valign`): middle or bottom; null is top. */
+export type ColumnsAlign = 'middle' | 'bottom';
+
+export function columnsAlignOf(attrs: FenceAttributes): ColumnsAlign | null {
+  const value = attrs.values.valign?.trim().toLowerCase();
+  if (value === 'middle' || value === 'center' || value === 'centre') return 'middle';
+  return value === 'bottom' ? 'bottom' : null;
+}
+
+/**
+ * A column's share of its Columns block, in percent (`::: {.column width="33%"}`, Pandoc's and Quarto's own form; a
+ * fraction such as `0.4` reads as 40 %). Null for none, and for anything else.
+ */
+export function columnWidthOf(attrs: FenceAttributes): number | null {
+  const value = attrs.values.width?.trim();
+  if (!value) return null;
+  const percent = /^(\d{1,3}(?:\.\d{1,2})?)\s*%$/.exec(value);
+  const share = percent ? Number(percent[1]) : /^0?\.\d{1,4}$/.test(value) ? Number(value) * 100 : NaN;
+  return Number.isFinite(share) && share > 0 && share <= 100 ? share : null;
+}
+
+/**
+ * The columns' grid when any of them has a width: each column's share as an `fr` (a column without one takes an even
+ * share, 100 / n), so the shares never have to add up. Null when none has a width: the even split slide.css draws.
+ * Only numbers reach the style, never the words written.
+ */
+export function columnTemplateOf(widths: ReadonlyArray<number | null>): string | null {
+  if (!widths.length || widths.every(width => width === null)) return null;
+  const even = 100 / widths.length;
+  const tracks = widths.map(width => `minmax(0, ${Math.round((width ?? even) * 100) / 100}fr)`);
+  return `grid-template-columns: ${tracks.join(' ')}; grid-auto-flow: row`;
+}
+
+/**
+ * The attributes a Boxes block is drawn with, the renderer's and the stage's alike: its look, how many boxes it holds
+ * (Auto's rows, slide.css) and its own values. Only fixed words reach them.
+ */
+export function boxesDrawnAttributes(attrs: FenceAttributes, count: number): Record<string, string> {
+  const look = boxesLookOf(attrs);
+  const out: Record<string, string> = { 'data-count': String(Math.max(0, Math.min(99, Math.floor(count)))) };
+  if (look.width) out['data-width'] = look.width;
+  if (look.fill) out['data-fill'] = look.fill;
+  if (look.align) out['data-align'] = look.align;
+  return out;
+}
+
+/** The attributes a Columns block is drawn with: its vertical alignment, and its grid when a column has a width. */
+export function columnsDrawnAttributes(attrs: FenceAttributes, columns: ReadonlyArray<FenceAttributes> | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  const align = columnsAlignOf(attrs);
+  if (align) out['data-valign'] = align;
+  const template = columns ? columnTemplateOf(columns.map(columnWidthOf)) : null;
+  if (template) out.style = template;
+  return out;
+}

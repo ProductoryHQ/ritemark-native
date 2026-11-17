@@ -167,6 +167,12 @@ import {
   EnvelopeSimple,
   OpenAiLogo,
   PencilSimpleLine,
+  TextAlignLeft,
+  TextAlignCenter,
+  AlignTop,
+  AlignCenterVertical,
+  AlignBottom,
+  DotsSixVertical,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -212,6 +218,13 @@ const iconMap = {
   'columns': Columns,
   'plus-square': PlusSquare,
   'scissors': Scissors,
+  // 17 November: the block's bar on a slide (alignment, and the ⋮ that moves a block).
+  'text-align-left': TextAlignLeft,
+  'text-align-center': TextAlignCenter,
+  'align-top': AlignTop,
+  'align-center-vertical': AlignCenterVertical,
+  'align-bottom': AlignBottom,
+  'dots-six-vertical': DotsSixVertical,
   'folder-simple': FolderSimple,
   'file-pdf': FilePdf,
   'book-open-text': BookOpenText,
