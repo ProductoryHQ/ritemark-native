@@ -516,10 +516,10 @@ export function isSlideOnly(slide: Pick<PublicSlide, 'handout' | 'data'>, textHa
 }
 
 /** The text column's part for one shown slide. */
-function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean): string {
+function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean): string {
   const number = index + 1;
   // A slide with no handout: its place only, with nothing in it (the page's script still finds it in the slide order).
-  if (isSlideOnly(slide, textHandout)) return `<div class="part only" data-i="${index}" id="s${number}" aria-hidden="true"></div>`;
+  if (slideOnly) return `<div class="part only" data-i="${index}" id="s${number}" aria-hidden="true"></div>`;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const exerciseSlide = isExercise(slide);
@@ -535,10 +535,10 @@ function partHtml(slide: PublicSlide, index: number, options: PageOptions, partK
   return `<article class="part"${exercise} data-i="${index}" id="s${number}"><div class="lab">Slide ${number}${pillHtml(slide)}</div>${title ? `<h2>${esc(title)}</h2>` : ''}\n${body}</article>`;
 }
 
-function contentsHtml(slides: PublicSlide[], textHandout: boolean): string {
+function contentsHtml(slides: PublicSlide[], slideOnly: readonly boolean[]): string {
   const rows = slides.map((slide, index) => {
     // A slide with no handout has no entry: Contents lists the text's parts.
-    if (isSlideOnly(slide, textHandout)) return '';
+    if (slideOnly[index]) return '';
     const title = titleOf(slide) || `Slide ${index + 1}`;
     const mark = isExercise(slide)
       ? `${pillHtml(slide)}<span class="done" aria-label="Done">${iconSvg('check-circle', 18)}</span>`
@@ -586,11 +586,13 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // A tick's id is its part's title (with which part of that title it is) and the step's words, never the part's place:
   // a slide added before an exercise keeps its ticks, and two exercises with one title keep theirs apart.
   const titles = new Map<string, number>();
+  // Which slides have no handout: read once, for the text and for Contents.
+  const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));
   const parts = deck.slides.map((slide, index) => {
     const title = titleOf(slide);
     const nth = (titles.get(title) ?? 0) + 1;
     titles.set(title, nth);
-    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true);
+    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true, slideOnly[index]);
   });
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
@@ -610,7 +612,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<header class="top"><div class="in">${who}<span class="grow"></span><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`
       + `<button class="cbtn" id="tocbtn" type="button" aria-expanded="false" aria-controls="toc">${iconSvg('list', 16)}Contents</button></div>`
       + `<div class="bar"><i id="bar" style="width:${count ? (100 / count).toFixed(4) : 0}%"></i></div></header>`,
-    contentsHtml(deck.slides, deck.textHandout === true),
+    contentsHtml(deck.slides, slideOnly),
     '<main class="wrap">',
     `<aside class="stage" aria-label="The slide"><div class="slidebox" id="slidebox">\n${layers.join('\n')}\n</div>`
       + `<div class="under"><span class="t" id="stitle">${first ? esc(`1 · ${titleOf(first)}`) : ''}</span><span class="nav">`

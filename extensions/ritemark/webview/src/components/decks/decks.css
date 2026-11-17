@@ -130,7 +130,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    part's text (its height is the deck view's, `measureRail`). Only the current slide's track has a colour, the accent
    at about 10 % (14 % in Ritemark Dark); another part's track is tinted faintly while it's pointed at, to show a click
    makes its slide the current one. */
-.deck-part-track { position: absolute; left: calc(var(--deck-column-gap, 0px) + 18px); top: 12px; width: 22px; height: 40px; border-radius: 11px; cursor: pointer; transition: background-color .2s; }
+.deck-part-track { position: absolute; left: calc(var(--deck-column-gap, 0px) + 18px); top: 12px; width: 22px; height: 40px; border-radius: 11px; transition: background-color .2s; }
 .deck-part-head:not(.is-current) .deck-part-track:hover { background: color-mix(in srgb, var(--r-ink-strong) 4%, transparent); }
 .deck-part-head.is-current .deck-part-track { background: color-mix(in srgb, var(--r-accent) 10%, transparent); }
 :is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-part-head.is-current .deck-part-track { background: color-mix(in srgb, var(--r-accent) 14%, transparent); }
@@ -179,8 +179,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2, h3, p) { margin-top: 0 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
 /* A wide table scrolls sideways inside its own frame, never cut at the handout's edge (Jarmo, 17 November). The frame
-   keeps the 24 px on its left where the row grips sit; what scrolls under it stops 6 px in, clear of the number's rail. */
-.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { max-width: calc(100% + 24px); overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); }
+   is the table's own place with room around it for its handles (TableHandlesLayer): 24 px on the left for the row
+   grips (the Text editor's), 24 px on the right for the + column bar, and 8 px above and under for the column grip and
+   the + row bar, so a table that fits never scrolls and no handle is cut. What scrolls under the left room stops 6 px
+   in, clear of the number's rail. */
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-right: -24px; padding-right: 24px; margin-top: -8px; margin-bottom: -8px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
 .deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 

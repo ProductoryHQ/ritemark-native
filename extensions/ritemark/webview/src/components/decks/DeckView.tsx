@@ -42,7 +42,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
-import type { Transaction } from '@tiptap/pm/state'
+import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction, undoDepth } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
@@ -54,7 +54,7 @@ import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../.
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
-import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
+import { DeckCurrent, deckCurrentKey, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead, partMenuSlots, type PartMenuSlot } from './handout/SlidePartHead'
 import { railPick, rowCaret, trackHeight } from './handout/partRail'
 import { DECK_REMOVED, DeckRemove, joinMarkOf, removalNotice, type DeckRemoval } from './handout/deckRemove'
@@ -950,23 +950,24 @@ export function DeckView({
   }, [fullSlide, goTo])
 
   // The number's rail (17 November): each track runs from where the head's CSS puts its top to the end of its part's text.
-  // Measured after the page is laid out: on every transaction (writing, a part folding or opening as the current slide
-  // moves), and when the handout's size changes. A folded block has no box, so it's passed over.
+  // Measured after the page is laid out: when the document, the selection (a part opens while the caret is in it) or the
+  // current slide (a part folds or opens) changes, and when the handout's size changes. A folded block has no box, so
+  // it's passed over. Every place is read first and every height written after, so the page is laid out once.
   const measureRail = useCallback(() => {
     if (!editor || editor.isDestroyed) return
     const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
-    heads.forEach((head, index) => {
+    const heights = heads.map((head, index) => {
       const track = head.querySelector<HTMLElement>(':scope > .deck-part-track')
-      if (!track) return
+      if (!track) return null
       const end = heads[index + 1] ?? null
       let bottom = head.getBoundingClientRect().bottom
       for (let block = head.nextElementSibling; block && block !== end; block = block.nextElementSibling) {
         const box = block.getBoundingClientRect()
         if (box.height > 0) bottom = Math.max(bottom, box.bottom)
       }
-      const height = `${trackHeight(track.getBoundingClientRect().top, bottom)}px`
-      if (track.style.height !== height) track.style.height = height
+      return { track, height: `${trackHeight(track.getBoundingClientRect().top, bottom)}px` }
     })
+    for (const entry of heights) if (entry && entry.track.style.height !== entry.height) entry.track.style.height = entry.height
   }, [editor])
   useEffect(() => {
     if (!editor) return
@@ -974,12 +975,15 @@ export function DeckView({
     const later = () => {
       if (frame === null) frame = requestAnimationFrame(() => { frame = null; measureRail() })
     }
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.docChanged || transaction.selectionSet || transaction.getMeta(deckCurrentKey) !== undefined) later()
+    }
     later()
-    editor.on('transaction', later)
+    editor.on('transaction', onTransaction)
     const observer = new ResizeObserver(later)
     observer.observe(editor.view.dom)
     return () => {
-      editor.off('transaction', later)
+      editor.off('transaction', onTransaction)
       observer.disconnect()
       if (frame !== null) cancelAnimationFrame(frame)
     }
@@ -999,21 +1003,23 @@ export function DeckView({
     dom.addEventListener('click', onClick)
     return () => dom.removeEventListener('click', onClick)
   }, [editor, pick])
-  // A slide with no handout's row (17 November): its slide becomes current and its part opens to write in.
+  // A slide with no handout's row (17 November): its part opens to write in and its slide becomes current. The caret goes
+  // in first, which opens the part (deckCurrent.ts: a part the caret is in never folds), so the handout scrolls to the
+  // part as it now stands.
   const openPart = useCallback((index: number) => {
     if (!editor || editor.isDestroyed) return
-    if (index !== currentRef.current) pick(index)
     const range = partRange(editor.state.doc, index)
-    if (!range) return
     const blocks: number[] = []
-    editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
-      if (pos > range.from && pos < range.to && node.isTextblock) blocks.push(pos)
-      return pos === range.from ? false : !node.isTextblock
-    })
+    if (range) {
+      editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+        if (pos > range.from && pos < range.to && node.isTextblock) blocks.push(pos)
+        return pos === range.from ? false : !node.isTextblock
+      })
+    }
     const caret = rowCaret(blocks)
-    if (caret === null) return
-    lockUntil.current = Date.now() + PICK_LOCK_MS
-    editor.chain().setTextSelection(caret).focus(undefined, { scrollIntoView: false }).run()
+    if (caret !== null) editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, caret)).setMeta('addToHistory', false))
+    pick(index)
+    if (caret !== null) editor.view.focus()
   }, [editor, pick])
 
   /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */

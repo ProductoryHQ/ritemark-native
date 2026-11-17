@@ -533,6 +533,11 @@ stable(COLUMNS, 'three columns')
   assert.equal(outlined.box, 'transparent')
   assert.notEqual(outlined.boxe, 'transparent', 'an outline keeps its line')
   assert.notEqual(themeVars({ ...BUILT_IN_THEME, boxes: 'outline' }, false).boxe, 'transparent')
+  // On a light Card ground the fill reads alone too (review of #780): white on cream, or a faint tint on paper.
+  for (const bg of ['#F5F1E8', '#FDFDFD']) {
+    const light = themeVars({ ...BUILT_IN_THEME, bg, head: '#2B2B2B', text: '#333333', glow: false, card: undefined }, false)
+    assert.ok(contrast(light.box, bg) >= 1.13 && light.box === light.boxf, `${bg}: ${light.box}`)
+  }
   assert.ok(!/\.blk-column \{[^}]*box-shadow/.test(css) && !/\.blk-box \{[^}]*var\(--s-boxl/.test(css), 'no column line and no box hairline at rest')
 }
 

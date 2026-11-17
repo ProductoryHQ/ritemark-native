@@ -83,6 +83,10 @@ class SlidePartHeadView implements NodeView {
     // The track, and in it the sticky column of the number (with the skipped mark under it) and the ⋯.
     this.track = document.createElement('div')
     this.track.className = 'deck-part-track'
+    // A click makes its slide the current one (the pointing hand is the page's one rule for `role="button"`). The strip
+    // is the keyboard's way to the same, so the track is no tab stop of its own.
+    this.track.setAttribute('role', 'button')
+    this.track.setAttribute('aria-label', 'Make this the current slide')
     const pin = document.createElement('div')
     pin.className = 'deck-part-pin'
     this.mark = document.createElement('span')

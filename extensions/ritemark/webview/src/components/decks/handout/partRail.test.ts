@@ -62,6 +62,13 @@ assert.equal(blocksAreBare([schema.nodes.codeBlock.create()]), false, 'a code bl
   assert.ok(!open.some(mark => mark.cls === 'is-only' || mark.cls === 'deck-only-fold'), 'open while current')
   assert.ok(open.some(mark => mark.cls === 'is-current'))
   assert.ok(open.some(mark => mark.cls === 'deck-empty'), 'its placeholders')
+  // The caret in it keeps it open, current or not: text is never typed into a folded part (review of #780).
+  const writing = deckDecorations(doc, 0, 1).find().map(deco => (deco as unknown as { type: { attrs: { class?: string } } }).type.attrs.class)
+  assert.ok(!writing.includes('is-only') && !writing.includes('deck-only-fold'), 'open while the caret is in it')
+  // A comment for the AI is no text: it never reaches the page either, so the editor and the page agree.
+  // (The editor's comment node, by its name: the test schema carries no comment extension.)
+  const comment = { type: { name: 'commentNode' } } as unknown as PMNode
+  assert.equal(blocksAreBare([heading(), comment]), true, 'a comment alone')
 }
 
 {

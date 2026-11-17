@@ -15,7 +15,7 @@ import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { partHeadingAt } from '../deckDocument'
+import { partHeadingAt, partIndexAt } from '../deckDocument'
 
 /** The placeholders, as the prototype words them (the Experience lead, 16 November). */
 export const HEADING_PLACEHOLDER = 'Heading'
@@ -34,11 +34,13 @@ export function currentSlideOf(state: EditorState): number | null {
 
 /**
  * Is this run of a part's blocks empty: no heading and no text? Each block an empty paragraph or an empty heading (a
- * line break is no text). A drawn heading (a deck written before 16 November shows its slide's title until the first
- * edit) is text, so such a part is never slide-only until the person empties it.
+ * line break is no text), or a comment for the AI, which never reaches the published page either (so the editor and
+ * the page agree: `isSlideOnly` in the page's HTML). A drawn heading (a deck written before 16 November shows its
+ * slide's title until the first edit) is text, so such a part is never slide-only until the person empties it.
  */
 export function blocksAreBare(blocks: readonly PMNode[]): boolean {
   return blocks.every(node => {
+    if (node.type.name === 'commentNode') return true
     if (node.type.name !== 'paragraph' && node.type.name !== 'heading') return false
     let bare = true
     node.forEach(child => {
@@ -65,20 +67,17 @@ export function slideOnlyParts(doc: PMNode): number[] {
 
 /**
  * The current slide's head (`is-current`); each part's empty heading ("Heading"); and the current part's first empty
- * paragraph when the part has no words yet.
+ * paragraph when the part has no words yet. A slide with no handout folds, unless it is the current one or the caret
+ * is in it (`writing`): text is never typed into a folded part.
  */
-export function deckDecorations(doc: PMNode, current: number | null): DecorationSet {
+export function deckDecorations(doc: PMNode, current: number | null, writing: number | null = null): DecorationSet {
   const found: Decoration[] = []
-  const slides: Array<{ pos: number; size: number }> = []
-  doc.forEach((node, pos) => {
-    if (node.type.name === 'deckSlide') slides.push({ pos, size: node.nodeSize })
-  })
-  const parts = partBlocks(doc)
+  const slides = partBlocks(doc)
   slides.forEach((slide, index) => {
     if (index === current) found.push(Decoration.node(slide.pos, slide.pos + slide.size, { class: 'is-current' }))
     // A slide with no handout, not the current one: one thin row, its empty blocks folded away.
-    const blocks = parts[index]?.blocks ?? []
-    if (index !== current && blocksAreBare(blocks.map(block => block.node))) {
+    const blocks = slide.blocks
+    if (index !== current && index !== writing && blocksAreBare(blocks.map(block => block.node))) {
       found.push(Decoration.node(slide.pos, slide.pos + slide.size, { class: 'is-only' }))
       for (const block of blocks) found.push(Decoration.node(block.pos, block.pos + block.node.nodeSize, { class: 'deck-only-fold' }))
       return
@@ -104,6 +103,13 @@ export function deckDecorations(doc: PMNode, current: number | null): Decoration
   return found.length ? DecorationSet.create(doc, found) : DecorationSet.empty
 }
 
+/** The part the caret is in, when it is in a part's text (not on a slide node, not in the preamble). */
+function writingPartOf(state: EditorState): number | null {
+  const { selection } = state
+  if (!selection.empty || !selection.$from.parent.isTextblock) return null
+  return partIndexAt(state.doc, selection.from)
+}
+
 export const DeckCurrent = Extension.create({
   name: 'deckCurrent',
 
@@ -119,7 +125,7 @@ export const DeckCurrent = Extension.create({
           },
         },
         props: {
-          decorations: state => deckDecorations(state.doc, currentSlideOf(state)),
+          decorations: state => deckDecorations(state.doc, currentSlideOf(state), writingPartOf(state)),
         },
       }),
     ]
