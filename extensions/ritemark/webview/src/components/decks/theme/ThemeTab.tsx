@@ -6,8 +6,9 @@
  *   - The bar: the theme's swatch and name, "Used by N decks" (it lists them; a deck opens from the list), then Saved,
  *     or Not saved with Discard, and Save ▾ (Save as a new theme…, Discard the changes).
  *   - On the left, the fields the engine reads: the four colours, each a swatch (a palette) and its hex code (typed),
- *     the soft light in a corner, the line that measures the text against the background, the corners and the boxes.
- *     Fonts and the logo come in later parts of the sprint; nothing of them shows until then.
+ *     the soft light in a corner, the line that measures the text against the background, the fonts for headings and
+ *     text (each from the six that ship with Ritemark, Sprint 162 PR 3), the corners and the boxes. The logo comes in a
+ *     later part of the sprint; nothing of it shows until then.
  *   - On the right, six of the deck's own slides in the draft, as Card or Borderless.
  *
  * Every change goes to the host, which writes it into the theme document's lines (`themeTextWith`): the draft is that
@@ -15,7 +16,7 @@
  * decks keep their look until Save. What the tab shows is always the document as the host last sent it.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
-import { parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { DECK_FONT_LIST, deckFont, deckFontStack, isDeckFontName, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { newThemeNameProblem, nextThemeName, normalColour, type ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeDeck, ThemePreview } from '../../../../../src/decks/themeProtocol'
 import type { DocumentApplyTarget } from '../../../types/documentSync'
@@ -27,6 +28,7 @@ import { Icon } from '../../ui/Icon'
 import { Input } from '../../ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover'
 import { SegmentedControl } from '../../ui/segmented-control'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select'
 import { SplitButton } from '../../ui/split-button'
 import { Switch } from '../../ui/switch'
 import { Tooltip } from '../../ui/tooltip'
@@ -45,6 +47,12 @@ export const COLOUR_ROWS: Array<{ field: 'bg' | 'head' | 'text' | 'accent'; labe
   { field: 'head', label: 'Headings' },
   { field: 'text', label: 'Text' },
   { field: 'accent', label: 'Accent', note: 'Numbers, icons, the line under a title' },
+]
+
+/** The two font rows (the prototype's Fonts: Headings and Text), each a choice of the six fonts. */
+export const FONT_ROWS: Array<{ field: 'fh' | 'fb'; label: string; tip: string }> = [
+  { field: 'fh', label: 'Headings', tip: 'The font of the slides\' titles and headings, and of the page\'s headings' },
+  { field: 'fb', label: 'Text', tip: 'The font of the slides\' words, and of the page\'s handout' },
 ]
 
 export const CORNER_OPTIONS = [{ value: 'square', label: 'Square' }, { value: 'soft', label: 'Soft' }, { value: 'round', label: 'Round' }]
@@ -254,6 +262,11 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
             <span>{contrast.words}</span>
           </div>
 
+          <div className="deck-settings-k">Fonts</div>
+          {FONT_ROWS.map(row => (
+            <FontRow key={row.field} label={row.label} tip={row.tip} value={theme[row.field]} onChange={value => set({ [row.field]: value })} />
+          ))}
+
           <div className="deck-settings-k">Shape</div>
           <div className="theme-row">
             <span className="theme-row-label">Corners</span>
@@ -395,6 +408,34 @@ function ColourRow({ label, note, value, onChange }: { label: string; note?: str
           }
         }}
       />
+    </div>
+  )
+}
+
+/**
+ * A font row: the six fonts, each named in its own face. A name the file holds that isn't one of the six ("Futura")
+ * shows as itself, drawn in Sofia Sans as the slide draws it (`deckFont`), with no font ticked, so any pick, Sofia Sans
+ * too, writes the one line.
+ */
+function FontRow({ label, tip, value, onChange }: { label: string; tip: string; value: string; onChange: (value: string) => void }) {
+  const known = isDeckFontName(value)
+  const current = deckFont(value).name
+  return (
+    <div className="theme-row theme-font">
+      <span className="theme-row-label">{label}</span>
+      <Select value={known ? current : ''} onValueChange={next => { if (!known || next !== current) onChange(next) }}>
+        {/* On hover only: the focus a closing choice gives back to its button opens no tooltip over the pick */}
+        <Tooltip label={known ? tip : `${value} doesn't come with Ritemark, so it draws in Sofia Sans. Choose one of the six.`} className="theme-font-select" hoverOnly>
+          <SelectTrigger aria-label={`${label} font`} className="w-full" style={{ fontFamily: deckFontStack(current) }}>
+            <SelectValue placeholder={`${value} (Sofia Sans)`} />
+          </SelectTrigger>
+        </Tooltip>
+        <SelectContent>
+          {DECK_FONT_LIST.map(font => (
+            <SelectItem key={font.name} value={font.name} style={{ fontFamily: deckFontStack(font.name) }}>{font.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }

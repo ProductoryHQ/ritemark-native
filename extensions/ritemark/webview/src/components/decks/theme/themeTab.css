@@ -106,6 +106,9 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 .theme-seg { display: inline-flex; }
 .theme-seg-control { min-width: 0; }
 
+/* Sprint 162 PR 3: a font row's choice, as wide as the Corners row's control (both end at the column's edge); each font named in its own face. */
+.theme-font-select { width: 158px; flex: none; }
+
 .theme-note { display: flex; gap: 8px; margin: 22px 0 0; font-size: 12px; line-height: 17px; color: var(--r-ink-muted); }
 .theme-note > svg { flex: none; margin-top: 1px; }
 

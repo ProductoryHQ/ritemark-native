@@ -4,7 +4,7 @@
  * Ritemark's white surface (Borderless), where the headings take the theme's darkest colour and the accent is darkened
  * until it reads on white. A theme's hand-picked shades (`card`, `borderless`) win over the worked-out ones.
  */
-import { DECK_FONTS, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { deckFontStack, type DeckTheme } from '../../../../../src/decks/deckTheme'
 
 type Rgb = [number, number, number]
 
@@ -156,8 +156,9 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
   }
   return {
     ...vars,
-    fh: DECK_FONTS[theme.fh] ?? DECK_FONTS['Sofia Sans'],
-    fb: DECK_FONTS[theme.fb] ?? DECK_FONTS['Sofia Sans'],
+    // Sprint 162 PR 3: one of the six bundled fonts, whatever the name's case; any other name draws in Sofia Sans.
+    fh: deckFontStack(theme.fh),
+    fb: deckFontStack(theme.fb),
     r: `${radius[0]}px`,
     r2: `${radius[1]}px`,
     rt: `${radius[2]}px`,

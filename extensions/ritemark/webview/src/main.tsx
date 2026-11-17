@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 import { watchRitemarkThemeClass } from './utils/themeClass'
-import { captureWebviewScriptUrl } from './lib/webviewAssets'
+import { captureWebviewScriptUrl, webviewAssetUrl } from './lib/webviewAssets'
+import { installDeckFontFaces } from './components/decks/theme/deckFonts'
 import { watchScrollingMark } from './lib/scrollingMark'
 import { watchInputMode } from './components/ui/input-mode'
 import { settingsTimingMark } from './lib/settingsTiming'
@@ -11,6 +12,9 @@ import { settingsTimingMark } from './lib/settingsTiming'
 // Sprint 138 (#481): webview.js's own URL, while it is still known, for the
 // files next to it in media/ (KaTeX's stylesheet and fonts).
 captureWebviewScriptUrl()
+
+// Sprint 162 PR 3: the deck themes' bundled fonts, from media/fonts/; a rule loads its file only when a slide uses it
+installDeckFontFaces(webviewAssetUrl)
 
 // Sprint 142 (#504): a list on the ground shows its slider while it scrolls
 watchScrollingMark()

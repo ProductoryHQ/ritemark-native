@@ -13,7 +13,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExt
 import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
-import type { DeckTheme } from '../../../../../src/decks/deckTheme'
+import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
@@ -344,16 +344,35 @@ export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme,
 
 const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
-  // The measuring pass's step, for these words; new words start again from the estimate.
-  const [fit, setFit] = useState<{ data: SlideData; kind: string; step: number }>({ data, kind, step: 0 })
-  const step = fit.data === data && fit.kind === kind ? fit.step : 0
+  // The measuring pass's step, for these words in these fonts; new words, another font (Sprint 162 PR 3) or a font
+  // that has just loaded start again from the estimate.
+  const [loaded, setLoaded] = useState(0)
+  const fonts = `${theme.fh}\u0000${theme.fb}\u0000${loaded}`
+  const [fit, setFit] = useState<{ data: SlideData; kind: string; fonts: string; step: number }>({ data, kind, fonts, step: 0 })
+  const same = fit.data === data && fit.kind === kind && fit.fonts === fonts
+  const step = same ? fit.step : 0
   const layout = layoutSlide(kind, data, { editing: !!editing, step })
+
+  // Only a face of this slide's own fonts measures it again (the review of #777: a strip of 40 slides would all
+  // start again for every font any view loads).
+  const heading = deckFont(theme.fh).name
+  const body = deckFont(theme.fb).name
+  useEffect(() => {
+    const fontSet = document.fonts
+    if (!fontSet) return
+    const remeasure = (event: Event) => {
+      const faces = (event as Event & { fontfaces?: ReadonlyArray<FontFace> }).fontfaces
+      if (!faces || faces.some(face => { const family = face.family.replace(/^["']|["']$/g, ''); return family === heading || family === body })) setLoaded(count => count + 1)
+    }
+    fontSet.addEventListener?.('loadingdone', remeasure)
+    return () => fontSet.removeEventListener?.('loadingdone', remeasure)
+  }, [heading, body])
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    if (step < MAX_STEP && overflows(canvas)) setFit({ data, kind, step: step + 1 })
-    else if (fit.data !== data || fit.kind !== kind) setFit({ data, kind, step })
+    if (step < MAX_STEP && overflows(canvas)) setFit({ data, kind, fonts, step: step + 1 })
+    else if (!same) setFit({ data, kind, fonts, step })
   })
 
   const scale = width / CANVAS_WIDTH
