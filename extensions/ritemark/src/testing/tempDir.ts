@@ -13,6 +13,17 @@ import * as path from 'node:path';
 const made = new Set<string>();
 let hooked = false;
 
+// A test stopped by Ctrl-C or a timeout's SIGTERM ends without 'exit': its folders are removed on the signal, and
+// the signal is then raised again, so the process still ends the way it would have (unless the test has its own
+// handler for it, which then decides). SIGKILL can't be caught.
+const SIGNALS: NodeJS.Signals[] = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
+function onSignal(signal: NodeJS.Signals): void {
+  removeTempDirs();
+  for (const s of SIGNALS) process.removeListener(s, onSignal);
+  if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+}
+
 /** fs.mkdtempSync(<os.tmpdir()>/<prefix>XXXXXX), removed with everything in it when the process exits. */
 export function makeTempDir(prefix: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -20,6 +31,7 @@ export function makeTempDir(prefix: string): string {
   if (!hooked) {
     hooked = true;
     process.on('exit', removeTempDirs);
+    for (const s of SIGNALS) process.on(s, onSignal);
   }
   return dir;
 }

@@ -1,7 +1,7 @@
 /**
  * Tests for makeTempDir (src/testing/tempDir.ts): the folder goes when the test process ends, pass or fail,
- * also with a read-only folder inside it. Each case runs a child process with its own TMPDIR and looks at what
- * is left in that TMPDIR afterwards.
+ * by a signal too, also with a read-only folder inside it. Each case runs a child process with its own TMPDIR and
+ * looks at what is left in that TMPDIR afterwards.
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -10,20 +10,18 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 const helper = path.join(__dirname, 'tempDir.ts');
-const tsx = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'tsx');
+const extensionRoot = path.join(__dirname, '..', '..');
 
-// The child's TMPDIR sits in a short root, not in os.tmpdir(): tsx puts an IPC socket in it, and a socket path over
-// 104 bytes fails to listen (os.tmpdir() may already be a nested test temp folder)
-const SHORT_ROOT = process.platform === 'win32' ? os.tmpdir() : '/tmp';
-
-function leftAfter(body: string): { status: number | null; left: string[]; out: string } {
-  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(SHORT_ROOT, 'rm-td-')));
+function leftAfter(body: string): { status: number | null; signal: NodeJS.Signals | null; left: string[]; out: string } {
+  const tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rm-td-')));
   try {
     const script = path.join(tmp, 'child.ts');
     fs.writeFileSync(script, `import * as fs from 'node:fs';\nimport * as path from 'node:path';\nimport { makeTempDir } from ${JSON.stringify(helper)};\n${body}\n`);
-    const r = spawnSync(tsx, [script], { env: { ...process.env, TMPDIR: tmp }, encoding: 'utf8' });
+    // node --import tsx (resolved from the extension folder), not the tsx command: that one opens an IPC socket in
+    // TMPDIR, and a socket path in a nested temp folder can pass the 104-byte limit
+    const r = spawnSync(process.execPath, ['--import', 'tsx', script], { cwd: extensionRoot, env: { ...process.env, TMPDIR: tmp }, encoding: 'utf8' });
     const left = fs.readdirSync(tmp).filter((n) => n.startsWith('case-'));
-    return { status: r.status, left, out: `${r.stdout}${r.stderr}` };
+    return { status: r.status, signal: r.signal, left, out: `${r.stdout}${r.stderr}` };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -44,6 +42,13 @@ assert.deepEqual(r.left, [], 'a failing test leaves its folders');
 r = leftAfter(`makeTempDir('case-'); throw new Error('boom');`);
 assert.notEqual(r.status, 0, r.out);
 assert.deepEqual(r.left, [], 'an uncaught error leaves the folder');
+
+// Stopped by a signal (Ctrl-C, a timeout's SIGTERM): the folder goes, and the process still ends by that signal
+for (const signal of process.platform === 'win32' ? [] : (['SIGTERM', 'SIGINT'] as const)) {
+  r = leftAfter(`makeTempDir('case-'); setInterval(() => {}, 1000); setTimeout(() => process.kill(process.pid, '${signal}'), 50);`);
+  assert.equal(r.signal, signal, `${signal}: ${r.status} ${r.out}`);
+  assert.deepEqual(r.left, [], `${signal} leaves the folder`);
+}
 
 // A read-only folder inside it
 r = leftAfter(`const d = makeTempDir('case-'); const ro = path.join(d, 'ro'); fs.mkdirSync(ro); fs.writeFileSync(path.join(ro, 'f'), 'x'); fs.chmodSync(ro, 0o500);`);

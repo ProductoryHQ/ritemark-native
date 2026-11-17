@@ -48,7 +48,7 @@ async function waitFor(check, ms = 3000) {
 }
 
 /** A temp folder of the test's own, given to the script as TMPDIR (run folders go directly in it). */
-const ownTmp = () => fs.realpathSync(fs.mkdtempSync(path.join(TMP_ROOT, 'dli-tmp-')));
+const ownTmp = () => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'dli-tmp-')));
 
 function stop(runDir, tmp) {
   const r = spawnSync('bash', [SCRIPT, 'stop', runDir], { env: { ...process.env, TMPDIR: tmp }, encoding: 'utf8' });
@@ -56,10 +56,13 @@ function stop(runDir, tmp) {
 }
 
 /** A run folder as start makes it (rm-<run>.XXXX in tmp, a run.env naming it), or as given. */
-function fakeRun(dir, { pid = '', runEnvDir = dir } = {}) {
+function fakeRun(dir, { pid = '', runEnvDir = dir, profile = path.join(dir, 'profile'), tempRoot = '', dry = false } = {}) {
   fs.mkdirSync(path.join(dir, 'profile', 'User'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'stdout.log'), 'log\n');
-  fs.writeFileSync(path.join(dir, 'run.env'), `RUN_DIR=${runEnvDir}\nPID=${pid}\nPROFILE=${path.join(dir, 'profile')}\n`);
+  const lines = [`RUN_DIR=${runEnvDir}`, `PID=${pid}`, `PROFILE=${profile}`];
+  if (tempRoot) lines.push(`TEMP_ROOT=${tempRoot}`);
+  if (dry) lines.push('DRY_RUN=1');
+  fs.writeFileSync(path.join(dir, 'run.env'), `${lines.join('\n')}\n`);
   return dir;
 }
 
@@ -265,6 +268,7 @@ test('stop removes the run folder when the instance already quit, and a second s
     assert.equal(second.status, 0, second.out);
     assert.match(second.stdout, /LEFT=0/, second.out);
     assert.match(second.stdout, /^REMOVED=.* \(already\)$/m, second.out);
+    assert.match(second.out, /removed by an earlier stop, or a wrong path/, 'a second stop says which two things it can mean');
     // A missing folder whose name is not a run folder's is refused, not reported as stopped
     const odd = stop(path.join(tmp, 'not-a-run'), tmp);
     assert.equal(odd.status, 2, odd.out);
@@ -297,7 +301,7 @@ test('stop removes only a run folder directly in $TMPDIR, named rm-<run>.XXXX, w
       assert.ok(fs.existsSync(path.join(dir, 'run.env')), `${why}: the folder is kept`);
       assert.ok(await waitFor(() => !alive(p)), `${why}: its instance is still stopped`);
     }
-    // A link named like a run folder: the folder it points at is kept
+    // A link is followed, and the folder it names is judged by the same rules: one outside TMPDIR is kept
     const target = fakeRun(path.join(elsewhere, 'rm-target.Q1w2'));
     const link = path.join(tmp, 'rm-link.Abcd');
     fs.symlinkSync(target, link);
@@ -308,6 +312,65 @@ test('stop removes only a run folder directly in $TMPDIR, named rm-<run>.XXXX, w
     for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test('stop from a shell with another TMPDIR removes a run folder in the system temp folder start recorded', { skip }, () => {
+  const startTmp = ownTmp(); // under os.tmpdir(): a system temp folder
+  const stopTmp = ownTmp();
+  const home = fs.realpathSync(fs.mkdtempSync(path.join(os.homedir(), '.dli-test-')));
+  try {
+    const runDir = fakeRun(path.join(startTmp, 'rm-moved.Q1w2'), { tempRoot: startTmp });
+    const r = stop(runDir, stopTmp);
+    assert.equal(r.status, 0, r.out);
+    assert.ok(!fs.existsSync(runDir), 'the run folder is removed');
+    // A recorded TEMP_ROOT that is no system temp folder widens nothing
+    const inHome = fakeRun(path.join(home, 'rm-home.Q1w2'), { tempRoot: home });
+    const h = stop(inHome, stopTmp);
+    assert.equal(h.status, 1, h.out);
+    assert.ok(fs.existsSync(path.join(inHome, 'run.env')), 'a run folder in the home folder is kept');
+  } finally {
+    for (const d of [startTmp, stopTmp, home]) fs.rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test('stop on a dry run removes its folder and signals nothing, even on its profile', { skip }, async () => {
+  const tmp = ownTmp();
+  const pids = [];
+  try {
+    // A dry run with a caller's profile, and later a real run on that same profile
+    const shared = path.join(tmp, 'caller-profile');
+    fs.mkdirSync(shared);
+    const real = standIn(`--user-data-dir=${shared}`);
+    pids.push(real);
+    assert.ok(await waitFor(() => alive(real)), 'stand-in started');
+    const runDir = fakeRun(path.join(tmp, 'rm-dry.Q1w2'), { profile: shared, dry: true });
+    const r = stop(runDir, tmp);
+    assert.equal(r.status, 0, r.out);
+    assert.ok(!fs.existsSync(runDir), 'the dry run’s folder is removed');
+    assert.ok(alive(real), 'the real run on the same profile is not stopped');
+  } finally {
+    for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('stop also ends a process that names the run’s extensions folder, whatever its profile', { skip }, async () => {
+  const tmp = ownTmp();
+  const pids = [];
+  try {
+    const runDir = fakeRun(path.join(tmp, 'rm-ext.Q1w2'), { profile: path.join(tmp, 'gone-profile') });
+    const ours = standIn('--user-data-dir=/elsewhere', `--extensions-dir=${runDir}/extensions`);
+    const theirs = standIn(`--extensions-dir=${runDir}/extensions2`);
+    pids.push(ours, theirs);
+    assert.ok(await waitFor(() => alive(ours) && alive(theirs)), 'stand-ins started');
+    const r = stop(runDir, tmp);
+    assert.equal(r.status, 0, r.out);
+    assert.ok(await waitFor(() => !alive(ours)), 'the run’s instance is stopped');
+    assert.ok(alive(theirs), 'another folder’s process is not');
+  } finally {
+    for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 

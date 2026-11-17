@@ -53,8 +53,29 @@ if (left.length) {
 } else {
   console.log('test-temp-leftovers: LEFT=0');
 }
+/** Gives write access back to every folder under dir (a test may leave a read-only one), so it can be removed. */
+function restoreWriteAccess(dir) {
+  const stat = fs.lstatSync(dir);
+  if (!stat.isDirectory()) return;
+  fs.chmodSync(dir, stat.mode | 0o700);
+  for (const name of fs.readdirSync(dir)) restoreWriteAccess(path.join(dir, name));
+}
+
+let removeFailed = false;
 if (keep) console.log(`test-temp-leftovers: kept ${tmp}`);
-else fs.rmSync(tmp, { recursive: true, force: true });
+else {
+  try {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  } catch {
+    try {
+      restoreWriteAccess(tmp);
+      fs.rmSync(tmp, { recursive: true, force: true });
+    } catch (error) {
+      removeFailed = true;
+      console.error(`test-temp-leftovers: could not remove ${tmp}: ${error.message}`);
+    }
+  }
+}
 
 if (r.error) console.error(`test-temp-leftovers: could not run the command: ${r.error.message}`);
-process.exit(code !== 0 ? code : left.length ? 1 : 0);
+process.exit(code !== 0 ? code : left.length || removeFailed ? 1 : 0);
