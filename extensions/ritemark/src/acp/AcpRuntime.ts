@@ -557,6 +557,10 @@ export class AcpRuntime implements AgentRuntime {
    * #658: OpenCode's browser requests name no conversation. While two sessions are mid-turn with different turn pages,
    * which one asked cannot be told, so a browser action would land in the wrong conversation's page: refuse it.
    */
+  chatsContested(): boolean {
+    return new Set(this._turnPages.values()).size > 1;
+  }
+
   browserContested(): boolean {
     const pageIds = new Set([...this._turnPages.values()].map((page) => page?.pageId ?? ''));
     return this._turnPages.size > 1 && pageIds.size > 1;
@@ -597,6 +601,11 @@ export class AcpRuntime implements AgentRuntime {
     }
     if (req.op === 'call' && req.group === 'browser' && this.browserContested()) {
       return { text: ANOTHER_OPENCODE_CONVERSATION_ERROR, isError: true };
+    }
+    // Sprint 162 PR 5: a theme write is recorded under its chat and, in Ask mode, asks there first; with two OpenCode
+    // chats mid-turn, which one asked can't be told, so the writing theme tools are refused as the browser's are
+    if (req.op === 'call' && req.group === 'deck' && (req.tool === 'set_deck_theme' || req.tool === 'set_theme_draft_colours') && this.chatsContested()) {
+      return { text: 'Another OpenCode conversation is working right now, so Ritemark cannot tell which chat this theme change belongs to. Nothing was written: try again when it has finished.', isError: true };
     }
     return _toolsInjector.handleIpc(req, 'opencode', this._browserPage);
   }

@@ -8,6 +8,7 @@
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
+import type { ThemeChangeView } from './themeChange';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
 export const MAX_ASSET_PATHS = 500;
@@ -57,6 +58,8 @@ export type DeckRequest =
   | { type: 'deck/add-to-library'; id: string; text: string; topic?: string }
   /** The library's topics, for the Add to library sheet. */
   | { type: 'deck/library-topics' }
+  /** Sprint 162 PR 5: See what changed's sheet: its Undo, for the AI's theme change with this id. */
+  | { type: 'deck/theme-change-undo'; id: string }
   /** Show the copy's source in the Slide library. */
   | { type: 'deck/show-in-library'; from: string }
   /** The strip's + "From the library…" / "From another deck…": the place opens there, inserting after part `after` (-1: before the first). */
@@ -114,6 +117,13 @@ export type DeckHostMessage =
    * deck"): the view writes its `theme:` line as a pick, one step of its Undo, and says so on its bar.
    */
   | { type: 'deck/use-theme'; path: string; name: string }
+  /**
+   * Sprint 162 PR 5 (17 November): See what changed for an AI's theme change, a sheet over the deck's stage: two slides,
+   * each before and after, drawn by the strip's renderer with the old theme and the new.
+   */
+  | { type: 'deck/theme-change'; change: ThemeChangeView }
+  /** The change with this id is undone (from the chat or the sheet): the sheet's Undo goes. */
+  | { type: 'deck/theme-change-undone'; id: string }
   /** The picture is saved: its path relative to the deck, and its webview URI; or it could not be. */
   | { type: 'deck/image-saved'; slideId: string; path: string; url: string }
   | { type: 'deck/image-failed'; slideId: string; message: string }
@@ -244,6 +254,10 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/library-topics': {
       exactKeys(input, ['type']);
       return { type: 'deck/library-topics' };
+    }
+    case 'deck/theme-change-undo': {
+      exactKeys(input, ['type', 'id']);
+      return { type: 'deck/theme-change-undo', id: stringOf(input.id, 64) };
     }
     case 'deck/themes': {
       exactKeys(input, ['type']);

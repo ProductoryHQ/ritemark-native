@@ -29,6 +29,7 @@ import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
 import type { DeckPublisher } from './deckPublish';
 import type { StartCardState } from './startCard';
+import type { ThemeChangeView } from './themeChange';
 
 /** One open deck view: its document and panel, and the slide it shows. */
 interface DeckView {
@@ -84,6 +85,10 @@ export class DeckPages implements vscode.Disposable {
   private readonly selectTitle = new Map<string, ReturnType<typeof setTimeout>>();
   /** A line for the bar of a deck whose view is still to come (a deck renamed into a copy); each forgotten after a minute. */
   private readonly pendingNotice = new Map<string, { text: string; timer: ReturnType<typeof setTimeout> }>();
+  /** Sprint 162 PR 5: See what changed for a deck whose view is still to come; each forgotten after a minute. */
+  private readonly pendingChange = new Map<string, { build: (webview: vscode.Webview) => Promise<ThemeChangeView>; timer: ReturnType<typeof setTimeout> }>();
+  /** Sprint 162 PR 5: the AI's theme changes (`themeAi.ts`), for See what changed's Undo; set once at activation. */
+  themeChanges: { undo: (id: string) => Promise<string> } | null = null;
   /** The handout's start card (16 November, frame 20): set once at activation (`decksHost.ts`). */
   startCard: {
     state: (document: vscode.TextDocument) => Promise<StartCardState>;
@@ -129,6 +134,26 @@ export class DeckPages implements vscode.Disposable {
     const key = path.normalize(fsPath);
     clearTimeout(this.pendingNotice.get(key)?.timer);
     this.pendingNotice.set(key, { text, timer: setTimeout(() => this.pendingNotice.delete(key), 60_000) });
+  }
+
+  /**
+   * Sprint 162 PR 5: See what changed for an AI's theme change, over the stage of the deck at `fsPath`: now when its view
+   * is open, else once it says which slide it shows (the person's press opens it).
+   */
+  themeChangeWhenShown(fsPath: string, build: (webview: vscode.Webview) => Promise<ThemeChangeView>): void {
+    const view = this.openViewOf(fsPath);
+    if (view) {
+      void build(view.panel.webview).then(change => this.post(view.panel.webview, { type: 'deck/theme-change', change }));
+      return;
+    }
+    const key = path.normalize(fsPath);
+    clearTimeout(this.pendingChange.get(key)?.timer);
+    this.pendingChange.set(key, { build, timer: setTimeout(() => this.pendingChange.delete(key), 60_000) });
+  }
+
+  /** Sprint 162 PR 5: a change was undone: every deck view's sheet for it loses its Undo. */
+  themeChangeUndone(id: string): void {
+    for (const view of this.views) void this.post(view.panel.webview, { type: 'deck/theme-change-undone', id });
   }
 
   /** The line for a deck that won't come after all (its rename was refused). */
@@ -434,8 +459,17 @@ export class DeckPages implements vscode.Disposable {
         if (this.takeSelectTitle(document)) await this.post(webview, { type: 'deck/select-title' });
         const notice = this.takeNotice(document);
         if (notice) await this.post(webview, { type: 'deck/notice', text: notice });
+        const change = this.pendingChange.get(path.normalize(document.uri.fsPath));
+        if (change) {
+          clearTimeout(change.timer);
+          this.pendingChange.delete(path.normalize(document.uri.fsPath));
+          await this.post(webview, { type: 'deck/theme-change', change: await change.build(webview) });
+        }
         return;
       }
+      case 'deck/theme-change-undo':
+        await this.themeChanges?.undo(request.id);
+        return;
       // The start card (16 November, frame 20): only with the flag on, as New → Deck is.
       case 'deck/start-card':
         await this.post(webview, { type: 'deck/start-card', state: this.startCard && isEnabled('decks') ? await this.startCard.state(document) : { fresh: false, ai: null, earlier: [] } });
@@ -583,6 +617,8 @@ export class DeckPages implements vscode.Disposable {
     this.selectTitle.clear();
     for (const pending of this.pendingNotice.values()) clearTimeout(pending.timer);
     this.pendingNotice.clear();
+    for (const pending of this.pendingChange.values()) clearTimeout(pending.timer);
+    this.pendingChange.clear();
     this.changed.dispose();
     this.slideChanged.dispose();
     this.revealed.dispose();

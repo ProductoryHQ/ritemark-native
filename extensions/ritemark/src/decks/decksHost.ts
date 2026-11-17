@@ -9,6 +9,7 @@ import { DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
 import { ThemePages } from './themePages';
+import { ThemeAi } from './themeAi';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
 import { DeckPublisher } from './deckPublish';
 import { DeckPresenter } from './present/DeckPresenter';
@@ -32,6 +33,8 @@ export interface DecksHost {
   publisher: DeckPublisher;
   /** The project's Slide library and decks, or null without a project folder on disk. */
   library: () => DeckLibrary | null;
+  /** Sprint 162 PR 5: the AI's theme changes, for the chat's See what changed, Undo and Open the theme. */
+  themeAi: ThemeAi;
 }
 
 export interface DecksHostOptions {
@@ -64,6 +67,11 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   // Sprint 162 PR 2: the theme's tab, and the Theme menu's Edit <Name> and New theme… that open it
   const themes = new ThemePages(library, pages);
   pages.themeEditor = { open: (deck, themePath) => themes.open(deck, themePath), make: (deck, request) => themes.make(deck, request) };
+  // Sprint 162 PR 5: the AI's theme tools and their change records; an Undo from anywhere takes every sheet's Undo away
+  const themeAi = new ThemeAi(library, pages, themes);
+  pages.themeChanges = { undo: id => themeAi.undo(id) };
+  themes.ai = { checkColours: (document, fix) => themeAi.checkColoursInTab(document, fix), undo: id => themeAi.undo(id) };
+  const undoneSheets = themeAi.onDidUndo(({ id }) => { pages.themeChangeUndone(id); themes.changeUndone(id); });
   // The handout's start card (16 November, frame 20) on the decks New made
   const fresh = freshDeckMarks(context.workspaceState, FRESH_DECKS, MAX_FRESH_DECKS);
   pages.startCard = startCardHost(pages, options, fresh);
@@ -83,12 +91,15 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
       const view = root ? pages.viewOf(path.join(root, ...deckPath.split('/'))) : null;
       return view ? (id, from) => view.setFrom(id, from) : undefined;
     },
+    themes: themeAi,
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
   context.subscriptions.push(
     publisher,
     pages,
     themes,
+    themeAi,
+    undoneSheets,
     presenter,
     view,
     vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
@@ -105,7 +116,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
       if (isEnabled('decks')) void rebaseMovedDecks(event.files).catch(error => console.warn('[Decks] Could not follow a move:', error));
     }),
   );
-  return { pages, themes, publisher, library };
+  return { pages, themes, publisher, library, themeAi };
 }
 
 /** The day a deck was last changed, as the start card shows it: "15 Nov 2026". */

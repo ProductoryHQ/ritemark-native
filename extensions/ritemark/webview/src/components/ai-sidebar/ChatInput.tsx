@@ -957,6 +957,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     return () => window.removeEventListener('ritemark:files-dropped', handler);
   }, []);
 
+
   // Reset "hide active file" when the active file changes
   useEffect(() => {
     setHideActiveFile(false);

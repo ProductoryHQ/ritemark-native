@@ -434,7 +434,7 @@ async function main(): Promise<void> {
     assert.equal(tools.deckToolsAvailable(), true);
     assert.deepEqual(toolGroupsFor({ browser: false }).map((group) => group.id), ['deck']);
     assert.equal(toolGroupById('deck'), deckGroup);
-    assert.deepEqual(deckGroup.tools.map((tool) => tool.name), ['list_decks', 'read_deck', 'insert_slides', 'update_library_slide', 'add_to_library']);
+    assert.deepEqual(deckGroup.tools.map((tool) => tool.name), ['list_decks', 'read_deck', 'insert_slides', 'update_library_slide', 'add_to_library', 'read_pptx_theme', 'set_deck_theme', 'check_theme_colours', 'set_theme_draft_colours']);
     assert.equal(claudeAllowName(deckGroup, deckGroup.tools[0]), 'mcp__ritemark_decks__list_decks');
     const tool = (name: string) => deckGroup.tools.find((item) => item.name === name)!;
     const context = { runtimeId: 'claude-code' as const };
@@ -492,6 +492,40 @@ async function main(): Promise<void> {
     assert.deepEqual(ipcList.tools?.map((item) => item.name), deckGroup.tools.map((item) => item.name));
     const ipcCall = await injector.handleIpc({ id: '2', op: 'call', group: 'deck', tool: 'list_decks', params: { where: 'library' } });
     assert.match(ipcCall.text ?? "", /Slide library\/Agents\.deck\.md/);
+    // Sprint 162 PR 5: the theme tools, the same for every runtime, each call with the chat it came from (the
+    // conversation's turn holder, which all three runtimes pass to Ritemark's tools).
+    const themeCalls: unknown[][] = [];
+    const themeGroup = tools.createDeckToolGroup(() => ({
+      library: () => library,
+      viewInsert: () => undefined,
+      themes: {
+        readPptx: async (file) => { themeCalls.push(['readPptx', file]); return { text: '{}' }; },
+        setDeckTheme: async (conversationId, input, approve) => { themeCalls.push(['setDeckTheme', conversationId, input, typeof approve]); return { text: 'made' }; },
+        checkColours: async (theme) => { themeCalls.push(['checkColours', theme]); return { text: 'pairs' }; },
+        setDraftColours: async (conversationId, theme, colours) => { themeCalls.push(['setDraftColours', conversationId, theme, colours]); return { text: 'moved' }; },
+      },
+    }));
+    const themeTool = (name: string) => themeGroup.tools.find((item) => item.name === name)!;
+    const { BrowserTurnPage } = await import('../browser/BrowserActionTools');
+    const chat = { runtimeId: 'codex' as const, browserPage: new BrowserTurnPage('chat-7') };
+    // Ask mode: the turn's approval goes with the write (UnifiedViewProvider sets it at the turn's start)
+    chat.browserPage.fileWriteApproval = async () => true;
+    await runTool(themeTool('set_deck_theme'), { name: 'Fernhollow Bank', background: '#F4F7F2', heading_font: 'Source Serif 4', decks: ['Clients/Harbour.deck.md'] }, chat);
+    await runTool(themeTool('set_theme_draft_colours'), { theme: 'Slide library/Themes/Evening.theme.md', text: '#C9CBE6' }, chat);
+    await runTool(themeTool('check_theme_colours'), { theme: 'Slide library/Themes/Evening.theme.md' }, context);
+    await runTool(themeTool('read_pptx_theme'), { file: 'Brand/Template.pptx' }, context);
+    assert.deepEqual(themeCalls, [
+      ['setDeckTheme', 'chat-7', { name: 'Fernhollow Bank', fields: { background: '#F4F7F2', heading_font: 'Source Serif 4' }, decks: ['Clients/Harbour.deck.md'] }, 'function'],
+      ['setDraftColours', 'chat-7', 'Slide library/Themes/Evening.theme.md', { text: '#C9CBE6' }],
+      ['checkColours', 'Slide library/Themes/Evening.theme.md'],
+      ['readPptx', 'Brand/Template.pptx'],
+    ]);
+    // A font not of the six, and a colour that isn't one, never reach the host
+    assert.equal((await runTool(themeTool('set_deck_theme'), { name: 'X', heading_font: 'Futura' }, context)).isError, true);
+    assert.equal((await runTool(themeTool('set_deck_theme'), { name: 'X', accent: 'green' }, context)).isError, true);
+    assert.equal(themeCalls.length, 4);
+    // Without a theme host (no project), the tools say so
+    assert.match((await runTool(tool('check_theme_colours'), { theme: 'Slide library/Themes/Evening.theme.md' }, context)).text, /Themes need a project folder/);
     // A copy that can't be linked: the library write is undone, so nothing is left behind.
     const agentsBefore = files['Slide library/Agents.deck.md'];
     const unlinked = tools.createDeckToolGroup(() => ({

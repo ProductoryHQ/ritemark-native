@@ -647,6 +647,11 @@ async function run() {
     const refused = await runtime.handleToolRequest(request);
     assert.strictEqual(refused.isError, true);
     assert.match(refused.text ?? '', /Another OpenCode conversation is using the browser right now/);
+    // Sprint 162 PR 5: the writing theme tools can't tell whose chat (or Ask mode) it is either: refused
+    assert.strictEqual(runtime.chatsContested(), true);
+    const theme = await runtime.handleToolRequest({ id: '3', op: 'call', group: 'deck', tool: 'set_deck_theme', params: { name: 'X' } });
+    assert.strictEqual(theme.isError, true);
+    assert.match(theme.text ?? '', /cannot tell which chat this theme change belongs to/);
     const other = await runtime.handleToolRequest({ id: '2', op: 'list', group: 'browser' });
     assert.strictEqual(other.isError, undefined, 'listing the tools is not an action');
 
@@ -657,6 +662,7 @@ async function run() {
     releases.forEach((release) => release());
     await Promise.all([turnA, turnB]);
     assert.strictEqual(runtime.browserContested(), false, 'turns that ended contest nothing');
+    assert.strictEqual(runtime.chatsContested(), false);
     console.log('✓ Test 16: a second OpenCode conversation with another page is refused the browser');
   }
 

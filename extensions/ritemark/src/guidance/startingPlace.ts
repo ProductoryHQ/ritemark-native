@@ -8,10 +8,10 @@ import * as path from 'path';
 import type { ReadyKind } from './readyRequest';
 
 /** The `starting_point_used` event's `place` (R15). */
-export type StartingPlace = 'project' | 'empty_project' | 'word_or_pdf' | 'short_text' | 'long_text' | 'table' | 'sample';
+export type StartingPlace = 'project' | 'empty_project' | 'word_or_pdf' | 'short_text' | 'long_text' | 'table' | 'sample' | 'theme';
 
 /** Every place, for checking what the sheet says against (the webview keeps the same list in its store). */
-export const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample'];
+export const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample', 'theme'];
 
 /** A place the sheet named, if it is one of Ritemark's; anything else is dropped, never passed on. */
 export function startingPlaceFrom(value: unknown): StartingPlace | undefined {
@@ -58,6 +58,8 @@ export function startingPlaceOf(front: FrontEditor | null, project: ReadyKind, p
   if (front.viewType === 'ritemark.docxViewer' || extension === '.docx') return passed.word ? 'word_or_pdf' : projectPlace(project);
   if (front.viewType === 'ritemark.pdfViewer' || extension === '.pdf') return passed.pdf ? 'word_or_pdf' : projectPlace(project);
   if (front.viewType === 'ritemark.excelViewer' || extension === '.csv') return 'table';
+  // Sprint 162 PR 5 (frame 11): a theme's tab keeps the colour check's starting point
+  if (front.viewType === 'ritemark.editor' && /\.theme\.md$/i.test(front.fileName)) return 'theme';
   if ((front.viewType === 'ritemark.editor' || front.viewType === undefined) && TEXT_EXTENSIONS.has(extension)) {
     return (front.words ?? 0) < SHORT_TEXT_WORDS ? 'short_text' : 'long_text';
   }

@@ -6,6 +6,7 @@
 import type { WallSlide } from './present/presentProtocol';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
 import { logoKindOfName, MAX_LOGO_BYTES } from './themeLogo';
+import type { ThemeChangeView } from './themeChange';
 
 export type ThemeRequest =
   /** The tab is drawn: the host sends the theme's state and its decks. */
@@ -31,7 +32,14 @@ export type ThemeRequest =
    */
   | { type: 'theme/logo-file'; dataUrl: string; filename: string }
   /** Sprint 162 PR 4: Choose a file… on the Logo row: the host asks for an SVG or a PNG, and takes it as a drop. */
-  | { type: 'theme/choose-logo' };
+  | { type: 'theme/choose-logo' }
+  /**
+   * Sprint 162 PR 5: the contrast line's "Check all colours" or "Fix with Claude": the AI's colour check goes to the
+   * open chat, and its changes land in this tab's draft.
+   */
+  | { type: 'theme/check-colours'; fix: boolean }
+  /** See what changed's sheet: its Undo, for the change with this id. */
+  | { type: 'theme/change-undo'; id: string };
 
 /**
  * Sprint 162 PR 4: the draft's logo as the tab shows it: the file it names, its address in the tab (null when it can't
@@ -75,7 +83,13 @@ export type ThemeHostMessage =
   /** A line for the tab's bar; with `token`, its Undo takes back a Save. */
   | { type: 'theme/notice'; text: string; token?: string }
   /** Save as a new theme…'s answer: done (the tab moves to the new theme), or why not (the sheet stays and says so). */
-  | { type: 'theme/save-as'; ok: boolean; problem?: string };
+  | { type: 'theme/save-as'; ok: boolean; problem?: string }
+  /** Sprint 162 PR 5: See what changed for an AI's change to the draft: the sheet over the preview. */
+  | { type: 'theme/change'; change: ThemeChangeView }
+  /** The change with this id is undone (from the chat or the sheet): the sheet's Undo goes. */
+  | { type: 'theme/change-undone'; id: string }
+  /** Check all colours or Fix the colours: what the contrast line says now. */
+  | { type: 'theme/check-result'; text: string };
 
 export class ThemeProtocolError extends Error {}
 
@@ -131,6 +145,13 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
       if (/[\\/\u0000]/.test(filename) || !logoKindOfName(filename)) throw new ThemeProtocolError('filename must be an SVG or a PNG name');
       return { type: 'theme/logo-file', dataUrl, filename };
     }
+    case 'theme/check-colours':
+      exactKeys(input, ['type', 'fix']);
+      if (typeof input.fix !== 'boolean') throw new ThemeProtocolError('fix must be a boolean');
+      return { type: 'theme/check-colours', fix: input.fix };
+    case 'theme/change-undo':
+      exactKeys(input, ['type', 'id']);
+      return { type: 'theme/change-undo', id: stringOf(input.id, 64) };
     default:
       throw new ThemeProtocolError('Unknown theme request');
   }
