@@ -27,7 +27,7 @@ register(`data:text/javascript,${encodeURIComponent(
 Object.assign(globalThis, { acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }) })
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
-const { caretTarget, leaveHiddenNote, startSlideComment } = await import('../SlideComments')
+const { caretTarget, leaveHiddenNote, markerSpot, startSlideComment } = await import('../SlideComments')
 const { liftCommentLine, registerOpenBox, startComment, yieldOpenBox } = await import('../../../extensions/comment/CommentNode')
 const { stripCommentCount } = await import('../SlideStrip')
 const { DeckComments, deckCommentStops, nextCommentStop, deckCommentsLabel, stopIndexOf } = await import('../DeckComments')
@@ -431,13 +431,21 @@ const requestedId = (storage: Storage) => {
   assert.match(items, /<ContextMenuShortcut>\{KEYS\.comment\}<\/ContextMenuShortcut>/)
   assert.match(editorSource, /comment: '⌘\/'/)
   // The app run (17 November): after Paste from the menu the caret was gone (⌘Z then did nothing), and Comment's box
-  // opened without the caret. The menu's close now gives the focus back to the slide's words, or starts the comment
-  // there, so the card's box keeps it.
-  assert.match(editorSource, /onCloseAutoFocus=\{event => \{\n          event\.preventDefault\(\)\n          if \(!editor \|\| editor\.isDestroyed\) return\n          if \(pendingComment\.current\) startPendingComment\(\)\n          else editor\.view\.focus\(\)\n        \}\}/)
-  assert.match(editorSource, /pendingComment\.current = menuTarget\.current\n                window\.setTimeout\(startPendingComment, 400\)/)
-  // A marker never covers the words it is on, nor a title's or a line's last letters (the app run).
-  assert.match(here('../SlideComments.tsx'), /kind === 'words' \? rect\.right - frameRect\.left \+ 2/)
-  assert.match(here('../SlideComments.tsx'), /target\.kind === 'block' && editor\.state\.doc\.nodeAt\(target\.pos\)\?\.isTextblock \? 'words'/)
+  // opened without the caret. The menu's close now gives the focus back to the slide's words (not after a press
+  // outside), and Comment starts there, on that one path. Proved live in the run (README); here, the wiring's parts.
+  assert.ok(menu.includes('onInteractOutside={() => { closedOutside.current = true }}'))
+  assert.ok(menu.includes('if (pendingComment.current) startPendingComment()') && menu.includes('else if (!closedOutside.current) editor.view.focus()'))
+  assert.ok(!menu.includes('setTimeout(startPendingComment'), 'one path: no timer racing the close')
+  // A marker never covers what it is on (the app run; the review of its fix): past the words' end, above it when the
+  // frame's edge is too close, stepping upward (never back onto the words) when two meet; a block's at its corner.
+  const wordsBox = { left: 100, top: 200, right: 300, width: 200 }
+  assert.deepEqual(markerSpot(wordsBox, 'words', 900, []), { left: 302, top: 190 }, 'just past the words, on their first line')
+  const second = markerSpot(wordsBox, 'words', 900, [{ left: 302, top: 190 }])
+  assert.ok(second.left >= 300 && second.top < 190 - 20, `a second one steps up, not left onto the words: ${JSON.stringify(second)}`)
+  const atEdge = markerSpot({ left: 600, top: 200, right: 890, width: 290 }, 'words', 900, [])
+  assert.ok(atEdge.top + 26 <= 200 && atEdge.left <= 900 - 26, `no room past the end: above it, inside the frame: ${JSON.stringify(atEdge)}`)
+  assert.deepEqual(markerSpot({ left: 100, top: 200, right: 500, width: 400 }, 'block', 900, []), { left: 490, top: 186 }, "a block's at its top-right corner")
+  assert.deepEqual(markerSpot(wordsBox, 'slide', 900, []), { left: 864, top: 10 }, "the slide's in its corner")
   assert.match(menu, /<ContextMenuTrigger asChild>\s+<div\s+ref=\{setFrameRef\}/, 'the menu is on the whole slide')
   assert.match(menu, /onMouseDown=\{event => \{ if \(event\.button === 2\) event\.preventDefault\(\) \}\}/, 'a right press keeps the selection the person made')
   assert.match(here('../../ui/context-menu.tsx'), /from '@radix-ui\/react-context-menu'/, "the menu is Radix's (DismissableLayer: outside press and Esc close it)")

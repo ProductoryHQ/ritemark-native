@@ -337,6 +337,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const menuTarget = useRef<SlideTarget>({ kind: 'slide' })
   /** The menu's Comment, waiting for the menu to close. */
   const pendingComment = useRef<SlideTarget | null>(null)
+  /** The menu closed on a press outside it: the focus stays where that press put it. */
+  const closedOutside = useRef(false)
   const startPendingComment = () => {
     const target = pendingComment.current
     pendingComment.current = null
@@ -371,6 +373,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           onMouseDown={event => { if (event.button === 2) event.preventDefault() }}
           onContextMenu={event => {
             if (!editor || editor.isDestroyed) return
+            closedOutside.current = false
+            pendingComment.current = null
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
           }}
@@ -392,13 +396,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
       </ContextMenuTrigger>
       <ContextMenuContent
         className="deck-slide-menu"
-        // The focus goes back to the slide's words (the app run: after Paste the caret was lost, and ⌘Z did nothing);
-        // Comment then moves it to the card's box.
+        // A press outside closes it and the focus stays where that press put it (the handout, a card, the strip).
+        onInteractOutside={() => { closedOutside.current = true }}
+        // Otherwise the focus goes back to the slide's words (the app run: after Paste the caret was lost, and ⌘Z did
+        // nothing), and Comment starts here, once the menu has handed the focus back, so the card's box keeps it.
         onCloseAutoFocus={event => {
           event.preventDefault()
           if (!editor || editor.isDestroyed) return
           if (pendingComment.current) startPendingComment()
-          else editor.view.focus()
+          else if (!closedOutside.current) editor.view.focus()
         }}
       >
         <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('cut')}>
@@ -419,10 +425,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
             <ContextMenuItem
               className="gap-2"
               onSelect={() => {
-                // Started once the menu has closed and handed the focus back (`onCloseAutoFocus`), so the card's box
-                // keeps it (the app run: the box opened without the caret); a close that hands nothing back still starts it.
+                // Started once the menu has closed and handed the focus back (`onCloseAutoFocus`), one path only, so the
+                // card's box keeps the caret (the app run: the box opened without it).
                 pendingComment.current = menuTarget.current
-                window.setTimeout(startPendingComment, 400)
               }}
             >
               <Icon name="chat-text" size={14} tone="inherit" />

@@ -51,6 +51,13 @@ One dev run on 17 November, 08:25–08:45 EET. Jarmo allowed a daytime run for t
 3. **Comment's icon touched its word in the menu.** It now has the menu's gap.
 4. **Markers covered words.** A words marker hid the last letters of what it was on, and a title's marker hid the title's last letter. Markers for words, a title or a line now sit just past their end. The three card shots were taken before this fix, so the words marker there still overlaps "open". `saved-markers-…` and `bar-…` are after it.
 
+After the run, the review of these fixes made them firmer, with tests:
+- one start path for Comment (the menu's close);
+- no refocus after a press outside the menu;
+- markers that step upwards, never back onto words, and sit above the words' end when there is no room past it.
+
+The shots don't change: none of them has two markers on one line or words at the frame's edge.
+
 **Not a product fault, noted.**
 - A synthetic ⌘/ sent over CDP while the webview's body had the focus zoomed the window out. It was reset with View: Reset Zoom; a real key in the editor (the caret in the slide) opened the comment.
 - The dev build shows "Activating extension 'GitHub.copilot-chat' failed" at start. It is the dev tree's own extension, not Ritemark's, and was cleared before the shots.

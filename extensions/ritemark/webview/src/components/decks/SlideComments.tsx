@@ -127,9 +127,17 @@ const NO_LAYOUT: Layout = { markers: {}, ring: null, card: null }
 
 /** A comment's target on screen: its words, its block (a text block's words, tight), or the slide. */
 function targetRect(editor: TipTapEditor, frame: HTMLElement, marker: SlideMarker): DOMRect | null {
+  return targetBox(editor, frame, marker)?.rect ?? null
+}
+
+/**
+ * A comment's target on screen, and which box that is: words (the words themselves, or a title's or a line's own
+ * words), a block's box, or the slide. The marker is placed by it, so the two never disagree (review of the run).
+ */
+function targetBox(editor: TipTapEditor, frame: HTMLElement, marker: SlideMarker): { rect: DOMRect; anchor: 'words' | 'block' | 'slide' } | null {
   const view = editor.view
   const target = marker.target
-  if (target.kind === 'slide') return frame.getBoundingClientRect()
+  if (target.kind === 'slide') return { rect: frame.getBoundingClientRect(), anchor: 'slide' }
   try {
     if (target.kind === 'words') {
       const ranges = marker.ranges ?? [{ from: target.from, to: target.to }]
@@ -144,7 +152,7 @@ function targetRect(editor: TipTapEditor, frame: HTMLElement, marker: SlideMarke
         if (!box.width && !box.height) continue
         rect = rect ? union(rect, box) : box
       }
-      return rect
+      return rect ? { rect, anchor: 'words' } : null
     }
     const dom = view.nodeDOM(target.pos)
     if (!(dom instanceof HTMLElement)) return null
@@ -154,12 +162,52 @@ function targetRect(editor: TipTapEditor, frame: HTMLElement, marker: SlideMarke
       const words = document.createRange()
       words.selectNodeContents(dom)
       const box = words.getBoundingClientRect()
-      if (box.width || box.height) return box
+      if (box.width || box.height) return { rect: box, anchor: 'words' }
     }
-    return dom.getBoundingClientRect()
+    return { rect: dom.getBoundingClientRect(), anchor: 'block' }
   } catch {
     return null
   }
+}
+
+/** A marker's size and the room kept from the frame's edges. */
+const MARKER = 26
+const MARKER_STEP = 30
+
+/**
+ * Where a marker goes, in the frame's coordinates: a block's over its top-right corner (frame 28); words' just past
+ * their end, on their first line, so it never covers them, or just above their end when there is no room past it; the
+ * slide's in its own corner. Two on the same spot step aside: a block's to the left, words' upwards, never onto words.
+ */
+export function markerSpot(
+  box: { left: number; top: number; right: number; width: number },
+  anchor: 'words' | 'block' | 'slide',
+  frameWidth: number,
+  taken: ReadonlyArray<{ left: number; top: number }>,
+): { left: number; top: number } {
+  let left: number
+  let top: number
+  if (anchor === 'slide') {
+    left = frameWidth - MARKER - 10
+    top = 10
+  } else if (anchor === 'words') {
+    left = box.right + 2
+    top = Math.max(2, box.top - 10)
+    if (left > frameWidth - MARKER - 2) {
+      left = Math.max(2, Math.min(box.right - MARKER, frameWidth - MARKER - 2))
+      top = Math.max(2, box.top - MARKER - 2)
+    }
+  } else {
+    left = Math.min(box.right - 10, frameWidth - MARKER - 2)
+    top = Math.max(2, box.top - 14)
+  }
+  const clash = () => taken.some(spot => Math.abs(spot.left - left) < 20 && Math.abs(spot.top - top) < 20)
+  for (let guard = 0; guard < 12 && clash(); guard++) {
+    if (anchor === 'words') top = Math.max(2, top - MARKER_STEP)
+    else left -= MARKER_STEP
+    if (anchor === 'words' && top === 2) left -= MARKER_STEP
+  }
+  return { left, top }
 }
 
 function union(a: DOMRect, b: DOMRect): DOMRect {
@@ -346,20 +394,18 @@ export function SlideComments({ editor, frame, slideNumber, open, onOpenTaken }:
     const taken: Array<{ left: number; top: number }> = []
     for (const marker of markers) {
       if (!marker.note.trim() && marker.key !== composeKey) continue
-      const rect = targetRect(editor, frame, marker)
-      if (!rect) continue
-      // A block's marker sits over its top-right corner (frame 28); words' marker just past their end, so it never
-      // covers them (the app run: it hid the words' last letters); the whole slide's in the slide's own corner.
-      // A title or a line counts as words here: its box is its words' own (`targetRect`).
-      const target = marker.target
-      const kind = target.kind === 'block' && editor.state.doc.nodeAt(target.pos)?.isTextblock ? 'words' : target.kind
-      let left = kind === 'slide' ? frameRect.width - 36 : kind === 'words' ? rect.right - frameRect.left + 2 : rect.right - frameRect.left - 10
-      const top = kind === 'slide' ? 10 : Math.max(2, rect.top - frameRect.top - (kind === 'words' ? 10 : 14))
-      left = Math.min(left, frameRect.width - 28)
-      // Two comments on the same thing stand side by side.
-      while (taken.some(spot => Math.abs(spot.left - left) < 20 && Math.abs(spot.top - top) < 20)) left -= 30
-      taken.push({ left, top })
-      placed[marker.key] = { left, top }
+      const found = targetBox(editor, frame, marker)
+      if (!found) continue
+      // The app run: a marker hid the words' last letters it was on (`markerSpot`).
+      const { rect, anchor } = found
+      const spot = markerSpot(
+        { left: rect.left - frameRect.left, top: rect.top - frameRect.top, right: rect.right - frameRect.left, width: rect.width },
+        anchor,
+        frameRect.width,
+        taken,
+      )
+      taken.push(spot)
+      placed[marker.key] = spot
     }
     let ring: Layout['ring'] = null
     let card: Layout['card'] = null
