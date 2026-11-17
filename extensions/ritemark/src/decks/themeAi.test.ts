@@ -413,6 +413,11 @@ async function main() {
     assert.equal(parseTheme(read('Slide library/Themes/Steady.theme.md')).round, 'soft');
   });
 
+  await test('Codex on #783: a theme that isn\'t there is said so, never measured as Evening', async () => {
+    await assert.rejects(ai.checkColours('Slide library/Themes/Nowhere.theme.md'), /There is no theme at Slide library\/Themes\/Nowhere\.theme\.md/);
+    assert.match((await ai.checkColours('Slide library/Themes/Evening.theme.md')).text, /^Evening: five pairs/);
+  });
+
   await test('Fix the colours: each failing pair reaches its ratio, its hue kept, and nothing else moves', () => {
     // Text too faint and the accent too dark on Evening's ground; headings pass
     const faint = parseTheme(change.aiThemeText(BUILT_IN_THEME_TEXT, 'Evening', { text: '#5A5F8C', accent: '#4A3A10' }));

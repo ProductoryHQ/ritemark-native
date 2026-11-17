@@ -21,7 +21,7 @@ import { deckName } from './DeckLibrary';
 import { frontMatterField, frontMatterLook } from './deckFormat';
 import { projectRelative, projectRoot } from './deckDocuments';
 import { projectThemeFiles, readProjectTheme, readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
-import { BUILT_IN_THEME, BUILT_IN_THEME_TEXT, parseTheme, pathKey, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER } from './deckTheme';
+import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, parseTheme, pathKey, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER } from './deckTheme';
 import { presentSlidesOf } from './present/presentSession';
 import { wallSlideOf } from './present/presentProtocol';
 import { slidePicturePaths } from './blocks/slideRenderer';
@@ -328,7 +328,10 @@ export class ThemeAi implements vscode.Disposable {
     const absolute = path.join(root, ...themePath.split('/'));
     const open = openDocument(absolute);
     if (open) return { text: open.getText(), draft: this.themes.hasView(open) ? open : null };
-    return { text: (await readProjectTheme(root, themePath)) ?? BUILT_IN_THEME_TEXT, draft: null };
+    // Only Evening's own path falls back to the built-in theme: a theme that isn't there is said so (Codex on #783)
+    const text = await readProjectTheme(root, themePath);
+    if (text === null && pathKey(themePath) !== pathKey(BUILT_IN_THEME_PATH)) throw new Error(`There is no theme at ${themePath}. Use list_decks to see each deck's theme.`);
+    return { text: text ?? BUILT_IN_THEME_TEXT, draft: null };
   }
 
   private themePathOf(root: string, value: string): string {
