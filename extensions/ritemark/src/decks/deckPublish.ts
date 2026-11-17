@@ -8,7 +8,8 @@
  *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck; the page is
  *    held while its file is written (`holdPage`), and never written while its sheet is open from elsewhere.
  *  - **The theme's fonts** beyond Sofia Sans are written beside the page first, in `fonts/` (Sprint 162 PR 3,
- *    `pageFile.writePageFonts`); a name there taken by another file stops Publish in one line, as the page's does.
+ *    `pageFile.writePageFonts`); a name there taken by another file stops Publish in one line, as the page's does. The
+ *    theme's logo goes the same way, in `logos/` (Sprint 162 PR 4), when its file is there.
  *  - **A first Publish that sends nothing** takes its page back (and the fonts it wrote with it): when the flow is cancelled, refused, not reachable or
  *    stopped by an error, a page this Publish created, with no record, is removed while it is still exactly the page
  *    written. A failed one stays, so the failure's Try again finds it.
@@ -32,10 +33,10 @@ import { splitFrontMatter } from '../editorSync/frontMatter';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
-import { readDeckTheme } from './deckPages';
+import { deckThemeAndLogo } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
-import { buildDeckPage, currentPageDigest, deckNameOf, nodeFontFs, nodePageFs, pagePathFor, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type PageFontFile } from './page/pageFile';
+import { buildDeckPage, currentPageDigest, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoFile, pagePathFor, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
@@ -150,8 +151,8 @@ export class DeckPublisher implements vscode.Disposable {
     try {
       const written = readPageMeta(await readHead(pagePath)).digest;
       if (!written) return false;
-      const theme = await this.themeOf(document);
-      return written !== await currentPageDigest(document.uri.fsPath, document.getText(), theme, nodePageFs, await this.fontAddresses(theme));
+      const { theme, logo } = await this.lookFor(document.uri.fsPath, document.getText());
+      return written !== await currentPageDigest(document.uri.fsPath, document.getText(), theme, nodePageFs, [...await this.fontAddresses(theme), ...(logo ? [logo.address] : [])]);
     } catch {
       return false;
     }
@@ -210,12 +211,16 @@ export class DeckPublisher implements vscode.Disposable {
       const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;
-      // Sprint 162 PR 3: the theme's fonts beyond Sofia Sans go beside the page as files, written just before it.
+      // Sprint 162 PR 3: the theme's fonts beyond Sofia Sans go beside the page as files, written just before it; and
+      // its logo (PR 4), when its file is there.
       let fontFiles: PageFontFile[];
+      let logoFiles: PageFile[];
       try {
-        theme = await this.themeFor(deckPath, text);
+        const look = await this.lookFor(deckPath, text);
+        theme = look.theme;
+        logoFiles = look.logo ? [look.logo] : [];
         fontFiles = await this.fontFilesFor(theme);
-        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles });
+        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: look.logo ? { address: look.logo.address, aspect: look.logo.aspect } : null });
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);
@@ -230,15 +235,17 @@ export class DeckPublisher implements vscode.Disposable {
       }
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
       let fonts: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
+      let logos: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
       let hadRecord: boolean;
       // This Publish's fonts are held until it ends, so another deck's cancelled Publish never takes them back.
-      const fontTargets = fontFiles.map(file => path.join(path.dirname(deckPath), ...file.address.split('/')));
+      const fontTargets = [...fontFiles, ...logoFiles].map(file => path.join(path.dirname(deckPath), ...file.address.split('/')));
       unhold = this.holdFonts(fontTargets);
       // Fonts this Publish wrote go again with a page it couldn't write or takes back (unless another Publish here
       // holds them, or another page of Ritemark's names them).
       const takeBackFonts = async () => {
         unhold();
         await removePageFonts(nodeFontFs, deckPath, fonts, fontFiles, target => this.fontsHeld.has(target)).catch(() => undefined);
+        await removePageFonts(nodeFontFs, deckPath, logos, logoFiles, target => this.fontsHeld.has(target), LOGO_PLACE).catch(() => undefined);
       };
       try {
         hadRecord = Boolean(await feature.controller.recordFor(pageKey));
@@ -247,8 +254,15 @@ export class DeckPublisher implements vscode.Disposable {
         if (fontsWritten.kind === 'refused') {
           written = { kind: 'refused', pagePath, line: fontsWritten.line };
         } else {
+          // Kept before the logo is written, so a logo that can't be written takes the fonts back with it (the review of #785).
           fonts = fontsWritten;
-          written = await writeDeckPage(nodePageFs, deckPath, built.html);
+          const logoWritten = await writePageFonts(nodeFontFs, deckPath, logoFiles, LOGO_PLACE);
+          if (logoWritten.kind === 'refused') {
+            written = { kind: 'refused', pagePath, line: logoWritten.line };
+          } else {
+            logos = logoWritten;
+            written = await writeDeckPage(nodePageFs, deckPath, built.html);
+          }
         }
       } catch (error) {
         console.warn('[Decks] Could not write the page:', error);
@@ -263,7 +277,7 @@ export class DeckPublisher implements vscode.Disposable {
         notice(written.line);
         return;
       }
-      this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles)) });
+      this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
       let outcome: PublishOutcome | undefined | 'stopped';
       try {
         outcome = await feature.publishPage(vscode.Uri.file(pagePath));
@@ -333,10 +347,10 @@ export class DeckPublisher implements vscode.Disposable {
       const open = await this.openDocumentAt(besidePath);
       const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
-      const theme = await this.themeFor(deckPath, text);
+      const { theme, logo } = await this.lookFor(deckPath, text);
       const fontFiles = await this.fontFilesFor(theme);
-      if (await currentPageDigest(deckPath, text, theme, nodePageFs, fontFiles.map(file => file.address)) !== meta.digest) return undefined;
-      return deckSheetRows(deckCounts(text, theme, fontFiles));
+      if (await currentPageDigest(deckPath, text, theme, nodePageFs, [...fontFiles.map(file => file.address), ...(logo ? [logo.address] : [])]) !== meta.digest) return undefined;
+      return deckSheetRows(deckCounts(text, theme, fontFiles, !!logo));
     } catch {
       return undefined;
     }
@@ -388,15 +402,15 @@ export class DeckPublisher implements vscode.Disposable {
     };
   }
 
-  private themeOf(document: vscode.TextDocument): Promise<DeckTheme> {
-    return this.themeFor(document.uri.fsPath, document.getText());
-  }
-
-  /** The theme the deck names, read as the deck view reads it (`readDeckTheme`), or the built-in one. */
-  private async themeFor(deckPath: string, text: string): Promise<DeckTheme> {
+  /**
+   * The theme the deck names, read as the deck view reads it (`deckThemeAndLogo`), or the built-in one; and its logo as
+   * the page's file (Sprint 162 PR 4), only when the theme has one and its file is there and can go.
+   */
+  private async lookFor(deckPath: string, text: string): Promise<{ theme: DeckTheme; logo: PageFile | null }> {
     const named = parseDeck(text.replace(/^\uFEFF/, '')).theme;
-    const themeText = await readDeckTheme(deckPath, themePathOf(named));
-    return themeText === null ? BUILT_IN_THEME : parseTheme(themeText);
+    const read = await deckThemeAndLogo(deckPath, themePathOf(named));
+    const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
+    return { theme, logo: theme.logo && read.logo.state === 'found' ? pageLogoFile(read.logo.bytes, read.logo.kind) : null };
   }
 
   dispose(): void {

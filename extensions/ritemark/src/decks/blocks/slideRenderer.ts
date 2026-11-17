@@ -16,7 +16,7 @@
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { EXERCISE_TAG, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import type { DeckTheme } from '../deckTheme';
+import type { DeckTheme, LogoOn, LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
@@ -403,6 +403,8 @@ export interface BlockSlideMarkupOptions {
   width?: number;
   /** The theme's `--s-*` properties on the slide (the page sets them once for every slide). */
   inlineTheme?: boolean;
+  /** Sprint 162 PR 4: the theme's logo; `blockSlideMarkup` takes it from the theme when it isn't given. */
+  logo?: SlideLogo | null;
 }
 
 const kebab = (key: string) => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
@@ -412,11 +414,92 @@ function styleText(style: Record<string, string | number>): string {
 }
 
 
+// ------------------------------------------------------------------ the theme's logo (Sprint 162 PR 4)
+
+/** A theme's logo as a slide draws it: its address, its corner, and where it shows. */
+export interface SlideLogo {
+  url: string;
+  place: LogoPlace;
+  on: LogoOn;
+  /** Its width on the 960 × 540 canvas: 26 px high, so 26 × its width to height, at most 190 (`LOGO_MAX_WIDTH`). */
+  width: number;
+}
+
+/** The logo's height and widest on the canvas (the prototype's `.slogo`, `slide.css` `.slide-logo`). */
+export const LOGO_HEIGHT = 26;
+export const LOGO_MAX_WIDTH = 190;
+/** The room kept between a top-right logo and a slide's first block (the Experience lead, 18 November). */
+export const LOGO_CLEARANCE = 16;
+/** How far the logo's right edge sits from the slide's (30 px) and the words' right edge sits from it (64 px). */
+const LOGO_RIGHT = 30;
+const FLOW_RIGHT = 64;
+
+/**
+ * The right margin a slide's first block gets beside a top-right logo, so a long title never runs under it (the
+ * Experience lead, 18 November): the logo's width and 16 px, measured from the words' own right edge. The logo sits
+ * in the slide's top margin (22 to 48 px), and a title's first line starts at 46 px, whose accents (Õ, Ä) reach above
+ * it, so a title that ran to the right edge would touch it.
+ */
+export function logoTitleMargin(logo: Pick<SlideLogo, 'width'>): number {
+  return Math.max(0, Math.ceil(logo.width + LOGO_CLEARANCE + LOGO_RIGHT - FLOW_RIGHT));
+}
+
+/** The room kept between a top-left or bottom-right logo and the words, beside its height (the Experience lead). */
+export const LOGO_GAP = 12;
+/** The words' top and bottom edges on the canvas (`slide.css` `.blk-flow`: 46 px from the top, 34 from the bottom). */
+export const FLOW_TOP = 46;
+export const FLOW_BOTTOM = 34;
+
+/** How much lower a slide's words start beside a top-left logo, and how much higher they end above a bottom-right one. */
+export function logoDrop(): number {
+  return LOGO_HEIGHT + LOGO_GAP;
+}
+
+/**
+ * The canvas's class and style for the room the logo keeps on this slide ("never touch", the Experience lead, step-3-themes.md,
+ * 18 November), only on a slide that shows it; the fit then makes the room:
+ *  - top right (`.logo-tr`): the first block ends the logo's width and 16 px short of it, on every slide but a title
+ *    slide (its words sit low);
+ *  - top left (`.logo-tl`): the words start lower by the logo's height and 12 px (38 px), so every line keeps its left edge;
+ *  - bottom right (`.logo-br`): the words end higher by the same.
+ */
+export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
+  if (!drawsLogo(logo, cover)) return { cls: '', style: {} };
+  if (logo.place === 'top-right') return cover ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
+  return { cls: logo.place === 'top-left' ? 'logo-tl' : 'logo-br', style: { '--logo-drop': `${logoDrop()}px` } };
+}
+
+/** The theme's logo to draw, or null: a theme with no logo, or whose picture has no address (a missing file). */
+export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl' | 'logoAspect'> | null | undefined): SlideLogo | null {
+  if (!theme?.logo || !theme.logoUrl) return null;
+  const aspect = theme.logoAspect;
+  const width = aspect && aspect > 0 ? Math.min(LOGO_MAX_WIDTH, LOGO_HEIGHT * aspect) : LOGO_MAX_WIDTH;
+  return { url: theme.logoUrl, place: theme.logo.place, on: theme.logo.on, width: Math.round(width * 100) / 100 };
+}
+
+/**
+ * Does this slide draw the logo? Every slide, or with "the title slides only" a title slide: one drawn big and low,
+ * its title alone (`isCoverSlide`; an old Title or Section slide is one).
+ */
+export function drawsLogo(logo: SlideLogo | null | undefined, cover: boolean): logo is SlideLogo {
+  return !!logo && (logo.on === 'every-slide' || cover);
+}
+
+/**
+ * The logo's markup, in its corner of the slide's 960 × 540 canvas (the 16:9 area, so the wall keeps it there, #779).
+ * Always an `<img>`: an SVG logo is never put into the page as markup, so nothing in it runs or loads (`slide.css`
+ * `.slide-logo`).
+ */
+export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean): string {
+  if (!drawsLogo(logo, cover)) return '';
+  return `<img class="slide-logo is-${logo.place}" src="${esc(logo.url)}" alt="" draggable="false">`;
+}
+
 /**
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width'>): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo'>): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -434,10 +517,14 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
     const gone = !url && !!path && missing(path);
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', isCoverSlide(markdown) ? 'is-cover' : ''].filter(Boolean).join(' ');
+  const cover = isCoverSlide(markdown);
+  const marks = logoCanvasMarks(options.logo, cover);
+  Object.assign(inner, marks.style);
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div></div>`;
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div>`
+    + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 
 /** One block slide, as every view draws it: the page puts this markup in; the deck view draws the same canvas. */
@@ -450,5 +537,5 @@ export function blockSlideMarkup(data: SlideData, options: BlockSlideMarkupOptio
   if (options.inlineTheme) Object.assign(outer, themeStyle(options.theme, options.borderless));
   const outerStyle = styleText(outer);
   return `<div class="deck-slide${options.borderless ? ' is-borderless' : ''}"${outerStyle ? ` style="${esc(outerStyle)}"` : ''}>`
-    + blockCanvasMarkup(data, options) + '</div>';
+    + blockCanvasMarkup(data, { ...options, logo: options.logo === undefined ? themeSlideLogo(options.theme) : options.logo }) + '</div>';
 }
