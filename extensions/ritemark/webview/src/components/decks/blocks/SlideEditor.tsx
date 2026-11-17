@@ -877,6 +877,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     if (editor && !editor.isDestroyed) {
       const tr = leavePicture(editor.state)
       if (tr) editor.view.dispatch(tr)
+      // The words give up the keys, so Backspace removes the picture, never a letter (review of #774).
+      editor.commands.blur()
     }
     setSideChosen(true)
   }

@@ -190,6 +190,15 @@ function createSlideMarked(): Marked {
         return pictureHtml(image.href, image.text, image.picture);
       },
     }, {
+      // Experience 49: a picture alone in its paragraph (its attribute block beside it) is a block of its own, decided
+      // from the tokens, so a look's markup never has to be read back (review of #774). Any other paragraph: as before.
+      name: 'paragraph',
+      renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
+        const paragraph = token as Tokens.Paragraph;
+        if (!isAlonePicture(paragraph)) return false;
+        return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
+      },
+    }, {
       name: 'slideDiv',
       level: 'block',
       start: fencedDivStart,
@@ -213,7 +222,7 @@ function createSlideMarked(): Marked {
       image: (href: string, _title: string | null, text: string) => pictureHtml(href, text),
       paragraph: (text: string) => {
         // A picture alone in its paragraph is a block of its own, as the editor's image node is.
-        if (/^\s*(?:<img (?:style="[^"]*" )?class="blk-pic" [^>]*>|<span class="pic blk-pic[^"]*" style="[^"]*"><span class="pic-box" style="[^"]*"><img [^>]*><\/span>(?:<span class="pic-cap">[^<]*<\/span>)?<\/span>|<span class="blk-pic empty"><\/span>|<span class="blk-pic empty is-missing"><span class="blk-missing">(?:<span class="blk-missing-(?:head|name)">[^<]*<\/span>){2}<\/span><\/span>)\s*$/.test(text)) return `${text.trim()}\n`;
+        if (/^\s*(?:<img class="blk-pic" [^>]*>|<span class="blk-pic empty"><\/span>|<span class="blk-pic empty is-missing"><span class="blk-missing">(?:<span class="blk-missing-(?:head|name)">[^<]*<\/span>){2}<\/span><\/span>)\s*$/.test(text)) return `${text.trim()}\n`;
         return `<p>${text}</p>\n`;
       },
     },
@@ -283,6 +292,12 @@ export function isCoverSlide(markdown: string): boolean {
   const cover = coverOf(markdown);
   coverCache.set(markdown, cover);
   return cover;
+}
+
+/** A paragraph that is one picture with a look (its attribute block, experience 49) and nothing else but space. */
+function isAlonePicture(paragraph: Tokens.Paragraph): boolean {
+  const parts = (paragraph.tokens ?? []).filter(token => !(token.type === 'text' && !token.raw.trim()) && token.type !== 'br');
+  return parts.length === 2 && parts[0].type === 'image' && parts[1].type === 'pictureBlock';
 }
 
 /** A paragraph that holds only pictures (and space): the renderer draws it as a Picture block. */

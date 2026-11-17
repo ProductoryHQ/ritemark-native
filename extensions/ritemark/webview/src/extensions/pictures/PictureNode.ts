@@ -15,7 +15,7 @@ import Image, { type ImageOptions } from '@tiptap/extension-image'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, type EditorState } from '@tiptap/pm/state'
 import type { Decoration, DecorationSource, EditorView, NodeView } from '@tiptap/pm/view'
-import { boxStyle, cropOfRegion, hasFrame, innerStyle, isPlainLook, lookOf, outerStyle, type PictureContext } from '../../../../src/markdown/pictureLook'
+import { boxStyle, cropOfRegion, hasFrame, innerStyle, isPlainLook, lookOf, outerStyle, slideFrameStyle, type PictureContext } from '../../../../src/markdown/pictureLook'
 import { missingHtml, picturePathOf } from '../../../../src/decks/blocks/slideRenderer'
 import { isRelativeTarget } from '../../../../src/decks/deckLibraryFormat'
 import { PICTURE_CROP, cropMeta, cropOf, leavePicture, setPictureLook, type CropState } from './pictureCommands'
@@ -69,10 +69,10 @@ export function drawPicture(attributes: Record<string, unknown>, node: PMNode, c
   }
   const frame = document.createElement('span')
   frame.className = `pic${context === 'slide' ? ' blk-pic' : ''}${look.caption ? ' has-caption' : ''}`
-  setStyle(frame, { display: 'block', ...outerStyle(look) })
+  setStyle(frame, { display: 'block', ...outerStyle(look), ...(context === 'slide' ? slideFrameStyle(look) : {}) })
   const box = document.createElement('span')
   box.className = 'pic-box'
-  setStyle(box, boxStyle(look))
+  setStyle(box, boxStyle(look, context === 'slide'))
   setStyle(image, innerStyle(look))
   box.appendChild(image)
   frame.appendChild(box)

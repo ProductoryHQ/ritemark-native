@@ -15,6 +15,7 @@ import {
   dragRegion,
   draggedWidth,
   lookOf,
+  markdownAlt,
   moveRegion,
   pictureMarkup,
   presetRegion,
@@ -27,7 +28,7 @@ import { slideDataOf, withBlockMarkdown, writeSlideData } from '../../../../src/
 import { BUILT_IN_THEME as DEFAULT_THEME } from '../../../../src/decks/deckTheme'
 import { EMPTY_SIDE, flowToSide, sideToText } from '../../components/decks/blocks/slidePicturePlace'
 import { CORNERS, cornerOf, frameBox, localBox, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
-import { chosenPicture, removePicture, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
+import { caretBeforePicture, chosenPicture, removePicture, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
 
 let failures = 0
 function check(name: string, run: () => void) {
@@ -93,7 +94,7 @@ check('pictureMarkup: a bare picture is untouched; a sized one gets its style; a
   assert.equal(pictureMarkup(img, {}), img)
   assert.equal(pictureMarkup(img, { width: '50%' }), '<img style="width:50%;max-width:100%" src="a.png" alt="A">')
   const framed = pictureMarkup(img, { crop: '16:9', caption: true }, { caption: 'A' })
-  assert.match(framed, /^<span class="pic has-caption" style="display:block"><span class="pic-box" style="display:block;position:relative;overflow:hidden;aspect-ratio:1.7778"><img style="[^"]*object-fit:cover[^"]*" src="a.png" alt="A"><\/span><span class="pic-cap">A<\/span><\/span>$/)
+  assert.match(framed, /^<span class="pic has-caption" style="display:block;width:fit-content;max-width:100%"><span class="pic-box" style="display:block;position:relative;overflow:hidden;aspect-ratio:1.7778"><img style="[^"]*object-fit:cover[^"]*" src="a.png" alt="A"><\/span><span class="pic-cap">A<\/span><\/span>$/)
 })
 
 // ---- the Text editor: load, save and the commands
@@ -195,11 +196,57 @@ check('the renderer draws a slide picture with its look, still as a picture bloc
   const sized = blockSlideHtml('![A](a.png){width=260px align=center}', { pictureUrl })
   assert.match(sized, /^<img style="width:260px;max-width:100%;display:block;margin-left:auto;margin-right:auto;align-self:center;object-position:center center" class="blk-pic" src="https:\/\/webview\/a.png" alt="A">\n$/)
   const cropped = blockSlideHtml('![A](a.png){crop=1:1}', { pictureUrl })
-  assert.match(cropped, /^<span class="pic blk-pic" style="display:block"><span class="pic-box"/)
+  assert.match(cropped, /^<span class="pic blk-pic" style="display:block;width:fit-content;max-width:min\(100%, 310px\);max-height:none"><span class="pic-box"/)
   assert.ok(!cropped.includes('<p>'), 'a picture alone is a block of its own')
   assert.ok(!blockSlideHtml('Words ![A](a.png){width=50%} more', { pictureUrl }).includes('{width'), 'the block never shows as words')
   // A title over a picture is no cover slide, with or without a look.
   assert.equal(isCoverSlide('# Title\n\n![A](a.png){width=260px}'), false)
+})
+
+// ---- review of #774
+
+check('a frame with no width is as wide as the picture; on a slide its crop never meets the height cap', () => {
+  assert.match(pictureMarkup('<img src="a.png" alt="A">', { crop: '1:1' }), /^<span class="pic" style="display:block;width:fit-content;max-width:100%">/)
+  const slide = pictureMarkup('<img class="blk-pic" src="a.png" alt="A">', { crop: '16:9', width: '100%' }, { frameClass: 'blk-pic' })
+  assert.match(slide, /^<span class="pic blk-pic" style="display:block;width:100%;max-width:min\(100%, 551px\);max-height:none"><span class="pic-box" style="[^"]*max-height:310px"/)
+})
+
+check('a key this reader can not draw stays as written until that key is set', () => {
+  assert.equal(withLook('{width=3in}', { align: 'center' }), '{width=3in align=center}')
+  assert.equal(withLook('{width=3in}', { width: '50%' }), '{width=50%}')
+  assert.equal(withLook('{zoom=0.5 focus=x}', { caption: true }), '{.caption zoom=0.5 focus=x}')
+})
+
+check('a description typed with a stray bracket or a last backslash never breaks its image line', () => {
+  assert.equal(markdownAlt('a [b] c'), 'a [b] c', 'paired brackets, as a file has them, stay')
+  assert.equal(markdownAlt('Step 1] the board'), 'Step 1\\] the board')
+  assert.equal(markdownAlt('C:\\'), 'C:\\ ')
+  for (const words of ['Step 1] the board', 'a [b', 'ends with \\', 'a [b] c']) {
+    let state = chooseFirst(docState(DOC))
+    state = state.apply(setPictureAlt(state, firstPicture(state.doc), words)!)
+    const saved = `${editorMarkdown(state.doc)}\n`
+    const back = openDocument(saved).doc
+    assert.equal(String(back.nodeAt(firstPicture(back))?.attrs.alt).trimEnd(), words, words)
+    assert.equal(openAndSave(saved), saved, `${words} reads back byte for byte`)
+  }
+})
+
+check('Comment on a document\'s first picture gets a caret before it, so its note goes there', () => {
+  const state = chooseFirst(docState('![A](a.png)\n\nAfter.\n'))
+  const { tr, top } = caretBeforePicture(state, firstPicture(state.doc))
+  assert.equal(top, 0)
+  assert.ok(tr.selection.empty, 'an empty selection: startComment places the note')
+  assert.equal(tr.selection.from, 0)
+  const later = chooseFirst(docState(DOC))
+  const after = caretBeforePicture(later, firstPicture(later.doc))
+  assert.ok(after.tr.selection.empty && after.tr.selection.from < firstPicture(later.doc))
+})
+
+check('two pictures in one paragraph stay a paragraph on a slide, as before', () => {
+  const pictureUrl = (path: string) => `u/${path}`
+  assert.match(blockSlideHtml('![A](a.png) ![B](b.png)', { pictureUrl }), /^<p>/)
+  assert.match(blockSlideHtml('![A](a.png){width=50%} ![B](b.png)', { pictureUrl }), /^<p>/)
+  assert.doesNotMatch(blockSlideHtml('![A](a.png){width=50%}', { pictureUrl }), /<p>/)
 })
 
 // ---- Place on a slide: the same picture between the words and the slide-wide place

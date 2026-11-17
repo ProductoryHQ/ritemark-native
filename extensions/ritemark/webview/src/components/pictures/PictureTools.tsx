@@ -129,26 +129,37 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
   const resize = useRef<ResizeDrag | null>(null)
   const cropDrag = useRef<CropDrag | null>(null)
 
-  // Drawn again as the editor changes, the window moves, and a picture loads (it takes its height then).
+  // A transaction draws the tools again only while a picture is chosen, or when one is chosen or left (review of #774).
+  const wasChosen = useRef(false)
   useEffect(() => {
     if (!editor) return
+    const changed = () => {
+      const now = !editor.isDestroyed && !!chosenPicture(editor.state)
+      if (now || wasChosen.current) redraw()
+      wasChosen.current = now
+    }
+    editor.on('transaction', changed)
+    return () => { editor.off('transaction', changed) }
+  }, [editor])
+
+  const chosen = editor && !editor.isDestroyed ? chosenPicture(editor.state) : null
+
+  // While a picture is chosen, drawn again as the window moves and as a picture loads (it takes its height then).
+  useEffect(() => {
+    if (!editor || !chosen) return
     const view = editor.view
-    editor.on('transaction', redraw)
     window.addEventListener('resize', redraw)
     window.addEventListener('scroll', redraw, true)
     view.dom.addEventListener('load', redraw, true)
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => redraw())
     observer?.observe(view.dom)
     return () => {
-      editor.off('transaction', redraw)
       window.removeEventListener('resize', redraw)
       window.removeEventListener('scroll', redraw, true)
       view.dom.removeEventListener('load', redraw, true)
       observer?.disconnect()
     }
-  }, [editor])
-
-  const chosen = editor && !editor.isDestroyed ? chosenPicture(editor.state) : null
+  }, [editor, !!chosen])
 
   // A press outside the picture, its handles and its bar leaves the picture (and crop mode, as Esc does).
   useEffect(() => {

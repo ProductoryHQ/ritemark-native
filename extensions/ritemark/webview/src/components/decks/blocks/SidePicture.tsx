@@ -61,14 +61,17 @@ export function SidePicture(props: SidePictureProps) {
       if (!target || ref.current?.contains(target) || target.closest(OWN_LAYERS)) return
       props.onLeave()
     }
+    // The bar follows the picture as the window or the deck scrolls (review of #774).
     const again = () => redraw(count => count + 1)
     window.addEventListener('keydown', keys, true)
     document.addEventListener('pointerdown', press, true)
     window.addEventListener('resize', again)
+    window.addEventListener('scroll', again, true)
     return () => {
       window.removeEventListener('keydown', keys, true)
       document.removeEventListener('pointerdown', press, true)
       window.removeEventListener('resize', again)
+      window.removeEventListener('scroll', again, true)
     }
   })
 

@@ -10,7 +10,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import type { EditorState } from '@tiptap/pm/state'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
-import { lookOf } from '../../../../../src/markdown/pictureLook'
+import { lookOf, markdownAlt } from '../../../../../src/markdown/pictureLook'
 import { imagePathOf } from '../../../extensions/pictures/PictureNode'
 import { removePicture } from '../../../extensions/pictures/pictureCommands'
 
@@ -19,14 +19,9 @@ export type SidePlace = 'left' | 'right' | 'behind'
 /** The header keys a side picture carries, all of them, so a change names each one (undefined takes it out). */
 export type SideHeader = Pick<SlideData, 'picture' | 'image' | 'alt' | 'focus'>
 
-/** A description as Markdown writes it inside `![…]`. */
-function altText(alt: string): string {
-  return alt.replace(/[\r\n]+/g, ' ').replace(/([\\[\]])/g, '\\$1')
-}
-
-/** A picture's image line. */
+/** A picture's image line, its description written as the editors' save writes it (`markdownAlt`). */
 export function pictureLine(path: string, alt = ''): string {
-  return `![${altText(alt)}](${pictureTarget(path)})`
+  return `![${markdownAlt(alt)}](${pictureTarget(path)})`
 }
 
 /** The slide's words with a picture line after them, a block of its own. */

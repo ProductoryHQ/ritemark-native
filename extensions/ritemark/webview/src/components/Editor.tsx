@@ -3,7 +3,7 @@ import { countWords, onDocChanged } from '../lib/docChange'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
 import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
-import { Selection, TextSelection } from '@tiptap/pm/state'
+import { TextSelection } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
 import { createNodeFromContent, type AnyExtension } from '@tiptap/core'
 import { sendToExtension, onMessage } from '../bridge'
@@ -27,7 +27,7 @@ import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
 import { PictureTools } from './pictures/PictureTools'
-import { chosenPicture, replacePicture } from '../extensions/pictures/pictureCommands'
+import { caretBeforePicture, chosenPicture, replacePicture } from '../extensions/pictures/pictureCommands'
 import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
@@ -1690,11 +1690,9 @@ export function getSelectionHTML(editor: TipTapEditor): string {
  * door for comments (`startComment`), so it reads and saves as every other comment does.
  */
 function commentOnPicture(editor: TipTapEditor, pos: number): void {
-  const { doc } = editor.state
-  const $pos = doc.resolve(pos)
-  const top = $pos.depth === 0 ? pos : $pos.before(1)
   // A note is placed at a caret, never over a selection: the picture's selection collapses beside it first.
-  editor.view.dispatch(editor.state.tr.setSelection(Selection.near(doc.resolve(top), -1)))
+  const { tr, top } = caretBeforePicture(editor.state, pos)
+  editor.view.dispatch(tr)
   startComment(editor, (tr, id) => {
     const type = tr.doc.type.schema.nodes.commentNode
     if (type) tr.insert(tr.mapping.map(top), type.create({ id, note: '', agentAlias: null }))

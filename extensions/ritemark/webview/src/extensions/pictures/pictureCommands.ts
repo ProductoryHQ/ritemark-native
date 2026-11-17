@@ -7,15 +7,12 @@
  * (its attribute block, `pictureLook.ts`), its description into `alt`, and Remove takes the node away, never the file.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { NodeSelection, PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { NodeSelection, PluginKey, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
+import { GapCursor } from '@tiptap/pm/gapcursor'
 import { closeHistory } from '@tiptap/pm/history'
 import { lookOf, withLook, type PictureLook, type Region } from '../../../../src/markdown/pictureLook'
-
-/** The slide editor's "an undo step of its own" meta (`slideCommands.ts`' `SLIDE_COMMAND`), set by every command. */
-const SLIDE_COMMAND = 'deckSlideCommand'
-
-/** A transaction from the picture's tools (the bar keeps it open across its own changes). */
-export const PICTURE_COMMAND = 'pictureCommand'
+// The slide editor's "an undo step of its own" meta, set by every command (harmless in the document editor).
+import { SLIDE_COMMAND } from '../../components/decks/blocks/slideCommands'
 
 export interface ChosenPicture {
   pos: number
@@ -37,7 +34,6 @@ export function isPictureSelection(selection: EditorState['selection']): boolean
 function ownStep(tr: Transaction): Transaction {
   closeHistory(tr)
   tr.setMeta(SLIDE_COMMAND, true)
-  tr.setMeta(PICTURE_COMMAND, true)
   return tr
 }
 
@@ -112,6 +108,19 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
   const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: picture.src, title: picture.title, picture: block || null })
   tr.setSelection(NodeSelection.create(tr.doc, pos))
   return ownStep(tr)
+}
+
+/**
+ * Comment on a picture in a document: the caret just before the picture's top-level block, where the margin note goes
+ * (`startComment` places a note only at a caret). With no words before it (the document's first block) the caret is a
+ * gap cursor there (review of #774).
+ */
+export function caretBeforePicture(state: EditorState, pos: number): { tr: Transaction; top: number } {
+  const { doc } = state
+  const $pos = doc.resolve(pos)
+  const top = $pos.depth === 0 ? pos : $pos.before(1)
+  const near = Selection.near(doc.resolve(top), -1)
+  return { tr: state.tr.setSelection(near.empty ? near : new GapCursor(doc.resolve(top))), top }
 }
 
 /** Esc on a chosen picture: the caret right after it, so typing goes on there. */

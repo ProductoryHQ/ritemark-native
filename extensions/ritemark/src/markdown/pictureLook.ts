@@ -126,23 +126,26 @@ const PLAIN_VALUE = /^[\w.%:,-]+$/;
 /**
  * The attribute block with the look set: the keys this editor owns changed in place, new ones added after the rest,
  * every other key, class and id kept as written. A block that already draws `look` comes back as it was, byte for
- * byte; '' when nothing is left (the picture is a bare image line again).
+ * byte; '' when nothing is left (the picture is a bare image line again). A key this reader can't draw (Pandoc's
+ * `width=3in`) stays as written until that very key is set (review of #774).
  */
 export function withLook(raw: string | null | undefined, look: PictureLook): string {
   const current = parsePictureBlock(raw);
-  if (current && sameLook(lookOf(raw), look)) return raw as string;
+  const before = lookOf(raw);
+  if (current && sameLook(before, look)) return raw as string;
   if (!current && isPlainLook(look)) return '';
   const attrs: FenceAttributes = current ?? { classes: [], id: null, values: {} };
   const values: Record<string, string> = { ...attrs.values };
-  const set = (key: string, value: string | undefined) => {
+  const set = (key: string, value: string | undefined, unchanged: boolean) => {
+    if (unchanged) return;
     if (value === undefined) delete values[key];
     else values[key] = value;
   };
-  set('width', look.width);
-  set('align', look.align);
-  set('crop', look.crop);
-  set('zoom', look.zoom && look.zoom > 1 ? trimNumber(look.zoom, 3) : undefined);
-  set('focus', look.focus ? `${trimNumber(look.focus.x, 1)},${trimNumber(look.focus.y, 1)}` : undefined);
+  set('width', look.width, (before.width ?? '') === (look.width ?? ''));
+  set('align', look.align, (before.align ?? '') === (look.align ?? ''));
+  set('crop', look.crop, (before.crop ?? '') === (look.crop ?? ''));
+  set('zoom', look.zoom && look.zoom > 1 ? trimNumber(look.zoom, 3) : undefined, (before.zoom ?? 1) === (look.zoom ?? 1));
+  set('focus', look.focus ? `${trimNumber(look.focus.x, 1)},${trimNumber(look.focus.y, 1)}` : undefined, sameFocus(before.focus, look.focus));
   const classes = attrs.classes.filter(name => name !== 'caption');
   if (look.caption) classes.unshift('caption');
   const parts = [
@@ -333,11 +336,20 @@ export function hasFrame(look: PictureLook): boolean {
   return !!(look.crop || (look.zoom && look.zoom > 1) || look.caption);
 }
 
-/** The outer element's style: its width and where it sits (a block's margins, a slide's flex column's `align-self`). */
+/** The tallest a picture is drawn on a slide (slide.css's `.blk-pic`). */
+export const SLIDE_PICTURE_HEIGHT = 310;
+
+/**
+ * The outer element's style: its width and where it sits (a block's margins, a slide's flex column's `align-self`). A
+ * frame with no width is as wide as the picture, never the whole column (review of #774).
+ */
 export function outerStyle(look: PictureLook): Record<string, string> {
   const style: Record<string, string> = {};
   if (look.width) {
     style.width = look.width;
+    style['max-width'] = '100%';
+  } else if (hasFrame(look)) {
+    style.width = 'fit-content';
     style['max-width'] = '100%';
   }
   if (look.align === 'center') Object.assign(style, { display: 'block', 'margin-left': 'auto', 'margin-right': 'auto', 'align-self': 'center' });
@@ -348,11 +360,23 @@ export function outerStyle(look: PictureLook): Record<string, string> {
   return style;
 }
 
-/** The box that crops: its shape, and nothing outside it shown. */
-export function boxStyle(look: PictureLook): Record<string, string> {
+/**
+ * A frame on a slide: the slide's picture height cap (slide.css's `.blk-pic`) goes from the frame, which holds the
+ * caption too, to its box; a crop's frame is never wider than the cap allows, so its shape holds (review of #774).
+ */
+export function slideFrameStyle(look: PictureLook): Record<string, string> {
+  const style: Record<string, string> = { 'max-height': 'none' };
+  const ratio = readRatio(look.crop);
+  if (ratio !== null) style['max-width'] = `min(100%, ${Math.round(SLIDE_PICTURE_HEIGHT * ratio)}px)`;
+  return style;
+}
+
+/** The box that crops: its shape, and nothing outside it shown; on a slide, never taller than a slide's picture. */
+export function boxStyle(look: PictureLook, slide = false): Record<string, string> {
   const style: Record<string, string> = { display: 'block', position: 'relative', overflow: 'hidden' };
   const ratio = readRatio(look.crop);
   if (ratio !== null) style['aspect-ratio'] = trimNumber(ratio, 4);
+  if (slide) style['max-height'] = `${SLIDE_PICTURE_HEIGHT}px`;
   return style;
 }
 
@@ -380,7 +404,31 @@ export function pictureMarkup(img: string, look: PictureLook, options: { frameCl
   const inner = img.replace(/^<img\s/i, `<img style="${cssText(innerStyle(look))}" `);
   const classes = ['pic', options.frameClass, look.caption ? 'has-caption' : ''].filter(Boolean).join(' ');
   const caption = look.caption && options.caption ? `<span class="pic-cap">${options.caption}</span>` : '';
-  return `<span class="${escapeHtml(classes)}" style="${cssText({ display: 'block', ...outerStyle(look) })}"><span class="pic-box" style="${cssText(boxStyle(look))}">${inner}</span>${caption}</span>`;
+  const slide = /\bblk-pic\b/.test(options.frameClass ?? '');
+  const frame = { display: 'block', ...outerStyle(look), ...(slide ? slideFrameStyle(look) : {}) };
+  return `<span class="${escapeHtml(classes)}" style="${cssText(frame)}"><span class="pic-box" style="${cssText(boxStyle(look, slide))}">${inner}</span>${caption}</span>`;
+}
+
+/**
+ * A description as it goes between `![` and `]`: as it is when its brackets pair up (as a description read from a file
+ * always does, so an untouched picture keeps its bytes), with its brackets escaped when they don't, and a space after a last
+ * backslash, so words typed in the bar never break their image line (review of #774).
+ */
+export function markdownAlt(alt: string): string {
+  let words = alt.replace(/[\r\n]+/g, ' ');
+  let depth = 0;
+  let paired = true;
+  for (let index = 0; index < words.length && paired; index++) {
+    const char = words[index];
+    if (char === '\\') index++;
+    else if (char === '[') depth++;
+    else if (char === ']') paired = --depth >= 0;
+  }
+  if (!paired || depth !== 0) words = words.replace(/\\?([[\]])/g, '\\$1');
+  const trailing = /\\+$/.exec(words)?.[0].length ?? 0;
+  // A last backslash would escape the closing bracket (marked keeps a doubled one as two): a space after it.
+  if (trailing % 2 === 1) words += ' ';
+  return words;
 }
 
 // ---------------------------------------------------------------------------
