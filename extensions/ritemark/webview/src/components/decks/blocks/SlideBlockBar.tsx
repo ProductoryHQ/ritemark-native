@@ -146,7 +146,9 @@ function Group({ label, options, folded }: { label: string; options: Option[]; f
  */
 function SmilePlusGlyph() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    // A stroke glyph: the Button fills its svgs and sizes them 16 unless told (the app run drew a filled disc), so it
+    // keeps no fill and the ⋮'s 14 px.
+    <svg xmlns="http://www.w3.org/2000/svg" className="size-3.5" style={{ fill: 'none' }} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M22 11v1a10 10 0 1 1-9-10" />
       <path d="M8 14s1.5 2 4 2 4-2 4-2" />
       <line x1="9" x2="9.01" y1="9" y2="9" />
@@ -392,7 +394,11 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
   // While a handle drags, only its drop line or guide shows (the lead on #773): the handles stay in the page, hidden,
   // so the dragged one keeps its pointer, and no tooltip opens.
   const hidden: CSSProperties = drag ? { visibility: 'hidden' } : {}
-  const handleStyle = (spot: { left: number; top: number }): CSSProperties => ({ left: spot.left, top: spot.top, width: HANDLE_SIZE, height: HANDLE_SIZE, ...hidden })
+  // Each handle sits in a box of its own at its place (`deck-block-at`), its tooltip's trigger inside it: the trigger is
+  // the Tooltip's own span, which had no size while the button itself was absolute, so every handle's tooltip opened at
+  // the layer's top left corner (the follow-up's app run).
+  const at = (spot: { left: number; top: number }, width = HANDLE_SIZE, height = HANDLE_SIZE, z = 5): CSSProperties => ({ left: spot.left, top: spot.top, width, height, zIndex: z, ...hidden })
+  const handleSize: CSSProperties = { width: HANDLE_SIZE, height: HANDLE_SIZE }
   // The ring keeps 8 px from the words: a box has its own padding, so a Boxes block's ring sits closer.
   const ring = ringGap(chosen.kind)
 
@@ -403,43 +409,51 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
       {createPortal(showing ? (
         <>
           <div className="deck-block-ring" style={{ left: block.left - ring, top: block.top - ring, width: block.width + ring * 2, height: block.height + ring * 2, ...hidden }} aria-hidden="true" />
-          <Tooltip label="Drag to move the block on the slide" suppressed={!!drag}>
-            <Button variant="ghost" className="deck-block-grip" style={handleStyle(grip)} aria-label="Move the block" onPointerDown={startMove} onMouseDown={event => event.preventDefault()}>
-              <Icon name="dots-six-vertical" size={14} tone="inherit" />
-            </Button>
-          </Tooltip>
-          {canAdd ? (
-            <Tooltip label={ADD_LABEL[chosen.kind]} suppressed={!!drag}>
-              <Button variant="outline" className="deck-block-plus" style={handleStyle(plus)} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
-                <Icon name="plus" size={12} tone="inherit" />
+          <div className="deck-block-at" style={at(grip)}>
+            <Tooltip label="Drag to move the block on the slide" suppressed={!!drag}>
+              <Button variant="ghost" className="deck-block-grip" style={handleSize} aria-label="Move the block" onPointerDown={startMove} onMouseDown={event => event.preventDefault()}>
+                <Icon name="dots-six-vertical" size={14} tone="inherit" />
               </Button>
             </Tooltip>
+          </div>
+          {canAdd ? (
+            <div className="deck-block-at" style={at(plus)}>
+              <Tooltip label={ADD_LABEL[chosen.kind]} suppressed={!!drag}>
+                <Button variant="outline" className="deck-block-plus" style={handleSize} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
+                  <Icon name="plus" size={12} tone="inherit" />
+                </Button>
+              </Tooltip>
+            </div>
           ) : null}
           {placed.icon && pickIcon ? (
-            <Tooltip label="Add an icon" suppressed={!!drag}>
-              <Button
-                variant="outline"
-                className="deck-block-icon"
-                style={handleStyle(placed.icon)}
-                aria-label="Add an icon"
-                onMouseDown={event => event.preventDefault()}
-                onClick={event => { if (placed.icon) pickIcon(placed.icon.pos, event.currentTarget, null) }}
-              >
-                <SmilePlusGlyph />
-              </Button>
-            </Tooltip>
+            <div className="deck-block-at" style={at(placed.icon)}>
+              <Tooltip label="Add an icon" suppressed={!!drag}>
+                <Button
+                  variant="outline"
+                  className="deck-block-icon"
+                  style={handleSize}
+                  aria-label="Add an icon"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={event => { if (placed.icon) pickIcon(placed.icon.pos, event.currentTarget, null) }}
+                >
+                  <SmilePlusGlyph />
+                </Button>
+              </Tooltip>
+            </div>
           ) : null}
           {placed.lines.map((line, index) => (
-            <Tooltip key={index} label="Drag to change the columns' widths" suppressed={!!drag}>
-              <Button
-                variant="ghost"
-                className="deck-block-split"
-                style={{ left: line.x - 6, top: block.top, height: block.height, ...hidden }}
-                aria-label="Change the columns' widths"
-                onPointerDown={startSplit(index)}
-                onMouseDown={event => event.preventDefault()}
-              />
-            </Tooltip>
+            <div key={index} className="deck-block-at" style={at({ left: line.x - 6, top: block.top }, 12, block.height, 4)}>
+              <Tooltip label="Drag to change the columns' widths" suppressed={!!drag}>
+                <Button
+                  variant="ghost"
+                  className="deck-block-split"
+                  style={{ height: block.height }}
+                  aria-label="Change the columns' widths"
+                  onPointerDown={startSplit(index)}
+                  onMouseDown={event => event.preventDefault()}
+                />
+              </Tooltip>
+            </div>
           ))}
           {drag?.kind === 'move' ? <div className="deck-block-drop" style={{ left: drag.left, top: drag.y - 1, width: drag.width }} aria-hidden="true" /> : null}
           {drag?.kind === 'split' ? <div className="deck-block-guide" style={{ left: drag.x - 1, top: drag.top, height: drag.height }} aria-hidden="true" /> : null}

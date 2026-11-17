@@ -175,9 +175,14 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   // The lead's follow-up to #773: the place is never drawn on the slide; the caret's box shows the icon handle in the
   // handles' layer (SlideBlockBar), so the box takes no room for it.
   assert.ok(!new RegExp(`\\.blk-box\\.${CARET_CLASS} > \\.blk-icon\\.is-place \\{ display: grid`).test(css), 'never drawn on the edited box either')
-  assert.ok(/\.deck-slide \.deck-block-icon \{ position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 50%; background: var\(--r-surface\);/.test(css), 'a white handle like the +')
+  assert.ok(/\.deck-slide \.deck-block-icon \{ position: relative; min-width: 0; padding: 0; border-radius: 50%; background: var\(--r-surface\);/.test(css), 'a white handle like the +')
   const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
   assert.ok(bar.includes('<Tooltip label="Add an icon"') && bar.includes('<SmilePlusGlyph />') && bar.includes("querySelector(':scope > .blk-icon.is-place')"), 'the handle: its tooltip, its glyph, only while the box has no icon')
+  // Every handle's tooltip opens at the handle (the app run: the Tooltip's span had no size while the button was
+  // absolute, so the tooltips opened at the layer's corner). The place is the box around the trigger, never the button.
+  assert.ok(css.includes('.deck-block-at { position: absolute; display: flex; }'), 'each handle in a placed box')
+  for (const name of ['grip', 'plus', 'icon', 'split']) assert.ok(new RegExp(`\\.deck-slide \\.deck-block-${name} \\{ position: relative;`).test(css), `the ${name} is not absolute`)
+  assert.equal((bar.match(/className="deck-block-at"/g) ?? []).length, 4, 'the ⋮, the +, the icon handle and the split line each in one')
 }
 
 // Words are never split mid-word on a slide, in boxes, steps, columns and cells; a web address may still break. A
