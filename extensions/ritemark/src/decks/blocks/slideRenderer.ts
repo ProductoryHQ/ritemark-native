@@ -21,6 +21,7 @@ import { themeStyle } from '../../../webview/src/components/decks/theme/themeVar
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 
 export { sidePictureOf };
 
@@ -177,6 +178,29 @@ function createSlideMarked(): Marked {
   const instance = new Marked({ gfm: true, breaks: true, tokenizer: slideTokenizer() });
   instance.use({
     extensions: [{
+      // Experience 48: a table with column widths (its delimiter row's dashes, `tableWidths.ts`) is drawn at the slide's
+      // width with those shares; any other table exactly as marked draws it.
+      name: 'table',
+      renderer(this: { parser: { parseInline: (tokens: Token[]) => string; renderer: { tablecell: (content: string, flags: { header: boolean; align: 'center' | 'left' | 'right' | null }) => string; tablerow: (content: string) => string; table: (header: string, body: string) => string } } }, token) {
+        const table = token as Tokens.Table;
+        const parser = this.parser;
+        let cells = '';
+        for (let col = 0; col < table.header.length; col++) cells += parser.renderer.tablecell(parser.parseInline(table.header[col].tokens), { header: true, align: table.align[col] });
+        const header = parser.renderer.tablerow(cells);
+        let body = '';
+        for (const row of table.rows) {
+          cells = '';
+          for (let col = 0; col < row.length; col++) cells += parser.renderer.tablecell(parser.parseInline(row[col].tokens), { header: false, align: table.align[col] });
+          body += parser.renderer.tablerow(cells);
+        }
+        const html = parser.renderer.table(header, body);
+        const delimiter = table.raw.split('\n')[1] ?? '';
+        const widths = tableHasWidths(table.raw) ? widthsOf(delimiter, true, table.header.length) : null;
+        if (!widths) return html;
+        const group = `<colgroup>${widths.map(width => `<col style="width:${width}%">`).join('')}</colgroup>`;
+        return html.replace(/^<table>\n?/, `<table class="has-widths" style="width:100%">\n${group}\n`);
+      },
+    }, {
       name: 'slideDiv',
       level: 'block',
       start: fencedDivStart,
@@ -302,20 +326,6 @@ export function blockSectionNumberOf(markdown: string): string | null {
   return /^(?:\d{1,3}(?:\.\d{1,3})*|[A-Za-z]|[IVXLC]{1,6})[.)]?$/.test(number) ? number : null;
 }
 
-/** PR 3: does a block slide hold a table (outside code and comments): Settings then offers Add a row and Add a column. */
-const tableCache = new Map<string, boolean>();
-
-export function blockHasTable(markdown: string): boolean {
-  const cached = tableCache.get(markdown);
-  if (cached !== undefined) return cached;
-  if (tableCache.size > 500) tableCache.clear();
-  let found = false;
-  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
-    if (token.type === 'table') found = true;
-  });
-  tableCache.set(markdown, found);
-  return found;
-}
 
 const stepsCache = new Map<string, string | null>();
 

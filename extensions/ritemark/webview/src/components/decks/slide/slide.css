@@ -136,6 +136,10 @@
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: .3em 0 .55em; border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
 .deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: .45em .8em; text-align: left; vertical-align: top; }
+/* A column's alignment as the file writes it (`:---:`, `---:`), on the stage (the editor's `data-md-align`) and in the
+   renderer's drawing (marked's `align`): the strip, the wall and the page alike (experience 48). */
+.deck-sl.is-blocks :is(th, td):is([align="center"], [data-md-align="center"]) { text-align: center; }
+.deck-sl.is-blocks :is(th, td):is([align="right"], [data-md-align="right"]) { text-align: right; }
 .deck-sl.is-blocks th { background: var(--s-thbg, rgba(242,181,68,.16)); color: var(--s-thfg, #F2B544); font-weight: 700; }
 .deck-sl.is-blocks td { border-top: 1px solid var(--s-row, rgba(255,255,255,.1)); }
 .deck-sl.is-blocks .blk-pic { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }

@@ -18,6 +18,18 @@ import {
   ArrowClockwise,
   ArrowCounterClockwise,
   ArrowSquareOut,
+  ArrowDown,
+  ArrowLeft,
+  ArrowLineDown,
+  ArrowLineLeft,
+  ArrowLineRight,
+  ArrowLineUp,
+  ArrowUp,
+  DotsSix,
+  DotsSixVertical,
+  TextAlignCenter,
+  TextAlignLeft,
+  TextAlignRight,
   ArrowRight,
   ArrowUpRight,
   ArrowsClockwise,
@@ -167,12 +179,9 @@ import {
   EnvelopeSimple,
   OpenAiLogo,
   PencilSimpleLine,
-  TextAlignLeft,
-  TextAlignCenter,
   AlignTop,
   AlignCenterVertical,
   AlignBottom,
-  DotsSixVertical,
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
@@ -218,13 +227,10 @@ const iconMap = {
   'columns': Columns,
   'plus-square': PlusSquare,
   'scissors': Scissors,
-  // 17 November: the block's bar on a slide (alignment, and the ⋮ that moves a block).
-  'text-align-left': TextAlignLeft,
-  'text-align-center': TextAlignCenter,
+  // 17 November: the block's bar on a slide, the Columns' vertical alignment (its text alignment and ⋮ are the table's).
   'align-top': AlignTop,
   'align-center-vertical': AlignCenterVertical,
   'align-bottom': AlignBottom,
-  'dots-six-vertical': DotsSixVertical,
   'folder-simple': FolderSimple,
   'file-pdf': FilePdf,
   'book-open-text': BookOpenText,
@@ -358,6 +364,19 @@ const iconMap = {
   'target': Target,
   'user-check': UserCheck,
   'users': Users,
+  // Tables you can change (experience 48): the grips, the row and column menus, the alignment segment
+  'arrow-down': ArrowDown,
+  'arrow-left': ArrowLeft,
+  'arrow-up': ArrowUp,
+  'arrow-line-down': ArrowLineDown,
+  'arrow-line-left': ArrowLineLeft,
+  'arrow-line-right': ArrowLineRight,
+  'arrow-line-up': ArrowLineUp,
+  'dots-six': DotsSix,
+  'dots-six-vertical': DotsSixVertical,
+  'text-align-center': TextAlignCenter,
+  'text-align-left': TextAlignLeft,
+  'text-align-right': TextAlignRight,
 } as const satisfies Record<string, PhosphorIconComponent>
 
 export type PhosphorIconName = keyof typeof iconMap

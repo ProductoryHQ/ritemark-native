@@ -34,7 +34,7 @@ import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
-import { addColumn, addRow, setPath } from './slide/slideEdits'
+import { setPath } from './slide/slideEdits'
 import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
@@ -49,7 +49,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { CONVERSION_NOTICE, DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
-import { blockHasTable, blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
@@ -1407,13 +1407,12 @@ export function DeckView({
   // Writing on the slide keeps it the current one while the handout is still.
   const onWriting = useCallback(() => { lockUntil.current = Date.now() + WRITE_LOCK_MS }, [])
 
-  // ---- Sprint 161 (PR 3): the slide's Slides items, "This slide is full", and a block table's rows in Settings
+  // ---- Sprint 161 (PR 3): the slide's Slides items and "This slide is full"
 
   /** The slide on the stage is full (its words at their smallest and still past its edge): the bar says so. */
   const [slideFull, setSlideFull] = useState(false)
-  /** The bar's Split at the cursor, and Settings' Add a row / Add a column, asked of the slide editor. */
+  /** The bar's Split at the cursor, asked of the slide editor. */
   const [splitRequest, setSplitRequest] = useState(0)
-  const [tableRequest, setTableRequest] = useState<{ what: 'row' | 'column'; serial: number } | null>(null)
   stageSlideId.current = slideShown && slide ? slide.data.id : undefined
   // The / menu's New slide below: an empty block slide after this one's part, its title taking the caret.
   const onNewSlideBelow = useCallback(() => stripActions.insert(shown + 1, ''), [stripActions, shown])
@@ -1425,8 +1424,6 @@ export function DeckView({
   }, [editor, dispatch, shown, pick])
   // The bar's Split at the cursor with no caret on the slide: it says where to click, and splits nothing.
   const needCaret = useCallback(() => setNotice({ text: 'Click on the slide where it should split, then Split at the cursor.' }), [])
-  /** A block slide with a table: Settings' Add a row and Add a column act on it through the slide editor. */
-  const blockTable = slideShown && !!slide && isBlockSlide(slide.kind) && blockHasTable(slide.data.markdown ?? '')
   // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is current).
   // Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
   const fullLine = (
@@ -1569,7 +1566,6 @@ export function DeckView({
                   onNeedCaret={needCaret}
                   onSlideSettings={stageSettings}
                   splitRequest={splitRequest}
-                  tableRequest={tableRequest}
                   picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
                 />
               ) : null}
@@ -1688,11 +1684,6 @@ export function DeckView({
                     : hiddenNote(slide.kind, slide.data)}
                 />
               )}
-              table={slide.kind === 'table'
-                ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) }
-                : blockTable
-                  ? { addRow: () => setTableRequest({ what: 'row', serial: Date.now() }), addColumn: () => setTableRequest({ what: 'column', serial: Date.now() }) }
-                  : undefined}
               onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
               onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
               onClose={() => setSettingsFor(null)}

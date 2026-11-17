@@ -125,13 +125,6 @@ export function addRow(data: SlideData): SlideData {
   return { ...data, rows }
 }
 
-/** Add a column (the slide's "Add a column"): an empty cell at the end of every row. */
-export function addColumn(data: SlideData): SlideData {
-  const rows = tableRows(data).map(row => [...row])
-  const columns = Math.max(1, ...rows.map(row => row.length))
-  return { ...data, rows: rows.map(row => [...row, ...Array.from({ length: columns + 1 - row.length }, () => '')]) }
-}
-
 /** Where Tab (or Shift+Tab) and Enter go from a cell: the next cell, or a new row past the last one. */
 export function nextCell(data: SlideData, path: string, key: 'tab' | 'shift-tab' | 'enter'): { path: string; data: SlideData } | null {
   const cell = cellPath(path)
