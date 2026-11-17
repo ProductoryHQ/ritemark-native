@@ -102,7 +102,7 @@ export function placeAfterMoves(moves: Array<{ from: string; to: string }>): (pa
 const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase();
 
 /** An inline picture: `![alt](target "title")`, the alt with one level of brackets, the title in "", '' or (). */
-const INLINE_PICTURE = /(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)(<[^>\n]*>|[^)\s]+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))/g;
+const INLINE_PICTURE = /(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)(<[^>\n]*>|(?:[^()\s]|\([^()\s]*\))+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))/g;
 /** An HTML picture's source: `<img … src="target">`. */
 const HTML_PICTURE = /(<img\b[^>]*?(?<![\w-])src\s*=\s*)(["'])([^"'>]*)\2/gi;
 /** A reference picture's use: `![alt][label]`, `![label][]` or `![label]`. */
@@ -143,7 +143,9 @@ function codeLines(lines: string[]): boolean[] {
       previousBlank = true;
       continue;
     }
-    if (/^(?: {4}|\t)/.test(line) && !inList && (previousBlank || indented)) {
+    // Indented code: four spaces (or a tab) at the top level, eight (or two tabs) inside a list item, after a blank.
+    const codeIndent = inList ? /^(?: {8}|\t\t| {4}\t|\t {4})/ : /^(?: {4}|\t)/;
+    if (codeIndent.test(line) && (previousBlank || indented)) {
       indented = true;
       previousBlank = false;
       code.push(true);

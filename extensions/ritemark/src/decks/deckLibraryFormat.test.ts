@@ -168,6 +168,10 @@ assert.equal(
   check('- a\n# H\n\n    ![](images/code.png)', '- a\n# H\n\n    ![](images/code.png)', 'a heading ends the list too');
   check('<img data-src="images/a.png" src="images/b.png">', '<img data-src="images/a.png" src="../images/b.png">', 'the real src, not data-src');
   check('![x][c]\n\n> [c]: images/c.png', '![x][c]\n\n> [c]: ../images/c.png', 'a definition in a quote');
+  // Codex on #771: indented code inside a list item, and balanced parentheses in a file's name.
+  check('- Item\n\n        ![](images/code.png)', '- Item\n\n        ![](images/code.png)', "a list item's indented code stays");
+  check('![](images/chart(1).png)', '![](../images/chart(1).png)', 'balanced parentheses in the name');
+  check('![](images/chart(1).png "t")', '![](../images/chart(1).png "t")', 'and with a title');
   // A deck: a reference picture in one part, its definition at the handout's end, in another part.
   const DECK = ['```slide', '# One', '```', '', '![chart][c]', '', '```slide', '# Two', '```', '', '[c]: images/c.png', ''].join('\n');
   assert.ok(rewriteDeckPictures(DECK, target => movedTarget(target, 'P/Koolitus', 'P/Koolitus/Arhiiv')).includes('[c]: ../images/c.png'), "the handout's labels are read over all of it");

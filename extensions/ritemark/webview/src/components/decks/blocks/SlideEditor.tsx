@@ -603,30 +603,40 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   }
 
   // 17 November: Replace picture… over each missing picture, in the frame (unscaled, so the button is its own size).
-  const [missingSpots, setMissingSpots] = useState<{ left: number; top: number; side: boolean; path: string }[]>([])
+  const [missingSpots, setMissingSpots] = useState<{ left: number; top: number; side: boolean; path: string; nth: number }[]>([])
   placeMissingRef.current = () => {
     const frameElement = frameRef.current
     if (!frameElement) return
     const origin = frameElement.getBoundingClientRect()
+    // The same missing picture may stand twice on a slide: each button knows which one it is (Codex on #771).
+    const seen = new Map<string, number>()
     const spots = Array.from(frameElement.querySelectorAll<HTMLElement>('.blk-flow > .blk-pic.is-missing, .photo.is-missing')).map(place => {
       const box = place.getBoundingClientRect()
       const words = place.querySelector('.blk-missing')?.getBoundingClientRect()
+      const side = place.classList.contains('photo')
+      const path = place.getAttribute('data-picture') ?? ''
+      const nth = side ? 0 : seen.get(path) ?? 0
+      if (!side) seen.set(path, nth + 1)
       return {
         left: Math.round(box.left + box.width / 2 - origin.left),
         top: Math.round((words ? words.bottom : box.top + box.height / 2) - origin.top + 4),
-        side: place.classList.contains('photo'),
-        path: place.getAttribute('data-picture') ?? '',
+        side,
+        path,
+        nth,
       }
     })
     setMissingSpots(current => (JSON.stringify(current) === JSON.stringify(spots) ? current : spots))
   }
   /** Replace picture… on a missing picture: the file picker; the picture saved beside the deck takes its place. */
-  const replacePicture = (spot: { side: boolean; path: string }) => {
+  const replacePicture = (spot: { side: boolean; path: string; nth: number }) => {
     if (!editor || editor.isDestroyed) return
     if (spot.side) { choosePicture(false); return }
+    // The picture the button stands over: the nth with its path, in the slide's order (as the places are drawn).
     let found: number | null = null
+    let count = 0
     editor.state.doc.descendants((node, pos) => {
-      if (found === null && node.type.name === 'image' && imagePathOf(node.attrs) === spot.path) found = pos
+      if (found !== null || node.type.name !== 'image' || imagePathOf(node.attrs) !== spot.path) return
+      if (count++ === spot.nth) found = pos
     })
     if (found === null) return
     // Waits for the picker: only a picture chosen there replaces it, never the / menu's next one.
@@ -849,7 +859,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             <EditorContent editor={editor} />
           </div>
           {missingSpots.map(spot => (
-            <Tooltip key={`${spot.side}:${spot.path}`} label={`Choose a picture for ${spot.path}`}>
+            <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>
               <Button
                 variant="outline"
                 size="sm"

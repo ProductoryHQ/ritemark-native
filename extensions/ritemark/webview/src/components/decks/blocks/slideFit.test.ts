@@ -113,6 +113,9 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(!pictureItem.includes('replaceAt'), "the / menu's Picture leaves a replace in flight alone")
   const replaceFn = stage.slice(stage.indexOf('const replacePicture ='), stage.indexOf('const replacePicture =') + 900)
   assert.ok(replaceFn.includes('pendingReplace.current = found') && !replaceFn.includes('replaceAt.current ='), 'Replace picture… only waits')
+  // Codex on #771: the same missing picture twice: each button replaces the one it stands over.
+  assert.ok(replaceFn.includes('if (count++ === spot.nth) found = pos'), 'the nth picture with that path')
+  assert.ok(stage.includes('const nth = side ? 0 : seen.get(path) ?? 0'), 'each place counted in the slide\'s order')
   const picker = stage.slice(stage.indexOf('const choosePicture ='), stage.indexOf('// 17 November: Replace picture… over each missing picture'))
   assert.ok(/if \(replacing\) \{\s*replaceAt\.current = pendingReplace\.current/.test(picker), 'a chosen file makes it the one replaced')
   assert.ok(/addEventListener\('cancel', \(\) => \{\s*if \(replacing\) pendingReplace\.current = null\s*else if \(slashAt !== null && pictureAt\.current === slashAt\) pictureAt\.current = null/.test(picker), 'a cancel forgets only its own')
