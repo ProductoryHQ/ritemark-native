@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
@@ -37,10 +37,11 @@ import { convertKind, hiddenNote } from './slide/convertKind'
 import { addColumn, addRow, setPath } from './slide/slideEdits'
 import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
-import { SlideStrip, type StripActions, type StripMark } from './SlideStrip'
+import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
+import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
 import type { Transaction } from '@tiptap/pm/state'
-import { isHistoryTransaction } from '@tiptap/pm/history'
+import { isHistoryTransaction, undoDepth } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
@@ -52,7 +53,8 @@ import { blockHasTable, blockStepsTagOf } from '../../../../src/decks/blocks/sli
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
-import { DeckSlideWithPartHead } from './handout/SlidePartHead'
+import { DeckSlideWithPartHead, partMenuSlots, type PartMenuSlot } from './handout/SlidePartHead'
+import { DECK_REMOVED, DeckRemove, joinMarkOf, removalNotice, type DeckRemoval } from './handout/deckRemove'
 import { DeckLines } from './handout/deckLines'
 import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
@@ -65,7 +67,7 @@ import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type Ke
 import './decks.css'
 
 /** The deck's extensions, made once: the editor's extension list is fixed at mount. */
-const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines, DeckDrawnHeadings, DeckConvert]
+const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLines, DeckDrawnHeadings, DeckConvert, DeckRemove]
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
@@ -101,6 +103,33 @@ const START_CARD_GAP = 8
 interface Notice {
   text: string
   action?: { label: string; tip: string; run: () => void }
+  /** While this holds, the notice stands; once it doesn't (its Undo would take back something else), it goes. */
+  valid?: () => boolean
+  /** A join's line: the full slide's line stays beside it (the joined slide may be full). */
+  withFull?: boolean
+}
+
+const NO_SLOTS: PartMenuSlot[] = []
+
+/**
+ * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
+ * items and actions, for the slide whose part head holds the slot. Drawn into the head's slot (a portal); nothing when
+ * the slot's slide isn't one of the deck's slides as this view last read them.
+ */
+function PartMenu({ slot, slides, actions, marks }: { slot: PartMenuSlot; slides: DeckSlideEntry[]; actions: StripActions; marks: Record<string, StripMark> }) {
+  const pos = slot.getPos()
+  const entry = pos === undefined ? undefined : slides.find(slide => slide.pos === pos)
+  if (!entry) return null
+  const fromLibrary = !!(entry.data.id && libraryBadge(marks[entry.data.id]))
+  return createPortal(
+    <DropdownMenu modal={false}>
+      <MoreActionsTrigger label={`Slide ${entry.index + 1}: more actions`} className="deck-part-more-button" />
+      <DropdownMenuContent align="end" side="bottom">
+        <SlideMenuItems index={entry.index} count={slides.length} skipped={entry.data.skip === true} fromLibrary={fromLibrary} actions={actions} />
+      </DropdownMenuContent>
+    </DropdownMenu>,
+    slot.element,
+  )
 }
 
 /** A part to put in the deck: its slide block's kind and body, its handout, and its notes when it keeps some. */
@@ -678,6 +707,46 @@ export function DeckView({
     return () => { editor.off('transaction', onTransaction) }
   }, [editor, showConvertedComment])
 
+  // Removing a slide from the handout (experience 46): Backspace in an empty part says "Slide 14 is deleted.", the
+  // join's second press "Slide 14 is joined to slide 13.", each with Undo, which is the deck's own Undo of that one step
+  // (the removal is an undo step of its own: handout/deckRemove.ts). Once anything else is done or undone, the notice
+  // goes: its Undo would take back something else. The first press of a join lights up the lower slide's thumbnail.
+  const [joinAt, setJoinAt] = useState<number | null>(null)
+  const noticeRef = useRef<Notice | null>(null)
+  noticeRef.current = notice
+  useEffect(() => {
+    if (!editor) return
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      const mark = joinMarkOf(editor.state)
+      setJoinAt(mark ? mark.index : null)
+      const removal = transaction.getMeta(DECK_REMOVED) as DeckRemoval | undefined
+      if (removal) {
+        const depth = undoDepth(editor.state)
+        const valid = () => !editor.isDestroyed && undoDepth(editor.state) === depth
+        setNotice({
+          text: removalNotice(removal),
+          valid,
+          withFull: removal.what === 'joined',
+          action: {
+            label: 'Undo',
+            tip: removal.what === 'joined' ? `Bring slide ${removal.number} back as it was` : 'Put the slide back',
+            run: () => { if (valid()) editor.commands.undo() },
+          },
+        })
+        return
+      }
+      const shown = noticeRef.current
+      if (transaction.docChanged && shown?.valid && !shown.valid()) setNotice(null)
+    }
+    editor.on('transaction', onTransaction)
+    return () => { editor.off('transaction', onTransaction) }
+  }, [editor])
+  // The part numbers' ⋯ (one menu in each part head's slot, the strip's own items and actions).
+  const partSlots = useSyncExternalStore(
+    useCallback((listener: () => void) => (editor ? partMenuSlots.subscribe(editor, listener) : () => {}), [editor]),
+    useCallback(() => (editor ? partMenuSlots.get(editor) : NO_SLOTS), [editor]),
+  )
+
   // Present (Sprint 159): from the current slide or from the start, on the wall; Stop brings the deck back to the slide
   // the presenter ended on.
   const present = useCallback((from: PresentFrom) => {
@@ -840,7 +909,7 @@ export function DeckView({
       const content = partContent(editor.state.doc, index)
       if (!content || !dispatch(deleteSlide(editor.state, index))) return
       setNotice({
-        text: `Slide ${index + 1} is deleted`,
+        text: `Slide ${index + 1} is deleted.`,
         action: {
           label: 'Undo',
           tip: 'Put the slide back',
@@ -1256,6 +1325,20 @@ export function DeckView({
   const needCaret = useCallback(() => setNotice({ text: 'Click on the slide where it should split, then Split at the cursor.' }), [])
   /** A block slide with a table: Settings' Add a row and Add a column act on it through the slide editor. */
   const blockTable = slideShown && !!slide && isBlockSlide(slide.kind) && blockHasTable(slide.data.markdown ?? '')
+  // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is current).
+  // Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
+  const fullLine = (
+    <>
+      <Tooltip label={SLIDE_FULL}>
+        <span className="deck-notice-text">{SLIDE_FULL}</span>
+      </Tooltip>
+      <Tooltip label="Move the words after the cursor to a new slide below this one">
+        <Button variant="link" className="deck-line-action" onClick={() => setSplitRequest(value => value + 1)}>
+          Split at the cursor
+        </Button>
+      </Tooltip>
+    </>
+  )
 
   return (
     <div className="deck-view h-screen bg-surface flex flex-col">
@@ -1360,21 +1443,12 @@ export function DeckView({
                   </Button>
                 </Tooltip>
               ) : null}
+              {/* A join (README, "Removing a slide from the handout"): the slide fits itself, and if it's now full, the
+                  bar says so too, with Split at the cursor. */}
+              {notice.withFull && slideFull && slideShown ? <span className="deck-notice-gap" aria-hidden="true" /> : null}
+              {notice.withFull && slideFull && slideShown ? fullLine : null}
             </>
-          ) : slideFull && slideShown ? (
-            // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is
-            // current). Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
-            <>
-              <Tooltip label={SLIDE_FULL}>
-                <span className="deck-notice-text">{SLIDE_FULL}</span>
-              </Tooltip>
-              <Tooltip label="Move the words after the cursor to a new slide below this one">
-                <Button variant="link" className="deck-line-action" onClick={() => setSplitRequest(value => value + 1)}>
-                  Split at the cursor
-                </Button>
-              </Tooltip>
-            </>
-          ) : null}
+          ) : slideFull && slideShown ? fullLine : null}
         </span>
         <span className="flex-1" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
@@ -1401,8 +1475,10 @@ export function DeckView({
             stripRef={stripRef}
             marks={marks}
             commentCounts={!!commentCallouts}
+            joinAt={joinAt}
           />
         ) : null}
+        {editor ? partSlots.map(slot => <PartMenu key={slot.id} slot={slot} slides={slides} actions={stripActions} marks={marks} />) : null}
 
         {slideShown ? (
           <div

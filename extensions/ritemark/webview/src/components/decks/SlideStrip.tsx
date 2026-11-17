@@ -12,7 +12,7 @@
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
@@ -24,6 +24,7 @@ import { isMac } from '../../hooks/usePlatform'
 import type { DeckSlideEntry } from './deckDocument'
 import { SlideCanvas } from './slide/SlideCanvas'
 import { keyOrigin, stripKeyOf } from './stripKeys'
+import { slideMenuItems, type SlideMenuActions } from './slideMenuItems'
 
 const THUMB_WIDTH = 96
 /** The key beside the menu's Delete slide, so people can find it. */
@@ -96,6 +97,27 @@ function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
   )
 }
 
+/**
+ * A slide's menu items, the same wherever the menu opens: the thumbnail's ⋯ (or a right-click) and the handout part
+ * number's ⋯ (experience 46, "Removing a slide from the handout"). `slideMenuItems` is the list; each acts on that slide.
+ */
+export function SlideMenuItems({ index, count, skipped, fromLibrary, actions }: { index: number; count: number; skipped: boolean; fromLibrary: boolean; actions: SlideMenuActions }) {
+  return (
+    <>
+      {slideMenuItems({ index, count, skipped, fromLibrary, deleteKey: DELETE_KEY }).map(item => (
+        <Fragment key={item.key}>
+          {item.separated ? <DropdownMenuSeparator /> : null}
+          <DropdownMenuItem tone={item.danger ? 'danger' : undefined} disabled={item.disabled} onSelect={() => item.run(actions)}>
+            <Icon name={item.icon} size={14} tone="inherit" />
+            {item.keyHint ? <span className="flex-1">{item.label}</span> : item.label}
+            {item.keyHint ? <span className="deck-menu-key">{item.keyHint}</span> : null}
+          </DropdownMenuItem>
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
 /** The + between two thumbnails, at gap `at` (before part `at`). */
 function Gap({ at, count, actions, dropHere }: { at: number; count: number; actions: StripActions; dropHere: boolean }) {
   const where = at === 0 ? 'Add before slide 1' : `Add after slide ${at}`
@@ -140,10 +162,12 @@ interface ThumbnailProps {
   badgeAmber: boolean
   /** Sprint 161: how many comments are on the slide (its amber dot); 0 for none. */
   comments: number
+  /** The handout's first Backspace marks this slide to be joined into the one above: it lights up. */
+  joining: boolean
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -153,7 +177,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       aria-selected={current}
       aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}`}
       data-thumb={index}
-      className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}`}
+      className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}${joining ? ' is-join' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
       onDragStart={event => event.preventDefault()}
       onClick={() => actions.pick(index)}
@@ -183,31 +207,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         <DropdownMenu modal={false} open={menuOpen} onOpenChange={open => onMenuOpen(open ? entry.index : null)}>
           <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} className="deck-thumb-more-button" />
           <DropdownMenuContent align="start" side="right" onCloseAutoFocus={onMenuCloseFocus}>
-            <DropdownMenuItem onSelect={() => actions.duplicate(index)}>
-              <Icon name="copy" size={14} tone="inherit" />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => actions.toggleSkip(index)}>
-              <Icon name={skipped ? 'eye' : 'eye-slash'} size={14} tone="inherit" />
-              {skipped ? 'Show slide' : 'Skip slide'}
-            </DropdownMenuItem>
-            {fromLibrary ? (
-              <DropdownMenuItem onSelect={() => actions.showInLibrary(index)}>
-                <Icon name="cards-three" size={14} tone="inherit" />
-                Show in the library
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onSelect={() => actions.addToLibrary(index)}>
-                <Icon name="cards-three" size={14} tone="inherit" />
-                Add to library…
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem tone="danger" disabled={count < 2} onSelect={() => actions.remove(index)}>
-              <Icon name="trash" size={14} tone="inherit" />
-              <span className="flex-1">Delete slide</span>
-              <span className="deck-menu-key">{DELETE_KEY}</span>
-            </DropdownMenuItem>
+            <SlideMenuItems index={index} count={count} skipped={skipped} fromLibrary={fromLibrary} actions={actions} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -246,9 +246,11 @@ interface SlideStripProps {
   marks: Record<string, StripMark>
   /** Sprint 161: count each slide's comments in its dot (the comment flag on). */
   commentCounts?: boolean
+  /** The slide the handout's first Backspace marked to join into the one above (null: none). */
+  joinAt?: number | null
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks, commentCounts }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, actions, stripRef, marks, commentCounts, joinAt = null }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -406,6 +408,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
             badgeLabel={(entry.data.id && libraryBadge(marks[entry.data.id])?.label) || null}
             badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
             comments={commentCounts ? stripCommentCount(entry) : 0}
+            joining={joinAt === entry.index}
           />
         </div>
       ))}

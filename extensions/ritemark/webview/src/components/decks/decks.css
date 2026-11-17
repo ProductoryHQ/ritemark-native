@@ -120,6 +120,19 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-part-head:has(+ h2) .deck-part-number { top: 34px; }
 .deck-part-head:has(+ h1) .deck-part-number { top: 41px; }
 .deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
+/* The part number's ⋯ (experience 46, "Removing a slide from the handout"): the strip's slide menu, shown on hover in the
+   handout's right margin beside the number, never over the text; it stays while its menu is open or it has the focus. */
+.deck-part-more { position: absolute; right: 6px; top: 25px; display: flex; visibility: hidden; }
+.deck-part-head:has(+ h2) .deck-part-more { top: 30px; }
+.deck-part-head:has(+ h1) .deck-part-more { top: 37px; }
+.deck-part-head:hover .deck-part-more, .deck-part-more:focus-within, .deck-part-more:has([data-state="open"]) { visibility: visible; }
+.deck-part-more .deck-part-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
+.deck-part-more .deck-part-more-button svg { width: 13px; height: 13px; }
+/* A join's first press: the line between the parts in the accent, and the note at the line (deckRemove.ts). */
+.deck-part-head.is-join { border-top: 2px solid var(--r-accent); }
+.deck-part-head.is-join::before { content: attr(data-join-note); position: absolute; left: var(--deck-text-left, 48px); top: 3px; font: 500 12px/16px var(--ritemark-ui-font-family); color: var(--r-accent); white-space: nowrap; pointer-events: none; }
+.deck-thumb.is-join { background: var(--r-accent-soft); border-radius: 6px; }
+.deck-thumb.is-join .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 /* The part's own heading, as the editor writes it, starts the part: no space of its own above it, room for the number */
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2, h3, p) { margin-top: 0 !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head + :is(h1, h2) { margin-right: 40px !important; }
@@ -171,6 +184,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present) { flex-shrink: 0; }
 .deck-bar > .deck-present { flex-shrink: 100; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A join's line and the full slide's line side by side: a hairline between them. */
+.deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
 
 /* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear (Phosphor `gear`) in the deck's bar after the
    count, its popup under it (a Popover, DeckView). Muted; ink on a quiet fill on hover; the bar's `on` while open. */

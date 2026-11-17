@@ -2,7 +2,8 @@
  * Sprint 157 (technical plan §5): the handout can't break the deck file.
  *
  *  - Typing, Backspace, Delete and a selection's delete can't remove a slide node, nor move one inside another block
- *    (where it would stop starting a part). Slides are deleted from the strip's menu. Host updates (they carry
+ *    (where it would stop starting a part). Slides are deleted from the strip's menu, the part number's ⋯ and the
+ *    handout's own Backspace in an empty part or its two-press join (`deckRemove.ts`, the deck view's own transactions). Host updates (they carry
  *    `ritemarkDocumentRevision`), undo and redo, and the deck view's own operations (`DECK_OPERATION`) are let through.
  *  - A slide pasted next to its original gets a new id, so ids stay unique within the deck.
  *  - `slide` and `notes` are refused as a code block's language in the handout: a typed ```` ```slide ```` would
