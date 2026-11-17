@@ -16,6 +16,8 @@
  *  - All slides: a grid of the slides shown; a click (or Return) goes there.
  *  - One 0.3 s fade between slides, the one before fading out as the next fades in (the ground under both stays), none
  *    with reduced motion.
+ *  - B or "." blanks the wall to the theme's ground (white on Borderless), W to white, with the same fade. Any key or a
+ *    click brings the slide back, and does nothing else (`blankKeyOf`); the presenter view says the wall is blank.
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
@@ -29,7 +31,7 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
-import { countLabel, goToKey, wallBleed, wallKeyOf, wallSlideSize } from './wallKeys'
+import { blankKeyOf, blankNow, countLabel, goToKey, settleAsked, wallBleed, wallKeyOf, wallSlideSize, type WallBlank } from './wallKeys'
 import '../decks.css'
 import './wall.css'
 
@@ -73,6 +75,12 @@ export function DeckWall() {
   const stateRef = useRef<WallState | null>(null)
   stateRef.current = state
   const barTimer = useRef<number | null>(null)
+  // The key that blanked the wall or brought the slide back: held down, its repeats do nothing (never a step).
+  const heldKey = useRef<string | null>(null)
+  // The blank this window last asked for, until the host's state carries it (`blankNow`).
+  const askedBlank = useRef<{ to: WallBlank | null } | null>(null)
+  // The colour the wall last blanked to, kept while the blank fades out.
+  const lastBlank = useRef<WallBlank>('ground')
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
   const bleed = wallBleed(frame, CANVAS_WIDTH)
@@ -88,6 +96,7 @@ export function DeckWall() {
   useEffect(() => onMessage(message => {
     if (message.type === 'present/wall') {
       const next = message as unknown as WallState
+      askedBlank.current = settleAsked(askedBlank.current, next.blank)
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
@@ -116,6 +125,10 @@ export function DeckWall() {
   }, [leaving])
 
   const send = useCallback((type: Move) => sendToExtension(type), [])
+  const askBlank = useCallback((to: WallBlank | null) => {
+    askedBlank.current = { to }
+    sendToExtension('present/blank', { to })
+  }, [])
   const goTo = useCallback((number: number) => sendToExtension('present/go', { number }), [])
 
   // ---- the bar: shown when the pointer moves, faded 2 s after it stops (not while the pointer is on it)
@@ -151,6 +164,17 @@ export function DeckWall() {
       const current = stateRef.current
       if (!current) return
       const take = () => { event.preventDefault(); event.stopPropagation() }
+      // A blank wall: any key brings the slide back and does nothing else; B, "." or W blanks it. The grid, open over a
+      // blank wall, keeps its own keys (Esc closes it, Return goes to the slide, which brings the slide back).
+      if (event.repeat && heldKey.current === event.key) { take(); return }
+      const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current))
+      if (blankStep) {
+        take()
+        heldKey.current = event.key
+        if (digits !== null) { setDigits(null); setPeeked(null) }
+        askBlank(blankStep.type === 'show' ? null : blankStep.to)
+        return
+      }
       if (gridOpen) {
         const columns = gridColumns(current.slides.length, screen.width)
         const move = (by: number) => { take(); setGridPick(at => Math.max(0, Math.min(current.slides.length - 1, at + by))) }
@@ -187,21 +211,31 @@ export function DeckWall() {
       if (key.type === 'stop') send('present/stop')
       else send(`present/${key.type}`)
     }
+    const onKeyUp = (event: KeyboardEvent) => { if (heldKey.current === event.key) heldKey.current = null }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [digits, gridOpen, gridPick, goTo, send, screen.width])
+    window.addEventListener('keyup', onKeyUp, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+    }
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, screen.width])
 
-  // A click on the slide goes on (not on the bar, the box or the grid).
+  // A click on the slide goes on (not on the bar, the box or the grid); on a blank wall it only brings the slide back.
   const onWallClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('.wall-bar, .wall-goto, .wall-grid')) return
-    if (event.button === 0) send('present/next')
-  }, [send])
+    if (event.button !== 0) return
+    if (stateRef.current && blankNow(stateRef.current.blank, askedBlank.current)) askBlank(null)
+    else send('present/next')
+  }, [send, askBlank])
 
   if (!state) return <div className="deck-wall" />
 
   const gotoNumber = digits === null ? null : Number(digits)
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
+  const blank = state.blank
+  if (blank) lastBlank.current = blank
+  const blankColour = (blank ?? lastBlank.current) === 'white' ? '#FFFFFF' : ground
 
   const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
     <div
@@ -226,11 +260,14 @@ export function DeckWall() {
         className="wall-frame"
         style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height, '--wall-bleed-x': `${bleed.x}px`, '--wall-bleed-y': `${bleed.y}px` } as CSSProperties}
         aria-live="polite"
-        aria-label={`Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
+        aria-label={blank ? 'The wall is blank' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
       </div>
+
+      {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen. */}
+      <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden="true" />
 
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">

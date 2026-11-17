@@ -201,6 +201,19 @@ export function browserSnapshot(target?: BrowserActionTarget): Promise<BrowserAc
  */
 export class BrowserTurnPage {
   private turnPageId: string | undefined;
+
+  /**
+   * Sprint 162 PR 5: the conversation this holder is for (`browserTurnPageFor`). Every runtime passes the holder to
+   * Ritemark's tools, so a tool knows the chat it was called from (the theme tools record their changes under it).
+   */
+  constructor(readonly conversationId?: string) {}
+
+  /**
+   * Sprint 162 PR 5: this turn's approval for a file write by one of Ritemark's tools (`set_deck_theme`), set at each
+   * turn's start: in Ask mode the unified approval gate's card, as the runtime's own file writes get; in Auto mode none,
+   * and the write goes ahead.
+   */
+  fileWriteApproval: ((request: { filePath: string; diff?: string }) => Promise<boolean>) | undefined;
   private knownPageIds: string[] | undefined;
 
   /**
@@ -288,7 +301,7 @@ const turnPages = new Map<string, BrowserTurnPage>();
 export function browserTurnPageFor(conversationId: string): BrowserTurnPage {
   let page = turnPages.get(conversationId);
   if (!page) {
-    page = new BrowserTurnPage();
+    page = new BrowserTurnPage(conversationId);
     turnPages.set(conversationId, page);
   }
   return page;

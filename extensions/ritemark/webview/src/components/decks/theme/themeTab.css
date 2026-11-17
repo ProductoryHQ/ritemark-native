@@ -140,3 +140,8 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 .theme-start-pic { display: block; flex: none; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline-strong); }
 .theme-start[aria-pressed="true"] .theme-start-pic { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 .theme-start-note { font-size: 12px; font-weight: 400; color: var(--r-ink-muted); line-height: 16px; }
+
+/* Sprint 162 PR 5: the colour check on the contrast line, a quiet link in the line's own ink; its sheet over the preview */
+.theme-body { position: relative; }
+.theme-contrast .theme-contrast-check { height: auto; padding: 0; font-size: inherit; line-height: inherit; font-weight: 600; color: inherit; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; vertical-align: baseline; }
+.theme-contrast .theme-contrast-check:hover { text-decoration-thickness: 2px; }

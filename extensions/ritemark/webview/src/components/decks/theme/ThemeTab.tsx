@@ -35,6 +35,8 @@ import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
+import { ThemeChangeSheet, themeChangeFrom } from './ThemeChangeSheet'
+import { changeSlideIndexes, colourPairs, type ThemeChangeView } from '../../../../../src/decks/themeChange'
 import '../decks.css'
 import './themeTab.css'
 
@@ -124,15 +126,32 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const [notice, setNotice] = useState<{ text: string; token?: string } | null>(null)
   const [look, setLook] = useState<'card' | 'borderless' | null>(null)
   const [saveAs, setSaveAs] = useState(false)
+  const [themeChange, setThemeChange] = useState<ThemeChangeView | null>(null)
+  // Sprint 162 PR 5: what Check all colours or Fix the colours found, on the contrast line until the next change
+  const [checkResult, setCheckResult] = useState<string | null>(null)
 
   useEffect(() => onMessage(message => {
     if (message.type === 'theme/state' && typeof message.text === 'string' && typeof message.path === 'string') {
-      setState({ path: message.path, text: message.text, dirty: message.dirty === true })
+      // A new text (a fix, its Undo, Discard, an AI's draft change) says its own contrast; a fix's words come after it
+      const text = message.text
+      setState(current => {
+        if (current && current.text !== text) setCheckResult(null)
+        return { path: message.path as string, text, dirty: message.dirty === true }
+      })
     } else if (message.type === 'theme/decks') {
       const next = themeDecksFrom(message)
       if (next) setDecks(next)
     } else if (message.type === 'theme/notice' && typeof message.text === 'string') {
       setNotice({ text: message.text, token: typeof message.token === 'string' ? message.token : undefined })
+    } else if (message.type === 'theme/change') {
+      // Sprint 162 PR 5: See what changed for the AI's colour check, over the preview
+      const change = themeChangeFrom(message.change)
+      if (change) setThemeChange(change)
+    } else if (message.type === 'theme/check-result' && typeof message.text === 'string') {
+      setCheckResult(message.text || null)
+    } else if (message.type === 'theme/change-undone' && typeof message.id === 'string') {
+      const id = message.id
+      setThemeChange(current => (current && current.id === id ? { ...current, undone: true } : current))
     }
   }), [])
   useEffect(() => { sendToExtension('theme/ready') }, [])
@@ -162,7 +181,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   }, [notice])
 
   const theme = useMemo(() => (state ? parseTheme(state.text) : null), [state])
-  const set = useCallback((changes: ThemeChanges) => sendToExtension('theme/set', { changes }), [])
+  const set = useCallback((changes: ThemeChanges) => { setCheckResult(null); sendToExtension('theme/set', { changes }) }, [])
   const save = useCallback(() => sendToExtension('theme/save'), [])
   const discard = useCallback(() => sendToExtension('theme/discard'), [])
 
@@ -171,6 +190,8 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const count = decks?.decks.length ?? 0
   const borderless = (look ?? (decks?.preview.borderless ? 'borderless' : 'card')) === 'borderless'
   const contrast = contrastLine(theme)
+  // Fix the colours whenever a pair a colour of the four can fix fails (the accent and Borderless too, not only the line)
+  const fixable = colourPairs(theme).some(pair => !pair.ok && pair.field !== null)
 
   return (
     <div className="theme-tab">
@@ -259,7 +280,19 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
           </label>
           <div className={`theme-contrast${contrast.ok ? '' : ' is-low'}`} role="status">
             <Icon name={contrast.ok ? 'check-circle' : 'warning'} size={14} tone="inherit" />
-            <span>{contrast.words}</span>
+            <span>
+              {checkResult ?? contrast.words}{' '}
+              {/* Sprint 162 PR 5 (the Experience lead, 17 November): the colour check sits on this line, where a problem
+                  shows, and is Ritemark's own. At rest a quiet "Check all colours" measures the five pairs; when the line
+                  is amber, "Fix the colours" moves each failing colour's lightness just far enough, into the draft. */}
+              <Tooltip label={!fixable
+                ? 'Measure all five colour pairs, on the card and borderless, against 4.5 to 1 for text and 3 to 1 for accents'
+                : 'Move each colour that fails just far enough to read, keeping its hue. It goes into the draft: the decks change when you save'}>
+                <Button variant="link" className="theme-contrast-check" onClick={() => sendToExtension('theme/check-colours', { fix: fixable })}>
+                  {fixable ? 'Fix the colours' : 'Check all colours'}
+                </Button>
+              </Tooltip>
+            </span>
           </div>
 
           <div className="deck-settings-k">Fonts</div>
@@ -288,6 +321,14 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
         </section>
 
         <Preview theme={theme} preview={decks?.preview ?? null} borderless={borderless} onLook={value => setLook(value === 'borderless' ? 'borderless' : 'card')} />
+        {themeChange ? (
+          <ThemeChangeSheet
+            change={withPreviewSlides(themeChange, decks?.preview ?? null)}
+            style={{ left: 340 }}
+            onUndo={() => sendToExtension('theme/change-undo', { id: themeChange.id })}
+            onClose={() => setThemeChange(null)}
+          />
+        ) : null}
       </div>
 
       {saveAs && decks ? (
@@ -458,6 +499,15 @@ function useWidth<T extends HTMLElement>(): [RefObject<T>, number] {
     return () => observer.disconnect()
   }, [])
   return [ref, width]
+}
+
+/**
+ * Sprint 162 PR 5: See what changed for the colour check shows the slides this tab previews on (the host sends none for
+ * a draft): the first, and the first with Boxes, Steps or Columns, as for a deck.
+ */
+function withPreviewSlides(change: ThemeChangeView, preview: ThemePreview | null): ThemeChangeView {
+  if (change.slides.length || !preview) return change
+  return { ...change, slides: changeSlideIndexes(preview.slides).map(index => preview.slides[index]), borderless: preview.borderless, assets: preview.assets }
 }
 
 /** The preview gap between slides: Card's and Borderless's (prototype). */

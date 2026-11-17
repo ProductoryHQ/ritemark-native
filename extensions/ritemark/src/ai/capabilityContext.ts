@@ -21,9 +21,25 @@
  */
 
 import type { AgentId } from '../agent/types';
+import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
+import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
+
+/**
+ * Sprint 162 PR 5: the DECKS lines on themes. The folder, the fonts and the ratios come from the theme reader's own
+ * constants, so the words never name a font or a rule the engine doesn't have. Kept short: it goes with every deck turn.
+ */
+function themeLines(): string[] {
+  const fonts = DECK_FONT_LIST.map((font) => font.name).join(', ');
+  return [
+    `- A deck's look is its theme: a \`<Name>.theme.md\` file in \`${THEMES_FOLDER}/\`, which the deck names in its \`theme:\` line. Its fields: \`name\`; \`background\`, \`headings\`, \`text\`, \`accent\` (each "#RRGGBB"); \`soft-light\` (true or false); \`heading-font\` and \`text-font\`; \`corners\` (square, soft or round); \`boxes\` (filled or outline). The fonts are the six Ritemark ships, by exact name: ${fonts}.`,
+    `- Make or change a theme, and point decks at it, only with set_deck_theme: never write a theme file or a \`theme:\` line yourself. For a look, change the theme file, never individual slides. Text and headings need ${TEXT_RATIO} : 1 against the background, the accent ${ACCENT_RATIO} : 1 (check_theme_colours measures them; set_theme_draft_colours moves colours in an open theme tab's draft, unsaved).`,
+    '- For a brand\'s look, read its brand guide (PDF or Word), logo (SVG or PNG) or `.pptx` in the folder (read_pptx_theme gives a PowerPoint theme\'s colours and fonts). A brand font that isn\'t one of the six gets the closest of them, and you say so in one line: "Fernhollow\'s guide uses Futura; the closest here is Space Grotesk."',
+    '- When the folder holds more than one deck, ask "this deck or all of them?" before you write, unless the user already said.',
+  ];
+}
 
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
-export const CAPABILITY_CONTEXT_VERSION = 4;
+export const CAPABILITY_CONTEXT_VERSION = 5;
 
 /**
  * Per-runtime binding details. NOT capability content — just how a runtime names
@@ -176,6 +192,8 @@ const SECTIONS: CapabilitySection[] = [
             '- A new slide is always a new slide block. In the deck view a line the person types in the handout (`***`) becomes one, with the heading after it as its title; in the file a line is only a line, so never put `***` or `---` between slides.',
             // 17 November (Jarmo: "how else do I say 'make the corrections on this slide'"): the slide the person is on
             '- A message sent while a deck is open in its deck view says which slide the person is on, in a `[Current slide: …]` line with its number, title and id. "This slide", "here" or "siin" means that slide: read it with read_deck and change it in the file, finding its block by its `id:` (by its number when it has none). Change other slides only when the person asks for them.',
+            // Sprint 162 PR 5 (step-3-themes.md, "The AI and themes"): themes, from the parser's own fields and fonts
+            ...themeLines(),
             // Sprint 159 PR 4: the handout page is made from the deck at Publish
             '- The web page beside a deck (`<deck name>.html`) is made from the deck when it is published: to change the page, change the deck, never the page.',
           ].join('\n')

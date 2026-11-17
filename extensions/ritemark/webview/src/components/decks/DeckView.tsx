@@ -37,6 +37,8 @@ import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
 import { ThemeMenu, themePickedNotice } from './ThemeMenu'
+import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
+import type { ThemeChangeView } from '../../../../src/decks/themeChange'
 import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
@@ -1628,6 +1630,18 @@ export function DeckView({
     if (propertiesRef.current.theme === message.path) return
     pickTheme(message.path, message.name)
   }), [pickTheme])
+  // Sprint 162 PR 5 (17 November, frame 13): See what changed for an AI's theme change, a sheet over the stage; the strip
+  // and the chat stay in view. Undo goes to the host, which puts the decks back and says so in the chat.
+  const [themeChange, setThemeChange] = useState<ThemeChangeView | null>(null)
+  useEffect(() => onMessage(message => {
+    if (message.type === 'deck/theme-change') {
+      const change = themeChangeFrom(message.change)
+      if (change) setThemeChange(change)
+    } else if (message.type === 'deck/theme-change-undone' && typeof message.id === 'string') {
+      const id = message.id
+      setThemeChange(current => (current && current.id === id ? { ...current, undone: true } : current))
+    }
+  }), [])
   // What New theme… shows of this deck: its name, and a slide with boxes when it has one (frame 14).
   const newTheme = useMemo(() => {
     const slide = slides.find(entry => entry.kind === 'boxes') ?? slides[1] ?? slides[0] ?? null
@@ -1757,6 +1771,14 @@ export function DeckView({
       </header>
 
       <div ref={deskRef} className="deck-desk">
+        {themeChange ? (
+          <ThemeChangeSheet
+            change={themeChange}
+            style={{ left: stripShown ? 'var(--deck-strip)' : 0 }}
+            onUndo={() => sendToExtension('deck/theme-change-undo', { id: themeChange.id })}
+            onClose={() => setThemeChange(null)}
+          />
+        ) : null}
         {stripShown ? (
           <SlideStrip
             slides={slides}

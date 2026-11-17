@@ -25,6 +25,8 @@ const POINTS: Record<StartingPlace, readonly string[]> = {
   long_text: ['Tighten this for a client', 'What is missing?', 'Add a summary at the top'],
   table: ['What stands out here?', 'Write a short summary of this table'],
   sample: ['Draft Module 4 from the brief', 'Summarise the call with the HR lead', 'What is here?'],
+  // Sprint 162 PR 5 (frame 11): a theme's tab
+  theme: ['Check that the colours are easy to read', 'What is here?'],
 }
 
 /** A label's fill: "Find what I wrote about…" → "Find what I wrote about " with the cursor at its end. */
