@@ -13,7 +13,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExt
 import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
-import type { DeckTheme } from '../../../../../src/decks/deckTheme'
+import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
@@ -353,13 +353,20 @@ const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, t
   const step = same ? fit.step : 0
   const layout = layoutSlide(kind, data, { editing: !!editing, step })
 
+  // Only a face of this slide's own fonts measures it again (the review of #777: a strip of 40 slides would all
+  // start again for every font any view loads).
+  const heading = deckFont(theme.fh).name
+  const body = deckFont(theme.fb).name
   useEffect(() => {
     const fontSet = document.fonts
     if (!fontSet) return
-    const remeasure = () => setLoaded(count => count + 1)
+    const remeasure = (event: Event) => {
+      const faces = (event as Event & { fontfaces?: ReadonlyArray<FontFace> }).fontfaces
+      if (!faces || faces.some(face => { const family = face.family.replace(/^["']|["']$/g, ''); return family === heading || family === body })) setLoaded(count => count + 1)
+    }
     fontSet.addEventListener?.('loadingdone', remeasure)
     return () => fontSet.removeEventListener?.('loadingdone', remeasure)
-  }, [])
+  }, [heading, body])
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current

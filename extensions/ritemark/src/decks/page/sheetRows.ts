@@ -64,11 +64,14 @@ function* walk(tokens: ReadonlyArray<{ type: string; tokens?: unknown; items?: u
   }
 }
 
-/** The deck's counts for the sheet. */
-export function deckCounts(text: string, theme: DeckTheme): DeckCounts {
+/**
+ * The deck's counts for the sheet. `fontFiles`: the theme's font files the page names (`themeFontFiles`), when known;
+ * else the theme's fonts beyond Sofia Sans, by name.
+ */
+export function deckCounts(text: string, theme: DeckTheme, fontFiles?: ReadonlyArray<{ family: string }>): DeckCounts {
   const parsed = parseDeck(text.replace(/^\uFEFF/, ''));
   const deck = publicDeck(text, { folderName: '', deckName: '', theme });
-  const fonts = themeFonts(theme).filter(font => font.name !== DEFAULT_DECK_FONT).length;
+  const fonts = fontFiles ? new Set(fontFiles.map(file => file.family)).size : themeFonts(theme).filter(font => font.name !== DEFAULT_DECK_FONT).length;
   return {
     slides: deck.slides.length,
     prompts: [deck.preamble, ...deck.slides.map(slide => slide.handout)].reduce((sum, markdown) => sum + promptsIn(markdown), 0),

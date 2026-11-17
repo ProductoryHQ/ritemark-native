@@ -22,7 +22,7 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import { blockPicturePaths } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFontFile, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
+import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFont, deckFontFile, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
 import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PageThemeFont, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 
@@ -52,11 +52,11 @@ export const nodePageFs: PageFs = {
 /** Sofia Sans as the app ships it (`media/fonts/`), with the webview's own unicode ranges (`webview/src/index.css`). */
 export const PAGE_FONTS = [
   {
-    file: 'SofiaSans-latin.woff2',
+    file: deckFontFile(deckFont(DEFAULT_DECK_FONT), 'latin'),
     unicodeRange: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD',
   },
   {
-    file: 'SofiaSans-latin-ext.woff2',
+    file: deckFontFile(deckFont(DEFAULT_DECK_FONT), 'latin-ext'),
     unicodeRange: 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF',
   },
 ] as const;
@@ -233,15 +233,20 @@ export async function buildDeckPage(
 ): Promise<BuiltPage> {
   const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
   const urls = await foundPictures(deck, input.deckPath, pageFs);
-  const digest = pageDigest(deck, urls.values());
+  // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
+  // by an app without them, reads as changed once they can go.
+  const digest = pageDigest(deck, [...urls.values(), ...(assets.themeFonts ?? []).map(font => font.address)]);
   const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null });
   return { deck, digest, html };
 }
 
-/** The deck's page digest now, without building the page: what the chip compares with the page's own (PR 4). */
-export async function currentPageDigest(deckPath: string, text: string, theme: DeckTheme, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<string> {
+/**
+ * The deck's page digest now, without building the page: what the chip compares with the page's own (PR 4), with the
+ * addresses of the theme's font files the page would name (`themeFontFiles`).
+ */
+export async function currentPageDigest(deckPath: string, text: string, theme: DeckTheme, pageFs: Pick<PageFs, 'stat'> = nodePageFs, fontAddresses: readonly string[] = []): Promise<string> {
   const deck = publicDeckOf(deckPath, text, theme);
-  return pageDigest(deck, (await foundPictures(deck, deckPath, pageFs)).values());
+  return pageDigest(deck, [...(await foundPictures(deck, deckPath, pageFs)).values(), ...fontAddresses]);
 }
 
 // ------------------------------------------------------------------ The theme's fonts, as files beside the page
@@ -332,7 +337,8 @@ export function foreignFontLine(shown: string): string {
 }
 
 export type FontWriteResult =
-  | { kind: 'written'; created: string[] }
+  /** `created`: the files this call put in; `madeFolder`: whether it made the `fonts` folder too. */
+  | { kind: 'written'; created: string[]; madeFolder: boolean }
   | { kind: 'refused'; line: string };
 
 const isMissing = (error: unknown) => (error as NodeJS.ErrnoException)?.code === 'ENOENT';
@@ -363,7 +369,7 @@ async function plainFolder(fontFs: FontFs, folder: string): Promise<boolean> {
  * plain folder, stops it: what this call wrote is taken back, and the result says why in one line.
  */
 export async function writePageFonts(fontFs: FontFs, deckPath: string, files: readonly PageFontFile[]): Promise<FontWriteResult> {
-  if (files.length === 0) return { kind: 'written', created: [] };
+  if (files.length === 0) return { kind: 'written', created: [], madeFolder: false };
   const folder = path.join(path.dirname(deckPath), PAGE_FONT_FOLDER);
   const created: string[] = [];
   let madeFolder = false;
@@ -400,12 +406,13 @@ export async function writePageFonts(fontFs: FontFs, deckPath: string, files: re
       try {
         await fontFs.link(temporary, target);
         created.push(target);
-      } catch (error) {
+      } catch {
         // Taken meanwhile: the same font from another window is fine, anything else stops the page. Where the system
-        // can't give a second name (FAT, exFAT, some network folders), a move after a last check stands in.
+        // can't give a second name (FAT, exFAT, some network folders), or the name was freed again meanwhile, a move
+        // after a last check stands in.
         const now = await fontAt(fontFs, target, file.bytes);
         if (now === 'other') return await refused(shown);
-        if (now === 'none' && (error as NodeJS.ErrnoException)?.code !== 'EEXIST') {
+        if (now === 'none') {
           await fontFs.rename(temporary, target);
           created.push(target);
         }
@@ -417,14 +424,23 @@ export async function writePageFonts(fontFs: FontFs, deckPath: string, files: re
     await takeBack();
     throw error;
   }
-  return { kind: 'written', created };
+  return { kind: 'written', created, madeFolder };
 }
 
 /**
- * Take back the font files a first Publish wrote, when its page was taken back: each only while it still holds the
- * bytes written and no other page Ritemark wrote in the deck's folder names it; then the `fonts` folder, if empty.
+ * Take back the font files a Publish wrote, when its page was taken back or never written: each only while it still
+ * holds the bytes written, no other page Ritemark wrote in the deck's folder names it, and `keep` doesn't hold it (a
+ * Publish of another deck in this window that is using it); then the `fonts` folder, if this Publish made it and it
+ * is empty.
  */
-export async function removePageFonts(fontFs: FontFs, deckPath: string, created: readonly string[], files: readonly PageFontFile[]): Promise<void> {
+export async function removePageFonts(
+  fontFs: FontFs,
+  deckPath: string,
+  written: { created: readonly string[]; madeFolder: boolean },
+  files: readonly PageFontFile[],
+  keep: (target: string) => boolean = () => false,
+): Promise<void> {
+  const { created } = written;
   if (created.length === 0) return;
   const folder = path.dirname(deckPath);
   const named = new Set<string>();
@@ -436,8 +452,8 @@ export async function removePageFonts(fontFs: FontFs, deckPath: string, created:
   }
   for (const target of created) {
     const file = files.find(candidate => path.join(folder, ...candidate.address.split('/')) === target);
-    if (!file || named.has(file.address)) continue;
+    if (!file || named.has(file.address) || keep(target)) continue;
     if ((await fontAt(fontFs, target, file.bytes).catch(() => 'other' as const)) === 'same') await fontFs.unlink(target).catch(() => undefined);
   }
-  await fontFs.rmdir(path.join(folder, PAGE_FONT_FOLDER)).catch(() => undefined);
+  if (written.madeFolder) await fontFs.rmdir(path.join(folder, PAGE_FONT_FOLDER)).catch(() => undefined);
 }

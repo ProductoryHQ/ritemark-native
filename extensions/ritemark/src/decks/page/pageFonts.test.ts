@@ -23,9 +23,10 @@ import { BUILT_IN_THEME, DECK_FONTS, DECK_FONT_LIST, DECK_FONT_SUBSETS, deckFont
 import { themeVars } from '../../../webview/src/components/decks/theme/themeVars';
 import { deckFontFaces } from '../../../webview/src/components/decks/theme/deckFonts';
 import {
-  PAGE_FONTS, buildDeckPage, foreignFontLine, nodeFontFs, nodePageFs, pagePathFor, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts,
+  PAGE_FONTS, buildDeckPage, currentPageDigest, foreignFontLine, nodeFontFs, nodePageFs, pagePathFor, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts,
 } from './pageFile';
 import { PAGE_CSP, type PageAssets } from './pageHtml';
+import { deckCounts, deckSheetRows } from './sheetRows';
 import { PRIVATE_DECK } from './testing/privateDeck';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
@@ -151,7 +152,8 @@ async function main(): Promise<void> {
     assert.equal(first.kind, 'written');
     assert.equal(first.kind === 'written' && first.created.length, 4);
     assert.deepEqual(fs.readdirSync(path.join(folder, 'fonts')).sort(), ['Inter-4.001-latin-ext.woff2', 'Inter-4.001-latin.woff2', 'SpaceGrotesk-2.000-latin-ext.woff2', 'SpaceGrotesk-2.000-latin.woff2'], 'only the theme\'s fonts, nothing under a hidden name');
-    assert.deepEqual(await writePageFonts(nodeFontFs, deckPath, files), { kind: 'written', created: [] }, 'the same files stay');
+    assert.equal(first.kind === 'written' && first.madeFolder, true);
+    assert.deepEqual(await writePageFonts(nodeFontFs, deckPath, files), { kind: 'written', created: [], madeFolder: false }, 'the same files stay');
     await writeDeckPage(nodePageFs, deckPath, built.html);
     const plan = await gatherPage(pagePath, project);
     assert.deepEqual(plan.files.filter(file => file.kind === 'font').map(file => file.relPath).sort(), files.map(file => file.address).sort(), 'the fonts are among the page\'s files');
@@ -167,13 +169,22 @@ async function main(): Promise<void> {
     const serifPage = await buildDeckPage({ deckPath: other, text: PRIVATE_DECK, theme: themeWith('Fraunces', 'Inter') }, { ...assets, themeFonts: serif });
     await writeDeckPage(nodePageFs, other, serifPage.html);
     assert.ok(await removeDeckPage(nodePageFs, pagePathFor(other), serifPage.html));
-    await removePageFonts(nodeFontFs, other, second.kind === 'written' ? second.created : [], serif);
+    assert.ok(second.kind === 'written');
+    await removePageFonts(nodeFontFs, other, second, serif);
     assert.deepEqual(fs.readdirSync(path.join(folder, 'fonts')).sort(), ['Inter-4.001-latin-ext.woff2', 'Inter-4.001-latin.woff2', 'SpaceGrotesk-2.000-latin-ext.woff2', 'SpaceGrotesk-2.000-latin.woff2']);
     // Inter is still named by the first page: taking back the first page's own Inter would keep it while the page stays.
-    await removePageFonts(nodeFontFs, deckPath, first.kind === 'written' ? first.created : [], files);
+    assert.ok(first.kind === 'written');
+    await removePageFonts(nodeFontFs, deckPath, first, files);
     assert.equal(fs.readdirSync(path.join(folder, 'fonts')).length, 4, 'a font another page of Ritemark\'s names stays');
     assert.ok(await removeDeckPage(nodePageFs, pagePath, built.html));
-    await removePageFonts(nodeFontFs, deckPath, first.kind === 'written' ? first.created : [], files);
+    // A font another Publish in this window holds stays too.
+    await removePageFonts(nodeFontFs, deckPath, first, files, target => target.endsWith('Inter-4.001-latin.woff2'));
+    assert.deepEqual(fs.readdirSync(path.join(folder, 'fonts')), ['Inter-4.001-latin.woff2'], 'a held font stays');
+    fs.rmSync(path.join(folder, 'fonts', 'Inter-4.001-latin.woff2'));
+    fs.rmdirSync(path.join(folder, 'fonts'));
+    const again = await writePageFonts(nodeFontFs, deckPath, files);
+    assert.ok(again.kind === 'written');
+    await removePageFonts(nodeFontFs, deckPath, again, files);
     assert.ok(!fs.existsSync(path.join(folder, 'fonts')), 'the fonts and their folder go with the page they were written for');
 
     // A name taken by another file stops the page, in one line; nothing is written and the file stays.
@@ -191,7 +202,43 @@ async function main(): Promise<void> {
     fs.symlinkSync(path.join(root, 'elsewhere'), path.join(folder, 'fonts'));
     assert.equal((await writePageFonts(nodeFontFs, deckPath, files)).kind, 'refused');
     assert.deepEqual(fs.readdirSync(path.join(root, 'elsewhere')), [], 'nothing written through the link');
-    assert.deepEqual(await writePageFonts(nodeFontFs, deckPath, []), { kind: 'written', created: [] }, 'a Sofia Sans theme writes nothing');
+    assert.deepEqual(await writePageFonts(nodeFontFs, deckPath, []), { kind: 'written', created: [], madeFolder: false }, 'a Sofia Sans theme writes nothing');
+    fs.rmSync(path.join(folder, 'fonts'));
+
+    // A `fonts` folder of the person's own, empty, stays after a take-back; only the fonts written go.
+    fs.mkdirSync(path.join(folder, 'fonts'));
+    const intoOwn = await writePageFonts(nodeFontFs, deckPath, files);
+    assert.ok(intoOwn.kind === 'written' && !intoOwn.madeFolder && intoOwn.created.length === 4);
+    await removePageFonts(nodeFontFs, deckPath, intoOwn, files);
+    assert.deepEqual(fs.readdirSync(path.join(folder, 'fonts')), [], 'their folder stays, empty');
+
+    // A name taken (EEXIST) and freed again before the last check is still written, not skipped.
+    {
+      let raced = false;
+      const racing = { ...nodeFontFs, link: async (from: string, to: string) => {
+        if (!raced) { raced = true; throw Object.assign(new Error('taken'), { code: 'EEXIST' }); }
+        return nodeFontFs.link(from, to);
+      } };
+      const result = await writePageFonts(racing, deckPath, files);
+      assert.ok(result.kind === 'written' && result.created.length === 4, 'all four are there');
+      for (const file of files) assert.ok(fs.readFileSync(path.join(folder, ...file.address.split('/'))).equals(file.bytes));
+      assert.deepEqual(fs.readdirSync(path.join(folder, 'fonts')).filter(name => name.startsWith('.')), [], 'nothing left under a hidden name');
+      fs.rmSync(path.join(folder, 'fonts'), { recursive: true });
+    }
+
+    // The digest counts the font files the page names: a page written without them reads as changed once they can go.
+    const withoutFonts = await buildDeckPage({ deckPath, text: PRIVATE_DECK, theme }, assets);
+    assert.notEqual(withoutFonts.digest, built.digest, 'the same deck with and without its font files');
+    assert.equal(await currentPageDigest(deckPath, PRIVATE_DECK, theme, nodePageFs, files.map(file => file.address)), built.digest, 'the chip\'s digest names them too');
+    assert.equal(await currentPageDigest(deckPath, PRIVATE_DECK, theme), withoutFonts.digest);
+
+    // The sheet's What goes names the theme's fonts only when files go.
+    assert.equal(deckCounts(PRIVATE_DECK, theme, files).fonts, 2);
+    assert.equal(deckCounts(PRIVATE_DECK, theme, []).fonts, undefined, 'none go: none named');
+    assert.equal(deckCounts(PRIVATE_DECK, theme).fonts, 2, 'by name when the files aren\'t known');
+    assert.equal(deckSheetRows({ slides: 14, prompts: 6, comments: 0, skipped: 0, fonts: 2 }).goes, '14 slides and their handout, 6 prompts with Copy, the pictures they use, and the theme\'s fonts.');
+    assert.equal(deckSheetRows({ slides: 1, prompts: 0, comments: 0, skipped: 0, fonts: 1 }).goes, '1 slide and its handout, the pictures it uses, and the theme\'s font.');
+    assert.equal(deckSheetRows({ slides: 0, prompts: 0, comments: 0, skipped: 0, fonts: 2 }).goes, 'The handout\'s text, the pictures it uses, and the theme\'s fonts.');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -108,7 +108,7 @@ export function deckFontFile(font: DeckFont, subset: (typeof DECK_FONT_SUBSETS)[
   return `${font.file}-${subset}.woff2`;
 }
 
-/** The fonts by name, as the CSS font lists their slides draw with (kept for the callers of PR 1's map). */
+/** The fonts by canonical name, as the CSS font lists their slides draw with (kept for PR 2, built on the map main had). Look a theme's name up with `deckFontStack`, never here. */
 export const DECK_FONTS: Record<string, string> = Object.fromEntries(DECK_FONT_LIST.map(font => [font.name, deckFontStack(font.name)]));
 
 /** Where a project's themes live, and the built-in theme's file name there. */

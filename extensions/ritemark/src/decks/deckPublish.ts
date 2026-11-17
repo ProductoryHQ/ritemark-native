@@ -75,6 +75,10 @@ export class DeckPublisher implements vscode.Disposable {
   private readonly running = new Set<string>();
   /** The sheet's rows for each page this window wrote, with the digest written beside them, by the page's real path. */
   private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
+  /** The app's own font files, read once per window (they never change while it runs). */
+  private readonly fontBytes = new Map<string, Promise<Buffer>>();
+  /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
+  private readonly fontsHeld = new Map<string, number>();
   private feature: PublishFeature | null = null;
 
   constructor(private readonly extensionPath: string) {
@@ -146,7 +150,8 @@ export class DeckPublisher implements vscode.Disposable {
     try {
       const written = readPageMeta(await readHead(pagePath)).digest;
       if (!written) return false;
-      return written !== await currentPageDigest(document.uri.fsPath, document.getText(), await this.themeOf(document));
+      const theme = await this.themeOf(document);
+      return written !== await currentPageDigest(document.uri.fsPath, document.getText(), theme, nodePageFs, await this.fontAddresses(theme));
     } catch {
       return false;
     }
@@ -192,6 +197,8 @@ export class DeckPublisher implements vscode.Disposable {
     const key = normalizeForCompare(deckPath);
     if (this.running.has(key)) return; // a second press while the first is still going: its sheet is on its way
     this.running.add(key);
+    // This Publish's font files, held while it runs (`holdFonts`), let go at its end at the latest.
+    let unhold = () => {};
     try {
       const pagePath = pagePathFor(deckPath);
       const pageKey = await pageKeyOf(pagePath);
@@ -207,7 +214,7 @@ export class DeckPublisher implements vscode.Disposable {
       let fontFiles: PageFontFile[];
       try {
         theme = await this.themeFor(deckPath, text);
-        fontFiles = await themeFontFiles(this.extensionPath, theme);
+        fontFiles = await this.fontFilesFor(theme);
         built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles });
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
@@ -222,27 +229,41 @@ export class DeckPublisher implements vscode.Disposable {
         return;
       }
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
-      let fontsWritten: Awaited<ReturnType<typeof writePageFonts>>;
+      let fonts: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
       let hadRecord: boolean;
+      // This Publish's fonts are held until it ends, so another deck's cancelled Publish never takes them back.
+      const fontTargets = fontFiles.map(file => path.join(path.dirname(deckPath), ...file.address.split('/')));
+      unhold = this.holdFonts(fontTargets);
+      // Fonts this Publish wrote go again with a page it couldn't write or takes back (unless another Publish here
+      // holds them, or another page of Ritemark's names them).
+      const takeBackFonts = async () => {
+        unhold();
+        await removePageFonts(nodeFontFs, deckPath, fonts, fontFiles, target => this.fontsHeld.has(target)).catch(() => undefined);
+      };
       try {
         hadRecord = Boolean(await feature.controller.recordFor(pageKey));
         // The fonts first, so the page never names a font that isn't beside it yet.
-        fontsWritten = await writePageFonts(nodeFontFs, deckPath, fontFiles);
-        written = fontsWritten.kind === 'refused' ? { kind: 'refused', pagePath, line: fontsWritten.line } : await writeDeckPage(nodePageFs, deckPath, built.html);
-        if (written.kind === 'refused' && fontsWritten.kind === 'written') await removePageFonts(nodeFontFs, deckPath, fontsWritten.created, fontFiles);
+        const fontsWritten = await writePageFonts(nodeFontFs, deckPath, fontFiles);
+        if (fontsWritten.kind === 'refused') {
+          written = { kind: 'refused', pagePath, line: fontsWritten.line };
+        } else {
+          fonts = fontsWritten;
+          written = await writeDeckPage(nodePageFs, deckPath, built.html);
+        }
       } catch (error) {
         console.warn('[Decks] Could not write the page:', error);
+        await takeBackFonts();
         notice(PAGE_NOT_WRITTEN);
         return;
       } finally {
         release();
       }
       if (written.kind === 'refused') {
+        await takeBackFonts();
         notice(written.line);
         return;
       }
-      const fontsCreated = fontsWritten.kind === 'written' ? fontsWritten.created : [];
-      this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
+      this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles)) });
       let outcome: PublishOutcome | undefined | 'stopped';
       try {
         outcome = await feature.publishPage(vscode.Uri.file(pagePath));
@@ -260,10 +281,11 @@ export class DeckPublisher implements vscode.Disposable {
       if (takeBack && written.created && !hadRecord && !(await feature.controller.recordFor(pageKey))) {
         if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) {
           this.written.delete(normalizeForCompare(pageKey));
-          await removePageFonts(nodeFontFs, deckPath, fontsCreated, fontFiles).catch(() => undefined);
+          await takeBackFonts();
         }
       }
     } finally {
+      unhold();
       this.running.delete(key);
       this.refreshDocument(document);
     }
@@ -312,8 +334,9 @@ export class DeckPublisher implements vscode.Disposable {
       const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
       const theme = await this.themeFor(deckPath, text);
-      if (await currentPageDigest(deckPath, text, theme) !== meta.digest) return undefined;
-      return deckSheetRows(deckCounts(text, theme));
+      const fontFiles = await this.fontFilesFor(theme);
+      if (await currentPageDigest(deckPath, text, theme, nodePageFs, fontFiles.map(file => file.address)) !== meta.digest) return undefined;
+      return deckSheetRows(deckCounts(text, theme, fontFiles));
     } catch {
       return undefined;
     }
@@ -331,6 +354,39 @@ export class DeckPublisher implements vscode.Disposable {
   }
 
   // ------------------------------------------------------------------ the theme
+
+  /** The theme's font files the page carries (`themeFontFiles`), read from the app's `media/fonts/` once per window. */
+  private fontFilesFor(theme: DeckTheme): Promise<PageFontFile[]> {
+    return themeFontFiles(this.extensionPath, theme, file => {
+      let bytes = this.fontBytes.get(file);
+      if (!bytes) {
+        bytes = fs.promises.readFile(file);
+        this.fontBytes.set(file, bytes);
+        // A failed read is tried again next time, not remembered.
+        bytes.catch(() => this.fontBytes.delete(file));
+      }
+      return bytes;
+    });
+  }
+
+  private async fontAddresses(theme: DeckTheme): Promise<string[]> {
+    return (await this.fontFilesFor(theme)).map(file => file.address);
+  }
+
+  /** Hold font files beside a page while a Publish uses them; the returned function lets go, once. */
+  private holdFonts(targets: readonly string[]): () => void {
+    for (const target of targets) this.fontsHeld.set(target, (this.fontsHeld.get(target) ?? 0) + 1);
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      for (const target of targets) {
+        const left = (this.fontsHeld.get(target) ?? 1) - 1;
+        if (left > 0) this.fontsHeld.set(target, left);
+        else this.fontsHeld.delete(target);
+      }
+    };
+  }
 
   private themeOf(document: vscode.TextDocument): Promise<DeckTheme> {
     return this.themeFor(document.uri.fsPath, document.getText());
