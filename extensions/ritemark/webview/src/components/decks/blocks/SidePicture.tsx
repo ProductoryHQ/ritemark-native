@@ -133,7 +133,8 @@ export function SidePicture(props: SidePictureProps) {
           ) : null}
         </div>
       )}
-      {side === 'behind' ? <div className="veil" /> : null}
+      {/* The veil darkens the picture behind the words; a click on it chooses the picture. */}
+      {side === 'behind' ? <div className="veil" style={{ pointerEvents: 'none' }} /> : null}
       {chosen ? (
         <PictureBar
           anchor={ref.current?.getBoundingClientRect() ?? null}

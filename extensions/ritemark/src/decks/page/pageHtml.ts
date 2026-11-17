@@ -356,6 +356,7 @@ svg { flex: none; }
 .part img, .pre img, .stage .deck-sl .blk-pic, .stage .deck-sl .pic img, .stage .deck-sl .photo:not(.empty) { cursor: zoom-in; }
 .zoom { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(10, 11, 30, .86); cursor: zoom-out; }
 .zoom[hidden] { display: none; }
+.zoom:focus { outline: none; }
 .zoom > img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; margin: 0; border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .45); object-fit: contain; }
 .zoom > .zoom-photo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }

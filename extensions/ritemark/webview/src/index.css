@@ -700,21 +700,28 @@ body {
   justify-content: center;
   gap: 4px;
   text-align: center;
-  font: 600 18px/24px var(--s-fb, 'Sofia Sans'), sans-serif;
-  color: var(--s-empt, rgba(255, 255, 255, 0.6));
+  font: 600 22px/28px var(--s-fb, 'Sofia Sans'), sans-serif;
+  color: var(--s-empt, rgba(255, 255, 255, 0.72));
   pointer-events: none;
 }
 .deck-slide.is-borderless .deck-sl .photo.empty .photo-hint {
   color: var(--s-empt, #8A8DAE);
 }
-.deck-sl .photo.is-chosen {
-  box-shadow: inset 0 0 0 3px var(--r-accent, #4f46e5);
+/* The chosen side picture's ring and its focus dot sit over the veil and the words (a picture Behind lies under both). */
+.deck-sl .photo.is-chosen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  box-shadow: inset 0 0 0 4px var(--r-accent, #4f46e5);
+  pointer-events: none;
 }
 .deck-sl .photo-focus {
   position: absolute;
-  width: 22px;
-  height: 22px;
-  margin: -11px 0 0 -11px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
   box-sizing: border-box;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.9);

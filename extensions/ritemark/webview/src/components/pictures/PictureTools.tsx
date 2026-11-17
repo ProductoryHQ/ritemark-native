@@ -304,7 +304,8 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
     </div>
   )
 
-  const anchorBox = whole ?? box
+  // Under the picture and its caption (the frame), or under the whole picture in crop mode.
+  const anchorBox = whole ?? localBox(root.getBoundingClientRect(), hostRect, scale)
   const anchor = {
     left: hostRect.left + anchorBox.left * scale,
     top: hostRect.top + anchorBox.top * scale,
