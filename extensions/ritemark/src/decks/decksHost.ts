@@ -14,7 +14,7 @@ import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import { copyEarlierDeck, earlierDecks, makeEmptyDeck } from './newDeck';
 import { freshDeckMarks, sendDraft, type StartCardState } from './startCard';
-import { slidesOfText } from './deckLibraryFormat';
+import { movedTarget, placeAfterMoves, rewriteDeckPictures, slidesOfText } from './deckLibraryFormat';
 import { AI_NAMES, AI_ORDER } from '../guidance/readyRequest';
 import { sheetAi } from '../guidance/GuidanceHost';
 import type { AgentId } from '../agent/types';
@@ -91,7 +91,12 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options, fresh) : undefined)),
     // A deck deleted or renamed in Ritemark takes its card's mark with it
     vscode.workspace.onDidDeleteFiles(event => { for (const file of event.files) void fresh.remove(markOf(file.fsPath)); }),
-    vscode.workspace.onDidRenameFiles(event => { for (const file of event.files) void fresh.remove(markOf(file.oldUri.fsPath)); }),
+    vscode.workspace.onDidRenameFiles(event => {
+      for (const file of event.files) void fresh.remove(markOf(file.oldUri.fsPath));
+      // 17 November: a deck moved or renamed in Ritemark keeps its pictures: its paths to them are written for its new
+      // place. The picture files are never touched.
+      if (isEnabled('decks')) void rebaseMovedDecks(event.files).catch(error => console.warn('[Decks] Could not follow a move:', error));
+    }),
   );
   return { pages, publisher, library };
 }
@@ -99,6 +104,65 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
 /** The day a deck was last changed, as the start card shows it: "15 Nov 2026". */
 function dayOf(modified: number): string {
   return new Date(modified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** A path from the file system's root, posix and without its leading slash (`Users/me/Project/a.png`, `C:/a.png`). */
+function rootless(fsPath: string): string {
+  return path.resolve(fsPath).replace(/\\/g, '/').replace(/^\/+/, '');
+}
+
+/**
+ * The decks a rename moved: a `.deck.md` file renamed or moved, or each deck inside a folder that was. With where each
+ * one was before. Only files Ritemark's rename named (or that are inside a folder it named) are read.
+ */
+async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<Array<{ uri: vscode.Uri; before: string }>> {
+  const decks: Array<{ uri: vscode.Uri; before: string }> = [];
+  for (const { oldUri, newUri } of files) {
+    if (newUri.scheme !== 'file') continue;
+    let stat: fs.Stats;
+    try {
+      stat = await fs.promises.stat(newUri.fsPath);
+    } catch {
+      continue;
+    }
+    if (stat.isFile()) {
+      if (/\.deck\.md$/i.test(newUri.fsPath)) decks.push({ uri: newUri, before: oldUri.fsPath });
+      continue;
+    }
+    if (!stat.isDirectory()) continue;
+    const inside = await vscode.workspace.findFiles(new vscode.RelativePattern(newUri, '**/*.deck.md'), null, 500);
+    for (const uri of inside) decks.push({ uri, before: path.join(oldUri.fsPath, path.relative(newUri.fsPath, uri.fsPath)) });
+  }
+  return decks;
+}
+
+/**
+ * 17 November (Jarmo's deck lost its pictures after a move): each deck a rename moved has its pictures' paths (the
+ * slides' `image:` lines and Markdown pictures, and the handout's) written for its new place, the way the Slide library
+ * rebases a copied slide. One edit per deck, saved unless the deck already had unsaved changes. A move back writes them
+ * back. Only the deck's text changes: no picture file is ever moved, copied or deleted.
+ */
+async function rebaseMovedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<void> {
+  const moves = files.map(file => ({ from: rootless(file.oldUri.fsPath), to: rootless(file.newUri.fsPath) }));
+  const after = placeAfterMoves(moves);
+  for (const deck of await movedDecks(files)) {
+    const oldFolder = path.posix.dirname(rootless(deck.before));
+    const newFolder = path.posix.dirname(rootless(deck.uri.fsPath));
+    const document = await vscode.workspace.openTextDocument(deck.uri);
+    const text = document.getText();
+    const next = rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
+    if (next === text) continue;
+    // Only the changed stretch is replaced, so the deck's editor keeps everything around it as it was.
+    let start = 0;
+    while (start < text.length && start < next.length && text[start] === next[start]) start++;
+    let end = 0;
+    while (end < text.length - start && end < next.length - start && text[text.length - 1 - end] === next[next.length - 1 - end]) end++;
+    const wasDirty = document.isDirty;
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(text.length - end)), next.slice(start, next.length - end));
+    if (!(await vscode.workspace.applyEdit(edit))) continue;
+    if (!wasDirty) await document.save();
+  }
 }
 
 /** A deck's key among the fresh marks: its file path, as this host compares paths. */

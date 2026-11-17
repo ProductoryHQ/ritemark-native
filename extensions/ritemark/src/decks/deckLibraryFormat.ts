@@ -50,12 +50,109 @@ export function rebasePath(target: string, fromFolder: string, toFolder: string)
   const [path, rest] = splitSuffix(target);
   const absolute = normalizePath(`${fromFolder}/${decodeSafe(path)}`);
   if (absolute === null) return target;
-  const from = toFolder ? toFolder.split('/') : [];
-  const to = absolute.split('/');
+  return encodeLike(path, relativeFrom(toFolder, absolute)) + rest;
+}
+
+/** The path from `folder` to `file` (both from the same root), with `..` where it climbs out. */
+function relativeFrom(folder: string, file: string): string {
+  const from = folder ? folder.split('/') : [];
+  const to = file.split('/');
   let common = 0;
   while (common < from.length && common < to.length - 1 && from[common] === to[common]) common++;
-  const relative = [...from.slice(common).map(() => '..'), ...to.slice(common)].join('/');
-  return encodeLike(path, relative) + rest;
+  return [...from.slice(common).map(() => '..'), ...to.slice(common)].join('/');
+}
+
+// ---------------------------------------------------------------------------
+// A deck moved or renamed (17 November)
+// ---------------------------------------------------------------------------
+
+/**
+ * A picture's target as written in a deck that was in `oldFolder` and is now in `newFolder` (paths from one root, posix,
+ * such as `Users/me/Project/Koolitus`). `moved` gives a file's place after the move: a picture that moved along (its
+ * folder was moved, or it was moved in the same step) keeps pointing at itself, and one that stayed is pointed at where
+ * it is. A target that still points right is left exactly as written; one that can't be written from the new folder
+ * (another drive) too.
+ */
+export function movedTarget(target: string, oldFolder: string, newFolder: string, moved: (path: string) => string = path => path): string {
+  if (!isRelativeTarget(target)) return target;
+  const [path, rest] = splitSuffix(target);
+  const before = normalizePath(`${oldFolder}/${decodeSafe(path)}`);
+  if (before === null) return target;
+  const after = moved(before);
+  // Still right from the new folder: nothing to change, not even its spelling.
+  if (normalizePath(`${newFolder}/${decodeSafe(path)}`) === after) return target;
+  // A relative path never crosses from one drive to another (C: and D:).
+  const rootOf = (value: string) => value.split('/')[0] ?? '';
+  if (newFolder && rootOf(newFolder) !== rootOf(after) && /:$/.test(rootOf(newFolder) + rootOf(after))) return target;
+  return encodeLike(path, relativeFrom(newFolder, after)) + rest;
+}
+
+/** A file's place after some moves (each `from` to `to`: a file, or a folder and everything in it); else where it was. */
+export function placeAfterMoves(moves: Array<{ from: string; to: string }>): (path: string) => string {
+  return path => {
+    for (const move of moves) {
+      if (path === move.from) return move.to;
+      if (path.startsWith(`${move.from}/`)) return move.to + path.slice(move.from.length);
+    }
+    return path;
+  };
+}
+
+/**
+ * The pictures of some Markdown (`![…](target)`), each target rewritten by `rewrite`; links stay, and nothing inside a
+ * code block or a code span is touched (a prompt's words are the person's own).
+ */
+export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string): string {
+  const lines = markdown.split('\n');
+  let fence: string | null = null;
+  return lines.map(line => {
+    const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (open && open[1][0] === fence[0] && open[1].length >= fence.length && /^ {0,3}[`~]+\s*$/.test(line)) fence = null;
+      return line;
+    }
+    if (open) {
+      fence = open[1];
+      return line;
+    }
+    // Code spans stay as written: only the text between them is read.
+    return line.split(/(`+[^`]*`+)/).map((part, index) => (index % 2 === 1 ? part : part.replace(/(!\[[^\]]*\]\()(<[^>]*>|[^)\s]+)((?:\s+"[^"]*")?\))/g, (_match, open: string, target: string, close: string) => {
+      const angled = target.startsWith('<') && target.endsWith('>');
+      const inner = angled ? target.slice(1, -1) : target;
+      const next = rewrite(inner);
+      if (next === inner) return `${open}${target}${close}`;
+      return `${open}${/\s/.test(next) ? `<${next}>` : next}${close}`;
+    }))).join('');
+  }).join('\n');
+}
+
+/**
+ * A deck's text with every picture's target rewritten by `rewrite`: each slide's `image:` line and the pictures in a
+ * block slide's Markdown, and the pictures in the handout. Everything else, byte for byte. Used when a deck is moved or
+ * renamed in Ritemark, so its pictures still show (17 November); the picture files themselves are never touched.
+ */
+export function rewriteDeckPictures(text: string, rewrite: (target: string) => string): string {
+  const deck = parseDeck(text);
+  let out = text;
+  // From the last slide back, so the places read from the text still hold.
+  for (let index = deck.slides.length - 1; index >= 0; index--) {
+    const slide = deck.slides[index];
+    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite) + out.slice(slide.handoutEnd);
+    const bodyStart = out.indexOf('\n', slide.start) + 1;
+    if (bodyStart <= 0 || out.slice(bodyStart, bodyStart + slide.body.length) !== slide.body) continue;
+    const data = slideDataOf(slide.kind, slide.body);
+    const image = data.image ? rewrite(data.image) : data.image;
+    // Through the slide writer only when the picture's path changes, so an unchanged header stays byte for byte.
+    let body = image !== data.image ? writeSlideData(slide.kind, slide.body, { ...data, image }) : slide.body;
+    if (isBlockSlide(slide.kind)) {
+      const parts = splitBlockSlide(body);
+      body = parts.head + rewritePictureTargets(parts.markdown, rewrite);
+    }
+    if (body !== slide.body) out = out.slice(0, bodyStart) + body + out.slice(bodyStart + slide.body.length);
+  }
+  // The words before the first slide, after the front matter.
+  const introEnd = deck.slides.length ? deck.slides[0].start : out.length;
+  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite) + out.slice(introEnd);
 }
 
 /** A path as the project knows it, from the folder it was written in; null when it is no relative path. */

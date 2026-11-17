@@ -6,6 +6,7 @@ import { parseDeck, parseSlideBody } from './deckFormat';
 import {
   appendPart, folderOf, newTopicText, normalizePath, partText, projectPath, rebasePath, rebaseSlide,
   foldMarkdown, insertPartsText, replaceSlidePart, rewriteMarkdownTargets, slideStamp, slideStamps, slidesOfText,
+  movedTarget, placeAfterMoves, rewriteDeckPictures, rewritePictureTargets,
 } from './deckLibraryFormat';
 
 // Paths.
@@ -101,5 +102,50 @@ assert.equal(
   assert.equal(slideStamps('boxes', data, 'Text.', 'Slide library').length, 2, 'and the one v1 stamp');
 }
 
+// 17 November: a deck moved or renamed in Ritemark keeps its pictures. Its paths to them are written for its new place:
+// the slides' `image:` lines and Markdown pictures, and the handout's; links, code and every other byte stay as written.
+{
+  const DECK = [
+    '---', 'deck: 2', '---', '',
+    'Intro ![](images/intro.png)', '',
+    '```slide', '---', 'id: m1', 'picture: right', 'image: images/side.png', '---', '# Pilot', '', '![chart](images/chart%201.png "the chart")', '', '[notes](notes.md)', '```', '',
+    'Handout ![](images/hand.png) and [a link](other.md).', '',
+    '```', 'A prompt: ![](images/in-code.png)', '```', '',
+    'Inline `![](images/span.png)` stays.', '',
+    '```slide', '---', 'id: m2', '---', '# Web', '', '![](https://example.org/a.png)', '```', '',
+  ].join('\n');
+  const old = 'Users/me/Project/Koolitus';
+  const moved = 'Users/me/Project/Arhiiv/2026';
+  const rebased = rewriteDeckPictures(DECK, target => movedTarget(target, old, moved));
+  // Every picture now points from the new place to the file that stayed where it was.
+  assert.ok(rebased.includes('Intro ![](../../Koolitus/images/intro.png)'), 'the words before the first slide');
+  assert.ok(rebased.includes('image: ../../Koolitus/images/side.png'), "a slide's own picture (image:)");
+  assert.ok(rebased.includes('![chart](../../Koolitus/images/chart%201.png "the chart")'), 'a picture in the slide, its encoding and title kept');
+  assert.ok(rebased.includes('Handout ![](../../Koolitus/images/hand.png)'), "the handout's picture");
+  // Links, code, a code span and a web address are never touched.
+  assert.ok(rebased.includes('[notes](notes.md)') && rebased.includes('[a link](other.md)'), 'links stay');
+  assert.ok(rebased.includes('A prompt: ![](images/in-code.png)'), 'a code block is the person\'s own words');
+  assert.ok(rebased.includes('`![](images/span.png)`'), 'a code span too');
+  assert.ok(rebased.includes('![](https://example.org/a.png)'), 'a web address');
+  // Only the pictures' paths changed.
+  const strip = (text: string) => text.replace(/(?:\.\.\/\.\.\/Koolitus\/)/g, '');
+  assert.equal(strip(rebased), DECK, 'every other byte as it was');
+  // A move back writes them back exactly (the person's Undo of the move in the explorer is a move back).
+  assert.equal(rewriteDeckPictures(rebased, target => movedTarget(target, moved, old)), DECK, 'a move back restores the paths');
+  // A rename in the same folder changes nothing.
+  assert.equal(rewriteDeckPictures(DECK, target => movedTarget(target, old, old)), DECK, 'renamed in place: nothing written');
+  // A folder moved with its pictures in it: the paths still point right, so nothing is written.
+  const after = placeAfterMoves([{ from: old, to: 'Users/me/Project/Kursus' }]);
+  assert.equal(rewriteDeckPictures(DECK, target => movedTarget(target, old, 'Users/me/Project/Kursus', after)), DECK, 'moved with its folder');
+  // The deck and one picture moved in the same step: that picture is followed to its new place.
+  const both = placeAfterMoves([{ from: `${old}/Fit.deck.md`, to: `${moved}/Fit.deck.md` }, { from: `${old}/images/side.png`, to: `${moved}/side.png` }]);
+  assert.equal(movedTarget('images/side.png', old, moved, both), 'side.png');
+  assert.equal(movedTarget('images/intro.png', old, moved, both), '../../Koolitus/images/intro.png');
+  // Never across drives: a path that can't be written relatively stays as it was.
+  assert.equal(movedTarget('images/a.png', 'C:/Decks', 'D:/Elsewhere'), 'images/a.png');
+  assert.equal(movedTarget('./images/a.png', old, old), './images/a.png', 'a spelling that still points right is kept');
+  assert.equal(movedTarget('images/a b.png', old, moved), '../../Koolitus/images/a b.png');
+  assert.ok(rewritePictureTargets('![](<images/a b.png>)', () => 'x/a b.png').includes('(<x/a b.png>)'), 'a space in the new path is bracketed');
+}
 
 console.log('deckLibraryFormat: passed');
