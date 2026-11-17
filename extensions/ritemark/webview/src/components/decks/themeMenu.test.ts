@@ -262,6 +262,10 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   // The pick and its notice with Undo, which takes back only that pick (the bar's other notices' rule).
   assert.match(view, /propertyTransaction\(editor\.state, 'theme', propertyValue\(propertiesRef\.current, 'theme'\), \{ present: true, value: path \}\)/)
   assert.match(view, /text: themePickedNotice\(name\),\s+action: \{ label: 'Undo', tip: '[^']+', run: \(\) => \{ if \(valid\(\)\) editor\.commands\.undo\(\) \} \},\s+valid,/)
+  // Cmd+Z on the bar (the focus is back on the Theme button after a pick) is the deck's Undo. In the capture phase: the
+  // webview's own script marks an undo outside a text field handled before a bubble listener sees it (found in the app).
+  assert.match(view, /if \(target && target !== document\.body && !target\.closest\('\.deck-bar'\)\) return/)
+  assert.match(view, /window\.addEventListener\('keydown', onKey, true\)\s+return \(\) => window\.removeEventListener\('keydown', onKey, true\)/)
   const menu = readFileSync(fileURLToPath(new URL('./ThemeMenu.tsx', import.meta.url)), 'utf8')
   assert.match(menu, /<Popover open=\{open\} onOpenChange=\{setOpen\}>/, 'a Radix popover: a press outside and Esc close it')
   assert.match(menu, /if \(open\) sendToExtension\('deck\/themes'\)/, 'the themes are asked for each time it opens')

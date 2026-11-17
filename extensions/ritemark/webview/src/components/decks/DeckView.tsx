@@ -1425,7 +1425,9 @@ export function DeckView({
     })
   }, [editor])
   // Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) with the focus on the deck's bar or nowhere in particular (after a pick the focus is
-  // back on the Theme button) is the deck's Undo, as on the slide, the strip and the handout, which keep their own.
+  // back on the Theme button) is the deck's Undo, as on the slide, the strip and the handout, which keep their own. In the
+  // capture phase: the webview's own script marks an undo outside a text field handled (for the workbench, whose undo
+  // here does nothing) before a listener in the bubble phase would see it. Only the bar and the page itself are taken.
   useEffect(() => {
     if (!editor) return
     const onKey = (event: KeyboardEvent) => {
@@ -1440,8 +1442,8 @@ export function DeckView({
       if (step === 'redo') editor.commands.redo()
       else editor.commands.undo()
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [editor])
 
   const handoutContainer = scrollContainer()
