@@ -55,6 +55,11 @@ interface DeckSeat {
   document: vscode.TextDocument;
   post: (message: DeckHostMessage) => Promise<boolean>;
   bar?: PageBarState;
+  /**
+   * The seat's refreshes, one after another (the review of #791): a theme's Save and its Undo, or an AI's write and
+   * the watcher's, each ask again, and an older answer must never be posted after a newer one, nor its 2.2 state kept.
+   */
+  queue?: Promise<void>;
 }
 
 /**
@@ -155,16 +160,25 @@ export class DeckPublisher implements vscode.Disposable {
    */
   private async deckChanged(document: vscode.TextDocument, pagePath: string): Promise<boolean> {
     try {
-      return await pageReadsChanged(await readHead(pagePath), await this.pageNow(document.uri.fsPath, document.getText()));
+      // A page without Ritemark's digest is never "changed": known before the theme and its files are read.
+      const written = readPageMeta(await readHead(pagePath)).digest;
+      if (!written) return false;
+      return await pageReadsChanged(written, await this.pageNow(document.uri.fsPath, document.getText()));
     } catch {
       return false;
     }
   }
 
-  private async refresh(seat: DeckSeat, ask = true): Promise<void> {
-    const { state, bar } = await this.readState(seat.document, ask, seat.bar);
-    seat.bar = bar;
-    await seat.post({ type: 'deck/page-state', state });
+  private refresh(seat: DeckSeat, ask = true): Promise<void> {
+    const run = async () => {
+      // Read when its turn comes, so a refresh that doesn't ask 2.2 keeps the newest answer an earlier one got.
+      const { state, bar } = await this.readState(seat.document, ask, seat.bar);
+      seat.bar = bar;
+      await seat.post({ type: 'deck/page-state', state });
+    };
+    const next = (seat.queue ?? Promise.resolve()).then(run, run);
+    seat.queue = next.catch(() => undefined);
+    return next;
   }
 
   private refreshAll(): void {
@@ -352,8 +366,7 @@ export class DeckPublisher implements vscode.Disposable {
     const besidePath = path.join(path.dirname(pagePath), `${path.basename(pagePath, '.html')}.deck.md`);
     if (deckNameOf(besidePath) === '') return undefined;
     try {
-      const head = await readHead(pagePath);
-      const meta = readPageMeta(head);
+      const meta = readPageMeta(await readHead(pagePath));
       if (!meta.ritemark || !meta.digest) return undefined;
       const registered = this.written.get(normalizeForCompare(pagePath));
       if (registered?.digest === meta.digest) return registered.rows;
@@ -361,7 +374,7 @@ export class DeckPublisher implements vscode.Disposable {
       const deckPath = open ? open.uri.fsPath : besidePath;
       const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
       const now = await this.pageNow(deckPath, text);
-      if (await pageReadsChanged(head, now)) return undefined;
+      if (await pageReadsChanged(meta.digest, now)) return undefined;
       return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
     } catch {
       return undefined;

@@ -270,15 +270,14 @@ export interface DeckPageNow {
 }
 
 /**
- * Sprint 162 PR 6 (step-3-themes.md, "The wall and the page follow the theme"): whether the page as written (its first
- * bytes, `pageHead`) no longer carries what the deck would publish now: its public words, its theme's fields (the
+ * Sprint 162 PR 6 (step-3-themes.md, "The wall and the page follow the theme"): whether the page as written (its
+ * `ritemark-deck` digest, `readPageMeta`) no longer carries what the deck would publish now: its public words, its theme's fields (the
  * theme's name too, so another theme picked is a change), the theme's font files and its logo's file. The chip's
  * "Published · changed" and the sheet's rows read it. A digest, never a render, so typing asks only this. Nothing here
  * writes: the page beside the deck, and so the live page, changes only with Publish or Update the page. Not changed for
  * a page without Ritemark's digest.
  */
-export async function pageReadsChanged(pageHead: string, now: DeckPageNow, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<boolean> {
-  const written = readPageMeta(pageHead).digest;
+export async function pageReadsChanged(written: string | null, now: DeckPageNow, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<boolean> {
   if (!written) return false;
   return written !== await currentPageDigest(now.deckPath, now.text, now.theme, pageFs, pageLookAddresses(now.theme, now.fonts, now.logo));
 }

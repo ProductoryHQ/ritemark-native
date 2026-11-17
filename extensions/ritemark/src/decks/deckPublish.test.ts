@@ -198,6 +198,27 @@ async function main(): Promise<void> {
     assert.deepEqual(posts.at(-1), { kind: 'published', changed: true }, 'the chip says Published · changed');
     assert.equal(pageStateAsks, asked, 'without asking 2.2: its page file is as it was');
 
+    // --- A Save and its Undo at once: the refreshes go in turn, so the last word is the newest (the review of #791)
+    {
+      const from = posts.length;
+      fs.writeFileSync(fernPath, themeText({ accent: '#0F766E' }));
+      publisher.lookChanged(document as never);
+      fs.writeFileSync(fernPath, themeText({ accent: '#7C3AED' }));
+      publisher.lookChanged(document as never);
+      for (let i = 0; i < 100 && posts.length < from + 2; i++) await new Promise(resolve => setTimeout(resolve, 10));
+      assert.equal(posts.length, from + 2);
+      assert.deepEqual(posts.at(-1), { kind: 'published', changed: true });
+      fs.writeFileSync(fernPath, themeText());
+      publisher.lookChanged(document as never);
+      fs.writeFileSync(fernPath, themeText({ accent: '#7C3AED' }));
+      publisher.lookChanged(document as never);
+      fs.writeFileSync(fernPath, themeText());
+      publisher.lookChanged(document as never);
+      for (let i = 0; i < 100 && posts.length < from + 5; i++) await new Promise(resolve => setTimeout(resolve, 10));
+      assert.deepEqual(posts.at(-1), { kind: 'published', changed: false }, 'the last write was the Undo: Published');
+      fs.writeFileSync(fernPath, themeText({ accent: '#7C3AED' }));
+    }
+
     // --- Nothing of that changed the page or the files beside it
     assert.deepEqual(pageFiles(), live, 'the page keeps its theme until Update the page');
     assert.equal(published, 1, 'and nothing went up');
