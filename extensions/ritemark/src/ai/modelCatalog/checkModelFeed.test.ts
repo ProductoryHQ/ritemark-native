@@ -7,16 +7,16 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { BUNDLED_CATALOG } from './bundledCatalog';
 import { buildPublishedFeed } from './feedExport';
 import { CODEX_MODEL_IDS } from '../modelConfig';
+import { makeTempDir } from '../../testing/tempDir';
 
 const extensionRoot = path.resolve(__dirname, '../../..');
 const script = path.join(extensionRoot, 'scripts', 'check-model-feed.ts');
 const tsx = path.join(extensionRoot, 'node_modules', '.bin', 'tsx');
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rm141-check-'));
+const dir = makeTempDir('rm141-check-');
 
 function run(candidate: unknown, extra: string[] = []): { status: number | null; out: string } {
   const file = path.join(dir, `candidate-${Math.random().toString(36).slice(2)}.json`);

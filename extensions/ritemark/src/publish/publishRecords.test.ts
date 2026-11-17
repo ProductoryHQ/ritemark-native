@@ -12,6 +12,7 @@ import { changedSincePublish, LOCK_STALE_MS, LOCK_WAIT_MS, type PublishRecord, P
 import { isSheetWebviewMessage } from './sheetProtocol';
 import { sheetModelOf } from './sheetModel';
 import type { PublishPlan } from './types';
+import { makeTempDir } from '../testing/tempDir';
 
 function plan(files: [string, string][], extra: Partial<PublishPlan> = {}): PublishPlan {
   return {
@@ -172,12 +173,12 @@ async function main(): Promise<void> {
     await deadHostLockMidWait(record);
 
     // Windows keys ignore case
-    const win = new PublishRecordStore(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-win-')), 'win32');
+    const win = new PublishRecordStore(makeTempDir('publish-records-win-'), 'win32');
     await win.put({ ...record, pagePath: 'C:\\Proj\\Page.html' });
     assert.ok(await win.get('c:\\proj\\page.html'));
 
     // An unreadable file is set aside, never overwritten
-    const broken = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-records-broken-'));
+    const broken = makeTempDir('publish-records-broken-');
     fs.mkdirSync(path.join(broken, RECORDS_FOLDER), { recursive: true });
     fs.writeFileSync(path.join(broken, RECORDS_FOLDER, RECORDS_FILE), '{ not json');
     const brokenStore = new PublishRecordStore(broken, 'darwin');

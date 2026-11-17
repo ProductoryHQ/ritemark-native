@@ -17,6 +17,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { ChildProcess } from 'child_process';
 import { AcpClient, type AcpClientHandlers } from './acpClient';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── Scripted agent ──────────────────────────────────────────────────────────
 // A minimal ACP agent that responds to JSON-RPC requests from the client. It
@@ -99,7 +100,7 @@ rl.on('line', (line) => {
 `;
 
 function writeAgentScript(): string {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'acp-test-')), 'agent.cjs');
+  const file = path.join(makeTempDir('acp-test-'), 'agent.cjs');
   fs.writeFileSync(file, AGENT_SCRIPT, 'utf8');
   return file;
 }

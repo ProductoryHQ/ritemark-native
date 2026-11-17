@@ -15,8 +15,8 @@
 import { strict as assert } from 'node:assert';
 import Module from 'node:module';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── vscode + posthog stubs (installed before requiring the unit) ────────────
 let saveDialogResult: { fsPath: string } | undefined;
@@ -58,7 +58,7 @@ const b64 = (s: string) => Buffer.from(s).toString('base64');
 const noopWebview = { postMessage: () => undefined } as unknown as Parameters<typeof saveAsMarkdownHandler>[2];
 
 function tmpProject(): { dir: string; sourceUri: { fsPath: string }; saveUri: { fsPath: string } } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-saveas-'));
+  const dir = makeTempDir('ritemark-saveas-');
   return {
     dir,
     sourceUri: { fsPath: path.join(dir, 'source.docx') },

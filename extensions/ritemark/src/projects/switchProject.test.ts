@@ -5,10 +5,10 @@
  */
 
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import Module from 'node:module';
-import os from 'node:os';
 import path from 'node:path';
+import { makeTempDir } from '../testing/tempDir';
 
 // switchProject.ts imports vscode for its glue: a small stand-in records what the switcher runs and answers its question.
 const calls: unknown[][] = [];
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   assert.equal(switchQuestion([null], 'A', 'B').title, 'The AI is still working in A');
 
   // The switcher (R9, S30–S33). A fake chat list; the notes go to a scratch global storage, as each window's do.
-  const storage = mkdtempSync(path.join(os.tmpdir(), 'ritemark-switch-test-'));
+  const storage = makeTempDir('ritemark-switch-test-');
   const context = { globalStorageUri: { fsPath: storage } } as never;
   const noteFile = (name: string) => switchNoteFile(storage, name);
   const note = (name: string): unknown => (existsSync(noteFile(name)) ? JSON.parse(readFileSync(noteFile(name), 'utf8')) : undefined);

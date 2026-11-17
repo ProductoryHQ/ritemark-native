@@ -6,7 +6,6 @@
 
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   ensureProjectSubfolder,
@@ -14,9 +13,10 @@ import {
   isProjectFolderError,
   ProjectFolderError,
 } from './projectFolderGuard';
+import { makeTempDir } from '../testing/tempDir';
 
 function tempFolder(): string {
-  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rm-project-guard-')));
+  return fs.realpathSync(makeTempDir('rm-project-guard-'));
 }
 
 function refusedWith(code: ProjectFolderError['code']) {

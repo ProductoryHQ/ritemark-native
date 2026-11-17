@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { BoardStore, BoardStoreError, nodeBoardStoreFileSystem, readFailureWords, saveFailedWords, type BoardEntry, type BoardStoreFileSystem, type CardDocuments } from './BoardStore';
 import { parseCardFile, serializeCard, splitCardText, type Card } from './cardFile';
+import { makeTempDir } from '../testing/tempDir';
 
 const trashed: string[] = [];
 
 function tempFolder(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-'));
+  return makeTempDir('rm-board-');
 }
 
 function fileSystem(overrides: Partial<BoardStoreFileSystem> = {}): BoardStoreFileSystem {
