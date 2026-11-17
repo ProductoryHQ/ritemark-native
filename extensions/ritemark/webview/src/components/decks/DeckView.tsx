@@ -25,7 +25,7 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, partContent, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -42,7 +42,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
-import type { Transaction } from '@tiptap/pm/state'
+import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction, undoDepth } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
@@ -54,8 +54,9 @@ import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../.
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
-import { DeckCurrent, setCurrentSlide } from './handout/deckCurrent'
+import { DeckCurrent, deckCurrentKey, deckFocusKey, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead, partMenuSlots, type PartMenuSlot } from './handout/SlidePartHead'
+import { railPick, rowCaret, trackHeight } from './handout/partRail'
 import { DECK_REMOVED, DeckRemove, joinMarkOf, removalNotice, type DeckRemoval } from './handout/deckRemove'
 import { DeckLines } from './handout/deckLines'
 import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
@@ -125,6 +126,9 @@ type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'left'; back: HTM
  * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
  * items and actions, for the slide whose part head holds the slot. Drawn into the head's slot (a portal); nothing when
  * the slot's slide isn't one of the deck's slides as this view last read them.
+ *
+ * With it, the row a slide with no handout folds to (17 November): "Slide only" and the slide's title, which opens the
+ * part to write in. The head shows it only while it's folded (`is-only`, decks.css).
  */
 interface PartMenuProps {
   slot: PartMenuSlot
@@ -135,18 +139,34 @@ interface PartMenuProps {
   fromLibrary: boolean
   actions: StripActions
   onSettings: (index: number, slot: PartMenuSlot) => void
+  /** The slide's title, for the folded row. */
+  title: string
+  onOpenPart: (index: number) => void
 }
 
-const PartMenu = memo(function PartMenu({ slot, index, count, skipped, fromLibrary, actions, onSettings }: PartMenuProps) {
+const PartMenu = memo(function PartMenu({ slot, index, count, skipped, fromLibrary, actions, onSettings, title, onOpenPart }: PartMenuProps) {
   if (index < 0) return null
-  return createPortal(
-    <DropdownMenu modal={false}>
-      <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} className="deck-part-more-button" />
-      <DropdownMenuContent align="end" side="bottom">
-        <SlideMenuItems index={index} count={count} skipped={skipped} fromLibrary={fromLibrary} actions={{ ...actions, settings: at => onSettings(at, slot) }} />
-      </DropdownMenuContent>
-    </DropdownMenu>,
-    slot.element,
+  return (
+    <>
+      {createPortal(
+        <DropdownMenu modal={false}>
+          <MoreActionsTrigger label={`Slide ${index + 1}: more actions`} className="deck-part-more-button" />
+          <DropdownMenuContent align="start" side="bottom">
+            <SlideMenuItems index={index} count={count} skipped={skipped} fromLibrary={fromLibrary} actions={{ ...actions, settings: at => onSettings(at, slot) }} />
+          </DropdownMenuContent>
+        </DropdownMenu>,
+        slot.element,
+      )}
+      {createPortal(
+        <Tooltip label="Write a handout for this slide">
+          <Button variant="ghost" className="deck-part-only-row" onMouseDown={event => event.preventDefault()} onClick={() => onOpenPart(index)}>
+            <span className="deck-part-only-key">Slide only</span>
+            <span className="deck-part-only-title">{title}</span>
+          </Button>
+        </Tooltip>,
+        slot.row,
+      )}
+    </>
   )
 })
 
@@ -932,6 +952,81 @@ export function DeckView({
     return () => window.removeEventListener('keydown', onKey)
   }, [fullSlide, goTo])
 
+  // The number's rail (17 November): each track runs from where the head's CSS puts its top to the end of its part's text.
+  // Measured after the page is laid out: when the document, the selection (a part opens while the caret is in it) or the
+  // current slide (a part folds or opens) changes, and when the handout's size changes. A folded block has no box, so
+  // it's passed over. Every place is read first and every height written after, so the page is laid out once.
+  const measureRail = useCallback(() => {
+    if (!editor || editor.isDestroyed) return
+    const heads = Array.from(editor.view.dom.querySelectorAll<HTMLElement>(':scope > .deck-part-head'))
+    const heights = heads.map((head, index) => {
+      const track = head.querySelector<HTMLElement>(':scope > .deck-part-track')
+      if (!track) return null
+      const end = heads[index + 1] ?? null
+      let bottom = head.getBoundingClientRect().bottom
+      for (let block = head.nextElementSibling; block && block !== end; block = block.nextElementSibling) {
+        const box = block.getBoundingClientRect()
+        if (box.height > 0) bottom = Math.max(bottom, box.bottom)
+      }
+      return { track, height: `${trackHeight(track.getBoundingClientRect().top, bottom)}px` }
+    })
+    for (const entry of heights) if (entry && entry.track.style.height !== entry.height) entry.track.style.height = entry.height
+  }, [editor])
+  useEffect(() => {
+    if (!editor) return
+    let frame: number | null = null
+    const later = () => {
+      if (frame === null) frame = requestAnimationFrame(() => { frame = null; measureRail() })
+    }
+    const onTransaction = ({ transaction }: { transaction: Transaction }) => {
+      if (transaction.docChanged || transaction.selectionSet || transaction.getMeta(deckCurrentKey) !== undefined || transaction.getMeta(deckFocusKey) !== undefined) later()
+    }
+    later()
+    editor.on('transaction', onTransaction)
+    const observer = new ResizeObserver(later)
+    observer.observe(editor.view.dom)
+    return () => {
+      editor.off('transaction', onTransaction)
+      observer.disconnect()
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [editor, measureRail])
+  // A click on a track makes its slide the current one, as a thumbnail does (its ⋯ is its own).
+  useEffect(() => {
+    if (!editor) return
+    const dom = editor.view.dom
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as Element | null
+      const track = target?.closest?.('.deck-part-track')
+      if (!track || target?.closest('.deck-part-more')) return
+      const heads = Array.from(dom.querySelectorAll(':scope > .deck-part-head'))
+      const index = railPick(heads.indexOf(track.parentElement as Element), Math.min(currentRef.current, countRef.current - 1), heads.length)
+      if (index !== null) pick(index)
+    }
+    dom.addEventListener('click', onClick)
+    return () => dom.removeEventListener('click', onClick)
+  }, [editor, pick])
+  // A slide with no handout's row (17 November): its part opens to write in and its slide becomes current. The handout
+  // takes the focus and the caret goes in first, which opens the part (deckCurrent.ts: a part the caret is in, while the
+  // handout has the focus, never folds), so the handout scrolls to the part as it now stands.
+  const openPart = useCallback((index: number) => {
+    if (!editor || editor.isDestroyed) return
+    const range = partRange(editor.state.doc, index)
+    const blocks: number[] = []
+    if (range) {
+      editor.state.doc.nodesBetween(range.from, range.to, (node, pos) => {
+        if (pos > range.from && pos < range.to && node.isTextblock) blocks.push(pos)
+        return pos === range.from ? false : !node.isTextblock
+      })
+    }
+    const caret = rowCaret(blocks)
+    if (caret !== null) {
+      editor.view.focus()
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, caret)).setMeta('addToHistory', false))
+    }
+    pick(index)
+  }, [editor, pick])
+
   /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */
   const idOf = useCallback((index: number): string | null => {
     if (!editor) return null
@@ -960,10 +1055,10 @@ export function DeckView({
       setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
     }))
   }, [pick, editor])
-  /** From a part number's ⋯: beside the number (on its left, so the number stays in view), the focus back to its ⋯. */
+  /** From a part number's ⋯: beside the number (on its right: the number is on the rail at the handout's left), the focus back to its ⋯. */
   const partSettings = useCallback((index: number, slot: PartMenuSlot) => openSettings(index, () => (
     slot.element.isConnected
-      ? { anchor: slot.element.parentElement?.querySelector<HTMLElement>('.deck-part-number') ?? slot.element, side: 'left', back: slot.element.querySelector('button') }
+      ? { anchor: slot.element.parentElement?.querySelector<HTMLElement>('.deck-part-number') ?? slot.element, side: 'right', back: slot.element.querySelector('button') }
       : null
   )), [openSettings])
   /** From the slide's own right-click menu: at the point it was opened, the focus back to the slide's words. */
@@ -1610,6 +1705,8 @@ export function DeckView({
               fromLibrary={!!(entry?.data.id && libraryBadge(marks[entry.data.id]))}
               actions={stripActions}
               onSettings={partSettings}
+              title={(entry?.data.title ?? '').trim()}
+              onOpenPart={openPart}
             />
           )
         }) : null}

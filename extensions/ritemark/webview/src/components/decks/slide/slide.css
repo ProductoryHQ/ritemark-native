@@ -20,7 +20,9 @@
 .deck-sl .stc { position: absolute; text-align: center; font: 700 58px/66px var(--s-fh, 'Sofia Sans'); overflow-wrap: anywhere; }
 .deck-sl .sxc { position: absolute; text-align: center; font: 400 26px/36px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
 .deck-sl .sn { position: absolute; min-width: 40px; font: 700 132px/132px var(--s-fh, 'Sofia Sans'); color: var(--s-acc, #F2B544); }
-.deck-sl .bx { position: absolute; box-sizing: border-box; padding: 24px 22px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+/* Space, not lines (Jarmo, 17 November): a filled box is its fill only; only an outline theme's box keeps its line
+   (`--s-boxe`, themeVars), because that's what the person chose. */
+.deck-sl .bx { position: absolute; box-sizing: border-box; padding: 24px 22px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-sl .bx.alt { background: var(--s-box2, rgba(255,255,255,.06)); }
 .deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
 .deck-sl .ic svg { width: 28px; height: 28px; }
@@ -46,7 +48,7 @@
 .deck-sl .arws { position: absolute; }
 .deck-sl .arw { position: absolute; box-sizing: border-box; padding: 22px 30px 22px 40px; background: var(--s-arw, rgba(255,255,255,.08)); clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%, 26px 50%); }
 .deck-sl .arw.first { clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 50%, calc(100% - 26px) 100%, 0 100%); }
-.deck-sl .cl { position: absolute; box-sizing: border-box; padding: 26px 30px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); }
+.deck-sl .cl { position: absolute; box-sizing: border-box; padding: 26px 30px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-sl .cl .ch { display: block; font: 700 30px/36px var(--s-fh, 'Sofia Sans'); color: var(--s-acct, #F2B544); margin-bottom: 14px; }
 .deck-sl .cl .cx { display: block; font: 400 23px/40px var(--s-fb, 'Sofia Sans'); color: var(--s-tx, #E4E6F7); white-space: pre-line; }
 .deck-sl .gnm { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
@@ -67,7 +69,7 @@
 .deck-slide.is-borderless .deck-sl .pts, .deck-slide.is-borderless .deck-sl .es, .deck-slide.is-borderless .deck-sl .cl .cx { color: var(--s-tx, #33365A); }
 .deck-slide.is-borderless .deck-sl .pts li::marker { color: var(--s-acct, #C98A10); }
 .deck-slide.is-borderless .deck-sl .sn { color: var(--s-acc, #E0A21F); }
-.deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #F6F6FB); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl .bx.alt { background: var(--s-box2, #F6F6FB); }
 .deck-slide.is-borderless .deck-sl .ic { background: var(--s-accs, rgba(242,181,68,.2)); color: var(--s-acct, #B07A12); }
 .deck-slide.is-borderless .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(224,162,31,.4)); color: var(--s-acct, rgba(176,122,18,.7)); }
@@ -163,12 +165,14 @@
 .deck-slide.is-borderless .deck-sl .blk-missing-name { color: var(--s-ph, rgba(28,31,74,.45)); }
 /* Columns: side by side, a thin line between them (frame 23). */
 .deck-sl.is-blocks .blk-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin: .3em 0 .5em; }
-.deck-sl.is-blocks .blk-column { min-width: 0; padding: .2em 1.1em; box-shadow: inset 1px 0 0 var(--s-row, rgba(255,255,255,.16)); }
-.deck-sl.is-blocks .blk-column:first-child { padding-left: 0; box-shadow: none; }
+/* Columns have space between them, and no line: the line shows only while the split is pointed at or dragged (the
+   block bar's split handle, decks.css). */
+.deck-sl.is-blocks .blk-column { min-width: 0; padding: .2em 1.1em; }
+.deck-sl.is-blocks .blk-column:first-child { padding-left: 0; }
 .deck-sl.is-blocks .blk-column > :last-child, .deck-sl.is-blocks .blk-box > :last-child { margin-bottom: 0; }
 /* Boxes: a row of cards, with an icon or the look's own mark. */
 .deck-sl.is-blocks .blk-boxes { gap: 16px; margin: .3em 0 .5em; counter-reset: blk-box; }
-.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 18px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.13)); font-size: .86em; }
+.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 18px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); font-size: .86em; }
 .deck-sl.is-blocks .blk-box > * { margin-bottom: 0; }
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
 .deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
@@ -211,7 +215,7 @@
 .deck-sl.is-blocks .blk-boxes[data-width="l"] { --blk-w: 400px; }
 .deck-sl.is-blocks .blk-boxes[data-width] > .blk-box { flex: 0 0 min(var(--blk-w), 100%); }
 .deck-sl.is-blocks .blk-boxes[data-align="center"] > .blk-box { align-items: center; text-align: center; }
-.deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="filled"] > .blk-box { background: var(--s-boxf, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxfl, rgba(255,255,255,.13)); }
+.deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="filled"] > .blk-box { background: var(--s-boxf, rgba(255,255,255,.07)); box-shadow: none; }
 .deck-slide .deck-sl.is-blocks .blk-boxes[data-fill="outline"] > .blk-box { background: transparent; box-shadow: inset 0 0 0 1.5px var(--s-boxo, rgba(255,255,255,.34)); }
 /* A column's blocks keep their own width when it is a flex column: a table and a picture never stretch (the slide's
    blocks have bottom margins only, so none collapse that would here). */
@@ -233,9 +237,7 @@
 .deck-slide.is-borderless .deck-sl.is-blocks strong, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li { color: var(--s-hd, #1C1F4A); }
 .deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote { color: var(--s-sub, #5B5F86); }
 .deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
-.deck-slide.is-borderless .deck-sl.is-blocks .blk-column { box-shadow: inset 1px 0 0 var(--s-row, #E2E3EE); }
-.deck-slide.is-borderless .deck-sl.is-blocks .blk-column:first-child { box-shadow: none; }
-.deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #F6F6FB); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
 .deck-slide.is-borderless .deck-sl.is-blocks table { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
 .deck-slide.is-borderless .deck-sl.is-blocks th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }

@@ -146,7 +146,7 @@ borderless:
   acct: "#B07A12"
   thbg: "#FFF4D6"
   thfg: "#8A5A00"
-  box: "#F6F6FB"
+  box: "#EFF0F8"
   box2: "#F6F6FB"
   pic: "#F6F6FB"
   boxl: "#E7E8F2"

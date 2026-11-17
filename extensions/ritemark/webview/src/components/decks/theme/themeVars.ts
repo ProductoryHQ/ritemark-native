@@ -42,6 +42,17 @@ const toward = (colour: string, target: string, min: number, ground: string) => 
 }
 
 const WHITE = '#FFFFFF'
+/**
+ * Space, not lines (Jarmo, 17 November): on white a filled box is its fill only, so the fill must read alone. One
+ * fainter than this against white (a theme's own hand-picked shade, Evening's #F6F6FB before then) is taken toward the
+ * headings' colour, a little at a time, until it does. Evening's own is #EFF0F8.
+ */
+const FILL_ALONE = 1.13
+export const fillAlone = (fill: string, ink: string, ground: string = WHITE) => {
+  let value = fill
+  for (let index = 0; index < 40 && contrast(value, ground) < FILL_ALONE; index++) value = mix(value, ink, 0.02)
+  return value
+}
 const RADII: Record<DeckTheme['round'], [number, number, number]> = { square: [3, 3, 4], soft: [14, 10, 20], round: [26, 18, 22] }
 
 /**
@@ -66,6 +77,9 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
     const x = theme.card ?? {}
     const paper = !dark && contrast(bg, WHITE) < 1.04
     const lift = (a: number, b: number) => (dark ? rgba(WHITE, a) : paper ? rgba(ink, b) : WHITE)
+    // A filled box on a light ground is its fill only too (17 November), so it must read alone on the theme's ground:
+    // white on a cream ground, or a faint tint of the ink on paper, is taken toward the ink until it does.
+    const filled = dark ? lift(0.07, 0.035) : fillAlone(paper ? mix(bg, ink, 0.035) : WHITE, ink, bg)
     vars = {
       bg: theme.glow
         ? `radial-gradient(120% 95% at 88% 8%, ${x.g1 || mix(bg, dark ? WHITE : theme.accent, dark ? 0.16 : 0.07)} 0%, ${bg} 52%, ${x.g3 || mix(bg, '#000000', dark ? 0.3 : 0.03)} 100%)`
@@ -78,13 +92,14 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
       acct: dark ? theme.accent : toward(theme.accent, '#000000', 3, bg),
       accs: rgba(theme.accent, dark ? 0.16 : 0.14),
       accl: rgba(theme.accent, 0.55),
-      box: outline ? 'transparent' : lift(0.07, 0.035),
+      box: outline ? 'transparent' : filled,
       box2: outline ? 'transparent' : lift(0.06, 0.03),
       arw: lift(0.08, 0.05),
       boxl: rgba(ink, outline ? (dark ? 0.34 : 0.24) : dark ? 0.13 : 0.1),
+      // A box's edge: an outline theme's line; a filled theme's box is its fill only (17 November).
+      boxe: outline ? rgba(ink, dark ? 0.34 : 0.24) : 'transparent',
       // The block bar's Style (17 November): a Boxes block's own Filled or Outline, whatever the theme's boxes are.
-      boxf: lift(0.07, 0.035),
-      boxfl: rgba(ink, dark ? 0.13 : 0.1),
+      boxf: filled,
       boxo: rgba(ink, dark ? 0.34 : 0.24),
       row: rgba(ink, dark ? 0.1 : 0.08),
       odd: rgba(ink, dark ? 0.03 : 0.025),
@@ -105,7 +120,7 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
     const hd = x.hd || (contrast(theme.bg, WHITE) >= 4.5 ? theme.bg : toward(theme.head, '#000000', 4.5, WHITE))
     const dark = isDark(theme.bg)
     const acc = x.acc || toward(theme.accent, '#000000', 2.2, WHITE)
-    const box = outline ? 'transparent' : x.box || mix(hd, WHITE, 0.96)
+    const box = outline ? 'transparent' : fillAlone(x.box || mix(hd, WHITE, 0.96), hd)
     vars = {
       bg: 'transparent',
       hd,
@@ -120,9 +135,9 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
       box2: outline ? 'transparent' : x.box2 || box,
       arw: x.arw || mix(hd, WHITE, 0.94),
       boxl: x.boxl || mix(hd, WHITE, outline ? 0.74 : 0.9),
+      boxe: outline ? x.boxl || mix(hd, WHITE, 0.74) : 'transparent',
+      boxf: fillAlone(x.box || mix(hd, WHITE, 0.96), hd),
       // The theme's own line (`borderless.boxl`) is for its own style: a filled theme's is too faint for an outline.
-      boxf: x.box || mix(hd, WHITE, 0.96),
-      boxfl: (!outline && x.boxl) || mix(hd, WHITE, 0.9),
       boxo: (outline && x.boxl) || mix(hd, WHITE, 0.74),
       row: x.row || mix(hd, WHITE, 0.92),
       odd: x.odd || mix(hd, WHITE, 0.98),

@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, PAGE_CSP, handoutHtml, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, PAGE_CSP, handoutHtml, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -306,6 +306,45 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   const unmarked = publicDeck(text.replace('handout: text\n', ''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
   assert.equal(unmarked.textHandout, undefined, 'and the digest of an unmarked deck is as it was');
   assert.deepEqual(parse(pageHtml(unmarked, assets, { digest: deckDigest(unmarked), pictureUrl })).querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], ['Agents act']]);
+}
+
+
+// A slide with no handout (17 November): a part with no heading and no text. The viewer sees nothing of it in the text,
+// no row, no title, no Contents entry; the slide keeps its place in the slide order (its layer, its place in the
+// text's order), so the arrows step through it and scrolling past the gap between its neighbours brings it up.
+{
+  const text = [
+    '---', 'deck: 1', 'theme: Slide library/Themes/Evening.theme.md', 'handout: text', '---', '',
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '', '## Welcome', '', 'Words.', '',
+    '```slide points', 'id: p001', 'title: Copilot or Cursor?', '```', '', '##', '', '<!-- a comment -->', '',
+    '```slide points', 'id: p002', 'title: Agents act', '```', '', 'Words after.', '',
+    '```slide points', 'id: p003', 'title: A picture only', '```', '', '![](images/which-stays.png)', '',
+  ].join('\n');
+  const deckOnly = publicDeck(text, { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(isSlideOnly(deckOnly.slides[1], true), true, 'an emptied part: an empty heading and a comment');
+  assert.equal(isSlideOnly(deckOnly.slides[0], true), false);
+  assert.equal(isSlideOnly(deckOnly.slides[3], true), false, 'a picture is something to see');
+  const bytes = pageHtml(deckOnly, assets, { digest: deckDigest(deckOnly), pictureUrl });
+  const page = parse(bytes);
+  assert.equal(page.querySelectorAll('.slidebox > .layer').length, 4, 'the slide stays in the deck');
+  assert.equal(page.querySelectorAll('.slidebox > .layer')[1].getAttribute('data-title'), 'Copilot or Cursor?');
+  const parts = page.querySelectorAll('.part[data-i]');
+  assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3'], "every slide keeps its place in the text's order");
+  const only = parts[1];
+  assert.ok(only.classList.contains('only') && only.getAttribute('aria-hidden') === 'true' && only.innerHTML === '', 'its place only, with nothing in it');
+  assert.ok(!page.querySelector('#text')!.text.includes('Copilot or Cursor?'), 'no title in the text');
+  assert.deepEqual(page.querySelectorAll('[data-go]').map(row => row.getAttribute('data-go')), ['0', '2', '3'], 'no Contents entry');
+  assert.ok(/\.part\.only \{ height: 0; padding: 0; border-top: 0; overflow: hidden; \}/.test(bytes), 'no height of its own');
+  // A deck written before 16 November shows a part's slide title as its heading, so an empty part is no slide-only one;
+  // a slide with no title and no handout shows nothing either way.
+  const older = publicDeck(text.replace('handout: text\n', '').replace('##\n\n', ''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(isSlideOnly(older.slides[1], false), false, 'an old deck: the title is its heading');
+  assert.equal(isSlideOnly({ handout: '', data: { title: '' } }, false), true);
+  const olderPage = parse(pageHtml(older, assets, { digest: deckDigest(older), pictureUrl }));
+  assert.deepEqual(olderPage.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text))[1], ['Copilot or Cursor?']);
+  assert.equal(olderPage.querySelectorAll('[data-go]').length, 4);
+  // A wide table's own scrollbar is its thumb only, with no track behind it (Jarmo's rule for every scrollbar).
+  assert.ok(/\.tw \{ overflow-x: auto;[^}]*scrollbar-color: [^;]+ transparent; \}/.test(bytes), 'no scrollbar track');
 }
 
 
