@@ -175,19 +175,26 @@ export function PictureBar(props: PictureBarProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [left, setLeft] = useState<number | null>(null)
   const [top, setTop] = useState(0)
-  /** Too wide for the slide's side: the words of Crop, Place and Description go, their icons and tooltips stay. */
-  const [compact, setCompact] = useState(false)
-  const fullWidth = useRef(0)
+  /**
+   * Too wide for the slide's side of the window: words go from the right, one step at a time, their icons and tooltips
+   * staying: 1 Description's, 2 Crop's too, 3 the Place items' too (the Experience lead, #774). 0: every word.
+   */
+  const [fold, setFold] = useState(0)
+  const widths = useRef<number[]>([])
 
   // Under the picture, centred on it, inside the window; over the picture's lower edge when there is no room below.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
     const width = bar.offsetWidth
-    if (!compact) fullWidth.current = width
+    widths.current[fold] = width
     const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
-    if ((fullWidth.current > room) !== compact) {
-      setCompact(!compact)
+    if (width > room && fold < 3) {
+      setFold(fold + 1)
+      return
+    }
+    if (fold > 0 && widths.current[fold - 1] !== undefined && widths.current[fold - 1] <= room) {
+      setFold(fold - 1)
       return
     }
     const height = bar.offsetHeight
@@ -272,7 +279,7 @@ export function PictureBar(props: PictureBarProps) {
               <Divider />
               <BarButton label="Crop" tip={canCrop ? 'Crop the picture: its file stays as it is' : 'The picture is still loading'} disabled={!canCrop} onClick={props.onCrop}>
                 <Icon name="crop" size={14} tone="inherit" />
-                {compact ? null : 'Crop'}
+                {fold >= 2 ? null : 'Crop'}
               </BarButton>
             </>
           ) : null}
@@ -283,7 +290,7 @@ export function PictureBar(props: PictureBarProps) {
                 {PLACES.map(option => (
                   <BarButton key={option.value} label={option.label} tip={option.tip} active={place === option.value} onClick={() => props.onPlace?.(option.value)}>
                     <Icon name={option.icon} size={14} tone="inherit" className={option.mirrored ? '-scale-x-100' : undefined} />
-                    {compact ? null : option.label}
+                    {fold >= 3 ? null : option.label}
                   </BarButton>
                 ))}
               </Group>
@@ -293,7 +300,7 @@ export function PictureBar(props: PictureBarProps) {
           {empty ? null : (
             <>
               <Divider />
-              <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} withCaption={kind === 'flow'} compact={compact} />
+              <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} withCaption={kind === 'flow'} compact={fold >= 1} />
             </>
           )}
           {comments && props.onComment ? (

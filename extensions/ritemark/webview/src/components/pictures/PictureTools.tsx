@@ -78,9 +78,10 @@ function partsOf(editor: Editor, pos: number, context: PictureContext): Parts | 
   return { root, image, target: (root.querySelector('.pic-box') as HTMLElement | null) ?? root, host }
 }
 
-/** On a slide, the stage's sides (the slide's own column, right of the strip and its divider), on the screen. */
+/** On a slide, the stage's sides (right of the strip and its divider), on the screen. */
 export function stageBounds(host: Element): { left: number; right: number } | undefined {
-  const column = host.closest('.deck-slide')?.parentElement
+  // The stage: right of the strip and its divider, the desk around the slide included (the bar may reach past the slide).
+  const column = host.closest('.deck-stage') ?? host.closest('.deck-slide')?.parentElement
   if (!column) return undefined
   const rect = column.getBoundingClientRect()
   return { left: rect.left, right: rect.right }

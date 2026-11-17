@@ -9,12 +9,12 @@ Taken in isolated dev instances on the PR's last two heads (06, 07, 09, 11, 12, 
 | 03-doc-crop-16x9 | Crop mode: the whole picture, the 16:9 frame moved and narrowed, the thirds, the rest dimmed; Reset and Done | (nothing until Done) |
 | 04-doc-cropped | After Done (Enter) | `{width=39% align=center crop=16:9 zoom=1.232 focus=50.8,47}` |
 | 05-doc-more-menu | ⋯: Replace picture…, Copy, Show in Finder, Remove | |
-| 06-slide-selected | A picture on a slide, chosen: the same bar with Place, kept on the slide's side (its words go where the side is too narrow; icons and tooltips stay) | |
+| 06-slide-selected | A picture on a slide, chosen: the same bar with Place, kept on the slide's side of the window (right of the strip and the divider; it may reach past the slide over the desk; only when it does not fit there do words go, from the right: Description, then Crop, then Place) | |
 | 07-slide-handles-mid-drag | A slide's corner handle mid-drag: it stays under the pointer at the slide's scale, and the bar hides until the drop | after the drop: `{width=400px}` (snapped to L) |
 | 08-slide-place-left | Place → Left: the same picture fills the slide's left side | header `picture: left`, `image:`, `alt:` |
 | 09-slide-left-focus-point | The side picture chosen, its focus point dragged; the bar inside the slide at its bottom, 12 px up | `focus: "27,50"` |
 | 10-slide-place-behind-focus | Place → Behind, its focus point moved | `picture: behind`, `focus: "64,35"` |
-| 11-slide-empty-after-remove | ⋯ → Remove: the place stays, with a picture icon and "Paste or drop a picture" above the veil in the slide's text colour; no Description on the bar | `picture: behind` only |
+| 11-slide-empty-after-remove | ⋯ → Remove: the place stays, with a picture icon and "Choose, paste or drop a picture" (a click opens the picker) above the veil in the slide's text colour; no Description on the bar | `picture: behind` only |
 | 12-slide-place-in-text | Place → In text on a side picture: it is back in the words, and the place is gone | `![The harbour from the hill](images/harbour.png)` |
 | 13-page-slide-before / -zoom | The published page, made from the same deck as 12: the slide's picture whole, as in the editor; a click opens it full size, with an × (44 px) at the top right | |
 | 14-page-handout-before / -zoom | A handout picture at half width with its caption; a click opens it full size | |
