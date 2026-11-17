@@ -157,15 +157,24 @@ check('a change that says what the block says already writes nothing', () => {
   assert.equal(setPictureLook(state, firstPicture(state.doc), { width: '50%' }), null)
 })
 
-check('Remove takes the picture out (one undo brings it back); Replace keeps size and words, drops the crop', () => {
+check('Remove takes the picture out (one undo brings it back)', () => {
   let state = chooseFirst(docState('Before.\n\n![A](images/a.png){width=50% crop=1:1}\n\nAfter.\n'))
   const removed = state.apply(removePicture(state, firstPicture(state.doc))!)
   assert.equal(editorMarkdown(removed.doc), 'Before.\n\nAfter.')
   let back = removed
   undo(back, tr => { back = back.apply(tr) })
   assert.equal(editorMarkdown(back.doc), 'Before.\n\n![A](images/a.png){width=50% crop=1:1}\n\nAfter.')
+})
+
+check('Replace (or a double click) keeps size, alignment and place; crop, focus and description start fresh; one Undo', () => {
+  const before = 'Before.\n\n![The old one](images/a.png){.caption width=50% align=center crop=1:1 zoom=1.5 focus=30,40 foo=bar}\n\nAfter.'
+  let state = chooseFirst(docState(`${before}\n`))
   state = state.apply(replacePicture(state, firstPicture(state.doc), { src: 'images/b.png', title: 'images/b.png' })!)
-  assert.equal(editorMarkdown(state.doc), 'Before.\n\n![A](images/b.png){width=50%}\n\nAfter.')
+  assert.equal(editorMarkdown(state.doc), 'Before.\n\n![](images/b.png){width=50% align=center foo=bar}\n\nAfter.')
+  assert.ok(chosenPicture(state), 'the new picture stays chosen')
+  let back = state
+  undo(back, tr => { back = back.apply(tr) })
+  assert.equal(editorMarkdown(back.doc), before, 'one Undo brings the old picture back with all its settings')
 })
 
 // ---- the slide editor

@@ -4,7 +4,7 @@
  * is its focus point, a dot dragged on the picture (`focus:` in the slide's header).
  *
  * A click on the picture chooses it (the accent ring); Esc, or a press anywhere else, leaves it; Backspace or Delete
- * removes it. Removed, the place stays, empty, and says "Paste or drop a picture"; only Picture: None takes the place
+ * removes it. Removed, the place stays, empty, and says "Choose, paste or drop a picture" (a click opens the file picker); only Picture: None takes the place
  * away. The picture's file is never touched.
  */
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
@@ -111,12 +111,16 @@ export function SidePicture(props: SidePictureProps) {
             if (event.button !== 0) return
             event.preventDefault()
             props.onChoose()
+            // An empty place opens the file picker at once (experience 49).
+            if (!url && !missing) props.onReplace()
           }}
+          // A double click on the picture chooses another one, as ⋯ → Replace picture… does.
+          onDoubleClick={() => { if (url) props.onReplace() }}
         >
           {!url ? (
             <span className="photo-hint">
               <Icon name="image" size={20} tone="inherit" />
-              Paste or drop a picture
+              Choose, paste or drop a picture
             </span>
           ) : null}
           {chosen && url ? (

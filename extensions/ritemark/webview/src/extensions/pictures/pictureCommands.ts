@@ -123,15 +123,16 @@ export function removePicture(state: EditorState, pos: number): Transaction | nu
 }
 
 /**
- * Another picture in this one's place (Replace picture…, or a paste or drop onto it): its size, alignment and
- * description stay; the crop, made for the old picture's shape, goes.
+ * Another picture in this one's place (Replace picture…, a double click, or a paste or drop onto it): its size and
+ * alignment stay; its crop, focus point and description (with its caption) start fresh, since they were the old
+ * picture's. One undo step brings the old picture back with all of them.
  */
 export function replacePicture(state: EditorState, pos: number, picture: { src: string; title: string }): Transaction | null {
   const node = pictureAt(state, pos)
   if (!node) return null
   const written = (node.attrs.picture as string | null) ?? ''
-  const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined }))
-  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: picture.src, title: picture.title, picture: block || null })
+  const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined, caption: undefined }))
+  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: picture.src, title: picture.title, alt: '', picture: block || null })
   tr.setSelection(NodeSelection.create(tr.doc, pos))
   return ownStep(tr)
 }

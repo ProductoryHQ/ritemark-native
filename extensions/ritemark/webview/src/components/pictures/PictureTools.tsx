@@ -30,7 +30,7 @@ import {
   type Region,
 } from '../../../../src/markdown/pictureLook'
 import { sendToExtension } from '../../bridge'
-import { commitCrop, imagePathOf } from '../../extensions/pictures/PictureNode'
+import { commitCrop, imagePathOf, isDiagram } from '../../extensions/pictures/PictureNode'
 import { chosenPicture, cropMeta, pictureEditorEnabled, cropOf, leavePicture, removePicture, setPictureLook, setPictureWords, type CropState } from '../../extensions/pictures/pictureCommands'
 import { runClipboardEdit } from '../tables/TableMenuItems'
 import { PictureBar, type PicturePlace } from './PictureBar'
@@ -153,6 +153,24 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
   }, [editor])
 
   const chosen = editor && !editor.isDestroyed ? chosenPicture(editor.state) : null
+
+  // A double click on a picture opens the file picker, as ⋯ → Replace picture… does (Jarmo, 17 November). Its first
+  // click chose the picture. A draw.io diagram keeps its own double click (its editor).
+  const replaceRef = useRef(onReplace)
+  replaceRef.current = onReplace
+  useEffect(() => {
+    if (!editor) return
+    const view = editor.view
+    const twice = (event: MouseEvent) => {
+      const picture = editor.isDestroyed || !pictureEditorEnabled() ? null : chosenPicture(editor.state)
+      const dom = picture ? view.nodeDOM(picture.pos) : null
+      if (!picture || !dom || !dom.contains(event.target as Node) || isDiagram(picture.node.attrs)) return
+      event.preventDefault()
+      replaceRef.current(picture.pos)
+    }
+    view.dom.addEventListener('dblclick', twice)
+    return () => view.dom.removeEventListener('dblclick', twice)
+  }, [editor])
 
   // While a picture is chosen, drawn again as the window moves and as a picture loads (it takes its height then).
   useEffect(() => {
