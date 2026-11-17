@@ -22,8 +22,8 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import { blockPicturePaths } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import type { DeckTheme } from '../deckTheme';
-import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PictureFrom } from './pageHtml';
+import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFontFile, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
+import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PageThemeFont, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 
 export interface PageFs {
@@ -242,4 +242,202 @@ export async function buildDeckPage(
 export async function currentPageDigest(deckPath: string, text: string, theme: DeckTheme, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<string> {
   const deck = publicDeckOf(deckPath, text, theme);
   return pageDigest(deck, (await foundPictures(deck, deckPath, pageFs)).values());
+}
+
+// ------------------------------------------------------------------ The theme's fonts, as files beside the page
+
+/**
+ * Sprint 162 PR 3 (step-3-themes.md: "The fonts go with the page as files (OFL allows it)"): the theme's fonts other
+ * than Sofia Sans (which the page carries inline, for its own words too) are files in a `fonts` folder beside the
+ * page, `fonts/<Font>-<version>-<part>.woff2`, which the page's `@font-face` rules name. 2.2's gather finds them in the
+ * page's style and sends them with it, under its own rules, as it sends the pictures. Only the theme's fonts are
+ * written, and each only once for all the decks in a folder. The page loads no font from anywhere else.
+ *
+ *  - A file Ritemark didn't write is never touched: a name taken by other bytes, a link or a folder stops the page in
+ *    one line, as the page's own place does. The version in the name means a newer font never meets an older file.
+ *  - A font whose files the app doesn't have (an app older than the fonts) is left out: the page draws it in Sofia
+ *    Sans, the next name in the slide's font list.
+ */
+export const PAGE_FONT_FOLDER = 'fonts';
+
+/** A theme font's file for the page, with its bytes. */
+export interface PageFontFile extends PageThemeFont {
+  bytes: Buffer;
+}
+
+/** The page's name for a font's part: `Inter-4.001-latin.woff2`. */
+export function pageFontName(font: DeckFont, subset: (typeof DECK_FONT_SUBSETS)[number]['subset']): string {
+  return `${font.file}-${font.version}-${subset}.woff2`;
+}
+
+/**
+ * The theme's fonts beyond Sofia Sans, read from the app's `media/fonts/`: both parts of each, or none of a font
+ * whose files aren't there.
+ */
+export async function themeFontFiles(
+  extensionPath: string,
+  theme: Pick<DeckTheme, 'fh' | 'fb'>,
+  read: (file: string) => Promise<Buffer> = file => fs.promises.readFile(file),
+): Promise<PageFontFile[]> {
+  const files: PageFontFile[] = [];
+  for (const font of themeFonts(theme)) {
+    if (font.name === DEFAULT_DECK_FONT) continue;
+    const parts = await Promise.all(DECK_FONT_SUBSETS.map(async part => {
+      try {
+        return {
+          family: font.name,
+          unicodeRange: part.unicodeRange,
+          address: `${PAGE_FONT_FOLDER}/${pageFontName(font, part.subset)}`,
+          bytes: await read(path.join(extensionPath, 'media', 'fonts', deckFontFile(font, part.subset))),
+        };
+      } catch {
+        return null;
+      }
+    }));
+    if (parts.every(part => part !== null)) files.push(...(parts as PageFontFile[]));
+  }
+  return files;
+}
+
+export interface FontFs {
+  /** Throws (ENOENT) when there is nothing at the path. */
+  lstat(target: string): Promise<{ isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean }>;
+  readFile(target: string): Promise<Buffer>;
+  /** Fails (EEXIST) when the path is taken. */
+  writeFile(target: string, data: Buffer): Promise<void>;
+  /** Fails (EEXIST) when the path is taken. */
+  mkdir(target: string): Promise<void>;
+  readdir(target: string): Promise<string[]>;
+  link(from: string, to: string): Promise<void>;
+  rename(from: string, to: string): Promise<void>;
+  unlink(target: string): Promise<void>;
+  rmdir(target: string): Promise<void>;
+}
+
+export const nodeFontFs: FontFs = {
+  lstat: target => fs.promises.lstat(target),
+  readFile: target => fs.promises.readFile(target),
+  writeFile: (target, data) => fs.promises.writeFile(target, data, { flag: 'wx' }),
+  mkdir: async target => { await fs.promises.mkdir(target); },
+  readdir: target => fs.promises.readdir(target),
+  link: (from, to) => fs.promises.link(from, to),
+  rename: (from, to) => fs.promises.rename(from, to),
+  unlink: target => fs.promises.unlink(target),
+  rmdir: target => fs.promises.rmdir(target),
+};
+
+/** The one line when the fonts' place beside the deck holds something Ritemark didn't put there. */
+export function foreignFontLine(shown: string): string {
+  return `"${shown}" is already beside this deck, and isn't the font Ritemark puts there, so it stays as it is. Rename it to publish the deck.`;
+}
+
+export type FontWriteResult =
+  | { kind: 'written'; created: string[] }
+  | { kind: 'refused'; line: string };
+
+const isMissing = (error: unknown) => (error as NodeJS.ErrnoException)?.code === 'ENOENT';
+
+/** What is at a font's place: nothing, the same bytes, or something else. */
+async function fontAt(fontFs: FontFs, target: string, bytes: Buffer): Promise<'none' | 'same' | 'other'> {
+  let info: { isFile(): boolean; isSymbolicLink(): boolean };
+  try {
+    info = await fontFs.lstat(target);
+  } catch (error) {
+    if (isMissing(error)) return 'none';
+    throw error;
+  }
+  if (info.isSymbolicLink() || !info.isFile()) return 'other';
+  return (await fontFs.readFile(target)).equals(bytes) ? 'same' : 'other';
+}
+
+/** Is the fonts' folder a plain folder (not a link, not a file)? */
+async function plainFolder(fontFs: FontFs, folder: string): Promise<boolean> {
+  const info = await fontFs.lstat(folder);
+  return !info.isSymbolicLink() && info.isDirectory();
+}
+
+/**
+ * Write the theme's font files beside the deck (`fonts/`), each where nothing is, in one step (a second name, which
+ * the system refuses when the name is taken; a move after a last check where it can't give one), as the page is
+ * written. A file already there with the same bytes stays. Anything else at a font's place, or a `fonts` that isn't a
+ * plain folder, stops it: what this call wrote is taken back, and the result says why in one line.
+ */
+export async function writePageFonts(fontFs: FontFs, deckPath: string, files: readonly PageFontFile[]): Promise<FontWriteResult> {
+  if (files.length === 0) return { kind: 'written', created: [] };
+  const folder = path.join(path.dirname(deckPath), PAGE_FONT_FOLDER);
+  const created: string[] = [];
+  let madeFolder = false;
+  const takeBack = async () => {
+    for (const file of created) await fontFs.unlink(file).catch(() => undefined);
+    if (madeFolder) await fontFs.rmdir(folder).catch(() => undefined);
+  };
+  const refused = async (shown: string): Promise<FontWriteResult> => {
+    await takeBack();
+    return { kind: 'refused', line: foreignFontLine(shown) };
+  };
+  try {
+    try {
+      if (!(await plainFolder(fontFs, folder))) return await refused(PAGE_FONT_FOLDER);
+    } catch (error) {
+      if (!isMissing(error)) throw error;
+      try {
+        await fontFs.mkdir(folder);
+        madeFolder = true;
+      } catch (made) {
+        if ((made as NodeJS.ErrnoException)?.code !== 'EEXIST') throw made;
+        if (!(await plainFolder(fontFs, folder))) return await refused(PAGE_FONT_FOLDER);
+      }
+    }
+    for (const file of files) {
+      const name = file.address.slice(PAGE_FONT_FOLDER.length + 1);
+      const target = path.join(folder, name);
+      const shown = `${PAGE_FONT_FOLDER}/${name}`;
+      const there = await fontAt(fontFs, target, file.bytes);
+      if (there === 'same') continue;
+      if (there === 'other') return await refused(shown);
+      const temporary = path.join(folder, `.${name}.${randomBytes(4).toString('hex')}.tmp`);
+      await fontFs.writeFile(temporary, file.bytes);
+      try {
+        await fontFs.link(temporary, target);
+        created.push(target);
+      } catch (error) {
+        // Taken meanwhile: the same font from another window is fine, anything else stops the page. Where the system
+        // can't give a second name (FAT, exFAT, some network folders), a move after a last check stands in.
+        const now = await fontAt(fontFs, target, file.bytes);
+        if (now === 'other') return await refused(shown);
+        if (now === 'none' && (error as NodeJS.ErrnoException)?.code !== 'EEXIST') {
+          await fontFs.rename(temporary, target);
+          created.push(target);
+        }
+      } finally {
+        await fontFs.unlink(temporary).catch(() => undefined);
+      }
+    }
+  } catch (error) {
+    await takeBack();
+    throw error;
+  }
+  return { kind: 'written', created };
+}
+
+/**
+ * Take back the font files a first Publish wrote, when its page was taken back: each only while it still holds the
+ * bytes written and no other page Ritemark wrote in the deck's folder names it; then the `fonts` folder, if empty.
+ */
+export async function removePageFonts(fontFs: FontFs, deckPath: string, created: readonly string[], files: readonly PageFontFile[]): Promise<void> {
+  if (created.length === 0) return;
+  const folder = path.dirname(deckPath);
+  const named = new Set<string>();
+  for (const entry of await fontFs.readdir(folder).catch(() => [] as string[])) {
+    if (!/\.html?$/i.test(entry)) continue;
+    const html = await fontFs.readFile(path.join(folder, entry)).then(bytes => bytes.toString('utf8')).catch(() => '');
+    if (!readPageMeta(html).ritemark) continue;
+    for (const file of files) if (html.includes(file.address)) named.add(file.address);
+  }
+  for (const target of created) {
+    const file = files.find(candidate => path.join(folder, ...candidate.address.split('/')) === target);
+    if (!file || named.has(file.address)) continue;
+    if ((await fontAt(fontFs, target, file.bytes).catch(() => 'other' as const)) === 'same') await fontFs.unlink(target).catch(() => undefined);
+  }
+  await fontFs.rmdir(path.join(folder, PAGE_FONT_FOLDER)).catch(() => undefined);
 }

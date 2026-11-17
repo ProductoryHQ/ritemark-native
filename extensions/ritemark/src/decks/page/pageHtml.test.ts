@@ -224,7 +224,7 @@ assert.deepEqual(scanText(html), []);
   assert.equal(scripts.length, 1);
   const hash = createHash('sha256').update(scripts[0]).digest('base64');
   assert.ok(policy.includes(`script-src 'sha256-${hash}'`), 'the script is allowed by its own hash');
-  for (const part of ["default-src 'none'", "style-src 'unsafe-inline'", 'font-src data:', "img-src 'self' data: file:", "base-uri 'none'", "form-action 'none'"]) {
+  for (const part of ["default-src 'none'", "style-src 'unsafe-inline'", "font-src 'self' data: file:", "img-src 'self' data: file:", "base-uri 'none'", "form-action 'none'"]) {
     assert.ok(policy.includes(part), part);
   }
   assert.ok(!/unsafe-eval|https?:|\*/.test(policy), 'nothing from elsewhere, no eval');

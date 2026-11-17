@@ -344,16 +344,28 @@ export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme,
 
 const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
-  // The measuring pass's step, for these words; new words start again from the estimate.
-  const [fit, setFit] = useState<{ data: SlideData; kind: string; step: number }>({ data, kind, step: 0 })
-  const step = fit.data === data && fit.kind === kind ? fit.step : 0
+  // The measuring pass's step, for these words in these fonts; new words, another font (Sprint 162 PR 3) or a font
+  // that has just loaded start again from the estimate.
+  const [loaded, setLoaded] = useState(0)
+  const fonts = `${theme.fh}\u0000${theme.fb}\u0000${loaded}`
+  const [fit, setFit] = useState<{ data: SlideData; kind: string; fonts: string; step: number }>({ data, kind, fonts, step: 0 })
+  const same = fit.data === data && fit.kind === kind && fit.fonts === fonts
+  const step = same ? fit.step : 0
   const layout = layoutSlide(kind, data, { editing: !!editing, step })
+
+  useEffect(() => {
+    const fontSet = document.fonts
+    if (!fontSet) return
+    const remeasure = () => setLoaded(count => count + 1)
+    fontSet.addEventListener?.('loadingdone', remeasure)
+    return () => fontSet.removeEventListener?.('loadingdone', remeasure)
+  }, [])
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    if (step < MAX_STEP && overflows(canvas)) setFit({ data, kind, step: step + 1 })
-    else if (fit.data !== data || fit.kind !== kind) setFit({ data, kind, step })
+    if (step < MAX_STEP && overflows(canvas)) setFit({ data, kind, fonts, step: step + 1 })
+    else if (!same) setFit({ data, kind, fonts, step })
   })
 
   const scale = width / CANVAS_WIDTH

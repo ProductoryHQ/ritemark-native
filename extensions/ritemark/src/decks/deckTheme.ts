@@ -33,10 +33,83 @@ export interface DeckTheme {
   borderless?: Record<string, string>;
 }
 
-/** The fonts a slide can use in this cut: Sofia Sans ships with Ritemark. Other names draw in Sofia Sans. */
-export const DECK_FONTS: Record<string, string> = {
-  'Sofia Sans': "'Sofia Sans', sans-serif",
-};
+/**
+ * Sprint 162 PR 3 (step-3-themes.md, "Fonts"): the six fonts a theme can use, all SIL OFL 1.1 and bundled with the app
+ * in `media/fonts/` (their notices: `media/fonts/OFL.txt`), so they draw offline, on the wall and on a published page.
+ * Each is a variable woff2 file (weight axis, upright) in a latin and a latin-ext part, so Estonian's õ ä ö ü š ž draw.
+ *
+ *  - `file`: the files' stem, `<file>-latin.woff2` and `<file>-latin-ext.woff2`.
+ *  - `version`: the font's own version (its name table), in the page's file names, so a page made with a newer font
+ *    never meets an older file of the same name beside it.
+ *  - `generic`: the family the browser falls back to after Sofia Sans.
+ *
+ * Sofia Sans is Ritemark's own: the webview carries it in its bundle (`webview/src/index.css`) and the page inline.
+ * The other five load as files when a slide uses them (the webview: `theme/deckFonts.ts`; the page: `pageFile.ts`).
+ */
+export interface DeckFont {
+  name: string;
+  file: string;
+  version: string;
+  generic: 'sans-serif' | 'serif';
+}
+
+export const DEFAULT_DECK_FONT = 'Sofia Sans';
+
+export const DECK_FONT_LIST: readonly DeckFont[] = [
+  { name: 'Sofia Sans', file: 'SofiaSans', version: '4.101', generic: 'sans-serif' },
+  { name: 'Inter', file: 'Inter', version: '4.001', generic: 'sans-serif' },
+  { name: 'IBM Plex Sans', file: 'IBMPlexSans', version: '3.201', generic: 'sans-serif' },
+  { name: 'Space Grotesk', file: 'SpaceGrotesk', version: '2.000', generic: 'sans-serif' },
+  { name: 'Source Serif 4', file: 'SourceSerif4', version: '4.004', generic: 'serif' },
+  { name: 'Fraunces', file: 'Fraunces', version: '1.000', generic: 'serif' },
+];
+
+/**
+ * The two parts of each font file and the characters each draws, as Google Fonts cuts them (the five fonts'
+ * `@fontsource-variable` stylesheets). Sofia Sans keeps its own ranges (`webview/src/index.css`, `PAGE_FONTS`).
+ */
+export const DECK_FONT_SUBSETS = [
+  {
+    subset: 'latin',
+    unicodeRange: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD',
+  },
+  {
+    subset: 'latin-ext',
+    unicodeRange: 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF',
+  },
+] as const;
+
+/** A font name as a key: one case, single spaces. */
+const fontKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+const FONTS_BY_KEY = new Map(DECK_FONT_LIST.map(font => [fontKey(font.name), font]));
+
+/**
+ * The font a theme's font name draws: one of the six whatever its case and spacing ("inter", "IBM  Plex Sans"), and
+ * Sofia Sans for a name that isn't one of them, or none.
+ */
+export function deckFont(name: unknown): DeckFont {
+  const found = typeof name === 'string' ? FONTS_BY_KEY.get(fontKey(name)) : undefined;
+  return found ?? FONTS_BY_KEY.get(fontKey(DEFAULT_DECK_FONT))!;
+}
+
+/** The CSS font list a slide draws a font name with: the font, Sofia Sans while it loads (or if it can't), its kind. */
+export function deckFontStack(name: unknown): string {
+  const font = deckFont(name);
+  return font.name === DEFAULT_DECK_FONT ? `'${DEFAULT_DECK_FONT}', sans-serif` : `'${font.name}', '${DEFAULT_DECK_FONT}', ${font.generic}`;
+}
+
+/** The fonts a theme draws (headings first), each once. */
+export function themeFonts(theme: Pick<DeckTheme, 'fh' | 'fb'>): DeckFont[] {
+  return [...new Set([deckFont(theme.fh), deckFont(theme.fb)])];
+}
+
+/** A font's file in `media/fonts/` for one of its parts: `Inter-latin.woff2`. */
+export function deckFontFile(font: DeckFont, subset: (typeof DECK_FONT_SUBSETS)[number]['subset']): string {
+  return `${font.file}-${subset}.woff2`;
+}
+
+/** The fonts by name, as the CSS font lists their slides draw with (kept for the callers of PR 1's map). */
+export const DECK_FONTS: Record<string, string> = Object.fromEntries(DECK_FONT_LIST.map(font => [font.name, deckFontStack(font.name)]));
 
 /** Where a project's themes live, and the built-in theme's file name there. */
 export const THEMES_FOLDER = 'Slide library/Themes';

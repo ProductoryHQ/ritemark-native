@@ -1,8 +1,9 @@
 /**
  * Sprint 159 (technical plan §2.3): the handout page as the learner page draws it (experience 46's `learner.html`),
  * without its look toggle, made from `publicDeck`'s output and nothing else. One HTML file carrying its CSS, its
- * fonts, its icons and its one script; pictures stay separate files at the deck's relative paths, which 2.2's gather
- * finds in the page and sends under its own rules.
+ * fonts, its icons and its one script; pictures stay separate files at the deck's relative paths, and so do the
+ * theme's fonts beyond Sofia Sans (`fonts/`, Sprint 162 PR 3), which 2.2's gather finds in the page and sends under its
+ * own rules.
  *
  *  - Nothing of Ritemark on it: the client and the session at the top, how far along it is, and Contents.
  *  - On a computer the slide stays on the left, centred, with arrows under it, and the text scrolls on the right; on a
@@ -37,11 +38,22 @@ export interface PageFont {
   unicodeRange: string;
 }
 
+/** One part of a theme font the page names as a file beside it (Sprint 162 PR 3, `pageFile.themeFontFiles`). */
+export interface PageThemeFont {
+  /** The font's family, one of the six (`deckTheme.DECK_FONT_LIST`). */
+  family: string;
+  unicodeRange: string;
+  /** Its address beside the page: `fonts/Inter-4.001-latin.woff2`. */
+  address: string;
+}
+
 export interface PageAssets {
   /** `slide/slide.css`: the slide's own rules, the deck view's. */
   slideCss: string;
   /** Sofia Sans, as the app's own fonts: latin and latin-ext. */
   fonts: PageFont[];
+  /** The theme's other fonts, as files beside the page; none when the theme draws in Sofia Sans only. */
+  themeFonts?: readonly PageThemeFont[];
 }
 
 export interface PageOptions {
@@ -454,8 +466,13 @@ function pageColours(deck: PublicDeck): string {
   return `:root{${page}}\n.deck-slide{${slide}}`.replace(/</g, '\\3c ');
 }
 
-function fontFaces(fonts: PageFont[]): string {
-  return fonts.map(font => `@font-face{font-family:'Sofia Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,${font.base64}) format('woff2');unicode-range:${font.unicodeRange};}`).join('\n');
+function fontFaces(fonts: PageFont[], themeFonts: readonly PageThemeFont[] = []): string {
+  const sofia = fonts.map(font => `@font-face{font-family:'Sofia Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(data:font/woff2;base64,${font.base64}) format('woff2');unicode-range:${font.unicodeRange};}`);
+  // The theme's own fonts, as files beside the page (relative addresses only: a font is never loaded from elsewhere).
+  const theme = themeFonts
+    .filter(font => /^fonts\/[A-Za-z0-9.-]+\.woff2$/.test(font.address) && /^[A-Za-z0-9 ]+$/.test(font.family))
+    .map(font => `@font-face{font-family:'${font.family}';font-style:normal;font-weight:100 900;font-display:swap;src:url(${font.address}) format('woff2');unicode-range:${font.unicodeRange};}`);
+  return [...sofia, ...theme].join('\n');
 }
 
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
@@ -526,14 +543,15 @@ const SCRIPT_TEXT = `\n${PAGE_SCRIPT}\n`;
 
 /**
  * The page's Content Security Policy: its one script by its hash, so nothing else runs (no inline handler, no other
- * script); styles and fonts its own (inline, data:); pictures from beside it (and from disk when the file is opened
+ * script); styles its own (inline), fonts its own (inline, and the theme's beside it); pictures from beside it (and from disk when the file is opened
  * there, as in the room without a network); and nothing loaded from anywhere else. It goes first in the head.
  */
 export const PAGE_CSP = [
   "default-src 'none'",
   `script-src 'sha256-${createHash('sha256').update(SCRIPT_TEXT).digest('base64')}'`,
   "style-src 'unsafe-inline'",
-  'font-src data:',
+  // Sofia Sans inline, and the theme's fonts from beside the page (`'self'` online, `file:` when opened from disk).
+  "font-src 'self' data: file:",
   "img-src 'self' data: file:",
   "base-uri 'none'",
   "form-action 'none'",
@@ -577,7 +595,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title)}</title>`,
-    `<style>\n${fontFaces(assets.fonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
     '</head>',
     `<body class="${borderless ? 'bl' : 'card'}">`,
     `<header class="top"><div class="in">${who}<span class="grow"></span><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`

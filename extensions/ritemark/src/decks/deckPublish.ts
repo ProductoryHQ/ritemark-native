@@ -7,7 +7,9 @@
  *    file, and run `ritemark.page.publish` on it, waited to its end (`PublishFeature.publishPage`). An update with the
  *    same pictures and nothing key-shaped goes straight up (2.2's `sheetNeeded`). One at a time per deck; the page is
  *    held while its file is written (`holdPage`), and never written while its sheet is open from elsewhere.
- *  - **A first Publish that sends nothing** takes its page back: when the flow is cancelled, refused, not reachable or
+ *  - **The theme's fonts** beyond Sofia Sans are written beside the page first, in `fonts/` (Sprint 162 PR 3,
+ *    `pageFile.writePageFonts`); a name there taken by another file stops Publish in one line, as the page's does.
+ *  - **A first Publish that sends nothing** takes its page back (and the fonts it wrote with it): when the flow is cancelled, refused, not reachable or
  *    stopped by an error, a page this Publish created, with no record, is removed while it is still exactly the page
  *    written. A failed one stays, so the failure's Try again finds it.
  *  - **The chip** reads 2.2's state for the page file (`_ritemark.publish.pageState`) and says "Published · changed"
@@ -33,7 +35,7 @@ import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckT
 import { readDeckTheme } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
-import { buildDeckPage, currentPageDigest, deckNameOf, nodePageFs, pagePathFor, readPageMeta, removeDeckPage, writeDeckPage } from './page/pageFile';
+import { buildDeckPage, currentPageDigest, deckNameOf, nodeFontFs, nodePageFs, pagePathFor, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
@@ -201,9 +203,12 @@ export class DeckPublisher implements vscode.Disposable {
       const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;
+      // Sprint 162 PR 3: the theme's fonts beyond Sofia Sans go beside the page as files, written just before it.
+      let fontFiles: PageFontFile[];
       try {
         theme = await this.themeFor(deckPath, text);
-        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, await loadPageAssets(this.extensionPath));
+        fontFiles = await themeFontFiles(this.extensionPath, theme);
+        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles });
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);
@@ -217,10 +222,14 @@ export class DeckPublisher implements vscode.Disposable {
         return;
       }
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
+      let fontsWritten: Awaited<ReturnType<typeof writePageFonts>>;
       let hadRecord: boolean;
       try {
         hadRecord = Boolean(await feature.controller.recordFor(pageKey));
-        written = await writeDeckPage(nodePageFs, deckPath, built.html);
+        // The fonts first, so the page never names a font that isn't beside it yet.
+        fontsWritten = await writePageFonts(nodeFontFs, deckPath, fontFiles);
+        written = fontsWritten.kind === 'refused' ? { kind: 'refused', pagePath, line: fontsWritten.line } : await writeDeckPage(nodePageFs, deckPath, built.html);
+        if (written.kind === 'refused' && fontsWritten.kind === 'written') await removePageFonts(nodeFontFs, deckPath, fontsWritten.created, fontFiles);
       } catch (error) {
         console.warn('[Decks] Could not write the page:', error);
         notice(PAGE_NOT_WRITTEN);
@@ -232,6 +241,7 @@ export class DeckPublisher implements vscode.Disposable {
         notice(written.line);
         return;
       }
+      const fontsCreated = fontsWritten.kind === 'written' ? fontsWritten.created : [];
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme)) });
       let outcome: PublishOutcome | undefined | 'stopped';
       try {
@@ -248,7 +258,10 @@ export class DeckPublisher implements vscode.Disposable {
       // one stays for Try again, and a busy one belongs to the flow that took it.
       const takeBack = outcome === 'cancelled' || outcome === 'not-ready' || outcome === undefined || outcome === 'stopped';
       if (takeBack && written.created && !hadRecord && !(await feature.controller.recordFor(pageKey))) {
-        if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) this.written.delete(normalizeForCompare(pageKey));
+        if (await removeDeckPage(nodePageFs, pagePath, built.html).catch(() => false)) {
+          this.written.delete(normalizeForCompare(pageKey));
+          await removePageFonts(nodeFontFs, deckPath, fontsCreated, fontFiles).catch(() => undefined);
+        }
       }
     } finally {
       this.running.delete(key);

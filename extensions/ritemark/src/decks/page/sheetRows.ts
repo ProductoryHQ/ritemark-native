@@ -2,6 +2,7 @@
  * Sprint 159 PR 4: the Publish sheet's What goes and What stays rows for a deck's page, in the brief's words:
  *
  *   What goes:  "14 slides and their handout, 6 prompts with Copy, and the pictures they use. Nothing else from the project."
+ *               (with a theme in other fonts than Sofia Sans: "…, the pictures they use, and the theme's fonts.")
  *   What stays: "On your computer: comments on 9 slides, and 2 skipped slides."
  *
  * A count of one is singular ("1 slide and its handout", "1 prompt"), and a part that is 0 is left out. With no comments
@@ -15,7 +16,7 @@
 import { isBlockSlide, parseDeck, slideDataOf } from '../deckFormat';
 import { conversionComment, hiddenWords } from '../blocks/legacyToBlocks';
 import { partComments } from '../present/partComments';
-import type { DeckTheme } from '../deckTheme';
+import { DEFAULT_DECK_FONT, themeFonts, type DeckTheme } from '../deckTheme';
 import { lexHandout } from './pageHtml';
 import { publicDeck } from './publicDeck';
 
@@ -36,6 +37,8 @@ export interface DeckCounts {
    */
   comments: number;
   skipped: number;
+  /** The theme's fonts beyond Sofia Sans, which go as files beside the page (Sprint 162 PR 3); left out when none. */
+  fonts?: number;
 }
 
 const PRIVATE_LANGS: ReadonlySet<string> = new Set(['notes', 'slide']);
@@ -65,6 +68,7 @@ function* walk(tokens: ReadonlyArray<{ type: string; tokens?: unknown; items?: u
 export function deckCounts(text: string, theme: DeckTheme): DeckCounts {
   const parsed = parseDeck(text.replace(/^\uFEFF/, ''));
   const deck = publicDeck(text, { folderName: '', deckName: '', theme });
+  const fonts = themeFonts(theme).filter(font => font.name !== DEFAULT_DECK_FONT).length;
   return {
     slides: deck.slides.length,
     prompts: [deck.preamble, ...deck.slides.map(slide => slide.handout)].reduce((sum, markdown) => sum + promptsIn(markdown), 0),
@@ -75,6 +79,7 @@ export function deckCounts(text: string, theme: DeckTheme): DeckCounts {
         || (data.markdown !== undefined && partComments(data.markdown).length > 0);
     }).length,
     skipped: parsed.slides.filter(slide => slideDataOf(slide.kind, slide.body).skip === true).length,
+    ...(fonts > 0 ? { fonts } : {}),
   };
 }
 
@@ -86,8 +91,11 @@ export function deckSheetRows(counts: DeckCounts): DeckSheetRows {
     counts.slides > 0 ? (counts.slides === 1 ? '1 slide and its handout' : `${counts.slides} slides and their handout`) : null,
     counts.prompts > 0 ? `${count(counts.prompts, 'prompt', 'prompts')} with Copy` : null,
   ].filter((part): part is string => part !== null);
-  const pictures = counts.slides === 1 ? 'the pictures it uses' : 'the pictures they use';
-  const goesLine = goes.length ? `${goes.join(', ')}, and ${pictures}.` : 'The handout\'s text, and the pictures it uses.';
+  const pictures = counts.slides === 1 || goes.length === 0 ? 'the pictures it uses' : 'the pictures they use';
+  // Sprint 162 PR 3: the theme's fonts go too, as files beside the page.
+  const fonts = counts.fonts ? (counts.fonts === 1 ? 'the theme\'s font' : 'the theme\'s fonts') : null;
+  const tail = fonts ? `${pictures}, and ${fonts}` : `and ${pictures}`;
+  const goesLine = goes.length ? `${goes.join(', ')}, ${tail}.` : `The handout's text, ${tail}.`;
   const stays = [
     counts.comments > 0 ? `comments on ${count(counts.comments, 'slide', 'slides')}` : null,
     counts.skipped > 0 ? count(counts.skipped, 'skipped slide', 'skipped slides') : null,
