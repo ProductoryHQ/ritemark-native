@@ -200,7 +200,8 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.ok(wallGround(fern, false).includes(fern.bg), 'its own ground in the soft light')
   assert.equal(wallGround(parseTheme(PAPER_TEXT), false), '#FAF7F0', 'no soft light: its ground')
   const wall = readFileSync(fileURLToPath(new URL('./present/DeckWall.tsx', import.meta.url)), 'utf8')
-  assert.match(wall, /style=\{\{ background: wallGround\(state\.theme, state\.borderless\) \}\}/)
+  assert.match(wall, /wallGround\(theme, borderless\)/)
+  assert.match(wall, /style=\{\{ background: ground \}\}/)
   assert.match(wall, /'--wall-bleed-x': `\$\{bleed\.x\}px`, '--wall-bleed-y': `\$\{bleed\.y\}px`/, 'the frame says how far to run')
   const css = readFileSync(fileURLToPath(new URL('./present/wall.css', import.meta.url)), 'utf8')
   assert.match(css, /\.wall-slide \.deck-sl \{ background: transparent; \}/, 'no ground inside the 16:9 area')
@@ -210,6 +211,8 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   }
   assert.match(css, /\.is-blocks \.photo \{ top: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); bottom: calc\(-1 \* var\(--wall-bleed-y, 0px\)\); \}/, 'and to the top and bottom')
   assert.match(css, /\.wall-slide\.is-leaving \{ animation: wall-fade-out/, 'the slide before fades out over the one ground')
+  assert.match(css, /wall-fade-out \{ from \{ opacity: var\(--wall-fade-from, 1\); \}/, 'from where it was, so a quick move never flashes')
+  assert.match(css, /\.wall-slide \.deck-sl\.is-blocks \{ overflow: visible; \}/, 'only a block canvas lets its picture out')
 }
 
 // ---- When the bar is short of room, what gives way, in order: the Theme button's name, Publish's word, the notice's

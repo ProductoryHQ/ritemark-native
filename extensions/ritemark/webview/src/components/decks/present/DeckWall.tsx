@@ -19,7 +19,7 @@
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WallSlide, WallState } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
@@ -59,8 +59,10 @@ function useScreenSize(): { width: number; height: number } {
 
 export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
-  // The slide before the last move, kept under the new one while it fades in.
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number } | null>(null)
+  // The slide before the last move, fading out as the new one fades in, from the opacity it had (a move during a
+  // fade takes the half-shown slide out from where it was, never from full, so nothing flashes).
+  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; from: number } | null>(null)
+  const enteringRef = useRef<HTMLDivElement | null>(null)
   const [serial, setSerial] = useState(0)
   const [barShown, setBarShown] = useState(false)
   const [overBar, setOverBar] = useState(false)
@@ -75,6 +77,11 @@ export function DeckWall() {
   const frame = wallSlideSize(screen.width, screen.height)
   const bleed = wallBleed(frame, CANVAS_WIDTH)
 
+  // The ground, worked out once per theme and look (the wall draws again at every pointer move).
+  const theme = state?.theme
+  const borderless = state?.borderless ?? false
+  const ground = useMemo(() => (theme ? wallGround(theme, borderless) : ''), [theme, borderless])
+
   usePageDrawn(state !== null)
 
   // The host's state after every move; a new slide fades in over the one before it.
@@ -83,8 +90,10 @@ export function DeckWall() {
       const next = message as unknown as WallState
       const previous = stateRef.current
       if (previous && previous.slide.number !== next.slide.number) {
+        const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
+        const from = Number.isFinite(shown) ? shown : 1
         setSerial(value => value + 1)
-        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1 }))
+        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1, from }))
       }
       setState(next)
       return
@@ -194,8 +203,13 @@ export function DeckWall() {
   const gotoTitle = gotoNumber !== null && peeked?.number === gotoNumber ? peeked.title : undefined
   const gotoMissing = gotoNumber !== null && (gotoNumber < 1 || gotoTitle === null)
 
-  const layer = (slide: WallSlide, className: string, key: string) => (
-    <div key={key} className={`wall-slide ${className}${state.borderless ? ' is-borderless' : ''}`}>
+  const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
+    <div
+      key={key}
+      ref={from === undefined ? enteringRef : undefined}
+      className={`wall-slide ${className}`}
+      style={from === undefined ? undefined : ({ '--wall-fade-from': from } as CSSProperties)}
+    >
       <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} />
     </div>
   )
@@ -204,7 +218,7 @@ export function DeckWall() {
     <div
       className={`deck-wall${barVisible || gridOpen ? '' : ' is-idle'}`}
       // The slide's ground on the whole screen: no band, no edge where the 16:9 area ends (a Borderless deck's white).
-      style={{ background: wallGround(state.theme, state.borderless) }}
+      style={{ background: ground }}
       onPointerMove={showBar}
       onClick={onWallClick}
     >
@@ -214,7 +228,7 @@ export function DeckWall() {
         aria-live="polite"
         aria-label={`Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`) : null}
+        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
       </div>
 

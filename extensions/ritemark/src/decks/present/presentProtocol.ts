@@ -266,7 +266,7 @@ export const PRESENT_NEEDS_UPDATE = 'Presenting needs a newer Ritemark. Update i
  * The same answer in a dev build, whose `vscode/` may be older than its extension (a light worktree's copied tree): what
  * to run, so a builder never takes the missing commands for a Present fault.
  */
-export const PRESENT_NEEDS_PATCHES = 'This dev build\'s vscode/ has no Present commands. Run ./scripts/apply-patches.sh and transpile vscode, then present again.';
+export const PRESENT_NEEDS_PATCHES = 'Run ./scripts/apply-patches.sh: this dev build has no Present commands.';
 
 /** The deck view's Present menu: whether a presenter view can show, where, and whether it is on. */
 export interface DeckPresentOptions {
