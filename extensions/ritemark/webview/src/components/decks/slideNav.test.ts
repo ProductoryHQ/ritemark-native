@@ -62,7 +62,8 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.equal(slideKeyTarget(null, body), 'page')
   assert.equal(slideKeyTarget(el('DIV', ['.deck-stage']), body), 'page', 'the stage, outside its boxes')
   assert.equal(slideKeyTarget(el('BUTTON', ['.deck-stage', 'button']), body), 'button', 'Settings on the stage')
-  assert.equal(slideKeyTarget(el('BUTTON', ['.deck-fold', 'button']), body), 'button', 'the fold button that just hid the handout')
+  assert.equal(slideKeyTarget(el('BUTTON', ['.deck-view-switch', 'button']), body), 'button', "the view switch's Slide only that just hid the handout (17 November)")
+  assert.equal(slideKeyTarget(el('BUTTON', ['.deck-fold', 'button']), body), null, 'the fold control is gone')
   // Never from an editable box: a title or box being edited keeps its arrows for the caret.
   assert.equal(slideKeyTarget(el('DIV', ['.deck-stage'], true), body), null, 'a title being edited')
   assert.equal(slideKeyTarget(el('SPAN', ['.deck-stage', '[contenteditable="true"]']), body), null, 'inside one')

@@ -8,9 +8,17 @@ import { BUILT_IN_THEME, isThemePath, parseTheme, type DeckTheme } from '../../.
 import type { DeckSlideEntry } from './deckDocument'
 import { slidePicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
-/** The slides' pictures as webview URIs, by the paths the slides name; asked again when the set of paths changes. */
-export function useDeckAssets(slides: DeckSlideEntry[]): Record<string, string> {
-  const [assets, setAssets] = useState<Record<string, string>>({})
+/** The host's list of pictures it found no file for, as a set; anything else is none. */
+export function missingFrom(value: unknown): ReadonlySet<string> {
+  return new Set(Array.isArray(value) ? value.filter((path): path is string => typeof path === 'string') : [])
+}
+
+/**
+ * The slides' pictures as webview URIs, by the paths the slides name, and (17 November) the ones the host looked for
+ * and found no file for; asked again when the set of paths changes.
+ */
+export function useDeckAssets(slides: DeckSlideEntry[]): { assets: Record<string, string>; missing: ReadonlySet<string> } {
+  const [found, setFound] = useState<{ assets: Record<string, string>; missing: ReadonlySet<string> }>({ assets: {}, missing: new Set() })
   // A block slide's own pictures too (Sprint 161), by the paths its renderer asks for.
   const paths = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))].sort()
   const key = paths.join('\n')
@@ -18,7 +26,7 @@ export function useDeckAssets(slides: DeckSlideEntry[]): Record<string, string> 
   useEffect(() => onMessage(message => {
     if (message.type !== 'deck/assets') return
     const next = message.assets
-    if (next && typeof next === 'object') setAssets(next as Record<string, string>)
+    if (next && typeof next === 'object') setFound({ assets: next as Record<string, string>, missing: missingFrom(message.missing) })
   }), [])
 
   useEffect(() => {
@@ -28,7 +36,7 @@ export function useDeckAssets(slides: DeckSlideEntry[]): Record<string, string> 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
-  return assets
+  return found
 }
 
 /**

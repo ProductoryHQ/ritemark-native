@@ -161,6 +161,9 @@ import {
   FilePdf,
   FolderSimple,
   Presentation,
+  SquareSplitHorizontal,
+  SquareSplitVertical,
+  Article,
   Columns,
   PlusSquare,
   Scissors,
@@ -213,6 +216,10 @@ const iconMap = {
   'user': User,
   'tray-arrow-down': TrayArrowDown,
   'presentation': Presentation,
+  // 17 November: the deck's view switch (Slide and handout, beside or above; Handout only).
+  'square-split-horizontal': SquareSplitHorizontal,
+  'square-split-vertical': SquareSplitVertical,
+  'article': Article,
   // Sprint 161 (PR 3): the slide's / menu (frame 22).
   'columns': Columns,
   'plus-square': PlusSquare,

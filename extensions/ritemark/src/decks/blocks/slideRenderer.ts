@@ -66,10 +66,22 @@ interface SlideDivToken {
 /** The renderer's state while one slide is drawn: where pictures come from, and the Boxes look a box is under. */
 interface RenderState {
   pictureUrl: (path: string) => string | null;
+  /** 17 November: a picture whose file the host didn't find: drawn as missing, with its file's name. */
+  missing: (path: string) => boolean;
   looks: string[];
 }
 
-let state: RenderState = { pictureUrl: () => null, looks: [] };
+let state: RenderState = { pictureUrl: () => null, missing: () => false, looks: [] };
+
+/** A picture's file name, from the path the slide names. */
+export function pictureFileName(path: string): string {
+  return path.replace(/[?#].*$/, '').split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
+/** The missing picture's words: "Picture not found" over its file's name (escaped here). The stage draws the same. */
+export function missingHtml(path: string): string {
+  return `<span class="blk-missing"><span class="blk-missing-head">Picture not found</span><span class="blk-missing-name">${esc(pictureFileName(path))}</span></span>`;
+}
 
 
 /** The pill over a Steps block: its `tag`, "Exercise" when it has none, and no pill for an empty one (#752's rule). */
@@ -115,8 +127,12 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
 /** A picture: drawn from beside the deck, or its empty place. Never loaded from the web. */
 function pictureHtml(href: string, text: string): string {
   const path = picturePathOf(href);
-  const url = isRelativeTarget(path) ? state.pictureUrl(path) : null;
-  return url ? `<img class="blk-pic" src="${esc(url)}" alt="${text}">` : '<span class="blk-pic empty"></span>';
+  const relative = isRelativeTarget(path);
+  const url = relative ? state.pictureUrl(path) : null;
+  if (url) return `<img class="blk-pic" src="${esc(url)}" alt="${text}">`;
+  // A picture whose file is gone says so, with its name, rather than leaving an empty place (17 November).
+  if (relative && state.missing(path)) return `<span class="blk-pic empty is-missing">${missingHtml(path)}</span>`;
+  return '<span class="blk-pic empty"></span>';
 }
 
 /** Build a renderer instance: the slide's scoped `marked` with the `:::` blocks and the slide's own rules. */
@@ -186,7 +202,7 @@ function createSlideMarked(): Marked {
       image: (href: string, _title: string | null, text: string) => pictureHtml(href, text),
       paragraph: (text: string) => {
         // A picture alone in its paragraph is a block of its own, as the editor's image node is.
-        if (/^\s*(?:<img class="blk-pic" [^>]*>|<span class="blk-pic empty"><\/span>)\s*$/.test(text)) return `${text.trim()}\n`;
+        if (/^\s*(?:<img class="blk-pic" [^>]*>|<span class="blk-pic empty"><\/span>|<span class="blk-pic empty is-missing"><span class="blk-missing">(?:<span class="blk-missing-(?:head|name)">[^<]*<\/span>){2}<\/span><\/span>)\s*$/.test(text)) return `${text.trim()}\n`;
         return `<p>${text}</p>\n`;
       },
     },
@@ -258,12 +274,20 @@ export function isCoverSlide(markdown: string): boolean {
   return cover;
 }
 
+/** A paragraph that holds only pictures (and space): the renderer draws it as a Picture block. */
+function isPictureParagraph(paragraph: Tokens.Paragraph): boolean {
+  const parts = (paragraph.tokens ?? []).filter(token => !(token.type === 'text' && !token.raw.trim()) && token.type !== 'br');
+  return parts.length > 0 && parts.every(token => token.type === 'image');
+}
+
 function coverOf(markdown: string): boolean {
   const blocks = drawnBlocksOf(markdown);
   const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
-  const isLine = (token: Token | undefined) => token?.type === 'paragraph' || (token?.type === 'heading' && (token as Tokens.Heading).depth === 2);
+  // A picture alone in its paragraph is a Picture block, never a line: a title over a picture is no cover, so the
+  // picture can't push the title up and off the slide (17 November, Jarmo's shot).
+  const isLine = (token: Token | undefined) => (token?.type === 'paragraph' && !isPictureParagraph(token as Tokens.Paragraph)) || (token?.type === 'heading' && (token as Tokens.Heading).depth === 2);
   if (blocks.length === 1) return isTitle(blocks[0]);
-  if (blocks.length === 2) return (isTitle(blocks[0]) && isLine(blocks[1])) || (blocks[0].type === 'paragraph' && (blocks[0] as Tokens.Paragraph).text.length <= 12 && isTitle(blocks[1]));
+  if (blocks.length === 2) return (isTitle(blocks[0]) && isLine(blocks[1])) || (blocks[0].type === 'paragraph' && !isPictureParagraph(blocks[0] as Tokens.Paragraph) && (blocks[0] as Tokens.Paragraph).text.length <= 12 && isTitle(blocks[1]));
   return false;
 }
 
@@ -306,9 +330,9 @@ export function blockStepsTagOf(markdown: string): string | null {
 }
 
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
-export function blockSlideHtml(markdown: string, options: { pictureUrl?: (path: string) => string | null } = {}): string {
+export function blockSlideHtml(markdown: string, options: { pictureUrl?: (path: string) => string | null; missing?: (path: string) => boolean } = {}): string {
   const previous = state;
-  state = { pictureUrl: options.pictureUrl ?? (() => null), looks: [] };
+  state = { pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), looks: [] };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -323,6 +347,9 @@ export interface BlockSlideMarkupOptions {
   step?: number;
   /** A picture's address, by the path the slide names; null draws its empty place. */
   pictureUrl?: (path: string) => string | null;
+  /** 17 November: a picture the host looked for and didn't find, drawn as missing with its name (the deck view only;
+   *  the page never says so). */
+  missing?: (path: string) => boolean;
   /** The slide's width: the slide gets its size and the canvas its scale. Without it the page scales the canvas. */
   width?: number;
   /** The theme's `--s-*` properties on the slide (the page sets them once for every slide). */
@@ -340,22 +367,25 @@ function styleText(style: Record<string, string | number>): string {
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'width'>): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width'>): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
+  const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
   const side = sidePictureOf(data);
   const inner: Record<string, string | number> = {};
   if (options.width !== undefined) inner.transform = `scale(${options.width / BLOCK_CANVAS_WIDTH})`;
   let photo = '';
   if (side) {
-    const url = data.image ? pictureUrl(data.image.trim()) : null;
+    const path = data.image?.trim();
+    const url = path ? pictureUrl(path) : null;
     const background = url ? ` style="background-image:url(&quot;${esc(url.replace(/"/g, '%22'))}&quot;)"` : '';
-    photo = `<div class="photo${url ? '' : ' empty'}"${background}></div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
+    const gone = !url && !!path && missing(path);
+    photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', isCoverSlide(markdown) ? 'is-cover' : ''].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl })}</div></div>`;
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div></div>`;
 }
 
 /** One block slide, as every view draws it: the page puts this markup in; the deck view draws the same canvas. */

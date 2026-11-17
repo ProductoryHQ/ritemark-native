@@ -5,12 +5,15 @@
  *
  * PR 3 (README frame 4 and "The 'Exercise' pill is the person's own word"; the plan's "Added to PR 3"):
  *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`); a box with none shows a place
- *    for one, on the stage only, under the looks that draw icons.
+ *    for one, on the stage only, under the looks that draw icons, and (17 November) only on the box being edited: the
+ *    caret's box, marked `is-caret` by `slideCaretBox`. It sits over the box's top edge, so it takes no room.
  *  - **The Steps pill** is edited in place, like every other word on the slide. Emptying it hides the pill; while the
  *    caret is in an empty pill, "Exercise" shows faint as its placeholder. Settings' Label row brings it back. Its words
  *    are the block's `tag` (the stage's field over the pill, `handlers.editPill`; #752's rule in `setStepsTag`).
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { OPEN_FENCE, OWN_MARK_LOOKS, parseFenceAttributes, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -110,7 +113,9 @@ class SlideDivView implements NodeView {
   private render() {
     const attrs = attributesOf(this.node)
     const kind = this.kind
-    this.dom.className = kind ? `blk-${kind}` : 'blk-group'
+    // The caret's box keeps its mark (`slideCaretBox`) through a redraw.
+    const caret = this.dom.classList.contains(CARET_CLASS)
+    this.dom.className = `${kind ? `blk-${kind}` : 'blk-group'}${caret ? ` ${CARET_CLASS}` : ''}`
     this.dom.setAttribute('data-fdiv', '')
     if (kind === 'boxes') this.dom.setAttribute('data-look', attrs.values.look ?? 'boxes')
     else this.dom.removeAttribute('data-look')
@@ -181,10 +186,48 @@ class SlideDivView implements NodeView {
   }
 
   ignoreMutation(mutation: ViewMutationRecord): boolean {
+    // The block's own attributes are drawn, never read back: its class (the caret's mark, `slideCaretBox`) changing is
+    // no edit (else the editor would draw the block again, and the mark again, without end).
+    if (mutation.type === 'attributes' && mutation.target === this.dom) return true
     // Only what happens in the words is the editor's: the icon and the pill are drawn.
     if (mutation.type === 'selection') return !!this.deco && this.deco.contains(mutation.target as Node)
     return !!this.deco && this.deco.contains(mutation.target as Node)
   }
+}
+
+/** The box the caret is in: its empty icon place shows, and only there (17 November). */
+export const CARET_CLASS = 'is-caret'
+
+/** The position of the innermost box (`::: box`) holding the selection's head, or null. */
+export function caretBoxPos(state: EditorState): number | null {
+  const $head = state.selection.$head
+  for (let depth = $head.depth; depth > 0; depth--) {
+    const node = $head.node(depth)
+    if (node.type.name === 'slideDiv' && slideBlockClassOf(attributesOf(node)) === 'box') return $head.before(depth)
+  }
+  return null
+}
+
+const slideCaretBoxKey = new PluginKey('slideCaretBox')
+
+/** Marks the caret's box (`is-caret`) as the selection moves; nothing in the document changes. */
+function slideCaretBox(): Plugin {
+  let marked: HTMLElement | null = null
+  const mark = (view: EditorView) => {
+    const pos = caretBoxPos(view.state)
+    const dom = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
+    if (dom === marked && dom?.classList.contains(CARET_CLASS)) return
+    marked?.classList.remove(CARET_CLASS)
+    marked = dom
+    marked?.classList.add(CARET_CLASS)
+  }
+  return new Plugin({
+    key: slideCaretBoxKey,
+    view: view => {
+      mark(view)
+      return { update: mark, destroy: () => { marked?.classList.remove(CARET_CLASS); marked = null } }
+    },
+  })
 }
 
 /** The `:::` node with the renderer's drawing, as the stage's slide editor uses it; with the stage's handlers in PR 3. */
@@ -192,6 +235,10 @@ export function slideDivWithView(handlers: SlideDivHandlers | null) {
   return SlideDiv.extend({
     addNodeView() {
       return ({ node, getPos, editor }) => new SlideDivView(node, getPos as () => number | undefined, () => editor.state.doc, handlers)
+    },
+    // The box being edited shows its empty icon place (17 November): the stage's editor, which has the handlers.
+    addProseMirrorPlugins() {
+      return handlers ? [slideCaretBox()] : []
     },
   })
 }

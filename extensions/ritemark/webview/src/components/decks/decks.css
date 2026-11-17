@@ -15,6 +15,12 @@
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
+/* Slide, both or handout (17 November; the prototype's `.viewseg`): one segment of three small icons right after the
+   strip's button, on the ground's colour; the chosen one raised on the desk's white with a hairline (DeckFolds.tsx). */
+.deck-bar .deck-view-switch { display: inline-flex; gap: 1px; margin: 0 2px 0 2px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
+.deck-bar .deck-view-switch .deck-view-part { width: 30px; height: 24px; border-radius: 6px; color: var(--r-ink-muted); background: transparent; box-shadow: none; }
+.deck-bar .deck-view-switch .deck-view-part:hover { color: var(--r-ink-strong); background: transparent; }
+.deck-bar .deck-view-switch .deck-view-part[data-state="active"] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15), 0 0 0 1px var(--r-hairline); }
 /* Present, the bar's one primary, last on the bar (frame 2): a little more room before it than between the others */
 .deck-bar .deck-present { margin-left: 4px; }
 /* Publish measures each slide's fit on the slides drawn out of sight (DeckPublish.tsx): laid out, never seen or reached */
@@ -46,41 +52,21 @@
 .deck-divider { position: absolute; top: 0; bottom: 0; width: 13px; margin-left: -6px; cursor: col-resize; z-index: 3; touch-action: none; }
 .deck-divider::before { content: ''; position: absolute; left: 6px; top: 12px; bottom: 12px; border-left: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
-.deck-fold { position: absolute; bottom: 28px; margin-left: -13px; z-index: 4; display: flex; }
-/* With one side folded: one round button to bring it back (DeckFolds.tsx) */
-.deck-fold .deck-fold-button { width: 26px; height: 26px; padding: 0; border-radius: 50%; }
-/* Fold either side as one split control (Jarmo, 16 November: "see võiks olla split button"; the prototype's
-   `.foldpair.v`): a 26 px pill upright on the line, the desk's colour in a 1 px ring, ‹ Hide the slide over › Hide the
-   handout, 26×28 each with a hairline between. No overflow clip: each half takes its end of the pill. Keyboard focus
-   gets the hover's look, with the focus ring drawn inside the half so it never crosses into the other one; a press
-   doesn't shrink a half inside the still ring (the Button's active scale). */
-.deck-fold.is-split { flex-direction: column; border-radius: 13px; background: var(--r-surface);
-  box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, 0.2); }
-.deck-fold.is-split .deck-fold-button { width: 26px; height: 28px; color: var(--r-ink-body); transform: none; }
-.deck-fold.is-split .deck-fold-button.is-upper { border-radius: 13px 13px 0 0; }
-.deck-fold.is-split .deck-fold-button.is-lower { border-radius: 0 0 13px 13px; box-shadow: inset 0 1px 0 var(--r-hairline-strong); }
-.deck-fold.is-split .deck-fold-button:hover { background: var(--r-accent-soft); color: var(--r-accent); }
-:where(:root:not([data-input-mode="pointer"])) .deck-fold.is-split .deck-fold-button:focus-visible { background: var(--r-accent-soft); color: var(--r-accent); outline-offset: -2px; }
 
 /* Split along the long side (16 November; deckLayout.ts): with the slide above the handout, the slide is centred on top
    at its pane's full height less 32 (16 above it and 16 under it; the Experience lead, 17 November), capped by the
-   width; the line is level, runs edge to edge from the strip, and drags; the split pill lies flat at the line's right
-   end, ˄ Hide the slide beside ˅ Hide the handout (the prototype's `.foldpair`, `.divider.h`, `.stage[data-stk]`). The
-   deck view sets the top and the height of each. */
+   width; the line is level, runs edge to edge from the strip, and drags (the prototype's `.divider.h`,
+   `.stage[data-stk]`). Since 17 November nothing sits on the line: the view switch on the bar shows or hides a pane.
+   The deck view sets the top and the height of each. */
 .deck-stage.is-above { bottom: auto; align-items: center; }
 .deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 1.5px dotted var(--r-hairline-strong); }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
-.deck-fold.is-above { right: 28px; bottom: auto; margin-left: 0; margin-top: -13px; }
 /* One line, not two (the Experience lead, 17 November): the scroll rule brings the current part's head 6 px under the
    handout's top (scrollRule.ts, PART_TOP_GAP), and its hairline border then ran just under the level line. Above, the
    handout's top 8 px are the desk's colour, over the text and under the line, so only the dotted line shows there. */
 .deck-handout.is-above::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; z-index: 1; background: var(--r-surface); pointer-events: none; }
-.deck-fold.is-split.is-above { flex-direction: row; }
-.deck-fold.is-split.is-above .deck-fold-button { width: 28px; height: 26px; }
-.deck-fold.is-split.is-above .deck-fold-button.is-upper { border-radius: 13px 0 0 13px; }
-.deck-fold.is-split.is-above .deck-fold-button.is-lower { border-radius: 0 13px 13px 0; box-shadow: inset 1px 0 0 var(--r-hairline-strong); }
 
 .deck-handout { position: absolute; top: 0; bottom: 0; right: 0; --deck-text-left: 48px; --deck-text-right: 32px; }
 .deck-handout.is-folded { visibility: hidden; pointer-events: none; }
@@ -376,8 +362,15 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    closes, and while the field is open, empty, the default word shows faint as its placeholder. */
 .deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover, .deck-sl.is-blocks.is-editing .blk-pill.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
 .deck-sl.is-blocks.is-editing .blk-pill.is-pickable { cursor: text; }
-.deck-sl.is-blocks.is-editing .blk-icon.is-place { background: transparent; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.28)); color: var(--s-ph, rgba(255,255,255,.45)); }
-.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .blk-icon.is-place { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); color: var(--s-ph, rgba(28,31,74,.35)); }
+/* 17 November: the empty place shows only on the box being edited (the caret's, `is-caret`), never on every box. It
+   sits on the box's top edge, over its corner, so it takes no room: the box, the slide's fit and the thumbnail stay as
+   they are while the caret moves from box to box. */
+.deck-sl.is-blocks.is-editing .blk-box { position: relative; }
+.deck-sl.is-blocks.is-editing .blk-icon.is-place { display: none; }
+.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place { display: grid; position: absolute; top: -13px; right: 12px; z-index: 1; width: 26px; height: 26px; margin: 0; background: var(--s-nm, #1C1F4A); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.28)); color: var(--s-ph, rgba(255,255,255,.6)); }
+.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place svg { width: 14px; height: 14px; }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place { background: var(--s-nm, #fff); box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); color: var(--s-ph, rgba(28,31,74,.45)); }
+.deck-sl.is-blocks.is-editing .blk-box.is-caret > .blk-icon.is-place:hover { box-shadow: inset 0 0 0 1.5px var(--s-foc, rgba(242,181,68,.7)); }
 .deck-pill-field::placeholder { color: inherit; opacity: .45; }
 /* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
    (the app run: an empty column had none, and was invisible). */

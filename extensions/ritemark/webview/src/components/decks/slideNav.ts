@@ -64,7 +64,7 @@ export interface KeyTargetElement {
 
 /**
  * Where a key came from, for the full slide view: 'page' for the page itself (nothing focused) or the stage outside any
- * editable box, 'button' for a button on the stage or the fold's (Space stays the button's), and null for everywhere else:
+ * editable box, 'button' for a button on the stage or the view switch's (Space stays the button's), and null for everywhere else:
  * a title or box being edited, a field, the strip (its own keys), a menu or dialog, the deck's bar.
  */
 export function slideKeyTarget(target: KeyTargetElement | null, body: unknown): 'page' | 'button' | null {
@@ -72,8 +72,8 @@ export function slideKeyTarget(target: KeyTargetElement | null, body: unknown): 
   if (target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return null
   if (target.closest('[contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]')) return null
   if (target.closest('[role="menu"], [role="dialog"], [role="alertdialog"], [role="listbox"], .deck-strip')) return null
-  // The stage, and the fold's button that just hid the handout (it keeps the focus after the press).
-  if (!target.closest('.deck-stage, .deck-fold')) return null
+  // The stage, and the view switch's Slide only that just hid the handout (it keeps the focus after the press; 17 November).
+  if (!target.closest('.deck-stage, .deck-view-switch')) return null
   return target.tagName === 'BUTTON' || target.closest('button') ? 'button' : 'page'
 }
 

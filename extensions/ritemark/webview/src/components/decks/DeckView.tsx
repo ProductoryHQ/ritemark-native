@@ -61,7 +61,7 @@ import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
+import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import './decks.css'
@@ -287,7 +287,7 @@ export function DeckView({
   const stripRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0)
   const currentRef = useRef(0)
-  const assets = useDeckAssets(slides)
+  const { assets, missing: missingPictures } = useDeckAssets(slides)
   const theme = useDeckTheme(properties.theme)
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
   // November it is chosen in the Slide settings popover, its last section (SlideSettings), not on the bar.
@@ -522,9 +522,8 @@ export function DeckView({
   })
   /** The handout's left edge; beside, the line between the slide and the handout too. */
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth
-  /** Where the fold's control stands: on the line beside (from the left), on the level line above (from the top); with
-   *  one side hidden, at the edge between them. */
-  const foldLine = above ? (split ? aboveLine : slideShown ? deskHeight : 0) : dividerLeft
+  /** What the view switch shows chosen: the view as drawn (under 600 px the handout has no room, so Slide only). */
+  const viewShown: DeckViewMode = !handoutShown ? 'slide' : !slideShown ? 'handout' : 'both'
 
   const scrollContainer = useCallback((): HTMLElement | null => {
     return (editor?.view.dom.closest('.wysiwyg-editor') as HTMLElement | null) ?? null
@@ -850,14 +849,15 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [above, avail, stripWidth, pick])
 
-  /** A fold button: that side folds away, or comes back; the deck's view keeps the choice, and the part being read
-   *  stays at the top. Slide settings stay: they belong to the current slide, which the strip still rings. */
-  const toggleFold = useCallback((side: 'slide' | 'handout') => {
-    const next = toggledFold(fold, side)
+  /** The view switch (17 November): Slide only, Slide and handout, or Handout only; the deck's view keeps the choice,
+   *  and the part being read stays at the top. Slide settings stay: they belong to the current slide, which the strip
+   *  still rings. */
+  const chooseView = useCallback((view: DeckViewMode) => {
+    const next = foldOfView(view)
     setFold(next)
     keepFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
-  }, [fold, pick])
+  }, [pick])
 
   // When the slide moves beside or above, the part being read stays at the top, as after a drag or a fold. Not at the
   // first decision, as the deck opens.
@@ -1455,6 +1455,8 @@ export function DeckView({
             <Icon name="list" size={14} tone={stripShown ? 'inherit' : 'muted'} />
           </Button>
         </Tooltip>
+        {/* Slide, both or handout (17 November): under 600 px the handout has no room, and the deck shows the slide only. */}
+        {deskWidth >= NARROWEST_DESK ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
@@ -1504,6 +1506,7 @@ export function DeckView({
             theme={theme}
             borderless={borderless}
             assets={assets}
+            missing={missingPictures}
             actions={stripActions}
             stripRef={stripRef}
             marks={marks}
@@ -1546,6 +1549,7 @@ export function DeckView({
                   theme={theme}
                   borderless={borderless}
                   assets={assets}
+                  missing={missingPictures}
                   width={bigWidth}
                   onWriting={onWriting}
                   commentCallouts={commentCallouts}
@@ -1579,9 +1583,6 @@ export function DeckView({
             aria-label={above ? 'Drag to change the heights' : 'Drag to change the widths'}
             onPointerDown={onDividerDown}
           />
-        ) : null}
-        {deskWidth >= NARROWEST_DESK ? (
-          <DeckFolds slideShown={slideShown} handoutShown={handoutShown} line={foldLine} above={above} onToggle={toggleFold} />
         ) : null}
 
         {addSheet && settingsAt ? (
