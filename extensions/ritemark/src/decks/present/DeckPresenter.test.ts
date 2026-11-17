@@ -48,9 +48,9 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 import * as assert from 'assert';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { DeckPresenter, presentFallbackAllowed, presenterViewAvailable } = require('./DeckPresenter') as typeof import('./DeckPresenter');
+const { DeckPresenter, presentNeedsShellMessage, presenterViewAvailable } = require('./DeckPresenter') as typeof import('./DeckPresenter');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PRESENT_NEEDS_UPDATE } = require('./presentProtocol') as typeof import('./presentProtocol');
+const { PRESENT_NEEDS_PATCHES, PRESENT_NEEDS_UPDATE } = require('./presentProtocol') as typeof import('./presentProtocol');
 
 const DECK = '---\ndeck: 1\n---\n\n```slide title\nid: a1\ntitle: One\n```\n\n```slide title\nid: a2\ntitle: Two\n```\n';
 
@@ -69,9 +69,11 @@ async function main(): Promise<void> {
   // The lead's words, exactly.
   assert.equal(PRESENT_NEEDS_UPDATE, 'Presenting needs a newer Ritemark. Update it, then present again.');
 
-  // Only a dev build places the wall with VS Code's own window commands.
-  assert.equal(presentFallbackAllowed({}), false);
-  assert.equal(presentFallbackAllowed({ VSCODE_DEV: '1' }), true);
+  // Without the shell's commands nothing opens, in a dev build too (17 November: VS Code's own window kept Ritemark's tab
+  // row on the wall); a dev build's notice says what to run.
+  assert.equal(presentNeedsShellMessage({}), PRESENT_NEEDS_UPDATE);
+  assert.equal(presentNeedsShellMessage({ VSCODE_DEV: '1' }), PRESENT_NEEDS_PATCHES);
+  assert.match(PRESENT_NEEDS_PATCHES, /apply-patches\.sh/);
 
   // One rule for the menu and a running presentation: the shell's commands, and two displays or the dev windowed mode.
   assert.equal(presenterViewAvailable(false, 2, false), false);

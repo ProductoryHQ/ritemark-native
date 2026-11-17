@@ -36,5 +36,14 @@ PR 1 goes first, because it moves "This deck" and touches the bar. After it, PR 
 - **When the bar is short of room,** what gives way, in order: the Theme button's name (its swatch and ▾ stay, the name is in its tooltip), Publish's word, the notice's words, and Present's word last.
 - **Not in PR 1:** Edit <Name> and New theme… (they open the theme's tab: PR 2). Only Sofia Sans renders until PR 3.
 
+## PR 2 as built
+- **The tab is a mode of the Markdown editor**, as a deck is: a `Slide library/Themes/<Name>.theme.md` in the project opens as the theme's tab (`themeMode`), named after the theme. The draft is the theme document's unsaved text, so the dot, Save and Cmd+S, the close question and a window reload come from VS Code. Each change writes only that field's line, in its quotes (a colour change also drops the hand-picked shades, as the prototype does); a theme opened and closed unchanged stays byte for byte. Theme files don't auto-save (`[ritemark-theme]` `files.autoSave: off`); the decks read the file on disk, so they change only on Save, and then at once.
+- **On the bar:** the swatch and name, "Used by N decks" (a list; a deck opens from it), Saved or Not saved with Discard, and Save ▾ (Save as a new theme…, Discard the changes). After Save the bar says how many decks have the new look, with Undo.
+- **In the tab:** the four colours (a palette swatch and a hex code each), Soft light in a corner, the contrast line (text and headings against the background, 4.5 to 1), Corners and Boxes, and six of the deck's slides as Card or Borderless. No fonts or logo yet (PR 3, PR 4).
+- **The Theme menu** has Edit <Name> (not for the built-in Evening while the project has no Evening file) and New theme… (a copy of the deck's theme, Paper or Ember, "Use it in this deck" ticked).
+- **The name rule** (for the Experience lead): a new theme's name is its file's name. It may not be a name or file another theme in the project has (Evening included), in any case; it holds no / \ : * ? " < > | #, starts with a letter or digit, doesn't end with a full stop, and has at most 60 characters. A name that breaks it is refused with the reason; nothing is renamed for you. Save as a new theme… offers "<Name> 2".
+- **The Experience lead (17 November):** the draft bar says what Save will do ("Not saved. Saving changes 2 decks.", the count opens the decks' list); a theme file and its tab show Lucide's palette (the file icon theme's `theme.md`); a refused name says why under the field as it is typed, and Make the theme stays disabled with the reason as its tooltip. Cmd+Z in the tab steps the draft back.
+- **The close question** is VS Code's own, without the list of decks: accepted for 2.3 (the Experience lead, 17 November), no patch.
+
 ## Not in the sprint
 Charts, image styles, custom CSS, per-slide themes, type sizes per level, a library shared across projects, and Gamma import (a Gamma look comes via a PDF or screenshots).

@@ -56,14 +56,13 @@ export const fillAlone = (fill: string, ink: string, ground: string = WHITE) => 
 const RADII: Record<DeckTheme['round'], [number, number, number]> = { square: [3, 3, 4], soft: [14, 10, 20], round: [26, 18, 22] }
 
 /**
- * Sprint 162 (step-3-themes.md, "The wall's bands"): the colour around the slide on a wall of another shape. A Card
- * deck's bands are its theme's ground at the darker end of its soft light (the plain ground when it has none), so the
- * slide reads as filling the wall; a Borderless deck's are its white.
+ * Sprint 162 (step-3-themes.md, "No bands on the wall"; Jarmo, 17 November): the wall's ground, the whole screen's. A
+ * Card deck's is its slide's own ground (`--s-bg`: the colour, and the soft light where the theme has one), drawn on
+ * the whole screen so the soft light is anchored to the screen's own corner and no edge shows where the 16:9 area
+ * ends; a Borderless deck's is white.
  */
-export function wallBand(theme: DeckTheme, borderless: boolean): string {
-  if (borderless) return WHITE
-  if (!theme.glow) return theme.bg
-  return theme.card?.g3 || mix(theme.bg, '#000000', isDark(theme.bg) ? 0.3 : 0.03)
+export function wallGround(theme: DeckTheme, borderless: boolean): string {
+  return borderless ? WHITE : themeVars(theme, false).bg
 }
 
 /** The slide's custom properties, without their `--s-` prefix. */

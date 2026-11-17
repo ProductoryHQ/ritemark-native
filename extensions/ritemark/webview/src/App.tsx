@@ -17,6 +17,7 @@ import { DocumentHeader, PropertiesModal, ExportMenu, SyncActionButton } from '.
 import { VoiceDictationButton } from './components/VoiceDictationButton'
 import { CardHead, CardStrip } from './components/tasks/CardPage'
 import { DeckView } from './components/decks/DeckView'
+import { ThemeTab } from './components/decks/theme/ThemeTab'
 import { AboutProjectNote } from './components/AboutProjectNote'
 import { startBoard, useBoardSnapshot } from './components/tasks/boardClient'
 import { CommentsMenuButton } from './components/header/CommentsMenuButton'
@@ -120,6 +121,8 @@ function App() {
   const [cardMode, setCardMode] = useState<{ cardId: string } | null>(null)
   // Sprint 157: a `.deck.md` shown as a deck (the host decides: the flag, the name, the deck version).
   const [deckMode, setDeckMode] = useState(false)
+  // Sprint 162 PR 2: a theme in the project's Slide library, shown as the theme's own tab (the host decides).
+  const [themeMode, setThemeMode] = useState(false)
   const boardSnapshot = useBoardSnapshot()
   const cardPageOn = cardMode !== null
   useEffect(() => {
@@ -222,6 +225,7 @@ function App() {
       const nextCard = payload.cardMode ?? null
       setCardMode((current) => (nextCard && current?.cardId === nextCard.cardId ? current : nextCard))
       setDeckMode(payload.deckMode === true)
+      setThemeMode(payload.themeMode === true)
       if (payload.isAgentMode) {
         setIsAgentMode(true)
         setAgentFrontmatter((payload.agentFrontmatter as AgentFrontmatter) || {})
@@ -340,6 +344,7 @@ function App() {
           })
           setCardMode((message.cardMode as { cardId: string } | undefined) ?? null)
           setDeckMode(message.deckMode === true)
+          setThemeMode(message.themeMode === true)
           if (message.isAgentMode) {
             setIsAgentMode(true)
             setAgentFrontmatter((message.agentFrontmatter as AgentFrontmatter) || {})
@@ -894,6 +899,7 @@ function App() {
         syncState={documentViewSync.state}
         properties={properties}
         onPropertiesChange={handlePropertiesChange}
+        filename={filename}
         findBar={showFindBar && editorRef.current ? (
           <FindBar
             editor={editorRef.current}
@@ -917,6 +923,28 @@ function App() {
             />
             {paragraphDialog}
           </>
+        }
+      />
+    )
+  }
+
+  // Sprint 162 PR 2: a theme in the project's Slide library, as the theme's own tab. Its draft is this document's
+  // unsaved text, which the host writes; the tab shows each payload as soon as it comes.
+  if (themeMode && fileType === 'markdown') {
+    return (
+      <ThemeTab
+        syncTarget={syncTarget}
+        onExternalApplied={handleDocumentApplied}
+        dialogs={
+          <DocumentConflictDialog
+            isOpen={showConflictDialog && !!documentViewSync.conflict}
+            filename={documentViewSync.conflict?.filename || filename}
+            reason={documentViewSync.conflict?.reason}
+            onClose={() => setShowConflictDialog(false)}
+            onCompare={() => sendConflictAction('compare')}
+            onKeepLocal={() => sendConflictAction('keep-local')}
+            onUseDisk={() => sendConflictAction('use-disk')}
+          />
         }
       />
     )

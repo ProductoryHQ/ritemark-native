@@ -28,6 +28,8 @@ export type DocumentRenderPayload =
       cardMode?: { cardId: string };
       /** A `.deck.md` shown as a deck (Sprint 157): the view draws the slides beside their handout. */
       deckMode?: true;
+      /** A theme in the project's Slide library shown as the theme's own tab (Sprint 162 PR 2). */
+      themeMode?: true;
       /** The operating system's language, such as "et-ee": dictation's first default (#486). */
       systemLanguage?: string;
     }
@@ -385,10 +387,11 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     return { fileType, filename, content, sizeBytes: integer(input, 'sizeBytes') };
   }
   if (fileType !== 'markdown') throw new DocumentProtocolError('Unknown render file type');
-  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills', 'cardMode', 'deckMode', 'systemLanguage']);
+  exactKeys(input, ['fileType', 'filename', 'content', 'properties', 'hasProperties', 'imageMappings', 'features', 'isAgentMode', 'agentFrontmatter', 'agentFlows', 'agentSkills', 'cardMode', 'deckMode', 'themeMode', 'systemLanguage']);
   if (typeof input.hasProperties !== 'boolean') throw new DocumentProtocolError('hasProperties must be boolean');
   if (input.isAgentMode !== undefined && typeof input.isAgentMode !== 'boolean') throw new DocumentProtocolError('isAgentMode must be boolean');
   if (input.deckMode !== undefined && input.deckMode !== true) throw new DocumentProtocolError('deckMode must be true when present');
+  if (input.themeMode !== undefined && input.themeMode !== true) throw new DocumentProtocolError('themeMode must be true when present');
   const features = record(input.features, 'features');
   exactKeys(features, ['voiceDictation', 'markdownExport', 'saveAsMarkdownFromPreview', 'commentCallouts', 'tableHandles', 'pictureEditor']);
   if (typeof features.voiceDictation !== 'boolean' || typeof features.markdownExport !== 'boolean') {
@@ -427,6 +430,7 @@ function parseRenderPayload(value: unknown): DocumentRenderPayload {
     ...(input.agentSkills === undefined ? {} : { agentSkills: array(input.agentSkills, 'agentSkills') }),
     ...(input.cardMode === undefined ? {} : { cardMode: cardModeOf(input.cardMode) }),
     ...(input.deckMode === true ? { deckMode: true as const } : {}),
+    ...(input.themeMode === true ? { themeMode: true as const } : {}),
     ...(input.systemLanguage === undefined ? {} : { systemLanguage: requiredString(input, 'systemLanguage', 64) }),
   };
 }

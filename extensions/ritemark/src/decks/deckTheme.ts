@@ -164,7 +164,7 @@ export const MAX_THEMES = 200;
  * A theme path as a key: `/` separators, no `./` or doubled slashes, and one case (the project folders Ritemark runs
  * on, macOS and Windows, find a file whatever its case), so a hand-written `theme:` line names the file it draws.
  */
-function pathKey(path: string): string {
+export function pathKey(path: string): string {
   return path.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '').toLowerCase();
 }
 

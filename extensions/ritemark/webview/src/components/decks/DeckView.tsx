@@ -230,6 +230,8 @@ interface DeckViewProps {
   /** The deck's front matter (its theme and its look), and the change of it. */
   properties: DocumentProperties
   onPropertiesChange: (properties: DocumentProperties) => void
+  /** Sprint 162 PR 2: the deck's file name, whose name New theme…'s "Use it in <deck>" says. */
+  filename?: string
 }
 
 /** The stage's width for a desk width, the handout's ratio and what is shown. */
@@ -254,6 +256,7 @@ export function DeckView({
   findBar,
   properties,
   onPropertiesChange,
+  filename,
 }: DeckViewProps) {
   const [editor, setEditor] = useState<TipTapEditor | null>(null)
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
@@ -1535,6 +1538,22 @@ export function DeckView({
       valid,
     })
   }, [editor])
+  // Sprint 162 PR 2: New theme… and Save as a new theme… with "Use it in this deck": the host names the new theme, and
+  // the deck uses it as a pick (one Undo, the bar's line). A theme it draws already is left as it is.
+  useEffect(() => onMessage(message => {
+    if (message.type !== 'deck/use-theme' || typeof message.path !== 'string' || typeof message.name !== 'string') return
+    if (propertiesRef.current.theme === message.path) return
+    pickTheme(message.path, message.name)
+  }), [pickTheme])
+  // What New theme… shows of this deck: its name, and a slide with boxes when it has one (frame 14).
+  const newTheme = useMemo(() => {
+    const slide = slides.find(entry => entry.kind === 'boxes') ?? slides[1] ?? slides[0] ?? null
+    return {
+      deckName: (filename ?? '').replace(/\.deck\.md$/i, '') || 'this deck',
+      slide: slide ? { kind: slide.kind, data: slide.data } : null,
+      assets,
+    }
+  }, [slides, filename, assets])
   // Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) with the focus on the deck's bar or nowhere in particular (after a pick the focus is
   // back on the Theme button) is the deck's Undo, as on the slide, the strip and the handout, which keep their own. In the
   // capture phase: the webview's own script marks an undo outside a text field handled (for the workbench, whose undo
@@ -1644,7 +1663,7 @@ export function DeckView({
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {/* Sprint 162 (frame 12): the deck's one look control, on the right before Saved. */}
-        <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} onPick={pickTheme} />
+        <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} onPick={pickTheme} newTheme={newTheme} />
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
         ) : (
