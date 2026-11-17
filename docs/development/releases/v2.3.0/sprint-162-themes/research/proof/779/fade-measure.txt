@@ -1,0 +1,9 @@
+PR 779, the wall's cross-fade on a quick double move (review finding: a half-shown slide restarted its fade-out from full).
+Final head's bundle, isolated dev instance, wall window: → then ← 120 ms later; each layer's computed opacity.
+
+120 ms after →         is-leaving 0.33   is-entering 0.67
+30 ms after ←          is-leaving 0.64   is-entering 0.04   (the half-shown slide goes out from 0.67, not from 1)
+60 ms                  is-leaving 0.52   is-entering 0.22
+90 ms                  is-leaving 0.36   is-entering 0.47
+120 ms                 is-leaving 0.22   is-entering 0.67
+620 ms                 one layer, 1.00

@@ -35,7 +35,7 @@ import { SlideSync } from './slideSync'
 import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, HANDLE_SIZE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, moveBlock, nearestGap, plusSpot, removeColumn,
+  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
   setColumnCount, setColumnSplit, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
@@ -299,6 +299,46 @@ stable(COLUMNS, 'three columns')
   assert.equal(setColumnCount(state, pos, 2), null, 'the count it has is no change')
 }
 
+// ---- A lower count takes an empty column first, wherever it stands (the Experience lead, 17 November); with none
+// empty, the last column's words join the one before it. One Undo gives the file back.
+{
+  const columnsWith = (words: (string | null)[]) => ['# Pick one', '', ':::: columns', ...words.flatMap((word, index) => [
+    ...(word === null ? ['::: column', ':::'] : ['::: column', `### ${word}`, '', `${word} words`, ':::']), ...(index < words.length - 1 ? [''] : []),
+  ]), '::::'].join('\n')
+  for (const [words, at, expected, label] of [
+    [['A', null, 'C'], 'A', ['A', 'C'], 'the empty middle column goes'],
+    [[null, 'B', 'C'], 'B', ['B', 'C'], 'the empty first column goes'],
+    [['A', 'B', null], 'A', ['A', 'B'], 'the empty last column goes'],
+    [['A', null, 'C', null], 'C', ['A', 'C'], '4 → 2: both empty columns go'],
+  ] as const) {
+    const markdown = columnsWith([...words])
+    stable(markdown, label)
+    const state = stateWith(markdown, at)
+    const pos = blockPos(state)
+    const tr = setColumnCount(state, pos, expected.length)!
+    assert.equal(columnCount(tr.doc.nodeAt(pos)!), expected.length, label)
+    assert.equal(after(tr), columnsWith([...expected]), `${label}: the others as they were`)
+  }
+  // None empty: 4 → 3 joins the last into the one before; an empty one among four goes before any words move.
+  const four = columnsWith(['A', 'B', 'C', 'D'])
+  const state = stateWith(four, 'A')
+  const three = after(setColumnCount(state, blockPos(state), 3))
+  assert.ok(three.includes('### C\n\nC words\n\n### D\n\nD words\n:::\n::::'), three)
+  const mixed = columnsWith(['A', 'B', null, 'D'])
+  const mixedState = stateWith(mixed, 'A')
+  const two = after(setColumnCount(mixedState, blockPos(mixedState), 2))
+  assert.equal(two, ['# Pick one', '', ':::: columns', '::: column', '### A', '', 'A words', ':::', '', '::: column', '### B', '', 'B words', '', '### D', '', 'D words', ':::', '::::'].join('\n'), two)
+  // In the deck: 3 → 2 with the middle emptied, then one Undo, the same bytes.
+  const text = DECK(columnsWith(['A', null, 'C']))
+  const deck = openDeck(text)
+  const stage = stageOn(deck, 0)
+  stage.caretIn('A')
+  stage.apply(setColumnCount(stage.inner, blockPos(stage.inner), 2))
+  assert.equal((stage.save().match(/^::: column$/gm) ?? []).length, 2)
+  stage.undo()
+  assert.equal(stage.save(), text, '3 → 2: one Undo gives the file back')
+}
+
 // ---- The split: the line drags and snaps to ⅓, ½ and ⅔ of its two columns; written as each column's width.
 {
   assert.deepEqual([0.05, 0.3, 0.4, 0.45, 0.55, 0.6, 0.7, 0.98].map(snapSplit), [1 / 3, 1 / 3, 1 / 3, 1 / 2, 1 / 2, 2 / 3, 2 / 3, 2 / 3])
@@ -502,9 +542,20 @@ stable(COLUMNS, 'three columns')
   const list = { left: 100, top: 50, width: 400, height: 90 }
   const plus = plusSpot(list, 'list', 112)
   assert.equal(plus.left + HANDLE_SIZE / 2, 112, 'a list\'s + under its bullets')
-  assert.equal(plus.top + HANDLE_SIZE / 2, 140, 'on its bottom edge')
-  assert.ok(barGap('list') >= HANDLE_SIZE / 2 + 8 && barGap('steps') === barGap('list'), 'the bar clears the + with a gap')
+  // The lead's follow-up: centred on the ring's bottom line (8 px off the block, the 2 px line's middle), clear of the
+  // last bullet; the bar keeps its 8 px gap below the +.
+  const ringLine = 140 + ringGap('list') + RING_LINE / 2
+  assert.equal(plus.top + HANDLE_SIZE / 2, ringLine, 'centred on the ring\'s bottom line')
+  assert.equal(plusSpot(list, 'steps', 112).top, plus.top, 'Steps the same')
+  assert.equal(140 + barGap('list') - (plus.top + HANDLE_SIZE), 8, 'the bar 8 px under the +')
+  assert.ok(barGap('steps') === barGap('list'), 'Steps the same')
   assert.equal(barGap('boxes'), 8)
+  assert.equal(barGap('columns'), 8)
+  // Boxes and Columns keep the + on the right edge's middle.
+  assert.deepEqual(plusSpot(list, 'columns'), { left: 500 - HANDLE_SIZE / 2, top: 95 - HANDLE_SIZE / 2 })
+  // A box's icon handle: centred on its top edge, 12 px of the slide in from its right, the handles' size.
+  const icon = iconSpot({ left: 100, top: 200, width: 300, height: 120 }, 0.5)
+  assert.deepEqual(icon, { left: 400 - 6 - HANDLE_SIZE, top: 200 - HANDLE_SIZE / 2 })
 }
 
 // ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.

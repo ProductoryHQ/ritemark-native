@@ -10,9 +10,7 @@
  *  - With the shell's `_ritemark.present.*` commands (patch 018, `ritemarkPresent.ts`): the wall goes full screen on the
  *    second display (the one that isn't built in) and the presenter view on the laptop's, each in a window of its own
  *    with nothing of Ritemark around it. The presenter view comes on by itself with two displays; the menu turns it off.
- *  - Without them, in a dev build only: the PR 5 path, VS Code's own commands. The wall moves into a window of its own,
- *    compact, its group locked, then full screen, each step only once the wall says its window has the focus. No
- *    presenter view.
+ *  - Without them (an older shell, or a dev build whose `vscode/` lacks the patches), Present opens nothing.
  *
  * The host is the only source of state. The session (`presentSession.ts`) holds the current slide by its key and reads
  * the deck's open document again at every move, so an edit reaches the wall at the next move. The presenter view's Now
@@ -26,10 +24,12 @@
  * `RITEMARK_PRESENT_WINDOWED=1` keeps both in windows instead of full screen, and offers the presenter view on one
  * display, only in a dev build (`VSCODE_DEV`), so a hidden test run never takes over the screen.
  *
- * The path without the shell's commands runs only in a dev build: in Ritemark's frame a window moved with VS Code's
- * commands keeps its title row ("<deck> — <project>") and the desk's edge, and the room would read the project's name
- * on the projector (the Experience lead, 16 November). Elsewhere, on an older shell, Present stays enabled and is
- * answered with a notice in the deck's bar, words only (`PRESENT_NEEDS_UPDATE`); nothing opens.
+ * Without the shell's commands Present stays enabled and is answered with a notice in the deck's bar, words only
+ * (`PRESENT_NEEDS_UPDATE`; in a dev build `PRESENT_NEEDS_PATCHES`, which says what to run); nothing opens. Until 17
+ * November a dev build placed the wall with VS Code's own window commands instead, but such a window keeps Ritemark's
+ * frame: its tab row whenever the compact step never came (the wall's window not reporting the focus), the desk's edge
+ * and gap always. The PR 1 builder's stale dev tree showed the room the tab row, so that path is gone: nothing of
+ * Ritemark is ever on the wall, in a dev build either.
  */
 import * as os from 'os';
 import * as path from 'path';
@@ -51,6 +51,7 @@ import {
   wallPicturePaths,
   wallStateOf,
   chooseDisplays,
+  PRESENT_NEEDS_PATCHES,
   PRESENT_NEEDS_UPDATE,
   type DeckPresentOptions,
   type DeckPresentRequest,
@@ -102,23 +103,12 @@ interface Running {
   /** The presenter view's refresh after an edit, once the typing pauses; and the latest state's number. */
   refresh: ReturnType<typeof setTimeout> | null;
   presenterSerial: number;
-  /** The wall answered a focus check (the PR 5 path): its window has the focus (and whether it is full screen). */
-  focused: (fullScreen: boolean) => void;
 }
 
-/** The shell's commands (patch 018), and VS Code's own for a window of its own (the path without them). */
+/** The shell's commands (patch 018). */
 const DISPLAYS_COMMAND = '_ritemark.present.displays';
 const PLACE_COMMAND = '_ritemark.present.place';
-const MOVE_TO_NEW_WINDOW = 'workbench.action.moveEditorToNewWindow';
-const COMPACT_WINDOW = 'workbench.action.enableCompactAuxiliaryWindow';
-const TOGGLE_FULL_SCREEN = 'workbench.action.toggleFullScreen';
-const LOCK_GROUP = 'workbench.action.lockEditorGroup';
-/**
- * How long the host waits for the wall's window to take the focus after the move (the wall loads the bundle again in
- * its new window), and how often it asks; how long it waits for a new panel to be an editor before it is moved.
- */
-const FOCUS_WAIT_MS = 10_000;
-const FOCUS_CHECK_MS = 150;
+/** How long the host waits for a new panel to be an editor before it is placed. */
 const ACTIVE_WAIT_MS = 3000;
 /** How long a page may take to load (the bundle is large): before a panel is moved, and again after. */
 const LOAD_WAIT_MS = 8000;
@@ -130,11 +120,6 @@ const PRESENTER_KEY = 'ritemark.present.presenterView';
 /** The dev windowed mode's windows, on the one display: the wall left, the presenter view right. */
 const WINDOWED_WALL = { x: 24, y: 64, width: 800, height: 450 };
 const WINDOWED_PRESENTER = { x: 840, y: 64, width: 864, height: 540 };
-
-/** VS Code's own window commands may place the wall only in a dev build (their window shows the project's name). */
-export function presentFallbackAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
-  return !!env.VSCODE_DEV;
-}
 
 /** The dev-only windowed mode: honoured only in a dev build. */
 export function presentWindowed(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -190,13 +175,13 @@ export class DeckPresenter implements vscode.Disposable {
   async start(origin: DeckOrigin, request: DeckPresentRequest): Promise<void> {
     this.stop();
     const start = ++this.starts;
-    // First, before the deck is read or anything opens: a shell without the placement commands can't place the wall
-    // (only a dev build may use VS Code's own), and Present answers with the notice.
+    // First, before the deck is read or anything opens: a shell without the placement commands can't place the wall,
+    // and Present answers with the notice (in a dev build, what to run).
     const shell = await hasShellPlacement();
     // Another Present (⌘↩ twice, or from another deck view) or a Stop came while this one asked the shell: it gives up.
     if (start !== this.starts) return;
-    if (!shell && !presentFallbackAllowed()) {
-      await post(origin.panel.webview, { type: 'deck/present-failed', message: PRESENT_NEEDS_UPDATE });
+    if (!shell) {
+      await post(origin.panel.webview, { type: 'deck/present-failed', message: presentNeedsShellMessage() });
       return;
     }
     let session: PresentSession;
@@ -207,7 +192,7 @@ export class DeckPresenter implements vscode.Disposable {
       await post(origin.panel.webview, { type: 'deck/present-failed', message: error.message });
       return;
     }
-    const displays = shell ? await readDisplays() : [];
+    const displays = await readDisplays();
     if (start !== this.starts) return;
     const chosen = chooseDisplays(displays);
     const running: Running = {
@@ -227,7 +212,6 @@ export class DeckPresenter implements vscode.Disposable {
       swapping: false,
       refresh: null,
       presenterSerial: 0,
-      focused: () => {},
     };
     this.running = running;
     this.listen(running, running.wall);
@@ -243,10 +227,6 @@ export class DeckPresenter implements vscode.Disposable {
       }),
       { dispose: () => { if (running.refresh) clearTimeout(running.refresh); } },
     );
-    if (!shell) {
-      await placeWithoutShell(running);
-      return;
-    }
     // The wall is placed on its display, then the presenter view is made and placed on the laptop's, which keeps the
     // focus (the presenter's keys and clicker work there). Each panel is made in the deck's group, where it is the
     // tab in front, so its page loads before it moves (a panel behind another tab loads nothing).
@@ -397,9 +377,6 @@ export class DeckPresenter implements vscode.Disposable {
         if (screen === running.wall) await this.showWall(running);
         else await this.showPresenter(running);
         return;
-      case 'present/focus':
-        if (screen === running.wall) running.focused(request.fullScreen);
-        return;
       case 'present/stop':
         this.stop();
         return;
@@ -534,6 +511,11 @@ function nextLoad(screen: Screen, ms: number): { loaded: Promise<boolean>; cance
 /** The shell's commands don't change while Ritemark runs: asked once. */
 let shellPlacement: Promise<boolean> | null = null;
 
+/** The notice for a shell without the commands: a dev build says what to run, any other build to update. */
+export function presentNeedsShellMessage(env: NodeJS.ProcessEnv = process.env): string {
+  return env.VSCODE_DEV ? PRESENT_NEEDS_PATCHES : PRESENT_NEEDS_UPDATE;
+}
+
 /** The shell can place the windows: this Ritemark's shell has the commands (patch 018, Sprint 159). */
 function hasShellPlacement(): Promise<boolean> {
   // Only an answer is kept: a failed ask (the extension host still starting) is asked again next time.
@@ -571,66 +553,6 @@ async function panelIsOpen(running: Running, viewType: string): Promise<boolean>
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   return false;
-}
-
-/**
- * The path without the shell's commands (PR 5): the wall goes into a window of its own, then that window is made
- * compact, its group locked and the window made full screen (in a dev build's windowed mode it stays a compact window).
- *
- *  - The panel is moved only once the main window reports it as the active editor: the move takes whatever editor is
- *    active, and it must never be the deck.
- *  - VS Code's compact, lock and full-screen commands act on the window that has the focus, and on the main window when
- *    none has it. A new window takes the focus a moment after the move, so before each step the host asks the wall
- *    (now in its own window) until it says its window has the focus. Without that answer nothing more is done: the
- *    main window is never made full screen by mistake, and the wall stays a window of its own.
- *  - The locked group keeps anything opened during the talk (a link, a file the AI opens) off the wall: it opens in
- *    the main window instead.
- *  - Full screen is a toggle, so it is sent only when the wall says its window is not full screen already.
- */
-async function placeWithoutShell(running: Running): Promise<void> {
-  if (!(await wallIsActive(running))) return;
-  await vscode.commands.executeCommand(MOVE_TO_NEW_WINDOW);
-  if (running.ended || !(await wallHasFocus(running))) return;
-  await vscode.commands.executeCommand(COMPACT_WINDOW);
-  await vscode.commands.executeCommand(LOCK_GROUP);
-  if (presentWindowed() || running.ended) return;
-  const focus = await wallHasFocus(running);
-  if (focus && !focus.fullScreen) await vscode.commands.executeCommand(TOGGLE_FULL_SCREEN);
-}
-
-/** Wait until the main window reports the wall as the active editor; false after a while or when the wall is gone. */
-async function wallIsActive(running: Running): Promise<boolean> {
-  const started = Date.now();
-  while (!running.ended && Date.now() - started < ACTIVE_WAIT_MS) {
-    const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-    if (input instanceof vscode.TabInputWebview && input.viewType.endsWith(DECK_WALL_VIEW_TYPE)) return true;
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  return false;
-}
-
-/**
- * Ask the wall until it says its window has the focus: its answer (whether the window is full screen already), or
- * null after a while or when the wall is gone.
- */
-function wallHasFocus(running: Running): Promise<{ fullScreen: boolean } | null> {
-  return new Promise(resolve => {
-    const started = Date.now();
-    const wall = running.wall.panel;
-    const finish = (value: { fullScreen: boolean } | null) => { clearInterval(timer); running.focused = () => {}; resolve(value); };
-    const ask = () => {
-      if (running.ended || Date.now() - started > FOCUS_WAIT_MS) {
-        finish(null);
-        return;
-      }
-      // The wall's window can have the focus with nothing inside it focused: revealing the panel puts it in the wall.
-      if (Date.now() - started >= FOCUS_CHECK_MS) wall.reveal(wall.viewColumn, false);
-      void post(wall.webview, { type: 'present/focus-check' });
-    };
-    const timer = setInterval(ask, FOCUS_CHECK_MS);
-    running.focused = fullScreen => finish({ fullScreen });
-    ask();
-  });
 }
 
 function workspaceFolderOf(document: vscode.TextDocument): string | null {

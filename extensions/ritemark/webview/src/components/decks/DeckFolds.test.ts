@@ -160,6 +160,13 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(/\.deck-handout\.is-solo, \.deck-handout\.is-above \{[^}]*var\(--deck-text-column/.test(css) && !/760px/.test(css), 'the solo column takes it, with no second copy')
   assert.ok(view.includes('[data-thumb="${addSheet.number - 1}"]'), 'the sheet is anchored to its thumbnail')
   assert.ok(/\.deck-handout\.is-above::before \{[^}]*top: 0; height: 8px; z-index: 1; background: var\(--r-surface\); pointer-events: none; \}/.test(css), 'the handout top masked above')
+  // Slide only fills the room and sits in its middle (Jarmo, 17 November: "align slide to center... and fill the
+  // space"): the whole-room size (`fullSlideWidthFor`, deckLayout.test.ts), the group the slide's own width, centred.
+  assert.ok(view.includes('const slideAlone = slideShown && !handoutShown') && view.includes('slideAlone ? fullSlideWidthFor(stageWidth, stageHeight) :'), 'the whole room in Slide only')
+  assert.ok(view.includes("${slideAlone ? ' is-alone' : ''}") && view.includes('above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 }'), 'its group the slide\'s width')
+  // A row under the slide scrolls with the stage; it never sizes the slide (review: it shrank as the row wrapped).
+  assert.ok(view.includes('if (!above || slideAlone) return'), 'rows measured only above, beside the handout')
+  assert.ok(css.includes('.deck-stage.is-alone { align-items: center; }') && css.includes('.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }'), 'centred both ways')
 }
 
 console.log('DeckFolds: passed')

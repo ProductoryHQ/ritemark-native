@@ -88,3 +88,15 @@ export function slideWidthFor(width: number, height: number, above: boolean, und
   const byHeight = above ? Math.floor(((height - ABOVE_STAGE_ROOM - Math.max(0, under)) * 16) / 9) : Infinity
   return Math.max(0, Math.min(byWidth, byHeight))
 }
+
+/**
+ * Slide only (the design: "Slide only gives the slide the whole room, and the strip stays"; Jarmo, 17 November: "align
+ * slide to center... and fill the space"): the largest 16:9 slide in the room `width` × `height` between the strip and
+ * the AI pane (or the window's edge), less the side margins and 32 in height and the rows still under it, with no
+ * 900 cap. The stage centres it both ways.
+ */
+export function fullSlideWidthFor(width: number, height: number, under = 0): number {
+  const byWidth = width - STAGE_MARGIN * 2
+  const byHeight = Math.floor(((height - ABOVE_STAGE_ROOM - Math.max(0, under)) * 16) / 9)
+  return Math.max(0, Math.min(byWidth, byHeight))
+}

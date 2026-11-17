@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/wallKeys.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, wallKeyOf, wallSlideSize } from './wallKeys'
+import { clockText, countLabel, goToKey, MAX_GOTO_DIGITS, presentKeyOf, wallKeyOf, wallSlideSize, wallBleed } from './wallKeys'
 
 // ---- On, back, the ends, stop
 for (const key of ['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter']) assert.deepEqual(wallKeyOf({ key }), { type: 'next' }, key)
@@ -39,6 +39,13 @@ assert.equal(countLabel(null, 6, false), '– of 6', 'a slide deleted while on t
 assert.deepEqual(wallSlideSize(1440, 900), { width: 1440, height: 810, left: 0, top: 45 }, '16:10: bands above and below')
 assert.deepEqual(wallSlideSize(1920, 1080), { width: 1920, height: 1080, left: 0, top: 0 }, '16:9: no bands')
 assert.deepEqual(wallSlideSize(1600, 600), { width: 1067, height: 600, left: 267, top: 0 }, 'wide: bands on the sides')
+
+// ---- The ground and the side picture run past the 16:9 area to the screen's edges (canvas pixels, a pixel over)
+assert.deepEqual(wallBleed(wallSlideSize(1440, 900), 960), { x: 0, y: 31 }, '16:10: 45 screen px above and below')
+assert.deepEqual(wallBleed(wallSlideSize(1728, 1080), 960), { x: 0, y: 31 }, 'the Mac below its notch: 54 px')
+assert.deepEqual(wallBleed(wallSlideSize(1920, 1080), 960), { x: 0, y: 0 }, '16:9: nothing to run past')
+assert.deepEqual(wallBleed(wallSlideSize(1600, 600), 960), { x: 242, y: 0 }, 'wide: to the sides')
+assert.deepEqual(wallBleed({ width: 0, left: 0, top: 0 }, 960), { x: 0, y: 0 }, 'a window not laid out yet')
 
 // ---- ⌘↩ presents from this slide, ⇧⌘↩ from the start; ⇧↩ stays the handout's line break
 assert.equal(presentKeyOf({ key: 'Enter', metaKey: true }, true), 'here')

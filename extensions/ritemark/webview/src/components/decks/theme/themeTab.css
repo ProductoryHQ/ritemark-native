@@ -2,6 +2,11 @@
    bar is the deck's bar; the settings sit on the left in a 340 px column on the desk's white, and the preview fills
    the rest on the ground. */
 
+/* Every colour swatch has a quiet 1 px inset ring, so a colour close to the panel's own still reads as a swatch (the
+   Experience lead, 17 November): ink at 12 % in Light, white at 15 % in Dark; the palette, a popover, too. */
+:root { --theme-swatch-ring: rgba(30, 27, 75, .12); }
+body.vscode-dark, body.vscode-high-contrast { --theme-swatch-ring: rgba(255, 255, 255, .15); }
+
 .theme-tab {
   --deck-bar: 44px;
   display: flex;
@@ -16,7 +21,7 @@
 
 /* ---- the bar */
 .theme-bar { border-bottom: 1px solid var(--r-hairline); gap: 8px; padding: 0 10px 0 14px; }
-.theme-bar > .deck-theme-swatch { width: 26px; height: 18px; border-radius: 5px; }
+.theme-bar > .deck-theme-swatch { width: 26px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--theme-swatch-ring); }
 .theme-bar > .deck-theme-swatch > i:first-child { top: 5px; left: 5px; width: 9px; }
 .theme-bar > .deck-theme-swatch > i:last-child { top: 10px; left: 5px; width: 14px; }
 .theme-bar-name { margin-left: 2px; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; flex: 0 1 auto; min-width: 0; }
@@ -64,9 +69,9 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
   height: 28px;
   border-radius: 7px;
   background: var(--swatch);
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16);
+  box-shadow: inset 0 0 0 1px var(--theme-swatch-ring);
 }
-.theme-tab .theme-swatch-button[data-state="open"] { box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.theme-tab .theme-swatch-button[data-state="open"] { box-shadow: inset 0 0 0 1px var(--theme-swatch-ring), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 .theme-tab .theme-hex { width: 84px; height: 30px; padding: 0 8px; font-family: var(--ritemark-mono-font-family, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12.5px; text-transform: uppercase; }
 .theme-tab .theme-hex.is-wrong { border-color: var(--r-error, #DC2626); }
 
@@ -77,9 +82,9 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
   height: 24px;
   border-radius: 6px;
   background: var(--swatch);
-  box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16);
+  box-shadow: inset 0 0 0 1px var(--theme-swatch-ring);
 }
-.theme-palette .theme-palette-colour.is-on { box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .16), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
+.theme-palette .theme-palette-colour.is-on { box-shadow: inset 0 0 0 1px var(--theme-swatch-ring), 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 
 
 .theme-contrast {
