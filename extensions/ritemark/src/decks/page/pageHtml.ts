@@ -62,7 +62,7 @@ export interface PageAssets {
    * Sprint 162 PR 4: the theme's logo as a file beside the page (`logos/logo-<hash>.svg`, `pageFile.pageLogoFile`),
    * drawn as an `<img>` in its corner of the slides it is on. None: no logo, or its file is missing.
    */
-  logo?: { address: string } | null;
+  logo?: { address: string; aspect?: number | null } | null;
 }
 
 export interface PageOptions {
@@ -657,7 +657,7 @@ export const PAGE_CSP = [
 export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOptions): string {
   const borderless = deck.look === 'borderless';
   // The logo's address is the file beside the page; a theme whose logo isn't there draws none (Sprint 162 PR 4).
-  const theme = deck.theme.logo && assets.logo ? { ...deck.theme, logoUrl: assets.logo.address } : deck.theme;
+  const theme = deck.theme.logo && assets.logo ? { ...deck.theme, logoUrl: assets.logo.address, ...(assets.logo.aspect ? { logoAspect: assets.logo.aspect } : {}) } : deck.theme;
   const count = deck.slides.length;
   const layers = deck.slides.map((slide, index) => {
     const drawing = {

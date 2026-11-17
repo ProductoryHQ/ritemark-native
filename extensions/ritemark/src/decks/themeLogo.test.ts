@@ -19,9 +19,9 @@ import * as path from 'node:path';
 import { gatherPage } from '../publish/gather';
 import { BUILT_IN_THEME_TEXT, isLogoPath, parseTheme } from './deckTheme';
 import { isThemeChanges, themeTextWith } from './themeFile';
-import { logoKindOfName, logoNames, logoProblem, MAX_LOGO_BYTES, svgProblem, themeStem } from './themeLogo';
+import { logoAspectOf, logoKindOfName, logoNames, logoProblem, MAX_LOGO_BYTES, svgProblem, themeStem } from './themeLogo';
 import { decodeThemeRequest, ThemeProtocolError } from './themeProtocol';
-import { blockCanvasMarkup, blockSlideMarkup, drawsLogo, slideLogoHtml, themeSlideLogo } from './blocks/slideRenderer';
+import { BLOCK_CANVAS_WIDTH, LOGO_CLEARANCE, LOGO_MAX_WIDTH, blockCanvasMarkup, blockSlideMarkup, drawsLogo, logoTitleMargin, slideLogoHtml, themeSlideLogo } from './blocks/slideRenderer';
 import { slideMarkup } from '../../webview/src/components/decks/slide/slideMarkup';
 import { LOGO_PLACE, PAGE_FONTS, buildDeckPage, foreignLogoLine, nodeFontFs, nodePageFs, pageLogoFile, removePageFonts, writeDeckPage, writePageFonts } from './page/pageFile';
 import type { PageAssets } from './page/pageHtml';
@@ -187,6 +187,36 @@ async function main(): Promise<void> {
     assert.match(fs.readFileSync(path.join(extension, 'src/decks/themePages.ts'), 'utf8'), /createFileSystemWatcher\(`\*\*\/\$\{THEMES_FOLDER\}\/\*\*\/\*\.\{svg,png,SVG,PNG\}`\)/, 'a logo put back is drawn again');
   });
 
+  await test('the Experience lead (18 November): a long title never runs under a top-right logo', () => {
+    // The logo's own width: 26 px high at its width to height (an SVG's viewBox, a PNG's header), at most 190.
+    assert.equal(logoAspectOf(Buffer.from(SVG), 'svg'), 172 / 32);
+    assert.equal(logoAspectOf(PNG, 'png'), 1);
+    assert.equal(logoAspectOf(Buffer.from('<svg width="80" height="40"></svg>'), 'svg'), 2);
+    assert.equal(logoAspectOf(Buffer.from('<svg></svg>'), 'svg'), null);
+    const theme = { ...parseTheme(themeTextWith(FERN, { logo: 'L.svg' })), logoUrl: 'L.svg', logoAspect: 172 / 32 };
+    const logo = themeSlideLogo(theme)!;
+    assert.equal(logo.width, 139.75);
+    assert.equal(themeSlideLogo({ ...theme, logoAspect: 20 })!.width, LOGO_MAX_WIDTH, 'a very wide logo counts at its widest');
+    assert.equal(themeSlideLogo({ ...theme, logoAspect: undefined })!.width, LOGO_MAX_WIDTH, 'an unknown shape counts at its widest');
+    // A two-line title that runs to the right edge: the first block's right edge is the logo's left edge less 16 px.
+    const title = { markdown: '# Mõõdame, kuidas meeskonna päevaplaan, kõnede jagamine ja õhtune ülevaade tegelikult toimivad\n\n- One\n- Two' };
+    const canvas = blockCanvasMarkup(title, { logo });
+    const room = Number(/--logo-room:(\d+)px/.exec(canvas)?.[1]);
+    assert.match(canvas, /class="deck-sl is-blocks logo-tr"/);
+    const flowRight = BLOCK_CANVAS_WIDTH - 64;
+    const logoLeft = BLOCK_CANVAS_WIDTH - 30 - logo.width;
+    assert.ok(flowRight - room <= logoLeft - LOGO_CLEARANCE, `the title ends at ${flowRight - room}, the logo starts at ${logoLeft}`);
+    assert.equal(room, logoTitleMargin(logo));
+    // Only a top-right logo on the slide keeps the room: not elsewhere, not where it isn't drawn, not on a title slide.
+    for (const other of [{ ...logo, place: 'top-left' as const }, { ...logo, place: 'bottom-right' as const }, { ...logo, on: 'title-slides' as const }]) {
+      assert.doesNotMatch(blockCanvasMarkup(title, { logo: other }), /logo-tr|--logo-room/);
+    }
+    assert.doesNotMatch(blockCanvasMarkup({ markdown: '# Harbour title\n\nA line under it' }, { logo }), /logo-tr/, 'a title slide\'s words sit low');
+    const css = fs.readFileSync(path.join(extension, 'webview/src/components/decks/slide/slide.css'), 'utf8');
+    assert.match(css, /\.deck-sl\.is-blocks\.logo-tr \.blk-flow > :first-child \{ margin-right: var\(--logo-room, 0px\); \}/);
+    assert.match(fs.readFileSync(path.join(extension, 'webview/src/components/decks/blocks/SlideEditor.tsx'), 'utf8'), /logoMarks\.cls\]/, 'the stage keeps the room too');
+  });
+
   // ---- The place and title-only rules, and a missing file
   await test('the logo in its corner, on every slide or on title slides only; no address draws nothing', () => {
     const theme = parseTheme(themeTextWith(FERN, { logo: 'L.svg' }));
@@ -194,7 +224,7 @@ async function main(): Promise<void> {
     assert.equal(slideLogoHtml(themeSlideLogo(theme), true), '');
     const drawn = { ...theme, logoUrl: 'https://file.test/L.svg?v=1' };
     const every = themeSlideLogo(drawn)!;
-    assert.deepEqual(every, { url: 'https://file.test/L.svg?v=1', place: 'top-right', on: 'every-slide' });
+    assert.deepEqual(every, { url: 'https://file.test/L.svg?v=1', place: 'top-right', on: 'every-slide', width: 190 });
     assert.ok(drawsLogo(every, false) && drawsLogo(every, true));
     const titles = { ...every, on: 'title-slides' as const };
     assert.ok(drawsLogo(titles, true) && !drawsLogo(titles, false));

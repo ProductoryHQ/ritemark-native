@@ -317,8 +317,9 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   const logoUrl = theme.logoUrl
   const logoPlace = theme.logo?.place
   const logoOn = theme.logo?.on
+  const logoAspect = theme.logoAspect
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn])
+  const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn, logoAspect])
   const html = useMemo(
     () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo }),
     [data, step, width, assets, missing, logo],

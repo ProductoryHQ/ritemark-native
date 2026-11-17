@@ -220,7 +220,7 @@ export class DeckPublisher implements vscode.Disposable {
         theme = look.theme;
         logoFiles = look.logo ? [look.logo] : [];
         fontFiles = await this.fontFilesFor(theme);
-        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: look.logo ? { address: look.logo.address } : null });
+        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: look.logo ? { address: look.logo.address, aspect: look.logo.aspect } : null });
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);

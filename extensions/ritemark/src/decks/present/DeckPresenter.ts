@@ -438,7 +438,7 @@ export class DeckPresenter implements vscode.Disposable {
       // wall's window (Sprint 162 PR 4; the presenter view draws the wall's state, and the same address).
       const read = await deckThemeFor(running.origin.document.uri.fsPath, themePathOf(themePath), running.wall.panel.webview);
       const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
-      running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo } : theme };
+      running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo, ...(read.logoAspect ? { logoAspect: read.logoAspect } : {}) } : theme };
     }
     return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };
   }

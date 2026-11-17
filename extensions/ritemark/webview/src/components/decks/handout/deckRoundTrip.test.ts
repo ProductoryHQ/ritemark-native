@@ -15,14 +15,14 @@ import { createDocument } from '@mixmark-io/domino'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, Plugin, type Transaction } from '@tiptap/pm/state'
-import { history, undo } from '@tiptap/pm/history'
+import { history, redo, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
 import { isTextHandout, parseSlideBody, writeSlideBody } from '../../../../../src/decks/deckFormat'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DECK_DERIVED, derivedHeadings, withDrawnHeadings } from '../deckDocument'
+import { DECK_DERIVED, derivedHeadings, duplicateSlide, moveSlide, nudgeTarget, partChangedBy, sealHistory, slidesOf, withDrawnHeadings } from '../deckDocument'
 import { documentReplacement } from '../../../lib/documentUpdate'
 import { DeckDrawnHeadings, drawnHeadingsFollow, handoutMarkFor, hasDrawnHeadings } from './drawnHeadings'
 
@@ -403,6 +403,128 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   const body = String(node.attrs.body).replace('# Four parts\n', `# Four parts\n\n<!-- {id:${id(5)}} A new note. -->\n`)
   const saved = save(EditorState.create({ doc }).tr.setNodeMarkup(at, undefined, { ...node.attrs, body }).doc)
   assert.equal(saved, text.replace('# Four parts\n', `# Four parts\n\n<!-- {id:${id(5)}} A new note. -->\n`))
+}
+
+// 17 November: Cmd+D and Cmd+↑ / Cmd+↓ write the deck file. A copy goes right after its slide with its handout part, a
+// move takes the part with it, the first and last slides don't move past the ends, and one Undo gives back the same
+// bytes, even right after typing (each is an undo step of its own). The undo says which part it changed, for the strip.
+{
+  const text = [
+    '---', 'deck: 2', 'handout: text', '---', '',
+    '```slide', '---', 'id: aa11', '---', '# First', '```', '', '## First part', '', 'Words for the first.', '',
+    '```slide', '---', 'id: bb22', '---', '# Second', '```', '', '## Second part', '', 'Words for the second.', '', '- a point', '',
+    '```slide', '---', 'id: cc33', '---', '# Third', '```', '', '## Third part', '', 'Words for the third.', '',
+  ].join('\n')
+  const { doc, save } = open(text)
+  assert.equal(save(doc), text, 'the synthetic deck saves byte for byte')
+  const fresh = () => EditorState.create({ doc, plugins: [history()] })
+  const undoOf = (state: EditorState) => {
+    let tr: Transaction | null = null
+    undo(state, (step: Transaction) => { tr = step })
+    assert.ok(tr, 'there is a step to undo')
+    return tr as Transaction
+  }
+  const ids = (next: PMNode) => slidesOf(next).map(entry => entry.data.id)
+  const part = (name: string) => `## ${name} part\n\nWords for the ${name.toLowerCase()}.`
+
+  // Cmd+D on the second slide: the copy (a new id) and its handout part come right after it.
+  {
+    const state = fresh()
+    const duplicated = state.apply(duplicateSlide(state, 1, () => 0.5)!)
+    const saved = save(duplicated.doc)
+    const [first, second, copy, third] = ids(duplicated.doc)
+    assert.deepEqual([first, second, third], ['aa11', 'bb22', 'cc33'])
+    assert.ok(copy && !['aa11', 'bb22', 'cc33'].includes(copy), 'the copy, right after it, has an id of its own')
+    assert.equal(saved.split(part('Second')).length - 1, 2, "the copy carries the slide's handout part")
+    assert.ok(saved.indexOf('- a point', saved.indexOf('- a point') + 1) < saved.indexOf(part('Third')), 'the copy stands right after it')
+    const back = undoOf(duplicated)
+    assert.equal(save(duplicated.apply(back).doc), text, 'one Undo gives back the same bytes')
+    assert.equal(partChangedBy(back), 1, 'the undo shows the slide the copy came from')
+    let again: Transaction | null = null
+    redo(duplicated.apply(back), (step: Transaction) => { again = step })
+    assert.equal(partChangedBy(again!), 2, 'a redo shows the copy')
+  }
+
+  // Cmd+↓ on the first slide, then Cmd+↑ on the last: each takes its handout part along.
+  {
+    const state = fresh()
+    const down = state.apply(moveSlide(state, 0, nudgeTarget(0, 1, 3)!)!)
+    assert.deepEqual(ids(down.doc), ['bb22', 'aa11', 'cc33'])
+    const saved = save(down.doc)
+    assert.ok(saved.indexOf('- a point') < saved.indexOf('# First') && saved.indexOf('# First') < saved.indexOf(part('First')) && saved.indexOf(part('First')) < saved.indexOf('# Third'), 'the part moved with its slide')
+    const back = undoOf(down)
+    assert.equal(save(down.apply(back).doc), text, 'one Undo of the move gives back the same bytes')
+    assert.equal(partChangedBy(back), 0, 'the undo shows the slide where it came back to')
+
+    const up = state.apply(moveSlide(state, 2, nudgeTarget(2, -1, 3)!)!)
+    assert.deepEqual(ids(up.doc), ['aa11', 'cc33', 'bb22'])
+    const upBack = undoOf(up)
+    assert.equal(save(up.apply(upBack).doc), text)
+    assert.equal(partChangedBy(upBack), 2, 'the slide moved up shows at its old place, the last')
+  }
+
+  // The ends: the first slide can't go up, nor the last down, nor a slide that isn't there.
+  assert.equal(nudgeTarget(0, -1, 3), null)
+  assert.equal(nudgeTarget(2, 1, 3), null)
+  assert.equal(nudgeTarget(3, -1, 3), null)
+  assert.equal(nudgeTarget(0, 1, 1), null, 'a deck of one slide moves nothing')
+  assert.equal(nudgeTarget(1, -1, 3), 0)
+  assert.equal(nudgeTarget(1, 1, 3), 3)
+
+  // Typing in the third part, then Cmd+D on the first at once: one Undo takes the copy back and keeps the words.
+  {
+    const state = fresh()
+    const third = slidesOf(doc)[2]
+    const end = third.pos + third.node.nodeSize + doc.nodeAt(third.pos + third.node.nodeSize)!.nodeSize - 1
+    const typed = state.apply(state.tr.insertText(' Typed', end))
+    const typedText = save(typed.doc)
+    assert.ok(typedText.includes('## Third part Typed'))
+    const duplicated = typed.apply(duplicateSlide(typed, 0, () => 0.5)!)
+    const back = undoOf(duplicated)
+    assert.equal(save(duplicated.apply(back).doc), typedText, 'the copy is an undo step of its own')
+    // The next Undo takes the words back, and shows the part they were in.
+    const undoneOnce = duplicated.apply(back)
+    const typing = undoOf(undoneOnce)
+    assert.equal(save(undoneOnce.apply(typing).doc), text)
+    assert.equal(partChangedBy(typing), 2, 'an undo of typing shows the part typed in')
+    const moved = typed.apply(moveSlide(typed, 0, 2)!)
+    assert.equal(save(moved.apply(undoOf(moved)).doc), typedText, 'a move is an undo step of its own too')
+  }
+
+  // Words typed at once after Cmd+D, in the copy's own part: the deck view seals the step (`sealHistory`), so one Undo
+  // takes the words alone, and the next the copy (review of #784).
+  {
+    const state = fresh()
+    const duplicated = state.apply(duplicateSlide(state, 0, () => 0.5)!)
+    const sealed = duplicated.apply(sealHistory(duplicated))
+    assert.equal(sealed.doc, duplicated.doc, 'sealing changes nothing in the file')
+    const copy = slidesOf(sealed.doc)[1]
+    const end = copy.pos + copy.node.nodeSize + sealed.doc.nodeAt(copy.pos + copy.node.nodeSize)!.nodeSize - 1
+    const typed = sealed.apply(sealed.tr.insertText(' again', end))
+    const once = typed.apply(undoOf(typed))
+    assert.equal(save(once.doc), save(duplicated.doc), 'one Undo takes the words typed after the copy, not the copy')
+    assert.equal(save(once.apply(undoOf(once)).doc), text)
+    // Without the seal the words would join the copy's step: what the deck view guards against.
+    const unsealed = duplicated.apply(duplicated.tr.insertText(' again', end))
+    assert.equal(save(unsealed.apply(undoOf(unsealed)).doc), text, 'the merge the seal prevents')
+  }
+
+  // Undoing a mark (bold, a comment) in another part shows that part: a mark step has no map of its own.
+  {
+    const state = fresh()
+    const third = slidesOf(doc)[2]
+    const heading = third.pos + third.node.nodeSize
+    const bolded = state.apply(state.tr.addMark(heading + 1, heading + 4, schema.marks.bold.create()))
+    assert.equal(partChangedBy(undoOf(bolded)), 2)
+  }
+
+  // A change of a slide's body (the stage's edit) shows that slide.
+  {
+    const state = fresh()
+    const second = slidesOf(doc)[1]
+    const edited = state.apply(state.tr.setNodeMarkup(second.pos, undefined, { ...second.node.attrs, body: String(second.node.attrs.body).replace('# Second', '# Second, edited') }))
+    assert.equal(partChangedBy(undoOf(edited)), 1)
+  }
 }
 
 console.log('deckRoundTrip: passed')

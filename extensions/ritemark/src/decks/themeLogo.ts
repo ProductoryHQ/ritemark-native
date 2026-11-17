@@ -98,6 +98,26 @@ export function logoProblem(name: string, bytes: Uint8Array): string | null {
   return svgProblem(text);
 }
 
+/**
+ * A logo's width to its height, from its own bytes: a PNG's header, an SVG's `viewBox` (or its `width` and `height`).
+ * Null when it can't be read; the slide then counts the logo at its widest (`LOGO_MAX_WIDTH`).
+ */
+export function logoAspectOf(bytes: Uint8Array, kind: LogoKind): number | null {
+  if (kind === 'png') {
+    if (bytes.length < 24) return null;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const width = view.getUint32(16);
+    const height = view.getUint32(20);
+    return width > 0 && height > 0 ? width / height : null;
+  }
+  const text = new TextDecoder().decode(bytes.subarray(0, 4096));
+  const root = /<(?:svg:)?svg\b[^>]*>/i.exec(text)?.[0] ?? '';
+  const box = /\bviewBox\s*=\s*["']\s*[-\d.eE+]+[\s,]+[-\d.eE+]+[\s,]+([\d.eE+]+)[\s,]+([\d.eE+]+)/.exec(root);
+  const size = (name: string) => Number(new RegExp(`\\b${name}\\s*=\\s*["']\\s*([\\d.]+)(?:px)?\\s*["']`).exec(root)?.[1]);
+  const [width, height] = box ? [Number(box[1]), Number(box[2])] : [size('width'), size('height')];
+  return width > 0 && height > 0 && Number.isFinite(width / height) ? width / height : null;
+}
+
 /** The theme file's own name, without `.theme.md`: the start of its logo's name. */
 export function themeStem(themeFile: string): string {
   const base = themeFile.split(/[\\/]/).pop() ?? '';

@@ -42,6 +42,8 @@ export interface DeckTheme {
    * beside it); never read from the theme file. No address, no logo: a missing file draws nothing.
    */
   logoUrl?: string;
+  /** The logo picture's width to its height, read from it where it is drawn; never from the theme file. */
+  logoAspect?: number;
 }
 
 /** Sprint 162 PR 4 (step-3-themes.md, "Logo"): top left, top right or bottom right, of the slide's 16:9 area. */

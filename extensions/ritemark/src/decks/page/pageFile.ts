@@ -25,6 +25,7 @@ import { isRelativeTarget } from '../deckLibraryFormat';
 import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFont, deckFontFile, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
 import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PageThemeFont, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
+import { logoAspectOf } from '../themeLogo';
 
 export interface PageFs {
   /** Throws (ENOENT) when there is nothing at the path. */
@@ -378,11 +379,13 @@ export const LOGO_PLACE: PageFilePlace = { folder: PAGE_LOGO_FOLDER, line: forei
 export interface PageFile {
   address: string;
   bytes: Buffer;
+  /** A logo's width to its height (Sprint 162 PR 4), for the title's room beside it. */
+  aspect?: number | null;
 }
 
 /** The logo's file for the page: `logos/logo-3f9a2c1d7e0b4a65.svg`. */
 export function pageLogoFile(bytes: Buffer, kind: 'svg' | 'png'): PageFile {
-  return { address: `${PAGE_LOGO_FOLDER}/logo-${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.${kind}`, bytes };
+  return { address: `${PAGE_LOGO_FOLDER}/logo-${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.${kind}`, bytes, aspect: logoAspectOf(bytes, kind) };
 }
 
 export type FontWriteResult =

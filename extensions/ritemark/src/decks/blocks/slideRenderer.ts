@@ -421,12 +421,42 @@ export interface SlideLogo {
   url: string;
   place: LogoPlace;
   on: LogoOn;
+  /** Its width on the 960 × 540 canvas: 26 px high, so 26 × its width to height, at most 190 (`LOGO_MAX_WIDTH`). */
+  width: number;
+}
+
+/** The logo's height and widest on the canvas (the prototype's `.slogo`, `slide.css` `.slide-logo`). */
+export const LOGO_HEIGHT = 26;
+export const LOGO_MAX_WIDTH = 190;
+/** The room kept between a top-right logo and a slide's first block (the Experience lead, 18 November). */
+export const LOGO_CLEARANCE = 16;
+/** How far the logo's right edge sits from the slide's (30 px) and the words' right edge sits from it (64 px). */
+const LOGO_RIGHT = 30;
+const FLOW_RIGHT = 64;
+
+/**
+ * The right margin a slide's first block gets beside a top-right logo, so a long title never runs under it (the
+ * Experience lead, 18 November): the logo's width and 16 px, measured from the words' own right edge. The logo sits
+ * in the slide's top margin (22 to 48 px), and a title's first line starts at 46 px, whose accents (Õ, Ä) reach above
+ * it, so a title that ran to the right edge would touch it.
+ */
+export function logoTitleMargin(logo: Pick<SlideLogo, 'width'>): number {
+  return Math.max(0, Math.ceil(logo.width + LOGO_CLEARANCE + LOGO_RIGHT - FLOW_RIGHT));
+}
+
+/** The canvas's class and style for a top-right logo on this slide (`slide.css`, `.logo-tr`); none otherwise. */
+export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
+  // A title slide's words sit low, far from the top margin: only the others keep the room.
+  if (cover || !drawsLogo(logo, cover) || logo.place !== 'top-right') return { cls: '', style: {} };
+  return { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
 }
 
 /** The theme's logo to draw, or null: a theme with no logo, or whose picture has no address (a missing file). */
-export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl'> | null | undefined): SlideLogo | null {
+export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl' | 'logoAspect'> | null | undefined): SlideLogo | null {
   if (!theme?.logo || !theme.logoUrl) return null;
-  return { url: theme.logoUrl, place: theme.logo.place, on: theme.logo.on };
+  const aspect = theme.logoAspect;
+  const width = aspect && aspect > 0 ? Math.min(LOGO_MAX_WIDTH, LOGO_HEIGHT * aspect) : LOGO_MAX_WIDTH;
+  return { url: theme.logoUrl, place: theme.logo.place, on: theme.logo.on, width: Math.round(width * 100) / 100 };
 }
 
 /**
@@ -470,7 +500,9 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
   const cover = isCoverSlide(markdown);
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : ''].filter(Boolean).join(' ');
+  const marks = logoCanvasMarks(options.logo, cover);
+  Object.assign(inner, marks.style);
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
     + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing })}</div>`

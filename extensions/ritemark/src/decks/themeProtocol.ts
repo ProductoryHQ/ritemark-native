@@ -49,6 +49,8 @@ export interface ThemeLogoState {
   file: string;
   url: string | null;
   problem: string | null;
+  /** Its width to its height, when it can be drawn. */
+  aspect?: number | null;
 }
 
 /** A logo's data URL: a picture of at most `MAX_LOGO_BYTES`, in base64, with its header. */

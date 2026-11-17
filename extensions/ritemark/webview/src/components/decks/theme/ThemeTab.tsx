@@ -100,7 +100,8 @@ export function logoStateFrom(value: unknown): ThemeLogoState | null {
   if (!value || typeof value !== 'object') return null
   const logo = value as Record<string, unknown>
   if (typeof logo.file !== 'string') return null
-  return { file: logo.file, url: typeof logo.url === 'string' && logo.url ? logo.url : null, problem: typeof logo.problem === 'string' ? logo.problem : null }
+  const aspect = typeof logo.aspect === 'number' && logo.aspect > 0 && Number.isFinite(logo.aspect) ? logo.aspect : null
+  return { file: logo.file, url: typeof logo.url === 'string' && logo.url ? logo.url : null, problem: typeof logo.problem === 'string' ? logo.problem : null, aspect }
 }
 
 interface ThemeDecks {
@@ -195,7 +196,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const theme = useMemo(() => {
     if (!state) return null
     const parsed = parseTheme(state.text)
-    return parsed.logo && state.logo?.url ? { ...parsed, logoUrl: state.logo.url } : parsed
+    return parsed.logo && state.logo?.url ? { ...parsed, logoUrl: state.logo.url, ...(state.logo.aspect ? { logoAspect: state.logo.aspect } : {}) } : parsed
   }, [state])
   const set = useCallback((changes: ThemeChanges) => { setCheckResult(null); sendToExtension('theme/set', { changes }) }, [])
   const save = useCallback(() => sendToExtension('theme/save'), [])

@@ -43,8 +43,9 @@ export function useDeckAssets(slides: DeckSlideEntry[]): { assets: Record<string
  * Sprint 162 PR 4: the theme with its logo's address as the host found it (a webview URI), or as it is when there is
  * none: a theme naming a logo whose file is missing draws no logo.
  */
-export function themeWithLogo(theme: DeckTheme, logo: unknown): DeckTheme {
-  return theme.logo && typeof logo === 'string' && logo ? { ...theme, logoUrl: logo } : theme
+export function themeWithLogo(theme: DeckTheme, logo: unknown, aspect?: unknown): DeckTheme {
+  if (!theme.logo || typeof logo !== 'string' || !logo) return theme
+  return typeof aspect === 'number' && aspect > 0 && Number.isFinite(aspect) ? { ...theme, logoUrl: logo, logoAspect: aspect } : { ...theme, logoUrl: logo }
 }
 
 /**
@@ -59,7 +60,7 @@ export function useDeckTheme(themePath: unknown): DeckTheme {
   useEffect(() => onMessage(message => {
     if (message.type !== 'deck/theme' || typeof message.path !== 'string') return
     const text = typeof message.text === 'string' ? message.text : null
-    setTheme({ path: message.path, theme: themeWithLogo(text === null ? BUILT_IN_THEME : parseTheme(text), message.logo) })
+    setTheme({ path: message.path, theme: themeWithLogo(text === null ? BUILT_IN_THEME : parseTheme(text), message.logo, message.logoAspect) })
   }), [])
 
   useEffect(() => {

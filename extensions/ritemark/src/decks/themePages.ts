@@ -758,7 +758,7 @@ export class ThemePages implements vscode.Disposable {
     const relative = projectRelative(root, themeFile) ?? path.basename(themeFile);
     const found = await themeLogoFile(root, relative, theme).catch(() => ({ state: 'missing' as const, file: theme.logo!.file }));
     switch (found.state) {
-      case 'found': return { file: found.file, url: logoWebviewUri(view.panel.webview, found), problem: null };
+      case 'found': return { file: found.file, url: logoWebviewUri(view.panel.webview, found), problem: null, aspect: found.aspect };
       case 'missing': return { file: found.file, url: null, problem: `The logo's file, ${found.file}, isn't beside the theme. The slides show no logo until it's back, or you choose another.` };
       case 'refused': return { file: found.file, url: null, problem: found.problem };
       default: return null;

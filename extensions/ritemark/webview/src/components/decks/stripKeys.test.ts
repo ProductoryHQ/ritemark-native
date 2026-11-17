@@ -6,7 +6,9 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { keyOrigin, stripKeyOf, type OriginElement } from './stripKeys'
+import { keyOrigin, slideOrderKeyOf, stripKeyOf, type OriginElement } from './stripKeys'
+import { slideKeyTarget } from './slideNav'
+import { slideMenuItems } from './slideMenuItems'
 
 // A strip with thumbnails whose ⋯ buttons can take the focus, a slide box (editable) inside a thumbnail, a + between
 // thumbnails, and a handout and a menu item outside the strip.
@@ -66,7 +68,9 @@ for (const key of ['Backspace', 'Delete', 'ArrowDown', 'Home', 'End', 'z']) {
 // ---- With a modifier, or already taken by a menu button, the key is not the strip's
 for (const mod of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey'] as const) {
   assert.equal(stripKeyOf({ key: 'Backspace', [mod]: true }, onStrip, 5, 2), null, `Backspace ${mod}`)
-  assert.equal(stripKeyOf({ key: 'ArrowDown', [mod]: true }, onStrip, 5, 2), null, `ArrowDown ${mod}`)
+  // Cmd+↓ on a Mac (Ctrl+↓ on Windows) moves the slide: below.
+  if (mod !== 'metaKey') assert.equal(stripKeyOf({ key: 'ArrowDown', [mod]: true }, onStrip, 5, 2), null, `ArrowDown ${mod}`)
+  if (mod !== 'ctrlKey') assert.equal(stripKeyOf({ key: 'ArrowDown', [mod]: true }, onStrip, 5, 2, false), null, `ArrowDown ${mod} on Windows`)
   assert.equal(stripKeyOf({ key: 'Home', [mod]: true }, onStrip, 5, 2), null, `Home ${mod}`)
 }
 assert.equal(stripKeyOf({ key: 'Delete', defaultPrevented: true }, { from: 'thumb', index: 1 }, 5, 2), null)
@@ -90,9 +94,87 @@ assert.equal(stripKeyOf({ key: 'F10' }, onStrip, 5, 1), null)
 assert.equal(stripKeyOf({ key: 'ArrowDown' }, { from: 'thumb', index: 1 }, 5, 1), null)
 assert.equal(stripKeyOf({ key: 'a' }, onStrip, 5, 1), null)
 
+// ---- 17 November: Cmd+D duplicates the selected slide, Cmd+↑ and Cmd+↓ move it; Ctrl on Windows
+assert.deepEqual(stripKeyOf({ key: 'd', metaKey: true }, onStrip, 5, 2), { type: 'duplicate', index: 2 })
+assert.deepEqual(stripKeyOf({ key: 'D', metaKey: true }, onStrip, 5, 2), { type: 'duplicate', index: 2 }, 'Caps Lock on')
+assert.deepEqual(stripKeyOf({ key: 'в', code: 'KeyD', metaKey: true }, onStrip, 5, 2), { type: 'duplicate', index: 2 }, 'a Russian layout: the physical D key')
+assert.deepEqual(stripKeyOf({ key: 'ArrowDown', metaKey: true }, onStrip, 5, 2), { type: 'nudge', index: 2, step: 1 })
+assert.deepEqual(stripKeyOf({ key: 'ArrowUp', metaKey: true }, onStrip, 5, 2), { type: 'nudge', index: 2, step: -1 })
+assert.deepEqual(stripKeyOf({ key: 'd', ctrlKey: true }, onStrip, 5, 2, false), { type: 'duplicate', index: 2 })
+assert.deepEqual(stripKeyOf({ key: 'ArrowUp', ctrlKey: true }, onStrip, 5, 2, false), { type: 'nudge', index: 2, step: -1 })
+// On a thumbnail (its ⋯ button), that thumbnail's slide.
+assert.deepEqual(stripKeyOf({ key: 'd', metaKey: true }, keyOrigin(moreButton3, strip), 5, 0), { type: 'duplicate', index: 3 })
+assert.deepEqual(stripKeyOf({ key: 'ArrowDown', metaKey: true }, keyOrigin(moreButton3, strip), 5, 0), { type: 'nudge', index: 3, step: 1 })
+// Only the platform's own modifier, and nothing else with it; never a held key's repeats.
+assert.equal(stripKeyOf({ key: 'd', ctrlKey: true }, onStrip, 5, 2), null, 'Ctrl+D on a Mac is the system\'s')
+assert.equal(stripKeyOf({ key: 'ArrowUp', ctrlKey: true }, onStrip, 5, 2), null, 'Ctrl+↑ on a Mac is Mission Control')
+assert.equal(stripKeyOf({ key: 'd', metaKey: true }, onStrip, 5, 2, false), null, 'the Windows key is not Ctrl')
+assert.equal(stripKeyOf({ key: 'd', metaKey: true, ctrlKey: true }, onStrip, 5, 2), null)
+assert.equal(stripKeyOf({ key: 'd', metaKey: true, shiftKey: true }, onStrip, 5, 2), null)
+assert.equal(stripKeyOf({ key: 'ArrowDown', metaKey: true, altKey: true }, onStrip, 5, 2), null)
+assert.equal(stripKeyOf({ key: 'd', metaKey: true, repeat: true }, onStrip, 5, 2), null, 'a held Cmd+D makes one copy')
+assert.equal(stripKeyOf({ key: 'ArrowDown', metaKey: true, repeat: true }, onStrip, 5, 2), null, 'a held Cmd+↓ makes one move')
+assert.equal(stripKeyOf({ key: 'd', metaKey: true, isComposing: true }, onStrip, 5, 2), null)
+assert.equal(stripKeyOf({ key: 'd', metaKey: true }, { from: 'thumb', index: 5 }, 5, 0), null, 'a thumbnail already gone')
+assert.equal(stripKeyOf({ key: 'd', metaKey: true }, onStrip, 0, 0), null, 'a deck with no slides')
+assert.equal(stripKeyOf({ key: 'd' }, onStrip, 5, 2), null, 'a plain d is no key of the strip')
+// Inside words (the handout, a box), or from a menu, the editor keeps its own keys.
+for (const event of [{ key: 'd', metaKey: true }, { key: 'ArrowDown', metaKey: true }, { key: 'ArrowUp', metaKey: true }]) {
+  assert.equal(stripKeyOf(event, keyOrigin(handout, strip), 5, 2), null, `handout ${event.key}`)
+  assert.equal(stripKeyOf(event, keyOrigin(boxInThumb, strip), 5, 2), null, `slide box ${event.key}`)
+  assert.equal(stripKeyOf(event, keyOrigin(menuItem, strip), 5, 2), null, `menu ${event.key}`)
+}
+
+// ---- The stage takes the same keys (the deck view's listener): slideOrderKeyOf, where slideKeyTarget says the key is
+//      the stage's (outside its words) or the page's, never from words being typed, a field, the strip or a menu
+assert.deepEqual(slideOrderKeyOf({ key: 'd', metaKey: true }, true), { type: 'duplicate' })
+assert.deepEqual(slideOrderKeyOf({ key: 'ArrowDown', ctrlKey: true }, false), { type: 'nudge', step: 1 })
+assert.equal(slideOrderKeyOf({ key: 'ArrowDown', ctrlKey: true }, true), null)
+assert.equal(slideOrderKeyOf({ key: 'd', metaKey: true, defaultPrevented: true }, true), null, 'a key the editor took stays its own')
+const stageTarget = (tagName: string, inside: string[], isContentEditable = false) => ({
+  tagName,
+  isContentEditable,
+  closest: (selector: string) => (selector.split(',').some(one => inside.includes(one.trim())) ? {} : null),
+})
+const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
+assert.equal(slideKeyTarget(body, body), 'page', 'nothing focused: the slide on the stage is the chosen one')
+assert.equal(slideKeyTarget(stageTarget('DIV', ['.deck-stage']), body), 'page', 'the stage outside its words')
+assert.equal(slideKeyTarget(stageTarget('P', ['.deck-stage', '[contenteditable="true"]']), body), null, "the slide's words keep their keys")
+assert.equal(slideKeyTarget(stageTarget('DIV', ['.deck-stage'], true), body), null)
+assert.equal(slideKeyTarget(stageTarget('DIV', ['.deck-strip']), body), null, 'the strip has its own')
+assert.equal(slideKeyTarget(stageTarget('DIV', ['[role="menu"]', '.deck-stage']), body), null, "a menu's keys stay the menu's")
+assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-bar', 'button']), body), null, "the deck's bar: not the stage's")
+assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-view-switch', 'button']), body), 'button', "the view switch's button: the deck view takes the order keys only from 'page' (Codex on #784)")
+
+// ---- The slide menu's Duplicate shows its key, as Delete slide shows ⌫
+const menuOf = (index: number, count: number) => slideMenuItems({ index, count, skipped: false, fromLibrary: false, deleteKey: '⌫', duplicateKey: '⌘D', upKey: '⌘↑', downKey: '⌘↓' })
+const menu = menuOf(1, 3)
+assert.equal(menu.find(item => item.key === 'duplicate')?.keyHint, '⌘D')
+assert.equal(menu.find(item => item.key === 'delete')?.keyHint, '⌫')
+
+// ---- 18 November (the Experience lead): Move up ⌘↑ and Move down ⌘↓ under Duplicate, then a line; Move up off on the
+//      first slide and Move down on the last, as a Mac menu has them, each saying why in its tooltip
+assert.deepEqual(menu.map(item => `${item.separated ? '| ' : ''}${item.label}${item.keyHint ? ` ${item.keyHint}` : ''}`),
+  ['Duplicate ⌘D', 'Move up ⌘↑', 'Move down ⌘↓', '| Skip slide', 'Add to library…', 'Slide settings…', '| Delete slide ⌫'])
+const offs = (index: number, count: number) => menuOf(index, count).filter(item => item.key === 'up' || item.key === 'down').map(item => `${item.key}${item.disabled ? ' off' : ''}`)
+assert.deepEqual(offs(1, 3), ['up', 'down'], 'a slide in the middle moves both ways')
+assert.deepEqual(offs(0, 3), ['up off', 'down'], 'the first slide')
+assert.deepEqual(offs(2, 3), ['up', 'down off'], 'the last slide')
+assert.deepEqual(offs(0, 1), ['up off', 'down off'], 'a deck of one slide')
+for (const item of [...menuOf(0, 3), ...menuOf(2, 3), ...menuOf(0, 1)]) {
+  assert.equal(!!item.disabled, !!item.disabledTip, `${item.label}: off says why, and only then`)
+}
+assert.equal(menuOf(0, 3).find(item => item.key === 'up')?.disabledTip, 'The first slide is already at the top')
+assert.equal(menuOf(2, 3).find(item => item.key === 'down')?.disabledTip, 'The last slide is already at the bottom')
+
 // ---- The strip uses these keys, and its menu's Delete slide shows the key (a wiring check, not a behaviour test)
 const source = readFileSync(new URL('./SlideStrip.tsx', import.meta.url), 'utf8')
 assert.ok(source.includes('stripKeyOf(') && source.includes('keyOrigin('), 'SlideStrip reads its keys from stripKeys')
 assert.ok(source.includes('deck-menu-key'), 'Delete slide shows its key')
+assert.ok(source.includes("duplicateKey: DUPLICATE_KEY") && source.includes('isMac)'), 'the strip passes its keys and the platform')
+assert.ok(source.includes('onKeyDownCapture={onKeyCapture}'), "Cmd+↓ is the strip's before a thumbnail's ⋯ opens its menu on ↓")
+const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
+assert.ok(view.includes('slideOrderKeyOf(event, isMac)') && view.includes("stageKeyFrom(event) !== 'page'") && view.includes('slideKeyTarget(event.target'), 'the stage takes the same keys where its words don\'t')
+assert.ok(view.includes('partChangedBy(transaction)') && view.includes('setFlash('), 'an undo shows the slide it changed')
 
 console.log('stripKeys: ok')

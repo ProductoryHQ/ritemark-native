@@ -9,7 +9,9 @@
  *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Add to library…, Slide
  *    settings… (17 November: the popover beside the thumbnail; the gear left the bar), Delete slide. Delete asks
  *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`). The
- *    handout part number's ⋯ is the same menu (`SlideMenuItems`).
+ *    handout part number's ⋯ is the same menu (`SlideMenuItems`). Cmd+D duplicates the selected slide, and Cmd+↑ and
+ *    Cmd+↓ move it with its handout part (17 November; Ctrl on Windows); its menu has them as Move up and Move down.
+ *  - Undo that changes a slide which isn't the current one makes it current, and its thumbnail flashes once.
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
@@ -31,6 +33,11 @@ import { slideMenuItems, type SlideMenuActions } from './slideMenuItems'
 const THUMB_WIDTH = 96
 /** The key beside the menu's Delete slide, so people can find it. */
 const DELETE_KEY = isMac ? '⌫' : 'Del'
+/** And beside Duplicate (17 November: Cmd+D on the strip or the stage). */
+const DUPLICATE_KEY = isMac ? '⌘D' : 'Ctrl+D'
+/** And beside Move up and Move down (18 November): the strip's Cmd+↑ and Cmd+↓. */
+const UP_KEY = isMac ? '⌘↑' : 'Ctrl+↑'
+const DOWN_KEY = isMac ? '⌘↓' : 'Ctrl+↓'
 /** How far a pointer moves before a press becomes a drag. */
 const DRAG_THRESHOLD = 4
 
@@ -43,6 +50,8 @@ export interface StripActions {
   remove: (index: number) => void
   /** Move part `from` to stand before part `to`. */
   move: (from: number, to: number) => void
+  /** Cmd+↑ (-1) or Cmd+↓ (+1): slide `index` one place up or down, with its handout part; nothing at the ends. */
+  nudge: (index: number, step: -1 | 1) => void
   /** The + menu's From the library… and From another deck…: the Slide library opens, inserting before part `at`. */
   fromLibrary: (at: number, section: 'topics' | 'other') => void
   /** The strip menu's Add to library… and Show in the library. */
@@ -108,16 +117,22 @@ function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
 export function SlideMenuItems({ index, count, skipped, fromLibrary, actions }: { index: number; count: number; skipped: boolean; fromLibrary: boolean; actions: SlideMenuActions }) {
   return (
     <>
-      {slideMenuItems({ index, count, skipped, fromLibrary, deleteKey: DELETE_KEY }).map(item => (
-        <Fragment key={item.key}>
-          {item.separated ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuItem tone={item.danger ? 'danger' : undefined} disabled={item.disabled} onSelect={() => item.run(actions)}>
+      {slideMenuItems({ index, count, skipped, fromLibrary, deleteKey: DELETE_KEY, duplicateKey: DUPLICATE_KEY, upKey: UP_KEY, downKey: DOWN_KEY }).map(item => {
+        const row = (
+          <DropdownMenuItem tone={item.danger ? 'danger' : undefined} disabled={item.disabled} onSelect={() => item.run(actions)} className={item.disabledTip ? 'w-full' : undefined}>
             <Icon name={item.icon} size={14} tone="inherit" />
             {item.keyHint ? <span className="flex-1">{item.label}</span> : item.label}
             {item.keyHint ? <span className="deck-menu-key">{item.keyHint}</span> : null}
           </DropdownMenuItem>
-        </Fragment>
-      ))}
+        )
+        return (
+          <Fragment key={item.key}>
+            {item.separated ? <DropdownMenuSeparator /> : null}
+            {/* An item that is off says why (Move up on the first slide, Move down on the last). */}
+            {item.disabled && item.disabledTip ? <Tooltip label={item.disabledTip} side="right" className="flex w-full">{row}</Tooltip> : row}
+          </Fragment>
+        )
+      })}
     </>
   )
 }
@@ -170,10 +185,12 @@ interface ThumbnailProps {
   comments: number
   /** The handout's first Backspace marks this slide to be joined into the one above: it lights up. */
   joining: boolean
+  /** Undo just changed this slide: a serial (0: none), so each undo flashes it once more. */
+  flash: number
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -195,6 +212,8 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       <span className="deck-thumb-no">{index + 1}</span>
       <div className="deck-thumb-slide">
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} missing={missing} />
+        {/* Keyed by the serial: a second undo of the same slide plays it again. None under reduced motion (decks.css). */}
+        {flash ? <span key={flash} className="deck-thumb-flash" aria-hidden="true" /> : null}
       </div>
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       {comments > 0 ? (
@@ -255,9 +274,11 @@ interface SlideStripProps {
   commentCounts?: boolean
   /** The slide the handout's first Backspace marked to join into the one above (null: none). */
   joinAt?: number | null
+  /** The slide an undo just changed, to flash once (null: none). */
+  flash?: { index: number; serial: number } | null
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null }: SlideStripProps) {
+export function SlideStrip({ slides, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null, flash = null }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -373,11 +394,25 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
     strip.focus({ preventScroll: true })
   }, [stripRef])
 
-  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const stripKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const origin = keyOrigin(event.target as HTMLElement, event.currentTarget)
-    const { key: name, shiftKey, metaKey, ctrlKey, altKey, repeat } = event
-    const key = stripKeyOf({ key: name, shiftKey, metaKey, ctrlKey, altKey, repeat, isComposing: event.nativeEvent.isComposing, defaultPrevented: event.isDefaultPrevented() }, origin, count, current)
-    if (!key) return
+    const { key: name, code, shiftKey, metaKey, ctrlKey, altKey, repeat } = event
+    return stripKeyOf({ key: name, code, shiftKey, metaKey, ctrlKey, altKey, repeat, isComposing: event.nativeEvent.isComposing, defaultPrevented: event.isDefaultPrevented() }, origin, count, current, isMac)
+  }
+
+  // Cmd+D, Cmd+↑ and Cmd+↓ before anything inside the strip: a thumbnail's ⋯ would take Cmd+↓ as its own ↓ and open
+  // its menu (review of #784). Taken here, the ⋯ sees the key handled and leaves it.
+  const onKeyCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const key = stripKey(event)
+    if (key?.type !== 'duplicate' && key?.type !== 'nudge') return
+    event.preventDefault()
+    if (key.type === 'duplicate') actions.duplicate(key.index)
+    else actions.nudge(key.index, key.step)
+  }
+
+  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const key = stripKey(event)
+    if (!key || key.type === 'duplicate' || key.type === 'nudge') return
     event.preventDefault()
     if (key.type === 'pick') actions.pick(key.index)
     else if (key.type === 'menu') setMenuFor(current)
@@ -394,6 +429,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
       role="listbox"
       aria-label="Slides"
       tabIndex={0}
+      onKeyDownCapture={onKeyCapture}
       onKeyDown={onKey}
     >
       {slides.map(entry => (
@@ -417,6 +453,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
             badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
             comments={commentCounts ? stripCommentCount(entry) : 0}
             joining={joinAt === entry.index}
+            flash={flash?.index === entry.index ? flash.serial : 0}
           />
         </div>
       ))}

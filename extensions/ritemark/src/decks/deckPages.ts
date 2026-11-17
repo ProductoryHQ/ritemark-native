@@ -19,7 +19,7 @@ import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type DeckTheme, type ThemeEntry } from './deckTheme';
-import { LOGO_TOO_LARGE, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
+import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
@@ -708,7 +708,7 @@ export async function readThemeFileOrEvening(root: string, themePath: string | n
  */
 export type ThemeLogoFile =
   | { state: 'none' }
-  | { state: 'found'; absolute: string; file: string; kind: LogoKind; bytes: Buffer; modified: number }
+  | { state: 'found'; absolute: string; file: string; kind: LogoKind; bytes: Buffer; modified: number; aspect: number | null }
   | { state: 'missing'; file: string }
   | { state: 'refused'; file: string; problem: string };
 
@@ -742,7 +742,7 @@ export async function themeLogoFile(root: string, themePath: string, theme: Pick
     if (seen && seen.modified === stat.mtimeMs && seen.size === stat.size) return seen.answer;
     const bytes = await fs.promises.readFile(realFile);
     const problem = logoProblem(file, bytes);
-    const answer: ThemeLogoFile = problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs) };
+    const answer: ThemeLogoFile = problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs), aspect: logoAspectOf(bytes, kind) };
     if (logoFileCache.size >= 16) logoFileCache.delete(logoFileCache.keys().next().value!);
     logoFileCache.set(key, { modified: stat.mtimeMs, size: stat.size, answer });
     return answer;
@@ -760,12 +760,14 @@ export function logoWebviewUri(webview: vscode.Webview, found: Extract<ThemeLogo
  * The theme a deck at `deckPath` draws, as the deck view and the wall are sent it: the theme
  * file's text (null: the built-in theme), and its logo's address in this webview (null: none, or a missing file).
  */
-export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<{ text: string | null; logo: string | null }> {
+export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<{ text: string | null; logo: string | null; logoAspect: number | null }> {
   const root = themeRootOf(deckPath);
   const read = await readThemeFileOrEvening(root, themePath);
-  if (!read) return { text: null, logo: null };
+  if (!read) return { text: null, logo: null, logoAspect: null };
   const found = await themeLogoFile(root, read.path, parseTheme(read.text));
-  return { text: read.text, logo: found.state === 'found' ? logoWebviewUri(webview, found) : null };
+  return found.state === 'found'
+    ? { text: read.text, logo: logoWebviewUri(webview, found), logoAspect: found.aspect }
+    : { text: read.text, logo: null, logoAspect: null };
 }
 
 /** The theme a deck at `deckPath` draws, and its logo file (Sprint 162 PR 4: the page carries it). */
