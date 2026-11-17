@@ -147,9 +147,25 @@ assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-bar', 'button']), body
 assert.equal(slideKeyTarget(stageTarget('BUTTON', ['.deck-view-switch', 'button']), body), 'button', "the view switch's button: the deck view takes the order keys only from 'page' (Codex on #784)")
 
 // ---- The slide menu's Duplicate shows its key, as Delete slide shows ⌫
-const menu = slideMenuItems({ index: 1, count: 3, skipped: false, fromLibrary: false, deleteKey: '⌫', duplicateKey: '⌘D' })
+const menuOf = (index: number, count: number) => slideMenuItems({ index, count, skipped: false, fromLibrary: false, deleteKey: '⌫', duplicateKey: '⌘D', upKey: '⌘↑', downKey: '⌘↓' })
+const menu = menuOf(1, 3)
 assert.equal(menu.find(item => item.key === 'duplicate')?.keyHint, '⌘D')
 assert.equal(menu.find(item => item.key === 'delete')?.keyHint, '⌫')
+
+// ---- 18 November (the Experience lead): Move up ⌘↑ and Move down ⌘↓ under Duplicate, then a line; Move up off on the
+//      first slide and Move down on the last, as a Mac menu has them, each saying why in its tooltip
+assert.deepEqual(menu.map(item => `${item.separated ? '| ' : ''}${item.label}${item.keyHint ? ` ${item.keyHint}` : ''}`),
+  ['Duplicate ⌘D', 'Move up ⌘↑', 'Move down ⌘↓', '| Skip slide', 'Add to library…', 'Slide settings…', '| Delete slide ⌫'])
+const offs = (index: number, count: number) => menuOf(index, count).filter(item => item.key === 'up' || item.key === 'down').map(item => `${item.key}${item.disabled ? ' off' : ''}`)
+assert.deepEqual(offs(1, 3), ['up', 'down'], 'a slide in the middle moves both ways')
+assert.deepEqual(offs(0, 3), ['up off', 'down'], 'the first slide')
+assert.deepEqual(offs(2, 3), ['up', 'down off'], 'the last slide')
+assert.deepEqual(offs(0, 1), ['up off', 'down off'], 'a deck of one slide')
+for (const item of [...menuOf(0, 3), ...menuOf(2, 3), ...menuOf(0, 1)]) {
+  assert.equal(!!item.disabled, !!item.disabledTip, `${item.label}: off says why, and only then`)
+}
+assert.equal(menuOf(0, 3).find(item => item.key === 'up')?.disabledTip, 'The first slide is already at the top')
+assert.equal(menuOf(2, 3).find(item => item.key === 'down')?.disabledTip, 'The last slide is already at the bottom')
 
 // ---- The strip uses these keys, and its menu's Delete slide shows the key (a wiring check, not a behaviour test)
 const source = readFileSync(new URL('./SlideStrip.tsx', import.meta.url), 'utf8')

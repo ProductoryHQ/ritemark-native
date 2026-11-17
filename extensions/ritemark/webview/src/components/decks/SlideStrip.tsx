@@ -10,7 +10,7 @@
  *    settings… (17 November: the popover beside the thumbnail; the gear left the bar), Delete slide. Delete asks
  *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`). The
  *    handout part number's ⋯ is the same menu (`SlideMenuItems`). Cmd+D duplicates the selected slide, and Cmd+↑ and
- *    Cmd+↓ move it with its handout part (17 November; Ctrl on Windows).
+ *    Cmd+↓ move it with its handout part (17 November; Ctrl on Windows); its menu has them as Move up and Move down.
  *  - Undo that changes a slide which isn't the current one makes it current, and its thumbnail flashes once.
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
@@ -35,6 +35,9 @@ const THUMB_WIDTH = 96
 const DELETE_KEY = isMac ? '⌫' : 'Del'
 /** And beside Duplicate (17 November: Cmd+D on the strip or the stage). */
 const DUPLICATE_KEY = isMac ? '⌘D' : 'Ctrl+D'
+/** And beside Move up and Move down (18 November): the strip's Cmd+↑ and Cmd+↓. */
+const UP_KEY = isMac ? '⌘↑' : 'Ctrl+↑'
+const DOWN_KEY = isMac ? '⌘↓' : 'Ctrl+↓'
 /** How far a pointer moves before a press becomes a drag. */
 const DRAG_THRESHOLD = 4
 
@@ -114,16 +117,22 @@ function NewSlideItems({ at, actions }: { at: number; actions: StripActions }) {
 export function SlideMenuItems({ index, count, skipped, fromLibrary, actions }: { index: number; count: number; skipped: boolean; fromLibrary: boolean; actions: SlideMenuActions }) {
   return (
     <>
-      {slideMenuItems({ index, count, skipped, fromLibrary, deleteKey: DELETE_KEY, duplicateKey: DUPLICATE_KEY }).map(item => (
-        <Fragment key={item.key}>
-          {item.separated ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuItem tone={item.danger ? 'danger' : undefined} disabled={item.disabled} onSelect={() => item.run(actions)}>
+      {slideMenuItems({ index, count, skipped, fromLibrary, deleteKey: DELETE_KEY, duplicateKey: DUPLICATE_KEY, upKey: UP_KEY, downKey: DOWN_KEY }).map(item => {
+        const row = (
+          <DropdownMenuItem tone={item.danger ? 'danger' : undefined} disabled={item.disabled} onSelect={() => item.run(actions)} className={item.disabledTip ? 'w-full' : undefined}>
             <Icon name={item.icon} size={14} tone="inherit" />
             {item.keyHint ? <span className="flex-1">{item.label}</span> : item.label}
             {item.keyHint ? <span className="deck-menu-key">{item.keyHint}</span> : null}
           </DropdownMenuItem>
-        </Fragment>
-      ))}
+        )
+        return (
+          <Fragment key={item.key}>
+            {item.separated ? <DropdownMenuSeparator /> : null}
+            {/* An item that is off says why (Move up on the first slide, Move down on the last). */}
+            {item.disabled && item.disabledTip ? <Tooltip label={item.disabledTip} side="right" className="flex w-full">{row}</Tooltip> : row}
+          </Fragment>
+        )
+      })}
     </>
   )
 }
