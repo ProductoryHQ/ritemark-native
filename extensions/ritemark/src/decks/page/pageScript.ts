@@ -8,6 +8,11 @@
  *    of the band that holds the slide. j and k, the arrows under the slide and Contents step a part at a time.
  *  - The progress bar and "n / N"; Contents, a finished exercise ticked in it; Copy, which says Copied, or selects the
  *    words where the browser won't copy; and ticks kept in this browser's own storage, on this device only.
+ *  - **The page remembers each reader's place and links to a part** (the decks README, small details 7): the address
+ *    follows the part being read (`#6`, through `history.replaceState`, so the history doesn't fill); a `#6` link opens
+ *    that part, a number with no part opens the top; and opened again without a link, the page returns to the last
+ *    part read in this browser, with a quiet "Start from the beginning" in its bar for 5 s. Only the part's number is
+ *    kept, in this browser's own storage, under the page's own name (its client and title, as the ticks are).
  *
  * It only shows, hides and moves what the page already holds: it sets no `src` or `href`, loads nothing, and writes
  * no HTML (text goes in through `textContent`), so 2.2's gather sees every file the page uses and its
@@ -62,6 +67,38 @@ export const PAGE_SCROLL_RULE = String.raw`
   function scrollTopFor(partTop) { return Math.max(0, partTop - PART_TOP_GAP); }
 `;
 
+/**
+ * Where a reader is (small details 7), as plain JavaScript: the part an address names, the address a part has, and the
+ * part kept in this browser. `pageScript.test.ts` runs these directly. Storage may be missing or may throw (a private
+ * window, blocked site data): every read and write is guarded, and nothing kept means the page opens at the top.
+ */
+export const PAGE_PLACE_RULE = String.raw`
+  var PLACE_NOTICE_MS = 5000;
+  // #6 is part 6 (and 2.2's #s6 still works); a number with no part opens the top (0); any other address names no part.
+  function linkedPart(hash, count) {
+    var match = /^#s?(\d{1,6})$/.exec(hash || '');
+    if (!match || count <= 0) return null;
+    var index = Number(match[1]) - 1;
+    return index >= 0 && index < count ? index : 0;
+  }
+  // The top part is the page's own address; every other part adds its number.
+  function addressFor(index) { return index > 0 ? '#' + (index + 1) : ''; }
+  function storageOf(win) {
+    try { return win.localStorage || null; } catch (error) { return null; }
+  }
+  // The part kept in this browser, if it is still on the page and isn't the top one (that one needs no return).
+  function readPlace(storage, key, count) {
+    var kept = null;
+    try { kept = storage ? storage.getItem(key) : null; } catch (error) { return null; }
+    if (typeof kept !== 'string' || !/^\d{1,6}$/.test(kept)) return null;
+    var index = Number(kept) - 1;
+    return index > 0 && index < count ? index : null;
+  }
+  function keepPlace(storage, key, index) {
+    try { if (storage) storage.setItem(key, String(index + 1)); } catch (error) { /* a browser that keeps nothing opens at the top */ }
+  }
+`;
+
 /** The page's behaviour, run once the page is read (the script is the body's last element). */
 const PAGE_BEHAVIOUR = String.raw`
   var doc = document, root = doc.documentElement;
@@ -78,6 +115,11 @@ const PAGE_BEHAVIOUR = String.raw`
   var count = parts.length;
   var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   var cur = -1, lockUntil = 0, frame = 0;
+  // Where this reader is: the page's own place in this browser's storage (its client and title, as the ticks are).
+  var storage = storageOf(window), placeKey = text.getAttribute('data-place') || 'ritemark-place';
+  var restart = doc.getElementById('restart'), restartTimer = 0, restartHeld = false;
+  // The part the page opened at, until the reader moves: the fonts settling may move it, and the page goes back to it.
+  var landing = null;
 
   // ---- where the text is read: under the top bar, or on a phone under the band that holds the slide
   var phone = function () { return window.innerWidth <= 860; };
@@ -120,15 +162,26 @@ const PAGE_BEHAVIOUR = String.raw`
     // Every part but the current one is dimmed; a section's band stays, its words dim (the Experience lead, PR 3).
     parts.forEach(function (part, at) { part.classList.toggle('dim', at !== index); });
     goers.forEach(function (button) { button.classList.toggle('on', Number(button.getAttribute('data-go')) === index); });
+    address(index);
+    keepPlace(storage, placeKey, index);
   }
 
-  function go(index) {
+  // The address follows the part being read, in place: the browser's history gets no entry for it.
+  function address(index) {
+    var want = addressFor(index);
+    if ((window.location.hash || '') === want) return;
+    try { window.history.replaceState(window.history.state, '', want || window.location.pathname + window.location.search); } catch (error) { /* an address that can't change stays as it is */ }
+  }
+
+  // At once when the page opens at a part (instant), smoothly otherwise. The top is the page's top, above any words
+  // before the first part.
+  function go(index, instant, top) {
     if (!count) return;
     index = Math.max(0, Math.min(count - 1, index));
     var s = state();
-    lockUntil = Date.now() + (reduced ? 400 : 1200);
+    lockUntil = Date.now() + (reduced || instant ? 400 : 1200);
     show(index);
-    window.scrollTo({ top: scrollTopFor(s.partTops[index]), behavior: reduced ? 'auto' : 'smooth' });
+    window.scrollTo({ top: top && index === 0 ? 0 : scrollTopFor(s.partTops[index]), behavior: reduced || instant ? 'auto' : 'smooth' });
   }
 
   window.addEventListener('scroll', function () {
@@ -296,15 +349,51 @@ const PAGE_BEHAVIOUR = String.raw`
   });
   window.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeZoom(); }, true);
 
-  // ---- start: the slide sized, the room set, and the part in view shown (an address's #s4 goes to slide 4)
+  // ---- "Start from the beginning": in the bar for 5 s when the page returns to a reader's place; it waits while the
+  // pointer or the focus is on it, and goes to the top
+  function hideRestart() {
+    if (!restart) return;
+    window.clearTimeout(restartTimer);
+    restartTimer = 0;
+    restart.hidden = true;
+  }
+  function offerRestart() {
+    if (!restart) return;
+    restart.hidden = false;
+    window.clearTimeout(restartTimer);
+    restartTimer = window.setTimeout(function () { restartTimer = 0; if (!restartHeld) hideRestart(); }, PLACE_NOTICE_MS);
+  }
+  if (restart) {
+    var hold = function () { restartHeld = true; };
+    var letGo = function () { restartHeld = false; if (!restartTimer) hideRestart(); };
+    restart.addEventListener('mouseenter', hold);
+    restart.addEventListener('mouseleave', letGo);
+    restart.addEventListener('focus', hold);
+    restart.addEventListener('blur', letGo);
+    restart.addEventListener('click', function () { restartHeld = false; hideRestart(); landing = null; go(0, false, true); });
+  }
+
+  // A part's address typed or followed while the page is open goes to that part.
+  window.addEventListener('hashchange', function () {
+    var index = linkedPart(window.location.hash, count);
+    if (index !== null) go(index, false, true);
+  });
+  var moved = function () { landing = null; };
+  ['wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(function (type) { window.addEventListener(type, moved, { passive: true }); });
+
+  // ---- start: the slide sized and the room set; then the part the address names (#6), else this reader's last part
+  // with "Start from the beginning", else the part in view
   function settle() { scale(); room(); }
   window.addEventListener('resize', function () { settle(); show(currentPart(state())); });
   settle();
-  show(count ? currentPart(state()) || 0 : null);
-  var wanted = /^#s(\d+)$/.exec(window.location.hash || '');
-  if (wanted) go(Number(wanted[1]) - 1);
-  if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(settle);
+  var linked = linkedPart(window.location.hash, count);
+  var returned = linked === null ? readPlace(storage, placeKey, count) : null;
+  landing = linked !== null ? linked : returned;
+  if (landing !== null) go(landing, true, true);
+  else show(count ? currentPart(state()) || 0 : null);
+  if (returned !== null) offerRestart();
+  if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { settle(); if (landing !== null) go(landing, true, true); });
 `;
 
 /** The whole script, in its own scope. */
-export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_BEHAVIOUR}})();`;
+export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_PLACE_RULE}${PAGE_BEHAVIOUR}})();`;

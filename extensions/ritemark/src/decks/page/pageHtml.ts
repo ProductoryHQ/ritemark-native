@@ -365,6 +365,12 @@ svg { flex: none; }
 .top .who span { font: 400 14.5px/1.2 var(--fh); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .grow { flex: 1; }
 .top .pos { font: 600 13px/1 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Small details 7: a quiet way back to the top when the page returns to a reader's place, for 5 s. */
+.restart { height: 30px; padding: 0 10px; border-radius: 8px; color: var(--muted); font: 600 13px/30px 'Sofia Sans', sans-serif; white-space: nowrap; animation: restart-in .3s ease; }
+.restart:hover { background: var(--soft); color: var(--ink); }
+.restart[hidden] { display: none; }
+@keyframes restart-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .restart { animation: none; } }
 .cbtn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px; border-radius: 9px; background: var(--soft); color: var(--ink); font: 600 13.5px/34px 'Sofia Sans', sans-serif; white-space: nowrap; }
 .cbtn:hover { background: var(--soft2); }
 .bar { height: 3px; background: var(--line); }
@@ -486,6 +492,9 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
   .top .in { padding: 0 16px; height: 52px; gap: 10px; }
   .top .who span { display: none; }
   .top .pos { display: none; }
+  .top .who { overflow: hidden; }
+  .top .who b { overflow: hidden; text-overflow: ellipsis; }
+  .restart { flex: none; padding: 0 6px; }
   .wrap { display: block; padding: 0 16px; }
   .stage { top: 55px; height: auto; z-index: 10; padding: 10px 16px 8px; margin: 0 -16px; background: #fff; box-shadow: 0 10px 14px -14px rgba(28,31,74,.45); }
   .slidebox { border-radius: 9px; box-shadow: none; }
@@ -674,6 +683,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     titles.set(title, nth);
     return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true, slideOnly[index]);
   });
+  const pageKey = shortHash(`${deck.client}\u0000${deck.title}`);
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
   return [
@@ -689,7 +699,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n</style>`,
     '</head>',
     `<body class="${borderless ? 'bl' : 'card'}">`,
-    `<header class="top"><div class="in">${who}<span class="grow"></span><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`
+    // "Start from the beginning" (small details 7): shown by the script for 5 s when the page returns to a reader's place.
+    `<header class="top"><div class="in">${who}<span class="grow"></span><button class="restart" id="restart" type="button" hidden>Start from the beginning</button><span class="pos" id="pos">${count ? `1 / ${count}` : ''}</span>`
       + `<button class="cbtn" id="tocbtn" type="button" aria-expanded="false" aria-controls="toc">${iconSvg('list', 16)}Contents</button></div>`
       + `<div class="bar"><i id="bar" style="width:${count ? (100 / count).toFixed(4) : 0}%"></i></div></header>`,
     contentsHtml(deck.slides, slideOnly),
@@ -698,8 +709,9 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       + `<div class="under"><span class="t" id="stitle">${first ? esc(`1 · ${titleOf(first)}`) : ''}</span><span class="nav">`
       + `<button id="prev" type="button" aria-label="Previous slide" disabled>${iconSvg('caret-up', 16)}</button>`
       + `<button id="next" type="button" aria-label="Next slide"${count > 1 ? '' : ' disabled'}>${iconSvg('caret-down', 16)}</button></span></div></aside>`,
-    // The ticks' place in this browser's storage: the same for every version of the page that keeps its client and title.
-    `<section class="text" id="text" data-store="ritemark-ticks-${shortHash(`${deck.client}\u0000${deck.title}`)}">`,
+    // The ticks' and the reader's place in this browser's storage: the same for every version of the page that keeps
+    // its client and title.
+    `<section class="text" id="text" data-store="ritemark-ticks-${pageKey}" data-place="ritemark-place-${pageKey}">`,
     preamble ? `<div class="pre">\n${preamble}</div>` : '',
     count ? parts.join('\n') : '<p class="empty">This deck has no slides to show.</p>',
     foot ? `<div class="foot">${foot}</div>` : '',

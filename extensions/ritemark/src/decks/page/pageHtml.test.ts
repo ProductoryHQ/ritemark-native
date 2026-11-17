@@ -95,6 +95,12 @@ const steps = root.querySelectorAll('#s3 ol.steps > li.step input[type="checkbox
 assert.equal(steps.length, 2);
 assert.notEqual(steps[0].getAttribute('data-tick'), steps[1].getAttribute('data-tick'));
 assert.match(root.querySelector('#text')!.getAttribute('data-store')!, /^ritemark-ticks-[0-9a-f]{12}$/);
+// Small details 7: the reader's place is kept under the page's own name (the ticks' name), and "Start from the beginning"
+// waits hidden in the bar for the script.
+assert.equal(root.querySelector('#text')!.getAttribute('data-place')!.replace('ritemark-place-', ''), root.querySelector('#text')!.getAttribute('data-store')!.replace('ritemark-ticks-', ''));
+const restart = root.querySelector('.top #restart')!;
+assert.equal(restart.text, 'Start from the beginning');
+assert.ok(restart.hasAttribute('hidden') && restart.getAttribute('type') === 'button');
 // A prompt that shows a comment shows it as words.
 assert.ok(html.includes('&lt;!-- a prompt that shows a comment stays as written --&gt;'));
 
