@@ -105,10 +105,19 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
     tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, kind: '', body: converted.body, notes })
     result.slides++
   }
-  // The handout's drawn headings are its text from now on, written with the conversion (`withWrittenHandout`'s rule).
-  // The empty line the view draws under a drawn heading with nothing under it (`derivedHeadings`) goes with it: no file
-  // holds an empty line, so the save's echo would take it out, and a host revision that replaces a range of the
-  // document (a new picture's address, Codex's P1 path on #765) would cut the conversion's Undo short.
+  writeDrawnHeadings(tr)
+  tr.setMeta(DECK_OPERATION, true).setMeta(DECK_CONVERTED, result)
+  return result
+}
+
+/**
+ * The handout's drawn headings written in `tr`, as its text from now on (`withWrittenHandout`'s rule): the conversion's
+ * and a slide's join (`deckRemove.ts`) both write them so. The empty line the view draws under a drawn heading with
+ * nothing under it (`derivedHeadings`) goes with it: no file holds an empty line, so the save's echo would take it out,
+ * and a host revision that replaces a range of the document (a new picture's address, Codex's P1 path on #765) would
+ * cut the step's Undo short.
+ */
+export function writeDrawnHeadings(tr: Transaction): void {
   const empties: number[] = []
   let previous: PMNode | null = null
   let previousDrawn = false
@@ -123,8 +132,6 @@ export function convertDeckInto(tr: Transaction): DeckConversion | null {
     const node = tr.doc.nodeAt(pos)
     if (node) tr.delete(pos, pos + node.nodeSize)
   }
-  tr.setMeta(DECK_OPERATION, true).setMeta(DECK_CONVERTED, result)
-  return result
 }
 
 /**

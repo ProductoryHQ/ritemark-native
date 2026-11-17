@@ -91,6 +91,8 @@ export interface SlideEditorProps {
   onFull?: (full: boolean) => void
   /** PR 3: the bar's Split at the cursor found no caret on the slide to split at. */
   onNeedCaret?: () => void
+  /** The right-click menu's Slide settings… (17 November): the popover at the point the menu was opened. */
+  onSlideSettings?: (at: { x: number; y: number }) => void
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
   /** PR 3: Settings' Add a row or Add a column, on the slide's table; each new serial adds one. */
@@ -177,7 +179,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
   return found
 }
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, splitRequest, tableRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -468,6 +470,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   useLayoutEffect(() => { refit() }, [refit, lookKey])
   useEffect(() => {
     if (!editor) return
+    // A slide that comes onto the stage full is said full, whatever the slide it replaced said: that slide's stage leaves
+    // with "no longer full" (the cleanup above), and React runs that cleanup after this stage's layout effect has
+    // measured, so the line went from a full slide to a full one (the join of a slide into a full one above it). Fitted
+    // again here and once more after the frame, and the state told as it is.
+    refit()
+    actionsRef.current.onFull?.(fullRef.current)
+    const settle = requestAnimationFrame(refit)
     editor.on('update', refit)
     const fonts = document.fonts
     fonts?.addEventListener?.('loadingdone', refit)
@@ -479,6 +488,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
     flow.addEventListener('scroll', unscroll)
     return () => {
+      cancelAnimationFrame(settle)
       editor.off('update', refit)
       fonts?.removeEventListener?.('loadingdone', refit)
       flow.removeEventListener('load', refit, true)
@@ -674,6 +684,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
   const pendingComment = useRef<SlideTarget | null>(null)
   /** The menu closed on a press outside it: the focus stays where that press put it. */
   const closedOutside = useRef(false)
+  /** Where the menu was opened, and its Slide settings… waiting for the menu to close. */
+  const menuPoint = useRef({ x: 0, y: 0 })
+  const pendingSettings = useRef(false)
   const startPendingComment = () => {
     const target = pendingComment.current
     pendingComment.current = null
@@ -711,6 +724,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
             if (!editor || editor.isDestroyed) return
             closedOutside.current = false
             pendingComment.current = null
+            pendingSettings.current = false
+            menuPoint.current = { x: event.clientX, y: event.clientY }
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
           }}
@@ -741,6 +756,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           if (!editor || editor.isDestroyed) return
           if (pendingComment.current) startPendingComment()
           else if (!closedOutside.current) editor.view.focus()
+          if (pendingSettings.current) {
+            pendingSettings.current = false
+            onSlideSettings?.(menuPoint.current)
+          }
         }}
       >
         <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('cut')}>
@@ -769,6 +788,16 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
               <Icon name="chat-text" size={14} tone="inherit" />
               Comment
               <ContextMenuShortcut>{KEYS.comment}</ContextMenuShortcut>
+            </ContextMenuItem>
+          </>
+        ) : null}
+        {onSlideSettings ? (
+          // The slide's settings at the end of its own menu, under a line (17 November, "Nothing around the slide").
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem className="gap-2" onSelect={() => { pendingSettings.current = true }}>
+              <Icon name="gear" size={14} tone="inherit" />
+              Slide settings…
             </ContextMenuItem>
           </>
         ) : null}

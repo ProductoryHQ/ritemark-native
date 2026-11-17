@@ -166,10 +166,11 @@ const labels = (slideShown: boolean, handoutShown: boolean) =>
   }
   const stage = block('{slideShown ? ( <div ref={stageRef} className={`deck-stage')
   assert.ok(stage.includes('<Stage'), 'the stage is drawn only while the slide shows (Sprint 161: no notes fold under it)')
-  // 17 November: Slide settings is the bar's gear. 16 November (the Experience lead): hiding the slide hides the stage,
-  // not the current slide, so the gear stays ready and opens the same popup (and a deck with no slides opens its look, #764).
-  assert.ok(view.includes('<Popover open={settingsOpen} onOpenChange={setSettingsOpen}>') && !view.includes('settingsReady'), 'Settings go with the current slide, shown or hidden')
-  assert.ok(!block('const toggleFold = useCallback(').includes('setSettingsOpen'), 'hiding the slide leaves Settings as they are')
+  // 17 November: Slide settings is in the slide's own menu (the gear left the bar). 16 November (the Experience lead):
+  // hiding the slide hides the stage, not the slide, so its menus (the strip's, the part number's) still open the same
+  // popover (and a deck with no slides opens its look from the strip's + menu, #764).
+  assert.ok(view.includes('<Popover open={settingsFor !== null}') && !view.includes('settingsReady'), 'Settings go with their slide, shown or hidden')
+  assert.ok(!block('const toggleFold = useCallback(').includes('setSettingsFor'), 'hiding the slide leaves Settings as they are')
   assert.ok(block('{handoutShown && slideShown ? (').includes('deck-divider'), 'nothing to drag with one side')
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the fold')
   assert.ok(view.includes('useState<DeckFold>(storedFold)'), 'the fold the view kept, at mount')
