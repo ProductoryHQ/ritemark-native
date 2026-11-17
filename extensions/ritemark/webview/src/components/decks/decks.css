@@ -390,3 +390,22 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
    (the app run: an empty column had none, and was invisible). */
 .deck-sl.is-blocks.is-editing th, .deck-sl.is-blocks.is-editing td { min-width: 4em; }
+
+/* The block's bar (experience 46, 17 November; `blocks/SlideBlockBar.tsx`). The handles sit over the slide in its
+   frame, at the chosen block's place, the page's size at any stage size; the bar is in the page (frame 29). */
+.deck-block-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.deck-block-layer > * { pointer-events: auto; }
+.deck-block-ring { position: absolute; z-index: 3; border-radius: 8px; box-shadow: 0 0 0 2px var(--r-accent); pointer-events: none; }
+.deck-slide .deck-block-grip { position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, .3); cursor: grab; touch-action: none; }
+.deck-slide .deck-block-grip:active { cursor: grabbing; }
+.deck-slide .deck-block-plus { position: absolute; z-index: 5; min-width: 0; padding: 0; border-radius: 50%; background: var(--r-surface); color: var(--r-accent); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
+.deck-slide .deck-block-split { position: absolute; z-index: 4; width: 12px; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: col-resize; touch-action: none; }
+.deck-slide .deck-block-split::after { content: ''; position: absolute; left: 5px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--r-accent); opacity: .45; }
+.deck-slide .deck-block-split:hover::after { opacity: 1; }
+.deck-block-drop { position: absolute; z-index: 6; height: 2px; border-radius: 1px; background: var(--r-accent); pointer-events: none; }
+.deck-block-guide { position: absolute; z-index: 6; width: 2px; background: var(--r-accent); pointer-events: none; }
+.deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
+.deck-block-bar .deck-bar-seg { display: inline-flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
+.deck-block-bar .deck-bar-seg .deck-bar-choice { height: 24px; padding: 0 8px; }
+.deck-block-bar .deck-bar-seg .deck-bar-choice[data-state="active"] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15); }
+.deck-block-bar .deck-bar-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--r-hairline-strong); }

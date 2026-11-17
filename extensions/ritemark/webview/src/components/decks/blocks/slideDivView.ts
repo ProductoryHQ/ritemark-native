@@ -15,11 +15,12 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
-import { OPEN_FENCE, OWN_MARK_LOOKS, parseFenceAttributes, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg, isPageIconName } from '../slide/pageIcons'
 import { slideIcon } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
+import { divAttributesOf } from './blockBar'
 
 /** What the stage does when a box's icon or the Steps pill is used (SlideEditor gives them; they read its latest state). */
 export interface SlideDivHandlers {
@@ -30,10 +31,7 @@ export interface SlideDivHandlers {
 }
 
 /** The block's attributes, read from its opening line as written. */
-function attributesOf(node: PMNode): FenceAttributes {
-  const open = OPEN_FENCE.exec(String(node.attrs.open ?? ''))
-  return (open ? parseFenceAttributes(open[2]) : null) ?? { classes: [], id: null, values: {} }
-}
+const attributesOf: (node: PMNode) => FenceAttributes = divAttributesOf
 
 /** The Boxes look a box is drawn under: its parent's, or Boxes. */
 function lookAround(getPos: () => number | undefined, doc: () => PMNode): string {
@@ -42,6 +40,29 @@ function lookAround(getPos: () => number | undefined, doc: () => PMNode): string
   const parent = doc().resolve(pos).parent
   if (parent.type.name !== 'slideDiv') return 'boxes'
   return attributesOf(parent).values.look ?? 'boxes'
+}
+
+/** The attributes the block bar's values are drawn with (`boxesDrawnAttributes`, `columnsDrawnAttributes`). */
+const DRAWN = ['data-count', 'data-many', 'data-width', 'data-fill', 'data-align', 'data-valign', 'style'] as const
+
+/** A block's child blocks of one class (`box`, `column`), in order. */
+export function childDivs(node: PMNode, kind: string): PMNode[] {
+  const found: PMNode[] = []
+  node.forEach(child => { if (child.type.name === 'slideDiv' && slideBlockClassOf(attributesOf(child)) === kind) found.push(child) })
+  return found
+}
+
+/** A Columns block's columns' attributes, or null when it holds a drawn block other than a column (as the renderer). */
+function onlyColumns(node: PMNode): FenceAttributes[] | null {
+  const columns: FenceAttributes[] = []
+  let other = false
+  node.forEach(child => {
+    if (child.type.name === 'commentNode') return
+    const attrs = child.type.name === 'slideDiv' ? attributesOf(child) : null
+    if (!attrs || slideBlockClassOf(attrs) !== 'column') other = true
+    else columns.push(attrs)
+  })
+  return other ? null : columns
 }
 
 /** A block drawn with something before its words: a box (its icon) and Steps (its pill). */
@@ -119,6 +140,12 @@ class SlideDivView implements NodeView {
     this.dom.setAttribute('data-fdiv', '')
     if (kind === 'boxes') this.dom.setAttribute('data-look', attrs.values.look ?? 'boxes')
     else this.dom.removeAttribute('data-look')
+    // The block bar's values, drawn as the renderer draws them (Width, Style, alignment; the columns' split).
+    this.drawn(kind === 'boxes'
+      ? boxesDrawnAttributes(attrs, childDivs(this.node, 'box').length)
+      : kind === 'columns'
+        ? columnsDrawnAttributes(attrs, onlyColumns(this.node))
+        : {})
     const deco = this.deco
     if (!deco) return
     if (kind === 'steps') {
@@ -161,6 +188,15 @@ class SlideDivView implements NodeView {
       deco.textContent = ''
       deco.hidden = true
       deco.removeAttribute('role')
+    }
+  }
+
+  /** The drawn attributes now, and none of the ones drawn before that are gone. */
+  private drawn(attributes: Record<string, string>) {
+    for (const name of DRAWN) {
+      const value = attributes[name]
+      if (value === undefined) this.dom.removeAttribute(name)
+      else if (this.dom.getAttribute(name) !== value) this.dom.setAttribute(name, value)
     }
   }
 
@@ -208,6 +244,15 @@ export function caretBoxPos(state: EditorState): number | null {
   return null
 }
 
+/**
+ * The element the caret's mark may go on: a box this view draws, in the page. Anything else (another node's element
+ * at a stale place while a slide is swapped in) would be read back by ProseMirror as a change, drawn again and marked
+ * again, without end: the block bar's app run hung the deck on changing slides.
+ */
+export function markableBox<T extends { isConnected?: boolean; classList?: { contains(name: string): boolean } }>(found: T | null | undefined): T | null {
+  return found && found.isConnected && found.classList?.contains('blk-box') ? found : null
+}
+
 const slideCaretBoxKey = new PluginKey('slideCaretBox')
 
 /** Marks the caret's box (`is-caret`) as the selection moves; nothing in the document changes. */
@@ -215,7 +260,10 @@ function slideCaretBox(): Plugin {
   let marked: HTMLElement | null = null
   const mark = (view: EditorView) => {
     const pos = caretBoxPos(view.state)
-    const dom = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
+    const found = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null)
+    // Only a box this view draws (`blk-box`): a class put on any other element is a change ProseMirror reads back and
+    // draws again, and the mark put back, without end (the block bar's app run: the deck hung on changing slides).
+    const dom = markableBox(found)
     if (dom === marked && dom?.classList.contains(CARET_CLASS)) return
     marked?.classList.remove(CARET_CLASS)
     marked = dom
