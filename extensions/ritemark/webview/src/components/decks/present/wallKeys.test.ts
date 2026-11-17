@@ -84,10 +84,24 @@ for (const blank of ['ground', 'white'] as const) {
   for (const key of ['Shift', 'Meta', 'Control', 'Alt', 'CapsLock']) assert.equal(blankKeyOf({ key }, blank), null, `${key} alone does nothing`)
   assert.equal(blankKeyOf({ key: 'q', metaKey: true }, blank), null, "⌘Q is still the app's")
 }
+// ---- Small details item 3: Q shows the published page's QR code; an unpublished deck's Q is no key of the wall's
+for (const key of ['q', 'Q']) {
+  assert.deepEqual(blankKeyOf({ key }, null, true), { type: 'blank', to: 'page' }, `${key} on a published deck shows the code`)
+  assert.equal(blankKeyOf({ key }, null, false), null, `${key} on an unpublished deck does nothing`)
+  assert.equal(blankKeyOf({ key }, null), null, `${key} with no page said does nothing`)
+}
+assert.equal(blankKeyOf({ key: 'q', metaKey: true }, null, true), null, "⌘Q quits, never shows the code")
+// While the code shows, any key (Q too) brings the slide back and does nothing else.
+for (const key of ['q', 'Q', 'b', 'w', 'ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp', ' ', 'Enter', 'Escape', 'Home', 'End', '4', 'x']) {
+  assert.deepEqual(blankKeyOf({ key }, 'page', true), { type: 'show' }, `${key} on the code shows the slide`)
+}
+for (const key of ['Shift', 'Meta', 'Alt']) assert.equal(blankKeyOf({ key }, 'page', true), null, `${key} alone does nothing`)
+// Q on a blank wall brings the slide back (one key, one change), never the code over the blank.
+assert.deepEqual(blankKeyOf({ key: 'q' }, 'ground', true), { type: 'show' })
 // The wall and the presenter view ask blankKeyOf first, and a key it takes goes no further: this is their order.
 {
-  const route = (key: string, blank: 'ground' | 'white' | null) => {
-    const step = blankKeyOf({ key }, blank)
+  const route = (key: string, blank: 'ground' | 'white' | 'page' | null) => {
+    const step = blankKeyOf({ key }, blank, true)
     if (step) return step
     if (goToKey(null, { key }).handled) return 'go-to box'
     return wallKeyOf({ key })
@@ -96,6 +110,9 @@ for (const blank of ['ground', 'white'] as const) {
   assert.deepEqual(route('PageDown', 'white'), { type: 'show' }, 'a clicker on a blank wall does not also step')
   assert.deepEqual(route('Escape', 'ground'), { type: 'show' }, 'Esc on a blank wall does not stop')
   assert.deepEqual(route('4', 'ground'), { type: 'show' }, 'a digit on a blank wall does not open the box')
+  assert.deepEqual(route('ArrowRight', 'page'), { type: 'show' }, '→ on the code does not also step')
+  assert.deepEqual(route('PageDown', 'page'), { type: 'show' }, 'a clicker on the code does not also step')
+  assert.deepEqual(route('Escape', 'page'), { type: 'show' }, 'Esc on the code does not stop')
   assert.deepEqual(route('PageDown', null), { type: 'next' }, 'on the slide, Page Down steps')
   assert.equal(route('4', null), 'go-to box')
 }
@@ -111,6 +128,11 @@ assert.deepEqual(settleAsked({ to: 'ground' }, null), { to: 'ground' }, 'a state
 assert.equal(settleAsked({ to: 'ground' }, 'ground'), null, 'the state that carries it settles it')
 assert.equal(settleAsked({ to: null }, null), null)
 assert.equal(settleAsked(null, 'white'), null)
+// A Q the host refused (the deck has no page now): settled, so the next key is read against the slide, not the code.
+assert.deepEqual(settleAsked({ to: 'page' }, null), { to: 'page' }, 'a state from before Q keeps it')
+assert.equal(settleAsked({ to: 'page' }, null, false), null, 'refused: no page, so no code to dismiss')
+assert.equal(settleAsked({ to: 'page' }, 'page', true), null)
+assert.deepEqual(blankKeyOf({ key: 'ArrowRight' }, blankNow(null, settleAsked({ to: 'page' }, null, false)), false), null, '→ after a refused Q is a step again')
 
 // ---- The time of day, in the locale's own format and the system's 12- or 24-hour choice
 {

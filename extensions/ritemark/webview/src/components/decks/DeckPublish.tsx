@@ -166,7 +166,7 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
 
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={state.changed ? 'The deck changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down'}>
+      <Tooltip label={state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down'}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="bar" className="deck-publish-chip">
             <Icon name="globe" size={14} tone="inherit" />

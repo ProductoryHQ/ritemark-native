@@ -237,7 +237,7 @@ export async function buildDeckPage(
   // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
   // by an app without them, reads as changed once they can go.
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
-  const digest = pageDigest(deck, [...urls.values(), ...(assets.themeFonts ?? []).map(font => font.address), ...(deck.theme.logo && assets.logo ? [assets.logo.address] : [])]);
+  const digest = pageDigest(deck, [...urls.values(), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
   const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null });
   return { deck, digest, html };
 }
@@ -249,6 +249,37 @@ export async function buildDeckPage(
 export async function currentPageDigest(deckPath: string, text: string, theme: DeckTheme, pageFs: Pick<PageFs, 'stat'> = nodePageFs, fontAddresses: readonly string[] = []): Promise<string> {
   const deck = publicDeckOf(deckPath, text, theme);
   return pageDigest(deck, [...(await foundPictures(deck, deckPath, pageFs)).values(), ...fontAddresses]);
+}
+
+/**
+ * Sprint 162 PR 6: the addresses of the theme's own files a page names, which its digest counts beside its pictures:
+ * the font files (PR 3) and the logo's file (PR 4), whose name holds its bytes' hash. The page and the chip both count
+ * them through this, so they never disagree about what a page carries.
+ */
+export function pageLookAddresses(theme: Pick<DeckTheme, 'logo'>, fonts: readonly { address: string }[], logo: { address: string } | null): string[] {
+  return [...fonts.map(font => font.address), ...(theme.logo && logo ? [logo.address] : [])];
+}
+
+/** What a deck would put on its page now: its text, the theme it draws (read from the file on disk), and that theme's files. */
+export interface DeckPageNow {
+  deckPath: string;
+  text: string;
+  theme: DeckTheme;
+  fonts: readonly { address: string }[];
+  logo: { address: string } | null;
+}
+
+/**
+ * Sprint 162 PR 6 (step-3-themes.md, "The wall and the page follow the theme"): whether the page as written (its
+ * `ritemark-deck` digest, `readPageMeta`) no longer carries what the deck would publish now: its public words, its theme's fields (the
+ * theme's name too, so another theme picked is a change), the theme's font files and its logo's file. The chip's
+ * "Published · changed" and the sheet's rows read it. A digest, never a render, so typing asks only this. Nothing here
+ * writes: the page beside the deck, and so the live page, changes only with Publish or Update the page. Not changed for
+ * a page without Ritemark's digest.
+ */
+export async function pageReadsChanged(written: string | null, now: DeckPageNow, pageFs: Pick<PageFs, 'stat'> = nodePageFs): Promise<boolean> {
+  if (!written) return false;
+  return written !== await currentPageDigest(now.deckPath, now.text, now.theme, pageFs, pageLookAddresses(now.theme, now.fonts, now.logo));
 }
 
 // ------------------------------------------------------------------ The theme's fonts, as files beside the page
