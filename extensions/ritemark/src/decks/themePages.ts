@@ -33,6 +33,7 @@ import { decodeThemeRequest, ThemeProtocolError, type ThemeDeck, type ThemeHostM
 import { deckPreview, SAMPLE_DECK_TEXT } from './themePreview';
 import type { ThemeChangeView } from './themeChange';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
+import { pickerFolder } from '../utils/dialogDefaults';
 
 /** The project's decks and themes, read once for an answer (`ThemePages.snapshot`). */
 interface ProjectThemes {
@@ -343,7 +344,8 @@ export class ThemePages implements vscode.Disposable {
       openLabel: 'Use as the logo',
       canSelectMany: false,
       canSelectFolders: false,
-      defaultUri: root ? vscode.Uri.file(root) : undefined,
+      // A folder that exists (`pickerFolder`, the rule every open dialog follows): the project's, else the theme's.
+      defaultUri: vscode.Uri.file(pickerFolder([root, path.dirname(view.document.uri.fsPath)])),
       filters: { 'Logo (SVG or PNG)': ['svg', 'png'] },
     });
     const uri = picked?.[0];
