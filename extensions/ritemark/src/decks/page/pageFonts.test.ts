@@ -25,7 +25,7 @@ import { deckFontFaces } from '../../../webview/src/components/decks/theme/deckF
 import {
   PAGE_FONTS, buildDeckPage, currentPageDigest, foreignFontLine, nodeFontFs, nodePageFs, pagePathFor, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts,
 } from './pageFile';
-import { PAGE_CSP, type PageAssets } from './pageHtml';
+import { PAGE_CSP, PAGE_CSS, type PageAssets } from './pageHtml';
 import { deckCounts, deckSheetRows } from './sheetRows';
 import { PRIVATE_DECK } from './testing/privateDeck';
 
@@ -143,6 +143,24 @@ async function main(): Promise<void> {
     assert.ok(!/fonts\.(googleapis|gstatic)|@import|https?:\/\/[^"'\s)]*\.woff2?/i.test(built.html), 'no font from the network');
     assert.ok(!/https?:/.test(PAGE_CSP) && PAGE_CSP.includes("font-src 'self' data: file:"), 'the page may load fonts only from beside it');
     assert.ok(built.html.includes("--s-fh:'Space Grotesk', 'Sofia Sans', sans-serif"), 'the slides draw the theme\'s headings font');
+    // The content wears the theme (step-3-themes.md, 16 November): the session's title, the part headings and Contents'
+    // entries in the heading font, the handout's text in the text font; the page's own controls keep Sofia Sans.
+    {
+      assert.ok(built.html.includes(":root{") && built.html.includes("--fh:'Space Grotesk', 'Sofia Sans', sans-serif") && built.html.includes("--fb:'Inter', 'Sofia Sans', sans-serif"), 'the page\'s --fh and --fb are the theme\'s');
+      const fontOf = (selector: string) => {
+        const rule = new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`, 'm').exec(PAGE_CSS);
+        assert.ok(rule, `a rule for ${selector}`);
+        return /font(?:-family)?:([^;]*)/.exec(rule![1])?.[1] ?? '';
+      };
+      for (const heading of ['.top .who span', '.toc button', '.part h2', '.part h3', '.part h4, .part h5', '.pre h1, .pre h2, .pre h3, .pre h4, .pre h5']) {
+        assert.match(fontOf(heading), /var\(--fh\)/, `${heading} in the theme's heading font`);
+      }
+      assert.match(fontOf('.text'), /var\(--fb\)/, 'the handout\'s text in the theme\'s text font');
+      for (const control of ['.top .who b', '.top .pos', '.cbtn', '.toc .hd', '.under', '.part .lab', '.k', '.copy', '.sect .eyebrow', '.foot', '.toast']) {
+        assert.match(fontOf(control), /'Sofia Sans'/, `${control} keeps Sofia Sans`);
+        assert.doesNotMatch(fontOf(control), /var\(--f[hb]\)/);
+      }
+    }
     const evening = await buildDeckPage({ deckPath, text: PRIVATE_DECK, theme: BUILT_IN_THEME }, assets);
     assert.ok(!evening.html.includes('fonts/'), 'a Sofia Sans theme names no font file');
 
