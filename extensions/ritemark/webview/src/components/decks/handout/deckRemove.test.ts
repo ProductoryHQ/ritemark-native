@@ -319,19 +319,21 @@ const DECK = [
     addToLibrary: index => calls.push(`add ${index}`),
     showInLibrary: index => calls.push(`show ${index}`),
     remove: index => calls.push(`remove ${index}`),
+    settings: index => calls.push(`settings ${index}`),
   }
   const items = slideMenuItems({ index: 2, count: 5, skipped: true, fromLibrary: false, deleteKey: '⌫' })
-  assert.deepEqual(items.map(item => item.label), ['Duplicate', 'Show slide', 'Add to library…', 'Delete slide'])
+  assert.deepEqual(items.map(item => item.label), ['Duplicate', 'Show slide', 'Add to library…', 'Slide settings…', 'Delete slide'])
   for (const item of items) item.run(actions)
-  assert.deepEqual(calls, ['duplicate 2', 'skip 2', 'add 2', 'remove 2'], 'each on that slide')
+  assert.deepEqual(calls, ['duplicate 2', 'skip 2', 'add 2', 'settings 2', 'remove 2'], 'each on that slide')
   assert.deepEqual(slideMenuItems({ index: 0, count: 1, skipped: false, fromLibrary: true, deleteKey: '⌫' }).map(item => `${item.label}${item.disabled ? ' (off)' : ''}`),
-    ['Duplicate', 'Skip slide', 'Show in the library', 'Delete slide (off)'])
+    ['Duplicate', 'Skip slide', 'Show in the library', 'Slide settings…', 'Delete slide (off)'])
   // Both menus draw that one list: the strip's thumbnail and the part number's ⋯.
   const here = join(process.cwd(), process.cwd().endsWith('webview') ? 'src/components/decks' : 'webview/src/components/decks')
   const strip = readFileSync(join(here, 'SlideStrip.tsx'), 'utf8')
   const view = readFileSync(join(here, 'DeckView.tsx'), 'utf8')
   assert.match(strip, /<DropdownMenuContent[^>]*onCloseAutoFocus=\{onMenuCloseFocus\}>\s*<SlideMenuItems /, "the thumbnail's menu")
-  assert.match(view, /function PartMenu[\s\S]*?<SlideMenuItems index=\{entry\.index\}[^>]*actions=\{actions\}/, "the part number's menu")
+  // The strip's own actions; Slide settings… anchored beside this part's number.
+  assert.match(view, /function PartMenu[\s\S]*?<SlideMenuItems index=\{entry\.index\}[^>]*actions=\{\{ \.\.\.actions, settings: index => onSettings\(index, slot\) \}\}/, "the part number's menu")
   assert.match(view, /<PartMenu key=\{slot\.id\} slot=\{slot\} slides=\{slides\} actions=\{stripActions\}/, "with the strip's own actions")
 }
 

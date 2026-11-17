@@ -4,8 +4,9 @@
  *  - Sprint 161 (PR 2): a block slide, and a v1 slide of the nine kinds (drawn as blocks, decision 8), is written on
  *    like text in the slide editor (`blocks/SlideEditor.tsx`); its first edit converts the deck. A slide of a kind this
  *    build doesn't know keeps its layout's words, typed in place: a click puts the caret there, and Enter goes on.
- *  - Nothing sits around the slide (17 November, "Nothing around the slide but the slide"): Slide settings is a gear in
- *    the deck's bar, and where a copy came from is at the top of its popup (`SlideAbout`). The fold for notes that
+ *  - Nothing sits around the slide (17 November, "Nothing around the slide but the slide"): Slide settings is in the
+ *    slide's own menu (the strip's, the part number's and the end of the slide's right-click menu), and where a copy
+ *    came from is at the top of its popover (`SlideAbout`). The fold for notes that
  *    sat under it is gone (Jarmo, 17 November): anything private is a comment in the handout.
  *
  * Every change is one transaction on the slide's node in the handout's editor, so it saves, merges and undoes as the
@@ -52,6 +53,8 @@ interface StageProps {
   onSplit?: (before: string, after: string) => void
   onFull?: (full: boolean) => void
   onNeedCaret?: () => void
+  /** The slide's right-click menu's Slide settings… (17 November): the popover at that point. */
+  onSlideSettings?: (at: { x: number; y: number }) => void
   splitRequest?: number
   tableRequest?: { what: 'row' | 'column'; serial: number } | null
   picture?: { path: string; url: string; serial: number } | null
@@ -63,7 +66,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, splitRequest, tableRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, tableRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -86,6 +89,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         onSplit={onSplit}
         onFull={onFull}
         onNeedCaret={onNeedCaret}
+        onSlideSettings={onSlideSettings}
         splitRequest={splitRequest}
         tableRequest={tableRequest}
         picture={picture}

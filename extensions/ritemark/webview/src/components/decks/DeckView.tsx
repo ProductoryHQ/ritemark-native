@@ -36,7 +36,7 @@ import { onMessage, sendToExtension } from '../../bridge'
 import { convertKind, hiddenNote } from './slide/convertKind'
 import { addColumn, addRow, setPath } from './slide/slideEdits'
 import { DeckLook, SlideAbout, SlideSettings } from './SlideSettings'
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
+import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
@@ -111,12 +111,18 @@ interface Notice {
 
 const NO_SLOTS: PartMenuSlot[] = []
 
+/** What the Slide settings popover is anchored to: a thumbnail, a part number's ⋯, or a point (the slide's right-click). */
+type SettingsAnchor = { getBoundingClientRect: () => DOMRect }
+
+/** Where a Slide settings… came from: what to anchor to, on which side, and where the focus goes back. */
+type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'left'; back: HTMLElement | null }
+
 /**
  * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
  * items and actions, for the slide whose part head holds the slot. Drawn into the head's slot (a portal); nothing when
  * the slot's slide isn't one of the deck's slides as this view last read them.
  */
-function PartMenu({ slot, slides, actions, marks }: { slot: PartMenuSlot; slides: DeckSlideEntry[]; actions: StripActions; marks: Record<string, StripMark> }) {
+function PartMenu({ slot, slides, actions, marks, onSettings }: { slot: PartMenuSlot; slides: DeckSlideEntry[]; actions: StripActions; marks: Record<string, StripMark>; onSettings: (index: number, slot: PartMenuSlot) => void }) {
   const pos = slot.getPos()
   const entry = pos === undefined ? undefined : slides.find(slide => slide.pos === pos)
   if (!entry) return null
@@ -125,7 +131,7 @@ function PartMenu({ slot, slides, actions, marks }: { slot: PartMenuSlot; slides
     <DropdownMenu modal={false}>
       <MoreActionsTrigger label={`Slide ${entry.index + 1}: more actions`} className="deck-part-more-button" />
       <DropdownMenuContent align="end" side="bottom">
-        <SlideMenuItems index={entry.index} count={slides.length} skipped={entry.data.skip === true} fromLibrary={fromLibrary} actions={actions} />
+        <SlideMenuItems index={entry.index} count={slides.length} skipped={entry.data.skip === true} fromLibrary={fromLibrary} actions={{ ...actions, settings: index => onSettings(index, slot) }} />
       </DropdownMenuContent>
     </DropdownMenu>,
     slot.element,
@@ -223,7 +229,12 @@ export function DeckView({
   const [stripWanted, setStripWanted] = useState(true)
   // Fold either side (16 November): the slide, the handout, or neither, as this deck's view kept it.
   const [fold, setFold] = useState<DeckFold>(storedFold)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
+  // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
+  const [settingsFor, setSettingsFor] = useState<{ index: number; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
+  const settingsAnchor = useRef<SettingsAnchor>({ getBoundingClientRect: () => new DOMRect() })
+  if (settingsFor) settingsAnchor.current = settingsFor.anchor
+  const settingsReturn = useRef<HTMLElement | null>(null)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   // The Slide library (PR 4): each copy's source, by the slide's id; the copy just written to the library; and the
@@ -269,7 +280,7 @@ export function DeckView({
   const assets = useDeckAssets(slides)
   const theme = useDeckTheme(properties.theme)
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
-  // November it is chosen in the gear's popup, its last section (SlideSettings), not on the bar.
+  // November it is chosen in the Slide settings popover, its last section (SlideSettings), not on the bar.
   const borderless = properties.look === 'borderless'
   const setLook = useCallback((look: string) => {
     const next: DocumentProperties = { ...properties }
@@ -721,6 +732,13 @@ export function DeckView({
       setJoinAt(mark ? mark.index : null)
       const removal = transaction.getMeta(DECK_REMOVED) as DeckRemoval | undefined
       if (removal) {
+        // The slide whose part holds the caret now (the part above) is the current one, held as writing holds it, so
+        // the handout settling under the removed part never makes another slide current.
+        const at = partIndexAt(editor.state.doc, editor.state.selection.from)
+        if (at !== null) {
+          lockUntil.current = Date.now() + WRITE_LOCK_MS
+          makeCurrent(at)
+        }
         const depth = undoDepth(editor.state)
         const valid = () => !editor.isDestroyed && undoDepth(editor.state) === depth
         setNotice({
@@ -740,7 +758,7 @@ export function DeckView({
     }
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
-  }, [editor])
+  }, [editor, makeCurrent])
   // The part numbers' ⋯ (one menu in each part head's slot, the strip's own items and actions).
   const partSlots = useSyncExternalStore(
     useCallback((listener: () => void) => (editor ? partMenuSlots.subscribe(editor, listener) : () => {}), [editor]),
@@ -871,6 +889,31 @@ export function DeckView({
     return id
   }, [editor])
 
+  /**
+   * Slide settings… from a slide's menu (17 November): the slide is made current (its part scrolled to, unless it is
+   * the current one already), then, once the menu has closed and handed its focus back, the popover opens beside where
+   * the menu came from. Index -1: the deck's look alone (a deck with no slides).
+   */
+  const openSettings = useCallback((index: number, place: () => SettingsPlace | null) => {
+    if (index >= 0 && index !== currentRef.current) pick(index)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const where = place()
+      if (!where) return
+      settingsReturn.current = where.back
+      setSettingsFor({ index, anchor: where.anchor, side: where.side })
+    }))
+  }, [pick])
+  /** From a part number's ⋯: beside the number, the focus back to its ⋯. */
+  const partSettings = useCallback((index: number, slot: PartMenuSlot) => openSettings(index, () => (
+    slot.element.isConnected ? { anchor: slot.element, side: 'left', back: slot.element.querySelector('button') } : null
+  )), [openSettings])
+  /** From the slide's own right-click menu: at the point it was opened, the focus back to the slide's words. */
+  const stageSettings = useCallback((at: { x: number; y: number }) => openSettings(currentRef.current, () => ({
+    anchor: { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
+    side: 'right',
+    back: stageRef.current?.querySelector<HTMLElement>('.ProseMirror') ?? null,
+  })), [openSettings])
+
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
   const dispatch = useCallback((tr: Transaction | null) => {
     if (tr && editor && !editor.isDestroyed) editor.view.dispatch(tr)
@@ -941,7 +984,7 @@ export function DeckView({
       if (!id) return
       // The sheet opens beside the slide; the slide is the current one, so the sheet sits by it.
       pick(index)
-      setSettingsOpen(false)
+      setSettingsFor(null)
       setTopics(null)
       setAddSheet({ id, number: index + 1 })
       sendToExtension('deck/library-topics')
@@ -954,7 +997,17 @@ export function DeckView({
       const from = editor ? slidesOf(editor.state.doc)[index]?.data.from : undefined
       if (from) sendToExtension('deck/show-in-library', { from })
     },
-  }), [editor, dispatch, pick, idOf])
+    // Beside the thumbnail it came from, top-aligned; the focus back to the strip, whose keys then work at once.
+    settings: index => openSettings(index, () => {
+      const thumb = stripRef.current?.querySelector<HTMLElement>(`[data-thumb="${index}"] .deck-thumb-slide`)
+      return thumb ? { anchor: thumb, side: 'right', back: stripRef.current } : null
+    }),
+    // A deck with no slides: its look from the strip's + menu at the end, beside that button.
+    deckLook: () => openSettings(-1, () => {
+      const button = stripRef.current?.querySelector<HTMLElement>('.deck-add-end')
+      return button ? { anchor: button, side: 'right', back: button } : null
+    }),
+  }), [editor, dispatch, pick, idOf, openSettings])
 
   // A notice in the bar fades after a while.
   useEffect(() => {
@@ -963,8 +1016,9 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  // Slide settings: closed when the slide changes. Add to library's sheet is placed beside the slide (over the handout when it must).
-  useEffect(() => { setSettingsOpen(false) }, [shown])
+  // Slide settings belong to their slide: another slide made current closes them. Add to library's sheet is placed
+  // beside the slide (over the handout when it must).
+  useEffect(() => { setSettingsFor(open => (open && open.index >= 0 && open.index !== shown ? null : open)) }, [shown])
   // The popup always has something to show (the deck's section when the deck has no slides), so it never stays open
   // unseen: no effect closes it when the slide goes, and a hidden slide keeps its settings (the Experience lead).
   // The Add to library sheet belongs to its slide: another slide closes it.
@@ -1297,9 +1351,9 @@ export function DeckView({
   }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
 
   const status = documentBarStatus(syncState, syncAction)
-  // The gear is always ready (#764). Slide settings belong to the current slide (the Experience lead, 16 November):
-  // hiding the slide hides the stage, not the current slide, which the strip still rings. A deck with no slides still
-  // chooses its look there, as the bar's segment allowed at any count: its popup is the deck's section alone.
+  // Slide settings belong to their slide (the Experience lead, 16 November): hiding the slide hides the stage, not the
+  // slide, so its menus still open them. A deck with no slides still chooses its look, as the bar's segment allowed at
+  // any count: the strip's + menu at the end has Deck look…, whose popover is the deck's section alone (#764).
   const deckLook = { count, look: borderless ? 'borderless' as const : 'card' as const, onLook: setLook }
   const handoutContainer = scrollContainer()
   // Writing on the slide keeps it the current one while the handout is still.
@@ -1329,10 +1383,10 @@ export function DeckView({
   // Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
   const fullLine = (
     <>
-      <Tooltip label={SLIDE_FULL}>
+      <Tooltip label={SLIDE_FULL} className="deck-notice-words">
         <span className="deck-notice-text">{SLIDE_FULL}</span>
       </Tooltip>
-      <Tooltip label="Move the words after the cursor to a new slide below this one">
+      <Tooltip label="Move the words after the cursor to a new slide below this one" className="deck-notice-act">
         <Button variant="link" className="deck-line-action" onClick={() => setSplitRequest(value => value + 1)}>
           Split at the cursor
         </Button>
@@ -1357,80 +1411,14 @@ export function DeckView({
           </Button>
         </Tooltip>
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
-        {/* 17 November (the Experience lead, "Nothing around the slide but the slide"): Slide settings is a gear here,
-            after the count, its popup under it, left-aligned; nothing sits above or beside the slide. A Popover: a
-            press outside or Esc closes it and the gear gets the focus back; choosing a layout keeps it open. */}
-        <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
-          <Tooltip label="Slide settings">
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="deck-settings-button"
-                data-state={settingsOpen ? 'active' : undefined}
-                aria-label="Slide settings"
-              >
-                <Icon name="gear" size={16} tone="inherit" />
-              </Button>
-            </PopoverTrigger>
-          </Tooltip>
-          <PopoverContent
-            align="start"
-            sideOffset={6}
-            collisionPadding={8}
-            className="deck-settings"
-            // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
-            onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
-            tabIndex={-1}
-          >
-            {slide ? (
-              <SlideSettings
-                number={shown + 1}
-                // A slide drawn as blocks (a v1 slide too, PR 2) has no layout: its blocks are its layout (frame 26).
-                kind={drawsAsBlocks(slide.kind) ? '' : slide.kind}
-                data={drawsAsBlocks(slide.kind) ? { ...slide.data, ...blockDataOf(slide.kind, slide.data), skip: slide.data.skip } : slide.data}
-                stepsTag={stepsTagSetting(slide)}
-                about={(
-                  <SlideAbout
-                    data={slide.data}
-                    sourceLines={slide.data.id && sources[slide.data.id] ? (
-                      <SourceLines
-                        source={sources[slide.data.id]}
-                        kept={slide.data.kept === true}
-                        justUpdated={justUpdated === slide.data.id}
-                        busy={!!busy[slide.data.id]}
-                        actions={sourceActions}
-                      />
-                    ) : undefined}
-                    hidden={drawsAsBlocks(slide.kind)
-                      ? (!isBlockSlide(slide.kind) && hiddenWords(slide.kind, slide.data).length > 0 ? 'Words its old layout hid become a comment in the handout when you first edit this deck.' : '')
-                      : hiddenNote(slide.kind, slide.data)}
-                    table={slide.kind === 'table'
-                      ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) }
-                      : blockTable
-                        ? { addRow: () => setTableRequest({ what: 'row', serial: Date.now() }), addColumn: () => setTableRequest({ what: 'column', serial: Date.now() }) }
-                        : undefined}
-                  />
-                )}
-                onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
-                onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
-                onClose={() => setSettingsOpen(false)}
-                onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
-                deck={deckLook}
-              />
-            ) : (
-              <DeckLook id="deck-reach-none" only {...deckLook} />
-            )}
-          </PopoverContent>
-        </Popover>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>
-              <Tooltip label={notice.text}>
+              <Tooltip label={notice.text} className="deck-notice-words">
                 <span className="deck-notice-text">{notice.text}</span>
               </Tooltip>
               {notice.action ? (
-                <Tooltip label={notice.action.tip}>
+                <Tooltip label={notice.action.tip} className="deck-notice-act">
                   <Button
                     variant="link"
                     className="deck-line-action"
@@ -1478,7 +1466,7 @@ export function DeckView({
             joinAt={joinAt}
           />
         ) : null}
-        {editor ? partSlots.map(slot => <PartMenu key={slot.id} slot={slot} slides={slides} actions={stripActions} marks={marks} />) : null}
+        {editor ? partSlots.map(slot => <PartMenu key={slot.id} slot={slot} slides={slides} actions={stripActions} marks={marks} onSettings={partSettings} />) : null}
 
         {slideShown ? (
           <div
@@ -1511,6 +1499,7 @@ export function DeckView({
                   onSplit={onSplit}
                   onFull={setSlideFull}
                   onNeedCaret={needCaret}
+                  onSlideSettings={stageSettings}
                   splitRequest={splitRequest}
                   tableRequest={tableRequest}
                   picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
@@ -1587,6 +1576,69 @@ export function DeckView({
           ) : null}
         </div>
       </div>
+      {/* 17 November (Jarmo: "slaidi settings peaks olema siin: mitte kuskil ülal tööriistaribas"; the Experience lead,
+          "Nothing around the slide"): Slide settings… in the slide's own menu opens this popover, anchored beside the
+          thumbnail, the part number or the point it came from, top-aligned with it. A Popover: a press outside or Esc
+          closes it, and the focus goes back to where the menu was opened. */}
+      <Popover open={settingsFor !== null} onOpenChange={open => { if (!open) setSettingsFor(null) }}>
+        {settingsFor ? <PopoverAnchor virtualRef={settingsAnchor} /> : null}
+        <PopoverContent
+          side={settingsFor?.side ?? 'right'}
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          className="deck-settings"
+          // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
+          onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+          onCloseAutoFocus={event => {
+            const back = settingsReturn.current
+            settingsReturn.current = null
+            if (!back || !back.isConnected) return
+            event.preventDefault()
+            back.focus({ preventScroll: true })
+          }}
+          tabIndex={-1}
+        >
+          {slide ? (
+            <SlideSettings
+              number={shown + 1}
+              // A slide drawn as blocks (a v1 slide too, PR 2) has no layout: its blocks are its layout (frame 26).
+              kind={drawsAsBlocks(slide.kind) ? '' : slide.kind}
+              data={drawsAsBlocks(slide.kind) ? { ...slide.data, ...blockDataOf(slide.kind, slide.data), skip: slide.data.skip } : slide.data}
+              stepsTag={stepsTagSetting(slide)}
+              about={(
+                <SlideAbout
+                  data={slide.data}
+                  sourceLines={slide.data.id && sources[slide.data.id] ? (
+                    <SourceLines
+                      source={sources[slide.data.id]}
+                      kept={slide.data.kept === true}
+                      justUpdated={justUpdated === slide.data.id}
+                      busy={!!busy[slide.data.id]}
+                      actions={sourceActions}
+                    />
+                  ) : undefined}
+                  hidden={drawsAsBlocks(slide.kind)
+                    ? (!isBlockSlide(slide.kind) && hiddenWords(slide.kind, slide.data).length > 0 ? 'Words its old layout hid become a comment in the handout when you first edit this deck.' : '')
+                    : hiddenNote(slide.kind, slide.data)}
+                />
+              )}
+              table={slide.kind === 'table'
+                ? { addRow: () => changeSlide(addRow), addColumn: () => changeSlide(addColumn) }
+                : blockTable
+                  ? { addRow: () => setTableRequest({ what: 'row', serial: Date.now() }), addColumn: () => setTableRequest({ what: 'column', serial: Date.now() }) }
+                  : undefined}
+              onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
+              onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
+              onClose={() => setSettingsFor(null)}
+              onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
+              deck={deckLook}
+            />
+          ) : (
+            <DeckLook id="deck-reach-none" only {...deckLook} />
+          )}
+        </PopoverContent>
+      </Popover>
       {dialogs}
     </div>
   )

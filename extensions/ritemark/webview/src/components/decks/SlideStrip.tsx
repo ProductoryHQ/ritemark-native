@@ -6,8 +6,10 @@
  *    Since Sprint 161's PR 3 its first item is New slide: an empty block slide, its title taking the caret; its blocks
  *    come from the slide's / menu (frame 22), so the menu no longer offers a layout (Boxes, Points, New exercise). From
  *    the library and From another deck stay. "New slide" under the last one does the same at the end.
- *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Delete slide. Delete asks
- *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`).
+ *  - Each thumbnail's menu (its ⋯, or a right-click): Duplicate, Skip slide or Show slide, Add to library…, Slide
+ *    settings… (17 November: the popover beside the thumbnail; the gear left the bar), Delete slide. Delete asks
+ *    nothing and has Undo (answer 6). Backspace or Delete does the same to the selected slide (`stripKeys.ts`). The
+ *    handout part number's ⋯ is the same menu (`SlideMenuItems`).
  *  - Dragging a thumbnail reorders, one transaction per move, with a line where it lands.
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
@@ -48,6 +50,10 @@ export interface StripActions {
   showInLibrary: (index: number) => void
   /** Cmd+Z / Cmd+Shift+Z on the strip: the deck's history, as on the stage, so a slide deleted from the keyboard comes back. */
   undo: (redo: boolean) => void
+  /** The menu's Slide settings… (17 November): the popover beside the thumbnail it came from. */
+  settings: (index: number) => void
+  /** A deck with no slides has no thumbnail and so no menu: its own look (Card | Borderless) from the + menu at the end. */
+  deckLook: () => void
 }
 
 /** What the strip shows of a copy's source: from a library topic, changed in this deck, or newer in the library. */
@@ -425,6 +431,16 @@ export function SlideStrip({ slides, current, theme, borderless, assets, actions
         <DropdownMenuContent align="start" side="right" onCloseAutoFocus={keepFocusOnNewSlide}>
           <div className="deck-menu-head">Add at the end</div>
           <NewSlideItems at={count} actions={actions} />
+          {count === 0 ? (
+            // No slide, so no slide menu: the deck's own look stays reachable here (#764 kept it for an empty deck).
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => actions.deckLook()}>
+                <Icon name="gear" size={14} tone="inherit" />
+                Deck look…
+              </DropdownMenuItem>
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

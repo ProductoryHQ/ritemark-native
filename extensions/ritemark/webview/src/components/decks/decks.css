@@ -121,11 +121,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-part-head:has(+ h1) .deck-part-number { top: 41px; }
 .deck-part-head.is-current .deck-part-number { color: var(--r-accent); }
 /* The part number's ⋯ (experience 46, "Removing a slide from the handout"): the strip's slide menu, shown on hover in the
-   handout's right margin beside the number, never over the text; it stays while its menu is open or it has the focus. */
-.deck-part-more { position: absolute; right: 6px; top: 25px; display: flex; visibility: hidden; }
+   handout's right margin beside the number, never over the text; it stays while its menu is open or it has the focus.
+   Transparent rather than hidden, so pointing at it (outside the head's own box) is pointing at the head. */
+.deck-part-more { position: absolute; right: 6px; top: 25px; display: flex; opacity: 0; }
 .deck-part-head:has(+ h2) .deck-part-more { top: 30px; }
 .deck-part-head:has(+ h1) .deck-part-more { top: 37px; }
-.deck-part-head:hover .deck-part-more, .deck-part-more:focus-within, .deck-part-more:has([data-state="open"]) { visibility: visible; }
+.deck-part-head:hover .deck-part-more, .deck-part-more:focus-within, .deck-part-more:has([data-state="open"]) { opacity: 1; }
 .deck-part-more .deck-part-more-button { width: 20px; height: 20px; min-width: 20px; padding: 0; border-radius: 5px; }
 .deck-part-more .deck-part-more-button svg { width: 13px; height: 13px; }
 /* A join's first press: the line between the parts in the accent, and the note at the line (deckRemove.ts). */
@@ -184,17 +185,18 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present) { flex-shrink: 0; }
 .deck-bar > .deck-present { flex-shrink: 100; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
+   text ends in an ellipsis; an action keeps its whole word. */
+.deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.deck-notice > .deck-notice-act { flex: none; }
 /* A join's line and the full slide's line side by side: a hairline between them. */
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
 
-/* Slide settings (17 November, "Nothing around the slide but the slide"): a 28 px gear (Phosphor `gear`) in the deck's bar after the
-   count, its popup under it (a Popover, DeckView). Muted; ink on a quiet fill on hover; the bar's `on` while open. */
-.deck-bar .deck-settings-button { color: var(--r-ink-muted); }
-.deck-bar .deck-settings-button:hover { background: var(--r-surface-muted); color: var(--r-ink-strong); }
-.deck-bar .deck-settings-button[data-state="active"], .deck-bar .deck-settings-button[data-state="open"] { background: var(--r-surface-soft); color: var(--r-ink-strong); }
+/* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
+   thumbnail, the part number or the point it came from (DeckView); the bar has no gear. */
 /* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
-/* The popup is never taller than the room under the gear: it scrolls, so its last section (the deck's Card | Borderless)
+/* The popup is never taller than the room it has: it scrolls, so its last section (the deck's Card | Borderless)
    is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
 .deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
 .deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }

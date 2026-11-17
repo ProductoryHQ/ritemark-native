@@ -1,6 +1,10 @@
 /**
- * Sprint 157 (README frame 4): the slide's settings, seen on the slide as they change. Since 17 November a popup under
- * the gear in the deck's bar (it sat beside the slide before).
+ * Sprint 157 (README frame 4): the slide's settings, seen on the slide as they change. Since 17 November a popover that
+ * the slide's own menu opens, "Slide settings…" (Jarmo, 17 November: "slaidi settings peaks olema siin: mitte kuskil
+ * ülal tööriistaribas"): the thumbnail's ⋯ or right-click, the handout part number's ⋯ and the end of the slide's own
+ * right-click menu, anchored beside where it came from. The gear in the bar is gone. Its order (README, "Nothing around
+ * the slide"): the library section, Picture, a Steps label, a table's Add a row and Add a column, then the deck's own
+ * look. Skip slide is only in the menu, so it isn't in two places.
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
  * slide. A change of kind keeps the words (`convertKind`). Built from the shared controls: the segmented control (its
  * picture variant for the layouts and the picture places) and the switch.
@@ -8,11 +12,9 @@
  * An exercise slide also has Label (16 November): its pill's words, as on the slide, with the default as the
  * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
  *
- * 17 November (Jarmo; the Experience lead, "Nothing around the slide but the slide"): Settings open from the gear in the
- * deck's bar, as a Popover (DeckView), which closes on a press outside and on Esc and gives the gear the focus back.
+ * The popover (DeckView) closes on a press outside and on Esc and gives the focus back to where the menu was opened.
  * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
- * actions, the words a layout keeps for others, and a table's Add a row and Add a column; then a line, then the
- * slide's own settings.
+ * actions, and the words a layout keeps for others; then a line, then the slide's own settings.
  *
  * 16 November (Jarmo: "card/borderless buttons also to settings?"; the Experience lead, "Card or Borderless lives in the
  * gear's popup"): the popup's last section, under a line, is the deck's own choice, Card or Borderless, set once per
@@ -26,7 +28,6 @@ import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
-import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { oneLine, setPath, undoKeyOf } from './slide/slideEdits'
 
@@ -77,6 +78,8 @@ interface SlideSettingsProps {
   onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
+  /** A slide with a table: Add a row and Add a column, after the Label row. */
+  table?: { addRow: () => void; addColumn: () => void }
   /**
    * Sprint 161 (PR 2): a slide drawn as blocks with a Steps block: its pill's words (#752's Label row, which brings an
    * emptied pill back), and their change.
@@ -135,14 +138,12 @@ interface SlideAboutProps {
   sourceLines?: ReactNode
   /** The words this layout keeps for others (`hiddenNote`), or ''. */
   hidden: string
-  /** A table slide: its two actions. */
-  table?: { addRow: () => void; addColumn: () => void }
 }
 
 /** The top of Settings: what sat under the slide before 17 November. Null when there is nothing to say. */
-export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps) {
+export function SlideAbout({ data, sourceLines, hidden }: SlideAboutProps) {
   const source = sourceLine(data.from)
-  if (!sourceLines && !source && !hidden && !table) return null
+  if (!sourceLines && !source && !hidden) return null
   return (
     <div className="deck-settings-about">
       {sourceLines ?? (source ? (
@@ -157,17 +158,21 @@ export function SlideAbout({ data, sourceLines, hidden, table }: SlideAboutProps
           {hidden}
         </div>
       ) : null}
-      {table ? (
-        <div className="deck-source">
-          <Tooltip label="Add an empty row at the bottom of the table">
-            <Button variant="link" className="deck-line-action" onClick={table.addRow}>Add a row</Button>
-          </Tooltip>
-          <span aria-hidden="true">·</span>
-          <Tooltip label="Add an empty column on the right of the table">
-            <Button variant="link" className="deck-line-action" onClick={table.addColumn}>Add a column</Button>
-          </Tooltip>
-        </div>
-      ) : null}
+    </div>
+  )
+}
+
+/** A table's two actions, as one line of links. */
+function TableRow({ table }: { table: { addRow: () => void; addColumn: () => void } }) {
+  return (
+    <div className="deck-source deck-settings-table">
+      <Tooltip label="Add an empty row at the bottom of the table">
+        <Button variant="link" className="deck-line-action" onClick={table.addRow}>Add a row</Button>
+      </Tooltip>
+      <span aria-hidden="true">·</span>
+      <Tooltip label="Add an empty column on the right of the table">
+        <Button variant="link" className="deck-line-action" onClick={table.addColumn}>Add a column</Button>
+      </Tooltip>
     </div>
   )
 }
@@ -200,8 +205,7 @@ function LabelRow({ id, value, onWords, onUndo }: { id: string; value: string; o
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag, deck }: SlideSettingsProps) {
-  const skipId = `deck-skip-${number}`
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, table, stepsTag, deck }: SlideSettingsProps) {
   const tagId = `deck-tag-${number}`
   const reachId = `deck-reach-${number}`
   return (
@@ -246,19 +250,6 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           />
         </>
       ) : null}
-      {stepsTag ? <LabelRow id={tagId} value={stepsTag.value} onWords={stepsTag.onChange} onUndo={onUndo} /> : null}
-      {kind === 'exercise' ? (
-        <LabelRow
-          id={tagId}
-          value={exerciseTagOf(data)}
-          // Through the pill's own rule (`setPath`): words as they were write nothing.
-          onWords={words => {
-            const next = setPath(data, 'tag', words)
-            if (next !== data) onChange({ tag: next.tag })
-          }}
-          onUndo={onUndo}
-        />
-      ) : null}
       {kind !== 'picture' ? (
         <>
           <div className="deck-settings-k">Picture</div>
@@ -272,11 +263,20 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           />
         </>
       ) : null}
-      <div className="deck-settings-sep" />
-      <div className="deck-settings-row">
-        <Label htmlFor={skipId}>Skip slide</Label>
-        <Switch id={skipId} checked={data.skip === true} onCheckedChange={skip => onChange({ skip: skip || undefined })} />
-      </div>
+      {stepsTag ? <LabelRow id={tagId} value={stepsTag.value} onWords={stepsTag.onChange} onUndo={onUndo} /> : null}
+      {kind === 'exercise' ? (
+        <LabelRow
+          id={tagId}
+          value={exerciseTagOf(data)}
+          // Through the pill's own rule (`setPath`): words as they were write nothing.
+          onWords={words => {
+            const next = setPath(data, 'tag', words)
+            if (next !== data) onChange({ tag: next.tag })
+          }}
+          onUndo={onUndo}
+        />
+      ) : null}
+      {table ? <TableRow table={table} /> : null}
       <div className="deck-settings-sep" />
       <DeckLook id={reachId} {...deck} />
     </section>
