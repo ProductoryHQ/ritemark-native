@@ -58,8 +58,11 @@ import {
   type PresentDisplay,
   type WallHostMessage,
   type WallRequest,
+  type ClockLocale,
+  type WallBlank,
   type WallState,
 } from './presentProtocol';
+import { readSystemClock } from './systemClock';
 import { deckLookOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
 
 /** Where the presentation was started from: the deck's document, and its view to return to. */
@@ -103,6 +106,10 @@ interface Running {
   /** The presenter view's refresh after an edit, once the typing pauses; and the latest state's number. */
   refresh: ReturnType<typeof setTimeout> | null;
   presenterSerial: number;
+  /** B, "." or W blanked the wall (until any key, a click or a move); the presenter view says so. */
+  blank: WallBlank | null;
+  /** The system's clock, read once at the start, for the presenter view's time of day (the webview's own until then). */
+  clock: ClockLocale;
 }
 
 /** The shell's commands (patch 018). */
@@ -212,8 +219,15 @@ export class DeckPresenter implements vscode.Disposable {
       swapping: false,
       refresh: null,
       presenterSerial: 0,
+      blank: null,
+      clock: { locale: null, hourCycle: null },
     };
     this.running = running;
+    // The system's clock comes a moment later (macOS's `defaults`): the presenter view gets it then.
+    void readSystemClock().then(clock => {
+      running.clock = clock;
+      if (clock.locale !== null || clock.hourCycle !== null) void this.showPresenter(running);
+    });
     this.listen(running, running.wall);
     running.subscriptions.push(
       // The deck's view closed: there is nothing to return to, and the presentation goes too.
@@ -389,6 +403,10 @@ export class DeckPresenter implements vscode.Disposable {
       case 'present/set-length':
         if (screen === running.presenter) await this.setLength(running);
         return;
+      case 'present/blank':
+        running.blank = request.to;
+        await this.showBlank(running);
+        return;
       case 'present/peek': {
         running.session.read(running.origin.document.getText());
         const slide = running.session.slideNumbered(request.number);
@@ -396,6 +414,8 @@ export class DeckPresenter implements vscode.Disposable {
         return;
       }
       default: {
+        // A move (a button, the row, the grid) brings the slide back too, on the slide it moves to.
+        running.blank = null;
         running.session.move(running.origin.document.getText(), moveOf(request));
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
         // wall and then in the presenter view.
@@ -436,7 +456,23 @@ export class DeckPresenter implements vscode.Disposable {
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
-    const state = wallStateOf(view, look, assets, presenter);
+    const state = wallStateOf(view, look, assets, presenter, running.blank);
+    running.wallState = state;
+    await post(running.wall.panel.webview, state);
+    await this.showPresenter(running);
+  }
+
+  /**
+   * Blanking is not a move: the wall gets the slide it last got, blank or not, so an edit made since still waits for the
+   * next move (and a key that brings the slide back never looks like a step).
+   */
+  private async showBlank(running: Running): Promise<void> {
+    const onWall = running.wallState;
+    if (!onWall) {
+      await this.showWall(running);
+      return;
+    }
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: running.blank };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -464,6 +500,8 @@ export class DeckPresenter implements vscode.Disposable {
       canSwap: twoDisplays,
       length: lengthMinutesOf(frontMatterValue(running.origin.document.getText(), 'ritemark-length')),
       startedAt: running.startedAt,
+      blank: running.blank,
+      clock: running.clock,
     }, onWall?.slide));
   }
 
