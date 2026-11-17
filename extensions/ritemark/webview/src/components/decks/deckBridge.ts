@@ -2,9 +2,9 @@
  * Sprint 157: the deck view's line to the host, over the editor's own webview channel (`deck/*`, decoded by the host's
  * `decodeDeckRequest`). The host answers only the webview that asked.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../bridge'
-import { BUILT_IN_THEME, isThemePath, parseTheme, type DeckTheme } from '../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DeckSlideEntry } from './deckDocument'
 import { slidePicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
@@ -44,7 +44,8 @@ export function useDeckAssets(slides: DeckSlideEntry[]): { assets: Record<string
  * none, or one the project doesn't have (a deck is never changed for it).
  */
 export function useDeckTheme(themePath: unknown): DeckTheme {
-  const path = typeof themePath === 'string' && isThemePath(themePath) ? themePath : null
+  // A deck naming no theme asks for Evening's path: the project's own Evening file, when it has one, is its Evening.
+  const path: string | null = themePathOf(themePath)
   const [theme, setTheme] = useState<{ path: string; theme: DeckTheme } | null>(null)
 
   useEffect(() => onMessage(message => {
@@ -57,5 +58,9 @@ export function useDeckTheme(themePath: unknown): DeckTheme {
     if (path) sendToExtension('deck/theme', { path })
   }, [path])
 
-  return path && theme?.path === path ? theme.theme : BUILT_IN_THEME
+  // Sprint 162: while a newly picked theme is read, the deck keeps the theme it had, so a pick never flashes Evening.
+  const drawn = useRef<DeckTheme>(BUILT_IN_THEME)
+  if (!path) drawn.current = BUILT_IN_THEME
+  else if (theme?.path === path) drawn.current = theme.theme
+  return drawn.current
 }

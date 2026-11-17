@@ -121,7 +121,6 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
 {
   const render = (kind: string, tag?: string) => parse(renderToStaticMarkup(createElement(SlideSettings, {
     number: 2, kind, data: { title: 'Try it', ...(tag === undefined ? {} : { tag }) }, onKind: () => {}, onChange: () => {}, onClose: () => {}, onUndo: () => {},
-    deck: { count: 4, look: 'card', onLook: () => {} },
   })))
   const field = (tag?: string) => render('exercise', tag).querySelector('#deck-tag-2')!
   assert.equal(render('exercise').querySelector('label[for="deck-tag-2"]')!.text, 'Label')

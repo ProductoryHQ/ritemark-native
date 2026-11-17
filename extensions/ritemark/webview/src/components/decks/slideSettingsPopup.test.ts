@@ -22,15 +22,14 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DECK_LOOKS, DECK_LOOK_TIP, DeckLook, SlideAbout, SlideSettings, deckReach } = await import('./SlideSettings')
+const { SlideAbout, SlideSettings } = await import('./SlideSettings')
 const { SourceLines } = await import('./library/SourceLines')
 const { libraryBadge } = await import('./SlideStrip')
 
 const noop = () => {}
 const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
-const cardDeck = { count: 15, look: 'card' as const, onLook: noop }
-const settings = (kind: string, data: Record<string, unknown>, about: unknown, deck: { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void } = cardDeck, extra: Record<string, unknown> = {}) => parse(renderToStaticMarkup(createElement(SlideSettings, {
-  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never, deck, ...extra,
+const settings = (kind: string, data: Record<string, unknown>, about: unknown, extra: Record<string, unknown> = {}) => parse(renderToStaticMarkup(createElement(SlideSettings, {
+  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never, ...extra,
 })))
 
 // ---- A changed library slide: its line, the sentence and the buttons first, then a line, then the slide's settings.
@@ -63,19 +62,20 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
 }
 
 // ---- The popover's order (README, "Nothing around the slide", 17 November): the library section, Picture, a Steps
-// label, then the deck's look last. Skip slide is only in the menu. A table's rows and columns are the table's own + bars
-// and grips (experience 48): Settings has no Add a row or Add a column.
+// label (the deck's look left for the Theme menu in Sprint 162). Skip slide is only in the menu. A table's rows and
+// columns are the table's own + bars and grips (experience 48): Settings has no Add a row or Add a column.
 {
   const data = { from: 'Slide library/Agents.deck.md#p1 @k2' }
   const about = createElement(SlideAbout, { data, hidden: '' })
-  const root = settings('', data, about, cardDeck, { stepsTag: { value: 'Exercise', onChange: noop } })
+  const root = settings('', data, about, { stepsTag: { value: 'Exercise', onChange: noop } })
   const text = root.textContent
-  const order = ['From the library · Agents', 'Picture', 'Label', 'This deck · all 15 slides'].map(words => {
+  const order = ['From the library · Agents', 'Picture', 'Label'].map(words => {
     const at = text.indexOf(words)
     assert.ok(at >= 0, words)
     return at
   })
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, Picture, Label, the deck')
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, Picture, Label')
+  assert.ok(!text.includes('This deck'), 'no deck section')
   assert.ok(!text.includes('Skip slide'), 'Skip slide is only in the menu')
   assert.ok(!text.includes('Add a row') && !text.includes('Add a column'), 'no Add a row or Add a column: the table has its + bars')
   assert.equal(root.querySelectorAll('.deck-settings-table').length, 0)
@@ -88,13 +88,11 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
 {
   assert.equal(renderToStaticMarkup(createElement(SlideAbout, { data: {}, hidden: '' })), '')
   const root = settings('points', {}, null)
-  assert.equal(root.querySelectorAll('.deck-settings-sep').length, 1, 'only the line above the deck')
-  assert.ok(root.querySelector('section')!.childNodes.filter(node => node.nodeType === 1)
-    .findIndex(node => ((node as { classNames?: string }).classNames ?? '').includes('deck-settings-sep')) > 1, 'no line under the head')
+  assert.equal(root.querySelectorAll('.deck-settings-sep').length, 0, 'no line at all')
 }
 
-// ---- Card or Borderless (16 November, "Card or Borderless lives in the gear's popup"; the popover since 17 November):
-// the popup's last section, under a line: the heading that names its reach, then the segment, the popup's full width.
+// ---- Sprint 162 (step-3-themes.md): the popover keeps only the slide's own settings. Card | Borderless left its
+// "This deck" section for the Theme menu on the deck's bar (themeMenu.test.ts), so no kind of slide shows it here.
 {
   for (const [kind, data, about] of [
     ['boxes', {}, null],
@@ -103,62 +101,15 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, d
     ['', {}, null],
     ['table', {}, createElement(SlideAbout, { data: {}, hidden: '2 more items are kept for other layouts' })],
   ] as const) {
-    const root = settings(kind, data, about, cardDeck)
-    type El = { classNames?: string; textContent: string; childNodes: Array<{ nodeType: number }>; getAttribute(name: string): string | null; querySelector(s: string): El | null }
-    const elements = (node: El) => node.childNodes.filter(child => child.nodeType === 1) as unknown as El[]
-    const children = elements(root.querySelector('section') as unknown as El)
-    const last = children.length - 1
-    assert.ok(!root.textContent.includes('Skip slide'), `${kind}: no Skip slide (it's in the menu)`)
-    assert.ok((children[last - 1].classNames ?? '').includes('deck-settings-sep'), `${kind}: a line, the deck's section, and nothing after it`)
-    // The section is a group named by its heading (review, #764): a screen reader hears the reach with the choice.
-    const section = children[last]
-    assert.equal(section.getAttribute('role'), 'group')
-    const [heading, tip] = elements(section)
-    assert.equal(elements(section).length, 2, `${kind}: the heading, then the segment`)
-    assert.equal(section.getAttribute('aria-labelledby'), heading.getAttribute('id'), `${kind}: named by its heading`)
-    assert.equal(heading.getAttribute('id'), 'deck-reach-6')
-    assert.ok((heading.classNames ?? '').includes('deck-settings-k'), `${kind}: the popup's small uppercase label`)
-    assert.equal(heading.textContent, 'This deck · all 15 slides', `${kind}: the heading with the count`)
-    const group = tip.querySelector('[role="radiogroup"]')!
-    assert.equal(group.getAttribute('aria-label'), 'How the slides look')
-    assert.match(group.getAttribute('class') ?? '', /\bw-full\b/, `${kind}: the popup's full width`)
-    assert.match(tip.getAttribute('class') ?? '', /\bw-full\b/, `${kind}: its tooltip's span too`)
+    const root = settings(kind, data, about)
+    assert.ok(!root.textContent.includes('This deck'), `${kind}: no deck section`)
+    assert.equal(root.querySelectorAll('[aria-label="How the slides look"]').length, 0, `${kind}: no Card | Borderless`)
+    assert.ok(!root.textContent.includes('Borderless'), `${kind}: no Borderless`)
+    const children = root.querySelector('section')!.childNodes.filter(node => node.nodeType === 1) as Array<{ classNames?: string }>
+    assert.ok(!(children[children.length - 1].classNames ?? '').includes('deck-settings-sep'), `${kind}: no line left at the end`)
   }
-  const radios = (look: 'card' | 'borderless') => settings('points', {}, null, { count: 15, look, onLook: noop })
-    .querySelectorAll('[role="radiogroup"][aria-label="How the slides look"] input[type="radio"]')
-  assert.deepEqual(radios('card').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', true], ['borderless', false]])
-  assert.deepEqual(radios('borderless').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', false], ['borderless', true]])
-  assert.deepEqual(settings('points', {}, null).querySelectorAll('[aria-label="How the slides look"] label').map(label => label.textContent), ['Card', 'Borderless'])
-  // The same words and tooltip as the bar's segment had.
-  assert.deepEqual(DECK_LOOKS, [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }])
-  assert.equal(DECK_LOOK_TIP, 'How the slides look: as a card, or the whole column as the stage')
-  // Its reach, live: the deck's own count, and one slide said as one.
-  assert.equal(deckReach(15), 'This deck · all 15 slides')
-  assert.equal(deckReach(2), 'This deck · all 2 slides')
-  assert.equal(deckReach(1), 'This deck · 1 slide')
-  assert.equal(settings('points', {}, null, { count: 3, look: 'card', onLook: noop }).querySelectorAll('.deck-settings-k').pop()!.textContent, 'This deck · all 3 slides')
-}
-
-// ---- A deck with no slides (#764): the popup is the deck's section alone, its heading "This deck · no slides yet", with
-// Card | Borderless as anywhere else; no slide head, no slide sections, no line.
-{
-  let chosen = ''
-  const root = parse(renderToStaticMarkup(createElement(DeckLook, { id: 'deck-reach-none', only: true, count: 0, look: 'card', onLook: look => { chosen = look } })))
-  const group = root.childNodes.filter(node => node.nodeType === 1) as unknown as Array<{ getAttribute(name: string): string | null; classNames: string }>
-  assert.equal(group.length, 1, 'one section and nothing else')
-  assert.equal(group[0].getAttribute('role'), 'group')
-  assert.equal(group[0].getAttribute('aria-labelledby'), 'deck-reach-none')
-  assert.equal(group[0].classNames, 'deck-settings-only')
-  assert.equal(root.querySelector('#deck-reach-none')!.textContent, 'This deck · no slides yet')
-  assert.equal(root.querySelectorAll('.deck-settings-k').length, 1)
-  assert.equal(root.querySelectorAll('.deck-settings-sep, section, header').length, 0, 'no line, no slide head, no slide section')
-  assert.ok(!root.textContent.includes('Skip slide') && !root.textContent.includes('Layout'), "none of a slide's settings")
-  assert.deepEqual(root.querySelectorAll('[aria-label="How the slides look"] input').map(input => [input.getAttribute('value'), input.hasAttribute('checked')]), [['card', true], ['borderless', false]])
-  assert.equal(chosen, '', 'nothing chosen by drawing it')
-  assert.equal(deckReach(0), 'This deck · no slides yet')
-  assert.match(here('./decks.css'), /\n\.deck-settings-only > \.deck-settings-k \{ margin-top: 0; \}/, 'its heading at the top of the popup')
-  // The same section, the same choice, the same `setLook`: the slide's popup draws it with the same component.
-  assert.match(here('./SlideSettings.tsx'), /<DeckLook id=\{reachId\} \{\.\.\.deck\} \/>\n    <\/section>/)
+  const source = here('./SlideSettings.tsx')
+  assert.doesNotMatch(source, /DeckLook|deckReach|DECK_LOOK|deck: DeckLookChoice/, 'the section and its parts are gone from the popover')
 }
 
 // ---- The thumbnail's badge: quiet, amber when changed here or newer there, with a tooltip that says which.
@@ -203,22 +154,24 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   // and the menu's Skip slide / Show slide does what it did.
   assert.ok(!/deck-skip-|<Switch|>Skip slide</.test(here('./SlideSettings.tsx')), 'no Skip slide in the popover')
   assert.match(here('./slideMenuItems.ts'), /label: skipped \? 'Show slide' : 'Skip slide'/)
-  // A deck with no slides (#764): no thumbnail and no menu, so the strip's + menu at the end offers Deck look…, whose
-  // popover is the deck's section alone.
+  // Sprint 162: a deck with no slides chooses its look on the bar's Theme menu, as every deck does, so the strip's +
+  // menu at the end no longer offers Deck look…, and the popover is a slide's settings or nothing.
   const stripSource = here('./SlideStrip.tsx')
-  assert.match(stripSource, /\{count === 0 \? \([\s\S]*?<DropdownMenuItem onSelect=\{\(\) => actions\.deckLook\(\)\}>[\s\S]*?Deck look…/)
-  assert.match(view, /deckLook: \(\) => openSettings\(-1,/)
-  assert.match(popover, /\{slide \? \(\s+<SlideSettings[\s\S]*\) : \(\s+<DeckLook id="deck-reach-none" only \{\.\.\.deckLook\} \/>\s+\)\}\s+<\/PopoverContent>\s+$/, "a slide's settings, or the deck's section alone")
-  assert.match(popover, /deck=\{deckLook\}/)
-  assert.match(view, /const deckLook = \{ count, look: borderless \? 'borderless' as const : 'card' as const, onLook: setLook \}/)
+  assert.doesNotMatch(stripSource, /Deck look…|actions\.deckLook/)
+  assert.doesNotMatch(view, /deckLook|DeckLook|openSettings\(-1/)
+  assert.match(popover, /\{slide \? \(\s+<SlideSettings[\s\S]*\) : null\}\s+<\/PopoverContent>\s+$/, "a slide's settings, or nothing")
   assert.match(view, /const count = slides\.length/)
-  assert.match(view, /const setLook = useCallback\(\(look: string\) => \{\s+const next: DocumentProperties = \{ \.\.\.properties \}\s+if \(look === 'borderless'\) next\.look = 'borderless'\s+else delete next\.look\s+onPropertiesChange\(next\)/, 'the front matter is written as before')
+  // Card | Borderless is in the Theme menu on the bar, and writes the front matter through the same `setLook`.
+  assert.match(bar, /<ThemeMenu theme=\{theme\} named=\{properties\.theme\} look=\{borderless \? 'borderless' : 'card'\} onLook=\{setLook\} onPick=\{pickTheme\} \/>/)
+  // Since Sprint 162 the look is a step of the deck's Undo (themeMenu.test.ts writes it through the same join).
+  assert.match(view, /const after = look === 'borderless' \? \{ present: true, value: 'borderless' \} : \{ present: false \}/, 'the same `look: borderless` line, or none')
+  assert.match(view, /editor\.view\.dispatch\(propertyTransaction\(editor\.state, 'look', before, after\)\)/)
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
   // Review, #764: the popup never grows past the room it has; it scrolls, so its last section stays reachable.
   assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)
   assert.match(here('./library/AddToLibrarySheet.tsx'), /className="deck-settings deck-addlib"/)
-  // Settings belong to their slide: another slide made current closes them; a slide that goes leaves the deck's section.
-  assert.match(view, /if \(open\.index < 0\) return count === 0 \? open : null\s+return open\.index === shown && \(open\.id === undefined \|\| open\.id === shownSlideId\) \? open : null/, 'by the slide id, never another slide at its number')
+  // Settings belong to their slide: another slide made current closes them, and so does the slide going.
+  assert.match(view, /return open\.index === shown && open\.index < count && \(open\.id === undefined \|\| open\.id === shownSlideId\) \? open : null/, 'by the slide id, never another slide at its number')
   assert.doesNotMatch(view, /settingsReady|The deck has no slides yet|Show the slide to change its settings/, 'no disabled state or its words')
   for (const line of view.split('\n').filter(text => text.includes('setSettingsFor(null)'))) {
     assert.doesNotMatch(line, /slideShown|fold|'slide'/, `nothing about the fold closes Settings: ${line.trim()}`)
