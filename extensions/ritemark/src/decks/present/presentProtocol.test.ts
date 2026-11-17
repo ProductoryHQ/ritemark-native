@@ -80,8 +80,12 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'borderless', 'count', 'position', 'presenter', 'skipped', 'slide', 'slides', 'theme', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'position', 'presenter', 'skipped', 'slide', 'slides', 'theme', 'type']);
   assert.deepEqual(state.presenter, { available: false, on: false });
+  assert.equal(state.blank, null, 'the slide, not a blank wall');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'white').blank, 'white');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'ground').blank, 'ground');
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, 'black' as never).blank, null, 'only the two blanks');
   assert.equal(state.skipped, false);
   assert.deepEqual(Object.keys(state.slide).sort(), ['data', 'kind', 'number', 'title']);
   // Sprint 161 (PR 2, decision 8): a v1 slide reaches the wall as the block slide its conversion writes.
@@ -127,6 +131,12 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(decodeWallRequest({ type: 'ritemark/pageDrawn' }), null, "the shell's page signals are not the host's");
   assert.equal(decodeWallRequest(null), null);
   assert.equal(decodeWallRequest([{ type: 'present/next' }]), null);
+  // B, "." or W blanks the wall; any key shows the slide again.
+  for (const to of ['ground', 'white', null] as const) assert.deepEqual(decodeWallRequest({ type: 'present/blank', to }), { type: 'present/blank', to });
+  assert.equal(decodeWallRequest({ type: 'present/blank' }), null);
+  assert.equal(decodeWallRequest({ type: 'present/blank', to: 'black' }), null);
+  assert.equal(decodeWallRequest({ type: 'present/blank', to: true }), null);
+  assert.equal(decodeWallRequest({ type: 'present/blank', to: 'white', number: 1 }), null);
 }
 
 // ---- The deck view's Present
@@ -145,7 +155,12 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'borderless', 'canSwap', 'comments', 'count', 'current', 'length', 'next', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'length', 'next', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.equal(first.blank, null);
+  assert.deepEqual(first.clock, { locale: null, hourCycle: null }, "no system clock yet: the webview's own");
+  const blanked = presenterStateOf(session.view(), look, {}, { ...clock, blank: 'ground', clock: { locale: 'et-EE', hourCycle: 'h23' } });
+  assert.equal(blanked.blank, 'ground', 'the presenter view knows the wall is blank');
+  assert.deepEqual(blanked.clock, { locale: 'et-EE', hourCycle: 'h23' });
   assert.deepEqual(first.comments, [{ note: 'NOTESWORD: say this only to yourself.' }]);
   assert.equal(first.next?.number, 3, 'the next slide shown (2 is skipped)');
   assert.equal(first.wallDisplay, 'Projector');
