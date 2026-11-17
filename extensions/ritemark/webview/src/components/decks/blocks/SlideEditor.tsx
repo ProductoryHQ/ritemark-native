@@ -335,6 +335,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
     setFrame(element)
   }, [])
   const menuTarget = useRef<SlideTarget>({ kind: 'slide' })
+  /** The menu's Comment, waiting for the menu to close. */
+  const pendingComment = useRef<SlideTarget | null>(null)
+  const startPendingComment = () => {
+    const target = pendingComment.current
+    pendingComment.current = null
+    if (target && editor && !editor.isDestroyed) startSlideComment(editor, target)
+  }
   const [hasSelection, setHasSelection] = useState(false)
   const runEdit = (command: 'cut' | 'copy' | 'paste') => {
     if (!editor || editor.isDestroyed) return
@@ -383,7 +390,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           ) : null}
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent className="deck-slide-menu" onCloseAutoFocus={event => event.preventDefault()}>
+      <ContextMenuContent
+        className="deck-slide-menu"
+        // The focus goes back to the slide's words (the app run: after Paste the caret was lost, and ⌘Z did nothing);
+        // Comment then moves it to the card's box.
+        onCloseAutoFocus={event => {
+          event.preventDefault()
+          if (!editor || editor.isDestroyed) return
+          if (pendingComment.current) startPendingComment()
+          else editor.view.focus()
+        }}
+      >
         <ContextMenuItem disabled={!hasSelection} onSelect={() => runEdit('cut')}>
           Cut
           <ContextMenuShortcut>{KEYS.cut}</ContextMenuShortcut>
@@ -400,12 +417,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, co
           <>
             <ContextMenuSeparator />
             <ContextMenuItem
+              className="gap-2"
               onSelect={() => {
-                const target = menuTarget.current
-                // After the menu has closed and given the focus back, so the card's box keeps it.
-                window.setTimeout(() => {
-                  if (editor && !editor.isDestroyed) startSlideComment(editor, target)
-                }, 0)
+                // Started once the menu has closed and handed the focus back (`onCloseAutoFocus`), so the card's box
+                // keeps it (the app run: the box opened without the caret); a close that hands nothing back still starts it.
+                pendingComment.current = menuTarget.current
+                window.setTimeout(startPendingComment, 400)
               }}
             >
               <Icon name="chat-text" size={14} tone="inherit" />

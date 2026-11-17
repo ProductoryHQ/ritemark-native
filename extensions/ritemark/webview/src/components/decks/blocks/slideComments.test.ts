@@ -430,6 +430,14 @@ const requestedId = (storage: Storage) => {
   assert.ok(order.every((index, i) => index > 0 && (i === 0 || index > order[i - 1])), `Cut, Copy, Paste, then Comment: ${order}`)
   assert.match(items, /<ContextMenuShortcut>\{KEYS\.comment\}<\/ContextMenuShortcut>/)
   assert.match(editorSource, /comment: '⌘\/'/)
+  // The app run (17 November): after Paste from the menu the caret was gone (⌘Z then did nothing), and Comment's box
+  // opened without the caret. The menu's close now gives the focus back to the slide's words, or starts the comment
+  // there, so the card's box keeps it.
+  assert.match(editorSource, /onCloseAutoFocus=\{event => \{\n          event\.preventDefault\(\)\n          if \(!editor \|\| editor\.isDestroyed\) return\n          if \(pendingComment\.current\) startPendingComment\(\)\n          else editor\.view\.focus\(\)\n        \}\}/)
+  assert.match(editorSource, /pendingComment\.current = menuTarget\.current\n                window\.setTimeout\(startPendingComment, 400\)/)
+  // A marker never covers the words it is on, nor a title's or a line's last letters (the app run).
+  assert.match(here('../SlideComments.tsx'), /kind === 'words' \? rect\.right - frameRect\.left \+ 2/)
+  assert.match(here('../SlideComments.tsx'), /target\.kind === 'block' && editor\.state\.doc\.nodeAt\(target\.pos\)\?\.isTextblock \? 'words'/)
   assert.match(menu, /<ContextMenuTrigger asChild>\s+<div\s+ref=\{setFrameRef\}/, 'the menu is on the whole slide')
   assert.match(menu, /onMouseDown=\{event => \{ if \(event\.button === 2\) event\.preventDefault\(\) \}\}/, 'a right press keeps the selection the person made')
   assert.match(here('../../ui/context-menu.tsx'), /from '@radix-ui\/react-context-menu'/, "the menu is Radix's (DismissableLayer: outside press and Esc close it)")

@@ -348,8 +348,13 @@ export function SlideComments({ editor, frame, slideNumber, open, onOpenTaken }:
       if (!marker.note.trim() && marker.key !== composeKey) continue
       const rect = targetRect(editor, frame, marker)
       if (!rect) continue
-      let left = marker.target.kind === 'slide' ? frameRect.width - 36 : rect.right - frameRect.left - 10
-      const top = marker.target.kind === 'slide' ? 10 : Math.max(2, rect.top - frameRect.top - 14)
+      // A block's marker sits over its top-right corner (frame 28); words' marker just past their end, so it never
+      // covers them (the app run: it hid the words' last letters); the whole slide's in the slide's own corner.
+      // A title or a line counts as words here: its box is its words' own (`targetRect`).
+      const target = marker.target
+      const kind = target.kind === 'block' && editor.state.doc.nodeAt(target.pos)?.isTextblock ? 'words' : target.kind
+      let left = kind === 'slide' ? frameRect.width - 36 : kind === 'words' ? rect.right - frameRect.left + 2 : rect.right - frameRect.left - 10
+      const top = kind === 'slide' ? 10 : Math.max(2, rect.top - frameRect.top - (kind === 'words' ? 10 : 14))
       left = Math.min(left, frameRect.width - 28)
       // Two comments on the same thing stand side by side.
       while (taken.some(spot => Math.abs(spot.left - left) < 20 && Math.abs(spot.top - top) < 20)) left -= 30
