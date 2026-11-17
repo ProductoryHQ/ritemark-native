@@ -14,7 +14,7 @@
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import { partHeadingAt, partIndexAt } from '../deckDocument'
 
 /** The placeholders, as the prototype words them (the Experience lead, 16 November). */
@@ -103,11 +103,24 @@ export function deckDecorations(doc: PMNode, current: number | null, writing: nu
   return found.length ? DecorationSet.create(doc, found) : DecorationSet.empty
 }
 
-/** The part the caret is in, when it is in a part's text (not on a slide node, not in the preamble). */
+/** Whether the handout has the focus: only then can typing reach the part the caret is in. */
+export const deckFocusKey = new PluginKey<boolean>('deckFocus')
+
+/**
+ * The part the caret is in while the handout has the focus, when it is in a part's text (not on a slide node, not in
+ * the preamble). With the focus elsewhere (a thumbnail clicked) nothing can be typed there, so the part may fold.
+ */
 function writingPartOf(state: EditorState): number | null {
+  if (deckFocusKey.getState(state) !== true) return null
   const { selection } = state
   if (!selection.empty || !selection.$from.parent.isTextblock) return null
   return partIndexAt(state.doc, selection.from)
+}
+
+/** Tells the plugins whether the handout has the focus (no document change, never in the undo history). */
+function focusChanged(view: EditorView, focused: boolean) {
+  if (deckFocusKey.getState(view.state) !== focused) view.dispatch(view.state.tr.setMeta(deckFocusKey, focused).setMeta('addToHistory', false))
+  return false
 }
 
 export const DeckCurrent = Extension.create({
@@ -126,6 +139,22 @@ export const DeckCurrent = Extension.create({
         },
         props: {
           decorations: state => deckDecorations(state.doc, currentSlideOf(state), writingPartOf(state)),
+        },
+      }),
+      new Plugin<boolean>({
+        key: deckFocusKey,
+        state: {
+          init: () => false,
+          apply: (tr, value) => {
+            const next = tr.getMeta(deckFocusKey)
+            return next === undefined ? value : next === true
+          },
+        },
+        props: {
+          handleDOMEvents: {
+            focus: view => focusChanged(view, true),
+            blur: view => focusChanged(view, false),
+          },
         },
       }),
     ]

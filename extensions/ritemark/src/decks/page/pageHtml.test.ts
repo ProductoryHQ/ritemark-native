@@ -343,6 +343,8 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   const olderPage = parse(pageHtml(older, assets, { digest: deckDigest(older), pictureUrl }));
   assert.deepEqual(olderPage.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text))[1], ['Copilot or Cursor?']);
   assert.equal(olderPage.querySelectorAll('[data-go]').length, 4);
+  // A wide table's own scrollbar is its thumb only, with no track behind it (Jarmo's rule for every scrollbar).
+  assert.ok(/\.tw \{ overflow-x: auto;[^}]*scrollbar-color: [^;]+ transparent; \}/.test(bytes), 'no scrollbar track');
 }
 
 

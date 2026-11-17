@@ -54,7 +54,7 @@ import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../.
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
-import { DeckCurrent, deckCurrentKey, setCurrentSlide } from './handout/deckCurrent'
+import { DeckCurrent, deckCurrentKey, deckFocusKey, setCurrentSlide } from './handout/deckCurrent'
 import { DeckSlideWithPartHead, partMenuSlots, type PartMenuSlot } from './handout/SlidePartHead'
 import { railPick, rowCaret, trackHeight } from './handout/partRail'
 import { DECK_REMOVED, DeckRemove, joinMarkOf, removalNotice, type DeckRemoval } from './handout/deckRemove'
@@ -979,7 +979,7 @@ export function DeckView({
       if (frame === null) frame = requestAnimationFrame(() => { frame = null; measureRail() })
     }
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
-      if (transaction.docChanged || transaction.selectionSet || transaction.getMeta(deckCurrentKey) !== undefined) later()
+      if (transaction.docChanged || transaction.selectionSet || transaction.getMeta(deckCurrentKey) !== undefined || transaction.getMeta(deckFocusKey) !== undefined) later()
     }
     later()
     editor.on('transaction', onTransaction)
@@ -1006,9 +1006,9 @@ export function DeckView({
     dom.addEventListener('click', onClick)
     return () => dom.removeEventListener('click', onClick)
   }, [editor, pick])
-  // A slide with no handout's row (17 November): its part opens to write in and its slide becomes current. The caret goes
-  // in first, which opens the part (deckCurrent.ts: a part the caret is in never folds), so the handout scrolls to the
-  // part as it now stands.
+  // A slide with no handout's row (17 November): its part opens to write in and its slide becomes current. The handout
+  // takes the focus and the caret goes in first, which opens the part (deckCurrent.ts: a part the caret is in, while the
+  // handout has the focus, never folds), so the handout scrolls to the part as it now stands.
   const openPart = useCallback((index: number) => {
     if (!editor || editor.isDestroyed) return
     const range = partRange(editor.state.doc, index)
@@ -1020,9 +1020,11 @@ export function DeckView({
       })
     }
     const caret = rowCaret(blocks)
-    if (caret !== null) editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, caret)).setMeta('addToHistory', false))
+    if (caret !== null) {
+      editor.view.focus()
+      editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, caret)).setMeta('addToHistory', false))
+    }
     pick(index)
-    if (caret !== null) editor.view.focus()
   }, [editor, pick])
 
   /** Part `index`'s slide id, given one first when it has none (the library and pictures find a slide by its id). */

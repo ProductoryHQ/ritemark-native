@@ -373,7 +373,7 @@ svg { flex: none; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .part hr, .pre hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
-.tw { overflow-x: auto; margin: 0 0 14px; }
+.tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta") */
 .tw table { border-collapse: collapse; font-size: 14.5px; }
 .tw th, .tw td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .tw th { color: var(--ink); font-weight: 700; }
