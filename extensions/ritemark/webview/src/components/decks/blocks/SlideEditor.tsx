@@ -56,6 +56,8 @@ import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
+import { SlideBlockBar } from './SlideBlockBar'
+import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from '../../ui/context-menu'
@@ -120,6 +122,7 @@ interface SlideTools {
   runItem: (range: { from: number; to: number }, item: BlockItemDef) => void
   enter: () => boolean
   splitLine: () => boolean
+  tab: (direction: 1 | -1) => boolean
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
   editPill: (pos: number, anchor: HTMLElement) => void
 }
@@ -295,6 +298,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         Enter: () => toolsRef.current?.enter() ?? false,
         // `***` alone on a line, then Space or Enter: Split slide here's shortcut.
         Space: () => toolsRef.current?.splitLine() ?? false,
+        // 17 November: Tab and Shift+Tab move across a Columns or Boxes block's items (a list's, a code box's and a
+        // table's own Tab first: `tabAcross` leaves those alone).
+        Tab: () => toolsRef.current?.tab(1) ?? false,
+        'Shift-Tab': () => toolsRef.current?.tab(-1) ?? false,
       }
     },
   }), [])
@@ -719,6 +726,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       splitAt(editor.state.apply(editor.state.tr.delete(line.from, line.to)), line.from)
       return true
     },
+    tab: direction => {
+      if (!editor || editor.isDestroyed || slashOpen(editor.state)) return false
+      const step = tabAcross(editor.state, direction)
+      if (step === null) return false
+      if (step !== 'stay') editor.view.dispatch(step)
+      return true
+    },
     pickIcon: (pos, anchor, current) => {
       const rect = anchor.getBoundingClientRect()
       setIconPick({ pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current })
@@ -870,6 +884,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
               </Button>
             </Tooltip>
           ))}
+          {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
+          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} />
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
