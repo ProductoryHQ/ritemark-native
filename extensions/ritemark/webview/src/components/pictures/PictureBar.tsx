@@ -59,6 +59,13 @@ export interface PictureBarProps {
   onRemove: () => void
   /** Esc: the picture is left (the caret after it). */
   onLeave: () => void
+  /**
+   * On a slide, the stage's sides: the bar stays between them, moved in from the strip and the divider (the block bar's
+   * rule, experience 49).
+   */
+  bounds?: { left: number; right: number }
+  /** A slide-wide place (a side or behind): the bar sits inside it at the bottom, 12 px up, over the picture. */
+  inside?: boolean
   /** The bar's own element, so a press on it is never "outside". */
   barRef?: (element: HTMLDivElement | null) => void
 }
@@ -109,7 +116,7 @@ function BarButton({ tip, active, onClick, children, disabled, label }: { tip: s
 }
 
 /** The Description: its words, and whether they show under the picture. */
-function DescriptionField({ alt, caption, onWords, disabled, withCaption }: { alt: string; caption: boolean; onWords: (alt: string, caption: boolean) => void; disabled?: boolean; withCaption: boolean }) {
+function DescriptionField({ alt, caption, onWords, withCaption }: { alt: string; caption: boolean; onWords: (alt: string, caption: boolean) => void; withCaption: boolean }) {
   const [open, setOpen] = useState(false)
   const [words, setWords] = useState(alt)
   const [shown, setShown] = useState(caption)
@@ -128,9 +135,9 @@ function DescriptionField({ alt, caption, onWords, disabled, withCaption }: { al
         setOpen(next)
       }}
     >
-      <Tooltip label={disabled ? 'Add a picture first' : 'The words a screen reader and a published page read'}>
+      <Tooltip label="The words a screen reader and a published page read">
         <PopoverTrigger asChild>
-          <Button type="button" variant="toolbar" size="compact" disabled={disabled} data-state={open ? 'active' : undefined}>
+          <Button type="button" variant="toolbar" size="compact" data-state={open ? 'active' : undefined}>
             <Icon name="text-t" size={14} tone="inherit" />
             Description
           </Button>
@@ -175,9 +182,12 @@ export function PictureBar(props: PictureBarProps) {
     if (!anchor || !bar) return
     const width = bar.offsetWidth
     const height = bar.offsetHeight
-    const x = Math.max(8, Math.min(window.innerWidth - width - 8, anchor.left + anchor.width / 2 - width / 2))
+    const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
+    const maxX = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - width - 8
+    const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
     const below = anchor.top + anchor.height + 10
-    const y = below + height + 8 <= window.innerHeight ? below : Math.max(8, anchor.top + anchor.height - height - 10)
+    const inside = Math.max(8, anchor.top + anchor.height - height - 12)
+    const y = props.inside ? inside : below + height + 8 <= window.innerHeight ? below : Math.max(8, anchor.top + anchor.height - height - 10)
     setLeft(Math.round(x))
     setTop(Math.round(y))
   })
@@ -270,8 +280,13 @@ export function PictureBar(props: PictureBarProps) {
               </Group>
             </>
           ) : null}
-          <Divider />
-          <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} disabled={empty} withCaption={kind === 'flow'} />
+          {/* With no picture there is nothing to describe: Description is hidden, not greyed. */}
+          {empty ? null : (
+            <>
+              <Divider />
+              <DescriptionField alt={alt} caption={!!look.caption} onWords={props.onWords} withCaption={kind === 'flow'} />
+            </>
+          )}
           {comments && props.onComment ? (
             <BarButton tip="Comment on the picture, for Claude or for yourself" label="Comment" onClick={props.onComment}>
               <Icon name="chat-text" size={14} tone="inherit" />

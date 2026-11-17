@@ -692,18 +692,21 @@ body {
 .deck-sl .photo.empty .photo-hint {
   position: absolute;
   inset: 0;
+  /* Above the veil, in the slide's own text colour, so it reads on a dark slide (experience 49). */
+  z-index: 3;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 10px;
   text-align: center;
   font: 600 22px/28px var(--s-fb, 'Sofia Sans'), sans-serif;
-  color: var(--s-empt, rgba(255, 255, 255, 0.72));
+  color: var(--s-tx, #E4E6F7);
   pointer-events: none;
 }
-.deck-slide.is-borderless .deck-sl .photo.empty .photo-hint {
-  color: var(--s-empt, #8A8DAE);
+.deck-sl .photo.empty .photo-hint svg {
+  width: 44px;
+  height: 44px;
 }
 /* The chosen side picture's ring and its focus dot sit over the veil and the words (a picture Behind lies under both). */
 .deck-sl .photo.is-chosen::after {

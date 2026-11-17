@@ -11,7 +11,8 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { missingHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { readSideFocus } from '../../../../../src/markdown/pictureLook'
 import { PictureBar, type PicturePlace } from '../../pictures/PictureBar'
-import { copyPicture } from '../../pictures/PictureTools'
+import { Icon } from '../../ui/Icon'
+import { copyPicture, stageBounds } from '../../pictures/PictureTools'
 import type { SidePlace } from './slidePicturePlace'
 
 const OWN_LAYERS = '[data-radix-popper-content-wrapper], .picture-bar'
@@ -112,7 +113,12 @@ export function SidePicture(props: SidePictureProps) {
             props.onChoose()
           }}
         >
-          {!url ? <span className="photo-hint">Paste or drop a picture</span> : null}
+          {!url ? (
+            <span className="photo-hint">
+              <Icon name="image" size={20} tone="inherit" />
+              Paste or drop a picture
+            </span>
+          ) : null}
           {chosen && url ? (
             <span
               className="photo-focus"
@@ -148,6 +154,9 @@ export function SidePicture(props: SidePictureProps) {
       {chosen ? (
         <PictureBar
           anchor={ref.current?.getBoundingClientRect() ?? null}
+          // A slide-wide place: the bar inside it, at its bottom, kept on the slide's side (experience 49).
+          inside
+          bounds={ref.current ? stageBounds(ref.current) : undefined}
           context="slide"
           kind="side"
           look={{}}

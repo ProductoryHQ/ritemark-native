@@ -258,16 +258,16 @@ const PAGE_BEHAVIOUR = String.raw`
   // ---- a picture, full size (experience 49): a click on a picture in the text or on the slide shows a copy of it over
   // the page, whole; a click anywhere or Esc closes it. The copy is the page's own picture (no new address, nothing
   // loaded), without its crop.
-  var zoom = doc.getElementById('zoom'), zoomFrom = null;
+  var zoom = doc.getElementById('zoom'), zoomPic = zoom ? zoom.querySelector('.zoom-pic') : null, zoomFrom = null;
   function closeZoom() {
     if (!zoom || zoom.hidden) return;
     zoom.hidden = true;
-    while (zoom.firstChild) zoom.removeChild(zoom.firstChild);
+    while (zoomPic && zoomPic.firstChild) zoomPic.removeChild(zoomPic.firstChild);
     if (zoomFrom && zoomFrom.focus) zoomFrom.focus();
     zoomFrom = null;
   }
   function openZoom(picture) {
-    if (!zoom) return;
+    if (!zoom || !zoomPic) return;
     var copy = picture.cloneNode(false);
     copy.removeAttribute('style');
     copy.removeAttribute('class');
@@ -277,8 +277,8 @@ const PAGE_BEHAVIOUR = String.raw`
       copy.className = 'zoom-photo';
       copy.style.backgroundImage = picture.style.backgroundImage;
     }
-    while (zoom.firstChild) zoom.removeChild(zoom.firstChild);
-    zoom.appendChild(copy);
+    while (zoomPic && zoomPic.firstChild) zoomPic.removeChild(zoomPic.firstChild);
+    zoomPic.appendChild(copy);
     zoomFrom = doc.activeElement;
     zoom.hidden = false;
     zoom.focus();

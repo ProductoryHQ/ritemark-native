@@ -11,7 +11,7 @@
  *  - Crop mode keeps the frame outside the document (`PICTURE_CROP`) until Done (Enter); Esc leaves it as it was.
  *  - The bar (`PictureBar`) under the picture; a press anywhere outside the picture and its bar leaves the picture.
  */
-import { useCallback, useEffect, useReducer, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import {
@@ -78,6 +78,14 @@ function partsOf(editor: Editor, pos: number, context: PictureContext): Parts | 
   return { root, image, target: (root.querySelector('.pic-box') as HTMLElement | null) ?? root, host }
 }
 
+/** On a slide, the stage's sides (the slide's own column, right of the strip and its divider), on the screen. */
+export function stageBounds(host: Element): { left: number; right: number } | undefined {
+  const column = host.closest('.deck-slide')?.parentElement
+  if (!column) return undefined
+  const rect = column.getBoundingClientRect()
+  return { left: rect.left, right: rect.right }
+}
+
 /** The column a picture's width is a share of: its parent's content width, in its own pixels. */
 function columnOf(root: HTMLElement): number {
   const parent = root.parentElement
@@ -127,6 +135,8 @@ interface CropDrag {
 export function PictureTools({ editor, context, comments, onComment, onReplace, onPlace }: PictureToolsProps) {
   const [, redraw] = useReducer((count: number) => count + 1, 0)
   const resize = useRef<ResizeDrag | null>(null)
+  /** A corner handle is being dragged: the bar hides until the drop (experience 49). */
+  const [resizing, setResizing] = useState(false)
   const cropDrag = useRef<CropDrag | null>(null)
 
   // A transaction draws the tools again only while a picture is chosen, or when one is chosen or left (review of #774).
@@ -205,6 +215,7 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
     event.currentTarget.setPointerCapture(event.pointerId)
     const startWidth = root.getBoundingClientRect().width / scale
     resize.current = { corner, startX: event.clientX, startWidth, column: columnOf(root), scale, width: startWidth, previous: root.style.width }
+    setResizing(true)
   }
   const moveResize = (event: ReactPointerEvent<HTMLElement>) => {
     const drag = resize.current
@@ -218,6 +229,7 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
   const endResize = () => {
     const drag = resize.current
     resize.current = null
+    setResizing(false)
     if (!drag) return
     root.style.width = drag.previous
     if (Math.abs(drag.width - drag.startWidth) < 2) return redraw()
@@ -333,7 +345,8 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
     <>
       {createPortal(layer, host)}
       <PictureBar
-        anchor={anchor}
+        anchor={resizing ? null : anchor}
+        bounds={context === 'slide' ? stageBounds(host) : undefined}
         context={context}
         kind="flow"
         look={look}

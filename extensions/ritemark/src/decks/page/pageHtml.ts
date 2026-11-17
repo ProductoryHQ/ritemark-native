@@ -360,8 +360,12 @@ svg { flex: none; }
 /* A picture Behind the words: a click on the slide reaches it through the veil and the words (none of them a link). */
 .stage .deck-sl.pic-behind .veil, .stage .deck-sl.pic-behind .blk-flow { pointer-events: none; }
 .stage .deck-sl.pic-behind .blk-flow img { pointer-events: auto; }
-.zoom > img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; margin: 0; border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .45); object-fit: contain; }
-.zoom > .zoom-photo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.zoom-pic { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.zoom-pic > img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; margin: 0; border-radius: 8px; box-shadow: 0 18px 60px rgba(0, 0, 0, .45); object-fit: contain; }
+/* The way out: an × at the top right, 44 px to tap (a click or a tap anywhere closes it too, and Esc). */
+.zoom-x { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 22px; background: rgba(255, 255, 255, .16); color: #fff; cursor: pointer; }
+.zoom-x:hover { background: rgba(255, 255, 255, .26); }
+.zoom-pic > .zoom-photo { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .part hr, .pre hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
@@ -594,7 +598,9 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '</main>',
     '<div class="toast" id="toast" role="status" hidden></div>',
     // Experience 49: the full-size view of a picture; the page's script puts a copy of the clicked picture in it.
-    '<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="The picture, full size" tabindex="-1" hidden></div>',
+    '<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="The picture, full size" tabindex="-1" hidden>'
+      + '<button class="zoom-x" type="button" aria-label="Close"><svg width="20" height="20" viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M205.66 194.34a8 8 0 0 1-11.32 11.32L128 139.31l-66.34 66.35a8 8 0 0 1-11.32-11.32L116.69 128 50.34 61.66a8 8 0 0 1 11.32-11.32L128 116.69l66.34-66.35a8 8 0 0 1 11.32 11.32L139.31 128Z"/></svg></button>'
+      + '<div class="zoom-pic"></div></div>',
     `<script>${SCRIPT_TEXT}</script>`,
     '</body>',
     '</html>',

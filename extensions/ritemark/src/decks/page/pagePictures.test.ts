@@ -80,7 +80,14 @@ assert.equal(handout!.querySelector('.pic-cap')!.text, 'The board, before');
 const zoom = root.querySelector('#zoom');
 assert.ok(zoom, 'the full-size view is on the page');
 assert.equal(zoom!.getAttribute('hidden'), '', 'and hidden until a click');
-assert.equal(zoom!.childNodes.length, 0, 'it holds nothing of its own');
+// Its way out: an × at the top right (44 px, styled in the page), and an empty place the script fills.
+assert.equal(zoom!.querySelector('button.zoom-x')?.getAttribute('aria-label'), 'Close');
+assert.ok(html.includes('.zoom-x { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px;'));
+assert.equal(zoom!.querySelector('.zoom-pic')?.childNodes.length, 0, 'the picture holder is empty until a click');
+// A picture in a slide's words, not cropped, is drawn as the editor draws it: shrunk to fit, never cut (no frame).
+const plain = pageHtml(publicDeck(DECK.replace('{width=260px crop=16:9 focus=40,30}', '{width=400px}'), { folderName: 'Harbour Logistics', deckName: 'Pictures', theme: BUILT_IN_THEME }), assets, { digest: 'x', pictureUrl });
+assert.ok(/<img style="width:400px;max-width:100%" class="blk-pic" src="[^"]*agents\.png"/.test(plain), 'a sized picture is the slide\'s own .blk-pic');
+assert.ok(!/class="pic blk-pic/.test(plain), 'no frame cuts it');
 assert.ok(PAGE_SCRIPT.includes('function openZoom(picture)'));
 assert.ok(PAGE_SCRIPT.includes(".part img, .pre img, .stage .deck-sl img, .stage .deck-sl .photo"));
 assert.equal(scriptBuildsReferences(PAGE_SCRIPT), false, 'the full-size view loads nothing and names no file');
