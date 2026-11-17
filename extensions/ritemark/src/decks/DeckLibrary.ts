@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, exerciseTagOf, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
+import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -147,7 +147,8 @@ export class DeckLibrary {
       const hits = query ? slides.filter(slide => words(slide).includes(query) || deckName(file.path).toLowerCase().includes(query)) : slides;
       if (query && hits.length === 0) continue;
       const frontMatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
-      const theme = /^theme:\s*(.+)$/m.exec(frontMatter)?.[1]?.trim() ?? null;
+      // Read as the deck view and the Theme menu read it (Sprint 162): its quotes taken off, so the path is the file's.
+      const theme = frontMatterField(text.replace(/^\uFEFF/, ''), 'theme')?.trim() || null;
       const borderless = /^look:\s*borderless\s*$/m.test(frontMatter);
       found.push({
         path: file.path,
@@ -167,6 +168,16 @@ export class DeckLibrary {
       });
     }
     return found.sort((a, b) => (a.topic === b.topic ? (a.topic ? a.name.localeCompare(b.name) : b.modified - a.modified) : a.topic ? -1 : 1));
+  }
+
+  /**
+   * Sprint 162: each of the project's decks' `theme:` value (null for a deck without one), read from its front matter
+   * only, for the Theme menu's "N decks". An open deck's unsaved text counts, as everywhere in the library.
+   */
+  async deckThemes(): Promise<Array<string | null>> {
+    // Read side by side: the menu waits on them each time it opens.
+    const texts = await Promise.all((await this.files.list()).map(file => this.files.read(file.path)));
+    return texts.filter((text): text is string => text !== null).map(text => frontMatterField(text.replace(/^\uFEFF/, ''), 'theme'));
   }
 
   /** A deck's slides as written. */

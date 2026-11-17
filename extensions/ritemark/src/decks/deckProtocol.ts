@@ -7,6 +7,7 @@
 
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
+import type { ThemeEntry } from './deckTheme';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
 export const MAX_ASSET_PATHS = 500;
@@ -23,6 +24,8 @@ export type DeckRequest =
   | { type: 'deck/assets'; paths: string[] }
   /** The text of the theme file the deck names (project-relative). */
   | { type: 'deck/theme'; path: string }
+  /** Sprint 162: the project's themes, each with how many decks draw it, for the deck's Theme menu. */
+  | { type: 'deck/themes' }
   /** A picture pasted or dropped on a slide: saved in `images/` beside the deck, for the slide with this id. */
   | { type: 'deck/save-image'; slideId: string; dataUrl: string; filename: string }
   /** The deck's current slide, for the Slide library's "Insert after slide N". */
@@ -91,6 +94,8 @@ export type DeckHostMessage =
   | { type: 'deck/assets'; assets: Record<string, string>; /** 17 November: the paths it looked for and found no file at. */ missing?: string[] }
   /** The theme file's text, or null when the deck names none the project has (the view draws the built-in theme). */
   | { type: 'deck/theme'; path: string; text: string | null }
+  /** Sprint 162: the project's themes (`themeEntries`), for the Theme menu. */
+  | { type: 'deck/themes'; themes: ThemeEntry[] }
   /** The picture is saved: its path relative to the deck, and its webview URI; or it could not be. */
   | { type: 'deck/image-saved'; slideId: string; path: string; url: string }
   | { type: 'deck/image-failed'; slideId: string; message: string }
@@ -221,6 +226,10 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/library-topics': {
       exactKeys(input, ['type']);
       return { type: 'deck/library-topics' };
+    }
+    case 'deck/themes': {
+      exactKeys(input, ['type']);
+      return { type: 'deck/themes' };
     }
     case 'deck/open-library': {
       exactKeys(input, ['type', 'section', 'after']);

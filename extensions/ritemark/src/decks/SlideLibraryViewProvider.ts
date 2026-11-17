@@ -12,7 +12,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
 import type { DeckLibrary, DeckSummary } from './DeckLibrary';
-import { readProjectTheme, resolveAssetsIn, type DeckPages } from './deckPages';
+import { readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
+import { themePathOf } from './deckTheme';
 import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
 import { projectRoot } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
@@ -200,7 +201,9 @@ async function looksOf(webview: vscode.Webview, decks: DeckSummary[]): Promise<{
   for (const deck of decks) {
     const images = [...new Set(deck.slides.flatMap(slide => slidePicturePaths(slide.data)))];
     if (images.length) assets[deck.path] = resolveAssetsIn(path.join(root, ...folderOf(deck.path).split('/').filter(Boolean)), webview, images);
-    if (deck.theme && !(deck.theme in themes)) themes[deck.theme] = await readProjectTheme(root, deck.theme);
+    // Sprint 162: a deck naming no theme, or a missing one, draws the project's own Evening file when it has one.
+    const key = themePathOf(deck.theme);
+    if (!(key in themes)) themes[key] = await readThemeOrEvening(root, key);
   }
   return { assets, themes };
 }

@@ -146,3 +146,78 @@ export function isThemePath(value: string | null | undefined): value is string {
   if (/^[a-z][a-z0-9+.-]*:/i.test(path) || path.startsWith('/') || path.startsWith('\\')) return false;
   return !path.split(/[\\/]/).includes('..');
 }
+
+/**
+ * One of the project's themes, as the deck's Theme menu lists it (Sprint 162): its path, its file's text (null for the
+ * built-in theme when the project has no file for it), and how many of the project's decks draw it.
+ */
+export interface ThemeEntry {
+  path: string;
+  text: string | null;
+  decks: number;
+}
+
+/** At most this many theme files are listed: a project's library, with room to spare. */
+export const MAX_THEMES = 200;
+
+/**
+ * A theme path as a key: `/` separators, no `./` or doubled slashes, and one case (the project folders Ritemark runs
+ * on, macOS and Windows, find a file whatever its case), so a hand-written `theme:` line names the file it draws.
+ */
+function pathKey(path: string): string {
+  return path.trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '').toLowerCase();
+}
+
+/**
+ * The entry a deck draws, by its `theme:` value: the theme file it names when the project has it; else Evening, which a
+ * deck with no line, or one naming a file that isn't there, draws. Evening is the project's own `Evening.theme.md` when
+ * it has one (step-3-themes.md: "A project's own file takes a built-in's place"), else the built-in theme. Null only for
+ * a list with no Evening at all, which `themeEntries` never makes.
+ */
+export function themeKeyOf(named: unknown, entries: ReadonlyArray<Pick<ThemeEntry, 'path' | 'text'>>): string | null {
+  const path = typeof named === 'string' ? named.trim() : '';
+  if (isThemePath(path)) {
+    const key = pathKey(path);
+    const file = entries.find(entry => entry.text !== null && pathKey(entry.path) === key);
+    if (file) return file.path;
+  }
+  return entries.find(entry => pathKey(entry.path) === pathKey(BUILT_IN_THEME_PATH))?.path ?? null;
+}
+
+/**
+ * The theme file a deck's view, wall, page and thumbnails read, by its `theme:` value: the file it names, or Evening's
+ * path when it names none. The readers fall back to Evening's file, then to the built-in theme (`readDeckTheme`).
+ */
+export function themePathOf(named: unknown): string {
+  const path = typeof named === 'string' ? named.trim() : '';
+  return isThemePath(path) ? path : BUILT_IN_THEME_PATH;
+}
+
+/**
+ * The project's themes for the Theme menu: every theme file in `Slide library/Themes`, and the built-in theme when the
+ * project has no file at its path; each with the number of decks that draw it (`deckThemes`: each deck's `theme:`
+ * value, or null), sorted by name.
+ */
+export function themeEntries(files: ReadonlyArray<{ path: string; text: string }>, deckThemes: ReadonlyArray<string | null>): ThemeEntry[] {
+  const entries: ThemeEntry[] = files.filter(file => isThemePath(file.path)).map(file => ({ path: file.path, text: file.text, decks: 0 }));
+  if (!entries.some(entry => pathKey(entry.path) === pathKey(BUILT_IN_THEME_PATH))) entries.push({ path: BUILT_IN_THEME_PATH, text: null, decks: 0 });
+  const byPath = new Map(entries.map(entry => [entry.path, entry]));
+  for (const named of deckThemes) {
+    const key = themeKeyOf(named, entries);
+    if (key !== null) byPath.get(key)!.decks += 1;
+  }
+  // Each name read once, not at every comparison.
+  const names = new Map(entries.map(entry => [entry, themeOfEntry(entry).name]));
+  return entries.sort((a, b) => names.get(a)!.localeCompare(names.get(b)!) || a.path.localeCompare(b.path));
+}
+
+/** An entry's theme: its file read, or the built-in theme. */
+export function themeOfEntry(entry: Pick<ThemeEntry, 'text'>): DeckTheme {
+  return entry.text === null ? BUILT_IN_THEME : parseTheme(entry.text);
+}
+
+/** "1 deck", "5 decks", "No decks": a theme's reach in the Theme menu. */
+export function deckCountLabel(count: number): string {
+  if (count === 0) return 'No decks';
+  return count === 1 ? '1 deck' : `${count} decks`;
+}

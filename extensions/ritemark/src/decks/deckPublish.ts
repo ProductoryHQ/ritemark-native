@@ -29,7 +29,7 @@ import { PAGE_BEING_PUBLISHED, WORKERS_DEV_ADDRESS, type PageBarState, type Publ
 import { splitFrontMatter } from '../editorSync/frontMatter';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { parseDeck, publishText } from './deckFormat';
-import { BUILT_IN_THEME, parseTheme, type DeckTheme } from './deckTheme';
+import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
 import { readDeckTheme } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
@@ -326,8 +326,7 @@ export class DeckPublisher implements vscode.Disposable {
   /** The theme the deck names, read as the deck view reads it (`readDeckTheme`), or the built-in one. */
   private async themeFor(deckPath: string, text: string): Promise<DeckTheme> {
     const named = parseDeck(text.replace(/^\uFEFF/, '')).theme;
-    if (!named) return BUILT_IN_THEME;
-    const themeText = await readDeckTheme(deckPath, named);
+    const themeText = await readDeckTheme(deckPath, themePathOf(named));
     return themeText === null ? BUILT_IN_THEME : parseTheme(themeText);
   }
 

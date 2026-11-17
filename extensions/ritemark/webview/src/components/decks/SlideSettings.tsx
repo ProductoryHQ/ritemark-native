@@ -3,7 +3,7 @@
  * the slide's own menu opens, "Slide settings…" (Jarmo, 17 November: "slaidi settings peaks olema siin: mitte kuskil
  * ülal tööriistaribas"): the thumbnail's ⋯ or right-click, the handout part number's ⋯ and the end of the slide's own
  * right-click menu, anchored beside where it came from. The gear in the bar is gone. Its order (README, "Nothing around
- * the slide"): the library section, Picture, a Steps label, then the deck's own look. A table's rows and columns are
+ * the slide"): the library section, Picture, then a Steps label. A table's rows and columns are
  * added with the table's own + bars and grips (experience 48), so Settings no longer has Add a row and Add a column.
  * Skip slide is only in the menu, so it isn't in two places.
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
@@ -17,10 +17,9 @@
  * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
  * actions, and the words a layout keeps for others; then a line, then the slide's own settings.
  *
- * 16 November (Jarmo: "card/borderless buttons also to settings?"; the Experience lead, "Card or Borderless lives in the
- * gear's popup"): the popup's last section, under a line, is the deck's own choice, Card or Borderless, set once per
- * deck. Its heading names its reach ("This deck · all 15 slides"), so it is never read as this slide's alone. It writes
- * the deck's front matter through the same `setLook` the bar's segment used. Themes join this section later.
+ * The popover holds only the slide's own settings. From 16 to 17 November its last section was the deck's own choice,
+ * Card or Borderless ("This deck · all 15 slides"); since Sprint 162 that choice lives in the Theme menu on the deck's
+ * bar (`ThemeMenu.tsx`, step-3-themes.md), with the deck's theme, and writes the deck's front matter the same way.
  */
 import type { ReactNode } from 'react'
 import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
@@ -84,43 +83,6 @@ interface SlideSettingsProps {
    * emptied pill back), and their change.
    */
   stepsTag?: { value: string; onChange: (tag: string) => void }
-  /** The deck's own look, last: how many slides it reaches, the choice, and the change of it (`setLook`). */
-  deck: DeckLookChoice
-}
-
-/** The deck's own look: how many slides it reaches, Card or Borderless, and the change of it (`setLook`). */
-export interface DeckLookChoice { count: number; look: 'card' | 'borderless'; onLook: (look: string) => void }
-
-/** Card or Borderless, as the bar's segment offered it before 16 November: the same words and the same tooltip. */
-export const DECK_LOOKS = [{ value: 'card', label: 'Card' }, { value: 'borderless', label: 'Borderless' }]
-export const DECK_LOOK_TIP = 'How the slides look: as a card, or the whole column as the stage'
-
-/** The deck section's heading: its reach, so a deck-wide choice in a slide's popup isn't read as that slide's. */
-export function deckReach(count: number): string {
-  if (count === 0) return 'This deck · no slides yet'
-  return count === 1 ? 'This deck · 1 slide' : `This deck · all ${count} slides`
-}
-
-/**
- * The deck's section: its heading, then Card | Borderless, the popup's full width. The last section of a slide's
- * settings, and the whole popup of a deck with no slides (Development manager, #764: the bar's segment worked at any
- * count, so an empty deck keeps the choice). One group named by its heading, so a screen reader hears the reach too.
- */
-export function DeckLook({ id, count, look, onLook, only = false }: DeckLookChoice & { id: string; only?: boolean }) {
-  return (
-    <div role="group" aria-labelledby={id} className={only ? 'deck-settings-only' : undefined}>
-      <div id={id} className="deck-settings-k">{deckReach(count)}</div>
-      <Tooltip label={DECK_LOOK_TIP} className="flex w-full">
-        <SegmentedControl
-          aria-label="How the slides look"
-          className="w-full [&>label]:flex-1 [&>label>span]:w-full [&>label>span]:text-center"
-          value={look}
-          onValueChange={onLook}
-          options={DECK_LOOKS}
-        />
-      </Tooltip>
-    </div>
-  )
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
@@ -189,9 +151,8 @@ function LabelRow({ id, value, onWords, onUndo }: { id: string; value: string; o
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag, deck }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag }: SlideSettingsProps) {
   const tagId = `deck-tag-${number}`
-  const reachId = `deck-reach-${number}`
   return (
     <section aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
@@ -260,8 +221,6 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
           onUndo={onUndo}
         />
       ) : null}
-      <div className="deck-settings-sep" />
-      <DeckLook id={reachId} {...deck} />
     </section>
   )
 }
