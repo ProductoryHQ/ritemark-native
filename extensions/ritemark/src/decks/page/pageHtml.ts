@@ -12,7 +12,8 @@
  *    hides them: it sets no `src` or `href` and writes no HTML (2.2's `scriptBuildsReferences` stays false).
  *  - The handout's Markdown goes through `marked` with raw HTML escaped (comments and `<mark>` tags taken out first,
  *    again, after `publicDeck`), web links kept as links, links to project files shown as plain names, and pictures
- *    as relative paths. Every code block is a prompt with Copy; an Exercise slide's numbered steps and every task list
+ *    as relative paths. Every code block is a prompt with Copy, then Open in Claude and Open in ChatGPT (links to a new
+ *    tab, `openInAddresses`; none for a deck with `open-in: none`); an Exercise slide's numbered steps and every task list
  *    get ticks; a Section slide is the grey band with "Section N" over its title.
  *
  * Pure: the slide CSS and the fonts come in as `PageAssets` (the host reads them, `pageAssets.ts`), and whether a
@@ -142,19 +143,45 @@ function ownItemsAreSteps(body: string): boolean {
   return false;
 }
 
+/**
+ * Decks README item 10: a prompt opens in Claude or ChatGPT with its words already in the box. These are links the
+ * reader chooses to follow, in a new tab; the page fetches nothing from these hosts and loads nothing from them, so
+ * the Content Security Policy is unchanged (a link is not a load).
+ */
+export const OPEN_IN_HOSTS = [
+  { label: 'Claude', base: 'https://claude.ai/new?q=' },
+  { label: 'ChatGPT', base: 'https://chatgpt.com/?q=' },
+] as const;
+
+/** Longer addresses than this are left out (Copy stays): browsers and the two hosts cut or refuse long ones. */
+export const OPEN_IN_MAX_ADDRESS = 8000;
+
+/** The prompt's "Open in" addresses, or none when either would be longer than `OPEN_IN_MAX_ADDRESS`. */
+export function openInAddresses(prompt: string): Array<{ label: string; href: string }> {
+  let words: string;
+  // A lone surrogate can't be encoded: that prompt keeps Copy only.
+  try { words = encodeURIComponent(prompt); } catch { return []; }
+  const links = OPEN_IN_HOSTS.map(host => ({ label: host.label, href: host.base + words }));
+  return links.some(link => link.href.length > OPEN_IN_MAX_ADDRESS) ? [] : links;
+}
+
 /** The renderer for one part's handout: `partKey` makes its ticks' ids. */
 class HandoutRenderer extends marked.Renderer {
   private readonly seen = new Map<string, number>();
 
-  constructor(private readonly partKey: string, private readonly pictureUrl: PictureUrl) {
+  constructor(private readonly partKey: string, private readonly pictureUrl: PictureUrl, private readonly openIn = true) {
     super();
   }
 
   code(code: string, infostring: string | undefined): string {
     const lang = (infostring ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
     if (PRIVATE_LANGS.has(lang)) return '';
-    return `<div class="prompt"><pre><code>${esc(code.replace(/\n$/, ''))}</code></pre>`
-      + `<button class="copy" type="button" aria-label="Copy the prompt"><span class="c1">${iconSvg('copy', 14)}Copy</span><span class="c2">${iconSvg('check', 14)}Copied</span></button></div>\n`;
+    const words = code.replace(/\n$/, '');
+    // Copy first, then the "Open in" links (left out for a deck with `open-in: none`, or a prompt too long for an address).
+    const links = this.openIn && words.trim() ? openInAddresses(words) : [];
+    const open = links.map(link => `<a class="open" href="${esc(link.href)}" target="_blank" rel="noopener noreferrer" aria-label="Open the prompt in ${link.label}, in a new tab">Open in ${link.label}</a>`).join('');
+    return `<div class="prompt${links.length ? ' ai' : ''}"><pre><code>${esc(words)}</code></pre>`
+      + `<button class="copy" type="button" aria-label="Copy the prompt"><span class="c1">${iconSvg('copy', 14)}Copy</span><span class="c2">${iconSvg('check', 14)}Copied</span></button>${open}</div>\n`;
   }
 
   html(html: string): string {
@@ -300,7 +327,7 @@ const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 type Token = ReturnType<typeof marked.lexer>[number];
 
 /** One part's handout as HTML. In an Exercise, a numbered list at the top level is its steps, each with a tick. */
-export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl }): string {
+export function handoutHtml(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl; openIn?: boolean }): string {
   return handoutParts(markdown, options).html;
 }
 
@@ -308,9 +335,9 @@ export function handoutHtml(markdown: string, options: { partKey: string; exerci
  * A part's handout as HTML, and whether it opens with its own heading (an H1 or H2 as its first block: 16 November,
  * the part's heading is the handout's), which is then the part's h2.
  */
-function handoutParts(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl; partHeading?: boolean }): { html: string; ownHeading: boolean } {
+function handoutParts(markdown: string, options: { partKey: string; exercise: boolean; pictureUrl: PictureUrl; partHeading?: boolean; openIn?: boolean }): { html: string; ownHeading: boolean } {
   if (!markdown.trim()) return { html: '', ownHeading: false };
-  const renderer = new HandoutRenderer(options.partKey, options.pictureUrl);
+  const renderer = new HandoutRenderer(options.partKey, options.pictureUrl, options.openIn !== false);
   const tokens = lexHandout(markdown);
   const first = tokens.find((token: Token) => token.type !== 'space');
   const ownHeading = first?.type === 'heading' && (first as { depth: number }).depth <= 2;
@@ -460,6 +487,12 @@ svg { flex: none; }
 .copy.ok .c1 { display: none; }
 .copy.ok .c2 { display: inline-flex; }
 .copy:active { transform: translateY(1px); }
+.prompt.ai { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 10px 10px 0; border-radius: 12px; background: var(--soft); } /* Copy, then Open in Claude and Open in ChatGPT, in a row over the prompt (Decks README item 10) */
+.prompt.ai pre { order: 1; flex: 1 0 100%; padding: 4px 6px 14px; border-radius: 0; background: none; }
+.prompt.ai .copy { position: static; }
+.prompt .open { display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 8px; background: #fff; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); font: 700 12.5px/30px 'Sofia Sans', sans-serif; white-space: nowrap; text-decoration: none; }
+.prompt .open:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.prompt .open:active { transform: translateY(1px); }
 .sect { margin: 18px -16px 8px; padding: 18px 16px 10px; border: 0; border-radius: 12px; background: var(--band); }
 .sect + .part { border-top: 0; }
 .sect .eyebrow { margin-bottom: 4px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); }
@@ -595,14 +628,14 @@ export function isSlideOnly(slide: Pick<PublicSlide, 'handout' | 'data'>, textHa
 }
 
 /** The text column's part for one shown slide. */
-function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean): string {
+function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean, openIn: boolean): string {
   const number = index + 1;
   // A slide with no handout: its place only, with nothing in it (the page's script still finds it in the slide order).
   if (slideOnly) return `<div class="part only" data-i="${index}" id="s${number}" aria-hidden="true"></div>`;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const exerciseSlide = isExercise(slide);
-  const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true });
+  const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true, openIn });
   const title = ownHeading || textHandout ? '' : titleOf(slide);
   const section = sectionNumberOf(slide);
   if (section !== null) {
@@ -662,7 +695,9 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     return `<div class="layer${index === 0 ? ' on' : ''}" data-title="${esc(titleOf(slide))}">${markup}</div>`;
   });
   const first = deck.slides[0];
-  const preamble = handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: options.pictureUrl });
+  // A deck's `open-in: none` leaves out the prompts' "Open in" links; every other deck has them.
+  const openIn = deck.openInOff !== true;
+  const preamble = handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: options.pictureUrl, openIn });
   // A tick's id is its part's title (with which part of that title it is) and the step's words, never the part's place:
   // a slide added before an exercise keeps its ticks, and two exercises with one title keep theirs apart.
   const titles = new Map<string, number>();
@@ -672,7 +707,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     const title = titleOf(slide);
     const nth = (titles.get(title) ?? 0) + 1;
     titles.set(title, nth);
-    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true, slideOnly[index]);
+    return partHtml(slide, index, options, `part\u0000${title}\u0000${nth}`, deck.textHandout === true, slideOnly[index], openIn);
   });
   const who = `<div class="who"><b>${esc(deck.client)}</b><span>${esc(deck.title)}</span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');

@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, PAGE_CSP, handoutHtml, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, handoutHtml, openInAddresses, isSlideOnly, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
@@ -90,6 +90,18 @@ const prompts = root.querySelectorAll('.prompt');
 assert.equal(prompts.length, root.querySelectorAll('pre').length, 'every code block is a prompt');
 assert.equal(prompts.length, 2);
 for (const prompt of prompts) assert.ok(prompt.querySelector('button.copy'), 'with Copy');
+// Decks README item 10: Copy first, then Open in Claude and Open in ChatGPT, each a link to a new tab with the prompt's
+// words in its address and nothing of this page sent with it.
+for (const prompt of prompts) {
+  assert.ok(prompt.classList.contains('ai'));
+  assert.deepEqual(prompt.querySelectorAll('button, a').map(control => control.text), ['CopyCopied', 'Open in Claude', 'Open in ChatGPT']);
+  const words = /<code>([\s\S]*?)<\/code>/.exec(prompt.toString())![1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  const links = prompt.querySelectorAll('a.open');
+  assert.deepEqual(links.map(link => link.getAttribute('target')), ['_blank', '_blank']);
+  assert.deepEqual(links.map(link => link.getAttribute('rel')), ['noopener noreferrer', 'noopener noreferrer']);
+  const hrefs = links.map(link => link.getAttribute('href')!.replace(/&amp;/g, '&').replace(/&#39;/g, "'"));
+  assert.deepEqual(hrefs, [`https://claude.ai/new?q=${encodeURIComponent(words)}`, `https://chatgpt.com/?q=${encodeURIComponent(words)}`]);
+}
 assert.equal(root.querySelector('#s3 .k')!.text, 'PROMPT');
 const steps = root.querySelectorAll('#s3 ol.steps > li.step input[type="checkbox"][data-tick]');
 assert.equal(steps.length, 2);
@@ -105,7 +117,9 @@ assert.deepEqual(loads, ['images/which-stays.png'], 'the gather finds the pictur
 for (const css of references.inlineCss) {
   for (const ref of cssReferences(css)) assert.match(ref.value, /^data:font\/woff2;base64,/, `the CSS loads only its fonts, inline: ${ref.value.slice(0, 40)}`);
 }
-assert.ok(!/(?:src|href)="(?:https?:)?\/\//i.test(html.replace(/<a href="https:\/\/[^"]*" target="_blank" rel="noopener noreferrer">/g, '')), 'no remote address but the handout\'s own web links');
+assert.ok(!/(?:src|href)="(?:https?:)?\/\//i.test(html
+  .replace(/<a href="https:\/\/[^"]*" target="_blank" rel="noopener noreferrer">/g, '')
+  .replace(/<a class="open" href="https:\/\/(?:claude\.ai\/new|chatgpt\.com\/)\?q=[^"]*" target="_blank" rel="noopener noreferrer"/g, '')), 'no remote address but the handout\'s own web links and the prompts\' Open in links');
 assert.ok(!/@import|<link\b/i.test(html), 'no stylesheet from elsewhere');
 assert.equal(references.inlineScripts.length, 1);
 assert.equal(references.builtAttribute, false);
@@ -308,6 +322,73 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.deepEqual(parse(pageHtml(unmarked, assets, { digest: deckDigest(unmarked), pictureUrl })).querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text)), [['Welcome'], ['Agents act']]);
 }
 
+
+// Decks README item 10: the prompts' Open in addresses.
+{
+  // Special characters, line breaks and Estonian letters, encoded so the box gets the words exactly.
+  const prompt = 'Tere! Kirjuta õpetajale & õpilastele: "Mis on äri?"\nRida kaks: 50% #1 ?q=x / šokolaad, Žürii, ÕÄÖÜ.';
+  const links = openInAddresses(prompt);
+  assert.deepEqual(links.map(link => link.label), ['Claude', 'ChatGPT']);
+  assert.equal(links[0].href, 'https://claude.ai/new?q=Tere!%20Kirjuta%20%C3%B5petajale%20%26%20%C3%B5pilastele%3A%20%22Mis%20on%20%C3%A4ri%3F%22%0ARida%20kaks%3A%2050%25%20%231%20%3Fq%3Dx%20%2F%20%C5%A1okolaad%2C%20%C5%BD%C3%BCrii%2C%20%C3%95%C3%84%C3%96%C3%9C.');
+  assert.equal(links[1].href, 'https://chatgpt.com/?q=' + links[0].href.slice('https://claude.ai/new?q='.length));
+  for (const link of links) {
+    const address = new URL(link.href);
+    assert.equal(address.searchParams.get('q'), prompt, 'the host reads back the prompt exactly');
+    assert.equal([...address.searchParams.keys()].join(), 'q', 'one parameter: a & or # in the prompt starts no other');
+    assert.equal(address.hash, '');
+  }
+  // Drawn on the page: the address in the attribute, escaped as HTML, and the box's words as written.
+  const drawn = parse(handoutHtml('```\n' + prompt + '\n```\n', { partKey: 'k', exercise: false, pictureUrl }));
+  assert.deepEqual(drawn.querySelectorAll('a.open').map(link => link.getAttribute('href')!.replace(/&amp;/g, '&').replace(/&#39;/g, "'")), links.map(link => link.href));
+  // An apostrophe stays unencoded by encodeURIComponent, and is escaped in the attribute, so it never closes it.
+  const quoted = handoutHtml("```\nDon't send it\n```\n", { partKey: 'k', exercise: false, pictureUrl });
+  assert.ok(quoted.includes('href="https://claude.ai/new?q=Don&#39;t%20send%20it"'));
+
+  // The length cap: an address of OPEN_IN_MAX_ADDRESS characters is kept; one character more, and both go, Copy stays.
+  const claudeBase = 'https://claude.ai/new?q='.length;
+  assert.equal(openInAddresses('a'.repeat(OPEN_IN_MAX_ADDRESS - claudeBase)).length, 2);
+  assert.equal(openInAddresses('a'.repeat(OPEN_IN_MAX_ADDRESS - claudeBase + 1)).length, 0);
+  // The cap counts the encoded address: 2,000 Estonian letters are 12,000 characters encoded.
+  assert.equal(openInAddresses('õ'.repeat(2000)).length, 0);
+  const long = parse(handoutHtml('```\n' + 'õ'.repeat(2000) + '\n```\n', { partKey: 'k', exercise: false, pictureUrl }));
+  assert.ok(long.querySelector('.prompt button.copy'), 'a long prompt keeps Copy');
+  assert.equal(long.querySelectorAll('a.open').length, 0, 'and has no Open in links');
+  assert.ok(!long.querySelector('.prompt')!.classList.contains('ai'), 'and is drawn as before, Copy in its corner');
+  // A prompt that can't be encoded (a lone surrogate), and an empty one, keep Copy only.
+  assert.equal(openInAddresses('broken \uD800 text').length, 0);
+  assert.equal(parse(handoutHtml('```\n\n```\n', { partKey: 'k', exercise: false, pictureUrl })).querySelectorAll('a.open').length, 0);
+  // The handout's own builder with them off (a deck's `open-in: none`).
+  assert.equal(parse(handoutHtml('```\nHello\n```\n', { partKey: 'k', exercise: false, pictureUrl, openIn: false })).querySelectorAll('a.open').length, 0);
+}
+
+// A deck's `open-in: none` turns them off on every prompt, the preamble's too; Copy stays, and the line itself, like all
+// of the front matter, never reaches the page.
+{
+  const text = (front: string) => [
+    '---', 'deck: 1', ...(front ? [front] : []), '---', '',
+    'Before the first slide.', '', '```', 'A prompt before the slides', '```', '',
+    '```slide title', 'id: t0a1', 'title: AI assistants and agents', '```', '', '## Welcome', '', '```', 'Help me write instructions.', '```', '',
+  ].join('\n');
+  for (const front of ['open-in: none', 'open-in: None', 'open-in: "none"', 'open-in:  none  ']) {
+    const off = publicDeck(text(front), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+    assert.equal(off.openInOff, true, front);
+    const bytes = pageHtml(off, assets, { digest: deckDigest(off), pictureUrl });
+    const page = parse(bytes);
+    assert.equal(page.querySelectorAll('.prompt').length, 2);
+    assert.equal(page.querySelectorAll('.prompt button.copy').length, 2, 'Copy stays');
+    assert.equal(page.querySelectorAll('a.open').length, 0, `${front}: no Open in links`);
+    assert.ok(!/claude\.ai|chatgpt\.com|open-in/.test(bytes), 'neither address, nor the line, is on the page');
+  }
+  // Without the line, or with any other value, both prompts have them, and the deck's digest is as it was.
+  for (const front of ['', 'open-in: all', 'open-in:']) {
+    const on = publicDeck(text(front), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+    assert.equal(on.openInOff, undefined, front);
+    assert.equal(parse(pageHtml(on, assets, { digest: deckDigest(on), pictureUrl })).querySelectorAll('a.open').length, 4, front);
+  }
+  const plain = publicDeck(text(''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });
+  assert.equal(deckDigest(publicDeck(text('open-in: all'), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME })), deckDigest(plain));
+  assert.notEqual(deckDigest(publicDeck(text('open-in: none'), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME })), deckDigest(plain), 'turning them off is a new page');
+}
 
 // A slide with no handout (17 November): a part with no heading and no text. The viewer sees nothing of it in the text,
 // no row, no title, no Contents entry; the slide keeps its place in the slide order (its layer, its place in the
