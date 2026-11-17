@@ -28,8 +28,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import Module from 'node:module';
 import { mock } from 'node:test';
-import * as os from 'os';
 import * as path from 'path';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── VS Code, stubbed: what the host calls is recorded ──
 
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
   const secrets = new Map<string, string>();
   const globalState = { get: <T>(key: string) => state.get(key) as T | undefined, update: async (key: string, value: unknown) => { state.set(key, value); } };
   const chats: unknown[] = [];
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-guidance-host-'));
+  const folder = makeTempDir('rm-guidance-host-');
   fs.writeFileSync(path.join(folder, 'Brief.docx'), 'x');
   const host = new GuidanceHost({
     context: {
@@ -387,7 +387,7 @@ async function main(): Promise<void> {
   assert.equal(shown.problem, null, 'the old line doesn\'t return without a new try');
 
   // ── Round 2, N2: the sample's line belongs to the ready request; a sign-in start clears it ──
-  const sample = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-guidance-sample-'));
+  const sample = makeTempDir('rm-guidance-sample-');
   fs.mkdirSync(path.join(sample, '.ritemark', 'tasks'), { recursive: true });
   fs.writeFileSync(path.join(sample, '.ritemark', 'tasks', 'm4d7r2.md'), '---\nstage: todo\n---\nDraft Module 4\n');
   fs.writeFileSync(path.join(sample, 'Brief.md'), 'x');

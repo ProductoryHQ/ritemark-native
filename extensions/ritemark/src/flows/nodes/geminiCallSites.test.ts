@@ -33,7 +33,6 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import type * as vscode from 'vscode';
 import { DEFAULT_MODELS, GEMINI_MODEL_IDS } from '../../ai/modelConfig';
@@ -47,6 +46,7 @@ import { flowModelDefaults } from '../flowModelDefaults';
 import { resolveAll } from '../../ai/modelCatalog/resolver';
 import { BUNDLED_CATALOG } from '../../ai/modelCatalog/bundledCatalog';
 import type { FlowNode, ExecutionContext } from '../types';
+import { makeTempDir } from '../../testing/tempDir';
 
 const KEY = 'test-placeholder-not-a-key';
 const fakeContext = { secrets: { get: async (name: string) => (name === 'google-ai-key' ? KEY : undefined) } } as unknown as vscode.ExtensionContext;
@@ -76,7 +76,7 @@ function assertKeyInHeaderOnly(call: Call): void {
   assert.ok(!/[?&]key=/.test(call.url), `no key= in ${call.url}`);
 }
 
-const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'rm141-'));
+const workspace = makeTempDir('rm141-');
 const context = { workspacePath: workspace, inputs: {}, outputs: new Map(), inputLabels: {}, nodeLabels: {} } as unknown as ExecutionContext;
 
 function llmNode(model: string | undefined, maxTokens?: number): FlowNode {

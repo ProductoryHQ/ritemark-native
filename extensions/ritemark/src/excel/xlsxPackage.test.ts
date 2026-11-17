@@ -10,6 +10,7 @@ import JSZip from 'jszip';
 import { checkOfficePackage } from '../officePreview/officePackageCheck';
 import { PackageError, crc32, encodeText, openPackage, readTextPart, rewritePackage, storedPart } from './xlsxPackage';
 import { SharedStrings } from './sharedStrings';
+import { makeTempDir } from '../testing/tempDir';
 
 const excelMac = new Uint8Array(
   fs.readFileSync(path.resolve(__dirname, '../../../../docs/development/sprints/sprint-81-excel-editing/test-workbook.xlsx')),
@@ -45,7 +46,7 @@ async function main() {
   const zip = await JSZip.loadAsync(out);
   assert.match(await zip.file('xl/worksheets/sheet1.xml')!.async('string'), /A99/, 'another ZIP reader reads it');
   // and the system's unzip finds no errors
-  const tmp = path.join(fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'xlsx-')), 'out.xlsx');
+  const tmp = path.join(makeTempDir('xlsx-'), 'out.xlsx');
   fs.writeFileSync(tmp, out);
   assert.match(execFileSync('unzip', ['-t', tmp]).toString(), /No errors detected/);
 

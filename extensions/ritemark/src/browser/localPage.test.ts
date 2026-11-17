@@ -5,11 +5,11 @@
 
 import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { finderInfoIsAlias, isFinderAlias, isInside, isPagePath, locatePage, localPagePath } from './localPage';
+import { makeTempDir } from '../testing/tempDir';
 
 async function main(): Promise<void> {
   // --- which targets are pages ---
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
   assert.equal(isInside('\\\\server\\share\\a.html', 'C:\\proj', 'win32'), false, 'a UNC path is outside');
 
   // --- locatePage on real folders ---
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'localpage-')));
+  const root = fs.realpathSync(makeTempDir('localpage-'));
   const project = path.join(root, 'project');
   const outside = path.join(root, 'Downloads');
   fs.mkdirSync(path.join(project, 'pages'), { recursive: true });

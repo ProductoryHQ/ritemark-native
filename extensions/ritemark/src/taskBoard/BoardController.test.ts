@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import type { AgentId } from '../agent/types';
 import type { RuntimeAvailabilities } from '../runtime/availability';
@@ -16,6 +15,7 @@ import {
 } from './BoardController';
 import type { BoardAnswer, CardHandoffView, HandoffState, WaitReason } from './protocol';
 import type { IdeaReviewInput, ReviewFields } from './ideaReview';
+import { makeTempDir } from '../testing/tempDir';
 
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ class FakeLedger implements HandoffLedger {
 const READY = { state: 'ready', usable: true, detail: null } as const;
 
 function setup(options: { codex?: 'ready' | 'needs-auth'; reviewer?: { review(input: IdeaReviewInput): Promise<ReviewFields> } } = {}) {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-controller-'));
+  const folder = makeTempDir('rm-board-controller-');
   const store = new BoardStore(folder, {
     fileSystem: { ...nodeBoardStoreFileSystem, async trash(file) { fs.rmSync(file); } },
     now,
@@ -667,7 +667,7 @@ async function main(): Promise<void> {
 
   // ── Sprint 145 (#596): Try again and Remove on a file the board couldn't read ──
   {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const folder = makeTempDir('rm-board-files-');
     const tasks = path.join(folder, '.ritemark', 'tasks');
     fs.mkdirSync(tasks, { recursive: true });
     const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
@@ -783,7 +783,7 @@ async function main(): Promise<void> {
 
   // ── Remove's last look, and a move's revision ─────────────────────────────
   {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const folder = makeTempDir('rm-board-files-');
     const tasks = path.join(folder, '.ritemark', 'tasks');
     fs.mkdirSync(tasks, { recursive: true });
     const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
@@ -861,7 +861,7 @@ async function main(): Promise<void> {
 
   // ── Remove's last look makes a read of its own, even when hung reads hold every slot (#610, Codex) ─
   {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-look-'));
+    const folder = makeTempDir('rm-board-look-');
     const tasks = path.join(folder, '.ritemark', 'tasks');
     fs.mkdirSync(tasks, { recursive: true });
     const cardText = (id: string, title: string) => `---\nritemark: task/1\nid: ${id}\ntitle: ${title}\nstage: todo\n---\n`;
@@ -934,7 +934,7 @@ async function main(): Promise<void> {
 
   // ── A move that couldn't be saved: the notice names the card in plain words (#610) ─
   {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-save-'));
+    const folder = makeTempDir('rm-board-save-');
     const tasks = path.join(folder, '.ritemark', 'tasks');
     fs.mkdirSync(tasks, { recursive: true });
     fs.writeFileSync(path.join(tasks, 'draft-module-6.md'), '---\nritemark: task/1\nid: dr4ft6\ntitle: Draft Module 6\nstage: todo\n---\n');
@@ -970,7 +970,7 @@ async function main(): Promise<void> {
 
   // ── Remove refuses a file the board hasn't listed, without blaming the trash ─
   {
-    const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-board-files-'));
+    const folder = makeTempDir('rm-board-files-');
     const store = new BoardStore(folder, {
       fileSystem: {
         ...nodeBoardStoreFileSystem,

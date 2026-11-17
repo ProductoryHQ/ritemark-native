@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import type { AgentProgress } from '../agent/types';
 import { AcpManager, OPENCODE_PERMISSION } from './acpManager';
 import type { AcpFsBackend } from './acpFsProxy';
+import { makeTempDir } from '../testing/tempDir';
 
 // Scripted agent: streams thought + tool_call + plan + message, and varies the
 // usage/content per env so we can exercise the soft-error path. It also echoes
@@ -92,7 +93,7 @@ rl.on('line',(line)=>{
 `;
 
 function writeAgentScript(): string {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'acp-mgr-test-')), 'agent.cjs');
+  const file = path.join(makeTempDir('acp-mgr-test-'), 'agent.cjs');
   fs.writeFileSync(file, AGENT_SCRIPT, 'utf8');
   return file;
 }

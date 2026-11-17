@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import {
   CommentTaskStore,
@@ -13,6 +12,7 @@ import {
 import { nodeConversationStoreFileSystem, type ConversationStoreFileSystem } from '../conversations/ConversationStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import type { CommentTaskRecordV1 } from './types';
+import { makeTempDir } from '../testing/tempDir';
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 const SHA = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
@@ -63,7 +63,7 @@ function record(index: number, overrides: Partial<CommentTaskRecordV1> = {}): Co
 }
 
 function tempDir(): string {
-  return commentTaskStoreDir(fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-comment-tasks-')));
+  return commentTaskStoreDir(makeTempDir('ritemark-comment-tasks-'));
 }
 
 function newStore(overrides: CommentTaskStoreDependencies = {}): CommentTaskStore {

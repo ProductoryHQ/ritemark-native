@@ -6,13 +6,13 @@
 
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { isProjectFolderError } from '../projects/projectFolderGuard';
 import { FlowStorage } from './FlowStorage';
+import { makeTempDir } from '../testing/tempDir';
 
 function tempProject(): { parent: string; root: string } {
-  const parent = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'rm-flow-storage-')));
+  const parent = fs.realpathSync(makeTempDir('rm-flow-storage-'));
   const root = path.join(parent, 'Notes');
   fs.mkdirSync(root);
   return { parent, root };

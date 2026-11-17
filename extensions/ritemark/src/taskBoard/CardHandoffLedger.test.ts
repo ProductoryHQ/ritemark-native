@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome } from '../commentTasks/protocol';
 import { BoardStore, nodeBoardStoreFileSystem } from './BoardStore';
 import { CardHandoffLedger, type CardTaskSidebar } from './CardHandoffLedger';
 import { CardTaskStore } from './CardTaskStore';
 import type { HandoffState } from './protocol';
+import { makeTempDir } from '../testing/tempDir';
 
 let clock = Date.parse('2026-10-12T09:00:00.000Z');
 const now = () => new Date(clock);
@@ -58,7 +58,7 @@ class FakeSidebar implements CardTaskSidebar {
 }
 
 function setup() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-ledger-'));
+  const root = makeTempDir('rm-ledger-');
   const board = new BoardStore(root, { fileSystem: { ...nodeBoardStoreFileSystem, async trash() {} }, now });
   const recordsDir = path.join(root, '.global');
   const store = new CardTaskStore(recordsDir);
