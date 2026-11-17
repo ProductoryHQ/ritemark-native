@@ -23,6 +23,10 @@ patches applied to the worktree's own vscode copy), on a synthetic project "Harb
 06  A theme whose logo file is missing (the PNG moved away, the window reloaded): the tab says "The logo's file, Harbour
     Paper logo.png, isn't beside the theme. ...", with Choose a file… and Remove; the preview draws no logo and no
     error. (The toast at the bottom right is the dev build's own GitHub.copilot-chat activation notice, not this PR.)
+07  "Never touch" (the Experience lead, 18 November), a second launch on the head with it: the logo top left on every slide,
+    and a two-line title on a body slide: the words start 38 px lower (the logo's height and 12 px), every line at its
+    own left edge, the title's first line below the logo. Top right (the title's room) and bottom right (the words end
+    38 px higher) are unit-tested in src/decks/themeLogo.test.ts.
 
 Byte for byte: Untouched.deck.md and "Slide library/Themes/Harbour Paper.theme.md" (written by hand, with a quoted logo
 line, a comment and logo-place) were opened (the deck, then the theme's tab), the window reloaded with both open, and
