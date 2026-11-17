@@ -344,7 +344,31 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.deepEqual(olderPage.querySelectorAll('.part').map(part => part.querySelectorAll('h2').map(h2 => h2.text))[1], ['Copilot or Cursor?']);
   assert.equal(olderPage.querySelectorAll('[data-go]').length, 4);
   // A wide table's own scrollbar is its thumb only, with no track behind it (Jarmo's rule for every scrollbar).
-  assert.ok(/\.tw \{ overflow-x: auto;[^}]*scrollbar-color: [^;]+ transparent; \}/.test(bytes), 'no scrollbar track');
+  assert.ok(/\.tw \{ overflow-x: auto;[^}]*scrollbar-color: [^;]+ transparent;[^}]*\}/.test(bytes), 'no scrollbar track');
+}
+
+// A wide table keeps sensible column widths (the Experience lead on #780), by the deck view's own rule
+// (`tableColumns.ts`): a text column's <col> keeps about 200 px, or its stored share when larger, never more than its
+// longest note on one line; a number column has no floor, so it keeps only its widest word.
+{
+  const table = (delimiter: string) => handoutHtml([
+    '| Mail drafted | Hours saved | Notes from the pilot week |',
+    delimiter,
+    '| 412 | 31 | Most replies needed **one edit** before [sending](https://example.org/a-very-long-address) |',
+    '| 268 | 1 200 | Fine |',
+  ].join('\n'), { partKey: 't', exercise: false, pictureUrl });
+  const cols = (html: string) => parse(html).querySelectorAll('.tw > table > colgroup > col').map(col => col.getAttribute('style') ?? '');
+  const automatic = table('| --- | --- | --- |');
+  // The note's words as read, without its marks or the link's address: "Most replies needed one edit before sending".
+  assert.deepEqual(cols(automatic), ['', '', 'min-width:min(200px, calc(43ch + 2em))'], 'numbers: no floor; the note: 200 px');
+  assert.ok(/<table>\n<colgroup>/.test(automatic), 'the colgroup comes first in the table');
+  // Stored widths (#772's form, 16 + 16 + 48 dashes: 20 %, 20 %, 60 %): the note's share of the frame when larger.
+  const stored = table(`|${'-'.repeat(16)}|${'-'.repeat(16)}|${'-'.repeat(48)}|`);
+  assert.deepEqual(cols(stored), ['', '', 'min-width:min(max(200px, 60cqw), calc(43ch + 2em))'], 'the stored share wins when larger');
+  // A table of numbers and single words has no colgroup at all: every column keeps its widest word.
+  assert.ok(!handoutHtml('| A | B |\n| --- | --- |\n| 1 | Yes |\n', { partKey: 't', exercise: false, pictureUrl }).includes('<colgroup>'));
+  // The frame the share counts against: the table's own scrolling frame.
+  assert.ok(/\.tw \{ overflow-x: auto;[^}]*container-type: inline-size;[^}]*\}/.test(html), 'the frame is the query container');
 }
 
 

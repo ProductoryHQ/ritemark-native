@@ -18,7 +18,9 @@
  * picture is there comes in as `pictureUrl`. The same input always gives the same bytes.
  */
 import { createHash } from 'node:crypto';
-import { Marked, marked } from 'marked';
+import { Marked, marked, type Tokens } from 'marked';
+import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
+import { columnFloors, floorCss } from '../../markdown/tableColumns';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
 import { blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
@@ -209,14 +211,49 @@ class HandoutRenderer extends marked.Renderer {
     return `<${tag}${steps}${from}>\n${body}</${tag}>\n`;
   }
 
+  /** The next table's `<colgroup>` with its columns' floors, set by the `table` extension just before the table. */
+  columns = '';
+
   table(header: string, body: string): string {
-    return `<div class="tw"><table>\n<thead>\n${header}</thead>\n${body ? `<tbody>${body}</tbody>` : ''}</table></div>\n`;
+    const columns = this.columns;
+    this.columns = '';
+    return `<div class="tw"><table>\n${columns}<thead>\n${header}</thead>\n${body ? `<tbody>${body}</tbody>` : ''}</table></div>\n`;
   }
+}
+
+/** A cell's words as written, without its marks: the text of its inline tokens (a picture's words left out). */
+function cellText(tokens: Token[] | undefined): string {
+  return (tokens ?? []).map(token => {
+    if (token.type === 'image') return '';
+    if ('tokens' in token && Array.isArray(token.tokens)) return cellText(token.tokens as Token[]);
+    return 'text' in token && typeof token.text === 'string' ? token.text : '';
+  }).join('');
+}
+
+/**
+ * A wide table's columns keep sensible widths (the Experience lead on #780), as in the deck view's handout: each text
+ * column's floor (`tableColumns.ts`) on its `<col>`, with its stored share (#772) when the table has widths. The table
+ * itself is drawn by the renderer as before; this only hands it the `<colgroup>`.
+ */
+export function tableColumnsHtml(table: Tokens.Table): string {
+  const columns = table.header.length;
+  const delimiter = table.raw.split('\n')[1] ?? '';
+  const widths = tableHasWidths(table.raw) ? widthsOf(delimiter, true, columns) : null;
+  const floors = columnFloors(table.rows.map(row => row.map(cell => cellText(cell.tokens))), columns, widths);
+  if (!floors.some(Boolean)) return '';
+  return `<colgroup>${floors.map(floor => floor ? `<col style="min-width:${floorCss(floor)}">` : '<col>').join('')}</colgroup>\n`;
 }
 
 /** The handout's pictures with their looks: the renderer's own picture, then its size, crop and caption around it. */
 const handoutPictureExtensions = new Marked().use({
-  extensions: [pictureBlockTokenizer, {
+  extensions: [{
+    name: 'table',
+    renderer(this: { parser: { renderer: InstanceType<typeof marked.Renderer> } }, token) {
+      const renderer = this.parser.renderer;
+      if (renderer instanceof HandoutRenderer) renderer.columns = tableColumnsHtml(token as Tokens.Table);
+      return false;
+    },
+  }, pictureBlockTokenizer, {
     name: 'image',
     renderer(this: { parser: { renderer: InstanceType<typeof marked.Renderer> } }, token) {
       const image = token as unknown as ImageTokenWithLook;
@@ -373,7 +410,7 @@ svg { flex: none; }
 .part blockquote, .pre blockquote { margin: 0 0 14px; padding: 2px 0 2px 14px; border-left: 3px solid var(--line); color: var(--muted); }
 .part hr, .pre hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
-.tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta") */
+.tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; container-type: inline-size; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta"); the frame a column's stored share counts against (its <col>'s min-width, tableColumnsHtml) */
 .tw table { border-collapse: collapse; font-size: 14.5px; }
 .tw th, .tw td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .tw th { color: var(--ink); font-weight: 700; }
