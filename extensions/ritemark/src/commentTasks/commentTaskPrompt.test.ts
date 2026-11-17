@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { buildCommentTaskPrompt, MARKER_PRESERVATION_GUARD } from './commentTaskPrompt';
 import type { CommentTaskCommentV1 } from './types';
+import { slideCommentPlaces } from '../decks/blocks/slideComments';
 
 const DOC = 'docs/notes/release-plan.md';
 
@@ -91,6 +92,25 @@ for (const comments of [[mark()], [note()], [mark(), note()], [mark({ anchoredTe
     buildCommentTaskPrompt(DOC, comments).includes(MARKER_PRESERVATION_GUARD),
     'the marker-preservation guard is unconditional',
   );
+}
+
+// ── Sprint 161: a comment on a deck's slide says which slide, and what on it ──
+{
+  const deck = 'decks/Training.deck.md';
+  const text = [
+    '```slide', '# Welcome', '```', '',
+    '```slide', '---', 'id: k3f9', '---', '# Four parts', '',
+    '<!-- {id:22222222-2222-4222-8222-222222222222} @codex Check the numbers -->', '', ':::: boxes', '', '::: box', 'One', ':::', '', '::: box', 'Two', ':::', '', '::::',
+    '', 'A <mark data-comment="@claude Strengthen this" data-comment-id="11111111-1111-4111-8111-111111111111">a single survey</mark> line.', '```', '',
+  ].join('\n');
+  const places = slideCommentPlaces(deck, text, ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222']);
+  const prompt = buildCommentTaskPrompt(deck, [mark(), note()], places);
+  assert.ok(prompt.includes('   On slide 2 of 2 ("Four parts", id k3f9), on the words below.\n   Anchored to: "a single survey"'), prompt);
+  assert.ok(prompt.includes('   On slide 2 of 2 ("Four parts", id k3f9), on the two boxes.'), 'a note names the block it is on');
+  assert.ok(!prompt.includes('standalone note — not anchored'), 'a note on a slide is anchored to a block');
+  assert.ok(prompt.includes(MARKER_PRESERVATION_GUARD));
+  assert.equal(slideCommentPlaces(DOC, text, ['11111111-1111-4111-8111-111111111111']).size, 0, 'only a deck has slides');
+  assert.equal(buildCommentTaskPrompt(DOC, [mark(), note()], new Map()), buildCommentTaskPrompt(DOC, [mark(), note()]), 'a Text document reads as before');
 }
 
 console.log('commentTasks/commentTaskPrompt: all assertions passed');

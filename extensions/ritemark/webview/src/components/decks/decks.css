@@ -307,3 +307,39 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* An empty slide's title waits for its words. */
 .deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-editing .is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+
+/* Sprint 161 (experience 46, "Comments on the slide, for Claude"; frames 27 and 28). A comment on a block or on the
+   whole slide is a standalone note (`ritemark-comment`) in the slide editor: never drawn, and taking no place, so the
+   rules that read a block's neighbours skip it and the slide being edited looks as its thumbnail does (the renderer
+   draws no comment at all). Each rule is its own, so a browser without `of S` drops only it. */
+.deck-sl.is-blocks.is-editing ritemark-comment { display: none !important; }
+.deck-sl.is-blocks.is-editing .blk-flow > :nth-child(1 of :not(ritemark-comment)) { margin-top: 0; }
+.deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
+.deck-sl.is-blocks.is-editing h1 + ritemark-comment + * { margin-top: 0; }
+.deck-sl.is-blocks.is-editing h1 + ritemark-comment + ritemark-comment + * { margin-top: 0; }
+.deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
+.deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { padding-left: 0; box-shadow: none; }
+.deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
+.deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { color: var(--s-acc, #E0A21F); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { color: var(--s-acc, #E0A21F); }
+/* The words a comment is on keep the handout's highlight, readable on the slide: a see-through amber on a Card slide's
+   dark ground, the handout's own soft yellow on Borderless white. */
+.deck-sl.is-blocks.is-editing mark.ritemark-comment-mark { background-color: rgba(242, 181, 68, .3); color: inherit; border-radius: 3px; }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing mark.ritemark-comment-mark { background-color: #FEF3C7; }
+
+/* The markers, the ring and the card (the prototype's `.smark`, `.sring` and `.ccm`). On the stage only: the strip, the
+   wall, the presenter view and the page draw no comment. */
+.deck-comments-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.deck-comment-spot { position: absolute; pointer-events: auto; }
+.deck-comment-marker { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 13px 13px 13px 3px; background: #F2B544; color: #1C1F4A; box-shadow: 0 0 0 2px rgba(28, 31, 74, .55), 0 4px 10px -3px rgba(0, 0, 0, .4); }
+.deck-comment-marker.is-open { box-shadow: 0 0 0 2px #1C1F4A, 0 4px 10px -3px rgba(0, 0, 0, .4); }
+:where(:root:not([data-input-mode="pointer"])) .deck-comment-marker:focus-visible { outline: 2px solid var(--r-accent); outline-offset: 2px; }
+.deck-comment-ring { position: absolute; border-radius: 12px; box-shadow: 0 0 0 2px #F2B544; pointer-events: none; }
+.deck-comment-card { position: fixed; z-index: 60; }
+/* The strip's thumbnail: the slide's comment count in an amber dot, bottom right. */
+.deck-thumb .deck-thumb-comments { position: absolute; right: 9px; bottom: 9px; z-index: 1; display: flex; }
+.deck-thumb .deck-thumb-comments > span { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #F2B544; color: #1C1F4A; font: 700 10px/16px 'Sofia Sans', sans-serif; text-align: center; box-sizing: border-box; }
+/* The deck's bar: the comments button with its count, and Previous and Next across the slides. */
+.deck-bar .deck-comments { display: inline-flex; align-items: center; gap: 2px; }
+.deck-bar .deck-comments-count { min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; border-radius: 8px; background: #F2B544; color: #1C1F4A; font: 700 10px/16px 'Sofia Sans', sans-serif; text-align: center; box-sizing: border-box; }

@@ -358,4 +358,35 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
   assert.deepEqual(mixed.map(node => node.attrs.kind), ['title', '', 'points', 'exercise', 'columns'])
 }
 
+// Sprint 161: a block deck with comments on its slides (a note before a block, a note on the whole slide, a request on
+// words) and in its handout opens and saves byte for byte, unedited; a comment added on a slide changes only its line.
+{
+  const id = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`
+  const text = [
+    '---', 'deck: 2', '---', '',
+    '```slide', '---', 'id: k3f9', '---', '# Four parts', '',
+    `A <mark data-comment="@claude say it once" data-comment-id="${id(1)}">line</mark> under it.`, '',
+    `<!-- {id:${id(2)}} Make each box at most five words. @claude -->`, '',
+    ':::: {.boxes look="boxes"}', '', '::: {.box icon="book"}', '### Knowledge', 'The files', ':::', '', '::::', '',
+    `<!-- {id:${id(3)}} The whole slide is too busy. -->`,
+    '```', '',
+    `The handout, with <mark data-comment="mine" data-comment-id="${id(4)}">its own</mark> comment.`, '',
+  ].join('\n')
+  const { doc, save } = open(text)
+  assert.equal(save(doc), text, 'a deck with comments on its slides, opened and saved: byte for byte')
+  // The slide's comments are inside its block, in its body: the handout's editor sees one atom, and the handout's own
+  // comment stays the Text editor's.
+  const node = slides(doc)[0]
+  assert.ok(String(node.attrs.body).includes(`<!-- {id:${id(2)}}`))
+  let handoutMarks = 0
+  doc.descendants(child => { if (child.marks.some(mark => mark.type.name === 'commentMark')) handoutMarks++ })
+  assert.equal(handoutMarks, 1, "only the handout's comment is the handout editor's")
+  // A comment added on the slide (the stage writes the slide's body) changes that one place in the file.
+  let at = -1
+  doc.forEach((child, offset) => { if (at < 0 && child.type.name === 'deckSlide') at = offset })
+  const body = String(node.attrs.body).replace('# Four parts\n', `# Four parts\n\n<!-- {id:${id(5)}} A new note. -->\n`)
+  const saved = save(EditorState.create({ doc }).tr.setNodeMarkup(at, undefined, { ...node.attrs, body }).doc)
+  assert.equal(saved, text.replace('# Four parts\n', `# Four parts\n\n<!-- {id:${id(5)}} A new note. -->\n`))
+}
+
 console.log('deckRoundTrip: passed')

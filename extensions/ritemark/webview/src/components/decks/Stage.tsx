@@ -43,6 +43,8 @@ interface StageProps {
   onFocusTaken?: () => void
   /** A picture pasted or dropped on the slide, read as a data URL. */
   onPicture: (dataUrl: string, filename: string) => void
+  /** Sprint 161: open one of the slide's saved comments (the deck's bar), by its place; a new serial asks again. */
+  commentOpen?: { ordinal: number; serial: number } | null
 }
 
 export function Stage(props: StageProps) {
@@ -51,7 +53,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -68,6 +70,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, width, onWriting
         focusTitle={focusTitle}
         onFocusTaken={onFocusTaken}
         onPicture={onPicture}
+        commentOpen={commentOpen}
       />
     </div>
   )

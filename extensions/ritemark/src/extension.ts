@@ -28,6 +28,7 @@ import { registerDecks, type DecksHost } from './decks/decksHost';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
+import { slideAtSendForComments, slideCommentPlaces } from './decks/blocks/slideComments';
 import { createGoogleDocsFeature, type GoogleDocsFeature } from './googleDocs/vscodeGoogleDocs';
 import { createPublishFeature, type PublishFeature } from './publish/vscodePublish';
 import { AgentLibraryViewProvider } from './views/AgentLibraryViewProvider';
@@ -483,7 +484,18 @@ export function activate(context: vscode.ExtensionContext) {
   commentTaskController = new CommentTaskController({
     store: commentTaskStore,
     isFeatureEnabled: () => isEnabled('comment-callouts'),
-    buildPrompt: (document, comments) => buildCommentTaskPrompt(document.displayPath, comments),
+    // Sprint 161: a comment on a deck's slide says which slide, and what on it.
+    buildPrompt: (document, comments) => buildCommentTaskPrompt(
+      document.displayPath,
+      comments,
+      slideCommentPlaces(document.displayPath, document.text, comments.map(comment => comment.commentId)),
+    ),
+    // Sprint 161: and its message names that slide in its chip, read from the deck as it is now.
+    slideAtSend: (record) => {
+      const open = vscode.workspace.textDocuments.find(candidate => candidate.uri.toString() === record.source.documentUri);
+      if (!open) return null;
+      return slideAtSendForComments(record.source.displayPath, open.getText(), record.comments.map(comment => comment.commentId));
+    },
     publishProjection: (documentUri, tasks) => {
       RitemarkEditorProvider.publishCommentTaskProjection(documentUri, tasks);
     },

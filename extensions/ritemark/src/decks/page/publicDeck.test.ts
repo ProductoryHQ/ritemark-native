@@ -9,7 +9,7 @@ import { publishText } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme } from '../deckTheme';
 import { joinFrontMatter, splitFrontMatter } from '../../editorSync/frontMatter';
 import { deckLookOf } from '../present/presentSession';
-import { deckDigest, drawnData, publicDeck, publicMarkdown, type PublicDeck } from './publicDeck';
+import { deckDigest, drawnData, publicDeck, publicMarkdown, publicSlide, type PublicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
 
 const options = { folderName: 'Harbour Logistics', deckName: 'AI assistants and agents', theme: BUILT_IN_THEME };
@@ -212,6 +212,27 @@ for (const front of frontMatters) {
       assert.equal(deckDigest(publicDeck(published, options)), deckDigest(publicDeck(caughtUp, options)), `the chip reads Published: ${JSON.stringify(front)} → ${look}`);
     }
   }
+}
+
+// Sprint 161: comments on the slide, for Claude, in the stage's notation: `publicSlide` and `publicMarkdown` drop the
+// note before a block, the note on the whole slide, a note on the title and a request on words, ids and all.
+{
+  const id = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
+  const markdown = [
+    `<!-- {id:${id(1)}} TITLENOTEQZA -->`, '', '# Four parts', '',
+    `A <mark data-comment="@claude WORDSNOTEQZB" data-comment-id="${id(2)}">kept words</mark> line.`, '',
+    `<!-- {id:${id(3)}} @chatgpt BLOCKNOTEQZC -->`, '', ':::: boxes', '', '::: box', 'One', ':::', '', '::::', '',
+    `<!-- {id:${id(4)}} WHOLENOTEQZD -->`,
+  ].join('\n');
+  const out = publicSlide('', { markdown, id: 'privateidqze' });
+  const text = JSON.stringify(out);
+  for (const secret of ['TITLENOTEQZA', 'WORDSNOTEQZB', 'BLOCKNOTEQZC', 'WHOLENOTEQZD', 'privateidqze', id(1), id(2), id(3), id(4), 'data-comment', '<!--', '@claude', '@chatgpt']) {
+    assert.ok(!text.includes(secret), `publicSlide drops ${secret}`);
+  }
+  assert.equal(out.data.title, 'Four parts');
+  assert.ok(out.data.markdown?.includes('A kept words line.'), 'the words a comment is on stay');
+  assert.ok(out.data.markdown?.includes(':::: boxes'), 'the block a note is on stays');
+  assert.equal(publicMarkdown(markdown), out.data.markdown);
 }
 
 console.log('publicDeck: passed');

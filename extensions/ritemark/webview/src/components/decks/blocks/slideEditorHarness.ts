@@ -7,7 +7,7 @@ import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTML, installTestDocument } from '../../../utils/markdownFidelity'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { SlideDiv, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
+import { SlideDiv, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
 
 installTestDocument()
 
@@ -34,4 +34,16 @@ export function loadSlide(markdown: string): PMNode {
 /** The slide editor's document as Markdown. */
 export function saveSlide(doc: PMNode): string {
   return slideEditorHTMLToMarkdown(editorHTML(doc))
+}
+
+/** Sprint 161: the slide editor's schema with the comment flag on (the comment mark and note), as the stage has it. */
+export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv], commentCallouts: true }))
+
+/**
+ * A block slide's Markdown as the slide editor's document with comments on (`ensureSlideCommentPipeline` first: the
+ * comment tokenizer then stays on the shared slide `marked` for the rest of the run, as it does in the app).
+ */
+export function loadSlideWithComments(markdown: string): PMNode {
+  ensureSlideCommentPipeline()
+  return PMDOMParser.fromSchema(slideCommentSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown)))
 }

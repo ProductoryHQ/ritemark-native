@@ -103,12 +103,153 @@ function rangesByCommentId(editor: TipTapEditor, id: string): { from: number; to
  * resolves to every fragment; a legacy id-less comment (or one still being
  * measured) uses its single representative range.
  */
-function markerRanges(editor: TipTapEditor, m: RailMarker): { from: number; to: number }[] {
+function markerRanges(editor: TipTapEditor, m: CommentTarget): { from: number; to: number }[] {
   if (m.commentId) {
     const ranges = rangesByCommentId(editor, m.commentId)
     if (ranges.length) return ranges
   }
   return m.from != null && m.to != null ? [{ from: m.from, to: m.to }] : []
+}
+
+/**
+ * The comment a card acts on: a margin rail's marker, or (Sprint 161) a
+ * comment on a slide. Its key is the rail's: `c:<id>`, `m:<from>-<to>` or
+ * `n:<pos>`.
+ */
+export interface CommentTarget {
+  key: string
+  kind: 'mark' | 'node'
+  commentId?: string
+  /** An anchored comment without an id: its range. */
+  from?: number
+  to?: number
+  /** A standalone note: its position. */
+  nodePos?: number
+}
+
+/** Delete a comment: its mark on every range (its words stay), or its note. */
+export function removeComment(editor: TipTapEditor, m: CommentTarget): void {
+  if (m.kind === 'mark') {
+    // Clear the mark on EVERY range of the comment: the FULL mark range
+    // (audit H-A) for a link-split fragment, and — for a multi-block
+    // comment (#150) — every block's range sharing the id.
+    const ranges = markerRanges(editor, m)
+    if (!ranges.length) return
+    let chain = editor.chain().focus()
+    for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
+    chain.setTextSelection(ranges[ranges.length - 1].to).run()
+  } else if (m.nodePos != null) {
+    // standalone atom node — delete it whole
+    const node = editor.state.doc.nodeAt(m.nodePos)
+    editor.chain().focus().deleteRange({ from: m.nodePos, to: m.nodePos + (node?.nodeSize ?? 1) }).run()
+  }
+}
+
+/** Save (or cancel) a note into a comment (mark or node): an empty one removes a new comment. */
+export function applyCommentNote(editor: TipTapEditor, m: CommentTarget, text: string): void {
+  const note = text.trim()
+  const alias = note ? detectAgentAlias(note) : null
+  if (m.kind === 'mark') {
+    // Apply to EVERY range (audit H-A for link splits; #150 for multi-block)
+    // so a comment fills/clears all its fragments, not just the first. The
+    // shared id is preserved so the fragments stay one comment.
+    const ranges = markerRanges(editor, m)
+    if (!ranges.length) return
+    const last = ranges[ranges.length - 1].to
+    let chain = editor.chain().focus()
+    if (!note) {
+      // empty → discard the placeholder mark, keep the text
+      for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
+    } else {
+      for (const r of ranges) chain = chain.setTextSelection(r).setCommentMark({ id: m.commentId ?? null, note, agentAlias: alias })
+    }
+    chain.setTextSelection(last).run()
+  } else if (m.nodePos != null) {
+    if (!note) {
+      // empty → remove the placeholder standalone note
+      const node = editor.state.doc.nodeAt(m.nodePos)
+      editor.chain().focus().deleteRange({ from: m.nodePos, to: m.nodePos + (node?.nodeSize ?? 1) }).run()
+    } else {
+      editor.chain().focus().setNodeSelection(m.nodePos).updateAttributes('commentNode', { note, agentAlias: alias }).run()
+    }
+  }
+}
+
+/**
+ * Accept one comment as a task. The id upgrade runs FIRST (D3): a legacy
+ * comment without an id is minted one in a single undoable transaction, and
+ * only then is the request built from the shared collector — so the payload
+ * is the same one the Comments menu would send for the same comment (R2).
+ * `report.state` is the card's own in-flight state, by marker key; `moved`
+ * says the key changed when an id was minted (`m:12-30` → `c:<id>`).
+ */
+export async function sendCommentTask(
+  editor: TipTapEditor,
+  markerKey: string,
+  report: { state: (key: string, state: SendState | null) => void; moved?: (from: string, to: string) => void },
+): Promise<void> {
+  let key = markerKey
+  report.state(key, { status: 'pending' })
+
+  const localFailure = (message: string, error?: Partial<CommentTaskError>) =>
+    report.state(key, {
+      status: 'rejected',
+      error: { code: 'comment-not-found', message, retryable: false, recovery: 'none', ...error },
+    })
+
+  let commentId: string | undefined
+  try {
+    commentId = assignMissingCommentIds(editor, [markerKey]).get(markerKey)
+  } catch {
+    localFailure('This comment could not be prepared for sending. Reopen the document and try again.')
+    return
+  }
+  if (!commentId) {
+    localFailure('This comment no longer exists in the document.')
+    return
+  }
+
+  // Minting an id changes the marker's identity (`m:12-30` → `c:<id>`), so
+  // the in-flight state and the open bubble move with it.
+  const mintedKey = `c:${commentId}`
+  if (mintedKey !== key) {
+    report.state(key, null)
+    report.state(mintedKey, { status: 'pending' })
+    report.moved?.(key, mintedKey)
+    key = mintedKey
+  }
+
+  const indexed = collectDocumentComments(editor.state.doc as unknown as MinimalNode).find(
+    (comment) => comment.commentId === commentId,
+  )
+  if (!indexed) {
+    localFailure('This comment no longer exists in the document.')
+    return
+  }
+  if (!indexed.alias) {
+    localFailure('Assign an agent with @claude, @chatgpt, or @opencode before sending.', {
+      code: 'unsupported-alias',
+    })
+    return
+  }
+
+  const outcome = await requestCommentTask('comment-task/accept', {
+    batchId: null,
+    surface: 'rail',
+    alias: indexed.alias,
+    // The webview does not know the host's TextDocument.version; the host
+    // validates the request by comment id against the live document.
+    documentVersion: 0,
+    comments: [toRequestComment(indexed)],
+  })
+  // Success is not announced here: the host's projection is what says the
+  // task exists, and it arrives on its own (audit F18).
+  report.state(key, outcome.ok ? null : { status: 'rejected', error: outcome.error })
+}
+
+/** A card's recovery (sign in, settings): those live on the host side; the editor only asks for them. */
+export function recoverCommentTask(recovery: CommentTaskError['recovery'], alias: CommentAgentAlias | null): void {
+  sendToExtension('comment:recover', { recovery, alias })
 }
 
 const MARKER_MIN_GAP = 8
@@ -285,7 +426,7 @@ function revealBoxAndLine(container: HTMLElement | null, box: HTMLElement | null
   if (delta) container.scrollTop += delta
 }
 
-const CommentIcon = ({ size = 13 }: { size?: number }) => (
+export const CommentIcon = ({ size = 13 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -324,15 +465,19 @@ function renderNoteWithMentions(note: string): ReactNode {
 }
 
 /** What the rail needs to bring its one open box forward (#687). */
-interface ComposeBoxHandle {
+export interface ComposeBoxHandle {
   /** The box itself, to scroll into view with the line it is about. */
   box: () => HTMLElement | null
   /** The caret at the end of the box's text. */
   focusEnd: () => void
 }
 
-/** Compose bubble — used to create a new comment and to edit an existing one. */
-function ComposeBubble({
+/**
+ * Compose bubble — used to create a new comment and to edit an existing one.
+ * Sprint 161: a comment on a slide uses the same card, anchored on the slide;
+ * `on` is its line under the head ("On the four boxes, slide 6").
+ */
+export function ComposeBubble({
   initial = '',
   width,
   offset,
@@ -340,6 +485,7 @@ function ComposeBubble({
   onCancel,
   handleRef,
   onDirtyChange,
+  on,
 }: {
   initial?: string
   width: number
@@ -350,6 +496,8 @@ function ComposeBubble({
   handleRef: { current: ComposeBoxHandle | null }
   /** Told whenever the box starts or stops holding words that aren't saved. */
   onDirtyChange: (dirty: boolean) => void
+  /** What the comment is on, under the head (a slide's comment). */
+  on?: string
 }) {
   const [text, setText] = useState(initial)
   const [caret, setCaret] = useState(initial.length)
@@ -425,6 +573,7 @@ function ComposeBubble({
       <div className="rm-bubble-head">
         <span className="rm-bubble-who">Comment</span>
       </div>
+      {on ? <div className="rm-bubble-on">{on}</div> : null}
       <ResizableComposer
         value={text}
         autoFocus
@@ -496,7 +645,170 @@ function ComposeBubble({
 }
 
 /** What this surface knows about its own in-flight accept — never more. */
-type SendState = { status: 'pending' } | { status: 'rejected'; error: CommentTaskError }
+export type SendState = { status: 'pending' } | { status: 'rejected'; error: CommentTaskError }
+
+/**
+ * A saved comment's card: its note, Edit and Delete (Mark as done once its task
+ * completed), and, for a comment to an AI, Send and the task's own state from
+ * the host's projection. The margin rail opens it beside its marker; Sprint 161
+ * opens the same card on a slide, under what the comment is on (`on`).
+ */
+export function CommentBubble({
+  note,
+  commentId,
+  width,
+  offset,
+  sendState,
+  onEdit,
+  onRemove,
+  onSend,
+  onRecovery,
+  on,
+}: {
+  note: string
+  commentId?: string
+  width: number
+  offset: number
+  sendState: SendState | undefined
+  onEdit: () => void
+  onRemove: () => void
+  onSend: () => void
+  onRecovery: (recovery: CommentTaskError['recovery'], alias: CommentAgentAlias | null) => void
+  /** What the comment is on, under the head (a slide's comment). */
+  on?: string
+}) {
+  const projection = useCommentTaskProjection(commentId)
+  const alias = detectAgentAlias(note)
+  const presentation = projection ? presentCommentTask(projection) : null
+  const sending = sendState?.status === 'pending'
+  // The destination caption is only worth asking for while a Send control is
+  // actually on screen (this card is) and no task exists yet.
+  const destination = useCommentTaskDestination(!!alias && !projection)
+
+  const runAction = (action: CommentTaskAction) => {
+    if (!projection) return
+    const type = action.kind === 'retry' ? 'comment-task/retry' : 'comment-task/open-conversation'
+    void requestCommentTask(type, { taskId: projection.taskId })
+  }
+
+  const rejection = sendState?.status === 'rejected' ? sendState.error : null
+  const recovery = rejection ? recoveryAction(rejection) : null
+
+  return (
+    <div className="rm-bubble" style={{ width, top: offset }}>
+      <div className="rm-bubble-head">
+        <span className="rm-bubble-who">Comment</span>
+        <span className="rm-grow" />
+        <Tooltip label="Edit comment">
+          <button className="rm-bubble-del rm-bubble-edit" aria-label="Edit comment" onClick={onEdit}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+            </svg>
+          </button>
+        </Tooltip>
+        {/* The same action, named for what the user is actually doing.
+            Jarmo, 2026-09-14: a red trash can on a comment the agent has
+            just finished reads as "throw this away", when the intent is
+            "this is handled". Once a task has completed, clearing the
+            comment IS marking it done — Ritemark has always left clearing
+            to the user, and the agent never removes a marker itself. Every
+            other state keeps Delete, because nothing has been resolved. */}
+        {presentation?.state === 'completed' ? (
+          <Tooltip label="Mark as done — removes this comment from the document">
+            <button
+              className="rm-bubble-del rm-bubble-done"
+              aria-label="Mark as done"
+              onClick={onRemove}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </button>
+          </Tooltip>
+        ) : (
+          <Tooltip label="Delete comment">
+            <button className="rm-bubble-del" aria-label="Delete comment" onClick={onRemove}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              </svg>
+            </button>
+          </Tooltip>
+        )}
+      </div>
+      {on ? <div className="rm-bubble-on">{on}</div> : null}
+
+      {/* The user's note stays primary; everything the agent adds stacks
+          below it and never rewrites it (R7). */}
+      <div className="rm-bubble-text">{renderNoteWithMentions(note)}</div>
+
+      {presentation && (
+        <>
+          <div className={`rm-task-status rm-task-status--${presentation.tone}`} role="status">
+            <span className="rm-task-glyph" aria-hidden="true">{presentation.glyph}</span>
+            <span>{presentation.statusLine}</span>
+          </div>
+          {presentation.destinationLine && (
+            <div className="rm-task-dest">{presentation.destinationLine}</div>
+          )}
+          {presentation.detail && <p className="rm-task-reply">{presentation.detail}</p>}
+        </>
+      )}
+
+      {sending && (
+        <div className="rm-task-status rm-task-status--progress" role="status">
+          <span className="rm-task-glyph" aria-hidden="true">◌</span>
+          <span>Sending task…</span>
+        </div>
+      )}
+
+      {rejection && (
+        <div className="rm-task-status rm-task-status--error" role="status">
+          <span className="rm-task-glyph" aria-hidden="true">!</span>
+          <span>{rejection.message}</span>
+        </div>
+      )}
+
+      {!projection && !sending && alias && destination && (
+        <div className="rm-task-dest">
+          {destinationCaption(destination.title, { alias, conversationRuntimeId: destination.runtimeId })}
+        </div>
+      )}
+
+      {(presentation || alias) && (
+        <div className="rm-bubble-foot">
+          {presentation?.actions.map((action) => (
+            <Button
+              key={action.kind}
+              size="sm"
+              variant={action.kind === 'open-conversation' ? 'default' : 'outline'}
+              onClick={() => runAction(action)}
+            >
+              {action.label}
+            </Button>
+          ))}
+          {recovery && (
+            <Button
+              size="sm"
+              variant={recovery.kind === 'retry' ? 'default' : 'outline'}
+              onClick={() => (recovery.kind === 'retry' ? onSend() : onRecovery(recovery.recovery, alias))}
+            >
+              {recovery.label}
+            </Button>
+          )}
+          {!projection && alias && recovery?.kind !== 'retry' && (
+            <Button size="sm" onClick={onSend} disabled={sending}>
+              <SendIcon />
+              {sending ? 'Sending…' : `Send to ${ALIAS_LABEL[alias]}`}
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function RailItem({
   marker,
@@ -549,27 +861,13 @@ function RailItem({
     if (reveal && itemRef.current) onRevealed(itemRef.current)
   }, [reveal, onRevealed])
   const projection = useCommentTaskProjection(marker.commentId)
-  const alias = detectAgentAlias(marker.note)
   const presentation = projection ? presentCommentTask(projection) : null
-  const sending = sendState?.status === 'pending'
   const markerRef = useRef<HTMLButtonElement>(null)
-  // The destination caption is only worth asking for while a Send control is
-  // actually on screen and no task exists yet.
-  const destination = useCommentTaskDestination(open && !!alias && !projection && !composing)
 
   const preview = marker.note.length > 24 ? marker.note.slice(0, 24) + '…' : marker.note
   const markerLabel = presentation
     ? `Comment: ${preview || 'empty'} — ${presentation.statusLine}`
     : `Comment: ${preview || 'empty'}`
-
-  const runAction = (action: CommentTaskAction) => {
-    if (!projection) return
-    const type = action.kind === 'retry' ? 'comment-task/retry' : 'comment-task/open-conversation'
-    void requestCommentTask(type, { taskId: projection.taskId })
-  }
-
-  const rejection = sendState?.status === 'rejected' ? sendState.error : null
-  const recovery = rejection ? recoveryAction(rejection) : null
 
   // The wrapper toggles pin for clicks/keypresses on itself or the marker
   // button, but a bubble action (Send, Edit, Delete, Retry, Open conversation)
@@ -649,117 +947,17 @@ function RailItem({
           )}
         </button>
         {open && (
-        <div className="rm-bubble" style={{ width: geometry.bubbleWidth, top: geometry.bubbleOffset }}>
-          <div className="rm-bubble-head">
-            <span className="rm-bubble-who">Comment</span>
-            <span className="rm-grow" />
-            <Tooltip label="Edit comment">
-              <button className="rm-bubble-del rm-bubble-edit" aria-label="Edit comment" onClick={onEdit}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                  strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
-                </svg>
-              </button>
-            </Tooltip>
-            {/* The same action, named for what the user is actually doing.
-                Jarmo, 2026-09-14: a red trash can on a comment the agent has
-                just finished reads as "throw this away", when the intent is
-                "this is handled". Once a task has completed, clearing the
-                comment IS marking it done — Ritemark has always left clearing
-                to the user, and the agent never removes a marker itself. Every
-                other state keeps Delete, because nothing has been resolved. */}
-            {presentation?.state === 'completed' ? (
-              <Tooltip label="Mark as done — removes this comment from the document">
-                <button
-                  className="rm-bubble-del rm-bubble-done"
-                  aria-label="Mark as done"
-                  onClick={onRemove}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                </button>
-              </Tooltip>
-            ) : (
-              <Tooltip label="Delete comment">
-                <button className="rm-bubble-del" aria-label="Delete comment" onClick={onRemove}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  </svg>
-                </button>
-              </Tooltip>
-            )}
-          </div>
-
-          {/* The user's note stays primary; everything the agent adds stacks
-              below it and never rewrites it (R7). */}
-          <div className="rm-bubble-text">{renderNoteWithMentions(marker.note)}</div>
-
-          {presentation && (
-            <>
-              <div className={`rm-task-status rm-task-status--${presentation.tone}`} role="status">
-                <span className="rm-task-glyph" aria-hidden="true">{presentation.glyph}</span>
-                <span>{presentation.statusLine}</span>
-              </div>
-              {presentation.destinationLine && (
-                <div className="rm-task-dest">{presentation.destinationLine}</div>
-              )}
-              {presentation.detail && <p className="rm-task-reply">{presentation.detail}</p>}
-            </>
-          )}
-
-          {sending && (
-            <div className="rm-task-status rm-task-status--progress" role="status">
-              <span className="rm-task-glyph" aria-hidden="true">◌</span>
-              <span>Sending task…</span>
-            </div>
-          )}
-
-          {rejection && (
-            <div className="rm-task-status rm-task-status--error" role="status">
-              <span className="rm-task-glyph" aria-hidden="true">!</span>
-              <span>{rejection.message}</span>
-            </div>
-          )}
-
-          {!projection && !sending && alias && destination && (
-            <div className="rm-task-dest">
-              {destinationCaption(destination.title, { alias, conversationRuntimeId: destination.runtimeId })}
-            </div>
-          )}
-
-          {(presentation || alias) && (
-            <div className="rm-bubble-foot">
-              {presentation?.actions.map((action) => (
-                <Button
-                  key={action.kind}
-                  size="sm"
-                  variant={action.kind === 'open-conversation' ? 'default' : 'outline'}
-                  onClick={() => runAction(action)}
-                >
-                  {action.label}
-                </Button>
-              ))}
-              {recovery && (
-                <Button
-                  size="sm"
-                  variant={recovery.kind === 'retry' ? 'default' : 'outline'}
-                  onClick={() => (recovery.kind === 'retry' ? onSend() : onRecovery(recovery.recovery, alias))}
-                >
-                  {recovery.label}
-                </Button>
-              )}
-              {!projection && alias && recovery?.kind !== 'retry' && (
-                <Button size="sm" onClick={onSend} disabled={sending}>
-                  <SendIcon />
-                  {sending ? 'Sending…' : `Send to ${ALIAS_LABEL[alias]}`}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+          <CommentBubble
+            note={marker.note}
+            commentId={marker.commentId}
+            width={geometry.bubbleWidth}
+            offset={geometry.bubbleOffset}
+            sendState={sendState}
+            onEdit={onEdit}
+            onRemove={onRemove}
+            onSend={onSend}
+            onRecovery={onRecovery}
+          />
         )}
         </>
       )}
@@ -1067,20 +1265,7 @@ export function MarginCommentRail({
   const remove = useCallback(
     (m: RailMarker) => {
       if (!editor) return
-      if (m.kind === 'mark') {
-        // Clear the mark on EVERY range of the comment: the FULL mark range
-        // (audit H-A) for a link-split fragment, and — for a multi-block
-        // comment (#150) — every block's range sharing the id.
-        const ranges = markerRanges(editor, m)
-        if (!ranges.length) return
-        let chain = editor.chain().focus()
-        for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
-        chain.setTextSelection(ranges[ranges.length - 1].to).run()
-      } else if (m.nodePos != null) {
-        // standalone atom node — delete it whole
-        const node = editor.state.doc.nodeAt(m.nodePos)
-        editor.chain().focus().deleteRange({ from: m.nodePos, to: m.nodePos + (node?.nodeSize ?? 1) }).run()
-      }
+      removeComment(editor, m)
       setOpenKey(null)
       setPinnedKey(null)
       rescan()
@@ -1092,32 +1277,7 @@ export function MarginCommentRail({
   const applyNote = useCallback(
     (m: RailMarker, text: string) => {
       if (!editor) return
-      const note = text.trim()
-      const alias = note ? detectAgentAlias(note) : null
-      if (m.kind === 'mark') {
-        // Apply to EVERY range (audit H-A for link splits; #150 for multi-block)
-        // so a comment fills/clears all its fragments, not just the first. The
-        // shared id is preserved so the fragments stay one comment.
-        const ranges = markerRanges(editor, m)
-        if (!ranges.length) return
-        const last = ranges[ranges.length - 1].to
-        let chain = editor.chain().focus()
-        if (!note) {
-          // empty → discard the placeholder mark, keep the text
-          for (const r of ranges) chain = chain.setTextSelection(r).unsetMark('commentMark')
-        } else {
-          for (const r of ranges) chain = chain.setTextSelection(r).setCommentMark({ id: m.commentId ?? null, note, agentAlias: alias })
-        }
-        chain.setTextSelection(last).run()
-      } else if (m.nodePos != null) {
-        if (!note) {
-          // empty → remove the placeholder standalone note
-          const node = editor.state.doc.nodeAt(m.nodePos)
-          editor.chain().focus().deleteRange({ from: m.nodePos, to: m.nodePos + (node?.nodeSize ?? 1) }).run()
-        } else {
-          editor.chain().focus().setNodeSelection(m.nodePos).updateAttributes('commentNode', { note, agentAlias: alias }).run()
-        }
-      }
+      applyCommentNote(editor, m, text)
       rescan()
     },
     [editor, rescan],
@@ -1132,80 +1292,19 @@ export function MarginCommentRail({
     })
   }, [])
 
-  /**
-   * Accept one comment as a task. The id upgrade runs FIRST (D3): a legacy
-   * comment without an id is minted one in a single undoable transaction, and
-   * only then is the request built from the shared collector — so the payload
-   * is the same one the Comments menu would send for the same comment (R2).
-   */
   const send = useCallback(
     async (m: RailMarker) => {
       if (!editor) return
-      let key = m.key
-      setSendState(key, { status: 'pending' })
-
-      const localFailure = (message: string, error?: Partial<CommentTaskError>) =>
-        setSendState(key, {
-          status: 'rejected',
-          error: { code: 'comment-not-found', message, retryable: false, recovery: 'none', ...error },
-        })
-
-      let commentId: string | undefined
-      try {
-        commentId = assignMissingCommentIds(editor, [m.key]).get(m.key)
-      } catch {
-        localFailure('This comment could not be prepared for sending. Reopen the document and try again.')
-        return
-      }
-      if (!commentId) {
-        localFailure('This comment no longer exists in the document.')
-        return
-      }
-
-      // Minting an id changes the marker's identity (`m:12-30` → `c:<id>`), so
-      // the in-flight state and the open bubble move with it.
-      const mintedKey = `c:${commentId}`
-      if (mintedKey !== key) {
-        setSendState(key, null)
-        setSendState(mintedKey, { status: 'pending' })
-        setOpenKey((current) => (current === key ? mintedKey : current))
-        key = mintedKey
-      }
-
-      const indexed = collectDocumentComments(editor.state.doc as unknown as MinimalNode).find(
-        (comment) => comment.commentId === commentId,
-      )
-      if (!indexed) {
-        localFailure('This comment no longer exists in the document.')
-        return
-      }
-      if (!indexed.alias) {
-        localFailure('Assign an agent with @claude, @chatgpt, or @opencode before sending.', {
-          code: 'unsupported-alias',
-        })
-        return
-      }
-
-      const outcome = await requestCommentTask('comment-task/accept', {
-        batchId: null,
-        surface: 'rail',
-        alias: indexed.alias,
-        // The webview does not know the host's TextDocument.version; the host
-        // validates the request by comment id against the live document.
-        documentVersion: 0,
-        comments: [toRequestComment(indexed)],
+      await sendCommentTask(editor, m.key, {
+        state: setSendState,
+        // The open bubble moves with a comment whose id was just minted.
+        moved: (from, to) => setOpenKey((current) => (current === from ? to : current)),
       })
-      // Success is not announced here: the host's projection is what says the
-      // task exists, and it arrives on its own (audit F18).
-      setSendState(key, outcome.ok ? null : { status: 'rejected', error: outcome.error })
     },
     [editor, setSendState],
   )
 
-  const onRecovery = useCallback((recovery: CommentTaskError['recovery'], alias: CommentAgentAlias | null) => {
-    // Sign-in / settings live on the host side; the editor only asks for them.
-    sendToExtension('comment:recover', { recovery, alias })
-  }, [])
+  const onRecovery = recoverCommentTask
 
   const density = railDensity(containerWidth)
   const geometry = railGeometry(containerWidth, density)

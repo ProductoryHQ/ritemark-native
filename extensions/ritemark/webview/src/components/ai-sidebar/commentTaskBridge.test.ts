@@ -126,6 +126,30 @@ function deliver(message: Record<string, unknown>): void {
   );
 }
 
+// ── 1b. Sprint 161: a comment on a deck's slide names the slide in its message's chip ──
+{
+  resetAll();
+  seed('dest', { agentConversation: [runningClaudeTurn('dest') as never] });
+  posted.length = 0;
+  const slideAtSend = {
+    path: 'decks/Training.deck.md',
+    slide: { deck: 'Training', count: 15, slides: [{ number: 6, id: 'k3f9', title: "An assistant's four parts" }] },
+  };
+  deliver(enqueueMessage({ taskId: 'task-slide', sourceDisplayPath: 'decks/Training.deck.md', slideAtSend }));
+  const [item] = queueFor(useAISidebarStore.getState().promptQueues, 'dest');
+  assert.deepEqual(item.slideAtSend, slideAtSend, 'the queued message carries the slide, as the composer chip would');
+
+  // What the host sends is checked field by field (`slideAtSendOf`): a malformed slide never reaches a prompt.
+  deliver(enqueueMessage({ taskId: 'task-forged', conversationTurnId: 'host-turn-2', slideAtSend: { path: 'x.deck.md', slide: { deck: 'x', count: 1, slides: [{ number: 9 }] } } }));
+  const forged = queueFor(useAISidebarStore.getState().promptQueues, 'dest').find((candidate) => candidate.taskId === 'task-forged');
+  assert.equal(forged?.slideAtSend, null, 'a slide number past the count is dropped');
+
+  // A comment in a Text document names no slide, as before.
+  deliver(enqueueMessage({ taskId: 'task-text', conversationTurnId: 'host-turn-3' }));
+  const text = queueFor(useAISidebarStore.getState().promptQueues, 'dest').find((candidate) => candidate.taskId === 'task-text');
+  assert.equal(text?.slideAtSend, undefined)
+}
+
 // ── 2. F17: a full queue is reported as full, never as queued ──
 {
   resetAll();

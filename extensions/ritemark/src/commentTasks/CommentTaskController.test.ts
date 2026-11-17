@@ -13,7 +13,9 @@ import {
 import { CommentTaskStore, TERMINAL_RETENTION_DAYS, commentTaskStoreDir } from './CommentTaskStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import type { CommentTaskEnqueueMessage, CommentTaskEnqueueOutcome, CommentTaskResultMessage } from './protocol';
-import { safeFailureMessage, type CommentTaskProjectionV1 } from './types';
+import { safeFailureMessage, type CommentTaskProjectionV1, type CommentTaskRecordV1 } from './types';
+import type { SlideAtSend } from '../decks/currentSlide';
+import { slideAtSendForComments } from '../decks/blocks/slideComments';
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 const COMMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -64,6 +66,8 @@ interface Settings {
   destination: CommentTaskDestination | null;
   featureEnabled: boolean;
   durable: boolean;
+  /** Sprint 161: the slide a task's comments are on, for its message's chip. */
+  slideAtSend?: (record: CommentTaskRecordV1) => SlideAtSend | null;
 }
 
 function harness(): Harness {
@@ -98,6 +102,7 @@ function harness(): Harness {
     runtimeSettings: () => ({ modelId: 'model-x', approvalMode: 'auto', thinkingEffort: 'auto' }),
     buildPrompt: (document, comments) =>
       `The user assigned you ${comments.length} comment(s) in ${document.displayPath}.`,
+    slideAtSend: (record) => (settings.slideAtSend ? settings.slideAtSend(record) : null),
     enqueue: async (message) => {
       enqueued.push(message);
       return settings.enqueueOutcome;
@@ -155,6 +160,7 @@ async function main(): Promise<void> {
     assert.equal(h.enqueued.length, 1);
     assert.match(h.enqueued[0].prompt, /docs\/brief\.md/, 'the prompt names the real document');
     assert.equal(h.enqueued[0].sourceDisplayPath, 'docs/brief.md');
+    assert.ok(!('slideAtSend' in h.enqueued[0]), 'a comment on no slide names none (Sprint 161)');
     assert.equal(
       h.enqueued[0].conversationTurnId,
       stored?.turn.conversationTurnId,
@@ -164,6 +170,37 @@ async function main(): Promise<void> {
     const last = h.projections.at(-1);
     assert.equal(last?.documentUri, 'file:///fixtures/project/docs/brief.md', 'the snapshot is document-scoped');
     assert.equal(last?.tasks[0].state, 'queued');
+  }
+
+  // ── Sprint 161: a comment on a deck's slide names its slide in the message's chip ──
+  {
+    const h = harness();
+    const deckText = [
+      '---', 'deck: 2', '---', '', '```slide', '# Welcome', '```', '', 'Handout.', '',
+      '```slide', '---', 'id: k3f9', '---', '# Four parts', '',
+      `<!-- {id:${COMMENT_ID}} @claude Make each box shorter -->`, '', ':::: boxes', '', '::: box', 'One', ':::', '', '::::', '```', '',
+    ].join('\n');
+    const seen: string[] = [];
+    h.set({
+      slideAtSend: (record) => {
+        seen.push(record.taskId);
+        return slideAtSendForComments(record.source.displayPath, deckText, record.comments.map((comment) => comment.commentId));
+      },
+    });
+    const deckDoc = doc({ uri: 'file:///fixtures/project/decks/Training.deck.md', displayPath: 'decks/Training.deck.md', text: deckText });
+    expectOk(await h.controller.handleRequest(acceptMessage({ requestId: 'req-slide', comments: [{ commentId: COMMENT_ID, kind: 'node', note: '@claude Make each box shorter', instruction: 'Make each box shorter' }] }), deckDoc), 'accept a slide comment');
+    assert.equal(seen.length, 1, 'the slide is read when the task is handed to the queue');
+    assert.deepEqual(h.enqueued[0].slideAtSend, {
+      path: 'decks/Training.deck.md',
+      slide: { deck: 'Training', count: 2, slides: [{ number: 2, id: 'k3f9', title: 'Four parts' }] },
+    }, 'the message carries slide 2, as the composer chip names it');
+
+    // A deck that can't be read names no slide, and the task still goes.
+    const failing = harness();
+    failing.set({ slideAtSend: () => { throw new Error('gone'); } });
+    expectOk(await failing.controller.handleRequest(acceptMessage({ requestId: 'req-slide-2' }), deckDoc), 'accept without a readable deck');
+    assert.equal(failing.enqueued.length, 1);
+    assert.ok(!('slideAtSend' in failing.enqueued[0]));
   }
 
   // ── Nothing is accepted when the environment says no ───────────────────────

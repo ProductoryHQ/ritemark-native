@@ -314,8 +314,12 @@ function finishStart(
  * brings back the old empty comment and never two boxes. Returns false only
  * when no comment can be made here (the document is then untouched), so ⌘/
  * falls through as it did before.
+ *
+ * `placeNote` (Sprint 161, a comment on a slide): where an empty selection's
+ * margin note goes, instead of at the cursor. The slide puts it before the
+ * block it is on, or at the slide's end for the whole slide.
  */
-export function startComment(editor: Editor): boolean {
+export function startComment(editor: Editor, placeNote?: (tr: Transaction, id: string) => void): boolean {
   const box = commentBoxStorage(editor)?.openBox ?? null
   const decision = decideNewBox(box)
   if (decision === 'bring-forward' && box) {
@@ -331,7 +335,8 @@ export function startComment(editor: Editor): boolean {
     return true
   }
   const id = newCommentId()
-  addEmptyComment(tr, id)
+  if (placeNote && tr.selection.empty) placeNote(tr, id)
+  else addEmptyComment(tr, id)
   if (!hasComment(tr.doc, id)) return false
   finishStart(editor, tr, closing, { key: `c:${id}`, as: 'box' })
   return true

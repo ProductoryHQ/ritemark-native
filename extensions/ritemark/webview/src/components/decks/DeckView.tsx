@@ -55,6 +55,7 @@ import { DeckSlideWithPartHead } from './handout/SlidePartHead'
 import { DeckLines } from './handout/deckLines'
 import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
+import { DeckComments, deckCommentStops } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
 import { DeckFolds, deckViewState, foldedSides, keepDeckViewState, keepFold, storedFold, toggledFold, type DeckFold } from './DeckFolds'
@@ -208,6 +209,9 @@ export function DeckView({
   const undoneFrom = useRef(new Map<string, { id: string; from: string | undefined; kept: boolean | undefined }>())
   // A slide whose title takes the caret once its stage is drawn (a new slide's), or is selected whole (a deck New made)
   const [focusTitleOf, setFocusTitleOf] = useState<{ index: number; select: boolean } | null>(null)
+  // Sprint 161: the slide comment the bar's Previous and Next stand on, and the one it asked the stage to open.
+  const [commentAt, setCommentAt] = useState<number | null>(null)
+  const [commentOpen, setCommentOpen] = useState<{ slide: number; ordinal: number; serial: number } | null>(null)
   // Sprint 159 (PR 7): the host asked to select the title slide's title, once the deck's slides are there
   const [selectTitle, setSelectTitle] = useState(false)
   const [ratio, setRatio] = useState(() => initialRatio(storedRatio()))
@@ -610,6 +614,17 @@ export function DeckView({
     const tops = partTops()
     if (container && tops[index] !== undefined) container.scrollTop = scrollTopFor(tops[index])
   }, [makeCurrent, partTops, scrollContainer])
+
+  // Sprint 161: the comments on the slides, for the bar's count and its Previous and Next. Going to one makes its slide
+  // the current one and opens its card there, latched under what it is on.
+  const commentStops = useMemo(() => (commentCallouts ? deckCommentStops(slides) : []), [commentCallouts, slides])
+  const goToComment = useCallback((index: number) => {
+    const stop = commentStops[index]
+    if (!stop) return
+    setCommentAt(index)
+    if (stop.slide !== currentRef.current) pick(stop.slide)
+    setCommentOpen(open => ({ slide: stop.slide, ordinal: stop.ordinal, serial: (open?.serial ?? 0) + 1 }))
+  }, [commentStops, pick])
 
   // The conversion's line in the bar (PR 2; the Experience lead on #765): "Old notes are now comments in the handout."
   // with Show, once per deck (this view keeps that it said it), and only when old notes or hidden words became comments.
@@ -1294,6 +1309,7 @@ export function DeckView({
           ) : null}
         </span>
         <span className="flex-1" />
+        <DeckComments stops={commentStops} at={commentAt} current={shown} onGo={goToComment} />
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
@@ -1342,6 +1358,7 @@ export function DeckView({
                   selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
                   onFocusTaken={titleSelected}
                   onPicture={onPicture}
+                  commentOpen={commentOpen && commentOpen.slide === slide.index ? commentOpen : null}
                 />
               ) : null}
             </div>

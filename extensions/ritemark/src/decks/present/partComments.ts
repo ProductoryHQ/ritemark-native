@@ -9,6 +9,7 @@
  */
 import type { Token } from 'marked';
 import { lexHandout } from '../page/publicDeck';
+import { commentsWrittenIn } from '../writtenComments';
 
 /** One comment of a part: its note, and for an anchored comment the words it is on. */
 export interface PartComment {
@@ -16,32 +17,11 @@ export interface PartComment {
   words?: string;
 }
 
-/** The standalone note's id carrier (`commentMarkedExtension`'s rule): metadata, never part of the note. */
-const ID_TOKEN = /^\{id:([0-9a-fA-F-]{36}|c-[a-z0-9]+-[a-z0-9]+)\}[ \t]*/;
-
-function decodeEntities(value: string): string {
-  return value.replace(/&(quot|amp|lt|gt|#39|#x27);/g, (_all, name: string) => ({ quot: '"', amp: '&', lt: '<', gt: '>', '#39': "'", '#x27': "'" })[name] as string);
-}
-
-/** The words of an anchored comment, without the Markdown marks a reader wouldn't see. */
-function plainWords(value: string): string {
-  return value.replace(/<[^>]*>/g, '').replace(/\\([\\`*_{}[\]()#+\-.!>~|])/g, '$1').replace(/[*_`]+/g, '').replace(/\s+/g, ' ').trim();
-}
-
-/** The comments in raw HTML or text, in order. */
+/** The comments in raw HTML or text, in order (empty notes left out). */
 function commentsIn(raw: string, out: PartComment[]): void {
-  const scan = /<!--([\s\S]*?)-->|<mark\b((?:"[^"]*"|'[^']*'|[^'">])*)>([\s\S]*?)<\/mark>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = scan.exec(raw))) {
-    if (match[1] !== undefined) {
-      const note = match[1].trim().replace(ID_TOKEN, '').trim();
-      if (note) out.push({ note });
-      continue;
-    }
-    const attribute = /\bdata-comment\s*=\s*("([^"]*)"|'([^']*)')/i.exec(match[2]);
-    if (!attribute) continue;
-    const note = decodeEntities(attribute[2] ?? attribute[3] ?? '').trim();
-    if (note) out.push({ note, words: plainWords(match[3]) });
+  for (const comment of commentsWrittenIn(raw)) {
+    if (!comment.note) continue;
+    out.push(comment.words === undefined ? { note: comment.note } : { note: comment.note, words: comment.words });
   }
 }
 

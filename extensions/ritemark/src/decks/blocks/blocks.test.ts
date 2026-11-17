@@ -23,7 +23,7 @@ import { parseFenceAttributes, scanFencedDiv } from './fencedDiv';
 import { deckDigest, publicDeck } from '../page/publicDeck';
 import { pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from '../page/pageHtml';
 import { picturePaths, PAGE_FONTS } from '../page/pageFile';
-import { PRIVATE_BLOCK_DECK, PRIVATE_BLOCK_WORDS, PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_BLOCK_WORDS } from '../page/testing/privateDeck';
+import { PRIVATE_BLOCK_DECK, PRIVATE_BLOCK_IDS, PRIVATE_BLOCK_WORDS, PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_BLOCK_WORDS } from '../page/testing/privateDeck';
 import { PresentSession } from '../present/presentSession';
 import { presenterStateOf, wallPicturePaths, wallStateOf } from '../present/presentProtocol';
 import { partComments } from '../present/partComments';
@@ -252,6 +252,44 @@ test('a block deck: no private word reaches the page, its digest, the file list 
     }
     session.move(PRIVATE_BLOCK_DECK, { type: 'next' });
   }
+});
+
+test('Sprint 161: a comment on the slide never goes out: the page, its digest, the wall, any thumbnail, the presenter view', () => {
+  const slideComments = [PRIVATE_BLOCK_WORDS.slideBlockNote, PRIVATE_BLOCK_WORDS.slideWholeNote, PRIVATE_BLOCK_WORDS.slideTitleNote, PRIVATE_BLOCK_WORDS.slideRequest, PRIVATE_BLOCK_WORDS.slideMarkId, ...PRIVATE_BLOCK_IDS];
+  const deck = publicDeck(PRIVATE_BLOCK_DECK, { folderName: 'Harbour Logistics', deckName: 'Blocks', theme: BUILT_IN_THEME });
+  const bytes = JSON.stringify(deck) + pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl });
+  for (const word of slideComments) assert.ok(!bytes.includes(word), `${word} reached the page`);
+  assert.ok(bytes.includes('Pick a question'), 'the words a request is on stay');
+  // A comment never changes how a slide is drawn: the cover with a note on the whole slide is still the cover.
+  assert.equal(deck.title, 'Block cover');
+  const cover = parseDeck(PRIVATE_BLOCK_DECK).slides[0];
+  assert.equal(isCoverSlide(slideDataOf(cover.kind, cover.body).markdown ?? ''), true);
+  // The digest: adding, changing or removing a slide comment never shows the page as changed.
+  const digest = (text: string) => deckDigest(publicDeck(text, { folderName: 'H', deckName: 'B', theme: BUILT_IN_THEME }));
+  const before = digest(PRIVATE_BLOCK_DECK);
+  assert.equal(digest(PRIVATE_BLOCK_DECK.replace('# Steps\n', '# Steps\n\n<!-- {id:77777777-7777-4777-8777-777777777777} new -->\n')), before, 'a note added');
+  assert.equal(digest(PRIVATE_BLOCK_DECK.replace(PRIVATE_BLOCK_WORDS.slideBlockNote, 'changed')), before, 'a note changed');
+  assert.equal(digest(PRIVATE_BLOCK_DECK.replace(`<!-- {id:${PRIVATE_BLOCK_IDS[2]}} @chatgpt ${PRIVATE_BLOCK_WORDS.slideBlockNote} -->\n\n`, '')), before, 'a note removed');
+  // Every thumbnail and drawing is the one renderer's, which draws no comment: the strip and the library panel draw
+  // the slide as written (not the public copy), so that is what is checked here.
+  for (const slide of parseDeck(PRIVATE_BLOCK_DECK).slides) {
+    if (!isBlockSlide(slide.kind)) continue;
+    const drawn = blockSlideMarkup(slideDataOf(slide.kind, slide.body), { theme: BUILT_IN_THEME, borderless: false });
+    for (const word of slideComments) assert.ok(!drawn.includes(word), `${word} drawn on a thumbnail`);
+  }
+  // The presenter view shows the handout part's comments only, never the slide's.
+  const session = new PresentSession(PRIVATE_BLOCK_DECK, { from: 'start' });
+  const look = { borderless: false, theme: BUILT_IN_THEME };
+  const shown: string[] = [];
+  for (let step = 0; step < 4; step++) {
+    const state = presenterStateOf(session.view(), look, {}, { wallDisplay: null, canSwap: false, length: null, startedAt: 0 });
+    shown.push(...state.comments.map(comment => comment.note))
+    const wall = JSON.stringify(wallStateOf(session.view(), look, {}));
+    for (const word of slideComments) assert.ok(!wall.includes(word), `${word} reached the wall`);
+    session.move(PRIVATE_BLOCK_DECK, { type: 'next' });
+  }
+  assert.ok(shown.includes(PRIVATE_BLOCK_WORDS.partComment), 'the presenter view shows the handout part\'s comment');
+  for (const word of slideComments) assert.ok(!shown.some(note => note.includes(word)), `${word} shown in the presenter view`);
 });
 
 test('a v1 layout\'s hidden words no longer reach the wall\'s state (red on main: they were copied field by field)', () => {

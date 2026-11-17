@@ -687,6 +687,8 @@ body {
 }
 .rm-bubble-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
 .rm-bubble-who { font-size: 12px; font-weight: 600; color: var(--r-ink-strong); }
+/* Sprint 161: what a comment on a slide is on, under its card's head ("On the four boxes, slide 6"). */
+.rm-bubble-on { margin: -2px 0 6px; font-size: 11.5px; line-height: 16px; color: var(--r-ink-muted); }
 .rm-agent-badge {
   display: inline-flex; align-items: center; background: var(--r-accent);
   color: var(--r-on-accent); border-radius: 999px; padding: 2px 8px; font-size: 11px; font-weight: 600;
