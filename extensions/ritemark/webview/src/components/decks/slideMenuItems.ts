@@ -32,7 +32,7 @@ export interface SlideMenuItem {
 }
 
 /** The menu of slide `index` (from 0) in a deck of `count` slides. */
-export function slideMenuItems(input: { index: number; count: number; skipped: boolean; fromLibrary: boolean; deleteKey: string; duplicateKey?: string }): SlideMenuItem[] {
+export function slideMenuItems(input: { index: number; count: number; skipped: boolean; fromLibrary: boolean; deleteKey: string; duplicateKey: string }): SlideMenuItem[] {
   const { index, count, skipped, fromLibrary, deleteKey, duplicateKey } = input
   return [
     { key: 'duplicate', label: 'Duplicate', icon: 'copy', keyHint: duplicateKey, run: actions => actions.duplicate(index) },

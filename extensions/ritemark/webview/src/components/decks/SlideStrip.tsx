@@ -385,17 +385,29 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
     strip.focus({ preventScroll: true })
   }, [stripRef])
 
-  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const stripKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const origin = keyOrigin(event.target as HTMLElement, event.currentTarget)
-    const { key: name, shiftKey, metaKey, ctrlKey, altKey, repeat } = event
-    const key = stripKeyOf({ key: name, shiftKey, metaKey, ctrlKey, altKey, repeat, isComposing: event.nativeEvent.isComposing, defaultPrevented: event.isDefaultPrevented() }, origin, count, current, isMac)
-    if (!key) return
+    const { key: name, code, shiftKey, metaKey, ctrlKey, altKey, repeat } = event
+    return stripKeyOf({ key: name, code, shiftKey, metaKey, ctrlKey, altKey, repeat, isComposing: event.nativeEvent.isComposing, defaultPrevented: event.isDefaultPrevented() }, origin, count, current, isMac)
+  }
+
+  // Cmd+D, Cmd+↑ and Cmd+↓ before anything inside the strip: a thumbnail's ⋯ would take Cmd+↓ as its own ↓ and open
+  // its menu (review of #784). Taken here, the ⋯ sees the key handled and leaves it.
+  const onKeyCapture = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const key = stripKey(event)
+    if (key?.type !== 'duplicate' && key?.type !== 'nudge') return
+    event.preventDefault()
+    if (key.type === 'duplicate') actions.duplicate(key.index)
+    else actions.nudge(key.index, key.step)
+  }
+
+  const onKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const key = stripKey(event)
+    if (!key || key.type === 'duplicate' || key.type === 'nudge') return
     event.preventDefault()
     if (key.type === 'pick') actions.pick(key.index)
     else if (key.type === 'menu') setMenuFor(current)
     else if (key.type === 'undo') actions.undo(key.redo)
-    else if (key.type === 'duplicate') actions.duplicate(key.index)
-    else if (key.type === 'nudge') actions.nudge(key.index, key.step)
     else actions.remove(key.index)
   }
 
@@ -408,6 +420,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
       role="listbox"
       aria-label="Slides"
       tabIndex={0}
+      onKeyDownCapture={onKeyCapture}
       onKeyDown={onKey}
     >
       {slides.map(entry => (

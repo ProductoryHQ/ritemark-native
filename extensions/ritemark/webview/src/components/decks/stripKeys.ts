@@ -43,6 +43,8 @@ export function keyOrigin(target: OriginElement | null, strip: { contains(node: 
 
 interface KeyLike {
   key: string
+  /** The physical key: Cmd+D on a Russian or Greek layout has another `key`, but `code` is still KeyD. */
+  code?: string
   shiftKey?: boolean
   metaKey?: boolean
   ctrlKey?: boolean
@@ -59,7 +61,7 @@ export function slideOrderKeyOf(event: KeyLike, mac: boolean): SlideOrderKey | n
   if (event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.shiftKey) return null
   // Only the platform's own modifier: Ctrl+↑ on a Mac is the system's (Mission Control), Cmd on Windows is the Windows key.
   if (mac ? !event.metaKey || event.ctrlKey : !event.ctrlKey || event.metaKey) return null
-  if (event.key.toLowerCase() === 'd') return { type: 'duplicate' }
+  if (event.key.toLowerCase() === 'd' || event.code === 'KeyD') return { type: 'duplicate' }
   if (event.key === 'ArrowUp') return { type: 'nudge', step: -1 }
   if (event.key === 'ArrowDown') return { type: 'nudge', step: 1 }
   return null

@@ -22,7 +22,7 @@ import { isTextHandout, parseSlideBody, writeSlideBody } from '../../../../../sr
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DECK_DERIVED, derivedHeadings, duplicateSlide, moveSlide, nudgeTarget, partChangedBy, slidesOf, withDrawnHeadings } from '../deckDocument'
+import { DECK_DERIVED, derivedHeadings, duplicateSlide, moveSlide, nudgeTarget, partChangedBy, sealHistory, slidesOf, withDrawnHeadings } from '../deckDocument'
 import { documentReplacement } from '../../../lib/documentUpdate'
 import { DeckDrawnHeadings, drawnHeadingsFollow, handoutMarkFor, hasDrawnHeadings } from './drawnHeadings'
 
@@ -489,6 +489,33 @@ const blocksOf = (text: string) => text.match(/```slide[\s\S]*?\n```/g) ?? []
     assert.equal(partChangedBy(typing), 2, 'an undo of typing shows the part typed in')
     const moved = typed.apply(moveSlide(typed, 0, 2)!)
     assert.equal(save(moved.apply(undoOf(moved)).doc), typedText, 'a move is an undo step of its own too')
+  }
+
+  // Words typed at once after Cmd+D, in the copy's own part: the deck view seals the step (`sealHistory`), so one Undo
+  // takes the words alone, and the next the copy (review of #784).
+  {
+    const state = fresh()
+    const duplicated = state.apply(duplicateSlide(state, 0, () => 0.5)!)
+    const sealed = duplicated.apply(sealHistory(duplicated))
+    assert.equal(sealed.doc, duplicated.doc, 'sealing changes nothing in the file')
+    const copy = slidesOf(sealed.doc)[1]
+    const end = copy.pos + copy.node.nodeSize + sealed.doc.nodeAt(copy.pos + copy.node.nodeSize)!.nodeSize - 1
+    const typed = sealed.apply(sealed.tr.insertText(' again', end))
+    const once = typed.apply(undoOf(typed))
+    assert.equal(save(once.doc), save(duplicated.doc), 'one Undo takes the words typed after the copy, not the copy')
+    assert.equal(save(once.apply(undoOf(once)).doc), text)
+    // Without the seal the words would join the copy's step: what the deck view guards against.
+    const unsealed = duplicated.apply(duplicated.tr.insertText(' again', end))
+    assert.equal(save(unsealed.apply(undoOf(unsealed)).doc), text, 'the merge the seal prevents')
+  }
+
+  // Undoing a mark (bold, a comment) in another part shows that part: a mark step has no map of its own.
+  {
+    const state = fresh()
+    const third = slidesOf(doc)[2]
+    const heading = third.pos + third.node.nodeSize
+    const bolded = state.apply(state.tr.addMark(heading + 1, heading + 4, schema.marks.bold.create()))
+    assert.equal(partChangedBy(undoOf(bolded)), 2)
   }
 
   // A change of a slide's body (the stage's edit) shows that slide.

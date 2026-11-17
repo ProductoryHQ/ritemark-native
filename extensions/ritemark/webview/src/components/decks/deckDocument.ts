@@ -230,13 +230,23 @@ export function partChangedBy(tr: Transaction): number | null {
       if (to > from) found.added ??= from
       else if (newEnd === newStart) found.removed ??= after.map(newStart, -1)
     })
-    // A step with no map changes a node's attributes in place.
-    const pos = ranges === 0 ? (step.toJSON() as { pos?: unknown }).pos : undefined
+    // A step with no map changes a node's attributes, or marks (bold, a comment), in place.
+    const json = ranges === 0 ? (step.toJSON() as { pos?: unknown; from?: unknown }) : null
+    const pos = json ? json.pos ?? json.from : undefined
     if (typeof pos === 'number') found.added ??= after.map(pos, 1)
   })
   if (found.added !== null) return partIndexAt(tr.doc, found.added)
   if (found.removed === null) return null
   return partIndexAt(tr.doc, Math.max(0, found.removed - 1)) ?? partIndexAt(tr.doc, found.removed)
+}
+
+/**
+ * Ends the undo step just made (a strip operation): whatever comes next, even words typed at once beside it, starts a
+ * step of its own. A transaction with no steps, out of the history; `moveSlide` and `duplicateSlide` close the step
+ * before themselves.
+ */
+export function sealHistory(state: EditorState): Transaction {
+  return closeHistory(state.tr).setMeta('addToHistory', false)
 }
 
 /** Where a part placed "before part `at`" goes: that part's start, or the document's end. */
