@@ -79,6 +79,23 @@ assert.deepEqual(titles(text, 'xyzq'), [])
 assert.deepEqual(titles(SLIDE_ITEMS, 'xyzq'), [])
 assert.deepEqual(titles(text, '-'), [])
 
+// Words are what spaces part: "draw.io" is one word, so "/io" doesn't find Diagram; "slidebelow" finds "slide below".
+assert.deepEqual(titles(text, 'io'), [])
+assert.deepEqual(titles(SLIDE_ITEMS, 'slidebelow'), ['New slide below'])
+// Marks alone find the item whose shortcut they start (review of #802).
+assert.deepEqual(titles(SLIDE_ITEMS, '#'), ['Title', 'Heading'])
+assert.deepEqual(titles(SLIDE_ITEMS, '##'), ['Heading'])
+assert.deepEqual(titles(SLIDE_ITEMS, '***'), ['Split slide here'])
+assert.deepEqual(titles(SLIDE_ITEMS, '-'), ['Bullet list'])
+// The deck's list is built once, so its items keep their identity from keystroke to keystroke.
+assert.equal(slashItemsFor(true), slashItemsFor(true))
+// The items both menus have share their words.
+for (const nodeType of ['bulletList', 'orderedList', 'table', 'image', 'picture']) {
+  const own = blockItems.find(item => item.nodeType === (nodeType === 'picture' ? 'image' : nodeType))!.keywords
+  const slide = SLIDE_ITEMS.find(item => item.nodeType === nodeType)
+  if (slide && nodeType !== 'image') assert.equal(slide.keywords, own, `${slide.title} shares its words`)
+}
+
 // Every item in both menus has hidden words (the README lists them all).
 for (const item of [...text, ...SLIDE_ITEMS]) assert.ok(item.keywords?.length, `${item.title} has hidden words`)
 

@@ -10,6 +10,8 @@ import type { BlockItemDef } from './blockItems'
 interface CommandsListProps {
   items: BlockItemDef[]
   command: (item: BlockItemDef) => void
+  /** What's typed after / (the suggestion's); the block menu has none. */
+  query?: string
 }
 
 export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
@@ -53,10 +55,9 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
     },
   }))
 
-  // Experience 22: a search puts name matches first, which can split a group; its heading is then left out rather
-  // than shown twice.
-  const groupRuns = props.items.filter((item, index) => item.group && item.group !== props.items[index - 1]?.group).map(item => item.group)
-  const showGroups = new Set(groupRuns).size === groupRuns.length
+  // Experience 22: a search's results are one list, name matches first, so the group headings show only for the whole
+  // menu (a heading never stands twice, and the menu doesn't switch between grouped and flat as letters are typed).
+  const showGroups = !props.query
 
   return (
     <div ref={listRef}

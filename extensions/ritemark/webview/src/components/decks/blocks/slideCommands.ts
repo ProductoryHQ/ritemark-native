@@ -23,7 +23,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
-import { PICTURE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { BULLET_LIST_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -41,12 +41,12 @@ export function isOwnStep(tr: Transaction): boolean {
 export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Text', title: 'Title', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['h1', 'heading 1', 'pealkiri'] },
   { group: 'Text', title: 'Heading', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['h2', 'subheading', 'alapealkiri'] },
-  { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: ['list', 'bullets', 'ul', 'loend', 'täpploend'] },
-  { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: ['list', 'numbers', 'ol', 'loend', 'nummerdatud'] },
+  { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: BULLET_LIST_KEYWORDS },
+  { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: NUMBERED_LIST_KEYWORDS },
   { group: 'Blocks', title: 'Columns', description: '', icon: 'columns', nodeType: 'columns', keywords: ['column', 'cols', 'two columns', 'layout', 'veerud', 'veerg'] },
   { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes', keywords: ['cards', 'tiles', 'grid', 'kastid', 'kaardid'] },
   { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps', keywords: ['process', 'timeline', 'flow', 'sammud', 'protsess'] },
-  { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: ['grid', 'tabel'] },
+  { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
   { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda', keywords: ['contents', 'toc', 'sisukord', 'päevakava'] },
   { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture', keywords: PICTURE_KEYWORDS },
