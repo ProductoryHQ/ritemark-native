@@ -55,8 +55,9 @@ Type `/` anywhere to open the command menu:
 | `/quote` | Blockquote |
 | `/divider` | Horizontal line |
 | `/table` | Table |
+| `/picture` | Picture from a file (`/image` works too) |
 
-Start typing to filter. Press Enter to insert.
+Start typing to filter. Other words find items too, in English or Estonian: `/list` finds the lists, `/pilt` finds Picture, `/ulesanded` finds Task List. Press Enter to insert.
 
 ### Block Reordering
 
