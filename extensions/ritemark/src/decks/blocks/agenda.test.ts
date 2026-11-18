@@ -19,6 +19,8 @@ import { wallSlideOf } from '../present/presentProtocol';
 import { deckDigest, publicDeck } from '../page/publicDeck';
 import { PAGE_CSS, PRINT_CSS, pageHtml, printOrderCss, type PageAssets } from '../page/pageHtml';
 import { PAGE_SCRIPT } from '../page/pageScript';
+import { deckPreview, PREVIEW_SLIDES } from '../themePreview';
+import { agendaEntriesFrom } from '../../../webview/src/components/decks/slide/agendaContext';
 
 const slide = (body: string, kind = '') => ['```slide' + (kind ? ` ${kind}` : ''), body, '```', ''].join('\n');
 const DECK = [
@@ -167,6 +169,53 @@ const assets: PageAssets = {
   assert.equal(printOrderCss(3, new Set([1])), '@media print{.slidebox>.layer:nth-child(1){order:1}#s1{order:2}.slidebox>.layer:nth-child(2){display:none}#s2{order:4;break-before:page;page-break-before:always}.slidebox>.layer:nth-child(3){order:5}#s3{order:6}}');
   assert.match(rule('.sect'), /break-after: avoid;/, 'no page holds a section alone');
   assert.match(rule('.sect'), /background: none;/, 'its band in the page\'s section style, printable');
+}
+
+// ---- 18 November (the smoke run): a theme's preview draws its Agenda slide with the deck's list, not its title alone.
+// The six slides are some of the deck's, so the list comes with them from every section slide the room sees.
+{
+  const preview = deckPreview('Training.deck.md', DECK);
+  assert.ok(preview.slides.length <= PREVIEW_SLIDES);
+  const shownAgenda = preview.slides.find(entry => blockHasAgenda(entry.data.markdown ?? ''));
+  assert.ok(shownAgenda, 'the Agenda slide is among the six');
+  assert.deepEqual(preview.agenda.map(entry => entry.title), ['Getting started', 'Writing with an assistant', 'Numbered, no header', 'Wrap-up'], 'the whole deck\'s sections, not only the six\'s; the skipped one left out');
+  const six = new Set(preview.slides.map(entry => entry.number));
+  assert.ok(preview.agenda.some(entry => !six.has(entry.number)), 'a section outside the six is listed too');
+  assert.deepEqual(preview.agenda, agendaOf(presentSlidesOf(DECK).filter(entry => !entry.skip).map(wallSlideOf)), 'the wall\'s list');
+  const html = parse(blockCanvasMarkup(shownAgenda!.data, { width: 480, agenda: { entries: preview.agenda, hint: false } }));
+  assert.equal(html.querySelectorAll('.blk-agenda li').length, 4, 'the preview\'s Agenda lists the four sections');
+  // What the webview takes from the host: the list as sent, anything malformed dropped.
+  assert.deepEqual(agendaEntriesFrom(JSON.parse(JSON.stringify(preview.agenda))), preview.agenda);
+  assert.deepEqual(agendaEntriesFrom([{ title: 'A', number: 2 }, { title: 3, number: 1 }, { title: 'B', number: 0 }, null, { title: 'C', number: 1.5 }]), [{ title: 'A', number: 2 }]);
+  assert.deepEqual(agendaEntriesFrom('nope'), []);
+}
+
+// ---- Every view that draws a deck's slides gives the Agenda its list: each file that renders `<SlideCanvas` provides
+// the AgendaContext itself, or is drawn only inside the deck view's provider (named here, each checked by its parent).
+{
+  const web = path.join(__dirname, '../../../webview/src/components/decks');
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.tsx') && !entry.name.includes('.test.')) files.push(full);
+    }
+  };
+  walk(web);
+  const insideDeckView = new Set(['Stage.tsx', 'SlideStrip.tsx', 'DeckPublish.tsx', 'TransitionPreview.tsx', 'NewThemeSheet.tsx']);
+  const drawing = files.filter(file => /<SlideCanvas\b/.test(fs.readFileSync(file, 'utf8')) && !file.endsWith(`${path.sep}SlideCanvas.tsx`));
+  assert.ok(drawing.length >= 10, `found the slide drawers (${drawing.length})`);
+  for (const file of drawing) {
+    const name = path.basename(file);
+    if (insideDeckView.has(name)) continue;
+    assert.match(fs.readFileSync(file, 'utf8'), /<AgendaContext\.Provider\b/, `${name} gives its Agenda slides the deck's list`);
+  }
+  // The named ones are drawn by the deck view (or its Theme menu), under its provider.
+  const deckView = fs.readFileSync(path.join(web, 'DeckView.tsx'), 'utf8');
+  assert.match(deckView, /<AgendaContext\.Provider value=\{agendaDrawing\}>/);
+  for (const name of ['Stage', 'SlideStrip', 'DeckPublish', 'TransitionPreview', 'ThemeMenu']) assert.match(deckView, new RegExp(`<${name}\\b`), `${name} is drawn in the deck view`);
+  assert.match(fs.readFileSync(path.join(web, 'ThemeMenu.tsx'), 'utf8'), /<NewThemeSheet\b/);
 }
 
 console.log('agenda and print: passed');

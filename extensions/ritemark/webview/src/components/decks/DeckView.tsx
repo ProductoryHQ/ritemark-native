@@ -59,7 +59,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { CONVERSION_NOTICE, DeckConvert, DeckFrontMatterSteps, commentNodeAt, conversionNoticeFor, conversionStateOf, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
-import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { agendaOf, blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, deckCurrentKey, deckFocusKey, setCurrentSlide } from './handout/deckCurrent'
@@ -1245,10 +1245,13 @@ export function DeckView({
     }),
     // Item 15: the slide in the look the strip shows, at 1920 × 1080, on the clipboard; the bar says so.
     copyPicture: index => {
-      const entry = editor ? slidesOf(editor.state.doc)[index] : undefined
+      const all = editor ? slidesOf(editor.state.doc) : []
+      const entry = all[index]
       if (!entry) return
       const look = lookRef.current
-      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing })
+      // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
+      const agenda = { entries: agendaOf(all.map(slide => ({ kind: slide.kind, data: slide.data, number: slide.index + 1 }))), hint: false }
+      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda })
         .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
     },
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.

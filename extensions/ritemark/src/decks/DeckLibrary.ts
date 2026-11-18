@@ -14,7 +14,8 @@ import {
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
 import { convertedPart, saysBlockDeck, withDeckVersion } from './blocks/convertDeck';
-import { blockStepsTagOf } from './blocks/slideRenderer';
+import { agendaOf, blockStepsTagOf } from './blocks/slideRenderer';
+import type { AgendaEntry } from './blocks/agenda';
 
 export const LIBRARY_FOLDER = 'Slide library';
 
@@ -57,6 +58,8 @@ export interface DeckSummary {
   borderless: boolean;
   modified: number;
   slides: SlideSummary[];
+  /** Small details 14: the deck's sections, from all its slides (a search lists only some), for an Agenda's tile. */
+  agenda: AgendaEntry[];
 }
 
 /** What a copy shows under it: where it came from, and whether it or the source changed since. */
@@ -165,6 +168,7 @@ export class DeckLibrary {
           handout: slide.handout.slice(0, 400),
           hasNotes: slide.notes !== null,
         })),
+        agenda: agendaOf(slides.map(slide => ({ kind: slide.kind, data: slide.data, number: slide.index + 1 }))),
       });
     }
     return found.sort((a, b) => (a.topic === b.topic ? (a.topic ? a.name.localeCompare(b.name) : b.modified - a.modified) : a.topic ? -1 : 1));

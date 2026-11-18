@@ -12,6 +12,8 @@ import { flushSync } from 'react-dom'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { SlideCanvas } from './slide/SlideCanvas'
+import { AgendaContext } from './slide/agendaContext'
+import type { AgendaDrawing } from '../../../../src/decks/blocks/agenda'
 import { PICTURE_HEIGHT, PICTURE_WIDTH, customProperties, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
 import { readFileAsBase64 } from '../../lib/pastedImage'
 
@@ -24,6 +26,8 @@ export interface SlidePictureInput {
   borderless: boolean
   assets: Record<string, string>
   missing?: ReadonlySet<string>
+  /** Small details 14: the deck's sections, for an Agenda slide (its own React root has no deck view around it). */
+  agenda?: AgendaDrawing | null
 }
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -130,7 +134,11 @@ export async function renderSlidePicture(input: SlidePictureInput): Promise<Blob
   document.body.appendChild(host)
   const root = createRoot(host)
   try {
-    flushSync(() => root.render(<SlideCanvas kind={input.kind} data={input.data} width={PICTURE_WIDTH} theme={input.theme} borderless={input.borderless} assets={input.assets} missing={input.missing} />))
+    flushSync(() => root.render(
+      <AgendaContext.Provider value={input.agenda ?? null}>
+        <SlideCanvas kind={input.kind} data={input.data} width={PICTURE_WIDTH} theme={input.theme} borderless={input.borderless} assets={input.assets} missing={input.missing} />
+      </AgendaContext.Provider>,
+    ))
     // Its fonts and pictures loaded, then the fit measured again with them (a frame for each pass).
     await document.fonts?.ready
     await Promise.all(Array.from(host.querySelectorAll('img')).map(image => image.decode().catch(() => undefined)))

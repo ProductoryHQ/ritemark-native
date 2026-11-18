@@ -33,11 +33,13 @@ import { SplitButton } from '../../ui/split-button'
 import { Switch } from '../../ui/switch'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
+import { AgendaContext, agendaEntriesFrom, useAgendaEntries } from '../slide/agendaContext'
 import { DECK_LOOKS, ThemeSwatch } from '../ThemeMenu'
 import { contrastLine } from './themeContrast'
 import { LogoRows } from './LogoRow'
 import { ThemeChangeSheet, themeChangeFrom } from './ThemeChangeSheet'
 import { changeSlideIndexes, colourPairs, type ThemeChangeView } from '../../../../../src/decks/themeChange'
+import type { AgendaEntry } from '../../../../../src/decks/blocks/agenda'
 import '../decks.css'
 import './themeTab.css'
 
@@ -125,7 +127,7 @@ export function themeDecksFrom(message: Record<string, unknown>): ThemeDecks | n
   if (!Array.isArray(message.decks) || !preview || !Array.isArray(preview.slides) || !taken || !Array.isArray(taken.names) || !Array.isArray(taken.files)) return null
   return {
     decks: message.decks.filter((deck): deck is ThemeDeck => !!deck && typeof deck.path === 'string' && typeof deck.name === 'string'),
-    preview: { deck: typeof preview.deck === 'string' ? preview.deck : null, borderless: preview.borderless === true, slides: preview.slides, assets: preview.assets && typeof preview.assets === 'object' ? preview.assets : {} },
+    preview: { deck: typeof preview.deck === 'string' ? preview.deck : null, borderless: preview.borderless === true, slides: preview.slides, assets: preview.assets && typeof preview.assets === 'object' ? preview.assets : {}, agenda: agendaEntriesFrom(preview.agenda) },
     useIn: typeof message.useIn === 'string' ? message.useIn : null,
     taken,
   }
@@ -536,8 +538,10 @@ function useWidth<T extends HTMLElement>(): [RefObject<T>, number] {
  */
 function withPreviewSlides(change: ThemeChangeView, preview: ThemePreview | null): ThemeChangeView {
   if (change.slides.length || !preview) return change
-  return { ...change, slides: changeSlideIndexes(preview.slides).map(index => preview.slides[index]), borderless: preview.borderless, assets: preview.assets }
+  return { ...change, slides: changeSlideIndexes(preview.slides).map(index => preview.slides[index]), agenda: preview.agenda, borderless: preview.borderless, assets: preview.assets }
 }
+
+const NO_AGENDA: AgendaEntry[] = []
 
 /** The preview gap between slides: Card's and Borderless's (prototype). */
 const GAP = { card: 20, borderless: 28 }
@@ -548,7 +552,10 @@ function Preview({ theme, preview, borderless, onLook }: { theme: DeckTheme; pre
   const gap = borderless ? GAP.borderless : GAP.card
   const columns = width >= 520 ? 2 : 1
   const slideWidth = Math.max(160, Math.floor((width - (columns - 1) * gap) / columns))
+  // Small details 14: an Agenda among the six lists the deck's sections, as the strip, the wall and the page do
+  const agenda = useAgendaEntries(preview?.agenda ?? NO_AGENDA)
   return (
+    <AgendaContext.Provider value={agenda}>
     <section className={`theme-preview${borderless ? ' is-borderless' : ''}`} aria-label="Preview">
       <div className="theme-preview-head">
         <span className="theme-preview-what">
@@ -567,6 +574,7 @@ function Preview({ theme, preview, borderless, onLook }: { theme: DeckTheme; pre
         )) : null}
       </div>
     </section>
+    </AgendaContext.Provider>
   )
 }
 

@@ -17,6 +17,7 @@ import { frontMatterField, writeScalar } from './deckFormat';
 import { BUILT_IN_THEME_TEXT, DECK_FONT_LIST, deckFont, isThemePath, pathKey, THEMES_FOLDER, type DeckTheme } from './deckTheme';
 import { normalColour, themeTextWith, type ThemeChanges } from './themeFile';
 import type { WallSlide } from './present/presentProtocol';
+import type { AgendaEntry } from './blocks/agenda';
 
 // ── A deck's theme line ─────────────────────────────────────────────────────
 
@@ -376,6 +377,8 @@ export interface ThemeChangeView {
   before: { name: string; text: string };
   after: { name: string; text: string };
   slides: WallSlide[];
+  /** Small details 14: the deck's sections, for an Agenda among the two slides; left out, the view's own deck's. */
+  agenda?: AgendaEntry[];
   borderless: boolean;
   assets: Record<string, string>;
   undone: boolean;

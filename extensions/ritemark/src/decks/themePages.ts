@@ -739,6 +739,7 @@ export class ThemePages implements vscode.Disposable {
       deck: slides.deck,
       borderless: slides.borderless,
       slides: slides.slides,
+      agenda: slides.agenda,
       assets: source?.folder && slides.pictures.length ? resolveAssetsIn(source.folder, view.panel.webview, slides.pictures) : {},
     };
     const useIn = originPath && this.decks.hasView(originPath) && root ? deckName(projectRelative(root, originPath) ?? originPath) : null;
