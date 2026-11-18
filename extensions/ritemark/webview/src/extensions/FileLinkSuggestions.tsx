@@ -24,6 +24,8 @@ export const FileLinkSuggestions = Extension.create({
             '\0',
             '\0'
           )
+          // Sprint 163 PR 3: no file links in a button's words or on it (its Enter is the button's; its words are plain).
+          if (/^button(?:Words|Label)$/.test(state.doc.resolve(range.from).parent.type.name)) return false
           return previousChar === '' || /[\s([{<]/.test(previousChar)
         },
         command: ({ editor, range, props }: any) => {

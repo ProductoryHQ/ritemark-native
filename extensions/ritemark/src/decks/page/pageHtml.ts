@@ -310,6 +310,16 @@ const handoutPictureExtensions = new Marked().use({
     renderer(this: { parser: TableParser }, token) {
       return handoutTableHtml(this.parser, token as Tokens.Table);
     },
+  }, {
+    // Sprint 163 PR 3: a Button block, wherever a paragraph stands (in a quote, a list): its words beside it, and a real
+    // link to its full https address in a new tab (any other address draws an inert button). Files stay where they
+    // are: Publish carries none.
+    name: 'paragraph',
+    renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
+      const button = buttonParagraphOf((token as Tokens.Paragraph).tokens);
+      if (!button) return false;
+      return buttonHtml({ wordsHtml: this.parser.parseInline(button.words), label: button.label, href: button.href, mode: 'link', className: 'pbutton' });
+    },
   }, pictureBlockTokenizer, {
     name: 'image',
     renderer(this: { parser: { renderer: InstanceType<typeof marked.Renderer> } }, token) {
@@ -321,9 +331,6 @@ const handoutPictureExtensions = new Marked().use({
 }).defaults.extensions;
 
 /** A label over a prompt: a short paragraph in capitals ("TRY IT", "PROMPT") just before a code block. */
-/** A button's icons in the page's text (Sprint 163 PR 3): a page for a file, an arrow out for any other address. */
-const PAGE_BUTTON_ICONS = { file: iconSvg('file-text', 16), link: iconSvg('arrow-up-right', 16) };
-
 const PROMPT_LABEL = /^[A-Z0-9][A-Z0-9 .,'’&:!?-]{0,28}$/;
 
 type Token = ReturnType<typeof marked.lexer>[number];
@@ -359,13 +366,6 @@ function handoutParts(markdown: string, options: { partKey: string; exercise: bo
       // A block of raw HTML is shown as its words, a paragraph of its own; a comment alone leaves nothing.
       const words = sanitizeHtml(token.text).trim();
       if (words) out += `<p>${words}</p>\n`;
-      return;
-    }
-    // Sprint 163 PR 3: a Button block: its words beside it, and a real link to its full https address in a new tab
-    // (any other address draws an inert button). Files stay where they are: Publish carries none.
-    const button = token.type === 'paragraph' ? buttonParagraphOf(token.tokens) : null;
-    if (button) {
-      out += buttonHtml({ wordsHtml: parser.parseInline(button.words), label: button.label, href: button.href, icons: PAGE_BUTTON_ICONS, mode: 'link', className: 'pbutton' });
       return;
     }
     if (token.type === 'paragraph' && PROMPT_LABEL.test(token.text.trim())) {

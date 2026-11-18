@@ -17,6 +17,7 @@
  */
 import type { Token, Tokens } from 'marked';
 import { parseFenceAttributes } from './fencedDiv';
+import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
 
 /** The class that makes a link a button (Pandoc's and Quarto's attribute: `{.button}`). */
 export const BUTTON_CLASS = 'button';
@@ -31,6 +32,7 @@ export const BUTTON_WORDS = {
   refused: 'Use a full address that starts with https://',
   placeholder: 'https://',
   done: 'Done',
+  doneTip: "Keep this address and go on to the button's words",
   address: 'Address',
   addressTip: 'Change the address the button opens',
   open: 'Open',
@@ -102,6 +104,19 @@ export function buttonIconOf(address: string | null | undefined): ButtonIcon {
 /** The Phosphor icon each kind draws: a page, or an arrow out. */
 export const BUTTON_ICON_NAME: Readonly<Record<ButtonIcon, 'file-text' | 'arrow-up-right'>> = { file: 'file-text', link: 'arrow-up-right' };
 
+/** The icons as inline SVG, in the button's own ink: the one set the renderer, the page and the editors draw. */
+export const BUTTON_ICONS: Readonly<Record<ButtonIcon, string>> = { file: iconSvg('file-text', 16), link: iconSvg('arrow-up-right', 16) };
+
+/**
+ * The icon a button draws, the same in the editors and wherever the slide is drawn: a page while it has no address yet
+ * (as drawn: the material it will hand out), the address's own for a full https one, an arrow out for any other.
+ */
+export function buttonIconFor(href: string | null | undefined): ButtonIcon {
+  const address = (href ?? '').trim();
+  if (!address) return 'file';
+  return isButtonAddress(address) ? buttonIconOf(address) : 'link';
+}
+
 // ---------------------------------------------------------------------------
 // Reading a button paragraph
 // ---------------------------------------------------------------------------
@@ -118,7 +133,7 @@ export function isButtonAttributes(text: string): boolean {
 export interface ButtonParagraph {
   /** The words beside the button: the paragraph's tokens before the separator. */
   words: Token[];
-  /** What stands between the words and the button as written: a space, or a line break (`' '`, `'\n'`); '' alone. */
+  /** What stands between the words and the button as written: a space, a line break or nothing; a button alone: ' '. */
   sep: string;
   /** The button's words, as plain text (escapes read). */
   label: string;
@@ -148,13 +163,15 @@ const isBlank = (token: Token) => token.type === 'text' && !/\S/.test((token as 
 export function buttonParagraphOf(tokens: readonly Token[] | undefined): ButtonParagraph | null {
   if (!tokens || tokens.length < 2) return null;
   let end = tokens.length;
-  // Trailing spaces after the block are the paragraph's (marked trims them; a soft break can't follow its last line).
+  // Spaces after the block are the paragraph's, not the button's: marked keeps them in the block's own text token (or
+  // one of their own), and the editor never writes a line's trailing spaces.
   while (end > 0 && isBlank(tokens[end - 1])) end -= 1;
   if (end < 2) return null;
   const tail = tokens[end - 1];
   const link = tokens[end - 2];
   if (tail.type !== 'text' || link.type !== 'link') return null;
-  const attrs = (tail as Tokens.Text).raw;
+  // Written straight after the link, as Pandoc reads it: `[x](y) {.button}` is a link and its words.
+  const attrs = (tail as Tokens.Text).raw.replace(/[ \t]+$/, '');
   if (!isButtonAttributes(attrs) || attrs !== attrs.trim()) return null;
   const linkToken = link as Tokens.Link;
   // Only `[words](address)`: a reference link (`[words][ref]`) or an autolink is no button.
@@ -191,7 +208,8 @@ export function buttonParagraphOf(tokens: readonly Token[] | undefined): ButtonP
     }
     break;
   }
-  if (!words.length) sep = '';
+  // A button alone: the separator a person's first words beside it will take.
+  if (!words.length) sep = ' ';
   return { words, sep, label, href: (linkToken.href ?? '').trim(), title: linkToken.title ?? null, dest, attrs };
 }
 
@@ -216,8 +234,6 @@ export interface ButtonDrawing {
   wordsHtml: string;
   label: string;
   href: string;
-  /** The icon's SVG, by kind (the caller's icon set). */
-  icons: Readonly<Record<ButtonIcon, string>>;
   /**
    * `link`: a real `<a target="_blank">` (the published page); `data`: the address on the button for the host to open
    * (the wall, the presenter view), never followed by the window itself.
@@ -235,7 +251,7 @@ export interface ButtonDrawing {
  */
 export function buttonHtml(drawing: ButtonDrawing): string {
   const ok = isButtonAddress(drawing.href);
-  const icon = drawing.icons[buttonIconOf(ok ? drawing.href : null)];
+  const icon = BUTTON_ICONS[buttonIconFor(drawing.href)];
   const solo = !drawing.wordsHtml.trim();
   const box = ['blk-button', solo ? 'is-solo' : '', drawing.className ?? ''].filter(Boolean).join(' ');
   const label = `<span class="blk-btn-icon">${icon}</span><span class="blk-btn-text">${esc(drawing.label)}</span>`;

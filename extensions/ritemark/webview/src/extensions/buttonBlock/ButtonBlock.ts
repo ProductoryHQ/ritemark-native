@@ -12,10 +12,10 @@
  * empty places their faint words. Enter, Backspace and Delete keep the block's two parts apart (`buttonCommands.ts`).
  */
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
+import type { Node as PMNode } from '@tiptap/pm/model'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { BUTTON_ATTRIBUTES, BUTTON_WORDS, buttonIconOf, isButtonAddress } from '../../../../src/decks/blocks/buttonBlock'
-import { iconSvg } from '../../components/decks/slide/pageIcons'
+import { BUTTON_ATTRIBUTES, BUTTON_ICONS, BUTTON_WORDS, buttonIconFor } from '../../../../src/decks/blocks/buttonBlock'
 import { BUTTON_LABEL_NODE, BUTTON_NODE, BUTTON_WORDS_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter } from './buttonCommands'
 
 /** One attribute kept as written: read from and written back to its own `data-*` attribute. */
@@ -50,8 +50,8 @@ export const ButtonBlock = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const href = String(node.attrs.href ?? '')
-    return ['div', mergeAttributes({ 'data-button': '', class: 'blk-button', 'data-icon': href ? buttonIconOf(isButtonAddress(href) ? href : null) : 'file' }, HTMLAttributes), 0]
+    // The renderer's own choice (`buttonIconFor`), so the stage and the strip draw the same icon.
+    return ['div', mergeAttributes({ 'data-button': '', class: 'blk-button', 'data-icon': buttonIconFor(String(node.attrs.href ?? '')) }, HTMLAttributes), 0]
   },
 })
 
@@ -88,7 +88,7 @@ export const ButtonWords = Node.create({
 })
 
 /** The icons a label draws; its block's `data-icon` shows one (`slide.css`, `buttonBlock.css`). */
-const LABEL_ICONS = `<span class="is-file">${iconSvg('file-text', 16)}</span><span class="is-link">${iconSvg('arrow-up-right', 16)}</span>`
+const LABEL_ICONS = `<span class="is-file">${BUTTON_ICONS.file}</span><span class="is-link">${BUTTON_ICONS.link}</span>`
 
 export const ButtonLabel = Node.create({
   name: BUTTON_LABEL_NODE,
@@ -122,28 +122,74 @@ export const ButtonLabel = Node.create({
   },
 })
 
-const decorationsKey = new PluginKey<boolean>('buttonBlockLook')
+/** The look's state: whether the editor has the focus, and the decorations (with how many buttons the document holds). */
+interface LookState {
+  focused: boolean
+  buttons: number
+  set: DecorationSet
+}
+
+const decorationsKey = new PluginKey<LookState>('buttonBlockLook')
 
 /** The button's ring off: the focus left the editor from its address sheet (a press elsewhere). */
-export function unchooseButton(view: { state: import('@tiptap/pm/state').EditorState; dispatch: (tr: import('@tiptap/pm/state').Transaction) => void }): void {
+export function unchooseButton(view: { state: EditorState; dispatch: (tr: Transaction) => void }): void {
   view.dispatch(view.state.tr.setMeta(decorationsKey, false))
 }
 
+/** The chosen button's ring, the alone look and the faint words of the empty places, for `state`. */
+function lookOf(state: EditorState, focused: boolean): LookState {
+  const chosen = focused ? buttonAt(state) : null
+  const decorations: Decoration[] = []
+  let buttons = 0
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== BUTTON_NODE) return !node.isTextblock && !node.isAtom
+    buttons++
+    const words = node.child(0)
+    const label = node.child(1)
+    const classes = [words.content.size === 0 ? 'is-solo' : '', chosen?.pos === pos ? 'is-chosen' : ''].filter(Boolean).join(' ')
+    if (classes) decorations.push(Decoration.node(pos, pos + node.nodeSize, { class: classes }))
+    if (words.content.size === 0) decorations.push(Decoration.node(pos + 1, pos + 1 + words.nodeSize, { 'data-empty': '', 'data-button-placeholder': BUTTON_WORDS.wordsPlaceholder }))
+    if (label.content.size === 0) {
+      const from = pos + 1 + words.nodeSize
+      decorations.push(Decoration.node(from, from + label.nodeSize, { 'data-empty': '' }))
+    }
+    return false
+  })
+  return { focused, buttons, set: decorations.length ? DecorationSet.create(state.doc, decorations) : DecorationSet.empty }
+}
+
+/** Does a transaction put a button in (a step's new content holds one)? */
+function addsButton(tr: Transaction): boolean {
+  return tr.steps.some(step => {
+    const slice = (step as unknown as { slice?: { content: { descendants: (f: (node: PMNode) => boolean | void) => void } } }).slice
+    let found = false
+    slice?.content.descendants(node => {
+      if (found) return false
+      if (node.type.name === BUTTON_NODE) found = true
+      return !found && !node.isTextblock
+    })
+    return found
+  })
+}
+
 /**
- * The chosen button's ring (`is-chosen`), a button with no words beside it (`is-solo`), and the faint words of its two
- * places while they are empty.
+ * The chosen button's ring (`is-chosen`, only while the editor, its bar or its sheet has the focus), a button with no
+ * words beside it (`is-solo`), and the faint words of its two places while they are empty. The document is walked only
+ * when it holds buttons or a change put one in: a Text document without any costs a step's slice per keystroke.
  */
 const ButtonLook = Extension.create({
   name: 'buttonBlockLook',
   addProseMirrorPlugins() {
-    return [new Plugin<boolean>({
+    return [new Plugin<LookState>({
       key: decorationsKey,
-      // Whether the editor has the focus: a button is chosen (its ring) only then, never while the person writes elsewhere.
       state: {
-        init: () => false,
-        apply: (tr, focused) => {
+        init: (_config, state) => lookOf(state, false),
+        apply: (tr, previous, _old, state) => {
           const meta = tr.getMeta(decorationsKey) as boolean | undefined
-          return meta === undefined ? focused : meta
+          const focused = meta === undefined ? previous.focused : meta
+          if (!tr.docChanged && !tr.selectionSet && focused === previous.focused) return previous
+          if (previous.buttons === 0 && !(tr.docChanged && addsButton(tr))) return focused === previous.focused ? previous : { ...previous, focused }
+          return lookOf(state, focused)
         },
       },
       props: {
@@ -157,25 +203,7 @@ const ButtonLook = Extension.create({
             return false
           },
         },
-        decorations(state) {
-          if (!state.schema.nodes[BUTTON_NODE]) return null
-          const chosen = decorationsKey.getState(state) ? buttonAt(state) : null
-          const decorations: Decoration[] = []
-          state.doc.descendants((node, pos) => {
-            if (node.type.name !== BUTTON_NODE) return !node.isTextblock && !node.isAtom
-            const words = node.child(0)
-            const label = node.child(1)
-            const classes = [words.content.size === 0 ? 'is-solo' : '', chosen?.pos === pos ? 'is-chosen' : ''].filter(Boolean).join(' ')
-            if (classes) decorations.push(Decoration.node(pos, pos + node.nodeSize, { class: classes }))
-            if (words.content.size === 0) decorations.push(Decoration.node(pos + 1, pos + 1 + words.nodeSize, { 'data-empty': '', 'data-button-placeholder': BUTTON_WORDS.wordsPlaceholder }))
-            if (label.content.size === 0) {
-              const from = pos + 1 + words.nodeSize
-              decorations.push(Decoration.node(from, from + label.nodeSize, { 'data-empty': '' }))
-            }
-            return false
-          })
-          return decorations.length ? DecorationSet.create(state.doc, decorations) : null
-        },
+        decorations: state => decorationsKey.getState(state)?.set ?? null,
       },
     })]
   },

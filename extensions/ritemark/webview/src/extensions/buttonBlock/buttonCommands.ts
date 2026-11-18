@@ -9,9 +9,10 @@
 import type { Node as PMNode, ResolvedPos, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { buttonDestination, isButtonAddress } from '../../../../src/decks/blocks/buttonBlock'
+import { SLIDE_COMMAND, placeBlock } from '../blockPlacement'
 
-/** The slide editor's meta for an undo step of its own (`slideCommands.SLIDE_COMMAND`, the same string). */
-const OWN_STEP = 'deckSlideCommand'
+/** The slide editor's meta for an undo step of its own. */
+const OWN_STEP = SLIDE_COMMAND
 
 /** Meta on the transaction that adds a button: its address sheet opens at once (`ButtonBlockTools`). */
 export const BUTTON_ASK = 'buttonAskAddress'
@@ -97,33 +98,12 @@ export function deleteButton(state: EditorState, pos: number): Transaction | nul
 }
 
 /**
- * Put a new button where the / was typed (`at`), in a Text document: in place of the empty line it stood on, else after
- * the line the caret is in. Never inside a table cell (a Markdown cell holds one line): after the table. The caret goes
- * into its words; the address sheet opens (`BUTTON_ASK`). The slide editor places its blocks its own way
- * (`insertSlideBlock`), with the same node and meta.
+ * Put a new button where the / was typed (`at`), in a Text document, by the slide's own rule (`placeBlock`): in place of
+ * the empty line it stood on, else after the line the caret is in; never inside a table cell (a Markdown cell holds one
+ * line), but after the table. The caret goes into its words; the address sheet opens (`BUTTON_ASK`).
  */
 export function insertButton(tr: Transaction, at: number): Transaction {
-  const node = buttonNode(tr.doc.type.schema)
-  const $pos = tr.doc.resolve(Math.max(0, Math.min(at, tr.doc.content.size)))
-  let depth = $pos.depth
-  for (let up = 1; up <= $pos.depth; up++) {
-    if (typeof $pos.node(up).type.spec.tableRole === 'string') { depth = up - 1; break }
-  }
-  let placed = -1
-  if (depth === $pos.depth && depth > 0 && $pos.parent.type.name === 'paragraph' && $pos.parent.content.size === 0) {
-    const holder = $pos.node(depth - 1)
-    const index = $pos.index(depth - 1)
-    if (holder.canReplaceWith(index, index + 1, node.type)) {
-      placed = $pos.before(depth)
-      tr.replaceWith(placed, $pos.after(depth), node)
-    }
-  }
-  for (let level = Math.min(depth, $pos.depth) - 1; placed < 0 && level >= 0; level--) {
-    const index = $pos.index(level) + 1
-    if (!$pos.node(level).canReplaceWith(index, index, node.type)) continue
-    placed = $pos.after(level + 1)
-    tr.insert(placed, node)
-  }
+  const placed = placeBlock(tr, at, buttonNode(tr.doc.type.schema))
   if (placed < 0) return tr
   tr.setSelection(TextSelection.create(tr.doc, placed + 2))
   return tr.setMeta(OWN_STEP, true).setMeta(BUTTON_ASK, true).scrollIntoView()

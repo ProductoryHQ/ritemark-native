@@ -139,7 +139,45 @@ const FORMS = [
   '[Open (PDF)](https://example.com/a_(1).pdf){#sample .button}',
   '[](){.button}',
   '[Open](javascript:alert(1)){.button}',
+  // Review: nothing between the words and the link stays nothing.
+  'Word.[Open](https://example.com/a.pdf){.button}',
+  '**Bold**[Open](https://example.com/a.pdf){.button}',
+  '> Quoted words. [Open](https://example.com/a.pdf){.button}',
 ]
+
+// Review: a space after the block is the line's, not the button's (many editors leave one); it is still a button,
+// drawn as one, and the editor's save drops the line's trailing space as it does for every paragraph.
+{
+  const html = blockSlideHtml('[Open](https://example.com/a.pdf){.button} \t')
+  assert.match(html, /class="blk-button is-solo"/, 'a trailing space: still a button')
+  assert.ok(!/\{\.button\}/.test(html))
+  assert.equal(saveDocument(openDocument('[Open](https://example.com/a.pdf){.button}  \n')), '[Open](https://example.com/a.pdf){.button}\n')
+}
+
+// Review: an empty address draws the page icon on the stage and wherever the slide is drawn (one rule, `buttonIconFor`).
+{
+  const unset = blockSlideHtml('[Open](){.button}')
+  assert.match(unset, /M213\.66,82\.34/, 'no address yet: the page, as the editor draws it')
+  const doc = loadSlide('[Open](){.button}')
+  let icon: string | null = null
+  doc.descendants(node => { if (node.type.name === BUTTON_NODE) icon = (node.type.spec.toDOM!(node) as unknown as [string, Record<string, string>])[1]['data-icon'] })
+  assert.equal(icon, 'file')
+}
+
+// Review: a button in a quote is a button on the published page too.
+assert.match(handoutHtml('> Quoted words. [Open](https://example.com/a.pdf){.button}', { partKey: 'p', exercise: false, pictureUrl: () => null }), /<blockquote>\n<div class="blk-button pbutton"><p class="blk-button-words">Quoted words\.<\/p><a class="blk-btn" href="https:\/\/example\.com\/a\.pdf"/)
+
+// Review: `/button` in a table cell of a Text document puts the button after the table, never nothing.
+{
+  const opened = openDocument('| A | B |\n| --- | --- |\n| one | two |\n')
+  let cell = -1
+  opened.doc.descendants((node, pos) => { if (cell < 0 && node.type.name === 'paragraph' && node.textContent === 'two') cell = pos + 2 })
+  const state = EditorState.create({ doc: opened.doc })
+  const tr = insertButton(state.tr, cell)
+  assert.ok(tr.docChanged, 'a button was put in')
+  assert.equal(tr.doc.lastChild?.type.name, BUTTON_NODE, 'after the table')
+  assert.equal(buttonAt(EditorState.create({ doc: tr.doc, selection: tr.selection }))?.pos, tr.doc.content.size - tr.doc.lastChild!.nodeSize)
+}
 
 for (const form of FORMS) {
   // A Text document.

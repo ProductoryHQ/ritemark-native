@@ -217,8 +217,9 @@
 .deck-sl.is-blocks .blk-btn-icon > .is-file, .deck-sl.is-blocks .blk-button[data-icon="link"] .blk-btn-icon > .is-file,
 .deck-sl.is-blocks .blk-button[data-icon="file"] .blk-btn-icon > .is-link { display: none; }
 .deck-sl.is-blocks .blk-button[data-icon="file"] .blk-btn-icon > .is-file { display: inline-flex; }
-.deck-sl.is-blocks :is(a, [data-href]).blk-btn:hover { background: color-mix(in srgb, var(--s-acc, #F2B544) 86%, #fff); }
-.deck-sl.is-blocks :is(a, [data-href]).blk-btn:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 88%, #000); }
+/* Pressed only where a press opens it: the wall, the presenter view's Now (the host opens it) and the page (a link). */
+:is(.deck-wall, .pv-now) .deck-sl.is-blocks [data-href].blk-btn:hover, .deck-sl.is-blocks a.blk-btn:hover { background: color-mix(in srgb, var(--s-acc, #F2B544) 86%, #fff); }
+:is(.deck-wall, .pv-now) .deck-sl.is-blocks [data-href].blk-btn:active, .deck-sl.is-blocks a.blk-btn:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 88%, #000); }
 /* A button with no full https address yet opens nothing: drawn quieter, so the room sees it isn't ready. */
 .deck-sl.is-blocks .blk-btn.is-unset { opacity: .6; }
 /* A thumbnail's button is drawn, never pressed: a click there is the thumbnail's (as the code block's controls). */

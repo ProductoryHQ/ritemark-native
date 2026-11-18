@@ -58,7 +58,8 @@ function buttonMarkdown(content: string, element: Element): string {
   const at = content.lastIndexOf(LABEL_MARK)
   const words = (at >= 0 ? content.slice(0, at) : content).replace(/^\n+/, '').replace(/\s+$/, '')
   const label = at >= 0 ? labelMarkdown(content.slice(at + 1).trim()) : ''
-  const sep = words ? element.getAttribute('data-sep') || ' ' : ''
+  // As read (nothing between `Word.` and the link stays nothing); a button with no separator recorded: a space.
+  const sep = words ? element.getAttribute('data-sep') ?? ' ' : ''
   const dest = element.getAttribute('data-dest') ?? ''
   const attrs = element.getAttribute('data-attrs') || BUTTON_ATTRIBUTES
   const link = `[${label}](${dest})${attrs}`

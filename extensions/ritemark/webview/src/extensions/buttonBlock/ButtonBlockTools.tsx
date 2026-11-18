@@ -256,7 +256,9 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
             {refused ? BUTTON_WORDS.refused : BUTTON_WORDS.hint}
           </p>
           <div className="btn-block-sheet-row">
-            <Button size="sm" onClick={done}>{BUTTON_WORDS.done}</Button>
+            <Tooltip label={BUTTON_WORDS.doneTip}>
+              <Button size="sm" onClick={done}>{BUTTON_WORDS.done}</Button>
+            </Tooltip>
           </div>
         </div>
       ) : null}

@@ -307,7 +307,6 @@ function createSlideMarked(): Marked {
             wordsHtml: this.parser.parseInline(button.words),
             label: button.label,
             href: button.href,
-            icons: BUTTON_ICONS,
             mode: state.buttonLinks ? 'link' : 'data',
             tabindex: -1,
           });
@@ -598,9 +597,6 @@ export interface BlockDrawingContext {
   /** Sprint 163 PR 3: a button as a real link to a new tab (the published page only). Left out: the address on it. */
   buttonLinks?: boolean;
 }
-
-/** A button's icons (Sprint 163 PR 3): a page for a file, an arrow out for any other address. */
-const BUTTON_ICONS = { file: iconSvg('file-text', 16), link: iconSvg('arrow-up-right', 16) };
 
 /** The code block's icons, drawn in the text's colour (`codeTools.codeBlockHtml`). */
 const CODE_ICONS = { copy: iconSvg('copy', 15), check: iconSvg('check', 15), openIn: iconSvg('arrow-up-right', 15) };
