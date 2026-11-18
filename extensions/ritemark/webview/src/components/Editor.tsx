@@ -399,11 +399,15 @@ export function Editor({
     rectOf: pictureRect,
     beforeMake: ask => (ask.place.kind === 'flow' && editor && !editor.isDestroyed && editor.state.doc.nodeAt(ask.place.pos)?.type.name === 'image' ? {} : null),
     placeMade: (place, picture, describe) => {
-      if (!editor || editor.isDestroyed || place.kind !== 'flow') return
+      if (!editor || editor.isDestroyed || place.kind !== 'flow') return false
       const old = editor.state.doc.nodeAt(place.pos)
+      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+      if (place.path && !(old && sameRelativeImagePath(imagePathOf(old.attrs) ?? '', place.path))) return false
       const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
       const tr = replacePictureKeepingCaret(editor.state, place.pos, { src: picture.url, title: picture.path }, alt)
-      if (tr) editor.view.dispatch(tr)
+      if (!tr) return false
+      editor.view.dispatch(tr)
+      return true
     },
     undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run() },
   })

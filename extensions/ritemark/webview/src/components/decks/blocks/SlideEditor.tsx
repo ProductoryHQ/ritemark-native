@@ -72,13 +72,14 @@ import { TableHandles, tableHandlesEnabled, tableMenuTargetAt } from '../../../e
 import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 import { PictureTools, stageBounds } from '../../pictures/PictureTools'
-import { PictureMakerView, usePictureMaker, type PicturePlaceRef } from '../../pictures/ChatgptPicture'
+import { PictureMakerView, usePictureMaker, type PictureAwayOptions, type PicturePlaceRef } from '../../pictures/ChatgptPicture'
 import { chosenPicture, chosenPictureUnder, leavePicture, replacePictureKeepingCaret } from '../../../extensions/pictures/pictureCommands'
 import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
 import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
+import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, sameSidePath, type SlideDocKit, type SlidePictureTarget } from './slidePictureSwap'
 
 export interface SlideEditorProps {
   /** The handout's editor, which holds the deck: the slide is written to its node there, and its history is the undo. */
@@ -941,6 +942,60 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     const dom = editor.view.nodeDOM(place.pos) as HTMLElement | null
     return dom?.isConnected ? dom.getBoundingClientRect() : null
   }, [editor])
+  // Jarmo's test of #800: a slide left while ChatGPT makes its picture. The request goes on; the picture lands on this
+  // slide in the deck (`putSlidePicture`, the stage's own load and save of the words), and the strip is back with the
+  // slide. The place is the slide's id and, in the words, which picture with that path it is.
+  const slideKey = slide.data.id ? `id:${slide.data.id}` : `index:${slide.index}`
+  const pictureAway: PictureAwayOptions = {
+    key: slideKey,
+    leave: place => {
+      // The picture standing in the place as the slide is left: the one ChatGPT's picture replaces.
+      if (place.kind === 'side') return { kind: 'side', path: place.path ?? header.image?.trim() ?? '' }
+      if (!editor) return null
+      const at = pictureNthAt(editor.state.doc, place.pos)
+      return at ? { kind: 'flow', pos: place.pos, path: at.id, nth: at.nth } : null
+    },
+    land: (place, made, describe) => {
+      const deck = outerRef.current
+      const schema = editor?.schema
+      if (deck.isDestroyed || !schema) return null
+      const { id } = slideRef.current.data
+      const ref = { ...(id ? { id } : {}), index: slideRef.current.index }
+      const assets = { ...assetsRef.current }
+      const kit: SlideDocKit = {
+        load: markdown => loadSlideDoc(schema, markdown, assets),
+        save: doc => saveSlideMarkdown(doc, getHTMLFromFragment(doc.content, schema), markdown => loadSlideDoc(schema, markdown, assets)),
+      }
+      const target: SlidePictureTarget = place.kind === 'side'
+        ? { slide: ref, side: true, path: place.path ?? '' }
+        : { slide: ref, side: false, path: place.path ?? '', nth: place.nth ?? 0 }
+      const put = putSlidePicture(deck.state, target, { picture: { path: made.path, url: made.url, describe } }, kit)
+      if (!put) return null
+      deck.view.dispatch(put.tr)
+      // Its own undo step: what is typed next, on any slide, is never undone with it.
+      deck.view.dispatch(closeHistory(deck.state.tr))
+      const landed = deck.state.doc
+      const madeTarget: SlidePictureTarget = place.kind === 'side' ? { slide: ref, side: true, path: made.path } : { slide: ref, side: false, path: made.path, nth: put.nth }
+      return {
+        place: place.kind === 'side' ? { kind: 'side', path: made.path } : { kind: 'flow', pos: 0, path: made.path, nth: put.nth },
+        undo: () => {
+          if (deck.isDestroyed) return
+          // Nothing since: the deck's own undo, as ⌘Z. Edits since: only this picture goes back (an undo would take those).
+          if (deck.state.doc === landed) { deck.commands.undo(); return }
+          const back = putSlidePicture(deck.state, madeTarget, { restore: put.before }, kit)
+          if (!back) return
+          deck.view.dispatch(back.tr)
+          deck.view.dispatch(closeHistory(deck.state.tr))
+        },
+      }
+    },
+    find: place => {
+      if (place.kind === 'side') return place
+      if (!editor || editor.isDestroyed || !place.path) return null
+      const pos = picturePosOf(editor.state.doc, place.path, place.nth ?? 0)
+      return pos === null ? null : { kind: 'flow', pos, path: place.path }
+    },
+  }
   const pictureMaker = usePictureMaker({
     editor,
     rectOf: pictureRect,
@@ -955,16 +1010,21 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (place.kind === 'side') {
         // The side keeps its place; its focus point starts fresh, and its description is the words asked unless the
         // person wrote their own (#800).
+        // A side picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+        if (place.path !== undefined && !sameSidePath(header.image, place.path)) return false
         const alt = describe(header.alt ?? '', header.image?.trim() || null)
         writeSlide(null, { image: made.path, alt: alt || undefined, focus: undefined })
-        return
+        return true
       }
-      if (!editor || editor.isDestroyed) return
+      if (!editor || editor.isDestroyed) return false
       const old = editor.state.doc.nodeAt(place.pos)
+      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+      if (place.path && !(old && samePicture(old.attrs, place.path))) return false
       const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
-      apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))
+      return apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))
     },
     undo: () => { if (!outerRef.current.isDestroyed) outerRef.current.commands.undo() },
+    away: pictureAway,
   })
   /** The slide's title and words, for ChatGPT: the title starts the field and names the file; the words are context. */
   const slideWords = (): { title: string; words: string } => {
@@ -976,7 +1036,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const startPictureMaker = (place: PicturePlaceRef, mode: 'new' | 'change', source: string | null) => {
     const { title, words } = slideWords()
     pictureMaker.start({
-      place: place.kind === 'flow' && source ? { ...place, path: source } : place,
+      // The picture standing in the place ('' an empty side): the made one replaces only that one.
+      place: place.kind === 'side' ? { kind: 'side', path: source ?? '' } : source ? { ...place, path: source } : place,
       mode,
       suggestion: mode === 'new' ? title : '',
       ...(words ? { words } : {}),
