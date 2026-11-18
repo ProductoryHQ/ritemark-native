@@ -15,7 +15,7 @@ import { EditorState, Plugin, TextSelection, type Transaction } from '@tiptap/pm
 import { closeHistory, history, undo, redo, undoDepth } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, isBlockSlide, slideDataOf, withWrittenHandout } from '../../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, slideDataOf, withWrittenHandout } from '../../../../../src/decks/deckFormat'
 import { slideStamp, slideStamps } from '../../../../../src/decks/deckLibraryFormat'
 import { convertDeckText } from '../../../../../src/decks/blocks/convertDeck'
 import { publicDeck } from '../../../../../src/decks/page/publicDeck'
@@ -23,10 +23,10 @@ import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DeckDrawnHeadings, drawnHeadingsFollow, handoutMarkFor, hasDrawnHeadings } from './drawnHeadings'
+import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
-import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, deckVersionFor, needsConversion, type DeckVersionWritten } from './deckConvert'
+import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, DeckFrontMatterSteps, needsConversion } from './deckConvert'
 import { derivedHeadings, slidesOf } from '../deckDocument'
 import { documentReplacement } from '../../../lib/documentUpdate'
 
@@ -325,34 +325,19 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
 // ---- The front matter the deck view writes with the first edit (`deck: 2`, `handout: text`) goes with it: one Undo
 // gives the file back byte for byte, whatever the deck held. The view's `handleChange` as DeckView runs it, and the
 // host's join with the file as it is now (ritemarkEditor.ts `serializeFrontMatter`), edit after edit.
-function deckView(text: string) {
-  let state = stateOf(text, deckPlugins()).state
+function deckView(text: string, depth?: number) {
+  const plugins = deckPlugins()
+  if (depth !== undefined) plugins[0] = history({ depth })
+  let state = stateOf(text, plugins).state
   let file = text
   let properties: Record<string, unknown> = JSON.parse(JSON.stringify(splitFrontMatter(text).properties))
-  let markAdded: number | null = null
-  let written: DeckVersionWritten | null = null
-  const change = (next: EditorState, history: boolean) => {
+  const steps = new DeckFrontMatterSteps()
+  const change = (next: EditorState, undone: boolean) => {
     state = next
-    const doc = next.doc
-    const depth = undoDepth(next)
-    const mark = handoutMarkFor({ marked: properties[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE, drawn: hasDrawnHeadings(doc), added: markAdded, undo: history, depth })
-    if (mark === 'add') { markAdded = depth; properties = { ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE } }
-    else if (mark === 'remove') { markAdded = null; properties = { ...properties }; delete properties[TEXT_HANDOUT_KEY] }
-    const version = deckVersionFor({
-      version: properties.deck,
-      blocks: slidesOf(doc).some(entry => isBlockSlide(entry.kind)),
-      undo: history,
-      depth,
-      written,
-    })
-    if (version && 'write' in version) { written = version.written; properties = { ...properties, deck: 2 } }
-    else if (version) {
-      written = null
-      properties = { ...properties }
-      if (version.restore === undefined) delete properties.deck
-      else properties.deck = version.restore
-    }
-    file = joinFrontMatter(properties as never, editorMarkdown(doc), file)
+    steps.transaction(undone, undoDepth(next))
+    const written = steps.change({ marked: properties[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE, version: properties.deck, doc: next.doc, undo: undone, depth: undoDepth(next) })
+    if (written) properties = written.apply(properties)
+    file = joinFrontMatter(properties as never, editorMarkdown(next.doc), file)
     return file
   }
   return {
@@ -361,6 +346,7 @@ function deckView(text: string) {
       return change(state.apply(own ? closeHistory(tr) : tr), false)
     },
     undo: () => { let next = state; assert.ok(undo(state, tr => { next = state.apply(tr) }), 'something to undo'); return change(next, true) },
+    tryUndo: () => { let next: EditorState | null = null; undo(state, tr => { next = state.apply(tr) }); return next ? change(next, true) : null },
     redo: () => { let next = state; assert.ok(redo(state, tr => { next = state.apply(tr) }), 'something to redo'); return change(next, true) },
   }
 }
@@ -435,6 +421,22 @@ const blockSlide = '```slide\n---\nid: b1\n---\n# Already blocks\n```\n\n## Alre
   const fourth = deckView(older)
   assert.ok(fourth.type(' It acts.', 'An agent is given a goal.').includes('handout: text'))
   assert.equal(fourth.undo(), older, 'drawn headings, one Undo: byte for byte')
+}
+{
+  // The history drops its oldest steps past its depth (review of #796): a first edit it dropped can't be undone, so
+  // what it wrote stays. Undoing every step still kept leaves `deck: 2` and the mark with the block slides they need.
+  const older = DECK
+  const view = deckView(older, 1)
+  view.type('!', 'Compare them.')
+  for (let index = 0; index < 22; index += 1) view.type('.', `Last words${'.'.repeat(index + 1)}`, true)
+  let file = ''
+  for (let index = 0; index < 50; index += 1) {
+    const back = view.tryUndo()
+    if (back === null) break
+    file = back
+  }
+  assert.ok(file.startsWith('---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\nhandout: text\n---\n'), file.slice(0, 120))
+  assert.ok(!file.includes('```slide points'), 'the slides stay converted')
 }
 
 console.log('deckConvert: passed')

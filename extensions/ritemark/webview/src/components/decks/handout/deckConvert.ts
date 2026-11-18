@@ -21,9 +21,9 @@ import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode, type Sche
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { convertSlide, convertsToBlocks, drawsAsBlocks, saysBlockDeck } from '../../../../../src/decks/blocks/convertDeck'
 import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
-import { slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, isBlockSlide, slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, isSlideNode, slidesOf } from '../deckDocument'
-import { passes } from './drawnHeadings'
+import { handoutMarkFor, hasDrawnHeadings, passes } from './drawnHeadings'
 import { editorHTMLToMarkdown } from '../../../utils/editorMarkdown'
 
 export const deckConvertKey = new PluginKey('deckConvert')
@@ -63,6 +63,82 @@ export function deckVersionFor(input: { version: unknown; blocks: boolean; undo:
   }
   if (written && input.undo && input.depth < written.depth) return { restore: written.value }
   return null
+}
+
+type FrontMatter = { [key: string]: unknown }
+
+/**
+ * What the deck view writes into the front matter with a deck's first edit (`handout: text`, `deck: 2`), and the step
+ * that wrote it, so that step's Undo takes it out again: one record for both, which the deck view and its tests drive
+ * alike (review of #796).
+ *
+ * A step is named by the undo history's depth right after it. The history keeps a bounded number of steps and drops the
+ * oldest past its depth (prosemirror-history's overflow): a dropped step can't be undone any more, so what was written
+ * with it stays, and the steps after it move down by as many.
+ */
+export class DeckFrontMatterSteps {
+  private mark: number | null = null
+  private version: DeckVersionWritten | null = null
+  private seen = 0
+
+  /** Every change of the document (the editor's `transaction`), with whether it was an undo or a redo and the depth after it. */
+  transaction(history: boolean, depth: number): void {
+    // A new step adds one to the depth and a merged one nothing: a change that lowers it without an undo dropped steps.
+    const cut = !history && depth < this.seen ? this.seen + 1 - depth : 0
+    if (cut > 0) {
+      this.mark = this.mark !== null && this.mark - cut >= 1 ? this.mark - cut : null
+      this.version = this.version && this.version.depth - cut >= 1 ? { ...this.version, depth: this.version.depth - cut } : null
+    }
+    this.seen = depth
+  }
+
+  /**
+   * An edit the editor reports: the front matter's change for it, with the mark and the version it leaves; null when
+   * the front matter stays. `marked` and `version` are the front matter as the view holds it; `depth` is null without
+   * an editor state, and then nothing is taken out.
+   */
+  change(input: { marked: boolean; version: unknown; doc: PMNode | null; undo: boolean; depth: number | null }):
+    { marked: boolean; version: unknown; apply: <P extends FrontMatter>(properties: P) => P } | null {
+    const { doc } = input
+    const depth = input.depth ?? 0
+    const undo = input.undo && input.depth !== null
+    const changes: Array<(properties: FrontMatter) => FrontMatter> = []
+    let marked = input.marked
+    let version = input.version
+    const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), added: this.mark, undo, depth })
+    if (mark === 'add') {
+      // The first real edit of the handout: its headings are written, and the mark goes with them, in this one edit.
+      this.mark = depth
+      marked = true
+      changes.push(properties => ({ ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE }))
+    } else if (mark === 'remove') {
+      this.mark = null
+      marked = false
+      changes.push(properties => {
+        const next = { ...properties }
+        delete next[TEXT_HANDOUT_KEY]
+        return next
+      })
+    }
+    const written = deckVersionFor({ version, blocks: !!doc && slidesOf(doc).some(entry => isBlockSlide(entry.kind)), undo, depth, written: this.version })
+    if (written && 'write' in written) {
+      this.version = written.written
+      version = 2
+      changes.push(properties => ({ ...properties, deck: 2 }))
+    } else if (written) {
+      const before = written.restore
+      this.version = null
+      version = before
+      changes.push(properties => {
+        const next = { ...properties }
+        if (before === undefined) delete next.deck
+        else next.deck = before
+        return next
+      })
+    }
+    if (changes.length === 0) return null
+    return { marked, version, apply: <P extends FrontMatter>(properties: P) => changes.reduce<FrontMatter>((current, change) => change(current), properties) as P }
+  }
 }
 
 /** Does the document hold a slide the conversion would change: a v1 slide of one of the nine kinds? */
