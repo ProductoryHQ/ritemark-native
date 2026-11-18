@@ -14,6 +14,7 @@
  *    that part, a number with no part opens the top; and opened again without a link, the page returns to the last
  *    part read in this browser, with a quiet "Start from the beginning" in its bar for 5 s. Only the part's number is
  *    kept, in this browser's own storage, under the page's own name (its client and title, as the ticks are).
+ *  - A wide table that scrolls sideways fades softly at the side with more to scroll to (`PAGE_EDGE_RULE`).
  *
  * It only shows, hides and moves what the page already holds: it sets no `src` or `href`, loads nothing, and writes
  * no HTML (text goes in through `textContent`), so 2.2's gather sees every file the page uses and its
@@ -97,6 +98,59 @@ export const PAGE_PLACE_RULE = String.raw`
   }
   function keepPlace(storage, key, index) {
     try { if (storage) storage.setItem(key, String(index + 1)); } catch (error) { /* a browser that keeps nothing opens at the top */ }
+  }
+`;
+
+/**
+ * A wide table's soft edges (the Experience lead on #781), as plain JavaScript: the editor's
+ * `webview/src/extensions/tables/tableEdges.ts`, which `pageScript.test.ts` runs beside this copy. A table's frame
+ * (`.tw`) gets `is-scrollable-left` / `is-scrollable-right` on whichever side has more to scroll to, and the page's CSS
+ * fades that side over 24 px. A passive scroll listener draws once per animation frame and a ResizeObserver before the
+ * frame is painted; only classes and one CSS variable change, so nothing moves with reduced motion.
+ */
+export const PAGE_EDGE_RULE = String.raw`
+  var EDGE_SLACK = 1;
+  function tableEdges(scrollLeft, scrollWidth, clientWidth, rtl) {
+    var room = scrollWidth - clientWidth;
+    if (!(room > EDGE_SLACK)) return { left: false, right: false };
+    var at = Math.min(room, Math.abs(scrollLeft));
+    var fromStart = at > EDGE_SLACK, toEnd = at < room - EDGE_SLACK;
+    return rtl ? { left: toEnd, right: fromStart } : { left: fromStart, right: toEnd };
+  }
+  function watchTableEdges(frame, content, win) {
+    var pending = 0, bar = '', stopped = false, rtl = null, observer = null;
+    function stop() {
+      stopped = true;
+      frame.removeEventListener('scroll', schedule);
+      if (observer) observer.disconnect();
+      if (pending) win.cancelAnimationFrame(pending);
+      pending = 0;
+    }
+    function draw() {
+      pending = 0;
+      if (stopped || !frame.isConnected) return;
+      if (rtl === null) {
+        var style = win.getComputedStyle(frame);
+        if (!/^(auto|scroll)$/.test(style.overflowX)) { stop(); return; }
+        rtl = style.direction === 'rtl';
+      }
+      var edges = tableEdges(frame.scrollLeft, frame.scrollWidth, frame.clientWidth, rtl);
+      frame.classList.toggle('is-scrollable-left', edges.left);
+      frame.classList.toggle('is-scrollable-right', edges.right);
+      var height = edges.left || edges.right ? Math.max(0, frame.offsetHeight - frame.clientHeight) : 0;
+      var next = height ? height + 'px' : '';
+      if (next === bar) return;
+      bar = next;
+      if (next) frame.style.setProperty('--rm-fade-bar', next);
+      else frame.style.removeProperty('--rm-fade-bar');
+    }
+    function schedule() { if (!pending && !stopped) pending = win.requestAnimationFrame(draw); }
+    var Observer = win.ResizeObserver;
+    observer = typeof Observer === 'function' ? new Observer(draw) : null;
+    frame.addEventListener('scroll', schedule, { passive: true });
+    if (observer) { observer.observe(frame, { box: 'border-box' }); observer.observe(content); }
+    schedule();
+    return stop;
   }
 `;
 
@@ -405,6 +459,9 @@ const PAGE_BEHAVIOUR = String.raw`
   }
   doc.addEventListener('load', function (event) { if (event.target && event.target.tagName === 'IMG') land(); }, true);
 
+  // ---- a wide table's soft edges: the side with more to scroll to fades (PAGE_EDGE_RULE)
+  list(doc.querySelectorAll('.tw')).forEach(function (frame) { watchTableEdges(frame, frame.firstElementChild || frame, window); });
+
   // ---- start: the slide sized and the room set; then the part the address names (#6), else this reader's last part
   // with "Start from the beginning", else the part in view
   function settle() { scale(); room(); }
@@ -420,4 +477,4 @@ const PAGE_BEHAVIOUR = String.raw`
 `;
 
 /** The whole script, in its own scope. */
-export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_PLACE_RULE}${PAGE_BEHAVIOUR}})();`;
+export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_PLACE_RULE}${PAGE_EDGE_RULE}${PAGE_BEHAVIOUR}})();`;

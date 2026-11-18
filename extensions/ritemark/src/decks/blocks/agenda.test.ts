@@ -146,6 +146,7 @@ const assets: PageAssets = {
   assert.match(rule('.part'), /break-inside: avoid/);
   assert.match(rule('.prompt, .prompt.ai'), /break-inside: avoid/);
   assert.match(rule('.prompt pre, .prompt.ai pre'), /border: 1px solid/, 'a prompt keeps its box as a line');
+  assert.match(rule('.tw, .tw.is-scrollable-left, .tw.is-scrollable-right'), /overflow: visible; -webkit-mask: none; mask: none;/, 'a table prints whole, without its edge fade');
   // The slide alone prints its colours exactly.
   assert.equal(PRINT_CSS.match(/print-color-adjust: exact/g)?.length, 2, 'once, with its -webkit- twin');
   assert.match(rule('.layer'), /-webkit-print-color-adjust: exact; print-color-adjust: exact;/);

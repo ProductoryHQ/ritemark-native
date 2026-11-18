@@ -492,6 +492,9 @@ svg { flex: none; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
 .tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; container-type: inline-size; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta"); the frame a column's stored share counts against (handoutTableHtml) */
 .tw .fl { display: block; height: 0; } /* a text column's floor (handoutTableHtml): a width, no height */
+.tw.is-scrollable-left, .tw.is-scrollable-right { --fade-l: #000; --fade-r: #000; -webkit-mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; } /* a soft 24 px edge on the side with more to scroll to, as in the handout (PAGE_EDGE_RULE sets the classes); the second layer keeps a classic scrollbar whole */
+.tw.is-scrollable-left { --fade-l: transparent; }
+.tw.is-scrollable-right { --fade-r: transparent; }
 .tw table { border-collapse: collapse; font-size: 14.5px; }
 .tw th, .tw td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .tw th { color: var(--ink); font-weight: 700; }
@@ -610,6 +613,8 @@ export const PRINT_CSS = `
   .part h2 { font-size: 15pt; }
   .sect h2 { font-size: 17pt; }
   .part img, .pre img, .part .pic, .tw { break-inside: avoid; page-break-inside: avoid; }
+  /* A table prints whole: no sideways scroll, and no edge fade (#795), which on paper would hide its last columns. */
+  .tw, .tw.is-scrollable-left, .tw.is-scrollable-right { overflow: visible; -webkit-mask: none; mask: none; }
   .prompt, .prompt.ai { display: block; margin: 0 0 4mm; padding: 0; border-radius: 0; background: none; break-inside: avoid; page-break-inside: avoid; }
   .prompt pre, .prompt.ai pre { padding: 3mm 4mm; border: 1px solid #C9CBD6; border-radius: 8px; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .steps label { background: none; box-shadow: none; border: 1px solid #DADCE4; break-inside: avoid; page-break-inside: avoid; }

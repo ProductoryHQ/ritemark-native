@@ -198,6 +198,13 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    column's floor on its <col> (TableHandles.ts, tableColumns.ts); the frame is the query container its share counts
    against (the handout's text width, the frame's padding left out). The published page draws the same floors. */
 .deck-handout .wysiwyg-editor .ProseMirror > .rm-table > table > colgroup > col { min-width: var(--rm-col-floor, 0); }
+/* Its soft edge (the Experience lead on #781): the frame fades its content over 24 px on whichever side has more to
+   scroll to, so the last column isn't cut mid-word, and the fade goes when that end is reached (tableEdges.ts sets the
+   classes). A mask, not a shadow: it fades the words and the grey header row too. The left fade starts where the
+   clip does (6 px in), the right one fills the + column's room. The second layer keeps a classic scrollbar whole. */
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table:is(.is-scrollable-left, .is-scrollable-right) { --rm-fade-l: #000; --rm-fade-r: #000; mask: linear-gradient(to right, var(--rm-fade-l) 6px, #000 30px, #000 calc(100% - 24px), var(--rm-fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table.is-scrollable-left { --rm-fade-l: transparent; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table.is-scrollable-right { --rm-fade-r: transparent; }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
 .deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
