@@ -4,7 +4,7 @@ import type { PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import { CommandsList } from './CommandsList'
-import { executeSlashCommand, slashItemsFor, type BlockItemDef } from './blockItems'
+import { executeSlashCommand, filterSlashItems, slashItemsFor, type BlockItemDef } from './blockItems'
 
 export type { BlockItemDef as Command }
 
@@ -49,9 +49,8 @@ export const SlashCommands = Extension.create<SlashCommandsOptions>({
         items: ({ query, editor }: any) => {
           // A deck's handout has the slide node in its schema (Sprint 157): its Divider starts a new slide.
           const items = itemsFor ? itemsFor(editor) : slashItemsFor(!!editor?.schema?.nodes?.deckSlide)
-          return items.filter((item) =>
-            item.title.toLowerCase().startsWith(query.toLowerCase())
-          )
+          // Experience 22: by the name's words and the item's hidden ones, name matches first.
+          return filterSlashItems(items, query ?? '')
         },
         render: () => {
           let component: any
