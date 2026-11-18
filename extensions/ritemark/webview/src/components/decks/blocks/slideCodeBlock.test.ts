@@ -177,6 +177,9 @@ const icons = { copy: '<svg data-i="copy"></svg>', check: '<svg data-i="check"><
   assert.deepEqual(words, ['[the report]', '[what the board wants to know]'])
   assert.equal(fillPlaceDecorations(loadSlide('```python\nx = a[0]\n```')).find().length, 0, 'never in a program')
   assert.equal(fillPlaceDecorations(loadSlide('Words [here] on the slide')).find().length, 0, 'only in a code block')
+  // A Text document's code block is marked the same (the lead, 18 November): the Text editor carries the extension.
+  const editorSource = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '../../Editor.tsx'), 'utf8')
+  assert.match(editorSource, /afterImage: \[\s*SlashCommands,[\s\S]*?CodeFillPlaces,/)
 }
 
 // ---- The published page's slides carry the same controls; `open-in: none` leaves out the ↗ there too.

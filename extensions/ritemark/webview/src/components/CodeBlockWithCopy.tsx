@@ -9,7 +9,8 @@
  *
  * Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"): one code block for a
  * Text document and a slide. Copy is a small pill at the block's top right (its icon and "Copy", then "Copied"), and it
- * takes the whole block. It always shows and the words flow around it. On a slide (`surface: 'slide'`) a ↗
+ * takes the whole block. It always shows, on a line of its own at the block's top right, the words under it. On a
+ * slide (`surface: 'slide'`) a round ↗
  * ("Open in…") beside it opens Open in Claude and Open in ChatGPT, for a deck without `open-in: none`; the host opens
  * the address in the person's own browser. The strip, the wall and the page draw the same controls from the one slide
  * renderer (`src/decks/blocks/codeTools.ts`).

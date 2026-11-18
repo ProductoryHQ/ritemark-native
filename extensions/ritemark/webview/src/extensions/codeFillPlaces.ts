@@ -1,8 +1,8 @@
 /**
  * Sprint 163 PR 1 (the decks README: "Places to fill in, `[like this]`, are highlighted in the code"): the slide
- * editor marks a code block's places to fill in as the slide renderer does (`codeTools.fillPlaces`, the class
- * `cb-fill`), so the stage, the strip, the wall and the page show the same marks. Decorations only: nothing is written
- * to the file.
+ * editor and the Text editor mark a code block's places to fill in as the slide renderer does
+ * (`codeTools.fillPlaces`, the class `cb-fill`), so the stage, the strip, the wall, the page and a Text document show
+ * the same marks. Decorations only: nothing is written to the file.
  */
 import { Extension } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
