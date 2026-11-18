@@ -21,14 +21,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
-import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, parseTheme, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, parseTheme, secondLogoGround, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
 import { frontMatterField } from './deckFormat';
 import { themeModeOf } from './deckMode';
 import { deckName, type DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
-import { logoWebviewUri, projectThemeFiles, readThemeOrEvening, resolveAssetsIn, themeLogoFile, type DeckPages } from './deckPages';
+import { logoWebviewUri, projectThemeFiles, readThemeOrEvening, resolveAssetsIn, themeLogoFile, type DeckPages, type ThemeLogoFile } from './deckPages';
 import { logoNames, logoProblem, logoKindOfName, MAX_LOGO_BYTES, LOGO_TOO_LARGE } from './themeLogo';
-import { newThemeNameProblem, newThemeText, themePathFor, themeTextWith, type ThemeStart } from './themeFile';
+import { newThemeNameProblem, newThemeText, SECOND_LOGO_FIELDS, themePathFor, themeTextWith, type ThemeStart } from './themeFile';
 import { decodeThemeRequest, ThemeProtocolError, type ThemeDeck, type ThemeHostMessage, type ThemeLogoState, type ThemePreview, type ThemeRequest } from './themeProtocol';
 import { deckPreview, SAMPLE_DECK_TEXT } from './themePreview';
 import type { ThemeChangeView } from './themeChange';
@@ -314,12 +314,13 @@ export class ThemePages implements vscode.Disposable {
       case 'theme/logo-file': {
         const { dataUrl, filename } = request;
         const bytes = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
-        await this.queue(document, () => this.takeLogo(view, filename, bytes));
+        await this.queue(document, () => this.takeLogo(view, filename, bytes, request.second === true));
         return;
       }
       case 'theme/choose-logo': {
-        const picked = await this.chooseLogo(view);
-        if (picked) await this.queue(document, () => this.takeLogo(view, picked.name, picked.bytes));
+        const second = request.second === true;
+        const picked = await this.chooseLogo(view, second);
+        if (picked) await this.queue(document, () => this.takeLogo(view, picked.name, picked.bytes, second));
         return;
       }
       // Sprint 162 PR 5: Check all colours and Fix the colours, Ritemark's own; a fix goes into the draft, one step
@@ -337,11 +338,12 @@ export class ThemePages implements vscode.Disposable {
   }
 
   /** Choose a file… on the Logo row: an SVG or a PNG, from the project's folder at first. Null when nothing is taken. */
-  private async chooseLogo(view: ThemeView): Promise<{ name: string; bytes: Buffer } | null> {
+  private async chooseLogo(view: ThemeView, second = false): Promise<{ name: string; bytes: Buffer } | null> {
     const root = rootOf(view.document.uri.fsPath);
+    const ground = second ? secondLogoGround(parseTheme(view.document.getText())) : null;
     const picked = await vscode.window.showOpenDialog({
-      title: 'Choose the theme\'s logo',
-      openLabel: 'Use as the logo',
+      title: ground ? `Choose the logo for ${ground} slides` : 'Choose the theme\'s logo',
+      openLabel: ground ? 'Use for ' + ground + ' slides' : 'Use as the logo',
       canSelectMany: false,
       canSelectFolders: false,
       // A folder that exists (`pickerFolder`, the rule every open dialog follows): the project's, else the theme's.
@@ -370,8 +372,13 @@ export class ThemePages implements vscode.Disposable {
    * never over another picture; the same picture already there is used), and named in the draft's `logo:` line. The
    * decks get it with Save, as any change. Discard leaves the copy beside the theme (Undo in the draft can name it
    * again), and nothing of Ritemark's removes a picture.
+   *
+   * `second`: the logo's version for the other ground (18 November), checked and copied the same way, as
+   * `<theme> logo for light slides.svg`, and named in the draft's `logo-for-light:` (or `logo-for-dark:`) line: the one
+   * the theme names already when it is replaced, else the one for the ground the theme isn't on. Only a theme with a
+   * logo takes one.
    */
-  private async takeLogo(view: ThemeView, name: string, bytes: Buffer): Promise<void> {
+  private async takeLogo(view: ThemeView, name: string, bytes: Buffer, second = false): Promise<void> {
     const say = (text: string) => this.post(view.panel.webview, { type: 'theme/notice', text });
     const problem = logoProblem(name, bytes);
     const kind = logoKindOfName(name);
@@ -379,6 +386,12 @@ export class ThemePages implements vscode.Disposable {
       await say(problem ?? 'A logo is an SVG or a PNG picture.');
       return;
     }
+    const draft = parseTheme(view.document.getText());
+    if (second && !draft.logo) {
+      await say('Add the logo first; its version for the other slides goes with it.');
+      return;
+    }
+    const ground = second ? secondLogoGround(draft) : undefined;
     const themeFile = view.document.uri.fsPath;
     const folder = path.dirname(themeFile);
     const root = rootOf(themeFile);
@@ -390,7 +403,7 @@ export class ThemePages implements vscode.Disposable {
         return;
       }
       let chosen: string | null = null;
-      for (const candidate of logoNames(path.basename(themeFile), kind)) {
+      for (const candidate of logoNames(path.basename(themeFile), kind, ground)) {
         const target = path.join(folder, candidate);
         try {
           await fs.promises.writeFile(target, bytes, { flag: 'wx' });
@@ -410,8 +423,10 @@ export class ThemePages implements vscode.Disposable {
         await say('The logo could not be copied beside the theme.');
         return;
       }
-      await this.change(view, themeTextWith(view.document.getText(), { logo: chosen }), 'edit');
-      await say(`The logo is beside the theme file, as ${chosen}. Save puts it on the decks.`);
+      await this.change(view, themeTextWith(view.document.getText(), ground ? { [SECOND_LOGO_FIELDS[ground]]: chosen } : { logo: chosen }), 'edit');
+      await say(ground
+        ? `The logo for ${ground} slides is beside the theme file, as ${chosen}. Save puts it on the decks.`
+        : `The logo is beside the theme file, as ${chosen}. Save puts it on the decks.`);
     } catch (error) {
       console.warn('[Themes] Could not copy the logo:', error);
       await say('The logo could not be copied beside the theme.');
@@ -757,9 +772,21 @@ export class ThemePages implements vscode.Disposable {
     const root = rootOf(themeFile) ?? path.dirname(themeFile);
     const relative = projectRelative(root, themeFile) ?? path.basename(themeFile);
     const found = await themeLogoFile(root, relative, theme).catch(() => ({ state: 'missing' as const, file: theme.logo!.file }));
+    const main = this.logoShown(view, found, 'The slides show no logo until it\'s back, or you choose another.');
+    if (!main) return null;
+    // The second version (18 November): its own line, said the same way.
+    const second = theme.logo.second;
+    if (!second) return main;
+    const secondFound = await themeLogoFile(root, relative, theme, true).catch(() => ({ state: 'missing' as const, file: second.file }));
+    const shown = this.logoShown(view, secondFound, `The ${second.ground} slides show the first logo until it's back, or you choose another.`);
+    return shown ? { ...main, second: { ...shown, ground: second.ground } } : main;
+  }
+
+  /** A logo file as the tab shows it, or null for none; `meanwhile` says what the slides draw while it is missing. */
+  private logoShown(view: ThemeView, found: ThemeLogoFile, meanwhile: string): Omit<ThemeLogoState, 'second'> | null {
     switch (found.state) {
       case 'found': return { file: found.file, url: logoWebviewUri(view.panel.webview, found), problem: null, aspect: found.aspect };
-      case 'missing': return { file: found.file, url: null, problem: `The logo's file, ${found.file}, isn't beside the theme. The slides show no logo until it's back, or you choose another.` };
+      case 'missing': return { file: found.file, url: null, problem: `The logo's file, ${found.file}, isn't beside the theme. ${meanwhile}` };
       case 'refused': return { file: found.file, url: null, problem: found.problem };
       default: return null;
     }

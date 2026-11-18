@@ -37,7 +37,7 @@ import * as vscode from 'vscode';
 import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { parseDeck } from '../deckFormat';
-import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../deckTheme';
+import { BUILT_IN_THEME, parseTheme, themePathOf, themeWithLogoAddresses, type DeckTheme } from '../deckTheme';
 import { deckThemeFor, resolveAssetsIn } from '../deckPages';
 import {
   DECK_PRESENTER_VIEW_TYPE,
@@ -485,7 +485,7 @@ export class DeckPresenter implements vscode.Disposable {
       // wall's window (Sprint 162 PR 4; the presenter view draws the wall's state, and the same address).
       const read = await deckThemeFor(running.origin.document.uri.fsPath, themePathOf(themePath), running.wall.panel.webview);
       const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
-      running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo, ...(read.logoAspect ? { logoAspect: read.logoAspect } : {}) } : theme };
+      running.theme = { path: themePath, value: themeWithLogoAddresses(theme, read.logo, read.logoAspect, read.secondLogo, read.secondLogoAspect) };
     }
     return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value, transition: deckTransitionOf(text) };
   }

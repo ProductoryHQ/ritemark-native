@@ -110,6 +110,6 @@ export function slideMarkup(kind: string, data: SlideData, options: SlideMarkupO
     + `<div class="deck-sl${layout.known ? '' : ' is-unknown'}"${attr('style', inner)} aria-hidden="true">`
     + layout.boxes.map(entry => box(entry, pictureUrl)).join('')
     // The theme's logo, last, over the slide's words and pictures (Sprint 162 PR 4).
-    + slideLogoHtml(themeSlideLogo(options.theme), isLayoutTitleSlide(kind))
+    + slideLogoHtml(themeSlideLogo(options.theme, options.borderless), isLayoutTitleSlide(kind))
     + '</div></div>'
 }

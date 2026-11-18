@@ -12,7 +12,7 @@
  * for a new theme's name and file. Pure: the host, the webview and the tests read the same rules.
  */
 import { writeScalar } from './deckFormat';
-import { DECK_FONT_LIST, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, deckFont, isDeckFontName, isLogoPath, LOGO_ONS, LOGO_PLACES, parseTheme, THEMES_FOLDER, type DeckTheme, type LogoOn, type LogoPlace } from './deckTheme';
+import { DECK_FONT_LIST, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, deckFont, isDeckFontName, isLogoPath, LOGO_ONS, LOGO_PLACES, parseTheme, SECOND_LOGO_KEYS, THEMES_FOLDER, type DeckTheme, type LogoGround, type LogoOn, type LogoPlace } from './deckTheme';
 
 /** The fields the theme's tab changes, as `DeckTheme` names them. */
 export interface ThemeChanges {
@@ -36,6 +36,12 @@ export interface ThemeChanges {
   /** The logo's corner and where it shows; written only while the theme has a logo. */
   logoAt?: LogoPlace;
   logoOn?: LogoOn;
+  /**
+   * The logo's second version, for light or for dark slides (18 November), or null to take it out. As with the logo,
+   * only the host names a picture, and only while the theme has a logo; the tab may only take one out.
+   */
+  logoForLight?: string | null;
+  logoForDark?: string | null;
 }
 
 export type ThemeField = keyof ThemeChanges;
@@ -55,10 +61,16 @@ export const THEME_KEYS: Record<ThemeField, string> = {
   logo: 'logo',
   logoAt: 'logo-place',
   logoOn: 'logo-on',
+  logoForLight: SECOND_LOGO_KEYS.light,
+  logoForDark: SECOND_LOGO_KEYS.dark,
 };
 
+/** The fields of the logo's second version, by the ground it is for. */
+export const SECOND_LOGO_FIELDS: Record<LogoGround, 'logoForLight' | 'logoForDark'> = { light: 'logoForLight', dark: 'logoForDark' };
+const SECOND_FIELDS: ThemeField[] = ['logoForLight', 'logoForDark'];
+
 /** The logo's lines, which go together when the logo is taken out. */
-const LOGO_KEYS = [THEME_KEYS.logo, THEME_KEYS.logoAt, THEME_KEYS.logoOn];
+const LOGO_KEYS = [THEME_KEYS.logo, THEME_KEYS.logoAt, THEME_KEYS.logoOn, THEME_KEYS.logoForLight, THEME_KEYS.logoForDark];
 
 const FIELDS = Object.keys(THEME_KEYS) as ThemeField[];
 const COLOUR_FIELDS: ThemeField[] = ['bg', 'head', 'text', 'accent'];
@@ -91,7 +103,9 @@ export function isThemeChanges(value: unknown): value is ThemeChanges {
       case 'fh':
       case 'fb': return typeof field === 'string' && DECK_FONT_LIST.some(font => font.name === field);
       // The tab only takes a logo out; a picture is named by the host, which copied it (`ThemePages.takeLogo`).
-      case 'logo': return field === null;
+      case 'logo':
+      case 'logoForLight':
+      case 'logoForDark': return field === null;
       case 'logoAt': return LOGO_PLACES.includes(field as LogoPlace);
       case 'logoOn': return LOGO_ONS.includes(field as LogoOn);
       default: return typeof field === 'string' && COLOUR.test(field);
@@ -119,6 +133,11 @@ export function changedFields(theme: DeckTheme, changes: ThemeChanges): ThemeCha
     } else if (field === 'logo') {
       // A picture the theme can name, or null to take the logo out (only when it has one).
       if (value === null ? theme.logo !== undefined : isLogoPath(String(value)) && String(value).trim() !== theme.logo?.file) out.logo = value === null ? null : String(value).trim();
+    } else if (field === 'logoForLight' || field === 'logoForDark') {
+      // A second version's picture, or null to take it out (only when the file names one for that ground).
+      const key = THEME_KEYS[field];
+      const now = theme.logo?.second && SECOND_LOGO_KEYS[theme.logo.second.ground] === key ? theme.logo.second.file : undefined;
+      if (value === null ? now !== undefined : isLogoPath(String(value)) && String(value).trim() !== now) (out as Record<string, unknown>)[field] = value === null ? null : String(value).trim();
     } else if (field === 'logoAt' || field === 'logoOn') {
       // A logo's place and where it shows, against what the theme reads (the default when its line is missing).
       const now = field === 'logoAt' ? theme.logo?.place ?? DEFAULT_LOGO_PLACE : theme.logo?.on ?? DEFAULT_LOGO_ON;
@@ -179,10 +198,14 @@ export function themeTextWith(text: string, changes: ThemeChanges): string {
   if (!hasLogo) {
     delete changed.logoAt;
     delete changed.logoOn;
+    delete changed.logoForLight;
+    delete changed.logoForDark;
   }
   const removeLogo = changed.logo === null;
+  // The lines that go: all the logo's with the logo (its second version too), or one second version's.
+  const removeKeys = removeLogo ? LOGO_KEYS : SECOND_FIELDS.filter(field => changed[field] === null).map(field => THEME_KEYS[field]);
   const fields = FIELDS.filter(field => changed[field] !== undefined && changed[field] !== null);
-  if (fields.length === 0 && !removeLogo) return text;
+  if (fields.length === 0 && removeKeys.length === 0) return text;
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const match = FRONT.exec(text);
   if (!match) {
@@ -193,11 +216,12 @@ export function themeTextWith(text: string, changes: ThemeChanges): string {
   const innerEnd = innerStart + match[1].length;
   const lines = match[1].split(/\r?\n/);
   const isSection = (line: string) => { const top = TOP.exec(line); return !!top && top[3].trim() === ''; };
-  // Sprint 162 PR 4: Remove takes out the logo's lines, every one of them (a key written twice too), and nothing else.
-  if (removeLogo) {
+  // Sprint 162 PR 4: Remove takes out the logo's lines, every one of them (a key written twice too), and nothing else;
+  // the second version's Remove its own line (18 November).
+  if (removeKeys.length) {
     for (let index = lines.length - 1; index >= 0; index--) {
       const top = TOP.exec(lines[index]);
-      if (top && LOGO_KEYS.includes(top[1]) && top[3].trim() !== '') lines.splice(index, 1);
+      if (top && removeKeys.includes(top[1]) && top[3].trim() !== '') lines.splice(index, 1);
     }
   }
   for (const field of fields) {

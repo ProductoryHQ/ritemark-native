@@ -106,7 +106,7 @@ export type DeckHostMessage =
    * The theme file's text, or null when the deck names none the project has (the view draws the built-in theme); and
    * (Sprint 162 PR 4) its logo's address in this webview, or null for none or a missing file.
    */
-  | { type: 'deck/theme'; path: string; text: string | null; logo: string | null; /** Its width to its height. */ logoAspect: number | null }
+  | { type: 'deck/theme'; path: string; text: string | null; logo: string | null; /** Its width to its height. */ logoAspect: number | null; /** The logo's second version (18 November), the same way. */ secondLogo: string | null; secondLogoAspect: number | null }
   /** Sprint 162: the project's themes (`themeEntries`), for the Theme menu. */
   | { type: 'deck/themes'; themes: ThemeEntry[] }
   /** Sprint 162 PR 2: New theme…'s answer: the theme is made, or why not (the sheet stays open and says so). */

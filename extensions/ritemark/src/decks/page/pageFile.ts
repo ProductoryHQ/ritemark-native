@@ -22,7 +22,7 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import { blockPicturePaths } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFont, deckFontFile, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
+import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFont, deckFontFile, drawsSecondLogo, themeFonts, type DeckFont, type DeckTheme } from '../deckTheme';
 import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PageThemeFont, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 import { logoAspectOf } from '../themeLogo';
@@ -417,6 +417,20 @@ export interface PageFile {
 /** The logo's file for the page: `logos/logo-3f9a2c1d7e0b4a65.svg`. */
 export function pageLogoFile(bytes: Buffer, kind: 'svg' | 'png'): PageFile {
   return { address: `${PAGE_LOGO_FOLDER}/logo-${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.${kind}`, bytes, aspect: logoAspectOf(bytes, kind) };
+}
+
+/** A theme's logo file as the host found it (`deckPages.ThemeLogoFile`): its bytes only when it is there and can go. */
+export type FoundLogoFile = { state: 'found'; bytes: Buffer; kind: 'svg' | 'png' } | { state: 'none' | 'missing' | 'refused' };
+
+/**
+ * The one logo file a deck's page carries (18 November): the theme's second version when the deck's look draws it
+ * (`drawsSecondLogo`: a Borderless deck the one for light slides, a Card deck the one for its theme's ground) and its
+ * file is there, else the `logo:` file; null when the theme has none or it isn't there. The other file never goes.
+ */
+export function pageLogoOf(theme: Pick<DeckTheme, 'logo' | 'bg'>, borderless: boolean, logo: FoundLogoFile, second: FoundLogoFile): PageFile | null {
+  if (!theme.logo) return null;
+  const drawn = drawsSecondLogo(theme, borderless) && second.state === 'found' ? second : logo;
+  return drawn.state === 'found' ? pageLogoFile(drawn.bytes, drawn.kind) : null;
 }
 
 export type FontWriteResult =

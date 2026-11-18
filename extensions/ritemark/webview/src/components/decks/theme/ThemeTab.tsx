@@ -16,7 +16,7 @@
  * decks keep their look until Save. What the tab shows is always the document as the host last sent it.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
-import { DECK_FONT_LIST, deckFont, deckFontStack, isDeckFontName, parseTheme, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { DECK_FONT_LIST, deckFont, deckFontStack, isDeckFontName, parseTheme, themeWithLogoAddresses, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { newThemeNameProblem, nextThemeName, normalColour, type ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeDeck, ThemeLogoState, ThemePreview } from '../../../../../src/decks/themeProtocol'
 import type { DocumentApplyTarget } from '../../../types/documentSync'
@@ -101,7 +101,14 @@ export function logoStateFrom(value: unknown): ThemeLogoState | null {
   const logo = value as Record<string, unknown>
   if (typeof logo.file !== 'string') return null
   const aspect = typeof logo.aspect === 'number' && logo.aspect > 0 && Number.isFinite(logo.aspect) ? logo.aspect : null
-  return { file: logo.file, url: typeof logo.url === 'string' && logo.url ? logo.url : null, problem: typeof logo.problem === 'string' ? logo.problem : null, aspect }
+  const state: ThemeLogoState = { file: logo.file, url: typeof logo.url === 'string' && logo.url ? logo.url : null, problem: typeof logo.problem === 'string' ? logo.problem : null, aspect }
+  // The second version (18 November), with the ground it is for.
+  const second = logo.second && typeof logo.second === 'object' ? logo.second as Record<string, unknown> : null
+  if (second && typeof second.file === 'string' && (second.ground === 'light' || second.ground === 'dark')) {
+    const read = logoStateFrom({ file: second.file, url: second.url, problem: second.problem, aspect: second.aspect })!
+    state.second = { file: read.file, url: read.url, problem: read.problem, aspect: read.aspect, ground: second.ground }
+  }
+  return state
 }
 
 interface ThemeDecks {
@@ -196,7 +203,7 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const theme = useMemo(() => {
     if (!state) return null
     const parsed = parseTheme(state.text)
-    return parsed.logo && state.logo?.url ? { ...parsed, logoUrl: state.logo.url, ...(state.logo.aspect ? { logoAspect: state.logo.aspect } : {}) } : parsed
+    return themeWithLogoAddresses(parsed, state.logo?.url, state.logo?.aspect, state.logo?.second?.url, state.logo?.second?.aspect)
   }, [state])
   const set = useCallback((changes: ThemeChanges) => { setCheckResult(null); sendToExtension('theme/set', { changes }) }, [])
   const save = useCallback(() => sendToExtension('theme/save'), [])

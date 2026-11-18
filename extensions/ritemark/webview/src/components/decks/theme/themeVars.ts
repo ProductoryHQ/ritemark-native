@@ -4,7 +4,7 @@
  * Ritemark's white surface (Borderless), where the headings take the theme's darkest colour and the accent is darkened
  * until it reads on white. A theme's hand-picked shades (`card`, `borderless`) win over the worked-out ones.
  */
-import { deckFontStack, type DeckTheme } from '../../../../../src/decks/deckTheme'
+import { deckFontStack, groundOf, type DeckTheme } from '../../../../../src/decks/deckTheme'
 
 type Rgb = [number, number, number]
 
@@ -33,7 +33,8 @@ export const contrast = (a: string, b: string) => {
   const y = luminance(b)
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
 }
-const isDark = (colour: string) => luminance(colour) < 0.2
+/** The one rule for a dark ground, the logo's too (`groundOf`). */
+const isDark = (colour: string) => groundOf(colour) === 'dark'
 /** Darker (or lighter) toward `target` until it reads on `ground` at `min` to 1. */
 const toward = (colour: string, target: string, min: number, ground: string) => {
   let value = colour

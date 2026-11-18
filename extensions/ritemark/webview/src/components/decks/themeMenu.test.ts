@@ -351,7 +351,7 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.equal(themeKeyOf(FERN, list), FERN)
   // The deck view's own reading (`useDeckTheme`): no text from the host is the built-in theme.
   const bridge = readFileSync(fileURLToPath(new URL('./deckBridge.ts', import.meta.url)), 'utf8')
-  assert.match(bridge, /theme: themeWithLogo\(text === null \? BUILT_IN_THEME : parseTheme\(text\), message\.logo, message\.logoAspect\)/)
+  assert.match(bridge, /theme: themeWithLogo\(text === null \? BUILT_IN_THEME : parseTheme\(text\), message\.logo, message\.logoAspect, message\.secondLogo, message\.secondLogoAspect\)/)
   assert.match(bridge, /const path: string \| null = themePathOf\(themePath\)/, 'a deck naming no theme asks for Evening\'s file')
   // The host's readers all fall back to the project's own Evening file, then to the built-in theme.
   const pages = readFileSync(fileURLToPath(new URL('../../../../src/decks/deckPages.ts', import.meta.url)), 'utf8')
