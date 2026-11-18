@@ -109,6 +109,8 @@ import {
   Lightning,
   LinkBreak,
   LinkSimple,
+  Link,
+  CursorClick,
   List,
   ListChecks,
   ListNumbers,
@@ -304,6 +306,9 @@ const iconMap = {
   'lightning': Lightning,
   'link-break': LinkBreak,
   'link-simple': LinkSimple,
+  // Sprint 163 PR 3: the Button block's / item and its bar's Address.
+  'link': Link,
+  'cursor-click': CursorClick,
   'list': List,
   'list-checks': ListChecks,
   'list-numbers': ListNumbers,

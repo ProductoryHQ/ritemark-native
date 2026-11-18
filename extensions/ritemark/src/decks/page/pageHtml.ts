@@ -43,6 +43,7 @@ import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, typ
 import { lookOf, pictureBlockTokenizer, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { PAGE_SCRIPT } from './pageScript';
 import { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses } from '../blocks/codeTools';
+import { buttonHtml, buttonParagraphOf } from '../blocks/buttonBlock';
 
 export { lexHandout };
 
@@ -309,6 +310,16 @@ const handoutPictureExtensions = new Marked().use({
     renderer(this: { parser: TableParser }, token) {
       return handoutTableHtml(this.parser, token as Tokens.Table);
     },
+  }, {
+    // Sprint 163 PR 3: a Button block, wherever a paragraph stands (in a quote, a list): its words beside it, and a real
+    // link to its full https address in a new tab (any other address draws an inert button). Files stay where they
+    // are: Publish carries none.
+    name: 'paragraph',
+    renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
+      const button = buttonParagraphOf((token as Tokens.Paragraph).tokens);
+      if (!button) return false;
+      return buttonHtml({ wordsHtml: this.parser.parseInline(button.words), label: button.label, href: button.href, mode: 'link', className: 'pbutton' });
+    },
   }, pictureBlockTokenizer, {
     name: 'image',
     renderer(this: { parser: { renderer: InstanceType<typeof marked.Renderer> } }, token) {
@@ -461,6 +472,16 @@ svg { flex: none; }
 .part li { margin-bottom: 6px; }
 .part li > p { margin: 0 0 6px; }
 .part a, .pre a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
+/* Sprint 163 PR 3: a Button block in the text: the words beside it and the button in the theme's accent; alone, the button. */
+.pbutton { display: flex; align-items: center; gap: 16px; margin: 0 0 14px; padding: 10px 12px 10px 18px; border-radius: 12px; background: var(--soft); box-shadow: inset 0 0 0 1px var(--line); }
+.pbutton.is-solo { padding: 0; background: none; box-shadow: none; }
+.pbutton .blk-button-words { flex: 1; min-width: 0; margin: 0; }
+.part .pbutton .blk-btn, .pre .pbutton .blk-btn { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px; background: var(--accent); color: var(--onacc); font: 700 15px/40px var(--fb); text-decoration: none; white-space: nowrap; }
+.pbutton a.blk-btn:hover { filter: brightness(1.06); }
+.pbutton a.blk-btn:active { filter: brightness(.94); }
+.pbutton .blk-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.pbutton .blk-btn.is-unset { opacity: .55; }
+@media (max-width: 859px) { .pbutton:not(.is-solo) { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px 16px; } .pbutton:not(.is-solo) .blk-btn { justify-content: center; } }
 .part img, .pre img { display: block; max-width: 100%; height: auto; margin: 4px 0 14px; border-radius: 8px; }
 /* Experience 49: a picture's look (pictureLook.ts): its frame crops it in its box and holds its caption. */
 .part .pic, .pre .pic { margin: 4px 0 14px; }
@@ -665,6 +686,8 @@ function pageColours(deck: PublicDeck): string {
   const vars: Record<string, string> = {
     ink: onWhite.hd,
     text: onWhite.tx,
+    // Sprint 163 PR 3: the words on a button in the accent (the Steps pill's ink).
+    onacc: onWhite.tagfg,
     muted: onWhite.sub,
     label: onWhite.acct,
     accent: deck.theme.accent,
@@ -823,6 +846,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       pictureUrl: (picture: string) => options.pictureUrl(picture, 'slide'),
       agenda,
       openIn,
+      // Sprint 163 PR 3: a button on a slide is a real link to its full https address, in a new tab.
+      buttonLinks: true,
     };
     // A block slide through the one block renderer (Sprint 161), a v1 slide through its layout, as the deck view draws them.
     const markup = isBlockSlide(slide.kind) ? blockSlideMarkup(slide.data, drawing) : slideMarkup(slide.kind, slide.data as SlideData, drawing);

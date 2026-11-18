@@ -44,6 +44,8 @@ import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
 import { TabPane, TabsBlock, addTabsTurndownRules, tabsMarkedExtension } from '../extensions/tabs/tabsMarkdown'
+import { buttonBlockExtensions } from '../extensions/buttonBlock/ButtonBlock'
+import { addButtonTurndownRules, buttonMarkedExtension } from '../extensions/buttonBlock/buttonMarkdown'
 import { preprocessTaskListHTML } from './taskListRoundTrip'
 import {
   annotateAsWritten,
@@ -77,6 +79,8 @@ editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0
 // Sprint 163: the Tabs block (`::: {.panel-tabset}`), one block in a slide, a handout and a Text document. Only that
 // `:::` block: any other `:::` line in a Text document stays text.
 editorMarked.use(tabsMarkedExtension as Parameters<typeof editorMarked.use>[0])
+// Sprint 163 PR 3: a paragraph ending with a `{.button}` link is a Button block (after the as-written paragraph).
+editorMarked.use(buttonMarkedExtension)
 
 let commentMarkedRegistered = false
 
@@ -402,6 +406,8 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
       onLinkClick: slots.onLinkClick,
     }),
     ...tableExtensions,
+    // Sprint 163 PR 3: the Button block, the same in a Text document and on a slide.
+    ...buttonBlockExtensions,
     slots.image ?? Image.configure(editorImageOptions),
     ...(slots.afterImage ?? []),
     // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
@@ -477,6 +483,8 @@ export function createEditorTurndownService(): TurndownService {
   addDeckTurndownRules(service)
   // Sprint 163: the Tabs block. Harmless without one, like the rules above.
   addTabsTurndownRules(service)
+  // Sprint 163 PR 3: the Button block (a paragraph ending with its `{.button}` link).
+  addButtonTurndownRules(service)
   return service
 }
 

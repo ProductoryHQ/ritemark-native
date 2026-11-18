@@ -17,6 +17,7 @@ import { transitionOf, type DeckTransition } from './deckTransition';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
 import { isTab, tabsOf, type WallTabs } from './wallTabs';
 import { COPY_MAX_TEXT, isOpenInAddress } from '../blocks/codeTools';
+import { isButtonAddress } from '../blocks/buttonBlock';
 
 export type { WallReveal };
 
@@ -204,6 +205,8 @@ export type WallRequest =
   | { type: 'present/copy'; text: string }
   /** Sprint 163 PR 1: its ↗ Open in Claude or ChatGPT, in the person's own browser (`openInAddresses`' own only). */
   | { type: 'present/open-in'; url: string }
+  /** Sprint 163 PR 3: a Button block's button, in the person's own browser (a full https address a button of the deck has). */
+  | { type: 'present/open-link'; url: string }
   | { type: 'present/next' }
   | { type: 'present/back' }
   | { type: 'present/first' }
@@ -467,6 +470,8 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
       return exactKeys(input, ['type', 'text']) && typeof input.text === 'string' && input.text.length <= COPY_MAX_TEXT ? { type: 'present/copy', text: input.text } : null;
     case 'present/open-in':
       return exactKeys(input, ['type', 'url']) && isOpenInAddress(input.url) ? { type: 'present/open-in', url: input.url } : null;
+    case 'present/open-link':
+      return exactKeys(input, ['type', 'url']) && isButtonAddress(input.url) ? { type: 'present/open-link', url: input.url } : null;
     case 'present/pointer': {
       if (!exactKeys(input, ['type', 'at'])) return null;
       if (input.at === null) return { type: 'present/pointer', at: null };
