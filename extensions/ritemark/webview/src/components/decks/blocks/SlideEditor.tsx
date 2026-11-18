@@ -49,7 +49,7 @@ import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
-import { slideAgendaWithView, type AgendaSource } from './slideAgendaView'
+import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
 import { onDocChanged } from '../../../lib/docChange'
 import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
@@ -306,8 +306,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       return { entries: agendaOf(slidesOf(deck.state.doc).map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 }))), hint: true }
     },
     // Every change to the deck, the host's too (a section renamed by an AI while the slide is open).
-    subscribe: listener => onDocChanged(outerRef.current, listener),
-  }), [])
+    subscribe: listener => onDocChanged(outer, listener),
+    // A new deck editor makes a new source (and a new slide editor), so the Agenda never listens to a gone one.
+  }), [outer])
   const SlideKeys = useMemo(() => Extension.create({
     name: 'slideKeys',
     priority: 900,
@@ -569,6 +570,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // the / menu left the slide at its first step, overflowing, until the next key).
     const flow = editor.view.dom
     flow.addEventListener('load', fresh, true)
+    // An Agenda drawn again for the deck's sections (a section added or renamed elsewhere) changes the slide's height.
+    flow.addEventListener(AGENDA_DRAWN_EVENT, fresh)
     // The browser keeps a caret in view by scrolling the clipped flow itself: it is put back, so the title stays whole.
     const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
     flow.addEventListener('scroll', unscroll)
@@ -577,6 +580,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       editor.off('update', typed)
       fonts?.removeEventListener?.('loadingdone', fresh)
       flow.removeEventListener('load', fresh, true)
+      flow.removeEventListener(AGENDA_DRAWN_EVENT, fresh)
       flow.removeEventListener('scroll', unscroll)
     }
   }, [editor, refit])

@@ -10,6 +10,9 @@ import { agendaHtml, type AgendaDrawing } from '../../../../../src/decks/blocks/
 import { agendaKey } from '../../../../../src/decks/blocks/slideRenderer'
 import { SlideAgenda } from './slideEditorMarkdown'
 
+/** The event a redrawn Agenda sends up the stage, so the stage measures its fit again (the list's height changed). */
+export const AGENDA_DRAWN_EVENT = 'deck-agenda-drawn'
+
 /** Where the stage's Agenda reads the deck: its sections now, and a call when they may have changed. */
 export interface AgendaSource {
   current: () => AgendaDrawing
@@ -27,16 +30,18 @@ class SlideAgendaView implements NodeView {
     this.dom.setAttribute('contenteditable', 'false')
     this.dom.setAttribute('data-agenda', '')
     this.draw()
-    this.stop = source ? source.subscribe(() => this.draw()) : () => {}
+    this.stop = source ? source.subscribe(() => { if (this.draw()) this.dom.dispatchEvent(new CustomEvent(AGENDA_DRAWN_EVENT, { bubbles: true })) }) : () => {}
   }
 
-  private draw() {
+  /** Draw the deck's list; true when it changed. */
+  private draw(): boolean {
     const drawing = this.source?.current() ?? { entries: [], hint: true }
     const key = `${drawing.hint}\u0002${agendaKey(drawing.entries)}`
-    if (key === this.shown) return
+    if (key === this.shown) return false
     this.shown = key
     // `agendaHtml` escapes every title; it never draws the block's own lines.
     this.dom.innerHTML = agendaHtml(drawing) || ''
+    return true
   }
 
   update(node: PMNode): boolean {

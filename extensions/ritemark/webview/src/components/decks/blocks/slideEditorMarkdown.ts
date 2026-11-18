@@ -143,6 +143,17 @@ export const SlideDiv = Node.create({
 })
 
 /**
+ * The line breaks around a `:::` block (the Agenda's too): tight with a neighbour only as written (`data-md-tight`); a
+ * fence line never merges with the block beside it.
+ */
+function fenceSpacing(element: HTMLElement): { lead: string; trail: string } {
+  const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
+  const next = element.nextElementSibling
+  const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
+  return { lead, trail }
+}
+
+/**
  * The decks README, small details 14: the Agenda block. One line pair in the file (`::: agenda`, `:::`), and its list
  * drawn from the deck's section slides, never written. An atom on the stage: it is chosen, moved, deleted and undone
  * whole, and its lines (with anything someone wrote between them) are written back exactly as they were read.
@@ -180,9 +191,7 @@ const isAgenda = (node: DomNode) => node.nodeName === 'DIV' && (node as HTMLElem
 /** The Agenda as Markdown: its lines as read (a new one's `::: agenda` and `:::`), apart from its neighbours as a div. */
 function agendaMarkdown(element: HTMLElement): string {
   const raw = (element.getAttribute('data-raw') ?? `${AGENDA_OPEN}\n${AGENDA_CLOSE}`).replace(/\n+$/, '')
-  const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
-  const next = element.nextElementSibling
-  const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
+  const { lead, trail } = fenceSpacing(element)
   return `${lead}${raw}${trail}`
 }
 
@@ -197,10 +206,7 @@ function slideDivMarkdown(content: string, element: HTMLElement): string {
   const gapOpen = element.getAttribute('data-gap-open') === 'true' ? '\n' : ''
   const gapClose = element.getAttribute('data-gap-close') === 'true' ? '\n' : ''
   const inside = content.replace(/^\n+/, '').replace(/\n+$/, '')
-  // Tight with a neighbour only as written (`data-md-tight`); a fence line never merges with the block beside it.
-  const lead = element.getAttribute('data-md-tight') === 'true' && element.previousElementSibling ? '\n' : '\n\n'
-  const next = element.nextElementSibling
-  const trail = next && next.getAttribute('data-md-tight') === 'true' ? '\n' : '\n\n'
+  const { lead, trail } = fenceSpacing(element)
   if (!inside) return `${lead}${open}\n${gapOpen}${close}${trail}`
   return `${lead}${open}\n${gapOpen}${inside}\n${gapClose}${close}${trail}`
 }

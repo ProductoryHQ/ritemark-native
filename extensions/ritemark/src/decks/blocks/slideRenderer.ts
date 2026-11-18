@@ -233,6 +233,9 @@ function createSlideMarked(): Marked {
       tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: Token[]) => Token[] } }, src: string) {
         const scan = scanFencedDiv(src);
         if (!scan) return undefined;
+        // The Agenda draws from the deck: what someone wrote between its lines is kept in the file and never read, so no
+        // picture or Steps block in it reaches the page (as the slide editor keeps it: `slideEditorMarkdown`).
+        if (isAgendaClasses(scan.attrs.classes)) return { type: 'slideDiv', raw: scan.raw, attrs: scan.attrs, tokens: [] } as SlideDivToken;
         return { type: 'slideDiv', raw: scan.raw, attrs: scan.attrs, tokens: this.lexer.blockTokens(scan.inner.replace(/^\n+/, ''), []) } as SlideDivToken;
       },
       renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
@@ -346,12 +349,22 @@ function coverOf(markdown: string): boolean {
   return false;
 }
 
+const sectionCache = new Map<string, string | null>();
+
 /**
  * PR 2: a block slide drawn as a section, the way an old Section slide converts (`legacyToBlocks`): a short first line
  * (its number) over its title, and nothing else. Its number ('' for none), or null for any other slide. The page draws
- * such a slide's part as a divider, as it drew a Section slide's.
+ * such a slide's part as a divider, as it drew a Section slide's. Read once per Markdown (the Agenda asks for every slide).
  */
 export function blockSectionNumberOf(markdown: string): string | null {
+  if (sectionCache.has(markdown)) return sectionCache.get(markdown) ?? null;
+  if (sectionCache.size > 500) sectionCache.clear();
+  const number = sectionNumberOfBlocks(markdown);
+  sectionCache.set(markdown, number);
+  return number;
+}
+
+function sectionNumberOfBlocks(markdown: string): string | null {
   const blocks = drawnBlocksOf(markdown);
   if (blocks.length !== 2 || blocks[0].type !== 'paragraph' || blocks[1].type !== 'heading' || (blocks[1] as Tokens.Heading).depth !== 1) return null;
   const number = (blocks[0] as Tokens.Paragraph).text.replace(/\\(.)/g, '$1').trim();
