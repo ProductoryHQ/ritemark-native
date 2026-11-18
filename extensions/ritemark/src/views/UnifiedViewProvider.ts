@@ -2771,6 +2771,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * gate (Sprint 130: the task board's Give to agent). A probe that throws
    * reads as `error`, never as usable.
    */
+  /**
+   * Pictures with ChatGPT: how Codex is signed in. Its image tool comes only with a ChatGPT account, never with an
+   * OpenAI API key. Null when it can't be read.
+   */
+  public async codexAuthMethod(): Promise<'apiKey' | 'chatgpt' | null> {
+    try {
+      return (await (this._runtimeRegistry.get('codex') as CodexRuntime).getCodexSidebarStatus()).authMethod ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   public async runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability> {
     const probe = await this._probeRuntimeAvailability(runtimeId);
     return probe.ok ? probe.availability : { state: 'error', usable: false, detail: probe.message };

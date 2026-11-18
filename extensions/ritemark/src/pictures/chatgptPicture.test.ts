@@ -14,6 +14,7 @@ import {
   PICTURE_PROBLEMS,
   PICTURE_SYSTEM_PROMPT,
   decodePictureRequest,
+  generatedImagesFolder,
   makePicture,
   pictureBaseName,
   pictureKindOf,
@@ -42,6 +43,7 @@ function deps(over: Partial<PictureMakerDeps> & { turns?: PictureTurn[]; signIns
       over.turns?.push(turn);
       return { text: 'Done.', picturesMade: [{ base64: PNG.toString('base64') }] };
     },
+    generatedFolder: '/nowhere/.codex/generated_images',
     ...over,
   };
 }
@@ -156,19 +158,28 @@ async function main(): Promise<void> {
   // ── What Codex made: its saved file only from a generated_images folder and only a real picture; a usage limit says so.
   {
     const { root, folder } = project();
-    const generated = path.join(root, 'codex-home', 'generated_images', 't1');
+    const codexFolder = path.join(root, 'codex-home', 'generated_images')
+    const generated = path.join(codexFolder, 't1');
     fs.mkdirSync(generated, { recursive: true });
     fs.writeFileSync(path.join(generated, 'ig.png'), PNG);
     fs.writeFileSync(path.join(generated, 'notes.txt'), 'secret words');
     fs.writeFileSync(path.join(root, 'elsewhere.png'), PNG);
-    assert.deepStrictEqual(await readMadePicture({ savedPath: path.join(generated, 'ig.png') }), { bytes: PNG, extension: 'png' });
-    assert.strictEqual(await readMadePicture({ savedPath: path.join(generated, 'notes.txt') }), null, 'not a picture');
-    assert.strictEqual(await readMadePicture({ savedPath: path.join(root, 'elsewhere.png') }), null, 'not where the image tool saves');
-    assert.deepStrictEqual(await readMadePicture({ savedPath: '/nowhere/generated_images/x.png', base64: JPEG.toString('base64') }), { bytes: JPEG, extension: 'jpg' });
+    const lookalike = path.join(folder, 'generated_images');
+    fs.mkdirSync(lookalike);
+    fs.writeFileSync(path.join(lookalike, 'theirs.png'), PNG);
+    assert.deepStrictEqual(await readMadePicture({ savedPath: path.join(generated, 'ig.png') }, codexFolder), { bytes: PNG, extension: 'png' });
+    assert.strictEqual(await readMadePicture({ savedPath: path.join(generated, 'notes.txt') }, codexFolder), null, 'not a picture');
+    assert.strictEqual(await readMadePicture({ savedPath: path.join(root, 'elsewhere.png') }, codexFolder), null, 'not where the image tool saves');
+    assert.strictEqual(await readMadePicture({ savedPath: path.join(lookalike, 'theirs.png') }, codexFolder), null, 'another generated_images folder is not Codex\'s');
+    assert.deepStrictEqual(await readMadePicture({ savedPath: '/nowhere/generated_images/x.png', base64: JPEG.toString('base64') }, codexFolder), { bytes: JPEG, extension: 'jpg' });
+    assert.strictEqual(generatedImagesFolder({ CODEX_HOME: '/tmp/home-x' }, '/Users/u'), path.join('/tmp/home-x', 'generated_images'));
+    assert.strictEqual(generatedImagesFolder({}, '/Users/u'), path.join('/Users/u', '.codex', 'generated_images'));
     assert.strictEqual(pictureKindOf(Buffer.from('<svg/>')), null);
     const limit = await makePicture(deps({ runTurn: async () => ({ text: 'Sorry', picturesMade: [], pictureFailure: 'usageLimitExceeded' }) }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
     assert.deepStrictEqual(limit, { kind: 'failed', problem: PICTURE_PROBLEMS.limit });
-    const none = await makePicture(deps({ runTurn: async () => ({ text: 'I can\'t', picturesMade: [{ savedPath: path.join(generated, 'notes.txt') }] }) }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const apiKey = await makePicture(deps({ authMethod: async () => 'apiKey' }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    assert.deepStrictEqual(apiKey, { kind: 'failed', problem: PICTURE_PROBLEMS.apiKey }, 'an API-key Codex has no image tool: said, not "try other words"');
+    const none = await makePicture(deps({ generatedFolder: codexFolder, runTurn: async () => ({ text: 'I can\'t', picturesMade: [{ savedPath: path.join(generated, 'notes.txt') }] }) }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
     assert.deepStrictEqual(none, { kind: 'failed', problem: PICTURE_PROBLEMS.none });
     const broken = await makePicture(deps({ runTurn: async () => { throw new Error('ChatGPT turn failed: 500'); } }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
     assert.deepStrictEqual(broken, { kind: 'failed', problem: PICTURE_PROBLEMS.failed });

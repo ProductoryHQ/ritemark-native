@@ -15,17 +15,19 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { AgentId } from '../agent/types';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { ONE_SHOT_CANCELLED, runOneShotTurnResult, type OneShotSettings, type OneShotTurnResult } from '../runtime/oneShotTurn';
 import type { RuntimeAvailability } from '../runtime/availability';
-import { decodePictureRequest, makePicture, type PictureMakerDeps, type PictureTurn } from './chatgptPicture';
+import { decodePictureRequest, generatedImagesFolder, makePicture, type PictureMakerDeps, type PictureTurn } from './chatgptPicture';
 
 /** What the AI's sheet gives this host. */
 export interface PictureSheet {
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
+  codexAuthMethod?(): Promise<'apiKey' | 'chatgpt' | null>;
   oneShotSettings(runtimeId: AgentId): Promise<OneShotSettings>;
   openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void>;
 }
@@ -105,6 +107,8 @@ export class ChatgptPictureHost {
       openSignIn: async () => {
         await sheet?.openLandingChat('codex', SIGN_IN_PLACEHOLDER);
       },
+      ...(standIn || !sheet?.codexAuthMethod ? {} : { authMethod: () => sheet.codexAuthMethod!() }),
+      generatedFolder: generatedImagesFolder(this.env, os.homedir()),
       runTurn: standIn
         ? standInTurn(standIn, this.standInMs)
         : async (turn) => {
@@ -140,7 +144,14 @@ export class ChatgptPictureHost {
 
   private async make(document: vscode.TextDocument, webview: vscode.Webview, message: unknown): Promise<void> {
     const request = decodePictureRequest(message);
-    if (!request) return;
+    if (!request) {
+      // A request the host can't take still gets its answer, so the strip never waits for nothing.
+      const requestId = (message as { requestId?: unknown }).requestId;
+      if (typeof requestId === 'string' && requestId) {
+        void webview.postMessage({ type: 'picture/status', requestId: requestId.slice(0, 100), state: 'failed', problem: 'ChatGPT can\'t change this picture: it isn\'t a file in this project.' });
+      }
+      return;
+    }
     if (document.uri.scheme !== 'file') {
       void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: 'failed', problem: 'Save the document first, then make a picture for it.' });
       return;
@@ -153,7 +164,11 @@ export class ChatgptPictureHost {
     const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? documentFolder;
     try {
       const outcome = await makePicture(this.deps(), { request, documentFolder, root, signal: controller.signal });
-      if (outcome.kind === 'made') {
+      // A Cancel or a closed editor after the picture was saved: it is neither placed nor told.
+      if (outcome.kind === 'made' && controller.signal.aborted) {
+        await fs.promises.unlink(path.join(documentFolder, 'images', outcome.file)).catch(() => undefined);
+        void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: 'cancelled' });
+      } else if (outcome.kind === 'made') {
         const url = webview.asWebviewUri(vscode.Uri.file(path.join(documentFolder, 'images', outcome.file))).toString();
         // A deck writes `images/…` (as its pasted pictures), a document `./images/…` (as its pasted pictures).
         const written = request.slideId ? `images/${outcome.file}` : `./images/${outcome.file}`;

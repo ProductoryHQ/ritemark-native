@@ -55,6 +55,8 @@ export interface PictureBarProps {
   onComment?: () => void
   /** ChatGPT: Make a new picture… ('new') or Change this picture… ('change'). Absent: no ChatGPT item. */
   onChatgpt?: (mode: 'new' | 'change') => void
+  /** The picture is a file in the project, so ChatGPT can change it (a web address can't be sent). Default true. */
+  chatgptCanChange?: boolean
   onReplace: () => void
   onCopy: () => void
   onReveal: () => void
@@ -176,7 +178,7 @@ function DescriptionField({ alt, caption, onWords, withCaption, compact }: { alt
  * ChatGPT (experience 49): Make a new picture… or Change this picture…, from a description. An empty place has no
  * picture to change, so the item makes a new one at once. Only ChatGPT makes pictures, so it is the only AI named.
  */
-function ChatgptItem({ empty, compact, onChatgpt }: { empty: boolean; compact: boolean; onChatgpt: (mode: 'new' | 'change') => void }) {
+function ChatgptItem({ empty, compact, canChange, onChatgpt }: { empty: boolean; compact: boolean; canChange: boolean; onChatgpt: (mode: 'new' | 'change') => void }) {
   const face = (
     <>
       <Icon name="sparkle" size={14} tone="inherit" />
@@ -202,7 +204,7 @@ function ChatgptItem({ empty, compact, onChatgpt }: { empty: boolean; compact: b
         </DropdownMenuTrigger>
       </Tooltip>
       <DropdownMenuContent align="end" onCloseAutoFocus={event => event.preventDefault()}>
-        <DropdownMenuItem onSelect={() => onChatgpt('change')}>Change this picture…</DropdownMenuItem>
+        {canChange ? <DropdownMenuItem onSelect={() => onChatgpt('change')}>Change this picture…</DropdownMenuItem> : null}
         <DropdownMenuItem onSelect={() => onChatgpt('new')}>Make a new picture…</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -347,7 +349,7 @@ export function PictureBar(props: PictureBarProps) {
               <Icon name="chat-text" size={14} tone="inherit" />
             </BarButton>
           ) : null}
-          {props.onChatgpt ? <ChatgptItem empty={!!empty} compact={fold >= 1} onChatgpt={props.onChatgpt} /> : null}
+          {props.onChatgpt ? <ChatgptItem empty={!!empty} compact={fold >= 1} canChange={props.chatgptCanChange !== false} onChatgpt={props.onChatgpt} /> : null}
           <DropdownMenu>
             <Tooltip label="More">
               <DropdownMenuTrigger asChild>

@@ -116,15 +116,31 @@ export function pictureKindOf(bytes: Buffer): { extension: string; mediaType: st
   return null;
 }
 
+/** Where Codex's image tool saves: `generated_images` in Codex's home (`CODEX_HOME`, else `~/.codex`). */
+export function generatedImagesFolder(env: NodeJS.ProcessEnv, home: string): string {
+  return path.join(env.CODEX_HOME?.trim() || path.join(home, '.codex'), 'generated_images');
+}
+
+/** Whether `file` (a real path) is inside `folder` (made real here). */
+async function isInsideReal(folder: string, file: string): Promise<boolean> {
+  try {
+    const inside = path.relative(await fs.promises.realpath(folder), file);
+    return !!inside && !inside.startsWith('..') && !path.isAbsolute(inside);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * The picture Codex made, as bytes: its saved file, read only when it is a regular file in a `generated_images` folder
- * (where the image tool saves) and really a picture; else the bytes the item carried. Null when neither is a picture.
+ * The picture Codex made, as bytes: its saved file, read only when it is a regular file inside Codex's own
+ * `generated_images` folder (`generatedFolder`, where the image tool saves) and really a picture; else the bytes the
+ * item carried. Null when neither is a picture.
  */
-export async function readMadePicture(made: MadePicture): Promise<{ bytes: Buffer; extension: string } | null> {
+export async function readMadePicture(made: MadePicture, generatedFolder: string): Promise<{ bytes: Buffer; extension: string } | null> {
   if (made.savedPath && path.isAbsolute(made.savedPath)) {
     try {
       const real = await fs.promises.realpath(made.savedPath);
-      if (real.split(path.sep).includes('generated_images')) {
+      if (await isInsideReal(generatedFolder, real)) {
         const stat = await fs.promises.stat(real);
         if (stat.isFile() && stat.size <= MAX_PICTURE_BYTES) {
           const bytes = await fs.promises.readFile(real);
@@ -165,7 +181,14 @@ export interface PictureMakerDeps {
   chatgptReady(): Promise<boolean>;
   /** ChatGPT's own sign-in card, on the AI's sheet. */
   openSignIn(): Promise<void>;
+  /**
+   * How ChatGPT is signed in. Its image tool comes only with a ChatGPT account: signed in with an OpenAI API key, it
+   * makes no picture, and rewording never helps.
+   */
+  authMethod?(): Promise<'apiKey' | 'chatgpt' | null>;
   runTurn(turn: PictureTurn): Promise<OneShotTurnResult>;
+  /** Codex's own `generated_images` folder, the only place its saved picture is read from. */
+  generatedFolder: string;
   log?(message: string): void;
 }
 
@@ -176,6 +199,7 @@ export const PICTURE_PROBLEMS = {
   limit: 'ChatGPT\'s picture limit is reached for now. Try again later.',
   failed: 'ChatGPT couldn\'t make the picture. Try again.',
   save: 'The picture couldn\'t be saved in images/ beside the document.',
+  apiKey: 'ChatGPT makes pictures only when signed in with a ChatGPT account, not an API key.',
 } as const;
 
 /** The picture to change, as the turn's attachment; or why it can't be sent. */
@@ -213,6 +237,7 @@ export async function makePicture(
     return { kind: 'sign-in' };
   }
   if (signal.aborted) return { kind: 'cancelled' };
+  if ((await deps.authMethod?.()) === 'apiKey') return { kind: 'failed', problem: PICTURE_PROBLEMS.apiKey };
 
   const attachments: UnifiedAttachment[] = [];
   if (request.mode === 'change') {
@@ -234,9 +259,11 @@ export async function makePicture(
   // The last picture the turn made: one is asked for.
   let picture: { bytes: Buffer; extension: string } | null = null;
   for (const made of [...result.picturesMade].reverse()) {
-    picture = await readMadePicture(made);
+    picture = await readMadePicture(made, deps.generatedFolder);
     if (picture) break;
   }
+  // A Cancel while the picture was read: nothing is saved.
+  if (signal.aborted) return { kind: 'cancelled' };
   if (!picture) {
     if (result.pictureFailure) deps.log?.(`[pictures] ChatGPT's image tool: ${result.pictureFailure}`);
     return { kind: 'failed', problem: result.pictureFailure === 'usageLimitExceeded' ? PICTURE_PROBLEMS.limit : PICTURE_PROBLEMS.none };
@@ -246,7 +273,13 @@ export async function makePicture(
     const imagesDir = path.join(documentFolder, 'images');
     // Only while the document's folder is there, as a paste is saved.
     await ensureProjectSubfolder(documentFolder, imagesDir);
+    if (signal.aborted) return { kind: 'cancelled' };
     const file = writeImageRelativeTo(imagesDir, `${pictureBaseName(request)}.${picture.extension}`, picture.bytes.toString('base64'));
+    // A Cancel that came while it was written: the new file (this request's own, never another) goes again.
+    if (signal.aborted) {
+      await fs.promises.unlink(path.join(imagesDir, file)).catch(() => undefined);
+      return { kind: 'cancelled' };
+    }
     return { kind: 'made', file };
   } catch (error) {
     deps.log?.(`[pictures] Couldn't save ChatGPT's picture: ${error instanceof Error ? error.message : String(error)}`);

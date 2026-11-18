@@ -100,7 +100,11 @@ async function main(): Promise<void> {
     assert.deepStrictEqual(posted[0], { type: 'deck/image-saved', slideId: 's-2', path: 'images/where-agents-work.png', url });
     assert.deepStrictEqual(posted[1], { type: 'picture/status', requestId: 'm1', state: 'made', path: 'images/where-agents-work.png', url });
     assert.deepStrictEqual(fs.readFileSync(path.join(root, 'images', 'where-agents-work.png')), PNG);
-    console.log('✓ a deck: saved in images/, placed as a saved picture');
+    // Change on a picture the host can't send (a web address: no path): answered, so the strip never waits forever.
+    host.handle(deck, view, { type: 'picture/make', requestId: 'm0', mode: 'change', description: 'Night' } as never);
+    await until(() => posted.length === 3);
+    assert.deepStrictEqual({ ...posted[2], problem: typeof posted[2].problem }, { type: 'picture/status', requestId: 'm0', state: 'failed', problem: 'string' });
+    console.log('✓ a deck: saved in images/, placed as a saved picture; a request it can\'t take is answered');
   }
 
   // ── Try another in a document: a new file next to the document, `./images/…`, the first one kept.

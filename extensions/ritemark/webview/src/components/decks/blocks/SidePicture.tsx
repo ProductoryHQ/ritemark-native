@@ -41,6 +41,8 @@ export interface SidePictureProps {
   onReplace: () => void
   /** ChatGPT: Make a new picture… or Change this picture… for this place. */
   onChatgpt?: (mode: 'new' | 'change') => void
+  /** The side picture is a file in the project, so ChatGPT can change it. */
+  chatgptCanChange?: boolean
   /** ChatGPT's field or strip is on this place: the bar gives it the place. */
   barHidden?: boolean
   onReveal: () => void
@@ -207,6 +209,7 @@ export function SidePicture(props: SidePictureProps) {
           onWords={words => props.onWords(words)}
           onComment={props.onComment}
           onChatgpt={props.onChatgpt}
+          chatgptCanChange={props.chatgptCanChange}
           onReplace={props.onReplace}
           onCopy={() => {
             if (!url) return

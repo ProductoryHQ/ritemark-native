@@ -37,6 +37,8 @@ export interface PictureMakerOptions {
   placeMade?: (place: PicturePlaceRef, picture: { path: string; url: string }) => void
   /** Undo on the strip: the editor's own undo. */
   undo: () => void
+  /** A request ended with no picture (Cancel, a failure, sign-in, the place gone): what `beforeMake` readied is let go. */
+  onSettled?: (ask: PictureAsk) => void
 }
 
 let serial = 0
@@ -67,7 +69,10 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos)
       if (pos === null) {
         // The picture went: a request still running is stopped, and nothing stays anchored on nothing.
-        if (current.phase === 'making') sendToExtension('picture/cancel', { requestId: current.requestId })
+        if (current.phase === 'making') {
+          sendToExtension('picture/cancel', { requestId: current.requestId })
+          latest.current.onSettled?.(current.ask)
+        }
         setState({ phase: 'idle' })
         return
       }
@@ -88,14 +93,29 @@ export function usePictureMaker(options: PictureMakerOptions) {
     if (current.phase === 'checking') asked.current = null
     if (next.phase === 'done' && typeof status.path === 'string' && typeof status.url === 'string') {
       latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url })
+    } else if (current.phase === 'making') {
+      latest.current.onSettled?.(current.ask)
     }
     setState(next)
   }), [])
 
+  // An editor that goes while its picture is made (a slide left for another): a picture for its words would have no
+  // place to replace, so the request stops; one for a slide's side goes on (the deck places it there).
+  useEffect(() => () => {
+    const current = stateRef.current
+    if (current.phase === 'making' && current.ask.place.kind === 'flow') {
+      sendToExtension('picture/cancel', { requestId: current.requestId })
+      latest.current.onSettled?.(current.ask)
+    }
+  }, [])
+
   /** Make a new picture… or Change this picture…: ChatGPT's readiness first (its sign-in card when it isn't). */
   const start = useCallback((ask: PictureAsk) => {
     const current = stateRef.current
-    if (current.phase === 'making') sendToExtension('picture/cancel', { requestId: current.requestId })
+    if (current.phase === 'making') {
+      sendToExtension('picture/cancel', { requestId: current.requestId })
+      latest.current.onSettled?.(current.ask)
+    }
     const requestId = newRequestId()
     asked.current = requestId
     setState({ phase: 'checking', ask })
@@ -116,7 +136,10 @@ export function usePictureMaker(options: PictureMakerOptions) {
 
   const cancel = useCallback(() => {
     const current = stateRef.current
-    if (current.phase === 'making') sendToExtension('picture/cancel', { requestId: current.requestId })
+    if (current.phase === 'making') {
+      sendToExtension('picture/cancel', { requestId: current.requestId })
+      latest.current.onSettled?.(current.ask)
+    }
     setState({ phase: 'idle' })
   }, [])
 
@@ -167,21 +190,29 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
   const [words, setWords] = useState('')
   const place = state.phase === 'idle' ? null : state.ask.place
 
-  // The field starts from its suggestion each time it opens.
-  const opened = state.phase === 'asking' ? state.ask : null
-  useEffect(() => { if (opened) setWords(opened.suggestion) }, [opened])
+  // The field starts from its suggestion each time it opens, never again while it's open (an edit above the picture
+  // moves its place, and the words typed stay).
+  const asking = state.phase === 'asking'
+  const suggestion = state.phase === 'asking' ? state.ask.suggestion : ''
+  useEffect(() => { if (asking) setWords(suggestion) }, [asking])
 
-  // Follows the place every frame while shown: a scroll, the slide's fit, the window.
+  // Follows the place while shown: a scroll, the window, and a look every quarter second for what moves it otherwise
+  // (the slide's fit, words typed above it), never a layout read every frame.
   useEffect(() => {
     if (!place) { setRect(null); return }
-    let frame = 0
     const tick = () => {
       const next = rectOf(place)
       setRect(previous => (previous && next && previous.left === next.left && previous.top === next.top && previous.width === next.width && previous.height === next.height ? previous : next))
-      frame = requestAnimationFrame(tick)
     }
     tick()
-    return () => cancelAnimationFrame(frame)
+    const timer = window.setInterval(tick, 250)
+    window.addEventListener('scroll', tick, true)
+    window.addEventListener('resize', tick)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('scroll', tick, true)
+      window.removeEventListener('resize', tick)
+    }
   }, [place?.kind, place?.kind === 'flow' ? place.pos : -1, rectOf])
 
   useLayoutEffect(() => {
@@ -200,10 +231,15 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
       maker.close()
     }
     const keys = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      event.stopPropagation()
-      maker.close()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        maker.close()
+        return
+      }
+      // Done: typing on goes on, and the strip goes with it, so its Undo never takes back words typed after the picture.
+      const target = event.target as Element | null
+      if (state.phase === 'done' && !['Shift', 'Control', 'Alt', 'Meta'].includes(event.key) && !(target && ref.current?.contains(target))) maker.close()
     }
     document.addEventListener('pointerdown', press, true)
     window.addEventListener('keydown', keys, true)
@@ -247,7 +283,9 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
         />
         <p className="m-0 text-[12px] leading-[17px] text-ink-muted">{sentWords(state.ask)}</p>
         <div className="flex justify-end gap-2 pt-0.5">
-          <Button type="button" variant="ghost" size="compact" onClick={maker.close}>Cancel</Button>
+          <Tooltip label="Close without asking ChatGPT (Esc)">
+            <Button type="button" variant="ghost" size="compact" onClick={maker.close}>Cancel</Button>
+          </Tooltip>
           <Tooltip label={words.trim() ? 'Ask ChatGPT for the picture (Enter)' : 'Describe the picture first'}>
             <Button type="submit" size="compact" disabled={!words.trim()}>
               <Icon name="sparkle" size={14} tone="inherit" />

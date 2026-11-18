@@ -71,7 +71,8 @@ import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 import { PictureTools, stageBounds } from '../../pictures/PictureTools'
 import { PictureMakerView, usePictureMaker, type PicturePlaceRef } from '../../pictures/ChatgptPicture'
-import { chosenPicture, chosenPictureUnder, leavePicture, replacePicture as pictureReplaced } from '../../../extensions/pictures/pictureCommands'
+import { chosenPicture, chosenPictureUnder, leavePicture, replacePictureKeepingCaret } from '../../../extensions/pictures/pictureCommands'
+import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
@@ -833,7 +834,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     if (replacing !== null && old?.type.name === 'image') {
       // A / menu picture still on its way keeps its place (review of #771). Experience 49: its size and words stay, a
       // crop made for the old picture's shape goes.
-      apply(pictureReplaced(editor.state, replacing, { src: picture.url, title: picture.path }))
+      apply(replacePictureKeepingCaret(editor.state, replacing, { src: picture.url, title: picture.path }))
       return
     }
     const at = Math.min(pictureAt.current ?? editor.state.doc.content.size, editor.state.doc.content.size)
@@ -953,6 +954,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       return { slideId }
     },
     undo: () => { if (!outerRef.current.isDestroyed) outerRef.current.commands.undo() },
+    // A request that made nothing lets its replace target go, so the next / menu Picture is inserted, never put in its place.
+    onSettled: ask => { if (ask.place.kind === 'flow' && replaceAt.current === ask.place.pos) replaceAt.current = null },
   })
   /** The slide's title and words, for ChatGPT: the title starts the field and names the file; the words are context. */
   const slideWords = (): { title: string; words: string } => {
@@ -1026,6 +1029,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
                 }}
                 onReplace={() => choosePicture(false)}
                 onChatgpt={mode => startPictureMaker({ kind: 'side' }, mode, header.image?.trim() || null)}
+                chatgptCanChange={isRelativeImagePath(header.image?.trim() ?? '')}
                 barHidden={makerOnSide}
                 onReveal={() => { if (header.image?.trim()) sendToExtension('revealImage', { relativePath: header.image.trim() }) }}
                 onRemove={() => writeSlide(null, EMPTY_SIDE)}
@@ -1144,6 +1148,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         const node = editor?.state.doc.nodeAt(pos)
         startPictureMaker({ kind: 'flow', pos }, mode, node ? imagePathOf(node.attrs) : null)
       }}
+      chatgptCanChange={pos => isRelativeImagePath((editor && imagePathOf(editor.state.doc.nodeAt(pos)?.attrs ?? {})) ?? '')}
       barHidden={makerInWords}
     />
     {/* Pictures with ChatGPT: the field, the pulse and the strip on the picture's place. */}

@@ -138,6 +138,19 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
 }
 
 /**
+ * Pictures with ChatGPT: a picture that comes back while the person works elsewhere takes its place as `replacePicture`
+ * does, but the caret stays where it is (the AI never moves what the person works on): the new picture is chosen
+ * only when the old one still was. Otherwise the next key typed would replace the chosen picture.
+ */
+export function replacePictureKeepingCaret(state: EditorState, pos: number, picture: { src: string; title: string }): Transaction | null {
+  const tr = replacePicture(state, pos, picture)
+  if (!tr) return null
+  const before = state.selection
+  if (!(before instanceof NodeSelection && before.from === pos)) tr.setSelection(before.map(tr.doc, tr.mapping))
+  return tr
+}
+
+/**
  * Comment on a picture in a document: the caret just before the picture's top-level block, where the margin note goes
  * (`startComment` places a note only at a caret). With no words before it (the document's first block) the caret is a
  * gap cursor there (review of #774).

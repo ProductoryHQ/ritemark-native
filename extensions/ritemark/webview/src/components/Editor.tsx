@@ -10,7 +10,7 @@ import { sendToExtension, onMessage } from '../bridge'
 import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../lib/pastedImage'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
-import { sameRelativeImagePath } from '../../../src/utils/imagePaths'
+import { isRelativeImagePath, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
 import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
@@ -29,7 +29,7 @@ import { TableHandlesLayer } from './tables/TableHandlesLayer'
 import { PictureTools } from './pictures/PictureTools'
 import { PictureMakerView, usePictureMaker, type PictureMode, type PicturePlaceRef } from './pictures/ChatgptPicture'
 import { imagePathOf } from '../extensions/pictures/PictureNode'
-import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture } from '../extensions/pictures/pictureCommands'
+import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture, replacePictureKeepingCaret } from '../extensions/pictures/pictureCommands'
 import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
@@ -397,7 +397,7 @@ export function Editor({
     beforeMake: ask => (ask.place.kind === 'flow' && editor && !editor.isDestroyed && editor.state.doc.nodeAt(ask.place.pos)?.type.name === 'image' ? {} : null),
     placeMade: (place, picture) => {
       if (!editor || editor.isDestroyed || place.kind !== 'flow') return
-      const tr = replacePicture(editor.state, place.pos, { src: picture.url, title: picture.path })
+      const tr = replacePictureKeepingCaret(editor.state, place.pos, { src: picture.url, title: picture.path })
       if (tr) editor.view.dispatch(tr)
     },
     undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run() },
@@ -853,6 +853,7 @@ export function Editor({
               sendToExtension('selectImageFile')
             }}
             onChatgpt={startPictureMaker}
+            chatgptCanChange={pos => isRelativeImagePath(imagePathOf(editor.state.doc.nodeAt(pos)?.attrs ?? {}) ?? '')}
             barHidden={pictureMaker.state.phase !== 'idle'}
           />
           <PictureMakerView maker={pictureMaker} rectOf={pictureRect} />

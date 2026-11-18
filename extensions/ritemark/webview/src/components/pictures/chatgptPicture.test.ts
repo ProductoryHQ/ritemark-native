@@ -6,11 +6,11 @@
  * Run: npx tsx webview/src/components/pictures/chatgptPicture.test.ts
  */
 import assert from 'node:assert/strict'
-import { EditorState, NodeSelection } from '@tiptap/pm/state'
+import { EditorState, NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { editorMarkdown, openDocument } from '../../utils/markdownFidelity'
-import { replacePicture } from '../../extensions/pictures/pictureCommands'
+import { chosenPicture, replacePicture, replacePictureKeepingCaret } from '../../extensions/pictures/pictureCommands'
 import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk } from './chatgptPictureState'
 
 let failures = 0
@@ -92,6 +92,25 @@ check('the place follows edits; a block written again with its picture keeps it;
   const deleted = state.tr.delete(pos, pos + node.nodeSize)
   assert.equal(followPicture(deleted.doc, deleted.mapping, pos), null)
   state = state.apply(typed)
+})
+
+check('a picture that comes back while the person types elsewhere never takes the caret (the next key keeps it)', () => {
+  const text = 'Before.\n\n![Three agents](images/agents.png)\n\nAfter.\n'
+  let state = EditorState.create({ doc: openDocument(text).doc, plugins: [history()] })
+  const pos = firstPicture(state.doc)
+  // The caret in "After.", where the person types on.
+  const after = state.doc.content.size - 2
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, after)))
+  state = state.apply(replacePictureKeepingCaret(state, pos, { src: 'vscode-webview://made', title: './images/made.png' })!)
+  assert.equal(chosenPicture(state), null, 'the made picture is not chosen')
+  assert.equal(state.selection.from, after, 'the caret stayed')
+  state = state.apply(state.tr.insertText('x'))
+  assert.match(editorMarkdown(state.doc), /!\[\]\(\.\/images\/made\.png\)/, 'the next key kept the picture')
+  // Still chosen (the person waited on it): the made one is chosen, as Replace picture… does.
+  let waited = EditorState.create({ doc: openDocument(text).doc })
+  waited = waited.apply(waited.tr.setSelection(NodeSelection.create(waited.doc, pos)))
+  waited = waited.apply(replacePictureKeepingCaret(waited, pos, { src: 'u', title: './images/made.png' })!)
+  assert.equal(chosenPicture(waited)?.pos, pos)
 })
 
 if (failures) {
