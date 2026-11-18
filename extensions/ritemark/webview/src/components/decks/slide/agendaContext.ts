@@ -14,7 +14,11 @@ export const AgendaContext = createContext<AgendaDrawing | null>(null)
 
 /** The deck's Agenda drawing from its slides, the same object while the list itself is the same. */
 export function useAgendaDrawing(slides: ReadonlyArray<{ kind: string; data: SlideData; number?: number }>, hint: boolean): AgendaDrawing {
-  const entries = agendaOf(slides)
+  return useAgendaMemo(agendaOf(slides), hint)
+}
+
+/** A list as a drawing, the same object while the list itself (and the hint) is the same. */
+function useAgendaMemo(entries: readonly AgendaEntry[], hint: boolean): AgendaDrawing {
   const key = agendaKey(entries)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => ({ entries, hint }), [key, hint])
@@ -29,7 +33,5 @@ export function agendaEntriesFrom(value: unknown): AgendaEntry[] {
 
 /** A host-sent list as a drawing, the same object while the list itself is the same (no hint: not the editor's). */
 export function useAgendaEntries(entries: readonly AgendaEntry[]): AgendaDrawing {
-  const key = agendaKey(entries)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => ({ entries, hint: false }), [key])
+  return useAgendaMemo(entries, false)
 }

@@ -377,7 +377,8 @@ export interface ThemeChangeView {
   before: { name: string; text: string };
   after: { name: string; text: string };
   slides: WallSlide[];
-  /** Small details 14: the deck's sections, for an Agenda among the two slides; left out, the view's own deck's. */
+  /** Small details 14: the deck's sections, for an Agenda among the two slides, where no deck view is around the sheet
+   *  (a theme's tab); a deck view draws its own, live list. */
   agenda?: AgendaEntry[];
   borderless: boolean;
   assets: Record<string, string>;

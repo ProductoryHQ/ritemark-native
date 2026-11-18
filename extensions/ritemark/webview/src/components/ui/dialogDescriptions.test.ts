@@ -23,6 +23,18 @@ function tsxFiles(dir: string): string[] {
   })
 }
 
+/** Where an opening JSX tag ends: its first `>` outside braces (an arrow's `=>` or an `a > b` sits inside them). */
+function openingTagEnd(text: string): number {
+  let depth = 0
+  for (let at = 0; at < text.length; at++) {
+    const char = text[at]
+    if (char === '{') depth++
+    else if (char === '}') depth--
+    else if (char === '>' && depth === 0) return at
+  }
+  return text.length - 1
+}
+
 const OPEN = /<(DialogContent|Dialog\.Content|DialogPrimitive\.Content)\b/g
 let checked = 0
 for (const file of tsxFiles(src)) {
@@ -34,11 +46,11 @@ for (const file of tsxFiles(src)) {
     const close = text.indexOf(`</${tag}>`, match.index)
     assert.ok(close > 0, `${name}: <${tag}> is closed`)
     const block = text.slice(match.index, close)
-    const head = block.slice(0, block.indexOf('>', block.search(/\n\s*>|[^=]>/)) + 1)
+    const head = block.slice(0, openingTagEnd(block) + 1)
     checked++
     if (/aria-describedby=\{undefined\}/.test(head)) continue
     assert.match(block, /<(DialogDescription|Dialog\.Description|DialogPrimitive\.Description)\b/, `${name}: the dialog at offset ${match.index} has a description`)
-    assert.doesNotMatch(head, /aria-describedby="/, `${name}: the content keeps Radix's own aria-describedby`)
+    assert.doesNotMatch(head, /aria-describedby=/, `${name}: the content keeps Radix's own aria-describedby`)
     for (const description of block.matchAll(/<(?:DialogDescription|Dialog\.Description|DialogPrimitive\.Description)\b[^>]*>/g)) {
       assert.doesNotMatch(description[0], /\sid=/, `${name}: a description keeps Radix's id (${description[0]})`)
     }

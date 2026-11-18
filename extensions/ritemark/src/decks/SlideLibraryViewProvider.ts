@@ -166,7 +166,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const generation = ++this.generation;
     const query = this.query;
     const library = this.library();
-    const decks = library ? await library.listDecks({ query }) : [];
+    const decks = library ? await library.listDecks({ query, agenda: true }) : [];
     const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
     await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query, project: !!library });

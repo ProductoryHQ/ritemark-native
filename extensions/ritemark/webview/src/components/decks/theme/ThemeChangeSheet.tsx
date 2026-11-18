@@ -77,10 +77,11 @@ export function ThemeChangeSheet({ change, onUndo, onClose, style }: { change: T
   const before = parseTheme(change.before.text)
   const after = parseTheme(change.after.text)
   const slideWidth = Math.max(120, Math.min(MAX_SLIDE, Math.floor((width - PAD * 2 - GAP) / 2)))
-  // Small details 14: an Agenda lists the deck's sections: the host's list, else the deck view's own around the sheet
+  // Small details 14: an Agenda lists the deck's sections: the deck view's own around the sheet (live, unsaved edits
+  // too), else (a theme's tab) the host's list
   const around = useContext(AgendaContext)
   const sent = useAgendaEntries(change.agenda ?? NO_AGENDA)
-  const agenda = change.agenda ? sent : around
+  const agenda = around ?? sent
 
   return (
     <AgendaContext.Provider value={agenda}>

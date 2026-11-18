@@ -209,7 +209,19 @@ const assets: PageAssets = {
   for (const file of drawing) {
     const name = path.basename(file);
     if (insideDeckView.has(name)) continue;
-    assert.match(fs.readFileSync(file, 'utf8'), /<AgendaContext\.Provider\b/, `${name} gives its Agenda slides the deck's list`);
+    // Each <SlideCanvas sits inside one of the file's providers, between its opening and its closing tag.
+    const text = fs.readFileSync(file, 'utf8');
+    const spans = [...text.matchAll(/<AgendaContext\.Provider\b/g)].map(open => [open.index!, text.indexOf('</AgendaContext.Provider>', open.index)] as const);
+    assert.ok(spans.length > 0, `${name} gives its Agenda slides the deck's list`);
+    const inside = (at: number) => spans.some(([from, to]) => from < at && at < to);
+    for (const canvas of text.matchAll(/<SlideCanvas\b/g)) {
+      if (inside(canvas.index!)) continue;
+      // Drawn by a local helper (the wall's `layer`, the presenter view's `canvas`): every call of it is inside.
+      const helper = [...text.slice(0, canvas.index).matchAll(/const (\w+) = \(/g)].pop()?.[1];
+      assert.ok(helper, `${name}: the SlideCanvas at ${canvas.index} is inside the provider`);
+      const calls = [...text.matchAll(new RegExp(`\\b${helper}\\(`, 'g'))].filter(call => text.slice(call.index! - 6, call.index!) !== 'const ');
+      assert.ok(calls.length > 0 && calls.every(call => inside(call.index!)), `${name}: ${helper}() draws its SlideCanvas only inside the provider`);
+    }
   }
   // The named ones are drawn by the deck view (or its Theme menu), under its provider.
   const deckView = fs.readFileSync(path.join(web, 'DeckView.tsx'), 'utf8');

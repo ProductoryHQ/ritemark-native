@@ -40,9 +40,10 @@ export function previewSlidesOf(slides: readonly PresentSlide[]): PresentSlide[]
  */
 export function deckPreview(path: string | null, text: string): { deck: string | null; borderless: boolean; slides: WallSlide[]; pictures: string[]; agenda: AgendaEntry[] } {
   const all = presentSlidesOf(text);
-  const slides = previewSlidesOf(all).map(wallSlideOf);
+  const shown = new Map(all.filter(slide => !slide.skip).map(slide => [slide, wallSlideOf(slide)]));
+  const slides = previewSlidesOf(all).map(slide => shown.get(slide)!);
   const pictures = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))].sort();
-  const agenda = agendaOf(all.filter(slide => !slide.skip).map(wallSlideOf));
+  const agenda = agendaOf([...shown.values()]);
   return { deck: path === null ? null : deckName(path), borderless: frontMatterLook(text) === 'borderless', slides, pictures, agenda };
 }
 

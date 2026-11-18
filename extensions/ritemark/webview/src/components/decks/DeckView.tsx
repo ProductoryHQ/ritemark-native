@@ -59,7 +59,7 @@ import { DeckGuard } from './handout/deckGuard'
 import { CONVERSION_NOTICE, DeckConvert, DeckFrontMatterSteps, commentNodeAt, conversionNoticeFor, conversionStateOf, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
 import { blockDataOf, drawsAsBlocks, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
-import { agendaOf, blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, deckCurrentKey, deckFocusKey, setCurrentSlide } from './handout/deckCurrent'
@@ -490,6 +490,9 @@ export function DeckView({
   const count = slides.length
   // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
   const agendaDrawing = useAgendaDrawing(slides.map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 })), true)
+  // Copy as picture (its own React root) reads the same list when it is asked for.
+  const agendaRef = useRef(agendaDrawing)
+  agendaRef.current = agendaDrawing
   const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
@@ -1245,12 +1248,11 @@ export function DeckView({
     }),
     // Item 15: the slide in the look the strip shows, at 1920 × 1080, on the clipboard; the bar says so.
     copyPicture: index => {
-      const all = editor ? slidesOf(editor.state.doc) : []
-      const entry = all[index]
+      const entry = editor ? slidesOf(editor.state.doc)[index] : undefined
       if (!entry) return
       const look = lookRef.current
       // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
-      const agenda = { entries: agendaOf(all.map(slide => ({ kind: slide.kind, data: slide.data, number: slide.index + 1 }))), hint: false }
+      const agenda = { entries: agendaRef.current.entries, hint: false }
       void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda })
         .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
     },
