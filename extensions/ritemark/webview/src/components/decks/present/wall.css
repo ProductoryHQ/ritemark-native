@@ -67,3 +67,22 @@
 .wall-grid-item.is-picked .wall-grid-slide { box-shadow: 0 0 0 2px #0E0C24, 0 0 0 5px #818CF8; }
 .wall-grid-number { display: block; margin-top: 8px; font-family: var(--ritemark-ui-font-family); font-size: 13px; font-weight: 500; line-height: 16px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
 .wall-grid-item.is-current .wall-grid-number { color: #818CF8; font-weight: 700; }
+
+/* Decks README item 12: the pointer dot, a soft accent dot about 14 px wide, over the slide, a spotlight, the blank and
+   the filled wall, under the bar. Its place never animates (no trail); it fades in and out in 0.12 s, at once with
+   reduced motion. */
+.wall-dot { position: absolute; z-index: 4; left: -40px; top: -40px; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: var(--wall-accent, #F2B544); box-shadow: 0 0 6px 2px color-mix(in srgb, var(--wall-accent, #F2B544) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, 0.35);
+  opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
+.wall-dot.is-shown { opacity: 0.95; }
+@media (prefers-reduced-motion: reduce) { .wall-dot { transition: none; } }
+.vscode-reduce-motion .wall-dot { transition: none; }
+
+/* Item 9: the exercise's countdown at the slide's bottom right, quiet, in the accent; over the slide's transitions, the
+   blank, the QR code and the grid. At 00:00 it pulses gently three times, never with reduced motion. */
+.wall-timer { position: absolute; z-index: 3; font-family: var(--ritemark-ui-font-family); font-weight: 600; line-height: 1; letter-spacing: 0.02em;
+  color: var(--wall-accent, #F2B544); opacity: 0.9; font-variant-numeric: tabular-nums; pointer-events: none; transform-origin: 100% 100%; }
+.wall-timer.is-pulsing { animation: wall-timer-pulse 0.9s ease-in-out 3; }
+@keyframes wall-timer-pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .wall-timer.is-pulsing { animation: none; } }
+.vscode-reduce-motion .wall-timer.is-pulsing { animation: none; }

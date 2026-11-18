@@ -41,6 +41,28 @@ export interface WallFocus {
 
 export const NO_FOCUS: WallFocus = { spot: null, fill: null };
 
+/**
+ * Decks README item 9 (17 November): the timer for an exercise, started from the presenter view. It ends at `endsAt`
+ * (ms since the epoch, the host's clock: the wall and the presenter view run on the same machine) and was set for
+ * `minutes`. It stays across slides until stopped, and ends with the presentation; nothing of it goes in the file.
+ */
+export interface WallTimer {
+  endsAt: number;
+  minutes: number;
+}
+
+/** The longest timer the presenter view may ask for, in minutes. */
+export const MAX_TIMER_MINUTES = 180;
+
+/**
+ * Decks README item 12 (17 November): where the pointer dot is on the slide, from 0 to 1 across and down the 16:9
+ * area, while L is held over the presenter view's Now; null: no dot. Relayed to the wall as it comes, never kept.
+ */
+export interface WallPoint {
+  x: number;
+  y: number;
+}
+
 /** The system's clock for the presenter view's time of day (`systemClock.ts`). */
 export interface ClockLocale {
   /** The system's locale tag, or null for the webview's own. */
@@ -89,6 +111,8 @@ export interface WallState {
    * it). Only the wall moves: the presenter view's state has none.
    */
   transition: DeckTransition;
+  /** README item 9: the exercise's countdown at the wall's bottom right, or null. */
+  timer: WallTimer | null;
 }
 
 /**
@@ -127,6 +151,8 @@ export interface PresenterState {
   fill: number | null;
   /** The system's clock, for the time of day beside the elapsed time. */
   clock: ClockLocale;
+  /** README item 9: the exercise's timer, shown on the wall, with Restart and Stop here; or null. */
+  timer: WallTimer | null;
 }
 
 /** The host's answer to a typed number: the title of the slide with that number, or null when the deck has none. */
@@ -136,7 +162,13 @@ export interface WallPeeked {
   title: string | null;
 }
 
-export type WallHostMessage = WallState | WallPeeked | PresenterState;
+/** README item 12: the presenter view's pointer dot, relayed to the wall (`at` null: none). */
+export interface WallPointer {
+  type: 'present/pointer';
+  at: WallPoint | null;
+}
+
+export type WallHostMessage = WallState | WallPeeked | PresenterState | WallPointer;
 
 /** The wall's requests. */
 export type WallRequest =
@@ -159,7 +191,11 @@ export type WallRequest =
   /** Item 16: a click or F, Tab, Shift+Tab spotlights an item; a click outside or Esc clears it (`item` null). */
   | { type: 'present/spot'; item: number | null }
   /** Item 11: a click on a spotlit picture fills the wall with it; any key or click returns (`item` null). */
-  | { type: 'present/fill'; item: number | null };
+  | { type: 'present/fill'; item: number | null }
+  /** Item 9: the presenter view starts (or restarts) the exercise's timer for `minutes`, or stops it (null). */
+  | { type: 'present/timer'; minutes: number | null }
+  /** Item 12: L held over the presenter view's Now: the dot's place on the slide, or none (null). */
+  | { type: 'present/pointer'; at: WallPoint | null };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
 export interface DeckPresentRequest {
@@ -222,6 +258,7 @@ export function wallStateOf(
   blank: WallBlank | null = null,
   page: string | null = null,
   focus: WallFocus = NO_FOCUS,
+  timer: WallTimer | null = null,
 ): WallState {
   const address = wallPageAddress(page);
   return {
@@ -240,6 +277,7 @@ export function wallStateOf(
     spot: itemOf(focus.spot),
     fill: itemOf(focus.fill),
     transition: transitionOf(look.transition),
+    timer: timerOf(timer),
   };
 }
 
@@ -260,7 +298,7 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null },
   onWall?: WallSlide,
 ): PresenterState {
   const address = wallPageAddress(session.page ?? null);
@@ -285,6 +323,7 @@ export function presenterStateOf(
     spot: itemOf(session.focus?.spot ?? null),
     fill: itemOf(session.focus?.fill ?? null),
     clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
+    timer: timerOf(session.timer ?? null),
   };
 }
 
@@ -315,6 +354,27 @@ function isItem(value: unknown): value is number {
 
 function itemOf(value: unknown): number | null {
   return isItem(value) ? value : null;
+}
+
+/** A timer as the windows may get it: whole minutes the presenter view offers, and an end that is a time; else null. */
+export function timerOf(value: unknown): WallTimer | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { endsAt, minutes } = value as Record<string, unknown>;
+  if (!isTimerMinutes(minutes) || typeof endsAt !== 'number' || !Number.isFinite(endsAt) || endsAt < 0) return null;
+  return { endsAt, minutes };
+}
+
+function isTimerMinutes(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= MAX_TIMER_MINUTES;
+}
+
+/** A dot's place: both numbers from 0 to 1, and nothing else; else null. */
+function pointOf(value: unknown): WallPoint | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const input = value as Record<string, unknown>;
+  if (!exactKeys(input, ['x', 'y'])) return null;
+  const inRange = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= 1;
+  return inRange(input.x) && inRange(input.y) ? { x: input.x, y: input.y } : null;
 }
 
 function exactKeys(input: Record<string, unknown>, keys: readonly string[]): boolean {
@@ -348,6 +408,14 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
     case 'present/spot':
     case 'present/fill':
       return exactKeys(input, ['type', 'item']) && (input.item === null || isItem(input.item)) ? { type: input.type, item: itemOf(input.item) } : null;
+    case 'present/timer':
+      return exactKeys(input, ['type', 'minutes']) && (input.minutes === null || isTimerMinutes(input.minutes)) ? { type: 'present/timer', minutes: input.minutes as number | null } : null;
+    case 'present/pointer': {
+      if (!exactKeys(input, ['type', 'at'])) return null;
+      if (input.at === null) return { type: 'present/pointer', at: null };
+      const at = pointOf(input.at);
+      return at ? { type: 'present/pointer', at } : null;
+    }
     default:
       return null;
   }
