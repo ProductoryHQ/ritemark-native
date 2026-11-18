@@ -53,7 +53,8 @@ export function pictureIdOf(attrs: Record<string, unknown>): string {
   return imagePathOf(attrs) ?? (typeof attrs.src === 'string' ? attrs.src.trim() : '')
 }
 
-function samePicture(attrs: Record<string, unknown>, id: string): boolean {
+/** Is this picture the one with that identity (`pictureIdOf`)? */
+export function samePicture(attrs: Record<string, unknown>, id: string): boolean {
   const own = imagePathOf(attrs)
   return own ? sameRelativeImagePath(own, id) : typeof attrs.src === 'string' && attrs.src.trim() === id
 }
@@ -92,7 +93,8 @@ function slideOf(doc: PMNode, ref: SlideRef): DeckSlideEntry | undefined {
 }
 
 const headerOf = (entry: DeckSlideEntry): SlideData => (isBlockSlide(entry.kind) ? entry.data : blockDataOf(entry.kind, entry.data))
-const sameSidePath = (a: string | undefined, b: string) => {
+/** Is the side picture written `a` the one at `b` ('' an empty place)? */
+export const sameSidePath = (a: string | undefined, b: string) => {
   const now = a?.trim() ?? ''
   return now === b || (!!now && !!b && sameRelativeImagePath(now, b))
 }

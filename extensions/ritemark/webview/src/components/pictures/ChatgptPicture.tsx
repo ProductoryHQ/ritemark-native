@@ -145,6 +145,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const placed = latest.current.placeMade?.(placeOfMade(current, next), { path: status.path, url: status.url }, describing(asked))
       if (placed === false) {
         // The place went (the picture replaced by hand meanwhile): nothing is placed; the picture stays in images/.
+        if (current.phase === 'making') latest.current.onSettled?.(current.ask)
         setState({ phase: 'idle' })
         return
       }

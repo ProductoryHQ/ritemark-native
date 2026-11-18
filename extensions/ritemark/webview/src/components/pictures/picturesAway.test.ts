@@ -16,7 +16,7 @@ import { installTestDocument } from '../../utils/markdownFidelity'
 import { DeckSlide } from '../decks/handout/deckSchema'
 import { slidesOf } from '../decks/deckDocument'
 import { loadSlide, saveSlide } from '../decks/blocks/slideEditorHarness'
-import { pictureNthAt, picturePosOf, putSlidePicture, type SlideDocKit, type SlidePictureTarget } from '../decks/blocks/slidePictureSwap'
+import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, type SlideDocKit, type SlidePictureTarget } from '../decks/blocks/slidePictureSwap'
 import { madeDescription, phaseAfterStatus, placeOfMade, type MakerPhase, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
 import { PicturesAway, type AwayLanding } from './picturesAway'
 
@@ -193,6 +193,34 @@ check('staying on the slide: the made picture goes to the place asked for, which
   const next = phaseAfterStatus(making, { requestId: 'r9', state: 'made', path: 'images/new.png', url: 'u' }, null)!
   assert.deepEqual(next.phase === 'done' && next.ask.place, { kind: 'flow', pos: 4, path: 'images/new.png' }, 'the strip follows the made picture')
   assert.deepEqual(placeOfMade(making, next), { kind: 'flow', pos: 4, path: 'images/old.png' }, 'the editor is given the old picture\'s place')
+})
+
+check('review of #803: a side place follows the made picture, so Try another replaces it', () => {
+  const making: MakerPhase = { phase: 'making', ask: changeAsk({ kind: 'side', path: 'images/side.png' }), description: 'x', requestId: 'r10' }
+  const next = phaseAfterStatus(making, { requestId: 'r10', state: 'made', path: 'images/new.png', url: 'u' }, null)!
+  assert.deepEqual(next.phase === 'done' && next.ask.place, { kind: 'side', path: 'images/new.png' })
+  assert.deepEqual(placeOfMade(making, next), { kind: 'side', path: 'images/side.png' })
+})
+
+check('review of #803: a picture with a web address is found again by its address', () => {
+  const words = loadSlide('# Title\n\n![](https://example.com/a.png)')
+  let at = -1
+  words.descendants((node, pos) => { if (node.type.name === 'image') at = pos })
+  const id = pictureNthAt(words, at)
+  assert.deepEqual(id, { id: 'https://example.com/a.png', nth: 0 })
+  assert.equal(samePicture(words.nodeAt(at)!.attrs, id!.id), true, 'the shown slide places the picture made for it')
+  assert.equal(picturePosOf(words, id!.id, 0), at)
+})
+
+check('review of #803: answers for slides never shown again are not kept forever', () => {
+  const away = new PicturesAway()
+  for (let index = 0; index < PicturesAway.KEPT + 5; index += 1) {
+    const place: PicturePlaceRef = { kind: 'side', path: 'images/side.png' }
+    away.hand({ requestId: `k${index}`, key: `id:k${index}`, ask: changeAsk(place), description: 'x', land: () => ({ place, undo: () => {} }) })
+    away.status({ requestId: `k${index}`, state: 'made', path: 'images/x.png', url: 'u' })
+  }
+  assert.equal(away.heldFor('id:k0'), 0, 'the oldest answer went')
+  assert.equal(away.heldFor(`id:k${PicturesAway.KEPT + 4}`), 1, 'the newest stays')
 })
 
 if (failures) {

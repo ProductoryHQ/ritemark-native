@@ -35,6 +35,8 @@ interface Entry extends AwayRequest {
 }
 
 export class PicturesAway {
+  /** How many requests are held at most (each answered one holds its slide's Undo). */
+  static readonly KEPT = 20
   private entries: Entry[] = []
 
   /** A request still being made, let go by its editor. */
@@ -42,6 +44,12 @@ export class PicturesAway {
     // One request per place: an older one for the same editor has been answered or taken back already.
     this.entries = this.entries.filter(entry => entry.key !== request.key || entry.outcome.state === 'making')
     this.entries.push({ ...request, outcome: { state: 'making' } })
+    // Answers for slides never shown again are not kept forever: the oldest answered ones go first.
+    while (this.entries.length > PicturesAway.KEPT) {
+      const answered = this.entries.find(entry => entry.outcome.state !== 'making')
+      if (!answered) break
+      this.drop(answered)
+    }
   }
 
   /** The host's `picture/status`: true when it answered a request held here. */

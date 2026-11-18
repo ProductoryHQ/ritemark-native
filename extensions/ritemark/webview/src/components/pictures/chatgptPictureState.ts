@@ -99,8 +99,9 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   }
   if (current.phase !== 'making' || message.requestId !== current.requestId) return undefined
   if (message.state === 'made' && typeof message.path === 'string' && typeof message.url === 'string') {
-    // The place now holds the made picture: it is followed by that picture's path.
-    const place = current.ask.place.kind === 'flow' ? { ...current.ask.place, path: message.path } : current.ask.place
+    // The place now holds the made picture: it is followed by that picture's path (a slide's side too, so Try another
+    // replaces the made one).
+    const place = current.ask.place.kind === 'flow' || current.ask.place.path !== undefined ? { ...current.ask.place, path: message.path } : current.ask.place
     return { phase: 'done', ask: { ...current.ask, place }, description: current.description }
   }
   if (message.state === 'sign-in') return { phase: 'sign-in', ask: current.ask }
