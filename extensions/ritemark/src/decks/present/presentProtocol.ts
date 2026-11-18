@@ -311,8 +311,6 @@ export function wallStateOf(
   };
 }
 
-
-
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */
 export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): string[] {
   const paths = new Set(wallPicturePaths(view));

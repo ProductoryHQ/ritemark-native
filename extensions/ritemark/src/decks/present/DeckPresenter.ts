@@ -512,8 +512,6 @@ export class DeckPresenter implements vscode.Disposable {
         running.blankSerial++;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
         running.focus = NO_FOCUS;
-        // Sprint 163: and every Tabs block shows its first tab again.
-        running.tabs = [];
         const move = moveOf(request);
         // README item 18: → shows the slide's next item and ← hides the last one shown, on the slide the wall has (an
         // edit since waits for the next move, as for blanking); past the first or the last, the press moves.
@@ -532,6 +530,9 @@ export class DeckPresenter implements vscode.Disposable {
         // open it); → and ← at the deck's ends go nowhere, and the step stays.
         const named = move.type === 'first' || move.type === 'last' || (move.type === 'go' && running.session.slideNumbered(move.number) !== undefined);
         if (moved || named) running.arrival = arrivalOf(move.type);
+        // Sprint 163: a slide a move reaches shows every Tabs block's first tab (a reveal step above keeps them, and a
+        // press that goes nowhere too).
+        if (moved || named) running.tabs = [];
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
         // wall and then in the presenter view.
         await this.showWall(running);

@@ -9,13 +9,16 @@
 import { strict as assert } from 'node:assert';
 import { parse } from 'node-html-parser';
 import { scanFencedDiv } from './fencedDiv';
-import { TABSET_CLOSE, TABSET_OPEN, newTabsetMarkdown, renamedTabLine, tabHeadingLine, tabsetMarkdown, tabsetOf, tabsetOfInner, type TabsetLines } from './tabset';
+import { TABSET_CLOSE, TABSET_OPEN, newTabsetMarkdown, renamedTabLine, tabHeadingLine, tabsetMarkdown, tabsetOf, tabsetOfInner, tabsetStart, type TabsetLines } from './tabset';
 import { agendaOf, blockCanvasMarkup, blockPicturePaths, blockRevealCount, blockSlideHtml, isCoverSlide } from './slideRenderer';
 import { blockTitleOf, fenceFor, parseDeck, partHeadingOf, slideDataOf } from '../deckFormat';
 import { PRINT_CSS, handoutHtml } from '../page/pageHtml';
 import { lexHandout, publicMarkdown } from '../page/publicDeck';
 import { decodeWallRequest } from '../present/presentProtocol';
 import { tabsOf, withTab } from '../present/wallTabs';
+import { slideCommentsOf } from './slideComments';
+import { partComments } from '../present/partComments';
+import { plainTabName } from './tabset';
 
 let passed = 0;
 function test(name: string, run: () => void): void {
@@ -223,6 +226,19 @@ test('Present\'s tab choice: the presenter view\'s request read exactly, and the
   assert.deepEqual(withTab([3], 0, 1), [1]);
   assert.deepEqual(tabsOf(['x', 2, -1]), [0, 2, 0]);
   assert.deepEqual(tabsOf(null), []);
+});
+
+test('a tab\'s name keeps a word\'s underscore and a lone tilde; only marks around words go (review)', () => {
+  assert.equal(plainTabName('app_config.py'), 'app_config.py');
+  assert.equal(plainTabName('~/setup'), '~/setup');
+  assert.equal(plainTabName('*Plan* and **check** `code` _quiet_'), 'Plan and check code quiet');
+  assert.equal(tabsetStart('Words\n::: panel-tabset\n## A\n:::'), 6, 'the bare-word form starts a block too');
+});
+
+test('a comment inside a tab\'s pane is found, on the slide and in the handout (review)', () => {
+  const slideMarkdown = `${TABSET_OPEN}\n## A\n\n<!-- {id:c1} Check this prompt -->\nWords\n:::`;
+  assert.equal(slideCommentsOf(slideMarkdown).length, 1, 'found in the pane');
+  assert.equal(partComments(`${TABSET_OPEN}\n## A\n\n<!-- A note for me -->\n\nWords\n:::\n`).length, 1);
 });
 
 console.log(`tabset: ${passed} passed`);

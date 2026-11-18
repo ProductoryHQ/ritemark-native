@@ -41,6 +41,8 @@ const FLOW_ITEMS = '.blk-box, .blk-column, li, table, .blk-pic'
 function isFlowItem(element: Element): boolean {
   // README item 18: an item Present hasn't shown yet (and whatever is in it) is no item to spotlight.
   if (element.closest('[data-reveal-hidden]')) return false
+  // Sprint 163: a Tabs block's other panes stand hidden in the same place: their items are none to spotlight.
+  if (element.closest('.blk-tabpane:not(.is-active)')) return false
   if (!element.classList.contains('blk-pic')) return true
   // An empty picture place, the picture inside its frame (the frame is the item), a small picture in a line of words.
   if (element.classList.contains('empty')) return false

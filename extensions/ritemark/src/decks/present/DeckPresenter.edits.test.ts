@@ -284,7 +284,7 @@ async function main(): Promise<void> {
     await settle();
     assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'a place that is not one is not a request');
     // → clears it and goes on, once.
-    const spotStates =wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length;
+    const spotStates = wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length;
     wall.send({ type: 'present/next' });
     await settle();
     assert.equal(last(wall, 'present/wall').spot, null, 'a move clears the spotlight');

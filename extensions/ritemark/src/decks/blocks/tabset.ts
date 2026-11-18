@@ -80,9 +80,10 @@ export function plainTabName(words: string): string {
     .replace(HEADING_ATTRIBUTES, '')
     .replace(/<\/?[A-Za-z][^>]*>/g, '')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    // The marks first, then the escapes: an escaped `\*` is a star of the name.
-    .replace(/(^|[^\\])[*_`~]+/g, '$1')
-    .replace(/(^|[^\\])[*_`~]+/g, '$1')
+    // The marks that wrap words first (`*plan*`, `**plan**`, `` `code` ``, `~~old~~`, `_plan_` never inside a word, so
+    // `app_config.py` and `~/setup` keep theirs), then the escapes: an escaped `\*` is a star of the name.
+    .replace(/(^|[^\\])(\*\*|\*|~~|`+)(?=\S)([^]*?\S)\2/g, '$1$3')
+    .replace(/(^|[^\w\\])(__|_)(?=\S)([^]*?\S)\2(?!\w)/g, '$1$3')
     .replace(/\\([\\`*_{}[\]()#+\-.!>~|<&$])/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
@@ -188,7 +189,7 @@ export function tabsetOfInner(inner: string): Tabset | null {
  * `marked` hands it the text after its first character, so a match at 0 would be in the middle of a line.
  */
 export function tabsetStart(src: string): number | undefined {
-  const line = /\n {0,3}:{3,}[ \t]*\{[^}\n]*\.panel-tabset\b/g;
+  const line = /\n {0,3}:{3,}[ \t]*(?:\{[^}\n]*\.panel-tabset\b|panel-tabset\b)/g;
   for (let match = line.exec(src); match; match = line.exec(src)) {
     const at = match.index + 1;
     const scan = scanFencedDiv(src.slice(at));
