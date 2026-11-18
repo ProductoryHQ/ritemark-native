@@ -17,7 +17,7 @@ import { DeckSlide } from '../decks/handout/deckSchema'
 import { slidesOf } from '../decks/deckDocument'
 import { loadSlide, saveSlide } from '../decks/blocks/slideEditorHarness'
 import { pictureNthAt, picturePosOf, putSlidePicture, type SlideDocKit, type SlidePictureTarget } from '../decks/blocks/slidePictureSwap'
-import { madeDescription, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
+import { madeDescription, phaseAfterStatus, placeOfMade, type MakerPhase, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
 import { PicturesAway, type AwayLanding } from './picturesAway'
 
 installTestDocument()
@@ -184,6 +184,15 @@ check('a failure while away is shown when the slide is back; a cancel is forgott
   away.status({ requestId: 'r8', state: 'cancelled' })
   assert.equal(away.take('id:s2', found => found), null)
   assert.equal(away.status({ requestId: 'other', state: 'made', path: 'a', url: 'b' }), false, 'another editor\'s answer is not this one\'s')
+})
+
+check('staying on the slide: the made picture goes to the place asked for, which still names the old picture', () => {
+  // The editor checks that the picture there is still the one asked about (a picture replaced by hand meanwhile is
+  // left as it is), so it must be given the place before the done state follows the made picture's path.
+  const making: MakerPhase = { phase: 'making', ask: changeAsk({ kind: 'flow', pos: 4, path: 'images/old.png' }), description: 'At night', requestId: 'r9' }
+  const next = phaseAfterStatus(making, { requestId: 'r9', state: 'made', path: 'images/new.png', url: 'u' }, null)!
+  assert.deepEqual(next.phase === 'done' && next.ask.place, { kind: 'flow', pos: 4, path: 'images/new.png' }, 'the strip follows the made picture')
+  assert.deepEqual(placeOfMade(making, next), { kind: 'flow', pos: 4, path: 'images/old.png' }, 'the editor is given the old picture\'s place')
 })
 
 if (failures) {

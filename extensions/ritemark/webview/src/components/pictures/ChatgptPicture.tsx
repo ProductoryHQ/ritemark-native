@@ -28,7 +28,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
-import { doneWords, followPicture, madeDescription, makeMessage, pictureKey, phaseAfterStatus, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
+import { doneWords, followPicture, madeDescription, makeMessage, pictureKey, phaseAfterStatus, placeOfMade, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
 import { PicturesAway, type AwayLanding } from './picturesAway'
 
 export type { MakerPhase, PictureAsk, PictureMode, PicturePlaceRef } from './chatgptPictureState'
@@ -142,7 +142,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
     if (next.phase === 'done' && typeof status.path === 'string' && typeof status.url === 'string') {
       // The words a picture was made with, by its path: a later change knows the description is still ChatGPT's.
       const asked = current.phase === 'making' ? current.description : ''
-      const placed = latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url }, describing(asked))
+      const placed = latest.current.placeMade?.(placeOfMade(current, next), { path: status.path, url: status.url }, describing(asked))
       if (placed === false) {
         // The place went (the picture replaced by hand meanwhile): nothing is placed; the picture stays in images/.
         setState({ phase: 'idle' })

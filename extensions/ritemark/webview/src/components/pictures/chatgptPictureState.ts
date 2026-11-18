@@ -110,6 +110,14 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   return { phase: 'idle' }
 }
 
+/**
+ * Where a made picture goes: the place as it was asked for, with the path of the picture standing there (the editor
+ * checks it is still that picture), not the done state's place, which already follows the made picture's path.
+ */
+export function placeOfMade(current: MakerPhase, next: MakerPhase): PicturePlaceRef {
+  if (current.phase === 'making') return current.ask.place
+  return next.phase === 'idle' ? { kind: 'side' } : next.ask.place
+}
 
 /** What `followPicture` reads of a ProseMirror document and mapping. */
 export interface PictureDoc { content: { size: number }; nodeAt: (pos: number) => { type: { name: string }; attrs?: Record<string, unknown> } | null | undefined }
