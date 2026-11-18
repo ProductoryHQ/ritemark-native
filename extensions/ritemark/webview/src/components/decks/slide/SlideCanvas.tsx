@@ -9,9 +9,10 @@
  * On the stage the words are edited in place (`editing`): each text box is a small plain-text editing host, kept
  * uncontrolled while it has the caret so typing is never redrawn under the person.
  */
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
+import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, blockHasAgenda, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { AgendaContext } from './agendaContext'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
 import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
@@ -54,6 +55,11 @@ interface SlideCanvasProps {
   /** 17 November: the pictures the host looked for and didn't find, drawn as missing with their names (the strip). */
   missing?: ReadonlySet<string>
   editing?: SlideEditing
+  /**
+   * Small details 14: the slide's place in the deck (from 1), in Present only: an Agenda on it mutes the sections
+   * passed and puts the next one in the accent. Elsewhere an Agenda draws the list alone.
+   */
+  at?: number
 }
 
 const px = (style: BoxStyle | undefined): CSSProperties | undefined => {
@@ -294,9 +300,13 @@ function overflows(canvas: HTMLElement): boolean {
  * (`blocks/SlideEditor.tsx`); this canvas draws the strip, the wall and the rest. The fit steps the words down while
  * they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
  */
-const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
+const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing, at }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
   const slideRef = useRef<HTMLDivElement>(null)
   const markdown = data.markdown ?? ''
+  // Small details 14: the deck around an Agenda block; a slide without one draws nothing new when the sections change.
+  const deckAgenda = useContext(AgendaContext)
+  const agenda = blockHasAgenda(markdown) ? deckAgenda : null
+  const agendaAt = agenda ? at : undefined
   // The fit belongs to these words in this look: a theme or Card | Borderless change measures again from the top.
   const key = fitKeyOf(markdown, data.image, data.picture, fitLookOf(borderless, theme))
   // 17 November: the slide on the stage is drawn here at the stage's own step, so a thumbnail is its scaled copy.
@@ -321,8 +331,8 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn, logoAspect])
   const html = useMemo(
-    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo }),
-    [data, step, width, assets, missing, logo],
+    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt }),
+    [data, step, width, assets, missing, logo, agenda, agendaAt],
   )
   // The stage's one measure (`fitFlow`), from the top: words past the top, the bottom or a right edge step it down.
   useLayoutEffect(() => {
@@ -353,8 +363,8 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   )
 })
 
-export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing }: SlideCanvasProps) {
-  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} />
+export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing, at }: SlideCanvasProps) {
+  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} at={at} />
   // PR 2 (decision 8 of the approved plan): a v1 slide of the nine kinds is drawn as the block slide its first edit
   // writes (`legacyToBlocks`), so the strip, the wall and the stage show what the conversion will write.
   if (drawsAsBlocks(kind)) return <BlockSlideCanvas data={blockDataOf(kind, data)} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} />

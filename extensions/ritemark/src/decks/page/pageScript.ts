@@ -8,6 +8,7 @@
  *    of the band that holds the slide. j and k, the arrows under the slide and Contents step a part at a time.
  *  - The progress bar and "n / N"; Contents, a finished exercise ticked in it; Copy, which says Copied, or selects the
  *    words where the browser won't copy; and ticks kept in this browser's own storage, on this device only.
+ *  - **The printed handout's footer** (small details 13) carries the page's own address, written once as text.
  *  - **The page remembers each reader's place and links to a part** (the decks README, small details 7): the address
  *    follows the part being read (`#6`, through `history.replaceState`, so the history doesn't fill); a `#6` link opens
  *    that part, a number with no part opens the top; and opened again without a link, the page returns to the last
@@ -162,6 +163,10 @@ const PAGE_BEHAVIOUR = String.raw`
   var prev = doc.getElementById('prev'), next = doc.getElementById('next');
   var toc = doc.getElementById('toc'), tocbtn = doc.getElementById('tocbtn'), note = doc.getElementById('toast');
   if (!box || !text || !header || !stage) return;
+  // ---- the page's address in the printed handout's footer (the decks README, small details 13): this page's own,
+  // without the part's #, given only by a page on the web (a file opened from disk has no address to give)
+  var addr = doc.getElementById('paddr');
+  if (addr && /^https?:$/.test(window.location.protocol)) addr.textContent = window.location.origin + window.location.pathname;
   var list = function (nodes) { return Array.prototype.slice.call(nodes); };
   var layers = list(box.querySelectorAll('.layer'));
   var parts = list(text.querySelectorAll('.part[data-i]'));

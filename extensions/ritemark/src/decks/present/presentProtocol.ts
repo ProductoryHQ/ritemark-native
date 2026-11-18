@@ -190,6 +190,8 @@ export function wallDataOf(data: SlideData): SlideData {
   }
   if (Array.isArray(data.rows)) out.rows = data.rows.map(row => row.map(cell => String(cell)));
   if (typeof data.markdown === 'string') out.markdown = data.markdown;
+  // A section's mark (no words; the page shows its band): an Agenda on the wall lists the deck's sections (small details 14).
+  if (data.section === true) out.section = true;
   return out;
 }
 

@@ -200,6 +200,18 @@
 .deck-sl.is-blocks .blk-steps ol > li::before { content: counter(blk-step); position: absolute; left: 0; top: .05em; width: 1.45em; height: 1.45em; border-radius: 50%; display: grid; place-items: center; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font-weight: 700; font-size: .8em; }
 /* A step's line under its heading (frame 30: a box turned into a step keeps its line), in the text's weight. */
 .deck-sl.is-blocks .blk-steps ol > li > :not(:first-child) { margin: .1em 0 0; font-weight: 400; font-size: .82em; color: var(--s-tx, #C7CAEB); }
+/* The Agenda (the decks README, small details 14): the deck's sections, numbered, drawn from the deck. In Present the
+   sections passed are muted and the next one is in the accent; an editor's deck with no sections shows a quiet line. */
+.deck-sl.is-blocks .blk-agenda { margin: 0 0 .55em; }
+.deck-sl.is-blocks .blk-agenda ol { list-style: none; margin: 0; padding: 0; }
+.deck-sl.is-blocks .blk-agenda li { display: flex; align-items: baseline; gap: .75em; margin: 0 0 .5em; font: 600 1.12em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks .blk-agenda li::marker { content: none; }
+.deck-sl.is-blocks .blk-agenda .blk-agenda-n { flex: none; min-width: 1.1em; font-weight: 700; color: var(--s-acct, #F2B544); font-variant-numeric: tabular-nums; }
+.deck-sl.is-blocks .blk-agenda .blk-agenda-t { min-width: 0; }
+.deck-sl.is-blocks .blk-agenda li.is-passed { opacity: .42; }
+.deck-sl.is-blocks .blk-agenda li.is-passed .blk-agenda-n { color: inherit; }
+.deck-sl.is-blocks .blk-agenda li.is-next { color: var(--s-acct, #F2B544); }
+.deck-sl.is-blocks .blk-agenda-hint { margin: 0; color: var(--s-ph, rgba(255,255,255,.35)); }
 
 /* The block bar (experience 46, 17 November). Boxes: Width, Style and alignment; Columns: the split and alignment.
    Boxes lay out as a wrapping row: Auto keeps one row while every box can be 180 px wide (a box's width plus the
