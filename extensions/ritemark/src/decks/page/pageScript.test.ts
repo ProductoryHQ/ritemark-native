@@ -438,8 +438,9 @@ for (const value of ['1', '7', 'junk']) {
     const clientWidth = Math.round(edgeNext() * 900) + 100;
     const scrollWidth = clientWidth + Math.round((edgeNext() - 0.3) * 600) + (edgeNext() < 0.2 ? edgeNext() : 0);
     const room = Math.max(0, scrollWidth - clientWidth);
-    const scrollLeft = edgeNext() < 0.15 ? 0 : edgeNext() < 0.15 ? room : edgeNext() * room * (edgeNext() < 0.1 ? -1 : 1);
-    assert.deepEqual(pageEdges.tableEdges(scrollLeft, scrollWidth, clientWidth), editorEdges.tableEdges(scrollLeft, scrollWidth, clientWidth), `edges ${scrollLeft}/${scrollWidth}/${clientWidth}`);
+    const rtl = edgeNext() < 0.2;
+    const scrollLeft = (edgeNext() < 0.15 ? 0 : edgeNext() < 0.15 ? room : edgeNext() * room) * (rtl ? -1 : 1);
+    assert.deepEqual(pageEdges.tableEdges(scrollLeft, scrollWidth, clientWidth, rtl), editorEdges.tableEdges(scrollLeft, scrollWidth, clientWidth, rtl), `edges ${scrollLeft}/${scrollWidth}/${clientWidth}/${rtl}`);
   }
   const classes = new Set<string>();
   let onScroll: (() => void) | null = null;

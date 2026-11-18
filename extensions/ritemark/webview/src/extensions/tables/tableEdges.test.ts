@@ -20,7 +20,10 @@ assert.deepEqual(tableEdges(0.5, 820, 720), { left: false, right: true }, 'half 
 assert.deepEqual(tableEdges(0, 720, 720), { left: false, right: false }, 'a table that fits never fades')
 assert.deepEqual(tableEdges(0, 720 + EDGE_SLACK, 720), { left: false, right: false }, 'a pixel of rounding is not a scroll')
 assert.deepEqual(tableEdges(0, 500, 720), { left: false, right: false }, 'a narrow table never fades')
-assert.deepEqual(tableEdges(-100, 820, 720), { left: true, right: false }, 'a right-to-left frame counts from its own start')
+// A right-to-left frame starts at its right edge (scrollLeft 0) and goes negative to the left.
+assert.deepEqual(tableEdges(0, 820, 720, true), { left: true, right: false }, 'right-to-left, at the start: the left side fades')
+assert.deepEqual(tableEdges(-50, 820, 720, true), { left: true, right: true }, 'right-to-left, in the middle: both')
+assert.deepEqual(tableEdges(-100, 820, 720, true), { left: false, right: true }, 'right-to-left, at the end: the right side fades')
 
 // ---- the watcher, in the editor's copy and the page's
 type Listener = () => void
@@ -31,6 +34,7 @@ class FakeFrame {
   offsetHeight = 120
   clientHeight = 120
   overflowX = 'auto'
+  direction = 'ltr'
   isConnected = true
   classes = new Set<string>()
   vars = new Map<string, string>()
@@ -59,16 +63,17 @@ class FakeFrame {
 /** A window whose animation frames run when told, and whose observers can be fired and counted. */
 function fakeWindow() {
   const frames = new Map<number, () => void>()
-  const observers: { callback: () => void; targets: unknown[]; connected: boolean }[] = []
+  const observers: { callback: () => void; targets: unknown[]; options: unknown[]; connected: boolean }[] = []
   let ids = 0
+  let styleReads = 0
   const win = {
-    getComputedStyle: (element: unknown) => ({ overflowX: (element as FakeFrame).overflowX }),
+    getComputedStyle: (element: unknown) => { styleReads++; return { overflowX: (element as FakeFrame).overflowX, direction: (element as FakeFrame).direction } },
     requestAnimationFrame(callback: () => void) { frames.set(++ids, callback); return ids },
     cancelAnimationFrame(handle: number) { frames.delete(handle) },
     ResizeObserver: class {
-      record: { callback: () => void; targets: unknown[]; connected: boolean }
-      constructor(callback: () => void) { this.record = { callback, targets: [], connected: true }; observers.push(this.record) }
-      observe(target: unknown) { this.record.targets.push(target) }
+      record: { callback: () => void; targets: unknown[]; options: unknown[]; connected: boolean }
+      constructor(callback: () => void) { this.record = { callback, targets: [], options: [], connected: true }; observers.push(this.record) }
+      observe(target: unknown, options?: unknown) { this.record.targets.push(target); this.record.options.push(options) }
       disconnect() { this.record.connected = false; this.record.targets = [] }
     },
   }
@@ -76,6 +81,7 @@ function fakeWindow() {
     win,
     observers,
     pending: () => frames.size,
+    styleReads: () => styleReads,
     flush() { const now = [...frames.values()]; frames.clear(); now.forEach(run => run()) },
     resize() { observers.filter(o => o.connected).forEach(o => o.callback()) },
   }
@@ -91,7 +97,8 @@ for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] a
   assert.equal(frame.shown(), '', `${name}: nothing before the first frame`)
   view.flush()
   assert.equal(frame.shown(), 'is-scrollable-right', `${name}: at the start, the right side fades`)
-  assert.deepEqual(view.observers[0].targets, [frame, table], `${name}: the frame's and the table's widths are watched`)
+  assert.deepEqual(view.observers[0].targets, [frame, table], `${name}: the frame's and the table's sizes are watched`)
+  assert.deepEqual(view.observers[0].options[0], { box: 'border-box' }, `${name}: the frame's border box, so a scrollbar appearing counts`)
 
   // Many scroll events in one frame draw once.
   frame.scrollTo(20)
@@ -104,11 +111,11 @@ for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] a
   view.flush()
   assert.equal(frame.shown(), 'is-scrollable-left', `${name}: at the end, only the left side fades`)
 
-  // The handout gets wider (or the table narrower): the table fits, and the fade goes.
+  // The handout gets wider (or the table narrower): the table fits, and the fade goes at once, before the frame is
+  // painted (the observer draws in its own callback, not a frame later).
   frame.clientWidth = 820
   frame.scrollLeft = 0
   view.resize()
-  view.flush()
   assert.equal(frame.shown(), '', `${name}: a table that fits has no fade`)
 
   // A classic scrollbar's height is kept whole by the mask; an overlay scrollbar has none.
@@ -122,12 +129,7 @@ for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] a
   view.flush()
   assert.equal(frame.vars.has('--rm-fade-bar'), false, `${name}: no scrollbar of its own, no strip`)
 
-  // A frame that doesn't scroll (a Text document's table, a slide's) gets no class, however wide its table.
-  frame.overflowX = 'visible'
-  view.resize()
-  view.flush()
-  assert.equal(frame.shown(), '', `${name}: a frame that doesn't scroll has no fade`)
-  frame.overflowX = 'auto'
+  assert.equal(view.styleReads(), 1, `${name}: the frame's style is read once, not on every draw`)
 
   // The clean-up: the listener, the observer and a waiting frame all go, and nothing draws after it.
   frame.scrollTo(50)
@@ -141,6 +143,36 @@ for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] a
   view.resize()
   view.flush()
   assert.equal(frame.shown(), before, `${name}: nothing draws after the clean-up`)
+}
+
+// A frame that doesn't scroll (a Text document's table, a slide's) gets no class however wide its table, and the
+// watcher stops at its first draw: no listener or observer stays behind. A frame not yet in the page waits for it.
+for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] as const) {
+  const frame = new FakeFrame()
+  frame.overflowX = 'visible'
+  frame.isConnected = false
+  const view = fakeWindow()
+  watch(frame as unknown as HTMLElement, {} as Element, view.win as unknown as EdgeWindow)
+  view.flush()
+  assert.equal(view.observers[0].connected, true, `${name}: a frame not yet in the page is still watched`)
+  frame.isConnected = true
+  view.resize()
+  assert.equal(frame.shown(), '', `${name}: a frame that doesn't scroll has no fade`)
+  assert.equal(frame.listeners.get('scroll')?.length, 0, `${name}: and no scroll listener`)
+  assert.equal(view.observers[0].connected, false, `${name}: and no observer`)
+}
+
+// A right-to-left frame, through both copies: at its start (its right edge) the left side fades.
+for (const [name, watch] of [['editor', watchTableEdges], ['page', pageWatch]] as const) {
+  const frame = new FakeFrame()
+  frame.direction = 'rtl'
+  const view = fakeWindow()
+  watch(frame as unknown as HTMLElement, {} as Element, view.win as unknown as EdgeWindow)
+  view.flush()
+  assert.equal(frame.shown(), 'is-scrollable-left', `${name}: right-to-left start`)
+  frame.scrollTo(-100)
+  view.flush()
+  assert.equal(frame.shown(), 'is-scrollable-right', `${name}: right-to-left end`)
 }
 
 // A browser without ResizeObserver still follows the scroll.

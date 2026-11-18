@@ -104,23 +104,36 @@ export const PAGE_PLACE_RULE = String.raw`
  * A wide table's soft edges (the Experience lead on #781), as plain JavaScript: the editor's
  * `webview/src/extensions/tables/tableEdges.ts`, which `pageScript.test.ts` runs beside this copy. A table's frame
  * (`.tw`) gets `is-scrollable-left` / `is-scrollable-right` on whichever side has more to scroll to, and the page's CSS
- * fades that side over 24 px. A passive scroll listener and a ResizeObserver draw once per animation frame; only classes
- * and one CSS variable change, so nothing moves with reduced motion.
+ * fades that side over 24 px. A passive scroll listener draws once per animation frame and a ResizeObserver before the
+ * frame is painted; only classes and one CSS variable change, so nothing moves with reduced motion.
  */
 export const PAGE_EDGE_RULE = String.raw`
   var EDGE_SLACK = 1;
-  function tableEdges(scrollLeft, scrollWidth, clientWidth) {
+  function tableEdges(scrollLeft, scrollWidth, clientWidth, rtl) {
     var room = scrollWidth - clientWidth;
     if (!(room > EDGE_SLACK)) return { left: false, right: false };
     var at = Math.min(room, Math.abs(scrollLeft));
-    return { left: at > EDGE_SLACK, right: at < room - EDGE_SLACK };
+    var fromStart = at > EDGE_SLACK, toEnd = at < room - EDGE_SLACK;
+    return rtl ? { left: toEnd, right: fromStart } : { left: fromStart, right: toEnd };
   }
   function watchTableEdges(frame, content, win) {
-    var pending = 0, bar = '';
+    var pending = 0, bar = '', stopped = false, rtl = null, observer = null;
+    function stop() {
+      stopped = true;
+      frame.removeEventListener('scroll', schedule);
+      if (observer) observer.disconnect();
+      if (pending) win.cancelAnimationFrame(pending);
+      pending = 0;
+    }
     function draw() {
       pending = 0;
-      var scrolls = frame.isConnected && /^(auto|scroll)$/.test(win.getComputedStyle(frame).overflowX);
-      var edges = scrolls ? tableEdges(frame.scrollLeft, frame.scrollWidth, frame.clientWidth) : { left: false, right: false };
+      if (stopped || !frame.isConnected) return;
+      if (rtl === null) {
+        var style = win.getComputedStyle(frame);
+        if (!/^(auto|scroll)$/.test(style.overflowX)) { stop(); return; }
+        rtl = style.direction === 'rtl';
+      }
+      var edges = tableEdges(frame.scrollLeft, frame.scrollWidth, frame.clientWidth, rtl);
       frame.classList.toggle('is-scrollable-left', edges.left);
       frame.classList.toggle('is-scrollable-right', edges.right);
       var height = edges.left || edges.right ? Math.max(0, frame.offsetHeight - frame.clientHeight) : 0;
@@ -130,18 +143,13 @@ export const PAGE_EDGE_RULE = String.raw`
       if (next) frame.style.setProperty('--rm-fade-bar', next);
       else frame.style.removeProperty('--rm-fade-bar');
     }
-    function schedule() { if (!pending) pending = win.requestAnimationFrame(draw); }
-    frame.addEventListener('scroll', schedule, { passive: true });
+    function schedule() { if (!pending && !stopped) pending = win.requestAnimationFrame(draw); }
     var Observer = win.ResizeObserver;
-    var observer = typeof Observer === 'function' ? new Observer(schedule) : null;
-    if (observer) { observer.observe(frame); observer.observe(content); }
+    observer = typeof Observer === 'function' ? new Observer(draw) : null;
+    frame.addEventListener('scroll', schedule, { passive: true });
+    if (observer) { observer.observe(frame, { box: 'border-box' }); observer.observe(content); }
     schedule();
-    return function () {
-      frame.removeEventListener('scroll', schedule);
-      if (observer) observer.disconnect();
-      if (pending) win.cancelAnimationFrame(pending);
-      pending = 0;
-    };
+    return stop;
   }
 `;
 
