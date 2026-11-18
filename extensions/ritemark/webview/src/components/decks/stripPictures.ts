@@ -21,11 +21,16 @@ export const STRIP_PICTURES_MIN = 2
 
 /**
  * A slide's title from a picture's file name: the extension taken off, dashes and underscores turned into spaces, the
- * spaces run together. In NFC, so a name macOS hands over decomposed ("o" and a combining tilde) reads as "õ".
+ * spaces run together, and its first letter a capital (the Experience lead, 18 November: "team-photo.png" is "Team
+ * photo"); the rest stays as the name has it. In NFC, so a name macOS hands over decomposed ("o" and a combining tilde)
+ * reads as "õ", which becomes "Õ".
  */
 export function pictureTitleOf(fileName: string): string {
   const name = fileName.normalize('NFC').replace(/^.*[\\/]/, '')
-  return name.replace(/\.[^.\s]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  const title = name.replace(/\.[^.\s]+$/, '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim()
+  // The first character whole (a letter outside the BMP is two code units), upper-cased for the person's language.
+  const [first = ''] = Array.from(title)
+  return first.toLocaleUpperCase() + title.slice(first.length)
 }
 
 /** The picture files of a drop, in the order the files came (anything that isn't a picture is left out). */

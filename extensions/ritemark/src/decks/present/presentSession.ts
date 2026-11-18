@@ -16,6 +16,7 @@
  */
 import { isBlockSlide, parseDeck, readScalar, slideDataOf, type SlideData } from '../deckFormat';
 import { conversionComment, hiddenWords } from '../blocks/legacyToBlocks';
+import { transitionOf, type DeckTransition } from './deckTransition';
 
 /** One slide of the deck, as presenting reads it. */
 export interface PresentSlide {
@@ -103,6 +104,16 @@ export function frontMatterValue(text: string, key: string): string | null {
  */
 export function deckLookOf(text: string): 'card' | 'borderless' {
   return frontMatterValue(text, 'look') === 'borderless' ? 'borderless' : 'card';
+}
+
+export type { DeckTransition };
+
+/**
+ * The deck's one transition, from its front matter (`transition: push`, `zoom` or `none`); Fade when there is no line
+ * or it holds anything else. The deck view's own rule (`transitionOf`, `deckTransition.ts`).
+ */
+export function deckTransitionOf(text: string): DeckTransition {
+  return transitionOf(frontMatterValue(text, 'transition'));
 }
 
 /** Why a presentation can't start: the deck has no slide to show. */

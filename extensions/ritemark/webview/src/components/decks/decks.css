@@ -62,6 +62,10 @@
 
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
 .deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
+/* README item 19: the Theme menu's transition, played once over the stage's slide (TransitionPreview). */
+.deck-transition-preview { position: absolute; inset: 0; z-index: 6; overflow: hidden; pointer-events: none; }
+.deck-transition-layer { position: absolute; inset: 0; }
+.deck-transition-layer .deck-sl { background: transparent; }
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
@@ -194,6 +198,13 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    column's floor on its <col> (TableHandles.ts, tableColumns.ts); the frame is the query container its share counts
    against (the handout's text width, the frame's padding left out). The published page draws the same floors. */
 .deck-handout .wysiwyg-editor .ProseMirror > .rm-table > table > colgroup > col { min-width: var(--rm-col-floor, 0); }
+/* Its soft edge (the Experience lead on #781): the frame fades its content over 24 px on whichever side has more to
+   scroll to, so the last column isn't cut mid-word, and the fade goes when that end is reached (tableEdges.ts sets the
+   classes). A mask, not a shadow: it fades the words and the grey header row too. The left fade starts where the
+   clip does (6 px in), the right one fills the + column's room. The second layer keeps a classic scrollbar whole. */
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table:is(.is-scrollable-left, .is-scrollable-right) { --rm-fade-l: #000; --rm-fade-r: #000; mask: linear-gradient(to right, var(--rm-fade-l) 6px, #000 30px, #000 calc(100% - 24px), var(--rm-fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table.is-scrollable-left { --rm-fade-l: transparent; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table.is-scrollable-right { --rm-fade-r: transparent; }
 /* The placeholders: a part's empty heading, and the current part's empty text (deckCurrent.ts) */
 .deck-handout .wysiwyg-editor .ProseMirror .deck-empty::before { content: attr(data-deck-placeholder); float: left; height: 0; color: var(--r-ink-faint); pointer-events: none; }
 
@@ -468,3 +479,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-block-bar .deck-bar-seg .deck-bar-choice { height: 24px; padding: 0 8px; }
 .deck-block-bar .deck-bar-seg .deck-bar-choice[data-state="active"] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15); }
 .deck-block-bar .deck-bar-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--r-hairline-strong); }
+
+/* Decks README item 16 (17 November): the spotlight in Present, on the wall and the presenter view's Now only (their
+   `.deck-spot`; `spotlight.ts` sets `.is-spot-dim`). The rest of the slide dims to 30 % in 0.2 s, back the same way;
+   at once with reduced motion. Nothing grows or moves. */
+.deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: opacity 0.2s ease; }
+.deck-spot .deck-sl .is-spot-dim { opacity: 0.3; }
+@media (prefers-reduced-motion: reduce) { .deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: none; } }
+.vscode-reduce-motion .deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: none; }

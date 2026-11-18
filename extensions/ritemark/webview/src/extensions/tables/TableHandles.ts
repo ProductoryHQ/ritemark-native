@@ -21,6 +21,7 @@ import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import type { EditorView, NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { cellAtPos, cellAtSelection, cellPos, columnWidths, nextCellOrNewRow, previousCell, tableTintPlugin, wholeTableChosen } from './tableOps'
 import { columnFloors, floorCss } from '../../../../src/markdown/tableColumns'
+import { watchTableEdges } from './tableEdges'
 
 /** The words of a table's body cells (every row under the header), one string per cell. */
 export function bodyTexts(table: PMNode): string[][] {
@@ -94,8 +95,13 @@ export class TableHandlesView implements NodeView {
     this.dom.appendChild(this.table)
     this.dom.appendChild(this.ui)
     this.drawWidths()
+    // A wide table that scrolls in its own frame (a deck's handout) fades at the side with more to scroll to
+    // (tableEdges.ts). Where the element doesn't scroll (a Text document, a slide), it gets no class.
+    this.unwatchEdges = watchTableEdges(this.dom, this.table)
     registry.add(this)
   }
+
+  private unwatchEdges: () => void
 
   update(node: PMNode): boolean {
     if (node.type !== this.node.type) return false
@@ -161,6 +167,7 @@ export class TableHandlesView implements NodeView {
   }
 
   destroy(): void {
+    this.unwatchEdges()
     this.registry.remove(this)
   }
 }

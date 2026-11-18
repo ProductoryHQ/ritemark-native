@@ -2,7 +2,7 @@
  * Sprint 159 (PR 5): the presenting session's rules. Run with `npx tsx src/decks/present/presentSession.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { deckLookOf, frontMatterValue, PresentSession, PresentStartError, presentSlidesOf, presentTitleOf, type PresentSlide } from './presentSession';
+import { deckLookOf, deckTransitionOf, frontMatterValue, PresentSession, PresentStartError, presentSlidesOf, presentTitleOf, type PresentSlide } from './presentSession';
 
 const slide = (kind: string, lines: string[], notes?: string) =>
   ['```slide ' + kind, ...lines, '```', ...(notes ? ['', '```notes', notes, '```'] : []), '', `The handout of ${lines.find(line => line.startsWith('title:')) ?? kind}.`, ''].join('\n');
@@ -42,6 +42,12 @@ const titleOf = (session: PresentSession) => session.view().current.data.title;
   assert.equal(frontMatterValue(TEXT, 'ritemark-length'), '45');
   assert.equal(frontMatterValue(TEXT, 'missing'), null);
   assert.equal(deckLookOf('---\n---\n\n```slide title\nlook: borderless\n```\n---\nmore\n'), 'card', 'an empty front matter, not a slide line before a later ---');
+  // README item 19: the deck's transition, Fade unless the line says push, zoom or none as written.
+  assert.equal(deckTransitionOf(A), 'fade', 'no front matter: Fade');
+  for (const transition of ['push', 'zoom', 'none', 'fade'] as const) assert.equal(deckTransitionOf(`---\ndeck: 2\ntransition: ${transition}\n---\n\n${A}`), transition);
+  assert.equal(deckTransitionOf('---\ntransition: Push\n---\n'), 'fade', 'only as written');
+  assert.equal(deckTransitionOf('---\ntransition: "zoom"\n---\n'), 'zoom', 'quoted reads the same');
+  assert.equal(deckTransitionOf('---\n---\n\n```slide title\ntransition: push\n```\n'), 'fade', 'never a slide line');
 }
 
 // ---- From the start and From this slide; n of N counts only the slides shown

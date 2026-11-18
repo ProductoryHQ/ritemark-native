@@ -80,8 +80,19 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'theme', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'spot', 'theme', 'transition', 'type']);
+  // Items 11 and 16: no spotlight and no filled wall unless asked; only an item's place gets through.
+  assert.equal(state.spot, null);
+  assert.equal(state.fill, null);
+  const focused = wallStateOf(session.view(), look, {}, undefined, null, null, { spot: 2, fill: 2 });
+  assert.equal(focused.spot, 2);
+  assert.equal(focused.fill, 2);
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, { spot: -1 as never, fill: 1.5 as never }).spot, null, 'never a place that is not one');
   assert.deepEqual(state.presenter, { available: false, on: false });
+  // README item 19: the deck's transition, Fade without one; only the four the wall knows.
+  assert.equal(state.transition, 'fade');
+  for (const transition of ['push', 'zoom', 'none', 'fade'] as const) assert.equal(wallStateOf(session.view(), { ...look, transition }, {}).transition, transition);
+  assert.equal(wallStateOf(session.view(), { ...look, transition: 'spin' as never }, {}).transition, 'fade', 'only the known transitions');
   assert.equal(state.blank, null, 'the slide, not a blank wall');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'white').blank, 'white');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'ground').blank, 'ground');
@@ -146,6 +157,13 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(decodeWallRequest({ type: 'present/blank', to: 'black' }), null);
   assert.equal(decodeWallRequest({ type: 'present/blank', to: true }), null);
   assert.equal(decodeWallRequest({ type: 'present/blank', to: 'white', number: 1 }), null);
+  // Items 11 and 16: an item's place on the slide, or null to clear it.
+  for (const type of ['present/spot', 'present/fill'] as const) {
+    for (const item of [0, 3, null]) assert.deepEqual(decodeWallRequest({ type, item }), { type, item }, `${type} ${item}`);
+    for (const item of [-1, 1.5, '2', true, 10_000]) assert.equal(decodeWallRequest({ type, item }), null, `${type} ${String(item)}`);
+    assert.equal(decodeWallRequest({ type }), null);
+    assert.equal(decodeWallRequest({ type, item: 1, extra: 1 }), null);
+  }
 }
 
 // ---- The deck view's Present
@@ -164,7 +182,9 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'length', 'next', 'page', 'position', 'skipped', 'slides', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'page', 'position', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.equal(first.spot, null);
+  assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, focus: { spot: 1, fill: null } }).spot, 1, 'Now shows the wall\'s spotlight');
   assert.equal(first.blank, null);
   assert.equal(first.page, null, 'no "Show the page" for an unpublished deck');
   const paged = presenterStateOf(session.view(), look, {}, { ...clock, blank: 'page', page: 'https://talk.example.workers.dev/' });

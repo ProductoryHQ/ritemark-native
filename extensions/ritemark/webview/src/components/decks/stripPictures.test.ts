@@ -72,17 +72,26 @@ function openDeck(text: string) {
 }
 
 // ---- The title from a file name
-assert.equal(pictureTitleOf('team-photo.png'), 'team photo', 'dashes become spaces')
+assert.equal(pictureTitleOf('team-photo.png'), 'Team photo', 'dashes become spaces; the first letter a capital')
 assert.equal(pictureTitleOf('Q3_results_final.JPG'), 'Q3 results final', 'underscores too, any extension case')
-assert.equal(pictureTitleOf('before--after__2.webp'), 'before after 2', 'runs of them become one space')
-assert.equal(pictureTitleOf('  _the-plan_ .png'), 'the plan', 'trimmed')
-assert.equal(pictureTitleOf('v1.2 notes.jpeg'), 'v1.2 notes', 'only the last extension goes')
+assert.equal(pictureTitleOf('before--after__2.webp'), 'Before after 2', 'runs of them become one space')
+assert.equal(pictureTitleOf('  _the-plan_ .png'), 'The plan', 'trimmed, then the capital')
+assert.equal(pictureTitleOf('v1.2 notes.jpeg'), 'V1.2 notes', 'only the last extension goes')
 assert.equal(pictureTitleOf('README'), 'README', 'no extension: the name as it is')
 assert.equal(pictureTitleOf('Õppepäev_Tartus.png'), 'Õppepäev Tartus', 'Estonian letters stay')
 assert.equal(pictureTitleOf('Õppepäev-Tartus.png'), 'Õppepäev Tartus', "macOS's decomposed name reads as the letters")
 assert.equal(pictureTitleOf('Šokolaad ja žürii.png'), 'Šokolaad ja žürii')
-assert.equal(pictureTitleOf('/Users/someone/shots/slide-3.png'), 'slide 3', 'a path: its last part')
+assert.equal(pictureTitleOf('/Users/someone/shots/slide-3.png'), 'Slide 3', 'a path: its last part')
 assert.equal(pictureTitleOf('.png'), '', 'nothing but an extension: no title')
+// The Experience lead, 18 November: only the first letter changes, for the person's language; the rest as the name has it.
+assert.equal(pictureTitleOf('results_q3-final.png'), 'Results q3 final')
+assert.equal(pictureTitleOf('õppepäev-tartus.png'), 'Õppepäev tartus', 'õ becomes Õ')
+assert.equal(pictureTitleOf('o\u0303ppepa\u0308ev.png'), 'Õppepäev', 'a decomposed õ too')
+assert.equal(pictureTitleOf('šokolaad.png'), 'Šokolaad')
+assert.equal(pictureTitleOf('iPhone-shot.png'), 'IPhone shot', 'the first letter only')
+assert.equal(pictureTitleOf('team-AI-day.png'), 'Team AI day', 'the rest keeps its capitals')
+assert.equal(pictureTitleOf('3-steps.png'), '3 steps', 'a digit has no capital')
+assert.equal(pictureTitleOf('𝒶bc.png'), '𝒶bc', 'a letter outside the BMP stays whole')
 
 // ---- The drop: only pictures, in the files' order; the drag over counts them
 {
@@ -124,13 +133,13 @@ const DECK = [
   const slides = slidesOf(deck.state.doc)
   assert.deepEqual(slides.map(slide => slide.data.id), ['a1', ids[0], ids[1], ids[2], 'b2'], 'at the drop place, in the files\' order')
   assert.deepEqual(slides.slice(1, 4).map(slide => slide.data.markdown), [
-    '# first shot\n\n![](images/first-shot.png)',
+    '# First shot\n\n![](images/first-shot.png)',
     '# Õppepäev 2\n\n![](images/Oppepaev_2.png)',
-    '# first shot\n\n![](images/first-shot-2.png)',
+    '# First shot\n\n![](images/first-shot-2.png)',
   ], 'a Picture slide each: its title and its picture; two of the same name keep their own files')
   const saved = deck.save()
-  assert.match(saved, /```slide\n---\nid: \w+\n---\n# first shot\n\n!\[\]\(images\/first-shot\.png\)\n```\n\n```slide/, 'written as block slides')
-  assert.ok(saved.indexOf('Ask who has done one.') < saved.indexOf('first shot') && saved.indexOf('first-shot-2') < saved.indexOf('What it taught us'), 'between the two parts')
+  assert.match(saved, /```slide\n---\nid: \w+\n---\n# First shot\n\n!\[\]\(images\/first-shot\.png\)\n```\n\n```slide/, 'written as block slides')
+  assert.ok(saved.indexOf('Ask who has done one.') < saved.indexOf('First shot') && saved.indexOf('first-shot-2') < saved.indexOf('What it taught us'), 'between the two parts')
   // One Cmd+Z takes them all back: the same bytes.
   assert.ok(deck.undo())
   assert.equal(deck.save(), before, 'one Undo gives the deck back, byte for byte')

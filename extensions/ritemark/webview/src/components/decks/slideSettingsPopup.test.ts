@@ -162,7 +162,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /\{slide \? \(\s+<SlideSettings[\s\S]*\) : null\}\s+<\/PopoverContent>\s+$/, "a slide's settings, or nothing")
   assert.match(view, /const count = slides\.length/)
   // Card | Borderless is in the Theme menu on the bar, and writes the front matter through the same `setLook`.
-  assert.match(bar, /<ThemeMenu theme=\{theme\} named=\{properties\.theme\} look=\{borderless \? 'borderless' : 'card'\} onLook=\{setLook\} onPick=\{pickTheme\} newTheme=\{newTheme\} \/>/)
+  assert.match(bar, /<ThemeMenu theme=\{theme\} named=\{properties\.theme\} look=\{borderless \? 'borderless' : 'card'\} onLook=\{setLook\} transition=\{transition\} onTransition=\{setTransition\} onPick=\{pickTheme\} newTheme=\{newTheme\} \/>/)
   // Since Sprint 162 the look is a step of the deck's Undo (themeMenu.test.ts writes it through the same join).
   assert.match(view, /const after = look === 'borderless' \? \{ present: true, value: 'borderless' \} : \{ present: false \}/, 'the same `look: borderless` line, or none')
   assert.match(view, /editor\.view\.dispatch\(propertyTransaction\(editor\.state, 'look', before, after\)\)/)

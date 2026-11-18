@@ -483,6 +483,13 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   // step's words take the step's width, so a table in a step has room (a query container takes no width from inside).
   assert.ok(/\.tw \.fl \{ display: block; height: 0; \}/.test(html), 'the spacer has no height');
   assert.ok(/\.tw \{ overflow-x: auto;[^}]*container-type: inline-size;[^}]*\}/.test(html), 'the frame is the query container');
+  // A wide table's soft edge (the Experience lead on #781): a 24 px mask on the side with more to scroll to, chosen by
+  // the classes the page's script sets, prefixed for older browsers, the scrollbar kept whole, and nothing that moves.
+  const fade = /\.tw\.is-scrollable-left, \.tw\.is-scrollable-right \{([^}]*)\}/.exec(html)?.[1] ?? '';
+  const gradient = 'linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat;';
+  assert.ok(fade.includes(`-webkit-mask: ${gradient}`) && fade.includes(` mask: ${gradient}`), 'the frame fades its content');
+  assert.ok(/\.tw\.is-scrollable-left \{ --fade-l: transparent; \}/.test(html) && /\.tw\.is-scrollable-right \{ --fade-r: transparent; \}/.test(html), 'each side by its own class');
+  assert.ok(!/\.tw[^{]*\{[^}]*(transition|animation)/.test(html), 'the fade appears and goes with no animation');
   assert.ok(/\.steps label > span \{ min-width: 0; flex: 1 1 auto; \}/.test(html), "a step's words take its width");
 }
 
