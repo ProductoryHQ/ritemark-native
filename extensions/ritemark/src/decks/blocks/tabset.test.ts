@@ -7,6 +7,8 @@
  * Run: npx tsx src/decks/blocks/tabset.test.ts
  */
 import { strict as assert } from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { parse } from 'node-html-parser';
 import { scanFencedDiv } from './fencedDiv';
 import { TABSET_CLOSE, TABSET_OPEN, newTabsetMarkdown, renamedTabLine, tabHeadingLine, tabsetMarkdown, tabsetOf, tabsetOfInner, tabsetStart, type TabsetLines } from './tabset';
@@ -246,6 +248,14 @@ test('the page fits a band\'s tabs before it scrolls, as the editor and the wall
   assert.ok(PAGE_SCRIPT.includes('function fitTabBands()'));
   assert.ok(PAGE_SCRIPT.includes("block.setAttribute('data-fit', String(step))"));
   assert.ok(!/\.innerHTML|\.src\s*=|\.href\s*=/.test(PAGE_SCRIPT.slice(PAGE_SCRIPT.indexOf('function fitTabBands'))), 'it writes no HTML and loads nothing');
+});
+
+test('a place to fill in looks the same in a pane as on the slide: no pane rule colours a code block\'s words', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8');
+  assert.ok(!/\.blk-tabpane[^{]*\b(?:pre|code)\b[^{]*\{[^}]*\bcolor:/.test(css), 'no pane rule sets a code block\'s colour');
+  assert.ok(/\.deck-sl\.is-blocks :is\(pre, code\) \.cb-fill[^{]*\{[^}]*color: var\(--s-acct/.test(css), 'the place mark keeps its own colour inside code');
+  const html = blockSlideHtml(`${TABSET_OPEN}\n## A\n\n\`\`\`\nAdd [the report].\n\`\`\`\n:::`);
+  assert.ok(html.includes('class="cb-fill"'), 'a place in a pane\'s prompt is marked as on the slide');
 });
 
 console.log(`tabset: ${passed} passed`);

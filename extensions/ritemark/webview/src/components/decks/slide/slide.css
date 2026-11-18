@@ -198,7 +198,9 @@
    presenter view's row and Next). The stage's slide and Now take them. */
 .deck-thumb .cb-tools, .wall-grid .cb-tools, .pv-row .cb-tools, .pv-side .cb-tools { pointer-events: none; }
 /* A place to fill in, [like this]: in the accent, so the reader knows to change it after pasting. */
-.deck-sl.is-blocks .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+/* One look for a place to fill in wherever the code block stands (a tab's pane included): its own colour, never the
+   words' around it. */
+.deck-sl.is-blocks .cb-fill, .deck-sl.is-blocks :is(pre, code) .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
