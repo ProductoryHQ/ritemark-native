@@ -329,13 +329,14 @@ const DECK = [
     showInLibrary: index => calls.push(`show ${index}`),
     remove: index => calls.push(`remove ${index}`),
     settings: index => calls.push(`settings ${index}`),
+    copyPicture: index => calls.push(`picture ${index}`),
   }
   const items = slideMenuItems({ index: 2, count: 5, skipped: true, fromLibrary: false, deleteKey: '⌫', duplicateKey: '⌘D', upKey: '⌘↑', downKey: '⌘↓' })
-  assert.deepEqual(items.map(item => item.label), ['Duplicate', 'Move up', 'Move down', 'Show slide', 'Add to library…', 'Slide settings…', 'Delete slide'])
+  assert.deepEqual(items.map(item => item.label), ['Duplicate', 'Move up', 'Move down', 'Show slide', 'Add to library…', 'Copy as picture', 'Slide settings…', 'Delete slide'])
   for (const item of items) item.run(actions)
-  assert.deepEqual(calls, ['duplicate 2', 'move 2 -1', 'move 2 1', 'skip 2', 'add 2', 'settings 2', 'remove 2'], 'each on that slide')
+  assert.deepEqual(calls, ['duplicate 2', 'move 2 -1', 'move 2 1', 'skip 2', 'add 2', 'picture 2', 'settings 2', 'remove 2'], 'each on that slide')
   assert.deepEqual(slideMenuItems({ index: 0, count: 1, skipped: false, fromLibrary: true, deleteKey: '⌫', duplicateKey: '⌘D', upKey: '⌘↑', downKey: '⌘↓' }).map(item => `${item.label}${item.disabled ? ' (off)' : ''}`),
-    ['Duplicate', 'Move up (off)', 'Move down (off)', 'Skip slide', 'Show in the library', 'Slide settings…', 'Delete slide (off)'])
+    ['Duplicate', 'Move up (off)', 'Move down (off)', 'Skip slide', 'Show in the library', 'Copy as picture', 'Slide settings…', 'Delete slide (off)'])
   // Both menus draw that one list: the strip's thumbnail and the part number's ⋯.
   const here = join(process.cwd(), process.cwd().endsWith('webview') ? 'src/components/decks' : 'webview/src/components/decks')
   const strip = readFileSync(join(here, 'SlideStrip.tsx'), 'utf8')

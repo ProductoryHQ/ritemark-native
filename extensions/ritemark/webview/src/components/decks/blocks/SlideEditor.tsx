@@ -49,12 +49,15 @@ import { slidesOf, type DeckSlideEntry } from '../deckDocument'
 import { convertDeckInto } from '../handout/deckConvert'
 import { SLIDE_SYNC, SlideSync } from './slideSync'
 import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
+import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
+import { onDocChanged } from '../../../lib/docChange'
+import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabAcross } from './blockBar'
@@ -295,6 +298,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     pickIcon: (pos, anchor, current) => toolsRef.current?.pickIcon(pos, anchor, current),
     editPill: (pos, anchor) => toolsRef.current?.editPill(pos, anchor),
   }), [])
+  // Small details 14: the Agenda reads the deck's sections from the handout's editor, and draws again as they change.
+  const agendaSource = useMemo<AgendaSource>(() => ({
+    current: () => {
+      const deck = outerRef.current
+      if (deck.isDestroyed) return { entries: [], hint: true }
+      return { entries: agendaOf(slidesOf(deck.state.doc).map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 }))), hint: true }
+    },
+    // Every change to the deck, the host's too (a section renamed by an AI while the slide is open).
+    subscribe: listener => onDocChanged(outer, listener),
+    // A new deck editor makes a new source (and a new slide editor), so the Agenda never listens to a gone one.
+  }), [outer])
   const SlideKeys = useMemo(() => Extension.create({
     name: 'slideKeys',
     priority: 900,
@@ -333,12 +347,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     afterImage: [OuterHistory, SlideKeys, SlideSlash, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
-    deck: [slideDivWithView(divHandlers)],
+    deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource)],
   }).map(extension => {
     if (extension.name === 'starterKit') return extension.configure({ history: false })
     if (extension.name === 'commentNode') return SlideCommentNode.extend()
     return extension
-  }), [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles, divHandlers, commentCallouts])
+  }), [OuterHistory, SlideKeys, SlideSlash, SlideTableHandles, divHandlers, agendaSource, commentCallouts])
 
   const editor = useEditor({
     extensions,
@@ -556,6 +570,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // the / menu left the slide at its first step, overflowing, until the next key).
     const flow = editor.view.dom
     flow.addEventListener('load', fresh, true)
+    // An Agenda drawn again for the deck's sections (a section added or renamed elsewhere) changes the slide's height.
+    flow.addEventListener(AGENDA_DRAWN_EVENT, fresh)
     // The browser keeps a caret in view by scrolling the clipped flow itself: it is put back, so the title stays whole.
     const unscroll = () => { if (flow.scrollTop || flow.scrollLeft) { flow.scrollTop = 0; flow.scrollLeft = 0 } }
     flow.addEventListener('scroll', unscroll)
@@ -564,6 +580,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       editor.off('update', typed)
       fonts?.removeEventListener?.('loadingdone', fresh)
       flow.removeEventListener('load', fresh, true)
+      flow.removeEventListener(AGENDA_DRAWN_EVENT, fresh)
       flow.removeEventListener('scroll', unscroll)
     }
   }, [editor, refit])
@@ -707,6 +724,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind, tag)); return true }).run()
           return
         }
+        case 'agenda':
+          // One block line pair, an undo step of its own; the list is the deck's, drawn where it stands.
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, agendaNode(editor.schema)); return true }).run()
+          return
         case 'picture':
           chain().run()
           pictureAt.current = range.from

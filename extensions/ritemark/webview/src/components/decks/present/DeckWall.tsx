@@ -38,6 +38,7 @@
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
+import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WallPoint, WallSlide, WallState, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
@@ -82,6 +83,8 @@ function useScreenSize(): { width: number; height: number } {
   }, [])
   return size
 }
+
+const NO_SLIDES: WallSlide[] = []
 
 export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
@@ -406,6 +409,9 @@ export function DeckWall() {
     actOnClick(spotClickOf(hit, spotNow(current.spot), 'next'))
   }, [askBlank, askFill, actOnClick, spotNow, fillNow])
 
+  // Small details 14: the shown slides' sections, for an Agenda on the wall (its progress from the slide's own place).
+  const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
+
   if (!state) return <div className="deck-wall" />
 
   const gotoNumber = digits === null ? null : Number(digits)
@@ -425,11 +431,12 @@ export function DeckWall() {
 
   const layer = (slide: WallSlide, className: string, key: string, going: boolean) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
     </div>
   )
 
   return (
+    <AgendaContext.Provider value={agendaDrawing}>
     <div
       className={`deck-wall${(barVisible && !pointing) || gridOpen ? '' : ' is-idle'}`}
       // The slide's ground on the whole screen: no band, no edge where the 16:9 area ends (a Borderless deck's white).
@@ -527,6 +534,7 @@ export function DeckWall() {
         />
       ) : null}
     </div>
+    </AgendaContext.Provider>
   )
 }
 
@@ -590,7 +598,7 @@ function WallGrid({ state, width, picked, onPick, onGo }: {
             onClick={() => onGo(slide.number)}
           >
             <div className={`wall-grid-slide${state.borderless ? ' is-borderless' : ''}`}>
-              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} />
+              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
             </div>
             <span className="wall-grid-number">{slide.number}</span>
           </div>
