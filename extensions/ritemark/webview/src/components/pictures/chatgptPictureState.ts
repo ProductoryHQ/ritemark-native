@@ -1,0 +1,75 @@
+/**
+ * Pictures with ChatGPT: the picture maker's states and messages, pure (no React, no bridge), so they are tested on
+ * their own (`chatgptPicture.test.ts`). The view and the hook are `ChatgptPicture.tsx`.
+ */
+
+export type PictureMode = 'new' | 'change'
+
+/** The place a picture is made for: a picture in an editor's words (followed through edits), or a slide's side. */
+export type PicturePlaceRef = { kind: 'flow'; pos: number } | { kind: 'side' }
+
+export interface PictureAsk {
+  place: PicturePlaceRef
+  mode: PictureMode
+  /** The words the field starts with (the slide's title for a new picture on a slide). */
+  suggestion: string
+  /** Change this picture…: its path as the document writes it. */
+  source?: string
+  /** On a slide: its words, sent as context. */
+  words?: string
+  /** The file's name before cleaning: the slide's title. */
+  name?: string
+}
+
+export type MakerPhase =
+  | { phase: 'idle' }
+  | { phase: 'checking'; ask: PictureAsk }
+  | { phase: 'asking'; ask: PictureAsk }
+  | { phase: 'making'; ask: PictureAsk; description: string; requestId: string }
+  | { phase: 'done'; ask: PictureAsk; description: string }
+  | { phase: 'failed'; ask: PictureAsk; description: string; problem: string }
+  | { phase: 'sign-in'; ask: PictureAsk }
+
+/** The words the strip says when ChatGPT is done (experience 46 and 49). */
+export function doneWords(mode: PictureMode): string {
+  return mode === 'change' ? 'ChatGPT changed the picture. The old one is still in images/.' : 'ChatGPT made the picture. It\'s in images/.'
+}
+
+/** Who gets what, under the field: the person's words, the slide's words, the picture to change. Never other files. */
+export function sentWords(ask: Pick<PictureAsk, 'mode' | 'words'>): string {
+  if (ask.mode === 'change') return ask.words ? 'ChatGPT gets these words, this picture and the slide\'s words.' : 'ChatGPT gets these words and this picture.'
+  return ask.words ? 'ChatGPT gets these words and the slide\'s words.' : 'ChatGPT gets these words.'
+}
+
+/** The `picture/make` message for a request: the words, and what the place adds (the slide, the picture to change). */
+export function makeMessage(ask: PictureAsk, description: string, requestId: string, slideId?: string): Record<string, unknown> {
+  return {
+    requestId,
+    mode: ask.mode,
+    description,
+    ...(ask.words ? { words: ask.words } : {}),
+    ...(ask.mode === 'change' && ask.source ? { source: ask.source } : {}),
+    ...(ask.name ? { name: ask.name } : {}),
+    ...(slideId ? { slideId } : {}),
+  }
+}
+
+/**
+ * The state after the host's `picture/status`: the check's answer opens the field (or says to sign in); the request's
+ * answer is done, failed, sign-in or over. Undefined: not this state's answer (another request's, or a late one).
+ */
+export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unknown; state?: unknown; problem?: unknown; path?: unknown; url?: unknown }, checking: string | null): MakerPhase | undefined {
+  if (typeof message.requestId !== 'string') return undefined
+  if (current.phase === 'checking') {
+    if (message.requestId !== checking) return undefined
+    return message.state === 'ready' ? { phase: 'asking', ask: current.ask } : { phase: 'sign-in', ask: current.ask }
+  }
+  if (current.phase !== 'making' || message.requestId !== current.requestId) return undefined
+  if (message.state === 'made' && typeof message.path === 'string' && typeof message.url === 'string') return { phase: 'done', ask: current.ask, description: current.description }
+  if (message.state === 'sign-in') return { phase: 'sign-in', ask: current.ask }
+  if (message.state === 'failed') {
+    return { phase: 'failed', ask: current.ask, description: current.description, problem: typeof message.problem === 'string' ? message.problem : 'ChatGPT couldn\'t make the picture. Try again.' }
+  }
+  return { phase: 'idle' }
+}
+

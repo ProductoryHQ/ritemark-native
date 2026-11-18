@@ -46,6 +46,11 @@ interface StageProps {
   onFocusTaken?: () => void
   /** A picture pasted or dropped on the slide, read as a data URL (`atCaret`: the / menu's Picture, PR 3). */
   onPicture: (dataUrl: string, filename: string, atCaret?: boolean) => void
+  /**
+   * Pictures with ChatGPT: a picture is on its way for the slide on the stage, placed as a saved one when it comes
+   * (`atCaret`: in the words, where the slide editor waits for it; else the slide's own beside or behind). Its slide id.
+   */
+  onPictureComing?: (atCaret: boolean) => string | null
   /** Sprint 161: open one of the slide's saved comments (the deck's bar), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for was opened: the asker forgets the request. */
@@ -67,7 +72,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, missing, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, missing, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, onPictureComing, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -85,6 +90,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, missing, width, 
         focusTitle={focusTitle}
         onFocusTaken={onFocusTaken}
         onPicture={onPicture}
+        onPictureComing={onPictureComing}
         commentOpen={commentOpen}
         onCommentOpened={onCommentOpened}
         onNewSlideBelow={onNewSlideBelow}

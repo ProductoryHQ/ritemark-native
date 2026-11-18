@@ -12,6 +12,8 @@ import { missingHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { readSideFocus } from '../../../../../src/markdown/pictureLook'
 import { PictureBar, type PicturePlace } from '../../pictures/PictureBar'
 import { Icon } from '../../ui/Icon'
+import { Button } from '../../ui/button'
+import { Tooltip } from '../../ui/tooltip'
 import { copyPicture, stageBounds } from '../../pictures/PictureTools'
 import type { SidePlace } from './slidePicturePlace'
 
@@ -37,6 +39,10 @@ export interface SidePictureProps {
   onWords: (alt: string) => void
   onComment: () => void
   onReplace: () => void
+  /** ChatGPT: Make a new picture… or Change this picture… for this place. */
+  onChatgpt?: (mode: 'new' | 'change') => void
+  /** ChatGPT's field or strip is on this place: the bar gives it the place. */
+  barHidden?: boolean
   onReveal: () => void
   onRemove: () => void
   onFocus: (focus: string) => void
@@ -121,6 +127,26 @@ export function SidePicture(props: SidePictureProps) {
             <span className="photo-hint">
               <Icon name="image" size={20} tone="inherit" />
               Choose, paste or drop a picture
+              {/* Experience 49: "or make one with ChatGPT", the hint's one part that doesn't open the file picker. */}
+              {props.onChatgpt ? (
+                <Tooltip label="Describe a picture and ChatGPT makes it">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="photo-make"
+                    onPointerDown={event => {
+                      event.stopPropagation()
+                      if (event.button === 0) props.onChoose()
+                    }}
+                    onClick={event => {
+                      event.stopPropagation()
+                      props.onChatgpt?.('new')
+                    }}
+                  >
+                    or make one with ChatGPT
+                  </Button>
+                </Tooltip>
+              ) : null}
             </span>
           ) : null}
           {chosen && url ? (
@@ -157,7 +183,7 @@ export function SidePicture(props: SidePictureProps) {
       {side === 'behind' ? <div className="veil" style={{ pointerEvents: 'none' }} /> : null}
       {chosen ? (
         <PictureBar
-          anchor={ref.current?.getBoundingClientRect() ?? null}
+          anchor={props.barHidden ? null : ref.current?.getBoundingClientRect() ?? null}
           // A slide-wide place: the bar inside it, at its bottom, kept on the slide's side (experience 49).
           inside
           bounds={ref.current ? stageBounds(ref.current) : undefined}
@@ -180,6 +206,7 @@ export function SidePicture(props: SidePictureProps) {
           onPlace={props.onPlace}
           onWords={words => props.onWords(words)}
           onComment={props.onComment}
+          onChatgpt={props.onChatgpt}
           onReplace={props.onReplace}
           onCopy={() => {
             if (!url) return

@@ -21,7 +21,7 @@ import { CodexRetryPairing, parseCodexRetryNotice, type CodexRetryNotice, type C
 import { CodexAuth } from './codexAuth';
 import { CodexManager } from './codexManager';
 import type { CodexCompatibilityStatus } from './codexManager';
-import { changedFilesOfCodexItem, type ToolRequestUserInputAnswer } from './codexProtocol';
+import { changedFilesOfCodexItem, madePictureOfCodexItem, pictureFailureOfCodexItem, type MadePicture, type ToolRequestUserInputAnswer } from './codexProtocol';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { routeApprovalRequest, threadIdOf } from './codexApproval';
 import { traceCodex } from './codexTrace';
@@ -467,10 +467,15 @@ export class CodexSession implements RuntimeSession {
   _lastAgentMessage: { itemId: string | null; text: string } = { itemId: null, text: '' };
   /** Sprint 155: the files this turn's completed `fileChange` items changed. */
   _turnFilesModified = new Set<string>();
+  /** Pictures with ChatGPT: the pictures this turn's image tool made, and why it made none when it said. */
+  _turnPicturesMade: MadePicture[] = [];
+  _turnPictureFailure: string | null = null;
 
   _onTurnStarted(turnId: string): void {
     this._lastAgentMessage = { itemId: null, text: '' };
     this._turnFilesModified = new Set();
+    this._turnPicturesMade = [];
+    this._turnPictureFailure = null;
     this._lastStartedTurnId = turnId;
     for (const waiter of this._turnStateWaiters) waiter(turnId, 'started');
   }
@@ -972,6 +977,11 @@ export class CodexRuntime implements AgentRuntime {
       const itemType = params.item?.type;
       // Sprint 155: a patch that applied changed its files; a command never counts.
       for (const file of changedFilesOfCodexItem(params.item)) session._turnFilesModified.add(file);
+      // Pictures with ChatGPT: what the image tool made (its saved file), or why it made none.
+      const picture = madePictureOfCodexItem(params.item);
+      if (picture) session._turnPicturesMade.push(picture);
+      const pictureFailure = pictureFailureOfCodexItem(params.item);
+      if (pictureFailure) session._turnPictureFailure = pictureFailure;
       // The finished message's own text, when Codex sends it, beats the deltas.
       if (itemType === 'agentMessage' && typeof params.item.text === 'string' && params.item.text.trim()) {
         session._lastAgentMessage = { itemId: params.item.id ?? null, text: params.item.text };
@@ -996,11 +1006,17 @@ export class CodexRuntime implements AgentRuntime {
         const lastAgentMessage = session._lastAgentMessage.text.trim();
         const filesModified = workspaceFilesOnly(session._turnFilesModified, config.workspacePath);
         session._turnFilesModified = new Set();
+        const picturesMade = session._turnPicturesMade;
+        const pictureFailure = session._turnPictureFailure;
+        session._turnPicturesMade = [];
+        session._turnPictureFailure = null;
         config.onCodexComplete?.({
           status: params.turn.status,
           error: errorMsg,
           ...(lastAgentMessage ? { lastAgentMessage } : {}),
           ...(filesModified.length ? { filesModified } : {}),
+          ...(picturesMade.length ? { picturesMade } : {}),
+          ...(pictureFailure ? { pictureFailure } : {}),
           ...(errorMsg && errorCode ? { errorCode } : {}),
           ...(errorMsg && errorHttpStatus !== undefined ? { errorHttpStatus } : {}),
         });

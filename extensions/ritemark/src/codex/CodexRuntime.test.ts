@@ -400,6 +400,28 @@ async function run() {
     console.log('✓ Test 7c: Sprint 155 — completed file changes, not commands or reads');
   }
 
+  // ── Test 7d: Pictures with ChatGPT — the turn reports the pictures its image tool made (the bundled app-server's
+  // `imageGeneration` item, with the file it saved), never a failed one; the next turn starts from nothing.
+  {
+    const { runtime, mock } = makeRuntime(['thread-a']);
+    let completed: { picturesMade?: unknown[]; pictureFailure?: string } | null = null;
+    await openTurn(runtime, 'conv-a', { ...dummyConfig, onCodexComplete: (result) => { completed = result; } });
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-p' } });
+    mock.emit('item/started', { threadId: 'thread-a', turnId: 'turn-p', item: { type: 'imageGeneration', id: 'ig1', status: 'inProgress' } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'imageGeneration', id: 'ig1', status: 'completed', revisedPrompt: 'a lake', savedPath: '/home/codex/generated_images/t/ig1.png', result: null } });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-p', status: 'completed', error: null } });
+    assert.deepStrictEqual(completed?.picturesMade, [{ savedPath: '/home/codex/generated_images/t/ig1.png' }]);
+    assert.strictEqual(completed?.pictureFailure, undefined);
+
+    completed = null;
+    mock.emit('turn/started', { threadId: 'thread-a', turn: { id: 'turn-q' } });
+    mock.emit('item/completed', { threadId: 'thread-a', item: { type: 'imageGeneration', id: 'ig2', status: 'failed', failure: { type: 'usageLimitExceeded', limitId: 'x', resetsAt: null }, savedPath: null } });
+    mock.emit('turn/completed', { threadId: 'thread-a', turn: { id: 'turn-q', status: 'completed', error: null } });
+    assert.strictEqual(completed?.picturesMade, undefined, 'a failed generation made no picture');
+    assert.strictEqual(completed?.pictureFailure, 'usageLimitExceeded');
+    console.log('✓ Test 7d: Pictures with ChatGPT — the image tool\'s saved picture, not a failed one');
+  }
+
   // ── Test 8: B1 REGRESSION — switching approval mode in one conversation must
   // not reset another's thread. `_threadApprovalKey` and the browser-tools
   // state were adapter scalars, so chat B switching Auto→Ask (or toggling

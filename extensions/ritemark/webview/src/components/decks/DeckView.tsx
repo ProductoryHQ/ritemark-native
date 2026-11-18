@@ -1427,6 +1427,16 @@ export function DeckView({
     caretPictureFor.current = atCaret ? id : null
     sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
   }, [editor, idOf, shown])
+  // Pictures with ChatGPT: a picture the host is making for the slide on the stage comes back as a saved one
+  // (`deck/image-saved`), so it is placed as a pasted picture is: in the words where the slide editor waits for it, or
+  // the slide's own beside or behind.
+  const onPictureComing = useCallback((atCaret: boolean): string | null => {
+    if (!editor) return null
+    const id = idOf(shown)
+    if (!id) return null
+    caretPictureFor.current = atCaret ? id : null
+    return id
+  }, [editor, idOf, shown])
 
   useEffect(() => onMessage(message => {
     // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
@@ -1928,6 +1938,7 @@ export function DeckView({
                   selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
                   onFocusTaken={titleSelected}
                   onPicture={onPicture}
+                  onPictureComing={onPictureComing}
                   // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
                   commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
                   onCommentOpened={commentOpened}
