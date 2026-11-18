@@ -41,6 +41,8 @@ import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
 import { SlashCommands } from '../../../extensions/SlashCommands'
+import { SlideCodeBlock } from '../../../extensions/CodeBlockWithCopyExtension'
+import { CodeFillPlaces } from '../../../extensions/codeFillPlaces'
 import type { BlockItemDef } from '../../../extensions/blockItems'
 import { FormattingBubbleMenu } from '../../FormattingBubbleMenu'
 import { themeStyle } from '../theme/themeVars'
@@ -350,8 +352,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     })],
     // 17 November: a picture whose file is gone is drawn as missing, with its name.
     image: SlidePicture,
+    // Sprint 163 PR 1: the Text document's code block, with Copy always shown and its ↗ Open in… beside it.
+    codeBlock: SlideCodeBlock,
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
+    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource)],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
@@ -724,6 +728,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           return
         case 'orderedList':
           chain().toggleOrderedList().command(ownStep).run()
+          return
+        case 'codeBlock':
+          // Sprint 163 PR 1: a prompt's code block, with its own Copy and ↗ Open in…
+          chain().setCodeBlock().command(ownStep).run()
           return
         case 'columns':
         case 'boxes':

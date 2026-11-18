@@ -36,7 +36,8 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
-import { parseDeck } from '../deckFormat';
+import { isOpenInOff, parseDeck } from '../deckFormat';
+import { openInBrowser } from '../openInLink';
 import { BUILT_IN_THEME, parseTheme, themePathOf, themeWithLogoAddresses, type DeckTheme } from '../deckTheme';
 import { deckThemeFor, resolveAssetsIn } from '../deckPages';
 import {
@@ -451,6 +452,14 @@ export class DeckPresenter implements vscode.Disposable {
       case 'present/stop':
         this.stop();
         return;
+      case 'present/copy':
+        // Sprint 163 PR 1: a code block's Copy, on the wall or the presenter view; not a move.
+        void Promise.resolve(vscode.env.clipboard.writeText(request.text)).catch(() => undefined);
+        return;
+      case 'present/open-in':
+        // Its ↗ Open in Claude or ChatGPT, in the person's own browser; not a move.
+        openInBrowser(request.url);
+        return;
       case 'present/presenter':
         await this.setPresenter(!running.presenter);
         return;
@@ -541,7 +550,7 @@ export class DeckPresenter implements vscode.Disposable {
   }
 
   /** The deck's look as its front matter has it now. */
-  private async look(running: Running): Promise<{ borderless: boolean; theme: DeckTheme; transition: DeckTransition }> {
+  private async look(running: Running): Promise<{ borderless: boolean; theme: DeckTheme; transition: DeckTransition; openIn: boolean }> {
     const text = running.origin.document.getText();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
@@ -551,7 +560,7 @@ export class DeckPresenter implements vscode.Disposable {
       const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
       running.theme = { path: themePath, value: themeWithLogoAddresses(theme, read.logo, read.logoAspect, read.secondLogo, read.secondLogoAspect) };
     }
-    return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value, transition: deckTransitionOf(text) };
+    return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value, transition: deckTransitionOf(text), openIn: !isOpenInOff(text) };
   }
 
   /** The pictures as a window's URIs, looked up on disk only when the document or the pictures changed. */
@@ -621,7 +630,7 @@ export class DeckPresenter implements vscode.Disposable {
     const view = running.session.view();
     // Before the wall has a state, the deck's look as it is now (the wall's first state then sends this view its own).
     const onWall = running.wallState;
-    const look = onWall ? { borderless: onWall.borderless, theme: onWall.theme } : await this.look(running);
+    const look = onWall ? { borderless: onWall.borderless, theme: onWall.theme, openIn: onWall.openIn } : await this.look(running);
     if (running.ended || running.presenter !== screen || serial !== running.presenterSerial) return;
     const assets = this.assets(running, screen, presenterPicturePaths(view, onWall?.slide));
     const twoDisplays = running.displays.length > 1;

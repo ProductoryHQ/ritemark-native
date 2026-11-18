@@ -5,6 +5,7 @@
  * Pure: no `vscode`, so the test decodes the same messages the host does.
  */
 
+import { isOpenInAddress } from './blocks/codeTools';
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
@@ -21,6 +22,8 @@ export const MAX_DECK_TEXT = 8 * 1024 * 1024;
 export const MAX_DECK_SLIDES = 10_000;
 
 export type DeckRequest =
+  /** Sprint 163 PR 1: a slide's ↗ Open in Claude or ChatGPT, in the person's own browser (only `openInAddresses`' own). */
+  | { type: 'deck/open-in'; url: string }
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
   | { type: 'deck/assets'; paths: string[] }
   /** The text of the theme file the deck names (project-relative). */
@@ -201,6 +204,11 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new DeckProtocolError('Message must be an object');
   const input = value as Record<string, unknown>;
   switch (input.type) {
+    case 'deck/open-in': {
+      exactKeys(input, ['type', 'url']);
+      if (!isOpenInAddress(input.url)) throw new DeckProtocolError('url must be an Open in address');
+      return { type: 'deck/open-in', url: input.url };
+    }
     case 'deck/assets': {
       exactKeys(input, ['type', 'paths']);
       if (!Array.isArray(input.paths) || input.paths.length > MAX_ASSET_PATHS) throw new DeckProtocolError('paths must be a short list');

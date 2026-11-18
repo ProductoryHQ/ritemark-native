@@ -6,12 +6,25 @@
  *
  * @see Sprint 14: Block Interactions
  * @see Sprint 46: Mermaid Diagram Rendering
+ *
+ * Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"): one code block for a
+ * Text document and a slide. Copy is a small pill at the block's top right (its icon and "Copy", then "Copied"), and it
+ * takes the whole block. It always shows, on a line of its own at the block's top right, the words under it. On a
+ * slide (`surface: 'slide'`) a round ↗
+ * ("Open in…") beside it opens Open in Claude and Open in ChatGPT, for a deck without `open-in: none`; the host opens
+ * the address in the person's own browser. The strip, the wall and the page draw the same controls from the one slide
+ * renderer (`src/decks/blocks/codeTools.ts`).
  */
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
-import { useState, useCallback, useEffect, useId, useRef } from 'react'
+import { useState, useCallback, useContext, useEffect, useId, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './ui/Icon'
+import { Button } from './ui/button'
+import { Tooltip } from './ui/tooltip'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu'
+import { COPIED_MS, DeckOpenInContext } from './decks/slide/codeToolsClick'
+import { CODE_TOOLS_WORDS, openInAddresses } from '../../../src/decks/blocks/codeTools'
 import { renderMermaid, renderMermaidToPngDataUrl } from '../lib/mermaid'
 import { sendToExtension } from '../bridge'
 
@@ -59,11 +72,16 @@ interface CodeBlockWithCopyProps {
       language?: string
     }
   }
+  /** The extension: `surface: 'slide'` on a slide (`SlideCodeBlock`), else a Text document's. */
+  extension?: { options?: { surface?: string } }
 }
 
-export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
+export function CodeBlockWithCopy({ node, extension }: CodeBlockWithCopyProps) {
   const [copied, setCopied] = useState(false)
-  const isMermaid = node.attrs.language === 'mermaid'
+  const onSlide = extension?.options?.surface === 'slide'
+  // A slide draws a Mermaid block as its code, as the wall and the page do (the renderer draws no diagram).
+  const isMermaid = !onSlide && node.attrs.language === 'mermaid'
+  const deckOpenIn = useContext(DeckOpenInContext)
 
   // Mermaid rendering state
   const [showCode, setShowCode] = useState(false)
@@ -111,11 +129,12 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
   }, [node.textContent, isMermaid, uniqueId])
 
   const handleCopy = useCallback(() => {
-    const text = node.textContent
+    // The block's words, without the empty line the editor keeps at a code block's end (Sprint 163 PR 1)
+    const text = node.textContent.replace(/\n$/, '')
     if (!text) return
     sendToExtension('copyToClipboard', { text })
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), COPIED_MS)
   }, [node.textContent])
 
   const toggleView = useCallback(() => {
@@ -529,23 +548,48 @@ export function CodeBlockWithCopy({ node }: CodeBlockWithCopyProps) {
     )
   }
 
-  // Non-mermaid code blocks: original behavior
+  // Every other code block: Copy, and on a slide its ↗ Open in… (Sprint 163 PR 1).
+  const words = node.textContent.replace(/\n$/, '')
+  const links = useMemo(() => (onSlide && deckOpenIn && words.trim() ? openInAddresses(words) : []), [onSlide, deckOpenIn, words])
   return (
     <NodeViewWrapper
       as="pre"
-      className="tiptap-code-block"
+      className={`tiptap-code-block cb${onSlide ? ' cb-on-slide' : ''}`}
       style={{ position: 'relative' }}
     >
-      <button
-        type="button"
-        onClick={handleCopy}
-        onMouseDown={(e) => e.preventDefault()}
-        className={`code-copy-btn ${copied ? 'copied' : ''}`}
-        data-tooltip={copied ? 'Copied!' : 'Copy code'}
-        aria-label={copied ? 'Copied!' : 'Copy code'}
-      >
-        <Icon name={copied ? 'check' : 'copy'} size={16} />
-      </button>
+      <span className="cb-tools" contentEditable={false}>
+        <Tooltip label={copied ? CODE_TOOLS_WORDS.copied : CODE_TOOLS_WORDS.copyTip}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleCopy}
+            onMouseDown={(e) => e.preventDefault()}
+            className={`cb-copy${copied ? ' ok' : ''}`}
+            aria-label={copied ? CODE_TOOLS_WORDS.copied : CODE_TOOLS_WORDS.copyTip}
+          >
+            <Icon name={copied ? 'check' : 'copy'} size={14} />
+            {copied ? CODE_TOOLS_WORDS.copied : CODE_TOOLS_WORDS.copy}
+          </Button>
+        </Tooltip>
+        {links.length ? (
+          <DropdownMenu modal={false}>
+            <Tooltip label={CODE_TOOLS_WORDS.openIn}>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" className="cb-open" aria-label={CODE_TOOLS_WORDS.openIn} onMouseDown={(e) => e.preventDefault()}>
+                  <Icon name="arrow-up-right" size={14} />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tooltip>
+            <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
+              {links.map((link) => (
+                <DropdownMenuItem key={link.id} onSelect={() => sendToExtension('deck/open-in', { url: link.href })}>
+                  {CODE_TOOLS_WORDS.item(link.label)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </span>
       <NodeViewContent as="code" />
     </NodeViewWrapper>
   )

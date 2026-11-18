@@ -16,6 +16,7 @@ import { presentTitleOf, type PresentSlide, type PresentView } from './presentSe
 import { transitionOf, type DeckTransition } from './deckTransition';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
 import { isTab, tabsOf, type WallTabs } from './wallTabs';
+import { COPY_MAX_TEXT, isOpenInAddress } from '../blocks/codeTools';
 
 export type { WallReveal };
 
@@ -126,6 +127,8 @@ export interface WallState {
   reveal: WallReveal | null;
   /** Sprint 163: the tab each Tabs block shows, as the presenter view chose it (`WallTabs`); empty: each its first. */
   tabs: WallTabs;
+  /** Sprint 163 PR 1: the code blocks' ↗ Open in… (false for a deck with `open-in: none`). */
+  openIn: boolean;
 }
 
 /**
@@ -175,6 +178,8 @@ export interface PresenterState {
   timer: WallTimer | null;
   /** Sprint 163: Now shows the tabs the wall shows (`WallTabs`). */
   tabs: WallTabs;
+  /** Sprint 163 PR 1: the code blocks' ↗ Open in… (false for a deck with `open-in: none`). */
+  openIn: boolean;
 }
 
 /** The host's answer to a typed number: the title of the slide with that number, or null when the deck has none. */
@@ -195,6 +200,10 @@ export type WallHostMessage = WallState | WallPeeked | PresenterState | WallPoin
 /** The wall's requests. */
 export type WallRequest =
   | { type: 'present/ready' }
+  /** Sprint 163 PR 1: a code block's Copy on the wall or the presenter view: its words to the clipboard. */
+  | { type: 'present/copy'; text: string }
+  /** Sprint 163 PR 1: its ↗ Open in Claude or ChatGPT, in the person's own browser (`openInAddresses`' own only). */
+  | { type: 'present/open-in'; url: string }
   | { type: 'present/next' }
   | { type: 'present/back' }
   | { type: 'present/first' }
@@ -278,7 +287,7 @@ export function wallPicturePaths(view: PresentView): string[] {
 /** The wall's state after a move. */
 export function wallStateOf(
   view: PresentView,
-  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition },
+  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition; openIn?: boolean },
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
@@ -308,6 +317,7 @@ export function wallStateOf(
     timer: timerOf(timer),
     reveal: revealOf(reveal),
     tabs: tabsOf(tabs),
+    openIn: look.openIn !== false,
   };
 }
 
@@ -326,7 +336,7 @@ export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): st
  */
 export function presenterStateOf(
   view: PresentView,
-  look: { borderless: boolean; theme: DeckTheme },
+  look: { borderless: boolean; theme: DeckTheme; openIn?: boolean },
   assets: Record<string, string>,
   session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null; reveal?: WallReveal | null; tabs?: readonly number[] },
   onWall?: WallSlide,
@@ -364,6 +374,7 @@ export function presenterStateOf(
     clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
     timer: timerOf(session.timer ?? null),
     tabs: tabsOf(session.tabs ?? []),
+    openIn: look.openIn !== false,
   };
 }
 
@@ -452,6 +463,10 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
       return exactKeys(input, ['type', 'minutes']) && (input.minutes === null || isTimerMinutes(input.minutes)) ? { type: 'present/timer', minutes: input.minutes as number | null } : null;
     case 'present/tab':
       return exactKeys(input, ['type', 'block', 'tab']) && isTab(input.block) && isTab(input.tab) ? { type: 'present/tab', block: input.block, tab: input.tab } : null;
+    case 'present/copy':
+      return exactKeys(input, ['type', 'text']) && typeof input.text === 'string' && input.text.length <= COPY_MAX_TEXT ? { type: 'present/copy', text: input.text } : null;
+    case 'present/open-in':
+      return exactKeys(input, ['type', 'url']) && isOpenInAddress(input.url) ? { type: 'present/open-in', url: input.url } : null;
     case 'present/pointer': {
       if (!exactKeys(input, ['type', 'at'])) return null;
       if (input.at === null) return { type: 'present/pointer', at: null };

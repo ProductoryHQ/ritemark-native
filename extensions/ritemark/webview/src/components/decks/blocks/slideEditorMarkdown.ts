@@ -95,7 +95,18 @@ export function ensureSlideCommentPipeline(): void {
 
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  return withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked))
+  return withoutCodeEndBreak(withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked)))
+}
+
+/**
+ * Sprint 163 PR 1: `marked` ends every code block's HTML with a line break of its own (`text\n</code></pre>`), which
+ * the editor would keep as an empty last line: on a slide that line made the block a line taller than the renderer
+ * draws it (the wall, the strip, the page), and Copy took it along. The break is marked's, never the file's (its
+ * tokenizer has already taken a code block's trailing breaks off), and the save writes the closing fence on its own
+ * line either way, so the file reads back as written.
+ */
+export function withoutCodeEndBreak(html: string): string {
+  return html.replace(/\n<\/code><\/pre>/g, '</code></pre>')
 }
 
 /**

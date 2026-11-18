@@ -80,7 +80,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'tabs', 'theme', 'timer', 'transition', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'openIn', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'tabs', 'theme', 'timer', 'transition', 'type']);
   // README item 18: no step unless the host gives one, and only a step that is one gets through.
   assert.equal(state.reveal, null);
   assert.deepEqual(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, { shown: 2, count: 4 }).reveal, { shown: 2, count: 4 });
@@ -210,7 +210,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'nextIsItem', 'nextReveal', 'page', 'position', 'reveal', 'skipped', 'slides', 'spot', 'startedAt', 'tabs', 'theme', 'timer', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'nextIsItem', 'nextReveal', 'openIn', 'page', 'position', 'reveal', 'skipped', 'slides', 'spot', 'startedAt', 'tabs', 'theme', 'timer', 'type', 'wallDisplay']);
   assert.equal(first.spot, null);
   assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, focus: { spot: 1, fill: null } }).spot, 1, 'Now shows the wall\'s spotlight');
   assert.equal(first.blank, null);

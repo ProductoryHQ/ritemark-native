@@ -153,6 +153,52 @@
 .deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
 .deck-sl.is-blocks pre { margin: 0 0 .55em; padding: .6em .8em; border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }
 .deck-sl.is-blocks pre code { padding: 0; background: none; }
+/* Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"; workbook.html v9's `.cb`
+   and `code-block-line.png`, 18 November): Copy and a round ↗ (Open in…) on a line of their own at the block's top
+   right, the words under them at the block's full width. The same in the slide editor (`CodeBlockWithCopy`,
+   `surface: 'slide'`) and wherever the renderer draws the slide (`codeTools.ts`): the strip, the wall, the presenter
+   view and the page. Sizes are the drawing's canvas pixels times the fit (`--fit`), so the fit takes them too: the
+   line padded 8 px at its top and right, 6 px between Copy and ↗, the words 6 px under it, the block padded 16 px at
+   its sides and 14 px at its foot.
+   The block takes the code's own type and the slide's text colour, so its lines are the code's wherever it is drawn. */
+.deck-sl.is-blocks pre.cb { padding: 0 calc(16px * var(--fit, 1)) calc(14px * var(--fit, 1)); color: var(--s-tx, #E4E6F7); font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; }
+.deck-sl.is-blocks pre.cb > code { display: block; overflow: visible; color: inherit; font: inherit; }
+.deck-sl.is-blocks .cb-tools { position: relative; z-index: 1; display: flex; justify-content: flex-end; align-items: center; gap: calc(6px * var(--fit, 1));
+  margin: 0 calc(-8px * var(--fit, 1)) calc(6px * var(--fit, 1)) 0; padding-top: calc(8px * var(--fit, 1));
+  font: 600 calc(13.5px * var(--fit, 1))/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+/* Both are the same round, translucent buttons (the lead, 18 November): the slide's heading ink at 12 %, 22 % under the
+   pointer, 30 % pressed or open. On a dark ground that ink is white, as drawn; on a light ground it is the theme's dark
+   heading ink at the same strengths. The keyboard's ring is the theme's accent (#F2B544 in the drawing's theme). */
+.deck-sl.is-blocks .cb-copy, .deck-sl.is-blocks .cb-open { display: inline-flex; align-items: center; justify-content: center; gap: calc(6px * var(--fit, 1));
+  height: calc(28px * var(--fit, 1)); min-width: 0; margin: 0; padding: 0 calc(12px * var(--fit, 1)); border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--s-hd, #fff) 12%, transparent); color: var(--s-hd, #fff); font: inherit; box-shadow: none; transform: none; }
+.deck-sl.is-blocks .cb-open { width: calc(28px * var(--fit, 1)); padding: 0; border-radius: 50%; }
+.deck-sl.is-blocks .cb-copy > span { display: inline-flex; align-items: center; gap: calc(6px * var(--fit, 1)); }
+.deck-sl.is-blocks .cb-copy .cb-w2, .deck-sl.is-blocks .cb-copy.ok .cb-w1 { display: none; }
+.deck-sl.is-blocks .cb-copy.ok .cb-w2 { display: inline-flex; }
+.deck-sl.is-blocks .cb-tools svg { width: calc(15px * var(--fit, 1)); height: calc(15px * var(--fit, 1)); flex: none; fill: currentColor; color: currentColor; }
+.deck-sl.is-blocks .cb-copy:hover, .deck-sl.is-blocks .cb-open:hover { background: color-mix(in srgb, var(--s-hd, #fff) 22%, transparent); color: var(--s-hd, #fff); }
+.deck-sl.is-blocks .cb-copy:active, .deck-sl.is-blocks .cb-open:active, .deck-sl.is-blocks .cb-open[aria-expanded="true"], .deck-sl.is-blocks .cb-open[data-state="open"] {
+  background: color-mix(in srgb, var(--s-hd, #fff) 30%, transparent); color: var(--s-hd, #fff); }
+/* Copied is said in ink, by its check and its word (green is only the ready dot, #578). */
+:where(:root:not([data-input-mode="pointer"])) .deck-sl.is-blocks .cb-copy:focus-visible, :where(:root:not([data-input-mode="pointer"])) .deck-sl.is-blocks .cb-open:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: 2px; }
+/* The ↗'s tooltip where the renderer draws it (the slide editor's is ui/tooltip.tsx's); none while its menu is open. */
+.deck-sl.is-blocks .cb-open[data-tip] { position: relative; }
+.deck-sl.is-blocks .cb-open[data-tip]:hover::after { content: attr(data-tip); position: absolute; top: calc(100% + .45em); right: 0; padding: .35em .65em; border-radius: .4em;
+  background: var(--s-nm, #1C1F4A); color: var(--s-hd, #fff); box-shadow: inset 0 0 0 1px var(--s-ring, rgba(255,255,255,.18)); font-weight: 500; white-space: nowrap; pointer-events: none; }
+.deck-sl.is-blocks .cb-open[aria-expanded="true"]::after { display: none; }
+/* The ↗'s menu where the renderer draws it (the wall, the presenter view, the page); the slide editor's is the app's. */
+.deck-sl.is-blocks .cb-menu { position: absolute; top: calc(100% + .4em); right: 0; display: flex; flex-direction: column; min-width: 11.5em; padding: .3em;
+  border-radius: .7em; background: var(--s-nm, #1C1F4A); box-shadow: inset 0 0 0 1px var(--s-ring, rgba(255,255,255,.18)), 0 .6em 1.6em rgba(0,0,0,.28); }
+.deck-sl.is-blocks .cb-menu[hidden] { display: none; }
+.deck-sl.is-blocks .cb-menu.is-up { top: auto; bottom: calc(100% + .4em); }
+.deck-sl.is-blocks .cb-item { display: block; padding: .55em .8em; border-radius: .45em; color: var(--s-hd, #fff); font: inherit; text-decoration: none; }
+.deck-sl.is-blocks .cb-item:hover { background: var(--s-ring, rgba(255,255,255,.18)); }
+/* A thumbnail's controls are drawn, never pressed: a click there is the thumbnail's (the strip, the wall's grid, the
+   presenter view's row and Next). The stage's slide and Now take them. */
+.deck-thumb .cb-tools, .wall-grid .cb-tools, .pv-row .cb-tools, .pv-side .cb-tools { pointer-events: none; }
+/* A place to fill in, [like this]: in the accent, so the reader knows to change it after pasting. */
+.deck-sl.is-blocks .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }

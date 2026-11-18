@@ -42,6 +42,7 @@ import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
 import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, type PublicSlide } from './publicDeck';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { PAGE_SCRIPT } from './pageScript';
+import { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses } from '../blocks/codeTools';
 
 export { lexHandout };
 
@@ -158,27 +159,9 @@ function ownItemsAreSteps(body: string): boolean {
   return false;
 }
 
-/**
- * Decks README item 10: a prompt opens in Claude or ChatGPT with its words already in the box. These are links the
- * reader chooses to follow, in a new tab; the page fetches nothing from these hosts and loads nothing from them, so
- * the Content Security Policy is unchanged (a link is not a load).
- */
-export const OPEN_IN_HOSTS = [
-  { label: 'Claude', base: 'https://claude.ai/new?q=' },
-  { label: 'ChatGPT', base: 'https://chatgpt.com/?q=' },
-] as const;
-
-/** Longer addresses than this are left out (Copy stays): browsers and the two hosts cut or refuse long ones. */
-export const OPEN_IN_MAX_ADDRESS = 8000;
-
-/** The prompt's "Open in" addresses, or none when either would be longer than `OPEN_IN_MAX_ADDRESS`. */
-export function openInAddresses(prompt: string): Array<{ label: string; href: string }> {
-  let words: string;
-  // A lone surrogate can't be encoded: that prompt keeps Copy only.
-  try { words = encodeURIComponent(prompt); } catch { return []; }
-  const links = OPEN_IN_HOSTS.map(host => ({ label: host.label, href: host.base + words }));
-  return links.some(link => link.href.length > OPEN_IN_MAX_ADDRESS) ? [] : links;
-}
+// Decks README item 10: a prompt opens in Claude or ChatGPT with its words already in the box. The links are built in
+// one place for the handout's prompts and the slides' code blocks (Sprint 163 PR 1, `codeTools.ts`).
+export { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses };
 
 /** The renderer for one part's handout: `partKey` makes its ticks' ids. */
 class HandoutRenderer extends marked.Renderer {
@@ -613,7 +596,7 @@ export const PRINT_CSS = `
   @page { margin: 14mm 15mm; }
   html, body { background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; }
-  .top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open { display: none !important; }
+  .top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open, .cb-tools { display: none !important; }
   .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0; gap: 0; }
   .stage, .slidebox, .text { display: contents; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
@@ -830,6 +813,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   const count = deck.slides.length;
   // Small details 14: an Agenda lists the page's sections as they are, with no progress and no hint when there are none.
   const agenda = { entries: agendaOf(deck.slides.map((slide, index) => ({ kind: slide.kind, data: slide.data, number: index + 1 }))), hint: false };
+  // A deck's `open-in: none` leaves out the prompts' "Open in" links, on its slides and in its text; every other deck has them.
+  const openIn = deck.openInOff !== true;
   const layers = deck.slides.map((slide, index) => {
     const drawing = {
       theme,
@@ -837,14 +822,13 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       step: slide.step,
       pictureUrl: (picture: string) => options.pictureUrl(picture, 'slide'),
       agenda,
+      openIn,
     };
     // A block slide through the one block renderer (Sprint 161), a v1 slide through its layout, as the deck view draws them.
     const markup = isBlockSlide(slide.kind) ? blockSlideMarkup(slide.data, drawing) : slideMarkup(slide.kind, slide.data as SlideData, drawing);
     return `<div class="layer${index === 0 ? ' on' : ''}" data-title="${esc(titleOf(slide))}">${markup}</div>`;
   });
   const first = deck.slides[0];
-  // A deck's `open-in: none` leaves out the prompts' "Open in" links; every other deck has them.
-  const openIn = deck.openInOff !== true;
   const preamble = handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: options.pictureUrl, openIn });
   // A tick's id is its part's title (with which part of that title it is) and the step's words, never the part's place:
   // a slide added before an exercise keeps its ticks, and two exercises with one title keep theirs apart.

@@ -28,6 +28,8 @@ export interface SlidePictureInput {
   missing?: ReadonlySet<string>
   /** Small details 14: the deck's sections, for an Agenda slide (its own React root has no deck view around it). */
   agenda?: AgendaDrawing | null
+  /** Sprint 163 PR 1: the code blocks' ↗ (off for a deck with `open-in: none`), as the deck view draws the slide. */
+  openIn?: boolean
 }
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -136,7 +138,7 @@ export async function renderSlidePicture(input: SlidePictureInput): Promise<Blob
   try {
     flushSync(() => root.render(
       <AgendaContext.Provider value={input.agenda ?? null}>
-        <SlideCanvas kind={input.kind} data={input.data} width={PICTURE_WIDTH} theme={input.theme} borderless={input.borderless} assets={input.assets} missing={input.missing} />
+        <SlideCanvas kind={input.kind} data={input.data} width={PICTURE_WIDTH} theme={input.theme} borderless={input.borderless} assets={input.assets} missing={input.missing} openIn={input.openIn} />
       </AgendaContext.Provider>,
     ))
     // Its fonts and pictures loaded, then the fit measured again with them (a frame for each pass).

@@ -64,7 +64,7 @@ assert.deepEqual(titles(text, 'drawio'), ['Diagram'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'h1'), ['Title'])
 
 // Names that start with the query come first, then the other matches, each in the menu's own order.
-assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Tabs', 'Agenda', 'Picture', 'New slide below'])
+assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Code block', 'Tabs', 'Agenda', 'Picture', 'New slide below'])
 assert.deepEqual(titles(text, 'ta'), ['Task List', 'Table', 'Tabs', 'Bullet List'])
 assert.deepEqual(titles(text, 'title'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'grid'), ['Boxes', 'Table'])

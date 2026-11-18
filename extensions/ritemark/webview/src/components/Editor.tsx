@@ -10,6 +10,7 @@ import { sendToExtension, onMessage } from '../bridge'
 import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../lib/pastedImage'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
+import { CodeFillPlaces } from '../extensions/codeFillPlaces'
 import { isRelativeImagePath, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
@@ -174,6 +175,8 @@ export function Editor({
       image: ImageExtension,
       afterImage: [
         SlashCommands,
+        // Sprint 163 PR 1: a prompt's places to fill in, [like this], marked as on a slide (decorations only).
+        CodeFillPlaces,
         FileLinkSuggestions,
         SearchExtension,
         DictationPlaceholder,
@@ -1178,7 +1181,61 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-class { color: #e5c07b !important; }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-id { color: #61afef !important; }
 
-        /* Code block copy button (icon-only, ghost button per Ritemark design) */
+        /* Sprint 163 PR 1 (workbook.html v9, code-block-line.png): Copy on a line of its own at the block's top right,
+           the same round, translucent button as a slide's (slide.css .cb-copy): white at 12 %, 22 % under the pointer,
+           30 % pressed, a 2 px #F2B544 ring for the keyboard. The line is padded 8 px at its top and right, the words
+           start 6 px under it at the block's full width, and the block is padded 16 px at its sides and 14 px at its
+           foot. Its places to fill in are marked as on a slide (codeFillPlaces.ts). The tooltip is ui/tooltip.tsx's. */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.cb {
+          padding: 0 16px 14px !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools {
+          position: relative !important;
+          z-index: 1 !important;
+          display: flex !important;
+          justify-content: flex-end !important;
+          align-items: center !important;
+          gap: 6px !important;
+          margin: 0 -8px 6px 0 !important;
+          padding-top: 8px !important;
+          user-select: none !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy {
+          height: 28px !important;
+          padding: 0 12px !important;
+          gap: 6px !important;
+          border: 0 !important;
+          border-radius: 999px !important;
+          background: rgba(255, 255, 255, 0.12) !important;
+          color: #fff !important;
+          font: 600 13.5px/1 'Sofia Sans', var(--ritemark-ui-font-family), sans-serif !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy svg {
+          width: 15px !important;
+          height: 15px !important;
+          color: currentColor !important;
+          fill: currentColor !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy:hover {
+          background: rgba(255, 255, 255, 0.22) !important;
+          color: #fff !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy:active {
+          background: rgba(255, 255, 255, 0.3) !important;
+        }
+        :where(:root:not([data-input-mode="pointer"])) .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy:focus-visible {
+          outline: 2px solid #F2B544 !important;
+          outline-offset: 2px !important;
+          box-shadow: none !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block mark.cb-fill {
+          padding: 0 3px !important;
+          border-radius: 4px !important;
+          background: rgba(242, 181, 68, 0.2) !important;
+          color: #FFD27A !important;
+        }
+
+        /* A Mermaid diagram's toolbar buttons (icon-only, ghost button per Ritemark design) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn {
           position: absolute !important;
           top: 8px !important;
