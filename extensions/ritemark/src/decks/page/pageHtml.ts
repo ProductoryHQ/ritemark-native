@@ -37,7 +37,7 @@ import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
 import { agendaOf, blockRevealCount, blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
-import { themeStyle, themeVars, wallGround } from '../../../webview/src/components/decks/theme/themeVars';
+import { mix, themeStyle, themeVars, wallGround } from '../../../webview/src/components/decks/theme/themeVars';
 import { groundOf } from '../deckTheme';
 import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
 import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, type PublicSlide } from './publicDeck';
@@ -86,6 +86,11 @@ export interface PageOptions {
    * place, as the deck view does.
    */
   pictureUrl: PictureUrl;
+  /**
+   * Sprint 163 PR 4: the deck's file name without `.deck.md`, used only hashed, in the reader's storage key for a deck with
+   * no title of its own (`pageHtml`). Never on the page.
+   */
+  name?: string;
 }
 
 /** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
@@ -429,6 +434,7 @@ svg { flex: none; }
 .layer:not(.on):not(.leaving) { display: none; }
 .layer.leaving { pointer-events: none; z-index: 0; }
 .layer.on { z-index: 1; }
+.layer:focus { outline: none; }
 .layer > .deck-slide { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .layer .deck-sl { transform: scale(var(--k, .6)); background: transparent; }
 /* A picture Behind, Left or Right runs past the 16:9 area to the window's edges on its side, as on the wall (wall.css). */
@@ -470,7 +476,7 @@ svg { flex: none; }
 .toc button.on { background: #FFF5DE; }
 .toc .n { width: 22px; flex: none; text-align: right; font-weight: 700; color: #6B6F94; font-variant-numeric: tabular-nums; }
 .toc .sec { font-weight: 700; }
-.toc .tag, .part .lab .tag { min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; padding: 1px 8px; border-radius: 10px; background: #FFF0CC; color: #8A5A00; font: 700 11px/18px 'Sofia Sans', sans-serif; letter-spacing: .4px; text-transform: uppercase; }
+.toc .tag { min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; padding: 1px 8px; border-radius: 10px; background: #FFF0CC; color: #8A5A00; font: 700 11px/18px 'Sofia Sans', sans-serif; letter-spacing: .4px; text-transform: uppercase; }
 .toc .tag { margin-left: auto; }
 .toc .done { margin-left: auto; color: #B07A12; display: none; }
 .toc button.finished .done { display: inline-flex; }
@@ -481,11 +487,10 @@ svg { flex: none; }
 .side .sclose[data-tip]:hover::after, .side .sclose[data-tip]:focus-visible::after { bottom: auto; top: calc(100% + 6px); }
 .side > .part, .side > .pre { display: none; }
 .side > .on { display: block; }
-.side .part h2:first-child, .side .part .lab:first-child + h2 { margin-right: 40px; }
+.side .part h2:first-child { margin-right: 40px; }
 .pre h1, .pre h2, .pre h3, .pre h4, .pre h5 { font-family: var(--fh); color: var(--ink); }
 .pre { padding: 0 0 18px; }
 .part { padding: 0; }
-.part .lab { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--label); }
 .part h2 { margin: 0 0 12px; font: 700 22px/1.25 var(--fh); color: var(--ink); text-wrap: balance; }
 .part h3 { margin: 18px 0 8px; font: 700 18px/1.3 var(--fh); color: var(--ink); }
 .part h4, .part h5 { margin: 16px 0 6px; font: 700 16px/1.35 var(--fh); color: var(--ink); }
@@ -577,17 +582,17 @@ svg { flex: none; }
 /* The ticks (the decks README, "The ticks stay"; the Experience lead's workbook-ticks.png): on the page only, a step's
    number is a checkbox. 38 x 38 on the 960 slide with a 9 radius; under the pointer an inset accent ring, pressed a
    stronger fill, the keyboard's 2 px accent ring; ticked, a check on the accent and the step's words go quiet. */
-.deck-sl.is-blocks .blk-steps ol > li:has(> .tick)::before { content: none; }
-.deck-sl.is-blocks .blk-steps .tick { position: absolute; left: 0; top: calc(-2px * var(--fit, 1)); width: calc(38px * var(--fit, 1)); height: calc(38px * var(--fit, 1)); display: grid; place-items: center; border-radius: calc(9px * var(--fit, 1)); background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 calc(18px * var(--fit, 1))/1 var(--s-fh, 'Sofia Sans'), sans-serif; transition: background-color .12s, color .12s, box-shadow .12s; }
-.deck-sl.is-blocks .blk-steps .tick svg { display: none; width: calc(20px * var(--fit, 1)); height: calc(20px * var(--fit, 1)); }
-.deck-sl.is-blocks .blk-steps .tick:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--s-acc, #F2B544) 65%, transparent); }
-.deck-sl.is-blocks .blk-steps .tick:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 32%, transparent); }
-.deck-sl.is-blocks .blk-steps .tick:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: 2px; }
-.deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] { background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); }
-.deck-sl.is-blocks .blk-steps .tick[aria-checked="true"]:hover { box-shadow: inset 0 0 0 1.5px rgba(28,31,74,.35); }
-.deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] .tick-n { display: none; }
-.deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] svg { display: block; }
-.deck-sl.is-blocks .blk-steps ol > li.done, .deck-sl.is-blocks .blk-steps ol > li.done > * { color: var(--quiet); }
+.layer .deck-sl.is-blocks .blk-steps ol > li:has(> .tick)::before { content: none; }
+.layer .deck-sl.is-blocks .blk-steps .tick { position: absolute; left: 0; top: calc(-2px * var(--fit, 1)); width: calc(38px * var(--fit, 1)); height: calc(38px * var(--fit, 1)); display: grid; place-items: center; border-radius: calc(9px * var(--fit, 1)); background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 calc(18px * var(--fit, 1))/1 var(--s-fh, 'Sofia Sans'), sans-serif; transition: background-color .12s, color .12s, box-shadow .12s; }
+.layer .deck-sl.is-blocks .blk-steps .tick svg { display: none; width: calc(20px * var(--fit, 1)); height: calc(20px * var(--fit, 1)); }
+.layer .deck-sl.is-blocks .blk-steps .tick:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--s-acc, #F2B544) 65%, transparent); }
+.layer .deck-sl.is-blocks .blk-steps .tick:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 32%, transparent); }
+.layer .deck-sl.is-blocks .blk-steps .tick:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: 2px; }
+.layer .deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] { background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); }
+.layer .deck-sl.is-blocks .blk-steps .tick[aria-checked="true"]:hover { box-shadow: inset 0 0 0 1.5px rgba(28,31,74,.35); }
+.layer .deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] .tick-n { display: none; }
+.layer .deck-sl.is-blocks .blk-steps .tick[aria-checked="true"] svg { display: block; }
+.layer .deck-sl.is-blocks .blk-steps ol > li.done, .layer .deck-sl.is-blocks .blk-steps ol > li.done > :not(.tick) { color: var(--quiet); }
 /* A Tabs block's tabs are the reader's to choose (Sprint 163 PR 2; the decks README, "Tabs are a block of their own"):
    the others brighter under the pointer, a soft fill when pressed, the keyboard's accent ring. */
 .layer .deck-sl.is-blocks .blk-tab:not(.is-active):hover { color: var(--s-hd, #fff); background: color-mix(in srgb, var(--s-hd, #fff) 5%, transparent); }
@@ -632,8 +637,8 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks table { display: block; overflow-x: auto; max-width: 100%; }
   .layer.flow .deck-sl.is-blocks .blk-pic { max-height: 60vh; }
   .layer.flow .deck-sl.is-blocks .blk-steps ol > li { padding-left: 46px; min-height: 32px; margin-bottom: .7em; }
-  .layer.flow .deck-sl.is-blocks .blk-steps .tick { width: 32px; height: 32px; top: -3px; border-radius: 8px; font-size: 16px; }
-  .layer.flow .deck-sl.is-blocks .blk-steps .tick svg { width: 17px; height: 17px; }
+  .layer.flow .layer .deck-sl.is-blocks .blk-steps .tick { width: 32px; height: 32px; top: -3px; border-radius: 8px; font-size: 16px; }
+  .layer.flow .layer .deck-sl.is-blocks .blk-steps .tick svg { width: 17px; height: 17px; }
   .side { position: relative; inset: auto; z-index: 1; width: auto; padding: 4px 16px calc(var(--line-h) + 16px); background: none; box-shadow: none; overflow: visible; }
   .side .sclose { display: none; }
   .line { background: var(--lbar); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 -1px 0 var(--lsep); padding-left: 16px; }
@@ -649,7 +654,7 @@ svg { flex: none; }
   #tocbtn { width: 32px; padding: 0; justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .prog i, .fb, .restart, .deck-sl.is-blocks .blk-steps .tick { transition: none; animation: none; }
+  .prog i, .fb, .restart, .layer .deck-sl.is-blocks .blk-steps .tick { transition: none; animation: none; }
 }
 `;
 
@@ -689,18 +694,16 @@ export const PRINT_CSS = `
      break below a slide drew a sliver of it at the foot of the page. */
   .layer > .deck-slide { position: relative; inset: auto; display: block; width: 576px; height: 324px; overflow: hidden; }
   .layer .deck-sl { position: absolute; transform: none !important; zoom: 0.6; width: 960px; height: 540px; overflow: hidden; }
-  .layer .deck-sl.is-blocks .blk-flow { position: absolute; inset: auto; top: 46px; left: 64px; right: 64px; bottom: 34px; font-size: calc(24px * var(--fit, 1)); overflow: hidden; }
   .layer .deck-sl [data-reveal-hidden] { visibility: visible; }
   .layer .deck-sl.is-blocks .photo { top: 0; bottom: 0; }
   .layer .deck-sl.is-blocks.pic-left .photo { left: 0; width: 384px; }
   .layer .deck-sl.is-blocks.pic-right .photo { right: 0; width: 384px; }
   .layer .deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
   .layer .deck-sl.is-blocks.pic-behind .veil { inset: 0; }
-  .layer .deck-sl.is-blocks .blk-steps .tick { box-shadow: none; }
+  .layer .layer .deck-sl.is-blocks .blk-steps .tick { box-shadow: none; }
   .side > .part, .side > .pre { display: block; }
   .side > .part.only { display: none; }
   .part { padding: 0 0 7mm; margin: 0; border-top: 0; break-inside: avoid; page-break-inside: avoid; }
-  .part .lab .tag { background: none; padding: 0; }
   .sect { margin: 0 0 6mm; padding: 0 0 4mm; border-radius: 0; background: none; border-bottom: 1.5px solid #DADCE4; break-after: avoid; page-break-after: avoid; }
   .part h2 { font-size: 15pt; margin-right: 0 !important; }
   .sect h2 { font-size: 17pt; }
@@ -767,7 +770,7 @@ function pageColours(deck: PublicDeck): string {
     text: on.tx,
     muted: on.sub,
     label: on.acct,
-    link: dark ? mixColour(deck.theme.accent, '#FFFFFF', 0.35) : on.hd,
+    link: dark ? mix(deck.theme.accent, '#FFFFFF', 0.35) : on.hd,
     // Sprint 163 PR 3: the words on a button in the accent (the Steps pill's ink).
     onacc: on.tagfg,
     accent: deck.theme.accent,
@@ -799,15 +802,6 @@ function pageColours(deck: PublicDeck): string {
   // Theme values are colours and font names from a fixed list (deckTheme.ts, themeVars.ts); `<` can't close the style.
   // The slide's own properties are the page's too, so the line's tick and accent read the same values the slide does.
   return `:root{${page};${slide}}\n.deck-slide{${slide}}`.replace(/</g, '\\3c ');
-}
-
-/** `a` taken toward `b` by `amount` (0 to 1), for two #RRGGBB colours; `a` as it is for anything else. */
-function mixColour(a: string, b: string, amount: number): string {
-  const read = (hex: string) => (/^#[0-9a-f]{6}$/i.test(hex) ? [1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)) : null);
-  const from = read(a);
-  const to = read(b);
-  if (!from || !to) return a;
-  return `#${from.map((value, index) => Math.round(value + (to[index] - value) * amount).toString(16).padStart(2, '0')).join('')}`;
 }
 
 function fontFaces(fonts: PageFont[], themeFonts: readonly PageThemeFont[] = []): string {
@@ -978,6 +972,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       items > 0 ? `data-items="${items}"` : '',
       isExercise(slide) ? 'data-exercise=""' : '',
       'role="group"',
+      'tabindex="-1"',
       'aria-roledescription="slide"',
       `aria-label="${esc(label)}"`,
       index === 0 ? '' : 'aria-hidden="true"',
@@ -990,7 +985,10 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // Small details 13 (18 November): the sections printed as their bands (a section whose part shows nothing keeps its slide).
   const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && !slideOnly[index] ? [index] : [])));
   const parts = deck.slides.map((slide, index) => partHtml(slide, index, options, keys[index], deck.textHandout === true, slideOnly[index], openIn));
-  const pageKey = shortHash(`${deck.client}\u0000${deck.title}`);
+  // The reader's storage is the page's own: its client and session, or, for a deck with no title of its own, its file's
+  // name, hashed (never on the page), so two such decks in one folder keep their ticks and places apart. It is the key
+  // such a page had before Sprint 163 PR 4, when its title was the file's name.
+  const pageKey = shortHash(`${deck.client}\u0000${deck.title || options.name || ''}`);
   const who = `<div class="who"><b>${esc(deck.client)}</b>${deck.title ? `<span>${esc(deck.title)}</span>` : ''}</div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
   // Small details 13: the printed handout's footer carries the page's address (the script writes it; never on screen).

@@ -197,7 +197,7 @@ const TICK_CHECK = iconSvg('check', 20);
 
 /**
  * Sprint 163 PR 4: the published page's ticks. Each step of the Steps block's own numbered list (its first top-level
- * `<ol>`, as `markListItems` reads it) opens with a checkbox over its number: `data-step="<block>.<step>"`, so the page
+ * `<ol>`, as `markListItems` reads it) ends with a checkbox drawn over its number: `data-step="<block>.<step>"`, so the page
  * keeps it per deck, slide and step. Not ticked when drawn: the page's script reads the reader's own ticks.
  */
 function tickListItems(html: string, block: number): string {
@@ -209,9 +209,13 @@ function tickListItems(html: string, block: number): string {
   return html.replace(/<(\/?)(ul|ol|li)\b([^>]*)>/g, (tag, close: string, name: string) => {
     if (done) return tag;
     if (name === 'li') {
-      if (!marking || close || depth !== 1) return tag;
-      step += 1;
-      return `${tag}<button class="tick" type="button" role="checkbox" aria-checked="false" aria-label="Step ${step} done" data-step="${block}.${step}"><span class="tick-n">${step}</span>${TICK_CHECK}</button>`;
+      if (!marking || depth !== 1) return tag;
+      if (!close) {
+        step += 1;
+        return tag;
+      }
+      // Last in its step, so the step's own first element keeps the step's first-line style (slide.css).
+      return `<button class="tick" type="button" role="checkbox" aria-checked="false" aria-label="Step ${step} done" data-step="${block}.${step}"><span class="tick-n">${step}</span>${TICK_CHECK}</button>${tag}`;
     }
     if (close) {
       depth -= 1;

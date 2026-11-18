@@ -220,7 +220,7 @@ export interface BuiltPage {
 }
 
 function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: readonly number[]): PublicDeck {
-  return publicDeck(text, { folderName: path.basename(path.dirname(deckPath)), deckName: deckNameOf(deckPath), theme, steps });
+  return publicDeck(text, { folderName: path.basename(path.dirname(deckPath)), theme, steps });
 }
 
 /**
@@ -238,7 +238,7 @@ export async function buildDeckPage(
   // by an app without them, reads as changed once they can go.
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
   const digest = pageDigest(deck, [...urls.values(), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null });
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
   return { deck, digest, html };
 }
 

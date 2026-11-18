@@ -25,7 +25,7 @@
  * HTML (text goes in through `textContent`), so 2.2's gather sees every file the page uses and its
  * `scriptBuildsReferences` stays false (the test checks).
  */
-import { MOTION_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { EASE_IN_OUT, EASE_OUT, MOTION_MS, REVEAL_MS, REVEAL_RISE, ROW, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
 
 import { PAGE_TABS_FIT } from '../blocks/tabsFit';
 
@@ -37,7 +37,8 @@ import { PAGE_TABS_FIT } from '../blocks/tabsFit';
 export const PAGE_MOTION_RULE = String.raw`
   var MOTION = { fade: ${MOTION_MS.fade}, push: ${MOTION_MS.push}, zoom: ${MOTION_MS.zoom} };
   var ZOOM_FROM = ${ZOOM_FROM}, REVEAL_MS = ${REVEAL_MS}, REVEAL_RISE = ${REVEAL_RISE};
-  var ROW_GAP = 70, ROW_MIN_GAP = 28, ROW_SPAN = 480, ROW_LAST = 13, ROW_MS = 480, ROW_RISE = 14, ROW_ZOOM = 0.92, LEAVE_MS = 150, PUSH_ROW_GAP = 30, PUSH_MS = 500;
+  var ROW_GAP = ${ROW.gap}, ROW_MIN_GAP = ${ROW.minGap}, ROW_SPAN = ${ROW.span}, ROW_LAST = ${ROW.last}, ROW_MS = ${ROW.ms}, ROW_RISE = ${ROW.rise}, ROW_ZOOM = ${ROW.zoom}, LEAVE_MS = ${ROW.leaveMs}, PUSH_ROW_GAP = ${ROW.pushGap}, PUSH_MS = ${MOTION_MS.push};
+  var EASE_OUT = '${EASE_OUT}', EASE_IN_OUT = '${EASE_IN_OUT}';
   // When each of a slide's n pieces starts, after the lead.
   function rowDelays(n, lead, push) {
     var gap = push ? PUSH_ROW_GAP : n <= 8 ? ROW_GAP : Math.max(ROW_MIN_GAP, Math.round(ROW_SPAN / (n - 1)));
@@ -189,7 +190,10 @@ const PAGE_BEHAVIOUR = String.raw`
     if (wrap) wrap.classList.toggle('more-open', showSide);
     if (!wide) {
       frame.style.left = frame.style.top = frame.style.width = frame.style.height = '';
-      frame.style.removeProperty('--k');
+      // A slide drawn as a picture (a kind this build doesn't lay out in one column) keeps its scale at the column's width.
+      frame.style.setProperty('--k', String(Math.max(0, frame.getBoundingClientRect ? frame.getBoundingClientRect().width : window.innerWidth - 32) / 960));
+      frame.style.removeProperty('--bleed-x');
+      frame.style.removeProperty('--bleed-y');
       return;
     }
     var areaW = Math.max(0, window.innerWidth - (showSide ? sw : 0)), areaH = Math.max(0, window.innerHeight - LINE_H);
@@ -223,7 +227,6 @@ const PAGE_BEHAVIOUR = String.raw`
     running.push(element.animate(keyframes, { duration: ms, delay: delay || 0, easing: easing || 'ease', fill: 'backwards' }));
     return (delay || 0) + ms;
   }
-  var EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)', EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)';
   // A slide's pieces in reading order (README item 20): the title, a paragraph, each point of a list, each box, step and
   // column, a table, a picture in the words. An item not shown yet waits; the logo never moves.
   function piecesOf(layer) {
@@ -323,6 +326,9 @@ const PAGE_BEHAVIOUR = String.raw`
     index = Math.max(0, Math.min(count - 1, index));
     finishMotion();
     var leaving = layers[cur], entering = layers[index], moved = index !== cur;
+    // The focus never stays on a slide that goes (a tick, a tab, Copy): it moves to the slide that comes, which a screen
+    // reader then names ("Slide 3 of 8: ...").
+    var focusWasOn = moved && leaving && doc.activeElement && leaving.contains(doc.activeElement);
     cur = index;
     shown = revealOnArrival(itemsOf(index), how === 'next' && moved);
     drawReveal(entering, shown);
@@ -331,9 +337,12 @@ const PAGE_BEHAVIOUR = String.raw`
       if (at === index) layer.removeAttribute('aria-hidden'); else layer.setAttribute('aria-hidden', 'true');
     });
     layout();
+    // A Tabs block is measured once it is laid out: a slide not shown has no width (README: a tab is never cut).
+    fitTabBands();
     drawLine();
     address(index);
     keepPlace(storage, placeKey, index);
+    if (focusWasOn && entering.focus) { try { entering.focus({ preventScroll: true }); } catch (error) { entering.focus(); } }
     if (!moved || how === 'still') return;
     if (narrow()) { try { window.scrollTo(0, 0); } catch (error) { /* no scroll */ } }
     if (side) side.scrollTop = 0;
@@ -524,7 +533,7 @@ const PAGE_BEHAVIOUR = String.raw`
   // ---- keys and a swipe, as on the wall
   window.addEventListener('keydown', function (event) {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (event.key === 'Escape') { if (closeContents(true)) return; return; }
+    if (event.key === 'Escape') { closeContents(true); return; }
     var target = event.target && event.target.closest ? event.target : null;
     if (target && target.closest('input, textarea, select, [contenteditable], .zoom')) return;
     if (toc && !toc.hidden && target && target.closest('.toc')) return;
@@ -728,7 +737,7 @@ const PAGE_BEHAVIOUR = String.raw`
   var resizeTimer = 0;
   window.addEventListener('resize', function () {
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(function () { finishMotion(); layout(); }, 40);
+    resizeTimer = window.setTimeout(function () { finishMotion(); layout(); fitTabBands(); }, 40);
   });
   var linked = linkedPart(window.location.hash, count);
   var returned = linked === null ? readPlace(storage, placeKey, count) : null;

@@ -93,8 +93,8 @@ export interface PublicDeckOptions {
   /** The deck's folder's name (the client line). */
   folderName: string;
   /**
-   * The deck's file name without `.deck.md`. Never shown since Sprint 163 PR 4 (the page's top bar showed it in place of
-   * the session's title); kept so callers stay as they are.
+   * Not read since Sprint 163 PR 4 (the page's top bar showed the file's name in place of the session's title). Left
+   * optional so the tests that pass it stay as they are; the page's storage key takes the name through `PageOptions.name`.
    */
   deckName?: string;
   /** The theme the deck names, read and parsed by the host (or the built-in theme). */
@@ -473,6 +473,9 @@ export function sessionTitleOf(text: string, slide: { data: SlideData } | undefi
 
 /** The quiet line's words for a deck (the page's, and the wall's): the client and the session. */
 export function sessionLineOf(text: string, folderName: string, theme: DeckTheme): { client: string; session: string } {
+  // The front matter's title is the session's without reading the slides; only a deck without one takes the public pass.
+  const written = (frontMatterField(text.replace(/^\uFEFF/, ''), 'title') ?? '').trim();
+  if (written) return { client: folderName.trim(), session: written };
   const deck = publicDeck(text, { folderName, theme });
   return { client: deck.client, session: deck.title };
 }

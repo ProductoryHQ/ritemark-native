@@ -70,6 +70,17 @@ assert.ok(layers.every(layer => layer.querySelector('.deck-slide.is-borderless .
 // A slide not shown is out of the page (display, not visibility): a Tabs block's pane sets its own visibility, and showed
 // through on the next slide when the slide around it was only invisible.
 assert.ok(PAGE_CSS.includes('.layer:not(.on):not(.leaving) { display: none; }'));
+// Review of #807: the reader's storage is the page's own. A deck with no title of its own keys by its file's name (hashed,
+// as the page did before), so two such decks in one folder keep their ticks and places apart.
+{
+  const untitled = publicDeck('```slide points\ntitle: Agenda\n```\n', { folderName: 'Acme', theme: BUILT_IN_THEME });
+  const store = (name: string) => parse(pageHtml(untitled, assets, { digest: 'd', pictureUrl, name })).querySelector('body')!.getAttribute('data-store');
+  assert.notEqual(store('day1'), store('day2'));
+  assert.equal(store('day1'), `ritemark-ticks-${createHash('sha256').update('Acme\u0000day1').digest('hex').slice(0, 12)}`, 'the key such a page had before');
+  assert.ok(!pageHtml(untitled, assets, { digest: 'd', pictureUrl, name: 'day1' }).includes('day1'), 'the name itself is never on the page');
+}
+// Print draws each slide as the slide does: no print rule moves the words, so a side picture and a logo keep their room.
+assert.ok(!/@media print[\s\S]*\.blk-flow \{[^}]*left: 64px/.test(html));
 const parts = root.querySelectorAll('#side .part');
 assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);
 assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3', '4']);

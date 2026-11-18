@@ -17,7 +17,7 @@ import * as path from 'node:path';
 import domino from '@mixmark-io/domino';
 import { scriptBuildsReferences } from '../../publish/references';
 import * as editorEdges from '../../../webview/src/extensions/tables/tableEdges';
-import { MOTION_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { EASE_IN_OUT, EASE_OUT, MOTION_MS, REVEAL_MS, REVEAL_RISE, ROW, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
 import { revealOnArrival as hostRevealOnArrival, revealStepOf } from '../present/revealSteps';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { blockSlideMarkup } from '../blocks/slideRenderer';
@@ -335,9 +335,24 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
 // One column: the frame is left to the CSS (no size set), and the page still steps.
 {
   const run = runPage({ hash: '#2', width: 720 });
-  assert.equal(run.doc.getElementById('frame')!.getAttribute('style') ?? '', '', 'no scale in one column');
+  assert.ok(!/left|top|width|height/.test(run.doc.getElementById('frame')!.getAttribute('style') ?? ''), 'the frame is left to the column (only a picture slide\'s scale is set)');
   run.key('ArrowRight');
   assert.equal(run.on(), 2);
+}
+
+// Review of #807: the row's numbers are the wall's own (wallMotion.ROW), a Tabs block is fitted when its slide comes in,
+// and the tick goes last in its step, so the step's own first element keeps its style.
+{
+  const row = new Function(`${PAGE_MOTION_RULE}\nreturn { ROW_GAP, ROW_MIN_GAP, ROW_SPAN, ROW_LAST, ROW_MS, ROW_RISE, ROW_ZOOM, LEAVE_MS, PUSH_ROW_GAP, PUSH_MS, EASE_OUT, EASE_IN_OUT };`)() as Record<string, number | string>;
+  assert.deepEqual(row, { ROW_GAP: ROW.gap, ROW_MIN_GAP: ROW.minGap, ROW_SPAN: ROW.span, ROW_LAST: ROW.last, ROW_MS: ROW.ms, ROW_RISE: ROW.rise, ROW_ZOOM: ROW.zoom, LEAVE_MS: ROW.leaveMs, PUSH_ROW_GAP: ROW.pushGap, PUSH_MS: MOTION_MS.push, EASE_OUT, EASE_IN_OUT });
+  assert.match(PAGE_SCRIPT, /layout\(\);\n\s*\/\/ A Tabs block is measured[^\n]*\n\s*fitTabBands\(\);/, 'go() fits the tabs of the slide it shows');
+  const drawn = blockSlideMarkup({ markdown: '# T\n\n::: steps\n1. **Save** it\n2. Open the file\n\n   Then read it\n:::' }, { theme: BUILT_IN_THEME, borderless: false, ticks: true });
+  const items = [...drawn.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map(match => match[1]);
+  assert.equal(items.length, 2);
+  for (const item of items) {
+    assert.ok(!item.startsWith('<button'), `the step's own words come first: ${item.slice(0, 60)}`);
+    assert.match(item, /<button class="tick"[^>]*>[\s\S]*<\/button>$/, 'the tick is last');
+  }
 }
 
 // The wall never shows ticks: the same slide drawn for the wall (no `ticks`) has none, and its canvas is a picture.

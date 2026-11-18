@@ -73,7 +73,7 @@ function* walk(tokens: ReadonlyArray<{ type: string; tokens?: unknown; items?: u
  */
 export function deckCounts(text: string, theme: DeckTheme, fontFiles?: ReadonlyArray<{ family: string }>, logo = false): DeckCounts {
   const parsed = parseDeck(text.replace(/^\uFEFF/, ''));
-  const deck = publicDeck(text, { folderName: '', deckName: '', theme });
+  const deck = publicDeck(text, { folderName: '', theme });
   const fonts = fontFiles ? new Set(fontFiles.map(file => file.family)).size : themeFonts(theme).filter(font => font.name !== DEFAULT_DECK_FONT).length;
   return {
     slides: deck.slides.length,

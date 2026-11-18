@@ -43,6 +43,18 @@ export const MOVE_FADE_MS = MOTION_MS.fade
 /** Zoom's new slide starts at this size. */
 export const ZOOM_FROM = 0.96
 
+/** The wall's easings: out for an arrival and the smooth move, in-and-out for Push. */
+export const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
+export const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)'
+
+/**
+ * README item 20, the content arriving in a row (the published page plays it, Sprint 163 PR 4): the slide before leaves
+ * as one in `leaveMs`; the new slide's pieces come `gap` ms apart (with more than eight, closer, never under `minGap`,
+ * within `span`; from the `last + 1`th piece on, together), each in `ms`, rising `rise` px (Fade) or growing from `zoom`
+ * (Zoom); in Push they come on the slide's heels, `pushGap` ms apart.
+ */
+export const ROW = { gap: 70, minGap: 28, span: 480, last: 13, ms: 480, rise: 14, zoom: 0.92, leaveMs: 150, pushGap: 30 } as const
+
 /** README item 18: an item shown by → arrives in 0.2 s, rising this far (on the 960 slide) as it fades in. */
 export const REVEAL_MS = 200
 export const REVEAL_RISE = 8

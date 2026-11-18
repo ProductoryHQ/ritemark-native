@@ -156,7 +156,7 @@ async function main(): Promise<void> {
         assert.match(fontOf(heading), /var\(--fh\)/, `${heading} in the theme's heading font`);
       }
       assert.match(fontOf('.side'), /var\(--fb\)/, 'the handout\'s text (More) in the theme\'s text font');
-      for (const control of ['.line', '.fb', '.line .pos', '.toc .hd', '.part .lab', '.k', '.copy', '.sect .eyebrow', '.toast, .restart']) {
+      for (const control of ['.line', '.fb', '.line .pos', '.toc .hd', '.k', '.copy', '.sect .eyebrow', '.toast, .restart']) {
         assert.match(fontOf(control), /'Sofia Sans'/, `${control} keeps Sofia Sans`);
         assert.doesNotMatch(fontOf(control), /var\(--f[hb]\)/);
       }

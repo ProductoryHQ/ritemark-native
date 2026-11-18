@@ -14,10 +14,7 @@
  *
  * Used by the wall, and by the Theme menu's preview on the stage (only the deck's transition there, never a move).
  */
-import { matchMotion, motionKeysOf, MOTION_MS, MOVE_FADE_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM, type MotionDirection, type MotionDrawing, type MotionPair, type MotionStep } from './wallMotion'
-
-const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
-const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)'
+import { EASE_IN_OUT, EASE_OUT, matchMotion, motionKeysOf, MOTION_MS, MOVE_FADE_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM, type MotionDirection, type MotionDrawing, type MotionPair, type MotionStep } from './wallMotion'
 
 /** Reduced motion, the system's or VS Code's own setting (the class it puts on a webview's body). */
 export function prefersReducedMotion(): boolean {
