@@ -1162,7 +1162,49 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-class { color: #e5c07b !important; }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-id { color: #61afef !important; }
 
-        /* Code block copy button (icon-only, ghost button per Ritemark design) */
+        /* Sprint 163 PR 1: Copy, the same pill as a slide's code block (slide.css .cb-copy): its icon and "Copy", then
+           "Copied", at the block's top right. In a Text document it shows under the pointer and the keyboard, and
+           while it says Copied. The tooltip is ui/tooltip.tsx's. */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools {
+          position: absolute !important;
+          top: 8px !important;
+          right: 8px !important;
+          z-index: 10 !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+          opacity: 0 !important;
+          transition: opacity 0.15s !important;
+          user-select: none !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block:hover .cb-tools,
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools:focus-within,
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools:has(.ok) {
+          opacity: 1 !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy {
+          height: 28px !important;
+          padding: 0 12px !important;
+          gap: 6px !important;
+          border: 0 !important;
+          border-radius: 999px !important;
+          background: rgba(255, 255, 255, 0.12) !important;
+          color: #fff !important;
+          font: 600 13px/1 'Sofia Sans', var(--ritemark-ui-font-family), sans-serif !important;
+          cursor: pointer !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy svg {
+          width: 14px !important;
+          height: 14px !important;
+          color: currentColor !important;
+          fill: currentColor !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy:hover {
+          background: rgba(255, 255, 255, 0.22) !important;
+          color: #fff !important;
+        }
+
+        /* A Mermaid diagram's toolbar buttons (icon-only, ghost button per Ritemark design) */
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .code-copy-btn {
           position: absolute !important;
           top: 8px !important;

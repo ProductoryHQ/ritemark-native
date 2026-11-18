@@ -338,11 +338,9 @@ const PAGE_BEHAVIOUR = String.raw`
     window.clearTimeout(noteTimer);
     noteTimer = window.setTimeout(function () { note.hidden = true; }, 2600);
   }
-  text.addEventListener('click', function (event) {
-    var button = event.target && event.target.closest ? event.target.closest('.copy') : null;
-    if (!button) return;
-    var code = button.parentNode ? button.parentNode.querySelector('code') : null;
-    if (!code) return;
+  // One Copy for the text's prompts and the slides' code blocks: the block's own words; where the browser won't copy,
+  // they are selected for the person to copy.
+  function copyWords(button, code) {
     var words = code.textContent || '';
     var copied = function () {
       button.classList.add('ok');
@@ -366,7 +364,51 @@ const PAGE_BEHAVIOUR = String.raw`
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(words).then(copied, select);
       else select();
     } catch (error) { select(); }
+  }
+  text.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest ? event.target.closest('.copy') : null;
+    if (!button) return;
+    var code = button.parentNode ? button.parentNode.querySelector('code') : null;
+    if (code) copyWords(button, code);
   });
+
+  // ---- a slide's code block (Sprint 163 PR 1): Copy takes the whole block, as the text's Copy does; the arrow opens its
+  // menu of two links (Open in Claude, Open in ChatGPT), which the reader follows in a new tab. The menu is the page's
+  // own markup, shown and hidden here; a click elsewhere or Esc closes it.
+  function closeCodeMenus(keep) {
+    var closed = false;
+    list(box.querySelectorAll('.cb-menu')).forEach(function (menu) {
+      if (menu === keep || menu.hidden) return;
+      menu.hidden = true;
+      var opener = menu.parentNode ? menu.parentNode.querySelector('.cb-open') : null;
+      if (opener) opener.setAttribute('aria-expanded', 'false');
+      closed = true;
+    });
+    return closed;
+  }
+  doc.addEventListener('click', function (event) {
+    var target = event.target && event.target.closest ? event.target : null;
+    var tools = target ? target.closest('.cb-tools') : null;
+    if (!tools || !box.contains(tools)) { closeCodeMenus(null); return; }
+    if (target.closest('.cb-item')) { closeCodeMenus(null); return; }
+    var button = target.closest('.cb-copy');
+    if (button) {
+      closeCodeMenus(null);
+      var code = tools.parentNode ? tools.parentNode.querySelector('code') : null;
+      if (code) copyWords(button, code);
+      return;
+    }
+    var opener = target.closest('.cb-open');
+    var menu = tools.querySelector('.cb-menu');
+    if (!opener || !menu) return;
+    var opening = menu.hidden;
+    closeCodeMenus(menu);
+    menu.hidden = !opening;
+    opener.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  });
+  window.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && closeCodeMenus(null)) event.stopPropagation();
+  }, true);
 
   // ---- a picture, full size (experience 49): a click on a picture in the text or on the slide shows a copy of it over
   // the page, whole; a click anywhere or Esc closes it. The copy is the page's own picture (no new address, nothing

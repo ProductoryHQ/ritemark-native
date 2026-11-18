@@ -139,7 +139,7 @@ const DECK = [
 // ---- The menu (frame 22): its groups and shortcuts; the Text editor's own menu is unchanged.
 {
   assert.deepEqual(SLIDE_ITEMS.map(item => `${item.group}: ${item.title}${item.shortcut ? ` ${item.shortcut}` : ''}`), [
-    'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.',
+    'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.', 'Text: Code block ```',
     'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Agenda',
     'Media: Picture', 'Media: Web page',
     'Slides: New slide below', 'Slides: Split slide here ***',
@@ -687,6 +687,44 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(stage.save(), DECK, 'Delete takes the block and its words, nothing else')
   stage.undo()
   assert.equal(stage.save(), text, 'one Undo brings it back as it was written')
+}
+
+// Sprint 163 PR 1: a code block on a slide. A deck that holds one (in the slide's longer fence, with a place to fill
+// in) opens and saves byte for byte; / → Code block on the stage writes an ordinary fenced block, the slide's fence
+// grows to hold it, and the file is stable on the next open; one Undo takes the block back.
+{
+  const prompt = 'Summarise [the report] for the board & stop.'
+  const text = [
+    '---', 'deck: 2', '---', '',
+    '````slide', '---', 'id: c1', '---', '# Plan', '', '```text', prompt, '```', '````', '',
+    '## Plan', '', 'Copy the prompt.', '',
+  ].join('\n')
+  const deck = openDeck(text)
+  assert.equal(deck.save(deck.state.doc), text, 'a deck with a code block on a slide: byte for byte')
+  assertStable(text, 'a code block on a slide')
+  const stage = stageOn(deck, 0)
+  stage.caretAfter('Plan')
+  stage.apply(stage.inner.tr.insertText(' it'))
+  const edited = stage.save()
+  assert.equal(edited, text.replace('# Plan\n', '# Plan it\n'), 'an edit beside it changes only its own words')
+
+  const plain = openDeck(DECK)
+  const typed = stageOn(plain, 0)
+  typed.caretAfter('Three jobs every week')
+  typed.apply(typed.inner.tr.split(typed.inner.selection.from))
+  const at = typed.inner.selection.from
+  const item = SLIDE_ITEMS.find(entry => entry.nodeType === 'codeBlock')!
+  assert.equal(item.title, 'Code block')
+  // The menu's choice, as SlideEditor's runItem makes it: the line set as a code block, an undo step of its own.
+  const tr = typed.inner.tr.setBlockType(at, at, typed.inner.schema.nodes.codeBlock).setMeta(SLIDE_COMMAND, true)
+  typed.apply(tr)
+  typed.apply(typed.inner.tr.insertText('Write [one line]'))
+  const saved = typed.save()
+  const markdown = slideDataOf('', slidesOf(typed.outer.doc)[0].node.attrs.body).markdown!
+  assert.equal(markdown, '# Where assistants help\n\nThree jobs every week\n\n```\nWrite [one line]\n```', markdown)
+  assert.ok(saved.includes('````slide\n---\nid: a1\n---\n# Where assistants help'), 'the slide\'s fence grows past the code block\'s')
+  assertStable(saved, 'a new code block')
+  assert.ok(blockSlideHtml(markdown).includes('<mark class="cb-fill">[one line]</mark>'), 'drawn with its place marked')
 }
 
 console.log('slideCommands: passed')

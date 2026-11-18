@@ -16,4 +16,14 @@ export const CodeBlockWithCopyExtension = CodeBlockLowlight.extend({
   },
 })
 
+/**
+ * Sprint 163 PR 1: the same code block on a slide, where Copy always shows and its ↗ Open in… sits beside it
+ * (`CodeBlockWithCopy`, `surface: 'slide'`).
+ */
+export const SlideCodeBlock = CodeBlockWithCopyExtension.extend({
+  addOptions() {
+    return { ...this.parent?.(), surface: 'slide' }
+  },
+})
+
 export default CodeBlockWithCopyExtension

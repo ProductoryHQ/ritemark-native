@@ -24,6 +24,7 @@ import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDiv
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
+import { codeBlockHtml } from './codeTools';
 
 export { sidePictureOf };
 
@@ -74,6 +75,8 @@ interface RenderState {
   /** The decks README, small details 14: the deck's sections an Agenda block lists, and the slide's place for Present. */
   agenda: AgendaDrawing | null;
   at: number | null;
+  /** Sprint 163 PR 1: a code block's ↗ Open in… (off for a deck with `open-in: none`). */
+  openIn: boolean;
   /**
    * README item 18: the items of One by one blocks, numbered from 0 across the slide as they are drawn
    * (`data-reveal-item`); in Present, those from `shown` on are drawn hidden (`data-reveal-hidden`), each in its place.
@@ -84,7 +87,7 @@ interface RenderState {
   parents: Array<{ kind: string | null; reveal: boolean }>;
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, reveal: { next: 0, shown: null }, parents: [] });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, reveal: { next: 0, shown: null }, parents: [] });
 
 let state: RenderState = freshState();
 
@@ -318,6 +321,8 @@ function createSlideMarked(): Marked {
       // A second guard: a `<` that still came through raw never opens a tag. Entities stay as they are.
       text: (text: string) => text.replace(/</g, '&lt;'),
       link: (_href: string, _title: string | null | undefined, text: string) => `<span class="blk-link">${text}</span>`,
+      // Sprint 163 PR 1: a code block carries its Copy and its ↗ Open in…, and its places to fill in are marked.
+      code: (code: string, infostring: string | undefined) => codeBlockHtml(code, infostring, { openIn: state.openIn, icons: CODE_ICONS }),
       image: (href: string, _title: string | null, text: string) => pictureHtml(href, text),
       paragraph: (text: string) => {
         // A picture alone in its paragraph is a block of its own, as the editor's image node is.
@@ -555,13 +560,18 @@ export interface BlockDrawingContext {
    * rest are drawn hidden, in their places. Left out: every item shows.
    */
   reveal?: number | null;
+  /** Sprint 163 PR 1: a code block's ↗ Open in…; false for a deck with `open-in: none`. Left out: shown. */
+  openIn?: boolean;
 }
+
+/** The code block's icons, drawn in the text's colour (`codeTools.codeBlockHtml`). */
+const CODE_ICONS = { copy: iconSvg('copy', 15), check: iconSvg('check', 15), openIn: iconSvg('arrow-up-right', 15) };
 
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
 export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
-  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, reveal: { next: 0, shown } };
+  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, reveal: { next: 0, shown } };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -612,6 +622,8 @@ export interface BlockSlideMarkupOptions {
   /** Small details 14: the deck's sections, for an Agenda block, and the slide's place in Present. */
   agenda?: AgendaDrawing | null;
   at?: number | null;
+  /** Sprint 163 PR 1: a code block's ↗ Open in…; false for a deck with `open-in: none`. */
+  openIn?: boolean;
 }
 
 const kebab = (key: string) => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
@@ -714,7 +726,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'> & { reveal?: number | null }): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at' | 'openIn'> & { reveal?: number | null }): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -738,7 +750,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal })}</div>`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, openIn: options.openIn })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

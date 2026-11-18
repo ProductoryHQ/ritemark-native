@@ -2,8 +2,8 @@
  * Sprint 161 (PR 3; experience 46, frames 22, 23, 24 and 26): what the slide's own / menu and its blocks do to the
  * slide editor's document. Pure ProseMirror, so the tests drive the same steps the stage takes.
  *
- *  - **The / menu** (frame 22) in four groups: Text (Title, Heading, Bullet list, Numbered list, with their Markdown
- *    shortcuts), Blocks (Columns, Boxes, Steps, Table, and the Agenda of small details 14), Media (Picture, Web page) and Slides (New slide below, Split
+ *  - **The / menu** (frame 22) in four groups: Text (Title, Heading, Bullet list, Numbered list, Code block, with their
+ *    Markdown shortcuts), Blocks (Columns, Boxes, Steps, Table, and the Agenda of small details 14), Media (Picture, Web page) and Slides (New slide below, Split
  *    slide here). Web page is a link to the page, in the picture's group; no live page is drawn.
  *  - **A block** goes where the / was typed: in place of the empty line, else after the block the caret is in. Its
  *    lines are the ones the conversion writes (`:::: columns`, `::: box`, `::: steps`), so a new block saves as an AI
@@ -23,7 +23,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
-import { BULLET_LIST_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { BULLET_LIST_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -43,6 +43,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Text', title: 'Heading', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['h2', 'subheading', 'alapealkiri'] },
   { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: BULLET_LIST_KEYWORDS },
   { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: NUMBERED_LIST_KEYWORDS },
+  // Sprint 163 PR 1: prompts live on the slide, each in a code block with its own Copy (the decks README).
+  { group: 'Text', title: 'Code block', description: '', icon: 'code', nodeType: 'codeBlock', shortcut: '```', keywords: CODE_BLOCK_KEYWORDS },
   { group: 'Blocks', title: 'Columns', description: '', icon: 'columns', nodeType: 'columns', keywords: ['column', 'cols', 'two columns', 'layout', 'veerud', 'veerg'] },
   { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes', keywords: ['cards', 'tiles', 'grid', 'kastid', 'kaardid'] },
   { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps', keywords: ['process', 'timeline', 'flow', 'sammud', 'protsess'] },
