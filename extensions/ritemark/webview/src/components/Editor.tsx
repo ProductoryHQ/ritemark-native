@@ -407,7 +407,7 @@ export function Editor({
     if (!node) return
     const alt = String(node.attrs.alt ?? '')
     pictureMaker.start({
-      place: { kind: 'flow', pos },
+      place: { kind: 'flow', pos, path: imagePathOf(node.attrs) ?? undefined },
       mode,
       // A new picture starts from the old one's description; a change from nothing.
       suggestion: mode === 'new' ? alt : '',

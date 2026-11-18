@@ -11,9 +11,11 @@ import { history, undo } from '@tiptap/pm/history'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { editorMarkdown, openDocument } from '../../utils/markdownFidelity'
 import { chosenPicture, replacePicture, replacePictureKeepingCaret } from '../../extensions/pictures/pictureCommands'
+import { imagePathOf } from '../../extensions/pictures/PictureNode'
 import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk } from './chatgptPictureState'
 
 let failures = 0
+const same = (path: string) => (attrs: Record<string, unknown>) => imagePathOf(attrs) === path
 function check(name: string, run: () => void) {
   try {
     run()
@@ -36,8 +38,9 @@ check('the host\'s answers move the field and the strip', () => {
   assert.deepEqual(phaseAfterStatus(checking, { requestId: 'c1', state: 'ready' }, 'c1'), { phase: 'asking', ask })
   assert.deepEqual(phaseAfterStatus(checking, { requestId: 'c1', state: 'sign-in' }, 'c1'), { phase: 'sign-in', ask }, 'not signed in: the sign-in line')
   assert.equal(phaseAfterStatus(checking, { requestId: 'old', state: 'ready' }, 'c1'), undefined, 'another check\'s answer')
+  assert.deepEqual(phaseAfterStatus(checking, { requestId: 'c1', state: 'failed', problem: 'API key.' }, 'c1'), { phase: 'failed', ask, description: '', problem: 'API key.' }, 'a check that fails says why, with nothing to try again')
   const making: MakerPhase = { phase: 'making', ask, description: 'At night', requestId: 'm1' }
-  assert.deepEqual(phaseAfterStatus(making, { requestId: 'm1', state: 'made', path: 'images/a.png', url: 'vscode-webview://a' }, null), { phase: 'done', ask, description: 'At night' })
+  assert.deepEqual(phaseAfterStatus(making, { requestId: 'm1', state: 'made', path: 'images/a.png', url: 'vscode-webview://a' }, null), { phase: 'done', ask: { ...ask, place: { kind: 'flow', pos: 4, path: 'images/a.png' } }, description: 'At night' }, 'the place now follows the made picture')
   assert.deepEqual(phaseAfterStatus(making, { requestId: 'm1', state: 'failed', problem: 'No.' }, null), { phase: 'failed', ask, description: 'At night', problem: 'No.' })
   assert.deepEqual(phaseAfterStatus(making, { requestId: 'm1', state: 'cancelled' }, null), { phase: 'idle' }, 'Cancel closes it')
   assert.deepEqual(phaseAfterStatus(making, { requestId: 'm1', state: 'sign-in' }, null), { phase: 'sign-in', ask })
@@ -81,16 +84,25 @@ check('the place follows edits; a block written again with its picture keeps it;
   const pos = firstPicture(state.doc)
   // Typing before the picture moves it.
   const typed = state.tr.insertText('Well. ', 1)
-  assert.equal(followPicture(typed.doc, typed.mapping, pos), pos + 6)
+  assert.equal(followPicture(typed.doc, typed.mapping, pos, same('images/agents.png')), pos + 6)
   // The slide's sync writes the picture's block again (the made picture coming back from the deck): still the place.
   const $pos = state.doc.resolve(pos)
   const block = $pos.depth > 0 ? { from: $pos.before($pos.depth), to: $pos.after($pos.depth) } : { from: pos, to: pos + state.doc.nodeAt(pos)!.nodeSize }
   const rewritten = state.tr.replaceWith(block.from, block.to, state.doc.slice(block.from, block.to).content)
-  assert.equal(followPicture(rewritten.doc, rewritten.mapping, pos), pos)
+  assert.equal(followPicture(rewritten.doc, rewritten.mapping, pos, same('images/agents.png')), pos)
+  assert.equal(followPicture(rewritten.doc, rewritten.mapping, pos, same('images/other.png')), null, 'another picture in the place is not this one')
   // The picture deleted: its place is gone, and a request for it stops.
   const node = state.doc.nodeAt(pos)!
   const deleted = state.tr.delete(pos, pos + node.nodeSize)
-  assert.equal(followPicture(deleted.doc, deleted.mapping, pos), null)
+  assert.equal(followPicture(deleted.doc, deleted.mapping, pos, same('images/agents.png')), null)
+  // Deleted, with the next paragraph's picture moving up into its place: still gone (review of #800).
+  const two = EditorState.create({ doc: openDocument('![A](images/a.png)\n\n![B](images/b.png)\n').doc })
+  const first = firstPicture(two.doc)
+  const $first = two.doc.resolve(first)
+  const firstBlock = $first.depth > 0 ? { from: $first.before($first.depth), to: $first.after($first.depth) } : { from: first, to: first + two.doc.nodeAt(first)!.nodeSize }
+  const gone = two.tr.delete(firstBlock.from, firstBlock.to)
+  assert.equal(gone.doc.nodeAt(first)?.type.name, 'image', 'B moved up into the place')
+  assert.equal(followPicture(gone.doc, gone.mapping, first, same('images/a.png')), null)
   state = state.apply(typed)
 })
 

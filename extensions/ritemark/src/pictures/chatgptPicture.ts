@@ -274,12 +274,8 @@ export async function makePicture(
     // Only while the document's folder is there, as a paste is saved.
     await ensureProjectSubfolder(documentFolder, imagesDir);
     if (signal.aborted) return { kind: 'cancelled' };
+    // The write is synchronous: a Cancel after it is the host's to answer (it removes this new file).
     const file = writeImageRelativeTo(imagesDir, `${pictureBaseName(request)}.${picture.extension}`, picture.bytes.toString('base64'));
-    // A Cancel that came while it was written: the new file (this request's own, never another) goes again.
-    if (signal.aborted) {
-      await fs.promises.unlink(path.join(imagesDir, file)).catch(() => undefined);
-      return { kind: 'cancelled' };
-    }
     return { kind: 'made', file };
   } catch (error) {
     deps.log?.(`[pictures] Couldn't save ChatGPT's picture: ${error instanceof Error ? error.message : String(error)}`);

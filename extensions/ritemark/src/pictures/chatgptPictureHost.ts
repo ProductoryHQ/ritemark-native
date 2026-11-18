@@ -6,8 +6,8 @@
  *  - `picture/make` (`PictureRequest`): the picture made and saved into `images/` beside the file.
  *  - `picture/cancel` {requestId}: stops that request's turn.
  *  - Answers `picture/status` {requestId, state: 'ready' | 'sign-in' | 'made' | 'failed' | 'cancelled', path?, url?,
- *    problem?}. In a deck, a made picture is told first as a saved one (`deck/image-saved`), so the deck places it as
- *    it places a pasted picture.
+ *    problem?}. The editor that asked places a made picture itself (a deck's path is `images/…`, a document's
+ *    `./images/…`, as their pasted pictures).
  *
  * A dev run's stand-in (`RITEMARK_PICTURE_STANDIN`, a PNG's path, only in a development build with `VSCODE_DEV=1`):
  * no AI is asked; after a moment the request comes back with that picture, and ChatGPT counts as signed in unless a
@@ -22,7 +22,7 @@ import type { AgentId } from '../agent/types';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { ONE_SHOT_CANCELLED, runOneShotTurnResult, type OneShotSettings, type OneShotTurnResult } from '../runtime/oneShotTurn';
 import type { RuntimeAvailability } from '../runtime/availability';
-import { decodePictureRequest, generatedImagesFolder, makePicture, type PictureMakerDeps, type PictureTurn } from './chatgptPicture';
+import { PICTURE_PROBLEMS, decodePictureRequest, generatedImagesFolder, makePicture, type PictureMakerDeps, type PictureTurn } from './chatgptPicture';
 
 /** What the AI's sheet gives this host. */
 export interface PictureSheet {
@@ -132,23 +132,34 @@ export class ChatgptPictureHost {
 
   private async check(webview: vscode.Webview, requestId: string): Promise<void> {
     const deps = this.deps();
-    let ready = false;
     try {
-      ready = await deps.chatgptReady();
-      if (!ready) await deps.openSignIn();
+      if (!(await deps.chatgptReady())) {
+        await deps.openSignIn();
+        void webview.postMessage({ type: 'picture/status', requestId, state: 'sign-in' });
+        return;
+      }
+      // Signed in with an API key, Codex has no image tool: said before any words are typed.
+      if ((await deps.authMethod?.()) === 'apiKey') {
+        void webview.postMessage({ type: 'picture/status', requestId, state: 'failed', problem: PICTURE_PROBLEMS.apiKey });
+        return;
+      }
+      void webview.postMessage({ type: 'picture/status', requestId, state: 'ready' });
     } catch (error) {
       console.warn('[pictures] Could not check ChatGPT:', error);
+      void webview.postMessage({ type: 'picture/status', requestId, state: 'failed', problem: 'ChatGPT couldn\'t be checked. Try again.' });
     }
-    void webview.postMessage({ type: 'picture/status', requestId, state: ready ? 'ready' : 'sign-in' });
   }
 
   private async make(document: vscode.TextDocument, webview: vscode.Webview, message: unknown): Promise<void> {
     const request = decodePictureRequest(message);
     if (!request) {
       // A request the host can't take still gets its answer, so the strip never waits for nothing.
-      const requestId = (message as { requestId?: unknown }).requestId;
-      if (typeof requestId === 'string' && requestId) {
-        void webview.postMessage({ type: 'picture/status', requestId: requestId.slice(0, 100), state: 'failed', problem: 'ChatGPT can\'t change this picture: it isn\'t a file in this project.' });
+      const raw = message as { requestId?: unknown; mode?: unknown; source?: unknown };
+      if (typeof raw.requestId === 'string' && raw.requestId) {
+        const problem = raw.mode === 'change' && !(typeof raw.source === 'string' && raw.source.trim())
+          ? 'ChatGPT can\'t change this picture: it isn\'t a file in this project.'
+          : 'ChatGPT couldn\'t take this request. Describe the picture and try again.';
+        void webview.postMessage({ type: 'picture/status', requestId: raw.requestId.slice(0, 100), state: 'failed', problem });
       }
       return;
     }
@@ -172,7 +183,6 @@ export class ChatgptPictureHost {
         const url = webview.asWebviewUri(vscode.Uri.file(path.join(documentFolder, 'images', outcome.file))).toString();
         // A deck writes `images/…` (as its pasted pictures), a document `./images/…` (as its pasted pictures).
         const written = request.slideId ? `images/${outcome.file}` : `./images/${outcome.file}`;
-        if (request.slideId) await webview.postMessage({ type: 'deck/image-saved', slideId: request.slideId, path: written, url });
         void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: 'made', path: written, url });
       } else {
         void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: outcome.kind, ...(outcome.kind === 'failed' ? { problem: outcome.problem } : {}) });

@@ -100,8 +100,6 @@ export interface SlideEditorProps {
    * where the / was (`picture` brings it back once saved).
    */
   onPicture: (dataUrl: string, filename: string, atCaret?: boolean) => void
-  /** Pictures with ChatGPT: a picture is on its way for this slide (`atCaret`: in the words); the slide's id. */
-  onPictureComing?: (atCaret: boolean) => string | null
   /** Sprint 161: open one of the slide's saved comments (the deck's bar, Prev and Next), by its place; a new serial asks again. */
   commentOpen?: { ordinal: number; serial: number } | null
   /** The comment asked for in `commentOpen` was opened: the asker forgets the request. */
@@ -203,7 +201,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
 
 const NO_MISSING: ReadonlySet<string> = new Set()
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, onPictureComing, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -217,8 +215,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   onWritingRef.current = onWriting
   const onPictureRef = useRef(onPicture)
   onPictureRef.current = onPicture
-  const onPictureComingRef = useRef(onPictureComing)
-  onPictureComingRef.current = onPictureComing
   const syncRef = useRef<SlideSync | null>(null)
   // The editor the sync was made for: a new editor (its extensions changed) gets a new sync, on its own schema.
   const syncEditor = useRef<TipTapEditor | null>(null)
@@ -928,8 +924,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   }
 
   // Pictures with ChatGPT (experience 46 and 49): Make a new picture… and Change this picture…, for a picture in the
-  // words or the slide's own beside or behind. The host saves the made picture and the deck places it as a saved one
-  // (`onPictureComing`): one undo step on the deck, ⌘Z brings the old picture back.
+  // words or the slide's own beside or behind. The host saves the made picture; this editor puts it in the place the
+  // request was for, followed through edits (never through the shared paste and / menu channels), as one undo step on
+  // the deck: ⌘Z brings the old picture back.
   const pictureRect = useCallback((place: PicturePlaceRef): DOMRect | null => {
     if (place.kind === 'side') return frameRef.current?.querySelector('.photo')?.getBoundingClientRect() ?? null
     if (!editor || editor.isDestroyed) return null
@@ -939,23 +936,23 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pictureMaker = usePictureMaker({
     editor,
     rectOf: pictureRect,
+    // The slide's id marks the request as a deck's (its pictures are written `images/…`).
     beforeMake: ask => {
-      const coming = onPictureComingRef.current
-      if (!coming) return null
-      if (ask.place.kind === 'side') {
-        const slideId = coming(false)
-        return slideId ? { slideId } : null
-      }
+      const slideId = slideRef.current.data.id || 'slide'
+      if (ask.place.kind === 'side') return { slideId }
       if (!editor || editor.isDestroyed || editor.state.doc.nodeAt(ask.place.pos)?.type.name !== 'image') return null
-      const slideId = coming(true)
-      if (!slideId) return null
-      // The made picture takes this one's place, as Replace picture… does.
-      replaceAt.current = ask.place.pos
       return { slideId }
     },
+    placeMade: (place, made) => {
+      if (place.kind === 'side') {
+        // The side keeps its place; the new picture's description and focus point start fresh (as a paste's).
+        writeSlide(null, { image: made.path, alt: undefined, focus: undefined })
+        return
+      }
+      if (!editor || editor.isDestroyed) return
+      apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }))
+    },
     undo: () => { if (!outerRef.current.isDestroyed) outerRef.current.commands.undo() },
-    // A request that made nothing lets its replace target go, so the next / menu Picture is inserted, never put in its place.
-    onSettled: ask => { if (ask.place.kind === 'flow' && replaceAt.current === ask.place.pos) replaceAt.current = null },
   })
   /** The slide's title and words, for ChatGPT: the title starts the field and names the file; the words are context. */
   const slideWords = (): { title: string; words: string } => {
@@ -967,7 +964,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const startPictureMaker = (place: PicturePlaceRef, mode: 'new' | 'change', source: string | null) => {
     const { title, words } = slideWords()
     pictureMaker.start({
-      place,
+      place: place.kind === 'flow' && source ? { ...place, path: source } : place,
       mode,
       suggestion: mode === 'new' ? title : '',
       ...(words ? { words } : {}),

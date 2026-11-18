@@ -18,6 +18,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Keyboar
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import { onMessage, sendToExtension } from '../../bridge'
+import { imagePathOf } from '../../extensions/pictures/PictureNode'
+import { sameRelativeImagePath } from '../../../../src/utils/imagePaths'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
@@ -66,7 +68,8 @@ export function usePictureMaker(options: PictureMakerOptions) {
     const follow = ({ transaction }: { transaction: { docChanged: boolean; doc: PictureDoc; mapping: PictureMapping } }) => {
       const current = stateRef.current
       if (!transaction.docChanged || current.phase === 'idle' || current.ask.place.kind !== 'flow') return
-      const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos)
+      const path = current.ask.place.path
+      const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos, path ? attrs => sameRelativeImagePath(imagePathOf(attrs) ?? '', path) : undefined)
       if (pos === null) {
         // The picture went: a request still running is stopped, and nothing stays anchored on nothing.
         if (current.phase === 'making') {
@@ -76,7 +79,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
         setState({ phase: 'idle' })
         return
       }
-      if (pos !== current.ask.place.pos) setState({ ...current, ask: { ...current.ask, place: { kind: 'flow', pos } } } as MakerPhase)
+      if (pos !== current.ask.place.pos) setState({ ...current, ask: { ...current.ask, place: { ...current.ask.place, pos } } } as MakerPhase)
     }
     editor.on('transaction', follow)
     return () => { editor.off('transaction', follow) }
@@ -99,11 +102,11 @@ export function usePictureMaker(options: PictureMakerOptions) {
     setState(next)
   }), [])
 
-  // An editor that goes while its picture is made (a slide left for another): a picture for its words would have no
-  // place to replace, so the request stops; one for a slide's side goes on (the deck places it there).
+  // An editor that goes while its picture is made (a slide left for another): its place goes with it, so the request
+  // stops and nothing is placed where the person no longer looks.
   useEffect(() => () => {
     const current = stateRef.current
-    if (current.phase === 'making' && current.ask.place.kind === 'flow') {
+    if (current.phase === 'making') {
       sendToExtension('picture/cancel', { requestId: current.requestId })
       latest.current.onSettled?.(current.ask)
     }
@@ -329,9 +332,11 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
       <div className="flex items-center gap-2 py-1 pl-3 pr-1.5" role="alert">
         <Icon name="warning-circle" size={14} tone="inherit" />
         <span className="whitespace-nowrap text-[13px]">{state.problem}</span>
-        <Tooltip label="Ask ChatGPT again with the same words">
-          <Button type="button" variant="ghost" size="compact" onClick={maker.tryAnother}>Try again</Button>
-        </Tooltip>
+        {state.description ? (
+          <Tooltip label="Ask ChatGPT again with the same words">
+            <Button type="button" variant="ghost" size="compact" onClick={maker.tryAnother}>Try again</Button>
+          </Tooltip>
+        ) : null}
       </div>
     )
   } else {

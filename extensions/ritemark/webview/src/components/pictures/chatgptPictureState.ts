@@ -6,7 +6,7 @@
 export type PictureMode = 'new' | 'change'
 
 /** The place a picture is made for: a picture in an editor's words (followed through edits), or a slide's side. */
-export type PicturePlaceRef = { kind: 'flow'; pos: number } | { kind: 'side' }
+export type PicturePlaceRef = { kind: 'flow'; pos: number; /** The picture's path there now, as written. */ path?: string } | { kind: 'side' }
 
 export interface PictureAsk {
   place: PicturePlaceRef
@@ -62,10 +62,17 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   if (typeof message.requestId !== 'string') return undefined
   if (current.phase === 'checking') {
     if (message.requestId !== checking) return undefined
-    return message.state === 'ready' ? { phase: 'asking', ask: current.ask } : { phase: 'sign-in', ask: current.ask }
+    if (message.state === 'ready') return { phase: 'asking', ask: current.ask }
+    // ChatGPT can't make pictures here (an API key, a check that failed): said, with nothing to try again.
+    if (message.state === 'failed') return { phase: 'failed', ask: current.ask, description: '', problem: typeof message.problem === 'string' ? message.problem : 'ChatGPT couldn\'t be checked. Try again.' }
+    return { phase: 'sign-in', ask: current.ask }
   }
   if (current.phase !== 'making' || message.requestId !== current.requestId) return undefined
-  if (message.state === 'made' && typeof message.path === 'string' && typeof message.url === 'string') return { phase: 'done', ask: current.ask, description: current.description }
+  if (message.state === 'made' && typeof message.path === 'string' && typeof message.url === 'string') {
+    // The place now holds the made picture: it is followed by that picture's path.
+    const place = current.ask.place.kind === 'flow' ? { ...current.ask.place, path: message.path } : current.ask.place
+    return { phase: 'done', ask: { ...current.ask, place }, description: current.description }
+  }
   if (message.state === 'sign-in') return { phase: 'sign-in', ask: current.ask }
   if (message.state === 'failed') {
     return { phase: 'failed', ask: current.ask, description: current.description, problem: typeof message.problem === 'string' ? message.problem : 'ChatGPT couldn\'t make the picture. Try again.' }
@@ -75,7 +82,7 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
 
 
 /** What `followPicture` reads of a ProseMirror document and mapping. */
-export interface PictureDoc { content: { size: number }; nodeAt: (pos: number) => { type: { name: string } } | null | undefined }
+export interface PictureDoc { content: { size: number }; nodeAt: (pos: number) => { type: { name: string }; attrs?: Record<string, unknown> } | null | undefined }
 export interface PictureMapping { mapResult: (pos: number, assoc?: number) => { pos: number; deleted: boolean } }
 
 /**
@@ -83,11 +90,15 @@ export interface PictureMapping { mapResult: (pos: number, assoc?: number) => { 
  * it; a slide's sync that writes the picture's block again (the made picture coming back from the deck) puts a picture
  * back where it stood, which is still its place.
  */
-export function followPicture(doc: PictureDoc, mapping: PictureMapping, pos: number): number | null {
+export function followPicture(doc: PictureDoc, mapping: PictureMapping, pos: number, isSame?: (attrs: Record<string, unknown>) => boolean): number | null {
   const mapped = mapping.mapResult(pos, 1)
   if (!mapped.deleted) return mapped.pos
+  // Only the same picture (its path) counts: another picture that moved up into the place is not this one.
+  if (!isSame) return null
   for (const at of [mapped.pos, mapping.mapResult(pos, -1).pos, pos]) {
-    if (at >= 0 && at < doc.content.size && doc.nodeAt(at)?.type.name === 'image') return at
+    if (at < 0 || at >= doc.content.size) continue
+    const node = doc.nodeAt(at)
+    if (node?.type.name === 'image' && isSame(node.attrs ?? {})) return at
   }
   return null
 }

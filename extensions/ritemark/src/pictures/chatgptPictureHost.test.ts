@@ -95,15 +95,18 @@ async function main(): Promise<void> {
   {
     const { posted, view } = webview();
     host.handle(deck, view, { type: 'picture/make', requestId: 'm1', mode: 'new', description: 'Three robots', name: 'Where agents work', slideId: 's-2' } as never);
-    await until(() => posted.length === 2);
+    await until(() => posted.length === 1);
     const url = `vscode-webview://test${path.join(root, 'images', 'where-agents-work.png')}`;
-    assert.deepStrictEqual(posted[0], { type: 'deck/image-saved', slideId: 's-2', path: 'images/where-agents-work.png', url });
-    assert.deepStrictEqual(posted[1], { type: 'picture/status', requestId: 'm1', state: 'made', path: 'images/where-agents-work.png', url });
+    // Only the status: the slide editor that asked places it (never the shared paste channel, deck/image-saved).
+    assert.deepStrictEqual(posted[0], { type: 'picture/status', requestId: 'm1', state: 'made', path: 'images/where-agents-work.png', url });
     assert.deepStrictEqual(fs.readFileSync(path.join(root, 'images', 'where-agents-work.png')), PNG);
     // Change on a picture the host can't send (a web address: no path): answered, so the strip never waits forever.
     host.handle(deck, view, { type: 'picture/make', requestId: 'm0', mode: 'change', description: 'Night' } as never);
+    await until(() => posted.length === 2);
+    assert.deepStrictEqual(posted[1], { type: 'picture/status', requestId: 'm0', state: 'failed', problem: 'ChatGPT can\'t change this picture: it isn\'t a file in this project.' });
+    host.handle(deck, view, { type: 'picture/make', requestId: 'm00', mode: 'new', description: '   ' } as never);
     await until(() => posted.length === 3);
-    assert.deepStrictEqual({ ...posted[2], problem: typeof posted[2].problem }, { type: 'picture/status', requestId: 'm0', state: 'failed', problem: 'string' });
+    assert.match(String(posted[2].problem), /Describe the picture/, 'an empty request is told so, not "not a file"');
     console.log('✓ a deck: saved in images/, placed as a saved picture; a request it can\'t take is answered');
   }
 
@@ -155,6 +158,18 @@ async function main(): Promise<void> {
     assert.deepStrictEqual(signIns, ['codex', 'codex'], 'ChatGPT\'s sign-in card, each time');
     assert.ok(!fs.existsSync(path.join(root, 'images', 'signed-out.png')));
     console.log('✓ signed out: ChatGPT\'s sign-in card, nothing made');
+  }
+
+  // ── Signed in with an API key: the check says ChatGPT needs a ChatGPT account, before any words are typed.
+  {
+    fs.rmSync(`${fixture}.signed-out`);
+    const keyed = new ChatgptPictureHost(() => ({ ...sheet, runtimeAvailability: async () => ({ state: 'ready', usable: true }), codexAuthMethod: async () => 'apiKey' }) as never, {}, 5);
+    const { posted, view } = webview();
+    keyed.handle(doc, view, { type: 'picture/check', requestId: 'c3' });
+    await until(() => posted.length === 1);
+    assert.equal(posted[0].state, 'failed');
+    assert.match(String(posted[0].problem), /ChatGPT account, not an API key/);
+    console.log('✓ an API-key Codex is told at once');
   }
 
   // ── Without the stand-in, the real path asks the AI's sheet whether ChatGPT is ready (here: signed out).
