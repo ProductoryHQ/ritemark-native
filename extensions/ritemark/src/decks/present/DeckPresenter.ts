@@ -53,6 +53,8 @@ import {
   wallPicturePaths,
   wallStateOf,
   chooseDisplays,
+  type WallPointer,
+  type WallTimer,
   PRESENT_NEEDS_PATCHES,
   PRESENT_NEEDS_UPDATE,
   type DeckPresentOptions,
@@ -120,6 +122,8 @@ interface Running {
   page: string | null;
   /** Each blank request and move takes a number: a Q still asking for the page gives way to a later key or move. */
   blankSerial: number;
+  /** Decks README item 9: the exercise's timer, started from the presenter view, until stopped (never saved). */
+  timer: WallTimer | null;
 }
 
 /** The shell's commands (patch 018). */
@@ -247,6 +251,7 @@ export class DeckPresenter implements vscode.Disposable {
       clock: { locale: null, hourCycle: null },
       page: null,
       blankSerial: 0,
+      timer: null,
     };
     this.running = running;
     // Whether the deck is published, and where: the wall and the presenter view get it once it is known, and again
@@ -332,6 +337,10 @@ export class DeckPresenter implements vscode.Disposable {
         if (screen === running.wall) void this.end(running);
         else if (running.presenter === screen) {
           running.presenter = null;
+          // A dot the presenter view was showing goes with it (item 12), and so does the timer (item 9): only the
+          // presenter view can stop it, so it never stays on the wall with nothing to stop it.
+          running.timer = null;
+          void post(running.wall.panel.webview, { type: 'present/pointer', at: null } satisfies WallPointer);
           void this.showWall(running);
         }
       }),
@@ -419,7 +428,11 @@ export class DeckPresenter implements vscode.Disposable {
         screen.loads++;
         for (const resolve of screen.loaded.splice(0)) resolve();
         if (screen === running.wall) await this.showWall(running);
-        else await this.showPresenter(running);
+        else {
+          // The presenter view's page loaded again (Swap displays): an L it held is gone, and so is its dot.
+          await post(running.wall.panel.webview, { type: 'present/pointer', at: null } satisfies WallPointer);
+          await this.showPresenter(running);
+        }
         return;
       case 'present/stop':
         this.stop();
@@ -455,6 +468,17 @@ export class DeckPresenter implements vscode.Disposable {
       case 'present/fill':
         running.focus = { ...running.focus, fill: request.item };
         await this.showSameSlide(running);
+        return;
+      case 'present/timer':
+        // Item 9: started, restarted or stopped from the presenter view; not a move, and it stays across moves.
+        if (screen !== running.presenter) return;
+        running.timer = request.minutes === null ? null : { endsAt: Date.now() + request.minutes * 60_000, minutes: request.minutes };
+        await this.showSameSlide(running);
+        return;
+      case 'present/pointer':
+        // Item 12: the presenter view's dot, relayed to the wall as it comes; nothing is kept, and nothing else is sent.
+        if (screen !== running.presenter) return;
+        await post(running.wall.panel.webview, { type: 'present/pointer', at: request.at } satisfies WallPointer);
         return;
       case 'present/peek': {
         running.session.read(running.origin.document.getText());
@@ -511,7 +535,7 @@ export class DeckPresenter implements vscode.Disposable {
     // An item's place names an item of the slide the wall has: when this draw brings the slide in another form (an edit
     // since, drawn now by a reload, the presenter view turned on or off), the spotlight and a filled wall go, rather
     // than land on another item (review of #790).
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus);
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
       state = { ...state, spot: null, fill: null };
@@ -532,7 +556,7 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill };
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, timer: running.timer };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -563,6 +587,7 @@ export class DeckPresenter implements vscode.Disposable {
       blank: running.blank,
       focus: running.focus,
       clock: running.clock,
+      timer: running.timer,
       page: running.page,
     }, onWall?.slide));
   }

@@ -311,6 +311,74 @@ async function main(): Promise<void> {
     await settle();
     assert.equal(last(wall, 'present/wall').blank, null, "an unpublished deck's Q does nothing");
 
+    // Decks README item 9: the timer, started from the presenter view, is on the wall and stays across moves, blanks
+    // and spotlights until stopped; nothing of it is written to the file.
+    const textBeforeTimer = document.text;
+    const timerStart = Date.now();
+    presenterView.send({ type: 'present/timer', minutes: 20 });
+    await settle();
+    const timed = last(wall, 'present/wall').timer as { endsAt: number; minutes: number };
+    assert.equal(timed.minutes, 20);
+    assert.ok(timed.endsAt >= timerStart + 20 * 60_000 && timed.endsAt <= Date.now() + 20 * 60_000, 'it ends 20 minutes from the start');
+    assert.deepEqual(last(presenterView, 'present/presenter').timer, timed, 'the presenter view has the same timer');
+    presenterView.send({ type: 'present/next' });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').timer, timed, 'it stays across slides');
+    wall.send({ type: 'present/blank', to: 'ground' });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').timer, timed, 'and on a blank wall');
+    wall.send({ type: 'present/blank', to: null });
+    await settle();
+    wall.send({ type: 'present/spot', item: 0 });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').timer, timed, 'and with a spotlight');
+    wall.send({ type: 'present/timer', minutes: 5 });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').timer, timed, "the wall can't set it: only the presenter view offers it");
+    presenterView.send({ type: 'present/timer', minutes: 0 });
+    presenterView.send({ type: 'present/timer', minutes: 'ten' });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').timer, timed, 'minutes that are not minutes are not a request');
+    presenterView.send({ type: 'present/timer', minutes: 20 });
+    await settle();
+    assert.ok((last(wall, 'present/wall').timer as { endsAt: number }).endsAt >= timed.endsAt, 'Restart starts it again');
+    presenterView.send({ type: 'present/timer', minutes: null });
+    await settle();
+    assert.equal(last(wall, 'present/wall').timer, null, 'Stop takes it off the wall');
+    assert.equal(last(presenterView, 'present/presenter').timer, null);
+    assert.equal(document.text, textBeforeTimer, 'the timer writes nothing to the file');
+
+    // Item 12: the presenter view's dot is relayed to the wall as it comes, and only the dot: no state is sent.
+    const wallStatesBeforeDot = wall.posted.filter(message => message.type === 'present/wall').length;
+    presenterView.send({ type: 'present/pointer', at: { x: 0.25, y: 0.75 } });
+    await settle();
+    assert.deepEqual(last(wall, 'present/pointer').at, { x: 0.25, y: 0.75 }, 'the wall gets the place');
+    presenterView.send({ type: 'present/pointer', at: null });
+    await settle();
+    assert.equal(last(wall, 'present/pointer').at, null, 'L let go: no dot');
+    presenterView.send({ type: 'present/pointer', at: { x: 2, y: 0.5 } });
+    wall.send({ type: 'present/pointer', at: { x: 0.5, y: 0.5 } });
+    await settle();
+    assert.equal(last(wall, 'present/pointer').at, null, 'a place off the slide, or from the wall itself, is not relayed');
+    assert.equal(wall.posted.filter(message => message.type === 'present/wall').length, wallStatesBeforeDot, 'the dot is no state');
+    assert.equal(document.text, textBeforeTimer, 'the dot writes nothing to the file');
+    // The presenter view's page loaded again (Swap displays) while L was held: the wall's dot goes.
+    presenterView.send({ type: 'present/pointer', at: { x: 0.5, y: 0.5 } });
+    await settle();
+    presenterView.send({ type: 'present/ready' });
+    await settle();
+    assert.equal(last(wall, 'present/pointer').at, null, 'a reloaded presenter view holds no dot');
+    // The presenter view turned off while a timer runs: the timer goes too, since only that view can stop it.
+    presenterView.send({ type: 'present/timer', minutes: 10 });
+    await settle();
+    assert.equal((last(wall, 'present/wall').timer as { minutes: number }).minutes, 10);
+    wall.send({ type: 'present/presenter' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').timer, null, 'no timer left on the wall without the view that stops it');
+    // On again, as the person last chose (the next start opens it too).
+    wall.send({ type: 'present/presenter' });
+    await settle(50);
+
     presenter.dispose();
     await settle();
     assert.ok(panels.every(panel => panel.disposed), 'Stop closes both');
