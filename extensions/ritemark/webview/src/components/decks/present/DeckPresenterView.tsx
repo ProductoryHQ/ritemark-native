@@ -93,7 +93,7 @@ function PresenterTimer({ timer, onRestart, onStop }: { timer: WallTimer; onRest
         <Tooltip label="Stop the timer and take it off the wall">
           <Button variant="outline" onClick={onStop}>
             <Icon name="square" size={16} tone="inherit" />
-            Stop
+            Stop timer
           </Button>
         </Tooltip>
       </div>
