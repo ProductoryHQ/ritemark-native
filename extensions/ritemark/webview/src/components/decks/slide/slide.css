@@ -201,6 +201,34 @@
 /* One look for a place to fill in wherever the code block stands (a tab's pane included): its own colour, never the
    words' around it. */
 .deck-sl.is-blocks .cb-fill, .deck-sl.is-blocks :is(pre, code) .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+/* Sprint 163 PR 3 (the decks README, "The Button block"; tabs-editor.html's `.wmat` and `.wbtn`): a button that opens a
+   full address in a new tab, the words beside it on its left in a quiet box; with no words, the button alone. The same
+   in the slide editor (`ButtonBlock`, its words and its label typed in place) and wherever the renderer draws the slide
+   (`buttonBlock.buttonHtml`): the strip, the wall, the presenter view and the page. Canvas pixels times the fit. */
+.deck-sl.is-blocks .blk-button { display: flex; align-items: center; gap: calc(16px * var(--fit, 1)); margin: 0 0 .55em; padding: calc(10px * var(--fit, 1)) calc(12px * var(--fit, 1)) calc(10px * var(--fit, 1)) calc(18px * var(--fit, 1));
+  border-radius: calc(12px * var(--fit, 1)); background: var(--s-box, rgba(255,255,255,.06)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.12)); box-sizing: border-box; }
+.deck-sl.is-blocks .blk-button.is-solo:not(.is-chosen) { width: fit-content; max-width: 100%; padding: 0; background: none; box-shadow: none; }
+.deck-sl.is-blocks .blk-button.is-solo:not(.is-chosen) > .blk-button-words { display: none; }
+.deck-sl.is-blocks .blk-button-words { flex: 1; min-width: 0; margin: 0; font-size: calc(14px * var(--fit, 1)); line-height: 1.36; color: var(--s-sub, #C7CAEB); }
+.deck-sl.is-blocks .blk-button-words strong { color: var(--s-hd, #fff); }
+.deck-sl.is-blocks .blk-btn { flex: none; display: inline-flex; align-items: center; gap: calc(8px * var(--fit, 1)); height: calc(40px * var(--fit, 1)); max-width: 100%; padding: 0 calc(18px * var(--fit, 1));
+  border-radius: 999px; background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 calc(15px * var(--fit, 1))/1 var(--s-fb, 'Sofia Sans'), sans-serif; text-decoration: none; white-space: nowrap; box-sizing: border-box; }
+.deck-sl.is-blocks .blk-btn-text { min-width: 1ch; overflow: hidden; text-overflow: ellipsis; }
+.deck-sl.is-blocks .blk-btn-icon { display: inline-flex; flex: none; }
+.deck-sl.is-blocks .blk-btn svg { width: calc(16px * var(--fit, 1)); height: calc(16px * var(--fit, 1)); fill: currentColor; }
+.deck-sl.is-blocks .blk-btn-icon > .is-file, .deck-sl.is-blocks .blk-button[data-icon="link"] .blk-btn-icon > .is-file,
+.deck-sl.is-blocks .blk-button[data-icon="file"] .blk-btn-icon > .is-link { display: none; }
+.deck-sl.is-blocks .blk-button[data-icon="file"] .blk-btn-icon > .is-file { display: inline-flex; }
+/* Pressed only where a press opens it: the wall, the presenter view's Now (the host opens it) and the page (a link). */
+:is(.deck-wall, .pv-now) .deck-sl.is-blocks [data-href].blk-btn:hover, .deck-sl.is-blocks a.blk-btn:hover { background: color-mix(in srgb, var(--s-acc, #F2B544) 86%, #fff); }
+:is(.deck-wall, .pv-now) .deck-sl.is-blocks [data-href].blk-btn:active, .deck-sl.is-blocks a.blk-btn:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 88%, #000); }
+/* A button with no full https address yet opens nothing: drawn quieter, so the room sees it isn't ready. */
+.deck-sl.is-blocks .blk-btn.is-unset { opacity: .6; }
+/* A thumbnail's button is drawn, never pressed: a click there is the thumbnail's (as the code block's controls). */
+.deck-thumb .blk-btn, .wall-grid .blk-btn, .pv-row .blk-btn, .pv-side .blk-btn { pointer-events: none; }
+/* The slide editor: the chosen button's accent ring, and its two places to type while they are empty. */
+.deck-sl.is-blocks .blk-button.is-chosen { outline: 2px solid var(--s-acc, #F2B544); outline-offset: calc(5px * var(--fit, 1)); }
+.deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
 .deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }

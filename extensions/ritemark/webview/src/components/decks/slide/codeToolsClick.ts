@@ -9,11 +9,14 @@
  */
 import { createContext, useEffect, type RefObject } from 'react'
 import { isOpenInAddress } from '../../../../../src/decks/blocks/codeTools'
+import { isButtonAddress } from '../../../../../src/decks/blocks/buttonBlock'
 import { sendToExtension } from '../../../bridge'
 
 export interface CodeToolsActions {
   copy: (text: string) => void
   open: (url: string) => void
+  /** Sprint 163 PR 3: a Button block's button, its full https address (`buttonBlock.buttonHtml` puts no other on it). */
+  link?: (url: string) => void
 }
 
 /**
@@ -29,6 +32,7 @@ export const COPIED_MS = 1600
 export const PRESENT_CODE_ACTIONS: CodeToolsActions = {
   copy: text => sendToExtension('present/copy', { text }),
   open: url => sendToExtension('present/open-in', { url }),
+  link: url => sendToExtension('present/open-link', { url }),
 }
 
 const MENU_OPEN = '.cb-menu:not([hidden])'
@@ -66,6 +70,15 @@ export function closeCodeMenus(root: ParentNode, keep: Element | null = null): b
  */
 export function codeToolsClick(target: EventTarget | null, root: ParentNode, actions: CodeToolsActions): 'used' | 'none' {
   const element = target && typeof (target as Element).closest === 'function' ? target as Element : null
+  // Sprint 163 PR 3: a button on the slide opens its address in the person's own browser (the host checks it again);
+  // a button with no full https address does nothing, and neither moves the wall on.
+  const button = element?.closest('.blk-btn') ?? null
+  if (button && actions.link) {
+    closeCodeMenus(root)
+    const href = button.getAttribute('data-href')
+    if (isButtonAddress(href)) actions.link(href)
+    return 'used'
+  }
   const tools = element?.closest('.cb-tools') ?? null
   if (!tools) return closeCodeMenus(root) ? 'used' : 'none'
   // A pressed control keeps no focus: the wall shows no ring once its menu closes (the keyboard never reaches them).

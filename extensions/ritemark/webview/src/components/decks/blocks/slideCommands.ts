@@ -23,15 +23,16 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
-import { BULLET_LIST_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, TABS_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { SLIDE_COMMAND, placeBlock } from '../../../extensions/blockPlacement'
+import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, TABS_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
 import { canHoldTabs } from '../../../extensions/tabs/tabsCommands'
 
-/** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own. */
-export const SLIDE_COMMAND = 'deckSlideCommand'
+/** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own (`blockPlacement`). */
+export { SLIDE_COMMAND }
 
 /** Is a slide editor transaction an undo step of its own: a block, an icon, a row, or a table's handles (experience 48)? */
 export function isOwnStep(tr: Transaction): boolean {
@@ -52,6 +53,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
   // Sprint 163: tabs, each pane ordinary blocks (decks README "Tabs in the editor").
   { group: 'Blocks', title: 'Tabs', description: '', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
+  // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
+  { group: 'Blocks', title: 'Button', description: '', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
   { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda', keywords: ['contents', 'toc', 'sisukord', 'päevakava'] },
   { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture', keywords: PICTURE_KEYWORDS },
@@ -109,33 +112,7 @@ export function slideBlockNode(schema: Schema, kind: SlideBlockKind, tag: string
  * inside a table: a Markdown table's cell holds one line, so the block goes after the table (review of #769).
  */
 export function insertSlideBlock(tr: Transaction, at: number, node: PMNode): Transaction {
-  const $pos = tr.doc.resolve(Math.max(0, Math.min(at, tr.doc.content.size)))
-  // The shallowest table on the way down: the levels from there on can't hold a block.
-  let tableDepth = -1
-  for (let depth = 1; depth <= $pos.depth; depth++) {
-    if (isTablePart($pos.node(depth))) { tableDepth = depth; break }
-  }
-  let placed = -1
-  if (tableDepth < 0 && $pos.depth > 0 && $pos.parent.type.name === 'paragraph' && $pos.parent.content.size === 0) {
-    const depth = $pos.depth
-    const holder = $pos.node(depth - 1)
-    const index = $pos.index(depth - 1)
-    if (holder.canReplaceWith(index, index + 1, node.type)) {
-      placed = $pos.before(depth)
-      tr.replaceWith(placed, $pos.after(depth), node)
-    }
-  }
-  if (placed < 0 && $pos.depth === 0 && tr.doc.canReplaceWith($pos.index(0), $pos.index(0), node.type)) {
-    placed = $pos.pos
-    tr.insert(placed, node)
-  }
-  for (let depth = (tableDepth < 0 ? $pos.depth : tableDepth) - 1; placed < 0 && depth >= 0; depth--) {
-    // After the child that holds the caret at this level, where that level can hold the block.
-    const index = $pos.index(depth) + 1
-    if (!$pos.node(depth).canReplaceWith(index, index, node.type)) continue
-    placed = $pos.after(depth + 1)
-    tr.insert(placed, node)
-  }
+  const placed = placeBlock(tr, at, node)
   if (placed < 0) return tr
   tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(placed + 1, tr.doc.content.size))))
   return tr.setMeta(SLIDE_COMMAND, true).scrollIntoView()

@@ -1,0 +1,44 @@
+/* Sprint 163 PR 3 (the decks README, "The Button block"; tabs-editor.html's `#bbar2`, `#apop`, `.wmat` and `.wbtn`).
+   The chosen button's bar and its address sheet (on a slide and in a Text document), and the button's look in a Text
+   document. On a slide the button is the slide's own (`slide.css`, `.deck-sl.is-blocks .blk-button`): nothing here
+   reaches inside a slide. */
+
+/* ---- The bar: the block bar's look (decks.css `.deck-block-bar`), the page's own size, in document.body. */
+.btn-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); color: var(--r-ink-strong);
+  box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
+.btn-block-bar [data-state="active"] { background: var(--r-surface-muted); color: var(--r-accent); }
+.btn-block-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--r-hairline-strong); }
+
+/* ---- The address sheet, under the bar (over it when the bar is over the button). */
+.btn-block-sheet { position: fixed; z-index: 41; width: 360px; max-width: calc(100vw - 16px); padding: 8px 10px 10px; border-radius: 12px; box-sizing: border-box; background: var(--r-surface); color: var(--r-ink-strong);
+  box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 14px 32px -10px rgba(30, 27, 75, .4); }
+.btn-block-sheet-head { padding: 2px 2px 8px; font: 700 11px/16px 'Sofia Sans', sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--r-ink-muted); }
+.btn-block-sheet-input { display: block; width: 100%; height: 34px; padding: 0 10px; border: 0; border-radius: 8px; box-sizing: border-box; background: var(--r-surface); color: var(--r-ink-strong);
+  box-shadow: inset 0 0 0 1px var(--r-hairline-strong); font: 500 13.5px/34px 'Sofia Sans', sans-serif; }
+.btn-block-sheet-input:focus { outline: 2px solid var(--r-accent); outline-offset: 0; }
+.btn-block-sheet-input[aria-invalid="true"] { box-shadow: inset 0 0 0 1px var(--r-warning-line, #F59E0B); }
+.btn-block-sheet-hint { margin: 8px 2px; font: 400 12.5px/1.4 'Sofia Sans', sans-serif; color: var(--r-ink-muted); }
+.btn-block-sheet-hint.is-refused { color: var(--r-warning-ink, #B45309); }
+.btn-block-sheet-row { display: flex; justify-content: flex-end; }
+
+/* ---- The button in a Text document (a deck's handout is one): the words beside it in a quiet box, the button in the
+   app's accent; alone, the button. Never a slide's (its own look is the theme's, slide.css). */
+.blk-button:not(.deck-sl *) { display: flex; align-items: center; gap: 16px; margin: 0.75em 0; padding: 10px 12px 10px 18px; border-radius: 12px; box-sizing: border-box;
+  background: var(--r-surface-muted); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); }
+.blk-button.is-solo:not(.is-chosen):not(.deck-sl *) { width: fit-content; max-width: 100%; padding: 0; background: none; box-shadow: none; }
+.blk-button.is-solo:not(.is-chosen):not(.deck-sl *) > .blk-button-words { display: none; }
+.blk-button:not(.deck-sl *) > .blk-button-words { flex: 1; min-width: 0; margin: 0; }
+.blk-button:not(.deck-sl *) .blk-btn { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 36px; max-width: 100%; padding: 0 16px; border-radius: 999px; box-sizing: border-box;
+  background: var(--r-accent); color: #fff; font: 700 14px/1 'Sofia Sans', sans-serif; white-space: nowrap; }
+.blk-button:not(.deck-sl *) .blk-btn-text { min-width: 1ch; overflow: hidden; text-overflow: ellipsis; }
+.blk-button:not(.deck-sl *) .blk-btn-icon { display: inline-flex; flex: none; }
+.blk-button:not(.deck-sl *) .blk-btn svg { width: 16px; height: 16px; fill: currentColor; }
+.blk-button:not(.deck-sl *) .blk-btn-icon > .is-file, .blk-button[data-icon="file"]:not(.deck-sl *) .blk-btn-icon > .is-link { display: none; }
+.blk-button[data-icon="file"]:not(.deck-sl *) .blk-btn-icon > .is-file { display: inline-flex; }
+.blk-button.is-chosen:not(.deck-sl *) { outline: 2px solid var(--r-accent); outline-offset: 4px; }
+.blk-button:not(.deck-sl *) [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
+
+/* ---- Both: the button's own empty words say "Button", faint, while they wait. */
+.blk-btn[data-empty] .blk-btn-text::before { content: 'Button'; opacity: .6; pointer-events: none; }
+/* The words beside it: their faint words sit at the caret, never after an empty line's break. */
+.blk-button-words[data-empty]::before { float: left; height: 0; white-space: nowrap; }

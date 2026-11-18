@@ -37,7 +37,8 @@ import * as vscode from 'vscode';
 import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { isOpenInOff, parseDeck } from '../deckFormat';
-import { openInBrowser } from '../openInLink';
+import { openButtonLink, openInBrowser } from '../openInLink';
+import { deckButtonAddresses } from '../deckButtons';
 import { BUILT_IN_THEME, parseTheme, themePathOf, themeWithLogoAddresses, type DeckTheme } from '../deckTheme';
 import { deckThemeFor, resolveAssetsIn } from '../deckPages';
 import { sessionLineOf } from '../page/publicDeck';
@@ -462,6 +463,11 @@ export class DeckPresenter implements vscode.Disposable {
       case 'present/open-in':
         // Its ↗ Open in Claude or ChatGPT, in the person's own browser; not a move.
         openInBrowser(request.url);
+        return;
+      case 'present/open-link':
+        // Sprint 163 PR 3: a Button block's button, in the person's own browser; not a move. Only an address a button
+        // of the deck carries now: the wall asks for nothing else.
+        openButtonLink(request.url, address => deckButtonAddresses(running.origin.document.getText()).has(address));
         return;
       case 'present/presenter':
         await this.setPresenter(!running.presenter);

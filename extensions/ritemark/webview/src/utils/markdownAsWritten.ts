@@ -131,7 +131,7 @@ function withAttributes(html: string, tag: string, extra: string): string {
   return extra && html.startsWith(`<${tag}`) ? `<${tag}${extra}${html.slice(tag.length + 1)}` : html
 }
 
-function tightAttribute(token: Token): string | undefined {
+export function tightAttribute(token: Token): string | undefined {
   return (token as Token & AsWrittenToken).rmTight ? 'true' : undefined
 }
 
@@ -553,6 +553,8 @@ function blockKind(node: Element): BlockKind {
   if (node.nodeName === 'DIV' && node.hasAttribute('data-fdiv')) return 'fdiv'
   // The decks README, small details 14: the Agenda, a `:::` block too (`::: agenda`, `:::`).
   if (node.nodeName === 'DIV' && node.hasAttribute('data-agenda')) return 'fdiv'
+  // Sprint 163 PR 3: a Button block is a paragraph in the file (its words, then its `{.button}` link).
+  if (node.nodeName === 'DIV' && node.hasAttribute('data-button')) return 'paragraph'
   switch (node.nodeName) {
     case 'P': case 'IMG': return 'paragraph'
     case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': return 'heading'
@@ -592,13 +594,13 @@ function writtenTight(previous: Element | null, next: Element): boolean {
 }
 
 /** The newlines before a top-level block. */
-function blockLeading(node: Element): string {
+export function blockLeading(node: Element): string {
   if (isList(node) && node.getAttribute('data-md-continues') === 'true' && isList(node.previousElementSibling)) return '\n'
   return writtenTight(node.previousElementSibling, node) ? '\n' : '\n\n'
 }
 
 /** The newlines after a top-level block. */
-function blockTrailing(node: Element): string {
+export function blockTrailing(node: Element): string {
   const next = node.nextElementSibling
   if (!next) return '\n\n'
   if (isList(node) && isList(next) && next.getAttribute('data-md-continues') === 'true') return lastItemGap(node) ? '\n\n' : '\n'

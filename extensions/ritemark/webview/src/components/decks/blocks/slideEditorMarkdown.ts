@@ -28,6 +28,7 @@ import { commentMarkedExtension } from '../../../extensions/comment/commentMarke
 import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
 import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
+import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
@@ -80,6 +81,8 @@ slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMa
 slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Sprint 163: the Tabs block, as the Text editor reads it.
 slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// Sprint 163 PR 3: the Button block, read as the Text editor reads it.
+slideEditorMarked.use(buttonMarkedExtension)
 
 let slideComments = false
 

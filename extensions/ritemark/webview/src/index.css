@@ -30,6 +30,8 @@
   [role="option"]:not([aria-disabled="true"]),
   [role="tab"],
   a[href],
+  .deck-wall [role="link"][data-href],
+  .pv-now [role="link"][data-href],
   label[for],
   summary,
   select,

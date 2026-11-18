@@ -7,6 +7,7 @@ import type { PhosphorIconName } from '../components/ui/Icon'
 import type { Transaction } from '@tiptap/pm/state'
 import { sendToExtension, emitInternalEvent } from '../bridge'
 import { insertTabsBlock } from './tabs/tabsCommands'
+import { insertButton } from './buttonBlock/buttonCommands'
 
 export interface BlockItemDef {
   title: string
@@ -34,6 +35,8 @@ export const TABLE_KEYWORDS = ['grid', 'tabel']
 export const TABS_KEYWORDS = ['tab', 'tabs', 'tabset', 'sakid', 'sakk', 'vahelehed']
 /** Sprint 163 PR 1: Code Block's words, shared with the slide's Code block (both / menus find it by them). */
 export const CODE_BLOCK_KEYWORDS = ['code', 'snippet', 'kood']
+/** Sprint 163 PR 3: the Button block's hidden words (the decks README), the same in both / menus. */
+export const BUTTON_KEYWORDS = ['link', 'file', 'material', 'download', 'nupp', 'fail', 'materjal']
 
 export const blockItems: BlockItemDef[] = [
   { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },
@@ -50,6 +53,8 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
   // Sprint 163: tabs, each pane ordinary blocks; the same block as on a slide (decks README "Tabs, one block everywhere").
   { title: 'Tabs', description: 'Insert tabs, each with its own text', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
+  // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
+  { title: 'Button', description: 'A button that opens an address', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
   { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio', keywords: ['drawio', 'draw.io', 'chart', 'skeem'] },
   // Experience 22 (18 November): one name for a picture, as experience 49 made it one picture editor; "image" finds it.
@@ -142,6 +147,12 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     return
   }
 
+  // Sprint 163 PR 3: the button where the / was, its address sheet open at once (`ButtonBlockTools`).
+  if (item.nodeType === 'button') {
+    editor.chain().focus().deleteRange(range).command(({ tr }: { tr: Parameters<typeof insertButton>[0] }) => { insertButton(tr, range.from); return true }).run()
+    return
+  }
+
   const chain = editor.chain().focus().deleteRange(range)
 
   switch (item.nodeType) {
@@ -206,6 +217,12 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
   // Sprint 163: a new Tabs block at the position, its first name chosen.
   if (item.nodeType === 'tabs') {
     editor.chain().focus().command(({ tr }: { tr: Transaction }) => { insertTabsBlock(tr, pos, editor.view); return true }).run()
+    return
+  }
+
+  // Sprint 163 PR 3: the button at the block menu's place, its address sheet open at once.
+  if (item.nodeType === 'button') {
+    editor.chain().focus().insertContentAt(pos, { type: 'paragraph' }).command(({ tr }: { tr: Parameters<typeof insertButton>[0] }) => { insertButton(tr, pos + 1); return true }).run()
     return
   }
 

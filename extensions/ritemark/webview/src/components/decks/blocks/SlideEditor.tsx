@@ -64,6 +64,8 @@ import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
 import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
+import { ButtonBlockTools } from '../../../extensions/buttonBlock/ButtonBlockTools'
+import { BUTTON_ASK, buttonNode } from '../../../extensions/buttonBlock/buttonCommands'
 import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -752,6 +754,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             return true
           }).run()
           return
+        case 'button':
+          // Sprint 163 PR 3: a button where the / was, an undo step of its own; its address sheet opens at once.
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, buttonNode(editor.schema)); tr.setMeta(BUTTON_ASK, true); return true }).run()
+          return
         case 'agenda':
           // One block line pair, an undo step of its own; the list is the deck's, drawn where it stands.
           chain().command(({ tr }) => { insertSlideBlock(tr, range.from, agendaNode(editor.schema)); return true }).run()
@@ -1145,6 +1151,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           ))}
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
           <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} pickIcon={divHandlers.pickIcon} />
+          {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
+          <ButtonBlockTools editor={editor} frame={frame} />
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />

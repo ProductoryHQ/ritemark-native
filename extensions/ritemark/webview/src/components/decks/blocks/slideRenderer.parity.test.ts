@@ -27,6 +27,8 @@ function outlineOfHTML(html: string): Outline {
     for (const child of Array.from(node.children)) {
       const tag = child.nodeName.toLowerCase()
       const classes = (child.getAttribute('class') ?? '').split(/\s+/)
+      // Sprint 163 PR 3: a Button block, its words beside it and on it (its icon is the renderer's own drawing).
+      if (tag === 'div' && classes.includes('blk-button')) { out.push(`${depth}:button ${words(child)}`); continue }
       if (tag === 'div') {
         const known = classes.map(name => name.replace(/^blk-/, '')).filter(name => KNOWN.includes(name))
         out.push(`${depth}:div.${known.join(' ') || 'block'}`)
@@ -62,6 +64,7 @@ function outlineOfDoc(doc: PMNode): Outline {
         case 'heading': out.push(`${depth}:h${child.attrs.level} ${text(child)}`); break
         case 'paragraph': out.push(`${depth}:p ${text(child)}`); break
         case 'codeBlock': out.push(`${depth}:pre ${text(child)}`); break
+        case 'buttonBlock': out.push(`${depth}:button ${text(child)}`); break
         case 'image': out.push(`${depth}:img ${child.attrs.src}`); break
         case 'bulletList': out.push(`${depth}:ul`); walk(child, depth + 1); break
         case 'orderedList': out.push(`${depth}:ol`); walk(child, depth + 1); break
@@ -103,6 +106,8 @@ const SPIKE = [
   '# Plan\n\n::: {reveal="one"}\n1. Open the file\n2. Ask the question\n:::',
   // Sprint 163 PR 1: a prompt in a code block, with a place to fill in, in a column too.
   '# Prompt\n\n```\nSummarise [the report] & stop.\n```\n\n:::: columns\n::: column\n```text\nOne [place]\n```\n:::\n::: column\nB\n:::\n::::',
+  // Sprint 163 PR 3: a Button block with words beside it, one alone in a column, and one with no full address.
+  '# Material\n\nUse **this** & that. [Open the sample](https://example.com/a.pdf){.button}\n\n:::: columns\n::: column\n[Open](https://example.com){.button}\n:::\n::: column\n[Not yet](http://example.com){.button}\n:::\n::::',
 ]
 
 const here = path.dirname(fileURLToPath(import.meta.url))
