@@ -203,7 +203,9 @@ export function themeTextWith(text: string, changes: ThemeChanges): string {
   }
   const removeLogo = changed.logo === null;
   // The lines that go: all the logo's with the logo (its second version too), or one second version's.
-  const removeKeys = removeLogo ? LOGO_KEYS : SECOND_FIELDS.filter(field => changed[field] === null).map(field => THEME_KEYS[field]);
+  // A second version's Remove takes out both grounds' lines (a hand-written file may name both; the tab shows one), so
+  // the other never takes its place unseen (the review of #798).
+  const removeKeys = removeLogo ? LOGO_KEYS : SECOND_FIELDS.some(field => changed[field] === null) ? SECOND_FIELDS.map(field => THEME_KEYS[field]) : [];
   const fields = FIELDS.filter(field => changed[field] !== undefined && changed[field] !== null);
   if (fields.length === 0 && removeKeys.length === 0) return text;
   const eol = text.includes('\r\n') ? '\r\n' : '\n';

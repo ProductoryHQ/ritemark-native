@@ -128,7 +128,7 @@ interface LogoBoxProps {
 /** One logo's box: the picture on its ground (or its missing file's name), with Replace and Remove. */
 function LogoBox({ file, url, alt, ground, caption, replaceTip, removeTip, onRemove, dropping }: LogoBoxProps) {
   return (
-    <div className={`theme-logo-box${dropping.over ? ' is-over' : ''}${url ? '' : ' is-missing'}`} style={url ? { background: ground } : undefined} {...dropping.drop}>
+    <div className={`theme-logo-box${caption ? ' has-caption' : ''}${dropping.over ? ' is-over' : ''}${url ? '' : ' is-missing'}`} style={url ? { background: ground } : undefined} {...dropping.drop}>
       {url ? (
         <img className="theme-logo-picture" src={url} alt={alt} draggable={false} />
       ) : (

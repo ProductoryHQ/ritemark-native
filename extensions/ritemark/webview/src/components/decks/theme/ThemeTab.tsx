@@ -203,7 +203,9 @@ export function ThemeTab({ syncTarget, onExternalApplied, dialogs }: ThemeTabPro
   const theme = useMemo(() => {
     if (!state) return null
     const parsed = parseTheme(state.text)
-    return themeWithLogoAddresses(parsed, state.logo?.url, state.logo?.aspect, state.logo?.second?.url, state.logo?.second?.aspect)
+    // The host's second picture only while it is the file the draft names (as the Logo row checks it).
+    const second = state.logo?.second && state.logo.second.file === parsed.logo?.second?.file ? state.logo.second : null
+    return themeWithLogoAddresses(parsed, state.logo?.url, state.logo?.aspect, second?.url, second?.aspect)
   }, [state])
   const set = useCallback((changes: ThemeChanges) => { setCheckResult(null); sendToExtension('theme/set', { changes }) }, [])
   const save = useCallback(() => sendToExtension('theme/save'), [])

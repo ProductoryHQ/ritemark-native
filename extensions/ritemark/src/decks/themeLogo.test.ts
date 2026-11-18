@@ -402,6 +402,10 @@ async function main(): Promise<void> {
     assert.deepEqual(parseTheme(withLines('logo: L.svg', 'logo-for-light: Light.svg')).logo?.second, { file: 'Light.svg', ground: 'light' });
     assert.deepEqual(parseTheme(withLines('logo: L.svg', 'logo-for-light: Light.svg', 'logo-for-dark: Dark.svg')).logo?.second, { file: 'Dark.svg', ground: 'dark' });
     assert.equal(parseTheme(withLines('logo-for-dark: Dark.svg')).logo, undefined, 'a second version alone is no logo');
+    // A file naming both: Remove takes both lines, so the other never takes the shown one's place (the review of #798).
+    const both = withLines('logo: L.svg', 'logo-for-light: Light.svg', 'logo-for-dark: Dark.svg');
+    assert.equal(themeTextWith(both, { logoForDark: null }), withLines('logo: L.svg'));
+    assert.equal(parseTheme(themeTextWith(both, { logoForDark: null })).logo?.second, undefined);
     // The tab may only take a second version out; the host names the picture.
     assert.ok(isThemeChanges({ logoForLight: null }) && isThemeChanges({ logoForDark: null }));
     assert.ok(!isThemeChanges({ logoForLight: 'Evil.svg' }) && !isThemeChanges({ logoForDark: '../x.svg' }));
@@ -461,6 +465,7 @@ async function main(): Promise<void> {
     const read = (file: string) => fs.readFileSync(path.join(extension, file), 'utf8');
     assert.match(read('webview/src/components/decks/slide/SlideCanvas.tsx'), /themeSlideLogo\(theme, borderless\), \[[^\]]*secondUrl[^\]]*borderless\]/);
     assert.match(read('webview/src/components/decks/slide/slideMarkup.ts'), /themeSlideLogo\(options\.theme, options\.borderless\)/);
+    assert.match(read('webview/src/components/decks/theme/ThemeTab.tsx'), /state\.logo\.second\.file === parsed\.logo\?\.second\?\.file/, 'the preview draws the host\'s second picture only while the draft names it');
     assert.match(read('src/decks/present/DeckPresenter.ts'), /themeWithLogoAddresses\(theme, read\.logo, read\.logoAspect, read\.secondLogo, read\.secondLogoAspect\)/, 'the wall');
   });
 

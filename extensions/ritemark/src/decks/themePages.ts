@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
-import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, parseTheme, secondLogoGround, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, parseTheme, secondLogoGround, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type LogoGround, type ThemeEntry } from './deckTheme';
 import { frontMatterField } from './deckFormat';
 import { themeModeOf } from './deckMode';
 import { deckName, type DeckLibrary } from './DeckLibrary';
@@ -320,7 +320,8 @@ export class ThemePages implements vscode.Disposable {
       case 'theme/choose-logo': {
         const second = request.second === true;
         const picked = await this.chooseLogo(view, second);
-        if (picked) await this.queue(document, () => this.takeLogo(view, picked.name, picked.bytes, second));
+        // The ground the dialog named is the one written, whatever the draft did while it was open (the review of #798).
+        if (picked) await this.queue(document, () => this.takeLogo(view, picked.name, picked.bytes, second, picked.ground));
         return;
       }
       // Sprint 162 PR 5: Check all colours and Fix the colours, Ritemark's own; a fix goes into the draft, one step
@@ -338,7 +339,7 @@ export class ThemePages implements vscode.Disposable {
   }
 
   /** Choose a file… on the Logo row: an SVG or a PNG, from the project's folder at first. Null when nothing is taken. */
-  private async chooseLogo(view: ThemeView, second = false): Promise<{ name: string; bytes: Buffer } | null> {
+  private async chooseLogo(view: ThemeView, second = false): Promise<{ name: string; bytes: Buffer; ground?: LogoGround } | null> {
     const root = rootOf(view.document.uri.fsPath);
     const ground = second ? secondLogoGround(parseTheme(view.document.getText())) : null;
     const picked = await vscode.window.showOpenDialog({
@@ -359,7 +360,7 @@ export class ThemePages implements vscode.Disposable {
         await this.post(view.panel.webview, { type: 'theme/notice', text: LOGO_TOO_LARGE });
         return null;
       }
-      return { name: path.basename(uri.fsPath), bytes: await fs.promises.readFile(uri.fsPath) };
+      return { name: path.basename(uri.fsPath), bytes: await fs.promises.readFile(uri.fsPath), ...(ground ? { ground } : {}) };
     } catch {
       await this.post(view.panel.webview, { type: 'theme/notice', text: 'That file could not be read.' });
       return null;
@@ -378,7 +379,7 @@ export class ThemePages implements vscode.Disposable {
    * the theme names already when it is replaced, else the one for the ground the theme isn't on. Only a theme with a
    * logo takes one.
    */
-  private async takeLogo(view: ThemeView, name: string, bytes: Buffer, second = false): Promise<void> {
+  private async takeLogo(view: ThemeView, name: string, bytes: Buffer, second = false, chosenGround?: LogoGround): Promise<void> {
     const say = (text: string) => this.post(view.panel.webview, { type: 'theme/notice', text });
     const problem = logoProblem(name, bytes);
     const kind = logoKindOfName(name);
@@ -391,7 +392,7 @@ export class ThemePages implements vscode.Disposable {
       await say('Add the logo first; its version for the other slides goes with it.');
       return;
     }
-    const ground = second ? secondLogoGround(draft) : undefined;
+    const ground = second ? chosenGround ?? secondLogoGround(draft) : undefined;
     const themeFile = view.document.uri.fsPath;
     const folder = path.dirname(themeFile);
     const root = rootOf(themeFile);

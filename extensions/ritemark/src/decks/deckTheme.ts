@@ -86,12 +86,17 @@ export function otherGround(ground: LogoGround): LogoGround {
  * follow (`themeVars`).
  */
 export function groundOf(colour: string): LogoGround {
+  return luminanceOf(colour) < 0.2 ? 'dark' : 'light';
+}
+
+/** WCAG's relative luminance of a `#RRGGBB` colour, the one formula the theme's contrast and ground rules use. */
+export function luminanceOf(colour: string): number {
   const value = colour.replace('#', '');
   const [r, g, b] = [0, 2, 4].map(index => {
     const channel = parseInt(value.substr(index, 2), 16) / 255;
     return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
   });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.2 ? 'dark' : 'light';
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 /** The ground a deck's slides are on: a Card deck's is its theme's, a Borderless deck's is always white. */
@@ -321,9 +326,10 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
   };
   const round = top.corners === 'square' || top.corners === 'round' || top.corners === 'soft' ? top.corners : fallback.round;
   const boxes = top.boxes === 'outline' || top.boxes === 'filled' ? top.boxes : fallback.boxes;
+  const bg = colour(top.background, fallback.bg);
   return {
     name: top.name?.trim() || fallback.name,
-    bg: colour(top.background, fallback.bg),
+    bg,
     head: colour(top.headings, fallback.head),
     text: colour(top.text, fallback.text),
     accent: colour(top.accent, fallback.accent),
@@ -339,7 +345,7 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
       file: top.logo.trim(),
       place: LOGO_PLACES.includes(top['logo-place'] as LogoPlace) ? top['logo-place'] as LogoPlace : DEFAULT_LOGO_PLACE,
       on: LOGO_ONS.includes(top['logo-on'] as LogoOn) ? top['logo-on'] as LogoOn : DEFAULT_LOGO_ON,
-      ...secondLogoOf(top, colour(top.background, fallback.bg)),
+      ...secondLogoOf(top, bg),
     } } : {}),
   };
 }
