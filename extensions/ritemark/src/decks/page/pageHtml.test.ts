@@ -81,6 +81,20 @@ assert.ok(PAGE_CSS.includes('.layer:not(.on):not(.leaving) { display: none; }'))
 }
 // Print draws each slide as the slide does: no print rule moves the words, so a side picture and a logo keep their room.
 assert.ok(!/@media print[\s\S]*\.blk-flow \{[^}]*left: 64px/.test(html));
+// The Experience lead on #807: in one column every block is at reading size, the Tabs block too (workbook.html's values),
+// and no rule of the page names a slide inside a slide (a doubled `.layer` matched nothing, so the narrow ticks were lost).
+{
+  const narrow = /@media screen and \(max-width: 860px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS)![1];
+  for (const rule of [
+    '.blk-tabs > .blk-tabbar > .blk-tab { height: 36px !important; padding: 0 13px !important; font-size: 14px !important;',
+    '.blk-tabpane { padding: 14px; font-size: 15px; line-height: 1.5; }',
+    'pre.cb { font-size: 13.5px; line-height: 21px; }',
+    '.cb-copy { height: 28px; padding: 0 11px; font-size: 13px; }',
+    '.cb-open { width: 28px; height: 28px; padding: 0; }',
+    '.blk-steps .tick { width: 32px; height: 32px;',
+  ]) assert.ok(narrow.includes(`.layer.flow .deck-sl.is-blocks ${rule}`), rule);
+  assert.ok(!/\.layer(?:\.flow)? \.layer\b/.test(PAGE_CSS), 'no slide inside a slide');
+}
 const parts = root.querySelectorAll('#side .part');
 assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);
 assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3', '4']);

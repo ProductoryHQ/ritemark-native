@@ -637,8 +637,17 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks table { display: block; overflow-x: auto; max-width: 100%; }
   .layer.flow .deck-sl.is-blocks .blk-pic { max-height: 60vh; }
   .layer.flow .deck-sl.is-blocks .blk-steps ol > li { padding-left: 46px; min-height: 32px; margin-bottom: .7em; }
-  .layer.flow .layer .deck-sl.is-blocks .blk-steps .tick { width: 32px; height: 32px; top: -3px; border-radius: 8px; font-size: 16px; }
-  .layer.flow .layer .deck-sl.is-blocks .blk-steps .tick svg { width: 17px; height: 17px; }
+  .layer.flow .deck-sl.is-blocks .blk-steps .tick { width: 32px; height: 32px; top: -3px; border-radius: 8px; font-size: 16px; }
+  .layer.flow .deck-sl.is-blocks .blk-steps .tick svg { width: 17px; height: 17px; }
+  /* Every block at reading size, the Tabs block too (the Experience lead on #807; workbook.html's one column): tab names
+     14 px on a 36 px tab with 13 px sides, pane words 15 px at 1.5, code 13.5 px on a 21 px line, Copy 28 px at 13 px, the
+     arrow's circle 28 px. The band scrolls sideways when the tabs don't fit, as on a slide. */
+  .layer.flow .deck-sl.is-blocks .blk-tabs > .blk-tabbar > .blk-tab { height: 36px !important; padding: 0 13px !important; font-size: 14px !important; line-height: 36px; }
+  .layer.flow .deck-sl.is-blocks .blk-tabpane { padding: 14px; font-size: 15px; line-height: 1.5; }
+  .layer.flow .deck-sl.is-blocks pre.cb { font-size: 13.5px; line-height: 21px; }
+  .layer.flow .deck-sl.is-blocks .cb-copy { height: 28px; padding: 0 11px; font-size: 13px; }
+  .layer.flow .deck-sl.is-blocks .cb-open { width: 28px; height: 28px; padding: 0; }
+  .layer.flow .deck-sl.is-blocks .cb-tools svg { width: 15px; height: 15px; }
   .side { position: relative; inset: auto; z-index: 1; width: auto; padding: 4px 16px calc(var(--line-h) + 16px); background: none; box-shadow: none; overflow: visible; }
   .side .sclose { display: none; }
   .line { background: var(--lbar); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 -1px 0 var(--lsep); padding-left: 16px; }
@@ -700,7 +709,7 @@ export const PRINT_CSS = `
   .layer .deck-sl.is-blocks.pic-right .photo { right: 0; width: 384px; }
   .layer .deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
   .layer .deck-sl.is-blocks.pic-behind .veil { inset: 0; }
-  .layer .layer .deck-sl.is-blocks .blk-steps .tick { box-shadow: none; }
+  .layer .deck-sl.is-blocks .blk-steps .tick { box-shadow: none; }
   .side > .part, .side > .pre { display: block; }
   .side > .part.only { display: none; }
   .part { padding: 0 0 7mm; margin: 0; border-top: 0; break-inside: avoid; page-break-inside: avoid; }
