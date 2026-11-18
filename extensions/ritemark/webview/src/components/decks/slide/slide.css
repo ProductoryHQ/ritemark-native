@@ -350,10 +350,6 @@
 .deck-sl.is-blocks .blk-tabpanes { flex: 0 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); background: var(--s-tpane, #0E0F2C); }
 .deck-sl.is-blocks .blk-tabpane { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: hidden auto; box-sizing: border-box; padding: 1.07em 1.2em 1.2em; visibility: hidden; color: var(--s-tx, #D5D8F2); font-size: .625em; line-height: 1.47; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
 .deck-sl.is-blocks .blk-tabpane > :last-child { margin-bottom: 0; }
-/* A prompt in a pane is a code block in the slide's own words' colour: the stage's code block (the Text editor's node)
-   would take the document's ink, dark on the dark pane. */
-.deck-sl.is-blocks .blk-tabpane pre, .deck-sl.is-blocks .blk-tabpane pre code, .deck-sl.is-blocks .blk-tabpane pre code * { color: var(--s-tx, #E4E6F7); }
-.deck-sl.is-blocks .blk-tabpane pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .deck-sl.is-blocks .blk-tabpane h3 { font-size: 1.15em; }
 .deck-sl.is-blocks .blk-tabname { display: none; }
 /* The chosen pane: the first by default, the presenter's choice in Present, the person's on the stage. The renderer and
