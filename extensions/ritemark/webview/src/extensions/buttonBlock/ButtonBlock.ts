@@ -51,7 +51,7 @@ export const ButtonBlock = Node.create({
 
   renderHTML({ node, HTMLAttributes }) {
     const href = String(node.attrs.href ?? '')
-    return ['div', mergeAttributes({ 'data-button': '', class: 'blk-button', 'data-icon': buttonIconOf(isButtonAddress(href) ? href : null) }, HTMLAttributes), 0]
+    return ['div', mergeAttributes({ 'data-button': '', class: 'blk-button', 'data-icon': href ? buttonIconOf(isButtonAddress(href) ? href : null) : 'file' }, HTMLAttributes), 0]
   },
 })
 
@@ -122,7 +122,12 @@ export const ButtonLabel = Node.create({
   },
 })
 
-const decorationsKey = new PluginKey('buttonBlockLook')
+const decorationsKey = new PluginKey<boolean>('buttonBlockLook')
+
+/** The button's ring off: the focus left the editor from its address sheet (a press elsewhere). */
+export function unchooseButton(view: { state: import('@tiptap/pm/state').EditorState; dispatch: (tr: import('@tiptap/pm/state').Transaction) => void }): void {
+  view.dispatch(view.state.tr.setMeta(decorationsKey, false))
+}
 
 /**
  * The chosen button's ring (`is-chosen`), a button with no words beside it (`is-solo`), and the faint words of its two
@@ -131,12 +136,30 @@ const decorationsKey = new PluginKey('buttonBlockLook')
 const ButtonLook = Extension.create({
   name: 'buttonBlockLook',
   addProseMirrorPlugins() {
-    return [new Plugin({
+    return [new Plugin<boolean>({
       key: decorationsKey,
+      // Whether the editor has the focus: a button is chosen (its ring) only then, never while the person writes elsewhere.
+      state: {
+        init: () => false,
+        apply: (tr, focused) => {
+          const meta = tr.getMeta(decorationsKey) as boolean | undefined
+          return meta === undefined ? focused : meta
+        },
+      },
       props: {
+        handleDOMEvents: {
+          focus: view => { view.dispatch(view.state.tr.setMeta(decorationsKey, true)); return false },
+          // Into the button's own bar or address sheet, the button stays chosen.
+          blur: (view, event) => {
+            const to = (event as FocusEvent).relatedTarget as Element | null
+            if (to && typeof to.closest === 'function' && to.closest('.btn-block-bar, .btn-block-sheet')) return false
+            view.dispatch(view.state.tr.setMeta(decorationsKey, false))
+            return false
+          },
+        },
         decorations(state) {
           if (!state.schema.nodes[BUTTON_NODE]) return null
-          const chosen = buttonAt(state)
+          const chosen = decorationsKey.getState(state) ? buttonAt(state) : null
           const decorations: Decoration[] = []
           state.doc.descendants((node, pos) => {
             if (node.type.name !== BUTTON_NODE) return !node.isTextblock && !node.isAtom
@@ -144,7 +167,7 @@ const ButtonLook = Extension.create({
             const label = node.child(1)
             const classes = [words.content.size === 0 ? 'is-solo' : '', chosen?.pos === pos ? 'is-chosen' : ''].filter(Boolean).join(' ')
             if (classes) decorations.push(Decoration.node(pos, pos + node.nodeSize, { class: classes }))
-            if (words.content.size === 0) decorations.push(Decoration.node(pos + 1, pos + 1 + words.nodeSize, { 'data-empty': '', 'data-placeholder': BUTTON_WORDS.wordsPlaceholder }))
+            if (words.content.size === 0) decorations.push(Decoration.node(pos + 1, pos + 1 + words.nodeSize, { 'data-empty': '', 'data-button-placeholder': BUTTON_WORDS.wordsPlaceholder }))
             if (label.content.size === 0) {
               const from = pos + 1 + words.nodeSize
               decorations.push(Decoration.node(from, from + label.nodeSize, { 'data-empty': '' }))

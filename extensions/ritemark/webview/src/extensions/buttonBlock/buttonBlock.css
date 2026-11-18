@@ -36,7 +36,7 @@
 .blk-button:not(.deck-sl *) .blk-btn-icon > .is-file, .blk-button[data-icon="file"]:not(.deck-sl *) .blk-btn-icon > .is-link { display: none; }
 .blk-button[data-icon="file"]:not(.deck-sl *) .blk-btn-icon > .is-file { display: inline-flex; }
 .blk-button.is-chosen:not(.deck-sl *) { outline: 2px solid var(--r-accent); outline-offset: 4px; }
-.blk-button:not(.deck-sl *) [data-empty]::before { content: attr(data-placeholder); opacity: .55; pointer-events: none; }
+.blk-button:not(.deck-sl *) [data-empty]::before { content: attr(data-button-placeholder); opacity: .55; pointer-events: none; }
 
 /* ---- Both: the button's own empty words say "Button", faint, while they wait. */
 .blk-btn[data-empty] .blk-btn-text::before { content: 'Button'; opacity: .6; pointer-events: none; }

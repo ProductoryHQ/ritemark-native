@@ -24,6 +24,7 @@ import { Tooltip } from '../../components/ui/tooltip'
 import { Icon } from '../../components/ui/Icon'
 import { useDismissOnOutside } from '../../lib/dismissOnOutside'
 import { BUTTON_ASK, buttonAt, deleteButton, setButtonAddress } from './buttonCommands'
+import { unchooseButton } from './ButtonBlock'
 import './buttonBlock.css'
 
 /** Between the button and its bar, clear of its ring (the drawing's 12 px). */
@@ -148,7 +149,10 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
   const closeSheet = useCallback((refocus: boolean) => {
     setSheet(null)
     setRefused(false)
-    if (refocus && editor && !editor.isDestroyed) editor.view.focus()
+    if (!editor || editor.isDestroyed) return
+    if (refocus) editor.view.focus()
+    // A press elsewhere: the focus went with it, so the button is no longer chosen.
+    else if (!editor.view.hasFocus()) unchooseButton(editor.view)
   }, [editor])
 
   useDismissOnOutside(sheetRef, () => closeSheet(false), { trigger: () => addressRef.current, enabled: !!sheet })
@@ -177,7 +181,8 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
   }
 
   const onKeys = (event: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') { event.preventDefault(); done() }
+    // After the key's own events: the Enter would otherwise reach the editor, now focused, and leave the button.
+    if (event.key === 'Enter') { event.preventDefault(); setTimeout(done, 0) }
     else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeSheet(true) }
   }
 
