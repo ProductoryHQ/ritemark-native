@@ -123,8 +123,8 @@ const assets: PageAssets = {
   // The page's sections (slides 3, 5, 7 and 9 of the deck's ten; the skipped one is not on the page) print as bands.
   const sectionPlaces = new Set([2, 4, 5, 7]);
   assert.ok(style.includes(printOrderCss(deck.slides.length, sectionPlaces)), 'the page prints its sections as bands');
-  assert.equal(root.querySelector('#s3')!.getAttribute('class'), 'part sect', 'the band the section prints as is the page\'s own');
-  assert.equal(root.querySelector('#s3 .eyebrow')!.text, 'Section 1');
+  assert.equal(root.querySelector('#t3')!.getAttribute('class'), 'part sect', 'the band the section prints as is the page\'s own');
+  assert.equal(root.querySelector('#t3 .eyebrow')!.text, 'Section 1');
   // The address in the handout's footer: an element the script fills as text, never shown on screen.
   const foot = root.querySelector('.foot')!;
   assert.ok(foot.querySelector('#paddr'), 'the address sits in the footer');
@@ -142,7 +142,7 @@ const assets: PageAssets = {
   assert.match(PRINT_CSS, /^\s*\.paddr, \.foot\.addr-only \{ display: none; \}/, 'the address never on screen');
   assert.ok(print.includes('.foot.addr-only:has(> .paddr:empty) { display: none; }'), 'no empty footer in print (a page opened from disk, with no client or title)');
   // No bar, no Contents, no arrows, no Copy, no Open in links.
-  for (const control of ['.top', '.toc', '.under', '.copy', '.prompt .open', '.cb-tools']) assert.ok(rule('.top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open, .cb-tools').includes('display: none !important') && print.includes(control), control);
+  for (const control of ['.line', '.toc', '.prog', '.copy', '.prompt .open', '.cb-tools']) assert.ok(rule('.ground, .line, .prog, .toc, .toast, .zoom, .restart, .sclose, .copy, .prompt .open, .cb-tools, .empty').includes('display: none !important') && print.includes(control), control);
   // Each slide stays with its part; a part is kept off two pages where it fits.
   assert.match(rule('.layer'), /break-inside: avoid; break-after: avoid;/);
   assert.match(rule('.part'), /break-inside: avoid/);
@@ -163,10 +163,10 @@ const assets: PageAssets = {
   assert.match(rule('.layer .deck-sl'), /zoom: 0\.6/);
   assert.equal(slideWidth, 960 * 0.6, 'the zoom draws the 960 px slide at the layer\'s width');
   // The order: slide n, then part n.
-  assert.equal(printOrderCss(2), '@media print{.slidebox>.layer:nth-child(1){order:1}#s1{order:2}.slidebox>.layer:nth-child(2){order:3}#s2{order:4}}');
+  assert.equal(printOrderCss(2), '@media print{.pre{order:0}#s1{order:1}#t1{order:2}#s2{order:3}#t2{order:4}}');
   assert.equal(printOrderCss(0), '');
   // A section (18 November): its slide is left out and its part starts a page, as its band; the next part follows it.
-  assert.equal(printOrderCss(3, new Set([1])), '@media print{.slidebox>.layer:nth-child(1){order:1}#s1{order:2}.slidebox>.layer:nth-child(2){display:none}#s2{order:4;break-before:page;page-break-before:always}.slidebox>.layer:nth-child(3){order:5}#s3{order:6}}');
+  assert.equal(printOrderCss(3, new Set([1])), '@media print{.pre{order:0}#s1{order:1}#t1{order:2}#s2{display:none!important}#t2{order:4;break-before:page;page-break-before:always}#s3{order:5}#t3{order:6}}');
   assert.match(rule('.sect'), /break-after: avoid;/, 'no page holds a section alone');
   assert.match(rule('.sect'), /background: none;/, 'its band in the page\'s section style, printable');
 }

@@ -191,7 +191,7 @@ const DECK = `---\ndeck: 2\nhandout: text\n---\n\n${blockSlide('s1', '# Start')}
   const page = (text: string) => pageHtml(publicDeck(text, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), { slideCss: '', fonts: [] }, { digest: 'd', pictureUrl: () => null });
   const revealed = page(DECK);
   assert.ok(revealed.includes('<div class="blk-group" data-reveal="one"><ul>'), 'the wrapper is drawn as a plain block');
-  assert.ok(!revealed.includes('data-reveal-hidden'), 'the page hides nothing');
+  assert.ok(!revealed.replace(/<script>[\s\S]*<\/script>/, '').replace(/<style>[\s\S]*<\/style>/, '').includes('data-reveal-hidden'), 'the page draws every item; its player hides them as the reader steps');
   const plain = revealed
     .replace(/ data-reveal-item="\d+"/g, '')
     .replace(/ data-reveal="one"/g, '')
