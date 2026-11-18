@@ -185,7 +185,7 @@ test('deck guidance teaches prompts, Tabs, Button and the exercise layout', () =
       '`::: {.panel-tabset}` with a `## ` heading per tab', '"put these four prompts in tabs" means one Tabs block',
       'Never put Tabs inside Tabs, a box, a step or a table cell',
       '`[Open the sample](https://…){.button}`', 'Only a full https address', 'never copy a file into the project',
-      'An exercise slide is one Columns block, with no title above it', '`{.column width="35%"}`', 'holds `# ` the title, then its `::: steps`', 'the material\'s Button right under it',
+      'An exercise slide is one Columns block, with no title above it', '`{.column width="35%"}`', 'holds `# ` the title and right under it its `::: steps`', 'opens and closes with four backticks, ```` ````slide ````', 'the material\'s Button right under it',
     ]) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }

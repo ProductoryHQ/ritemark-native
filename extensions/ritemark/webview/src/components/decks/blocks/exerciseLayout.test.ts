@@ -116,14 +116,16 @@ assert.equal(wallDataOf(data[1]).title, 'A long report, in steps')
   assert.ok(html.trimStart().startsWith('<div class="blk-columns"'), 'nothing above the columns')
   assert.match(html, /<div class="blk-column"><h1[^>]*>A long report, in steps<\/h1>\n?<div class="blk-steps"><span class="blk-pill">Exercise · 1 \/ 2<\/span>/)
   const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
-  assert.ok(css.includes('.blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]))'), 'the column makes room for the pill')
-  assert.ok(css.includes('.blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute;'), 'the pill sits at the column\'s top')
+  assert.ok(css.includes('> .blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden])) { position: relative;'), 'the column makes room for the pill')
+  assert.ok(css.includes('> .blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute;'), 'the pill sits at the column\'s top')
   assert.ok(css.includes('.blk-column > h1:first-child:has(+ .blk-steps) { font-size: 1.58em; }'), 'the title at the prototype\'s 38 units')
   assert.ok(css.includes('.blk-column > h1:first-child + .blk-steps { font-size: .75em; }'), 'the steps at its 18 units')
   // A narrow Button card stacks: its own container, the words at the full width under 420 units (390 + 30 padding).
   assert.ok(css.includes('container: blk-button / inline-size'))
   assert.ok(css.includes('@container blk-button (width < 390px) { .deck-sl.is-blocks .blk-button > .blk-button-words { flex-basis: 100%; } }'))
-  assert.ok(css.includes('.deck-sl.is-blocks .blk-button { flex-wrap: wrap; row-gap: calc(10px * var(--fit, 1)); }'))
+  assert.ok(css.includes('.deck-sl.is-blocks .blk-button { display: flex; flex-wrap: wrap; align-items: center; gap: calc(10px * var(--fit, 1)) calc(16px * var(--fit, 1));'), 'wraps, 10 units under the words')
+  assert.ok(css.includes('.blk-box > .blk-button, .deck-sl.is-blocks .blk-box > .blk-inner > .blk-button { align-self: stretch; }'), 'a card in a box keeps its width')
+  assert.ok(css.includes('.blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column'), 'Middle and Bottom keep the pill in its flow')
 }
 
 // The slide editor gives it back byte for byte, and again on a second open.
