@@ -791,7 +791,11 @@ export const PAGE_CSP = [
 export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOptions): string {
   const borderless = deck.look === 'borderless';
   // The logo's address is the file beside the page; a theme whose logo isn't there draws none (Sprint 162 PR 4).
-  const theme = deck.theme.logo && assets.logo ? { ...deck.theme, logoUrl: assets.logo.address, ...(assets.logo.aspect ? { logoAspect: assets.logo.aspect } : {}) } : deck.theme;
+  // It is the one file its slides draw (`pageFile.pageLogoOf`, the second version too), so the page's theme names that
+  // file as its only logo: no second version is chosen again here (the review of #798).
+  const theme = deck.theme.logo && assets.logo
+    ? { ...deck.theme, logo: { file: deck.theme.logo.file, place: deck.theme.logo.place, on: deck.theme.logo.on }, logoUrl: assets.logo.address, ...(assets.logo.aspect ? { logoAspect: assets.logo.aspect } : {}) }
+    : deck.theme;
   const count = deck.slides.length;
   // Small details 14: an Agenda lists the page's sections as they are, with no progress and no hint when there are none.
   const agenda = { entries: agendaOf(deck.slides.map((slide, index) => ({ kind: slide.kind, data: slide.data, number: index + 1 }))), hint: false };

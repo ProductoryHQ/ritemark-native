@@ -26,7 +26,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
+  AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
   gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
@@ -287,7 +287,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
     let top = placed.screen.bottom + barGap(chosen.kind)
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
     const inPane = barLeft(placed.screen.left, width, placed.pane, window.innerWidth)
-    if (inPane === null && fold < 3) { setFold(fold + 1); return }
+    if (inPane === null && fold < MAX_FOLD) { setFold(fold + 1); return }
     const left = inPane ?? Math.max(8, placed.pane.left + 8)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
@@ -526,17 +526,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                 <>
                   <Sep />
                   {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
-                  <Group label="Style" folded={fold >= 3} options={[
+                  <Group label="Style" folded={fold >= FOLD_AT.style} options={[
                     { key: 'filled', on: fill === 'filled', label: 'Filled', tip: "Boxes filled with the theme's colour", pick: () => setValue('fill', theme.boxes === 'filled' ? null : 'filled') },
                     { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
                   ]} />
                   <Sep />
-                  <Group label="Width" folded={fold >= 2} options={[
+                  <Group label="Width" folded={fold >= FOLD_AT.size} options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },
                     ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: width.toUpperCase(), tip: `Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`, pick: () => setValue('width', width) })),
                   ]} />
                   <Sep />
-                  <Group label="Text alignment" folded={fold >= 1} options={[
+                  <Group label="Text alignment" folded={fold >= FOLD_AT.alignment} options={[
                     { key: 'left', on: !look.align, icon: 'text-align-left', tip: 'Text on the left', pick: () => setValue('align', null) },
                     { key: 'center', on: look.align === 'center', icon: 'text-align-center', tip: 'Text in the centre', pick: () => setValue('align', 'center') },
                   ]} />
@@ -546,7 +546,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                 <>
                   <Sep />
                   {/* The count is how columns are added and taken away (the lead on #773: no ⋯ for Columns). */}
-                  <Group label="Columns" folded={fold >= 2} options={[2, 3, 4].map(count => ({
+                  <Group label="Columns" folded={fold >= FOLD_AT.size} options={[2, 3, 4].map(count => ({
                     key: String(count),
                     on: columns === count,
                     label: String(count),
@@ -554,7 +554,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                     pick: () => run(act(pos => setColumnCount(editor.state, pos, count))),
                   }))} />
                   <Sep />
-                  <Group label="Vertical alignment" folded={fold >= 1} options={[
+                  <Group label="Vertical alignment" folded={fold >= FOLD_AT.alignment} options={[
                     { key: 'top', on: !columnsAlignOf(attrs), icon: 'align-top', tip: "Columns' words at the top", pick: () => setValue('valign', null) },
                     { key: 'middle', on: columnsAlignOf(attrs) === 'middle', icon: 'align-center-vertical', tip: "Columns' words in the middle", pick: () => setValue('valign', 'middle') },
                     { key: 'bottom', on: columnsAlignOf(attrs) === 'bottom', icon: 'align-bottom', tip: "Columns' words at the bottom", pick: () => setValue('valign', 'bottom') },
@@ -564,12 +564,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
               {agenda ? null : (
                 <>
                   <Sep />
-                  {/* README item 18: how the block's items arrive in Present. All at once writes nothing. */}
-                  <span className="deck-bar-label" aria-hidden="true">Reveal</span>
-                  <Group label="Reveal" folded={fold >= 1} options={[
-                    { key: 'all', on: !reveal, label: 'All at once', tip: 'In Present, every item shows when the slide opens', pick: () => run(act(pos => setReveal(editor.state, pos, false))) },
-                    { key: 'one', on: reveal, label: 'One by one', tip: 'In Present, the slide opens with the first item, and each → or clicker press shows the next', pick: () => run(act(pos => setReveal(editor.state, pos, true))) },
-                  ]} />
+                  {/* README item 18: one toggle, pressed when on; off (All at once, the default) writes nothing. Folded,
+                      it keeps its toggle as an icon with the same tooltip. */}
+                  <Segment label="Reveal">
+                    <Choice
+                      on={reveal}
+                      icon="cards-three"
+                      label={fold >= FOLD_AT.reveal ? undefined : REVEAL_LABEL}
+                      tip={REVEAL_TIP}
+                      onPick={() => run(act(pos => setReveal(editor.state, pos, !reveal)))}
+                    />
+                  </Segment>
                 </>
               )}
               <Sep />

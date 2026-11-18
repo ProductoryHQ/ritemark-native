@@ -18,7 +18,7 @@ import { blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer
 import { deckTransitionOf } from '../../../../../src/decks/present/presentSession'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import {
-  DECK_TRANSITIONS, MOTION_MS, MotionRun, REVEAL_MS, REVEAL_RISE, directionOf, matchMotion, motionKeysOf, previewTarget, revealArrivals, stepOf, transitionOf, transitionValue,
+  DECK_TRANSITIONS, MOTION_MS, MotionRun, REVEAL_MS, REVEAL_RISE, directionOf, matchMotion, motionKeysOf, previewTarget, revealArrivals, revealRises, stepOf, transitionOf, transitionValue,
   type MotionClock, type MotionElement,
 } from './wallMotion'
 import { playReveal, playStep } from './playMotion'
@@ -248,7 +248,13 @@ class FakeClock implements MotionClock {
 
   // The wall: reduced motion (or a covered wall) shows the item at once, without the rise; a press first jumps it.
   const wallSource = readFileSync(fileURLToPath(new NodeURL('./DeckWall.tsx', import.meta.url)), 'utf8')
-  assert.match(wallSource, /if \(!run \|\| covered \|\| prefersReducedMotion\(\)\) \{ setArriving\(null\); return \}/)
+  assert.match(wallSource, /if \(!run \|\| !current \|\| !revealRises\(transitionOf\(current\.transition\), prefersReducedMotion\(\), covered\)\) \{ setArriving\(null\); return \}/)
+  // The rule itself: the item rises only with motion allowed, the wall uncovered and a transition other than None (the
+  // Experience lead, 18 November: None means stillness throughout).
+  for (const transition of ['fade', 'push', 'zoom'] as const) assert.equal(revealRises(transition, false, false), true, `${transition}: it rises`)
+  assert.equal(revealRises('none', false, false), false, 'None: at once, no rise')
+  assert.equal(revealRises('fade', true, false), false, 'reduced motion: at once')
+  assert.equal(revealRises('fade', false, true), false, 'a blank or filled wall: at once')
   assert.match(wallSource, /const send = useCallback\(\(type: Move\) => \{\n\s+jump\(\)/)
   // A move whose step had not started when a press showed the next item is put at its end, so the item still rises.
   assert.match(wallSource, /if \(moves\.current !== leavingSerial\) \{ setLeaving\(value => \(value\?\.serial === leavingSerial \? null : value\)\); return \}/)

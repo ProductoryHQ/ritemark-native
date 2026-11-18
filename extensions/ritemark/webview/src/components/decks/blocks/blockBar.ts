@@ -19,7 +19,8 @@
  *    each column's `width` on its own line (`::: {.column width="33%"}`, Pandoc's and Quarto's form).
  *  - **Add, the +, Delete and the ⋮ drag.** A comment note before the block moves with it; Delete keeps the block's
  *    comments (they are words), where the block stood.
- *  - **Reveal** (decks README item 18): All at once · One by one, for every kind but the Agenda (`setReveal`). Boxes,
+ *  - **Reveal** (decks README item 18): one toggle, "One by one", pressed when on (off is All at once), for every kind
+ *    but the Agenda (`setReveal`); it folds right after the alignment (`FOLD_AT`). Boxes,
  *    Steps and Columns write `reveal="one"` on their own line; a list is wrapped in `::: incremental` (`::: {reveal="one"}`
  *    is read the same), which the bar sees through (`revealWrappedList`): to it, the block is still a List. Turn into
  *    carries One by one to the new kind.
@@ -42,6 +43,21 @@ export const BAR_KINDS: readonly BarKind[] = ['boxes', 'steps', 'columns', 'list
 export const BAR_KIND_LABEL: Readonly<Record<BarKind, string>> = { boxes: 'Boxes', steps: 'Steps', columns: 'Columns', list: 'List', numbered: 'Numbered', agenda: 'Agenda' }
 /** The Agenda's tooltip on its bar (the decks README, small details 14). */
 export const AGENDA_TIP = "Lists this deck's sections"
+
+/**
+ * README item 18 (the Experience lead, 18 November): Reveal is one toggle, "One by one", pressed when on; off is All at
+ * once, the default. Its words and tooltip.
+ */
+export const REVEAL_LABEL = 'One by one'
+export const REVEAL_TIP = 'In Present, show the items one by one: the slide opens with the first, and each → or clicker press shows the next'
+
+/**
+ * When the bar is wider than the slide's pane, its own groups fold one by one (the lead on #773), in this order: the
+ * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then Width or the Columns count, then
+ * Style. `fold` counts the folds; a group is folded from its number on.
+ */
+export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4 } as const
+export const MAX_FOLD = FOLD_AT.style
 
 /** A Columns block holds two to four columns from the bar (more can be written, and are kept). */
 export const MIN_COLUMNS = 2

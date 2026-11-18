@@ -31,7 +31,8 @@
  *    returns to the slide, and does nothing else (`fillKeyOf`).
  *  - Items one by one (item 18): the slide is drawn at the host's step (`reveal`), the items not shown yet hidden in their
  *    places; the item a press shows rises in, 8 px in 0.2 s (`playReveal`, run by `MotionRun`, so a press during it puts
- *    it at its end); with reduced motion, or under a blank or filled wall, it is simply there.
+ *    it at its end); with reduced motion, in a deck whose transition is None, or under a blank or filled wall, it is
+ *    simply there.
  *  - The pointer dot (item 12): while L is held, a soft accent dot about 14 px wide where the pointer is, from this
  *    window's own pointer on one display, or from the presenter view's over its Now (`present/pointer`, relayed by the
  *    host). No trail; with reduced motion it doesn't fade. The pointer and the bar stay hidden while L is held.
@@ -54,7 +55,7 @@ import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
-import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, stepOf, transitionOf, type MotionDirection } from './wallMotion'
+import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
 import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
@@ -234,7 +235,8 @@ export function DeckWall() {
     const run = motion.current
     const current = stateRef.current
     const covered = !current || current.blank !== null || current.fill !== null || fillShown.current
-    if (!run || covered || prefersReducedMotion()) { setArriving(null); return }
+    // Reduced motion, a covered wall or a deck whose transition is None (stillness throughout): the item is simply there.
+    if (!run || !current || !revealRises(transitionOf(current.transition), prefersReducedMotion(), covered)) { setArriving(null); return }
     const drawing = playReveal(frameRef.current?.querySelector(SLIDE_NOW) ?? null, arriving)
     run.begin(drawing ? REVEAL_MS : 0, drawing, () => setArriving(value => (value?.serial === arrivingSerial ? null : value)))
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -329,12 +329,17 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   }, [])
   // Sprint 162 PR 4: the theme's logo, kept while its address, corner and where it shows stay (a new theme object
   // with the same logo draws nothing new).
+  // The second version (18 November) is drawn by the look and the theme's ground, so both are in the key too.
   const logoUrl = theme.logoUrl
   const logoPlace = theme.logo?.place
   const logoOn = theme.logo?.on
   const logoAspect = theme.logoAspect
+  const secondUrl = theme.secondLogoUrl
+  const secondAspect = theme.secondLogoAspect
+  const secondGround = theme.logo?.second?.ground
+  const ground = theme.bg
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn, logoAspect])
+  const logo = useMemo(() => themeSlideLogo(theme, borderless), [logoUrl, logoPlace, logoOn, logoAspect, secondUrl, secondAspect, secondGround, ground, borderless])
   const html = useMemo(
     () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt, reveal }),
     [data, step, width, assets, missing, logo, agenda, agendaAt, reveal],
@@ -415,7 +420,7 @@ const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, t
     <div className={`deck-slide${borderless ? ' is-borderless' : ''}`} data-step={step} style={{ width, height: Math.round(width * CANVAS_HEIGHT / CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}>
       <div ref={canvasRef} className={`deck-sl${layout.known ? '' : ' is-unknown'}`} style={{ transform: `scale(${scale})` }} aria-hidden={editing ? undefined : true}>
         {layout.boxes.map(box => <Box key={box.key} box={box} editing={editing} assets={assets} />)}
-        <SlideLogoImage logo={themeSlideLogo(theme)} cover={isLayoutTitleSlide(kind)} />
+        <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isLayoutTitleSlide(kind)} />
       </div>
     </div>
   )

@@ -36,7 +36,7 @@ import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
+  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
 installTestDocument()
@@ -647,6 +647,20 @@ stable(COLUMNS, 'three columns')
     assert.equal(chosen.kind, 'list')
     assert.equal(revealsOneBlock(chosen), true)
     assert.equal(after(setReveal(state, chosen.pos, false)), LIST, `${form.split('\n')[2]}: All at once unwraps to the bare list`)
+  }
+  // The bar's control (the Experience lead, 18 November): one toggle, "One by one", pressed when on, with a tooltip; a
+  // press flips it (off is All at once). It folds just after the alignment: before Width (or the count) and Style.
+  assert.equal(REVEAL_LABEL, 'One by one')
+  assert.ok(/Present/.test(REVEAL_TIP) && /one by one/.test(REVEAL_TIP), REVEAL_TIP)
+  assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Width or count, Style')
+  assert.equal(FOLD_AT.reveal, FOLD_AT.alignment + 1, 'Reveal folds right after the alignment')
+  assert.equal(MAX_FOLD, FOLD_AT.style, 'every group can fold')
+  {
+    const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+    assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
+    assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
+    for (const group of ['Style', 'Width', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
+    assert.match(barSource, /fold < MAX_FOLD/)
   }
   // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).
   for (const [line, keptLine] of [['::: {.incremental #intro}', '::: {#intro}'], ['::: {.note reveal="one"}', '::: note'], ['::: {reveal="one" data-x="1"}', '::: {data-x="1"}']] as const) {

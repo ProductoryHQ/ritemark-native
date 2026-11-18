@@ -44,7 +44,16 @@ export interface DeckTheme {
   logoUrl?: string;
   /** The logo picture's width to its height, read from it where it is drawn; never from the theme file. */
   logoAspect?: number;
+  /**
+   * The second logo's address and its width to its height (step-3-themes.md, "A second logo for the other ground"),
+   * worked out where it is drawn, as `logoUrl` is; never read from the theme file.
+   */
+  secondLogoUrl?: string;
+  secondLogoAspect?: number;
 }
+
+/** A slide's ground, for its logo: dark or light. */
+export type LogoGround = 'dark' | 'light';
 
 /** Sprint 162 PR 4 (step-3-themes.md, "Logo"): top left, top right or bottom right, of the slide's 16:9 area. */
 export type LogoPlace = 'top-left' | 'top-right' | 'bottom-right';
@@ -56,6 +65,89 @@ export interface ThemeLogo {
   file: string;
   place: LogoPlace;
   on: LogoOn;
+  /**
+   * The logo's version for light slides (18 November, the Experience lead's option (a)): `logo-for-light:`, a dark
+   * theme's logo for the white of a Borderless deck; the `logo:` file is then the dark slides'. Drawn only while the
+   * theme is dark (`drawsSecondLogo`). Absent with one file only, which is used everywhere.
+   */
+  second?: { file: string; ground: LogoGround };
+}
+
+/** Each ground's line for the logo's second version. */
+export const SECOND_LOGO_KEYS: Record<LogoGround, string> = { light: 'logo-for-light', dark: 'logo-for-dark' };
+
+/** The other ground. */
+export function otherGround(ground: LogoGround): LogoGround {
+  return ground === 'dark' ? 'light' : 'dark';
+}
+
+/**
+ * A colour's ground, dark or light: dark below 0.2 of WCAG's relative luminance, the rule a Card slide's words and boxes
+ * follow (`themeVars`).
+ */
+export function groundOf(colour: string): LogoGround {
+  return luminanceOf(colour) < 0.2 ? 'dark' : 'light';
+}
+
+/** WCAG's relative luminance of a `#RRGGBB` colour, the one formula the theme's contrast and ground rules use. */
+export function luminanceOf(colour: string): number {
+  const value = colour.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map(index => {
+    const channel = parseInt(value.substr(index, 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** The ground a deck's slides are on: a Card deck's is its theme's, a Borderless deck's is always white. */
+export function slideGroundOf(theme: Pick<DeckTheme, 'bg'>, borderless: boolean): LogoGround {
+  return borderless ? 'light' : groundOf(theme.bg);
+}
+
+/**
+ * Does a deck in this look draw the theme's second logo (18 November)? Only when the theme has one and it is for the
+ * slides' ground (`slideGroundOf`); else the `logo:` file is drawn, as with one file only.
+ */
+export function drawsSecondLogo(theme: Pick<DeckTheme, 'logo' | 'bg'>, borderless: boolean): boolean {
+  const second = theme.logo?.second;
+  // Only a dark theme's (the Experience lead's option (a), 18 November): a theme turned light keeps the line and the
+  // file, unused, until it turns dark again.
+  return !!second && offersSecondLogo(theme) && second.ground === slideGroundOf(theme, borderless);
+}
+
+/**
+ * Does the tab offer (and show) the logo's second version? Only on a dark theme, as "Add a version for light slides"
+ * (the Experience lead's option (a), step-3-themes.md, 18 November); a light theme's slides all draw the `logo:` file.
+ */
+export function offersSecondLogo(theme: Pick<DeckTheme, 'bg'>): boolean {
+  return groundOf(theme.bg) === 'dark';
+}
+
+/** The ground the logo's second version is for: light slides, the white of a Borderless deck (option (a)). */
+export function secondLogoGround(theme: Pick<DeckTheme, 'logo' | 'bg'>): LogoGround {
+  return theme.logo?.second?.ground ?? 'light';
+}
+
+/**
+ * The theme with its logos' addresses where they are drawn (the host's webview URIs, the page's files), each with its
+ * width to its height when known; an address that isn't one is left out, so a missing file draws nothing (a missing
+ * second version: the first). A theme with no logo is as it was.
+ */
+export function themeWithLogoAddresses(theme: DeckTheme, logo: unknown, aspect?: unknown, secondLogo?: unknown, secondAspect?: unknown): DeckTheme {
+  if (!theme.logo) return theme;
+  const ratio = (value: unknown) => (typeof value === 'number' && value > 0 && Number.isFinite(value) ? value : undefined);
+  const out: DeckTheme = { ...theme };
+  if (typeof logo === 'string' && logo) {
+    out.logoUrl = logo;
+    const value = ratio(aspect);
+    if (value) out.logoAspect = value;
+  }
+  if (theme.logo.second && typeof secondLogo === 'string' && secondLogo) {
+    out.secondLogoUrl = secondLogo;
+    const value = ratio(secondAspect);
+    if (value) out.secondLogoAspect = value;
+  }
+  return out;
 }
 
 export const LOGO_PLACES: readonly LogoPlace[] = ['top-left', 'top-right', 'bottom-right'];
@@ -241,9 +333,10 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
   };
   const round = top.corners === 'square' || top.corners === 'round' || top.corners === 'soft' ? top.corners : fallback.round;
   const boxes = top.boxes === 'outline' || top.boxes === 'filled' ? top.boxes : fallback.boxes;
+  const bg = colour(top.background, fallback.bg);
   return {
     name: top.name?.trim() || fallback.name,
-    bg: colour(top.background, fallback.bg),
+    bg,
     head: colour(top.headings, fallback.head),
     text: colour(top.text, fallback.text),
     accent: colour(top.accent, fallback.accent),
@@ -259,8 +352,19 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
       file: top.logo.trim(),
       place: LOGO_PLACES.includes(top['logo-place'] as LogoPlace) ? top['logo-place'] as LogoPlace : DEFAULT_LOGO_PLACE,
       on: LOGO_ONS.includes(top['logo-on'] as LogoOn) ? top['logo-on'] as LogoOn : DEFAULT_LOGO_ON,
+      ...secondLogoOf(top),
     } } : {}),
   };
+}
+
+/**
+ * The logo's second version a theme file names (18 November), as `ThemeLogo.second`: its `logo-for-light:` line, read
+ * whatever the theme's ground, so a theme turned light keeps it (unused, `drawsSecondLogo`) for when it turns dark
+ * again. None when it names none.
+ */
+function secondLogoOf(top: Record<string, string>): { second?: ThemeLogo['second'] } {
+  const value = top[SECOND_LOGO_KEYS.light];
+  return isLogoPath(value) ? { second: { file: value.trim(), ground: 'light' } } : {};
 }
 
 /** The built-in theme, read from its own text. */

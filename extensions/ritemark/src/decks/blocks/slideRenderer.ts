@@ -16,7 +16,7 @@
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { EXERCISE_TAG, isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
-import type { DeckTheme, LogoOn, LogoPlace } from '../deckTheme';
+import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
@@ -646,12 +646,20 @@ export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boole
   return { cls: logo.place === 'top-left' ? 'logo-tl' : 'logo-br', style: { '--logo-drop': `${logoDrop()}px` } };
 }
 
-/** The theme's logo to draw, or null: a theme with no logo, or whose picture has no address (a missing file). */
-export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl' | 'logoAspect'> | null | undefined): SlideLogo | null {
-  if (!theme?.logo || !theme.logoUrl) return null;
-  const aspect = theme.logoAspect;
+/**
+ * The theme's logo to draw on a deck in this look, or null: a theme with no logo, or whose picture has no address (a
+ * missing file). A theme with a second version for the slides' ground draws that one (`drawsSecondLogo`: a Card deck
+ * the one for its theme's ground, a Borderless deck the one for light slides), at its own size, so the room the words
+ * keep is the drawn logo's; its file missing, the first is drawn.
+ */
+export function themeSlideLogo(theme: Pick<DeckTheme, 'logo' | 'logoUrl' | 'logoAspect' | 'secondLogoUrl' | 'secondLogoAspect' | 'bg'> | null | undefined, borderless: boolean): SlideLogo | null {
+  if (!theme?.logo) return null;
+  const second = drawsSecondLogo(theme, borderless) && theme.secondLogoUrl;
+  const url = second ? theme.secondLogoUrl : theme.logoUrl;
+  if (!url) return null;
+  const aspect = second ? theme.secondLogoAspect : theme.logoAspect;
   const width = aspect && aspect > 0 ? Math.min(LOGO_MAX_WIDTH, LOGO_HEIGHT * aspect) : LOGO_MAX_WIDTH;
-  return { url: theme.logoUrl, place: theme.logo.place, on: theme.logo.on, width: Math.round(width * 100) / 100 };
+  return { url, place: theme.logo.place, on: theme.logo.on, width: Math.round(width * 100) / 100 };
 }
 
 /**
@@ -714,5 +722,5 @@ export function blockSlideMarkup(data: SlideData, options: BlockSlideMarkupOptio
   if (options.inlineTheme) Object.assign(outer, themeStyle(options.theme, options.borderless));
   const outerStyle = styleText(outer);
   return `<div class="deck-slide${options.borderless ? ' is-borderless' : ''}"${outerStyle ? ` style="${esc(outerStyle)}"` : ''}>`
-    + blockCanvasMarkup(data, { ...options, logo: options.logo === undefined ? themeSlideLogo(options.theme) : options.logo }) + '</div>';
+    + blockCanvasMarkup(data, { ...options, logo: options.logo === undefined ? themeSlideLogo(options.theme, options.borderless) : options.logo }) + '</div>';
 }
