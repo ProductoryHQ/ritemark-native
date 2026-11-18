@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../bridge'
-import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, parseTheme, themePathOf, themeWithLogoAddresses, type DeckTheme } from '../../../../src/decks/deckTheme'
 import type { DeckSlideEntry } from './deckDocument'
 import { slidePicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
@@ -41,11 +41,10 @@ export function useDeckAssets(slides: DeckSlideEntry[]): { assets: Record<string
 
 /**
  * Sprint 162 PR 4: the theme with its logo's address as the host found it (a webview URI), or as it is when there is
- * none: a theme naming a logo whose file is missing draws no logo.
+ * none: a theme naming a logo whose file is missing draws no logo. With its second version's too (18 November).
  */
-export function themeWithLogo(theme: DeckTheme, logo: unknown, aspect?: unknown): DeckTheme {
-  if (!theme.logo || typeof logo !== 'string' || !logo) return theme
-  return typeof aspect === 'number' && aspect > 0 && Number.isFinite(aspect) ? { ...theme, logoUrl: logo, logoAspect: aspect } : { ...theme, logoUrl: logo }
+export function themeWithLogo(theme: DeckTheme, logo: unknown, aspect?: unknown, secondLogo?: unknown, secondAspect?: unknown): DeckTheme {
+  return themeWithLogoAddresses(theme, logo, aspect, secondLogo, secondAspect)
 }
 
 /**
@@ -60,7 +59,7 @@ export function useDeckTheme(themePath: unknown): DeckTheme {
   useEffect(() => onMessage(message => {
     if (message.type !== 'deck/theme' || typeof message.path !== 'string') return
     const text = typeof message.text === 'string' ? message.text : null
-    setTheme({ path: message.path, theme: themeWithLogo(text === null ? BUILT_IN_THEME : parseTheme(text), message.logo, message.logoAspect) })
+    setTheme({ path: message.path, theme: themeWithLogo(text === null ? BUILT_IN_THEME : parseTheme(text), message.logo, message.logoAspect, message.secondLogo, message.secondLogoAspect) })
   }), [])
 
   useEffect(() => {

@@ -3,6 +3,7 @@
  * exact fields before the host acts on it; anything else is dropped. Pure: no `vscode`, so the test decodes the same
  * messages the host does.
  */
+import type { LogoGround } from './deckTheme';
 import type { WallSlide } from './present/presentProtocol';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
 import { logoKindOfName, MAX_LOGO_BYTES } from './themeLogo';
@@ -30,9 +31,9 @@ export type ThemeRequest =
    * Sprint 162 PR 4: a picture dropped on the Logo row, as a data URL (an SVG or a PNG, at most `MAX_LOGO_DATA_URL`)
    * with its file's name. The host checks it, copies it beside the theme file and names it in the draft.
    */
-  | { type: 'theme/logo-file'; dataUrl: string; filename: string }
+  | { type: 'theme/logo-file'; dataUrl: string; filename: string; /** The logo's second version (18 November). */ second?: true }
   /** Sprint 162 PR 4: Choose a file… on the Logo row: the host asks for an SVG or a PNG, and takes it as a drop. */
-  | { type: 'theme/choose-logo' }
+  | { type: 'theme/choose-logo'; second?: true }
   /**
    * Sprint 162 PR 5: the contrast line's "Check all colours" or "Fix with Claude": the AI's colour check goes to the
    * open chat, and its changes land in this tab's draft.
@@ -51,6 +52,11 @@ export interface ThemeLogoState {
   problem: string | null;
   /** Its width to its height, when it can be drawn. */
   aspect?: number | null;
+  /**
+   * The logo's second version (18 November), as the tab shows it, with the ground it is for; null or absent when the
+   * theme names none.
+   */
+  second?: (Omit<ThemeLogoState, 'second'> & { ground: LogoGround }) | null;
 }
 
 /** A logo's data URL: a picture of at most `MAX_LOGO_BYTES`, in base64, with its header. */
@@ -118,9 +124,12 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/discard':
     case 'theme/undo':
     case 'theme/redo':
-    case 'theme/choose-logo':
       exactKeys(input, ['type']);
       return { type: input.type };
+    case 'theme/choose-logo':
+      exactKeys(input, ['type', 'second']);
+      if (input.second !== undefined && input.second !== true) throw new ThemeProtocolError('second must be true');
+      return input.second ? { type: 'theme/choose-logo', second: true } : { type: 'theme/choose-logo' };
     case 'theme/set':
       exactKeys(input, ['type', 'changes']);
       if (!isThemeChanges(input.changes)) throw new ThemeProtocolError('changes must be theme fields');
@@ -139,13 +148,14 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
       exactKeys(input, ['type', 'token']);
       return { type: 'theme/undo-save', token: stringOf(input.token, 64) };
     case 'theme/logo-file': {
-      exactKeys(input, ['type', 'dataUrl', 'filename']);
+      exactKeys(input, ['type', 'dataUrl', 'filename', 'second']);
+      if (input.second !== undefined && input.second !== true) throw new ThemeProtocolError('second must be true');
       const dataUrl = stringOf(input.dataUrl, MAX_LOGO_DATA_URL);
       if (!/^data:image\/(svg\+xml|png);base64,[A-Za-z0-9+/=]+$/.test(dataUrl)) throw new ThemeProtocolError('dataUrl must be an SVG or a PNG');
       // Only the name's last part, as a picture's name: never a path the host would follow.
       const filename = stringOf(input.filename, 255);
       if (/[\\/\u0000]/.test(filename) || !logoKindOfName(filename)) throw new ThemeProtocolError('filename must be an SVG or a PNG name');
-      return { type: 'theme/logo-file', dataUrl, filename };
+      return { type: 'theme/logo-file', dataUrl, filename, ...(input.second ? { second: true as const } : {}) };
     }
     case 'theme/check-colours':
       exactKeys(input, ['type', 'fix']);

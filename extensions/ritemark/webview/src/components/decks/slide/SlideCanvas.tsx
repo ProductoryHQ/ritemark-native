@@ -60,6 +60,11 @@ interface SlideCanvasProps {
    * passed and puts the next one in the accent. Elsewhere an Agenda draws the list alone.
    */
   at?: number
+  /**
+   * Decks README item 18, in Present only (the wall, the presenter view's Now and Next): how many items of the slide's
+   * One by one blocks show; the rest keep their places, hidden. Left out, every item shows, as everywhere else.
+   */
+  reveal?: number
 }
 
 const px = (style: BoxStyle | undefined): CSSProperties | undefined => {
@@ -300,7 +305,7 @@ function overflows(canvas: HTMLElement): boolean {
  * (`blocks/SlideEditor.tsx`); this canvas draws the strip, the wall and the rest. The fit steps the words down while
  * they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
  */
-const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing, at }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
+const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing, at, reveal }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
   const slideRef = useRef<HTMLDivElement>(null)
   const markdown = data.markdown ?? ''
   // Small details 14: the deck around an Agenda block; a slide without one draws nothing new when the sections change.
@@ -324,15 +329,20 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   }, [])
   // Sprint 162 PR 4: the theme's logo, kept while its address, corner and where it shows stay (a new theme object
   // with the same logo draws nothing new).
+  // The second version (18 November) is drawn by the look and the theme's ground, so both are in the key too.
   const logoUrl = theme.logoUrl
   const logoPlace = theme.logo?.place
   const logoOn = theme.logo?.on
   const logoAspect = theme.logoAspect
+  const secondUrl = theme.secondLogoUrl
+  const secondAspect = theme.secondLogoAspect
+  const secondGround = theme.logo?.second?.ground
+  const ground = theme.bg
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const logo = useMemo(() => themeSlideLogo(theme), [logoUrl, logoPlace, logoOn, logoAspect])
+  const logo = useMemo(() => themeSlideLogo(theme, borderless), [logoUrl, logoPlace, logoOn, logoAspect, secondUrl, secondAspect, secondGround, ground, borderless])
   const html = useMemo(
-    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt }),
-    [data, step, width, assets, missing, logo, agenda, agendaAt],
+    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt, reveal }),
+    [data, step, width, assets, missing, logo, agenda, agendaAt, reveal],
   )
   // The stage's one measure (`fitFlow`), from the top: words past the top, the bottom or a right edge step it down.
   useLayoutEffect(() => {
@@ -363,8 +373,8 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   )
 })
 
-export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing, at }: SlideCanvasProps) {
-  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} at={at} />
+export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing, at, reveal }: SlideCanvasProps) {
+  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} at={at} reveal={reveal} />
   // PR 2 (decision 8 of the approved plan): a v1 slide of the nine kinds is drawn as the block slide its first edit
   // writes (`legacyToBlocks`), so the strip, the wall and the stage show what the conversion will write.
   if (drawsAsBlocks(kind)) return <BlockSlideCanvas data={blockDataOf(kind, data)} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} />
@@ -410,7 +420,7 @@ const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, t
     <div className={`deck-slide${borderless ? ' is-borderless' : ''}`} data-step={step} style={{ width, height: Math.round(width * CANVAS_HEIGHT / CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}>
       <div ref={canvasRef} className={`deck-sl${layout.known ? '' : ' is-unknown'}`} style={{ transform: `scale(${scale})` }} aria-hidden={editing ? undefined : true}>
         {layout.boxes.map(box => <Box key={box.key} box={box} editing={editing} assets={assets} />)}
-        <SlideLogoImage logo={themeSlideLogo(theme)} cover={isLayoutTitleSlide(kind)} />
+        <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isLayoutTitleSlide(kind)} />
       </div>
     </div>
   )

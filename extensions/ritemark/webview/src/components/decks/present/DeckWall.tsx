@@ -29,12 +29,22 @@
  *  - A click on a spotlit picture (a picture alone on its slide: the first click) fills the wall with it, whole, on
  *    the theme's ground (item 11). Any key or click
  *    returns to the slide, and does nothing else (`fillKeyOf`).
+ *  - Items one by one (item 18): the slide is drawn at the host's step (`reveal`), the items not shown yet hidden in their
+ *    places; the item a press shows rises in, 8 px in 0.2 s (`playReveal`, run by `MotionRun`, so a press during it puts
+ *    it at its end); with reduced motion, in a deck whose transition is None, or under a blank or filled wall, it is
+ *    simply there.
+ *  - The pointer dot (item 12): while L is held, a soft accent dot about 14 px wide where the pointer is, from this
+ *    window's own pointer on one display, or from the presenter view's over its Now (`present/pointer`, relayed by the
+ *    host). No trail; with reduced motion it doesn't fade. The pointer and the bar stay hidden while L is held.
+ *  - The timer for an exercise (item 9): started from the presenter view, a quiet mm:ss countdown at the bottom right
+ *    of the slide, in the accent, across slides, transitions, a blank wall and the QR code until it is stopped; at
+ *    00:00 it pulses three times, not with reduced motion (`pointerTimer.ts`).
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
-import type { WallSlide, WallState } from '../../../../../src/decks/present/presentProtocol'
+import type { WallPoint, WallSlide, WallState, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
 import { Button } from '../../ui/button'
@@ -45,9 +55,11 @@ import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
-import { directionOf, MOTION_MS, MotionRun, stepOf, transitionOf, type MotionDirection } from './wallMotion'
-import { motionPairsOf, playStep, prefersReducedMotion } from './playMotion'
+import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
+import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
+import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
+import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './wall.css'
 
@@ -82,7 +94,9 @@ export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
   // The slide before the last move, going as the new one comes (README 19, the deck's transition, or 17's smooth move).
   // A move during a step first jumps that step to its end (`MotionRun`), so the slide going is always the whole one.
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection } | null>(null)
+  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection; reveal: number | undefined } | null>(null)
+  // README item 18: the items a press just showed, rising in on the slide now (one step's own number, as a move's).
+  const [arriving, setArriving] = useState<{ from: number; to: number; serial: number } | null>(null)
   const enteringRef = useRef<HTMLDivElement | null>(null)
   const leavingRef = useRef<HTMLDivElement | null>(null)
   const motion = useRef<MotionRun | null>(null)
@@ -116,8 +130,19 @@ export function DeckWall() {
   const fillShown = useRef(false)
   fillShown.current = fillUrl !== null
   const lastFillUrl = useRef<string | null>(null)
+  // Item 12: L held in this window, the pointer's place on the slide (this window's own), and the presenter view's dot.
+  const [pointing, setPointingState] = useState(false)
+  // The one place `pointing` is known between renders (the key and pointer handlers read it); set only by setPointing.
+  const pointingRef = useRef(false)
+  const [ownDot, setOwnDot] = useState<WallPoint | null>(null)
+  const [relayedDot, setRelayedDot] = useState<WallPoint | null>(null)
+  const lastPointer = useRef<{ x: number; y: number } | null>(null)
+  const lastDot = useRef<WallPoint | null>(null)
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
+  // The handlers read the frame from here, so a resize never takes the window's key listeners down and up again.
+  const boxRef = useRef(frame)
+  boxRef.current = frame
   const bleed = wallBleed(frame, CANVAS_WIDTH)
 
   // The ground, worked out once per theme and look (the wall draws again at every pointer move).
@@ -141,13 +166,27 @@ export function DeckWall() {
         const direction = directionOf(previous.slide.number, next.slide.number)
         setSerial(value => value + 1)
         moves.current += 1
-        setLeaving({ slide: previous.slide, serial: moves.current, direction })
+        // The slide going is drawn as the room last saw it: at its step (README item 18).
+        setLeaving({ slide: previous.slide, serial: moves.current, direction, reveal: previous.reveal?.shown })
+      } else {
+        // README item 18: a press that showed the next item on this slide; it rises in once it is drawn.
+        const arrivals = revealArrivals(previous?.reveal ?? null, next.reveal, !!previous)
+        if (arrivals) {
+          motion.current?.finish()
+          moves.current += 1
+          setArriving({ ...arrivals, serial: moves.current })
+        }
       }
       setState(next)
       return
     }
     if (message.type === 'present/peeked' && typeof message.number === 'number') {
       setPeeked({ number: message.number, title: typeof message.title === 'string' ? message.title : null })
+      return
+    }
+    if (message.type === 'present/pointer') {
+      const at = message.at as WallPoint | null | undefined
+      setRelayedDot(at && typeof at.x === 'number' && typeof at.y === 'number' ? { x: at.x, y: at.y } : null)
       return
     }
   }), [])
@@ -169,6 +208,9 @@ export function DeckWall() {
       const now = enteringRef.current
       const current = stateRef.current
       if (!run || !before || !now || !current) { setLeaving(null); return }
+      // A press came since this move, before its step could start (README item 18: it showed the new slide's next
+      // item): the move is at its end at once, as for any press during one, and the item's rise goes on.
+      if (moves.current !== leavingSerial) { setLeaving(value => (value?.serial === leavingSerial ? null : value)); return }
       // Nothing moves under a blank wall, the page's QR code or a picture filling the wall: the slide is simply there
       // when it is shown again.
       const covered = current.blank !== null || current.fill !== null || fillShown.current
@@ -184,6 +226,21 @@ export function DeckWall() {
     return () => window.cancelAnimationFrame(frame)
   }, [leavingSerial])
   useEffect(() => () => { motion.current?.finish() }, [])
+
+  // README item 18: the item a press showed rises in, 8 px in 0.2 s, once it is drawn; a press during it puts it at its
+  // end (`jump`), as for a move. Under a blank or filled wall, or with reduced motion, it is simply there.
+  const arrivingSerial = arriving?.serial
+  useLayoutEffect(() => {
+    if (!arriving || arrivingSerial === undefined) return
+    const run = motion.current
+    const current = stateRef.current
+    const covered = !current || current.blank !== null || current.fill !== null || fillShown.current
+    // Reduced motion, a covered wall or a deck whose transition is None (stillness throughout): the item is simply there.
+    if (!run || !current || !revealRises(transitionOf(current.transition), prefersReducedMotion(), covered)) { setArriving(null); return }
+    const drawing = playReveal(frameRef.current?.querySelector(SLIDE_NOW) ?? null, arriving)
+    run.begin(drawing ? REVEAL_MS : 0, drawing, () => setArriving(value => (value?.serial === arrivingSerial ? null : value)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrivingSerial])
 
   // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
   const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
@@ -229,6 +286,18 @@ export function DeckWall() {
     barTimer.current = window.setTimeout(() => setBarShown(false), BAR_MS)
   }, [])
   useEffect(() => () => { if (barTimer.current !== null) window.clearTimeout(barTimer.current) }, [])
+
+  // Item 12: L held here. While it is, the bar goes (it would sit beside the dot) and the pointer hides with it.
+  const setPointing = useCallback((on: boolean) => {
+    if (pointingRef.current === on) return
+    pointingRef.current = on
+    setPointingState(on)
+    if (on) {
+      if (barTimer.current !== null) window.clearTimeout(barTimer.current)
+      barTimer.current = null
+      setBarShown(false)
+    }
+  }, [])
   const barVisible = barShown || overBar
 
   // ---- the go-to box: the host names the slide; a pause closes it
@@ -305,6 +374,17 @@ export function DeckWall() {
         return
       }
       if (digits !== null) { setDigits(null); setPeeked(null) }
+      // The pointer dot (item 12): L held shows it where the pointer is; its repeats change nothing.
+      const pointerStep = pointerKeyStep(pointingRef.current, 'down', event)
+      if (pointerStep) {
+        take()
+        if (!pointingRef.current) {
+          setPointing(true)
+          const at = lastPointer.current
+          setOwnDot(at ? pointOnSlide(boxRef.current, at.x, at.y, true) : null)
+        }
+        return
+      }
       // The spotlight (item 16): F, Tab and Shift+Tab, and Esc while one is on. → and a clicker go on, which clears it.
       const spotStep = spotKeyOf(event, spotNow(current.spot), spotItems(frameRef.current?.querySelector(SLIDE_NOW) ?? null).length)
       if (spotStep) {
@@ -318,14 +398,35 @@ export function DeckWall() {
       if (key.type === 'stop') send('present/stop')
       else send(`present/${key.type}`)
     }
-    const onKeyUp = (event: KeyboardEvent) => { if (heldKey.current === event.key) heldKey.current = null }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (heldKey.current === event.key) heldKey.current = null
+      const pointerStep = pointerKeyStep(pointingRef.current, 'up', event)
+      if (pointerStep) {
+        if (pointerStep.take) { event.preventDefault(); event.stopPropagation() }
+        setPointing(false)
+      }
+    }
+    // A key let go in another window never comes here: the dot goes when this window loses the keys.
+    const onBlur = () => setPointing(false)
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', onBlur)
     }
-  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width])
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width, setPointing])
+
+  // Item 12: the pointer's place, always kept, so L shows the dot at once; while L is held the bar stays away.
+  const onWallPointerMove = useCallback((event: { clientX: number; clientY: number }) => {
+    lastPointer.current = { x: event.clientX, y: event.clientY }
+    if (pointingRef.current) {
+      setOwnDot(pointOnSlide(boxRef.current, event.clientX, event.clientY, true))
+      return
+    }
+    showBar()
+  }, [showBar])
 
   // A click acts on what it hits (not on the bar, the box or the grid): an item spotlights, the spotlit picture fills
   // the wall, outside any item it clears the spotlight or, with none, goes on. On a blank or filled wall it only
@@ -355,20 +456,25 @@ export function DeckWall() {
   const blankColour = blankShown === 'white' ? '#FFFFFF' : ground
   if (fillUrl) lastFillUrl.current = fillUrl
   const filledUrl = fillUrl ?? lastFillUrl.current
+  // This window's own dot while L is held here, else the presenter view's; the last one kept while it fades out.
+  const dot = (pointing ? ownDot : null) ?? relayedDot
+  if (dot) lastDot.current = dot
+  const dotShownAt = dot ?? lastDot.current
+  const dotAt = dotShownAt ? dotPlace(dotShownAt, frame) : null
 
-  const layer = (slide: WallSlide, className: string, key: string, going: boolean) => (
+  const layer = (slide: WallSlide, className: string, key: string, going: boolean, reveal: number | undefined) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
     </div>
   )
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
     <div
-      className={`deck-wall${barVisible || gridOpen ? '' : ' is-idle'}`}
+      className={`deck-wall${(barVisible && !pointing) || gridOpen ? '' : ' is-idle'}`}
       // The slide's ground on the whole screen: no band, no edge where the 16:9 area ends (a Borderless deck's white).
-      style={{ background: ground }}
-      onPointerMove={showBar}
+      style={{ background: ground, '--wall-accent': state.theme.accent } as CSSProperties}
+      onPointerMove={onWallPointerMove}
       onClick={onWallClick}
     >
       <div
@@ -378,8 +484,8 @@ export function DeckWall() {
         aria-live="polite"
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true) : null}
-        {layer(state.slide, '', `slide-${serial}`, false)}
+        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true, leaving.reveal) : null}
+        {layer(state.slide, '', `slide-${serial}`, false, state.reveal?.shown)}
       </div>
 
       {/* Item 11: the picture whole and uncropped on the theme's ground, over the whole screen, under the blank. */}
@@ -392,6 +498,16 @@ export function DeckWall() {
       <div className={`wall-blank${blank ? ' is-shown' : ''}`} style={{ background: blankColour }} aria-hidden={blank === 'page' ? undefined : true}>
         {blankShown === 'page' && state.page ? <PageCode address={state.page} theme={state.theme} borderless={state.borderless} height={screen.height} width={screen.width} /> : null}
       </div>
+
+      {/* Item 9: the exercise's countdown, over the slide, its transitions, the blank and the QR code. */}
+      {state.timer ? <WallCountdown timer={state.timer} frame={frame} /> : null}
+
+      {/* Item 12: the pointer dot, over the slide and a spotlight; no trail (the place never animates). */}
+      <div
+        className={`wall-dot${dot ? ' is-shown' : ''}`}
+        style={dotAt ? { left: dotAt.left, top: dotAt.top } : undefined}
+        aria-hidden="true"
+      />
 
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">
@@ -452,6 +568,24 @@ export function DeckWall() {
       ) : null}
     </div>
     </AgendaContext.Provider>
+  )
+}
+
+/**
+ * Item 9: the countdown at the slide's bottom right, in the accent, its words changing once a second. At 00:00 it
+ * stays and pulses three times, not with reduced motion.
+ */
+function WallCountdown({ timer, frame }: { timer: WallTimer; frame: { left: number; top: number; width: number; height: number } }) {
+  const look = timerLook(timer, useTimerNow(timer), prefersReducedMotion())
+  return (
+    <div
+      className={`wall-timer${look.done ? ' is-done' : ''}${look.pulse ? ' is-pulsing' : ''}`}
+      style={{ right: frame.left + Math.round(frame.width * 0.028), bottom: frame.top + Math.round(frame.height * 0.04), fontSize: Math.max(18, Math.round(frame.height * 0.042)) }}
+      role="timer"
+      aria-label={look.done ? 'The exercise’s time is up' : `Time left: ${look.text}`}
+    >
+      {look.text}
+    </div>
   )
 }
 

@@ -14,7 +14,7 @@
  *
  * Used by the wall, and by the Theme menu's preview on the stage (only the deck's transition there, never a move).
  */
-import { matchMotion, motionKeysOf, MOTION_MS, MOVE_FADE_MS, ZOOM_FROM, type MotionDirection, type MotionDrawing, type MotionPair, type MotionStep } from './wallMotion'
+import { matchMotion, motionKeysOf, MOTION_MS, MOVE_FADE_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM, type MotionDirection, type MotionDrawing, type MotionPair, type MotionStep } from './wallMotion'
 
 const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
 const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)'
@@ -91,6 +91,33 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
         }
       }
       for (const step of undo.reverse()) step()
+    },
+  }
+}
+
+/**
+ * README item 18: the items shown by a press (`from` to `to`, their `data-reveal-item` numbers) arrive in `slide`, each
+ * fading in as it rises 8 px (on the slide's own canvas) in 0.2 s. Its `finish` puts them at their end at once, so a press
+ * during it never waits. Nothing to draw: null.
+ */
+export function playReveal(slide: Element | null, arrivals: { from: number; to: number }): MotionDrawing | null {
+  if (!slide) return null
+  const animations: Animation[] = []
+  for (let index = arrivals.from; index < arrivals.to; index++) {
+    const item = slide.querySelector<HTMLElement>(`[data-reveal-item="${index}"]`)
+    if (!item || typeof item.animate !== 'function') continue
+    animations.push(item.animate([{ opacity: 0, transform: `translateY(${REVEAL_RISE}px)` }, { opacity: 1, transform: 'translateY(0)' }], { duration: REVEAL_MS, easing: EASE_OUT }))
+  }
+  if (!animations.length) return null
+  return {
+    finish: () => {
+      for (const animation of animations) {
+        try {
+          animation.finish()
+        } catch {
+          // An item that left the page: nothing to finish.
+        }
+      }
     },
   }
 }

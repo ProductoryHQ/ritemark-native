@@ -30,6 +30,9 @@
 
 .pv-row { display: flex; gap: 12px; margin: 45px 0 0 -7px; padding: 7px; overflow-x: auto; scrollbar-width: none; }
 .pv-row::-webkit-scrollbar { display: none; }
+/* Decks README item 18: "Shown 2 of 4" under Now, in the gap above the row, so the row stays where it is. */
+.pv-shown { height: 18px; margin-top: 12px; font-size: 13px; font-weight: 500; line-height: 18px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
+.pv-shown + .pv-row { margin-top: 15px; }
 .pv-thumb { flex: none; opacity: 0.8; }
 .pv-thumb .pv-slide { border-radius: 6px; }
 .pv-thumb.is-past { opacity: 0.45; }
@@ -71,6 +74,16 @@
 .pv-goto-number { min-width: 40px; height: 36px; padding: 0 10px; border-radius: 8px; background: rgba(248, 250, 252, 0.14); font-size: 20px; font-weight: 700; line-height: 36px; text-align: center; font-variant-numeric: tabular-nums; }
 .pv-goto-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pv-key { height: 22px; margin-left: 6px; padding: 0 6px; border-radius: 5px; background: rgba(248, 250, 252, 0.12); font-size: 12px; font-weight: 600; line-height: 22px; color: #C7D2FE; }
+/* Decks README item 12: while L is held over Now, the room's dot in Now, and no pointer of its own over it. */
+.pv-now.is-pointing, .pv-now.is-pointing * { cursor: none !important; }
+.pv-dot { position: absolute; z-index: 3; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4); pointer-events: none; }
+/* Item 9: the timer for an exercise, under Next: the minutes and Start on a Steps slide; while it runs, on every slide,
+   the time left with Restart and Stop. */
+.pv-timer { flex: none; margin-top: 22px; }
+.pv-timer-row { display: flex; align-items: center; gap: 8px; }
+.pv-timer-unit { font-size: 14px; color: #C7D2FE; }
+.pv-timer-left { font-size: 22px; font-weight: 600; line-height: 28px; color: #F8FAFC; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pv-timer-left.is-done { color: #FBBF24; }
 /* Small details item 3: the page's QR code in Now, as the room sees it; the words under it, at the bottom. */
 .pv-blank.is-page .pv-blank-ground { opacity: 1; }
 .pv-blank.is-page .page-code { position: relative; }

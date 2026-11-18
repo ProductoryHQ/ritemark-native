@@ -95,6 +95,10 @@ const SPIKE = [
   '# Picture\n\n![](images/pilot.png)\n\nA caption under it',
   '# Private words\n\nSeen text\n\n<!-- a remark -->\n\nMore text with <b>raw</b> HTML',
   'Line one\nline two with a break',
+  // README item 18: One by one on a block's line, and a list in its `::: incremental` wrapper (or `{reveal="one"}`).
+  '# Plan\n\n:::: {.boxes reveal="one"}\n::: box\n### One\n:::\n::: box\n### Two\n:::\n::::',
+  '# Plan\n\n::: incremental\n- Open the file\n- Ask the question\n:::\n\nAfter the list.',
+  '# Plan\n\n::: {reveal="one"}\n1. Open the file\n2. Ask the question\n:::',
 ]
 
 const here = path.dirname(fileURLToPath(import.meta.url))

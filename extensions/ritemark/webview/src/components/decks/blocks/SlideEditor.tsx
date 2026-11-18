@@ -979,7 +979,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
   // Sprint 162 PR 4: a top-right logo's room for the title, as every other view draws it (`logoCanvasMarks`).
-  const logoMarks = logoCanvasMarks(themeSlideLogo(theme), isCoverSlide(shownMarkdown))
+  const logoMarks = logoCanvasMarks(themeSlideLogo(theme, borderless), isCoverSlide(shownMarkdown))
   const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', logoMarks.cls].filter(Boolean).join(' ')
   return (
     <>
@@ -1035,7 +1035,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             ) : null}
             <EditorContent editor={editor} />
             {/* Sprint 162 PR 4: the theme's logo in its corner, over the words, as every other view draws it. */}
-            <SlideLogoImage logo={themeSlideLogo(theme)} cover={isCoverSlide(shownMarkdown)} />
+            <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isCoverSlide(shownMarkdown)} />
           </div>
           {missingSpots.map(spot => (
             <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>

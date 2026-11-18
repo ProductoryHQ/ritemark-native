@@ -5,7 +5,7 @@
  */
 import { strict as assert } from 'node:assert';
 import { BUILT_IN_THEME } from '../deckTheme';
-import { chooseDisplays, decodeDeckPresentMenuRequest, decodeDeckPresentRequest, decodeWallRequest, frontMatterEdit, lengthMinutesOf, presenterPicturePaths, presenterStateOf, wallDataOf, wallPicturePaths, wallStateOf } from './presentProtocol';
+import { chooseDisplays, decodeDeckPresentMenuRequest, decodeDeckPresentRequest, decodeWallRequest, frontMatterEdit, lengthMinutesOf, MAX_TIMER_MINUTES, presenterPicturePaths, presenterStateOf, wallDataOf, wallPicturePaths, wallStateOf, timerOf } from './presentProtocol';
 import { PresentSession } from './presentSession';
 
 const TEXT = [
@@ -80,7 +80,13 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'spot', 'theme', 'transition', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'theme', 'timer', 'transition', 'type']);
+  // README item 18: no step unless the host gives one, and only a step that is one gets through.
+  assert.equal(state.reveal, null);
+  assert.deepEqual(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, { shown: 2, count: 4 }).reveal, { shown: 2, count: 4 });
+  for (const bad of [{ shown: 5, count: 4 }, { shown: 0, count: 4 }, { shown: 1.5, count: 4 }, { shown: '2', count: 4 }]) {
+    assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, bad as never).reveal, null, `not a step: ${JSON.stringify(bad)}`);
+  }
   // Items 11 and 16: no spotlight and no filled wall unless asked; only an item's place gets through.
   assert.equal(state.spot, null);
   assert.equal(state.fill, null);
@@ -93,6 +99,9 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   assert.equal(state.transition, 'fade');
   for (const transition of ['push', 'zoom', 'none', 'fade'] as const) assert.equal(wallStateOf(session.view(), { ...look, transition }, {}).transition, transition);
   assert.equal(wallStateOf(session.view(), { ...look, transition: 'spin' as never }, {}).transition, 'fade', 'only the known transitions');
+  // Item 9: the timer, or none.
+  assert.equal(wallStateOf(session.view(), look, {}).timer, null);
+  assert.deepEqual(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, { endsAt: 5000, minutes: 15 }).timer, { endsAt: 5000, minutes: 15 });
   assert.equal(state.blank, null, 'the slide, not a blank wall');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'white').blank, 'white');
   assert.equal(wallStateOf(session.view(), look, {}, undefined, 'ground').blank, 'ground');
@@ -164,6 +173,25 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
     assert.equal(decodeWallRequest({ type }), null);
     assert.equal(decodeWallRequest({ type, item: 1, extra: 1 }), null);
   }
+  // Item 9: the timer's whole minutes, or null to stop it.
+  for (const minutes of [5, 20, 30, null]) assert.deepEqual(decodeWallRequest({ type: 'present/timer', minutes }), { type: 'present/timer', minutes }, `timer ${minutes}`);
+  for (const minutes of [0, -5, 2.5, '20', true, MAX_TIMER_MINUTES + 1]) assert.equal(decodeWallRequest({ type: 'present/timer', minutes }), null, `timer ${String(minutes)}`);
+  assert.equal(decodeWallRequest({ type: 'present/timer' }), null);
+  assert.equal(decodeWallRequest({ type: 'present/timer', minutes: 5, endsAt: 1 }), null, 'the host sets the end, never a window');
+  // Item 12: the dot's place on the slide, from 0 to 1, or null.
+  assert.deepEqual(decodeWallRequest({ type: 'present/pointer', at: { x: 0, y: 1 } }), { type: 'present/pointer', at: { x: 0, y: 1 } });
+  assert.deepEqual(decodeWallRequest({ type: 'present/pointer', at: null }), { type: 'present/pointer', at: null });
+  for (const at of [{ x: 1.01, y: 0 }, { x: -0.1, y: 0.5 }, { x: '0.5', y: 0.5 }, { x: 0.5 }, { x: 0.5, y: 0.5, z: 1 }, [0.5, 0.5], Number.NaN, 'here']) {
+    assert.equal(decodeWallRequest({ type: 'present/pointer', at }), null, `pointer ${JSON.stringify(at)}`);
+  }
+  assert.equal(decodeWallRequest({ type: 'present/pointer' }), null);
+}
+
+// ---- Item 9: the timer reaches the windows only as a timer
+{
+  assert.deepEqual(timerOf({ endsAt: 1000, minutes: 20 }), { endsAt: 1000, minutes: 20 });
+  assert.deepEqual(timerOf({ endsAt: 1000, minutes: 20, extra: 'x' }), { endsAt: 1000, minutes: 20 }, 'copied field by field');
+  for (const bad of [null, {}, { endsAt: 'soon', minutes: 20 }, { endsAt: 1000, minutes: 0 }, { endsAt: Number.POSITIVE_INFINITY, minutes: 5 }, 'timer']) assert.equal(timerOf(bad), null, JSON.stringify(bad));
 }
 
 // ---- The deck view's Present
@@ -182,7 +210,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'page', 'position', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'nextIsItem', 'nextReveal', 'page', 'position', 'reveal', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'timer', 'type', 'wallDisplay']);
   assert.equal(first.spot, null);
   assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, focus: { spot: 1, fill: null } }).spot, 1, 'Now shows the wall\'s spotlight');
   assert.equal(first.blank, null);
