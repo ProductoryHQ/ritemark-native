@@ -648,6 +648,19 @@ stable(COLUMNS, 'three columns')
     assert.equal(revealsOneBlock(chosen), true)
     assert.equal(after(setReveal(state, chosen.pos, false)), LIST, `${form.split('\n')[2]}: All at once unwraps to the bare list`)
   }
+  // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).
+  for (const [line, keptLine] of [['::: {.incremental #intro}', '::: {#intro}'], ['::: {.note reveal="one"}', '::: note'], ['::: {reveal="one" data-x="1"}', '::: {data-x="1"}']] as const) {
+    const form = written.replace('::: incremental', line)
+    const state = stateWith(form, 'Ask')
+    const chosen = chosenBlockAt(state)!
+    assert.equal(revealsOneBlock(chosen), true, `${line}: One by one`)
+    assert.equal(after(setReveal(state, chosen.pos, false)), form.replace(line, keptLine), `${line}: the rest of its line stays`)
+  }
+  // A task list in the wrapper is not a list to the bar, nor revealed in Present (the renderer's own rule).
+  const tasks = ['# Plan', '', '::: incremental', '- [ ] One', '- [ ] Two', ':::'].join('\n')
+  stable(tasks, 'a task list in a wrapper')
+  assert.equal(chosenBlockAt(stateWith(tasks, 'One')), null, 'no bar for a task list in a wrapper')
+  assert.ok(!blockSlideHtml(tasks).includes('data-reveal'), 'and nothing to reveal')
   // A wrapper holding more than one list is no reveal wrapper: the bar is not for it, and it is kept as written.
   const two = ['# Plan', '', '::: incremental', '- One', '', 'Words between.', ':::'].join('\n')
   stable(two, 'a wrapper with more than a list')

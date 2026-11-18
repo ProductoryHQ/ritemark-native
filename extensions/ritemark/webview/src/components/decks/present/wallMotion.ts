@@ -49,11 +49,12 @@ export const REVEAL_RISE = 8
 
 /**
  * The items that arrive with a state from the host (README item 18): those from the step before up to the step now, on
- * the same slide, when the step went on (one item for a press). Null for another slide (its transition draws it), a
- * step back (the item hides at once) or none; with reduced motion the wall shows them without the rise.
+ * the same slide, when a press showed the next item (one more). Null for another slide (its transition draws it), a
+ * step back (the item hides at once), no step, or a jump that shows the slide whole (the go-to box, End, the row on the
+ * slide already shown: whole at once, nothing rises); with reduced motion the wall shows the item without the rise.
  */
 export function revealArrivals(before: { shown: number } | null, now: { shown: number } | null, sameSlide: boolean): { from: number; to: number } | null {
-  if (!sameSlide || !before || !now || now.shown <= before.shown) return null
+  if (!sameSlide || !before || !now || now.shown !== before.shown + 1) return null
   return { from: before.shown, to: now.shown }
 }
 

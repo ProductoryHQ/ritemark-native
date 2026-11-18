@@ -289,3 +289,21 @@ export function isRevealWrapperAttrs(attrs: FenceAttributes): boolean {
   if (slideBlockClassOf(attrs) !== null || attrs.classes.includes('agenda')) return false;
   return attrs.classes.includes(REVEAL_LIST_CLASS) || revealsOne(attrs);
 }
+
+/**
+ * A list wrapper's opening line set back to All at once: its `incremental` class and `reveal` value taken out, every
+ * other class, its id and other values kept (`::: {.incremental #intro}` → `::: {#intro}`). Null when nothing else is
+ * on it: the wrapper itself then goes, and the list stands as written.
+ */
+export function wrapperLineWithoutReveal(openLine: string): string | null {
+  const open = OPEN_FENCE.exec(openLine);
+  const attrs = open ? parseFenceAttributes(open[2]) : null;
+  if (!open || !attrs) return null;
+  const classes = attrs.classes.filter(name => name !== REVEAL_LIST_CLASS);
+  const entries = Object.entries(attrs.values).filter(([name]) => name !== REVEAL_KEY);
+  if (!attrs.id && classes.length === 0 && entries.length === 0) return null;
+  const indent = /^ */.exec(openLine)?.[0] ?? '';
+  if (!attrs.id && classes.length === 1 && entries.length === 0) return `${indent}${open[1]} ${classes[0]}`;
+  const parts = [...(attrs.id ? [`#${attrs.id}`] : []), ...classes.map(name => `.${name}`), ...entries.map(([name, text]) => `${name}=${fenceAttributeValue(text)}`)];
+  return `${indent}${open[1]} {${parts.join(' ')}}`;
+}

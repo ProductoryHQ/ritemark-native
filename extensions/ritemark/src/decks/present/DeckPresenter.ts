@@ -51,6 +51,7 @@ import {
   presenterPicturePaths,
   presenterStateOf,
   wallPicturePaths,
+  wallSlideOf,
   wallStateOf,
   chooseDisplays,
   type WallPointer,
@@ -503,7 +504,11 @@ export class DeckPresenter implements vscode.Disposable {
         const move = moveOf(request);
         // README item 18: → shows the slide's next item and ← hides the last one shown, on the slide the wall has (an
         // edit since waits for the next move, as for blanking); past the first or the last, the press moves.
-        const step = move.type === 'next' || move.type === 'back' ? revealStepOf(running.reveal, move.type) : null;
+        // A slide deleted in the editor while it is on the wall has no items left to show: the press moves on.
+        running.session.read(running.origin.document.getText());
+        const onDeck = running.session.view();
+        const gone = onDeck.position === null && !onDeck.current.skip;
+        const step = !gone && (move.type === 'next' || move.type === 'back') ? revealStepOf(running.reveal, move.type) : null;
         if (step) {
           running.reveal = step;
           await this.showSameSlide(running);
@@ -556,17 +561,16 @@ export class DeckPresenter implements vscode.Disposable {
     // An item's place names an item of the slide the wall has: when this draw brings the slide in another form (an edit
     // since, drawn now by a reload, the presenter view turned on or off), the spotlight and a filled wall go, rather
     // than land on another item (review of #790).
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer);
+    // README item 18: a slide a move just reached opens as the move opens it (its first item, or whole); the same slide
+    // drawn again keeps its step, within its items now.
+    const count = revealCountOf(wallSlideOf(view.current));
+    running.reveal = running.arrival ? revealOnArrival(count, running.arrival) : revealKept(running.reveal, count);
+    running.arrival = null;
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
       state = { ...state, spot: null, fill: null };
     }
-    // README item 18: a slide a move just reached opens as the move opens it (its first item, or whole); the same slide
-    // drawn again keeps its step, within its items now.
-    const count = revealCountOf(state.slide);
-    running.reveal = running.arrival ? revealOnArrival(count, running.arrival) : revealKept(running.reveal, count);
-    running.arrival = null;
-    state = { ...state, reveal: running.reveal };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);

@@ -129,7 +129,8 @@ function columnChildren(token: SlideDivToken): FenceAttributes[] | null {
 export function isRevealListToken(token: { attrs: FenceAttributes; tokens: Token[] }): boolean {
   if (!isRevealWrapperAttrs(token.attrs)) return false;
   const drawn = token.tokens.filter(child => child.type !== 'space' && !isCommentBlock(child));
-  return drawn.length === 1 && drawn[0].type === 'list';
+  // A bullet or numbered list, as the slide editor's bar reads it (`revealWrappedList`): never a task list.
+  return drawn.length === 1 && drawn[0].type === 'list' && !(drawn[0] as Tokens.List).items.some(item => item.task);
 }
 
 /** The next item of a One by one block: its number, and hidden while Present hasn't shown it yet. */
@@ -139,18 +140,25 @@ function revealItemAttributes(): string {
   return ` data-reveal-item="${index}"${hidden ? ' data-reveal-hidden=""' : ''}`;
 }
 
-/** The items of the first list drawn in `html` (its own `<li>`s, never a nested list's), marked as a block's items. */
-function markListItems(html: string): string {
+/**
+ * The items of the first list drawn in `html` (its own `<li>`s, never a nested list's), marked as a block's items; with
+ * `only`, the first top-level list of that kind (a Steps block's steps are its numbered list, whatever stands before it).
+ */
+function markListItems(html: string, only?: 'ol'): string {
   let depth = 0;
+  let marking = false;
   let done = false;
   // The renderer's own markup: every word in it is escaped, so a tag here is one it drew.
   return html.replace(/<(\/?)(ul|ol|li)\b([^>]*)>/g, (tag, close: string, name: string, rest: string) => {
     if (done) return tag;
-    if (name === 'li') return !close && depth === 1 ? `<li${revealItemAttributes()}${rest}>` : tag;
+    if (name === 'li') return marking && !close && depth === 1 ? `<li${revealItemAttributes()}${rest}>` : tag;
     if (close) {
       depth -= 1;
-      if (depth === 0) done = true;
-    } else depth += 1;
+      if (marking && depth === 0) done = true;
+    } else {
+      if (depth === 0 && (!only || name === only)) marking = true;
+      depth += 1;
+    }
     return tag;
   });
 }
@@ -203,7 +211,7 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
     case 'steps': {
       const tag = stepsTagOf(token.attrs);
       const body = within();
-      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${reveals ? markListItems(body) : body}</div>\n`;
+      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${reveals ? markListItems(body, 'ol') : body}</div>\n`;
     }
     default: {
       const body = within();

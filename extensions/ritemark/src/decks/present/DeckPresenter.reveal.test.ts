@@ -148,6 +148,11 @@ const DECK = `---\ndeck: 2\nhandout: text\n---\n\n${blockSlide('s1', '# Start')}
   assert.equal(blockRevealCount(LIST.replace('::: incremental', '::: {reveal="one"}')), 2, '{reveal="one"} around a list reveals too');
   assert.equal(blockRevealCount(BOXES.replace(' reveal="one"', '')), 0, 'All at once: nothing to reveal');
   assert.equal(blockRevealCount(['::: {.steps reveal="one"}', '1. A', '   - inner', '2. B', ':::'].join('\n')), 2, 'a step, not its inner list');
+  // Steps' items are its numbered list, whatever stands before it (review of #799); a task list is no reveal list.
+  const stepsAfterList = ['::: {.steps reveal="one"}', '- a note', '- another', '', '1. A', '2. B', '3. C', ':::'].join('\n');
+  assert.equal(blockRevealCount(stepsAfterList), 3, 'the steps, not the bullets before them');
+  assert.ok(blockSlideHtml(stepsAfterList, { reveal: 1 }).includes('<li data-reveal-item="1" data-reveal-hidden="">B</li>'));
+  assert.equal(blockRevealCount(['::: incremental', '- [ ] a', '- [ ] b', ':::'].join('\n')), 0, 'a task list in the wrapper is not revealed');
   assert.equal(blockRevealCount([':::: {.columns reveal="one"}', '::: column', 'A', ':::', '::: column', 'B', ':::', '::::'].join('\n')), 2);
   // Two blocks on one slide: their items one after another, in the slide's order.
   assert.equal(blockRevealCount(`${BOXES}\n\n${LIST.replace('# Two steps\n\n', '')}`), 6);
@@ -304,6 +309,18 @@ async function main(): Promise<void> {
     await settle();
     at(2, { shown: 4, count: 4 }, 'the wall drawn again keeps its step');
     assert.ok(JSON.stringify(onWall().slide).includes('Four, edited'), 'and shows the edit');
+
+    // The slide on the wall deleted in the editor during a step: it has no items left to show, so → moves on
+    // (review of #799), to the slide that came after it.
+    await press('present/back');
+    at(2, { shown: 3, count: 4 }, 'a step before the deletion');
+    document.text = document.text.replace(blockSlide('s2', BOXES.replace('### Four', '### Four, edited')), '');
+    document.version = 3;
+    assert.ok(!document.text.includes('Four habits'), 'the slide is gone from the deck');
+    await press('present/next');
+    assert.equal(onWall().slide.number, 2, 'the slide that came after it, now second');
+    assert.ok(JSON.stringify(onWall().slide).includes('Two steps'));
+    assert.deepEqual(onWall().reveal, { shown: 1, count: 2 }, 'opening with its first item');
 
     presenter.stop();
     await settle();

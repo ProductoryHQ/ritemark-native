@@ -17,12 +17,12 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, isRevealWrapperAttrs, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg, isPageIconName } from '../slide/pageIcons'
 import { slideIcon } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
-import { divAttributesOf } from './blockBar'
+import { divAttributesOf, revealWrappedList } from './blockBar'
 
 /** What the stage does when a box's icon or the Steps pill is used (SlideEditor gives them; they read its latest state). */
 export interface SlideDivHandlers {
@@ -144,7 +144,7 @@ class SlideDivView implements NodeView {
     else this.dom.removeAttribute('data-look')
     // README item 18: a block set to One by one, marked as the renderer marks it (a list's `::: incremental` wrapper is
     // then drawn at the list's own size, slide.css). The stage always shows every item.
-    const reveals = kind === null ? isRevealWrapperAttrs(attrs) : (kind === 'boxes' || kind === 'steps' || kind === 'columns') && revealsOne(attrs)
+    const reveals = kind === null ? revealWrappedList(this.node) !== null : (kind === 'boxes' || kind === 'steps' || kind === 'columns') && revealsOne(attrs)
     if (reveals) this.dom.setAttribute('data-reveal', 'one')
     else this.dom.removeAttribute('data-reveal')
     // The block bar's values, drawn as the renderer draws them (Width, Style, alignment; the columns' split).

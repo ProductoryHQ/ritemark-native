@@ -29,7 +29,7 @@
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { liftTarget } from '@tiptap/pm/transform'
-import { OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
 
 /**
@@ -120,6 +120,14 @@ export function setReveal(state: EditorState, pos: number, one: boolean): Transa
     const wrapper = slideDivNode(state.schema, REVEAL_LIST_OPEN, REVEAL_LIST_CLOSE, [block.node])
     tr.wrap(range, [{ type: wrapper.type, attrs: wrapper.attrs }])
   } else {
+    // A wrapper that carries more than Reveal (an id, another class or value) keeps them: only its Reveal goes.
+    const open = String(block.node.attrs.open ?? '')
+    const kept = wrapperLineWithoutReveal(open)
+    if (kept !== null) {
+      const attrs = OPEN_FENCE.exec(kept)
+      const read = attrs ? parseFenceAttributes(attrs[2]) : null
+      return tr.setNodeMarkup(pos, undefined, { ...block.node.attrs, open: kept, class: read ? read.classes.join(' ') : '' }).setMeta(SLIDE_COMMAND, true)
+    }
     // A wrapper read as `::: {reveal="one"}` is unwrapped the same: All at once writes nothing.
     const range = state.doc.resolve(pos + 1).blockRange(state.doc.resolve(pos + block.node.nodeSize - 1))
     const target = range ? liftTarget(range) : null

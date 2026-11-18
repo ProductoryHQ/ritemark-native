@@ -205,6 +205,8 @@ class FakeClock implements MotionClock {
   assert.equal(revealArrivals({ shown: 1 }, { shown: 1 }, true), null, 'a blank, a spotlight: no step')
   assert.equal(revealArrivals({ shown: 4 }, { shown: 1 }, false), null, 'another slide: its transition draws it')
   assert.equal(revealArrivals(null, { shown: 1 }, true), null)
+  // A jump that shows the slide whole (the go-to box, End, the row on the slide already shown): nothing rises.
+  assert.equal(revealArrivals({ shown: 1 }, { shown: 4 }, true), null, 'whole at once, no rise')
 
   const BOXES = ['# Four ideas', '', ':::: {.boxes reveal="one"}', ...['One', 'Two', 'Three', 'Four'].flatMap(word => ['::: box', `### ${word}`, ':::', '']), '::::', '', 'A line after them.'].join('\n')
   const drawn = (reveal?: number) => createDocument(`<body>${blockCanvasMarkup({ markdown: BOXES }, { reveal })}</body>`).body as unknown as HTMLElement
@@ -248,6 +250,8 @@ class FakeClock implements MotionClock {
   const wallSource = readFileSync(fileURLToPath(new NodeURL('./DeckWall.tsx', import.meta.url)), 'utf8')
   assert.match(wallSource, /if \(!run \|\| covered \|\| prefersReducedMotion\(\)\) \{ setArriving\(null\); return \}/)
   assert.match(wallSource, /const send = useCallback\(\(type: Move\) => \{\n\s+jump\(\)/)
+  // A move whose step had not started when a press showed the next item is put at its end, so the item still rises.
+  assert.match(wallSource, /if \(moves\.current !== leavingSerial\) \{ setLeaving\(value => \(value\?\.serial === leavingSerial \? null : value\)\); return \}/)
   // The slide on the wall and the one going are drawn at their steps; the editor's canvases never are.
   assert.match(wallSource, /layer\(state\.slide, '', `slide-\$\{serial\}`, false, state\.reveal\?\.shown\)/)
 }

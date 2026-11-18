@@ -207,6 +207,9 @@ export function DeckWall() {
       const now = enteringRef.current
       const current = stateRef.current
       if (!run || !before || !now || !current) { setLeaving(null); return }
+      // A press came since this move, before its step could start (README item 18: it showed the new slide's next
+      // item): the move is at its end at once, as for any press during one, and the item's rise goes on.
+      if (moves.current !== leavingSerial) { setLeaving(value => (value?.serial === leavingSerial ? null : value)); return }
       // Nothing moves under a blank wall, the page's QR code or a picture filling the wall: the slide is simply there
       // when it is shown again.
       const covered = current.blank !== null || current.fill !== null || fillShown.current
