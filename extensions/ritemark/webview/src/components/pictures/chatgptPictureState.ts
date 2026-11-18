@@ -73,3 +73,21 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   return { phase: 'idle' }
 }
 
+
+/** What `followPicture` reads of a ProseMirror document and mapping. */
+export interface PictureDoc { content: { size: number }; nodeAt: (pos: number) => { type: { name: string } } | null | undefined }
+export interface PictureMapping { mapResult: (pos: number, assoc?: number) => { pos: number; deleted: boolean } }
+
+/**
+ * Where a picture being made for (or just made) stands after an edit, or null when it's gone. An edit elsewhere moves
+ * it; a slide's sync that writes the picture's block again (the made picture coming back from the deck) puts a picture
+ * back where it stood, which is still its place.
+ */
+export function followPicture(doc: PictureDoc, mapping: PictureMapping, pos: number): number | null {
+  const mapped = mapping.mapResult(pos, 1)
+  if (!mapped.deleted) return mapped.pos
+  for (const at of [mapped.pos, mapping.mapResult(pos, -1).pos, pos]) {
+    if (at >= 0 && at < doc.content.size && doc.nodeAt(at)?.type.name === 'image') return at
+  }
+  return null
+}

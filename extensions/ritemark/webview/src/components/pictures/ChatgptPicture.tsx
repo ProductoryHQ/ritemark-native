@@ -22,7 +22,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
-import { doneWords, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
+import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
 
 export type { MakerPhase, PictureAsk, PictureMode, PicturePlaceRef } from './chatgptPictureState'
 
@@ -44,9 +44,14 @@ const newRequestId = () => `picture-${Date.now().toString(36)}-${(serial += 1)}`
 
 /** The ChatGPT picture's state for one editor, and what its strip's buttons do. */
 export function usePictureMaker(options: PictureMakerOptions) {
-  const [state, setState] = useState<MakerPhase>({ phase: 'idle' })
+  const [state, setPhase] = useState<MakerPhase>({ phase: 'idle' })
   const stateRef = useRef(state)
   stateRef.current = state
+  // Each change is seen at once by the next event, before React draws it (two transactions in a row).
+  const setState = useCallback((next: MakerPhase) => {
+    stateRef.current = next
+    setPhase(next)
+  }, [])
   const latest = useRef(options)
   latest.current = options
 
@@ -56,17 +61,17 @@ export function usePictureMaker(options: PictureMakerOptions) {
   useEffect(() => {
     const editor = options.editor
     if (!editor) return
-    const follow = ({ transaction }: { transaction: { docChanged: boolean; mapping: { mapResult: (pos: number, assoc?: number) => { pos: number; deleted: boolean } } } }) => {
+    const follow = ({ transaction }: { transaction: { docChanged: boolean; doc: PictureDoc; mapping: PictureMapping } }) => {
       const current = stateRef.current
       if (!transaction.docChanged || current.phase === 'idle' || current.ask.place.kind !== 'flow') return
-      const mapped = transaction.mapping.mapResult(current.ask.place.pos, 1)
-      if (mapped.deleted) {
+      const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos)
+      if (pos === null) {
         // The picture went: a request still running is stopped, and nothing stays anchored on nothing.
         if (current.phase === 'making') sendToExtension('picture/cancel', { requestId: current.requestId })
         setState({ phase: 'idle' })
         return
       }
-      if (mapped.pos !== current.ask.place.pos) setState({ ...current, ask: { ...current.ask, place: { kind: 'flow', pos: mapped.pos } } } as MakerPhase)
+      if (pos !== current.ask.place.pos) setState({ ...current, ask: { ...current.ask, place: { kind: 'flow', pos } } } as MakerPhase)
     }
     editor.on('transaction', follow)
     return () => { editor.off('transaction', follow) }

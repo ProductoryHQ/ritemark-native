@@ -11,7 +11,7 @@ import { history, undo } from '@tiptap/pm/history'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { editorMarkdown, openDocument } from '../../utils/markdownFidelity'
 import { replacePicture } from '../../extensions/pictures/pictureCommands'
-import { doneWords, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk } from './chatgptPictureState'
+import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk } from './chatgptPictureState'
 
 let failures = 0
 function check(name: string, run: () => void) {
@@ -73,6 +73,25 @@ check('made, then Try another: each one undo step; ⌘Z goes back to the first, 
   assert.equal(editorMarkdown(state.doc), 'Before.\n\n![](./images/at-night.png){width=50% align=center}\n\nAfter.', 'one Undo: the first one')
   undo(state, tr => { state = state.apply(tr) })
   assert.equal(editorMarkdown(state.doc), before, 'and the old picture, with its description')
+})
+
+check('the place follows edits; a block written again with its picture keeps it; a deleted picture ends it', () => {
+  const text = 'Before.\n\n![Three agents](images/agents.png)\n\nAfter.\n'
+  let state = EditorState.create({ doc: openDocument(text).doc })
+  const pos = firstPicture(state.doc)
+  // Typing before the picture moves it.
+  const typed = state.tr.insertText('Well. ', 1)
+  assert.equal(followPicture(typed.doc, typed.mapping, pos), pos + 6)
+  // The slide's sync writes the picture's block again (the made picture coming back from the deck): still the place.
+  const $pos = state.doc.resolve(pos)
+  const block = $pos.depth > 0 ? { from: $pos.before($pos.depth), to: $pos.after($pos.depth) } : { from: pos, to: pos + state.doc.nodeAt(pos)!.nodeSize }
+  const rewritten = state.tr.replaceWith(block.from, block.to, state.doc.slice(block.from, block.to).content)
+  assert.equal(followPicture(rewritten.doc, rewritten.mapping, pos), pos)
+  // The picture deleted: its place is gone, and a request for it stops.
+  const node = state.doc.nodeAt(pos)!
+  const deleted = state.tr.delete(pos, pos + node.nodeSize)
+  assert.equal(followPicture(deleted.doc, deleted.mapping, pos), null)
+  state = state.apply(typed)
 })
 
 if (failures) {
