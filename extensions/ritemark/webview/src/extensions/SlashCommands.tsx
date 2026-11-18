@@ -42,6 +42,8 @@ export const SlashCommands = Extension.create<SlashCommandsOptions>({
         editor: this.editor,
         ...this.options.suggestion,
         ...(pluginKey ? { pluginKey } : {}),
+        // Sprint 163 PR 3: no / menu in a button's words or the words beside it (a block can't go inside a line).
+        allow: ({ state, range }: any) => !/^button(?:Words|Label)$/.test(state.doc.resolve(range.from).parent.type.name),
         command: ({ editor, range, props }: any) => {
           if (run) run(editor, range, props)
           else executeSlashCommand(editor, range, props)

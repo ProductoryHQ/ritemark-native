@@ -5,6 +5,7 @@
 
 import type { PhosphorIconName } from '../components/ui/Icon'
 import { sendToExtension, emitInternalEvent } from '../bridge'
+import { insertButton } from './buttonBlock/buttonCommands'
 
 export interface BlockItemDef {
   title: string
@@ -30,6 +31,8 @@ export const NUMBERED_LIST_KEYWORDS = ['list', 'numbers', 'ol', 'loend', 'nummer
 export const TABLE_KEYWORDS = ['grid', 'tabel']
 /** Sprint 163 PR 1: Code Block's words, shared with the slide's Code block (both / menus find it by them). */
 export const CODE_BLOCK_KEYWORDS = ['code', 'snippet', 'kood']
+/** Sprint 163 PR 3: the Button block's hidden words (the decks README), the same in both / menus. */
+export const BUTTON_KEYWORDS = ['link', 'file', 'material', 'download', 'nupp', 'fail', 'materjal']
 
 export const blockItems: BlockItemDef[] = [
   { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },
@@ -44,6 +47,8 @@ export const blockItems: BlockItemDef[] = [
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
   { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
+  // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
+  { title: 'Button', description: 'A button that opens an address', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
   { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio', keywords: ['drawio', 'draw.io', 'chart', 'skeem'] },
   // Experience 22 (18 November): one name for a picture, as experience 49 made it one picture editor; "image" finds it.
@@ -130,6 +135,12 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     return
   }
 
+  // Sprint 163 PR 3: the button where the / was, its address sheet open at once (`ButtonBlockTools`).
+  if (item.nodeType === 'button') {
+    editor.chain().focus().deleteRange(range).command(({ tr }: { tr: Parameters<typeof insertButton>[0] }) => { insertButton(tr, range.from); return true }).run()
+    return
+  }
+
   const chain = editor.chain().focus().deleteRange(range)
 
   switch (item.nodeType) {
@@ -188,6 +199,12 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
 
   if (item.nodeType === 'table') {
     editor.chain().focus().setTextSelection(pos).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    return
+  }
+
+  // Sprint 163 PR 3: the button at the block menu's place, its address sheet open at once.
+  if (item.nodeType === 'button') {
+    editor.chain().focus().insertContentAt(pos, { type: 'paragraph' }).command(({ tr }: { tr: Parameters<typeof insertButton>[0] }) => { insertButton(tr, pos + 1); return true }).run()
     return
   }
 

@@ -30,6 +30,7 @@
   [role="option"]:not([aria-disabled="true"]),
   [role="tab"],
   a[href],
+  [role="link"][data-href],
   label[for],
   summary,
   select,

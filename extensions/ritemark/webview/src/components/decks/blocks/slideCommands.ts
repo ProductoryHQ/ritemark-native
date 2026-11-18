@@ -23,7 +23,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
-import { BULLET_LIST_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -49,6 +49,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes', keywords: ['cards', 'tiles', 'grid', 'kastid', 'kaardid'] },
   { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps', keywords: ['process', 'timeline', 'flow', 'sammud', 'protsess'] },
   { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
+  // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
+  { group: 'Blocks', title: 'Button', description: '', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
   { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda', keywords: ['contents', 'toc', 'sisukord', 'päevakava'] },
   { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture', keywords: PICTURE_KEYWORDS },

@@ -14,6 +14,7 @@ import { CodeFillPlaces } from '../extensions/codeFillPlaces'
 import { isRelativeImagePath, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
+import { ButtonBlockTools } from '../extensions/buttonBlock/ButtonBlockTools'
 import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
 import { HeadingLevelShortcuts } from '../extensions/HeadingLevelShortcuts'
 import { SelectionBoundaryKeys } from '../extensions/SelectionBoundaryKeys'
@@ -851,6 +852,8 @@ export function Editor({
             <MarginCommentRail editor={editor} container={scrollContainer} />
           )}
           {tableHandlesEnabled() ? <TableHandlesLayer editor={editor} /> : null}
+          {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
+          <ButtonBlockTools editor={editor} />
           {/* Experience 49: the chosen picture's ring, handles, crop frame and bar. */}
           <PictureTools
             editor={editor}

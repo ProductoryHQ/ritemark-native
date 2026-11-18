@@ -26,6 +26,7 @@ import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtensio
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
 import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
 import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
+import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
@@ -75,6 +76,8 @@ slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
 slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// Sprint 163 PR 3: the Button block, read as the Text editor reads it.
+slideEditorMarked.use(buttonMarkedExtension)
 
 let slideComments = false
 

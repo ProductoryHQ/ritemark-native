@@ -9,6 +9,7 @@
  */
 import * as vscode from 'vscode';
 import { openInTarget } from './blocks/codeTools';
+import { isButtonAddress } from './blocks/buttonBlock';
 
 /** Open a slide's Open in address in the person's browser; false (and nothing opened) for any other value. */
 export function openInBrowser(url: unknown): boolean {
@@ -16,5 +17,17 @@ export function openInBrowser(url: unknown): boolean {
   if (target === null) return false;
   // The runtime takes a string here and keeps it as written (above); the typing names only a Uri.
   void Promise.resolve(vscode.env.openExternal(target as unknown as vscode.Uri)).catch(() => false);
+  return true;
+}
+
+/**
+ * Sprint 163 PR 3: a Button block's address, in the person's own browser, as the string it is (as above). Only a full
+ * https address (`isButtonAddress`) is opened, and, when `onDeck` is given (Present's wall and presenter view), only one
+ * a button of the deck carries. False, and nothing opened, for anything else.
+ */
+export function openButtonLink(url: unknown, onDeck?: (address: string) => boolean): boolean {
+  if (!isButtonAddress(url)) return false;
+  if (onDeck && !onDeck(url)) return false;
+  void Promise.resolve(vscode.env.openExternal(url as unknown as vscode.Uri)).catch(() => false);
   return true;
 }

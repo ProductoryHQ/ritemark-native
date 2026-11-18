@@ -43,6 +43,8 @@ import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNod
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
+import { buttonBlockExtensions } from '../extensions/buttonBlock/ButtonBlock'
+import { addButtonTurndownRules, buttonMarkedExtension } from '../extensions/buttonBlock/buttonMarkdown'
 import { preprocessTaskListHTML } from './taskListRoundTrip'
 import {
   annotateAsWritten,
@@ -73,6 +75,8 @@ editorMarked.use(asWrittenMarkedExtension)
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 // Experience 49: a picture's size, crop and caption, kept in the block after its image line.
 editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
+// Sprint 163 PR 3: a paragraph ending with a `{.button}` link is a Button block (after the as-written paragraph).
+editorMarked.use(buttonMarkedExtension)
 
 let commentMarkedRegistered = false
 
@@ -396,6 +400,8 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
       onLinkClick: slots.onLinkClick,
     }),
     ...tableExtensions,
+    // Sprint 163 PR 3: the Button block, the same in a Text document and on a slide.
+    ...buttonBlockExtensions,
     slots.image ?? Image.configure(editorImageOptions),
     ...(slots.afterImage ?? []),
     // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
@@ -467,6 +473,8 @@ export function createEditorTurndownService(): TurndownService {
   addCommentTurndownRules(service)
   // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
   addDeckTurndownRules(service)
+  // Sprint 163 PR 3: the Button block (a paragraph ending with its `{.button}` link).
+  addButtonTurndownRules(service)
   return service
 }
 

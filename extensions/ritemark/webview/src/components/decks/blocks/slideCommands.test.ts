@@ -140,7 +140,7 @@ const DECK = [
 {
   assert.deepEqual(SLIDE_ITEMS.map(item => `${item.group}: ${item.title}${item.shortcut ? ` ${item.shortcut}` : ''}`), [
     'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.', 'Text: Code block ```',
-    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Agenda',
+    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Button', 'Blocks: Agenda',
     'Media: Picture', 'Media: Web page',
     'Slides: New slide below', 'Slides: Split slide here ***',
   ])

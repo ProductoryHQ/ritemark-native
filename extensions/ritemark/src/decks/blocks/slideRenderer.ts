@@ -25,6 +25,7 @@ import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
 import { codeBlockHtml } from './codeTools';
+import { buttonHtml, buttonParagraphOf, isButtonAddress } from './buttonBlock';
 
 export { sidePictureOf };
 
@@ -78,6 +79,11 @@ interface RenderState {
   /** Sprint 163 PR 1: a code block's ↗ Open in… (off for a deck with `open-in: none`). */
   openIn: boolean;
   /**
+   * Sprint 163 PR 3: a Button block's button as a real link that opens a new tab (the published page), else with its
+   * address on it for the host to open (the wall, the presenter view; the strip and the stage never open it).
+   */
+  buttonLinks: boolean;
+  /**
    * README item 18: the items of One by one blocks, numbered from 0 across the slide as they are drawn
    * (`data-reveal-item`); in Present, those from `shown` on are drawn hidden (`data-reveal-hidden`), each in its place.
    * `shown` null: every item shows (the editor, the strip, the handout, the page, print).
@@ -87,7 +93,7 @@ interface RenderState {
   parents: Array<{ kind: string | null; reveal: boolean }>;
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, reveal: { next: 0, shown: null }, parents: [] });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [] });
 
 let state: RenderState = freshState();
 
@@ -294,6 +300,18 @@ function createSlideMarked(): Marked {
       name: 'paragraph',
       renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
         const paragraph = token as Tokens.Paragraph;
+        // Sprint 163 PR 3: a paragraph that ends with a `{.button}` link is a Button block, its words beside it.
+        const button = buttonParagraphOf(paragraph.tokens);
+        if (button) {
+          return buttonHtml({
+            wordsHtml: this.parser.parseInline(button.words),
+            label: button.label,
+            href: button.href,
+            icons: BUTTON_ICONS,
+            mode: state.buttonLinks ? 'link' : 'data',
+            tabindex: -1,
+          });
+        }
         if (!isAlonePicture(paragraph)) return false;
         return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
       },
@@ -374,6 +392,21 @@ export function blockPicturePaths(markdown: string): string[] {
   const paths = [...found];
   picturePathsCache.set(markdown, paths);
   return paths;
+}
+
+/**
+ * Sprint 163 PR 3: the addresses a block slide's buttons open, each a full https one (`isButtonAddress`). Present's host
+ * opens only these for the wall: an address that isn't on a button of the deck is never opened.
+ */
+export function blockButtonAddresses(markdown: string): string[] {
+  if (!markdown.includes('{')) return [];
+  const found = new Set<string>();
+  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
+    if (token.type !== 'paragraph') return;
+    const button = buttonParagraphOf((token as Tokens.Paragraph).tokens);
+    if (button && isButtonAddress(button.href)) found.add(button.href);
+  });
+  return [...found];
 }
 
 /** Every picture a slide names: its `image:` line and, for a block slide, the pictures in its Markdown. */
@@ -562,7 +595,12 @@ export interface BlockDrawingContext {
   reveal?: number | null;
   /** Sprint 163 PR 1: a code block's ↗ Open in…; false for a deck with `open-in: none`. Left out: shown. */
   openIn?: boolean;
+  /** Sprint 163 PR 3: a button as a real link to a new tab (the published page only). Left out: the address on it. */
+  buttonLinks?: boolean;
 }
+
+/** A button's icons (Sprint 163 PR 3): a page for a file, an arrow out for any other address. */
+const BUTTON_ICONS = { file: iconSvg('file-text', 16), link: iconSvg('arrow-up-right', 16) };
 
 /** The code block's icons, drawn in the text's colour (`codeTools.codeBlockHtml`). */
 const CODE_ICONS = { copy: iconSvg('copy', 15), check: iconSvg('check', 15), openIn: iconSvg('arrow-up-right', 15) };
@@ -571,7 +609,7 @@ const CODE_ICONS = { copy: iconSvg('copy', 15), check: iconSvg('check', 15), ope
 export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
-  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, reveal: { next: 0, shown } };
+  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown } };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -624,6 +662,8 @@ export interface BlockSlideMarkupOptions {
   at?: number | null;
   /** Sprint 163 PR 1: a code block's ↗ Open in…; false for a deck with `open-in: none`. */
   openIn?: boolean;
+  /** Sprint 163 PR 3: a button as a real link to a new tab: the published page only. */
+  buttonLinks?: boolean;
 }
 
 const kebab = (key: string) => (key.startsWith('--') ? key : key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`));
@@ -726,7 +766,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at' | 'openIn'> & { reveal?: number | null }): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at' | 'openIn' | 'buttonLinks'> & { reveal?: number | null }): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -750,7 +790,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, openIn: options.openIn })}</div>`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, openIn: options.openIn, buttonLinks: options.buttonLinks })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

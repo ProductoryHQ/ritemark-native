@@ -31,6 +31,7 @@ import {
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
+import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar' }
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '' }
@@ -193,7 +194,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
   /** The chosen block now, and where it and its parts are. */
   const measure = useCallback(() => {
     if (!editor || editor.isDestroyed || !frame) return
-    const block = chosenBlockAt(editor.state)
+    // Sprint 163 PR 3: a button chosen inside a block (a column's) has its own bar; the block's waits.
+    const block = buttonAt(editor.state) ? null : chosenBlockAt(editor.state)
     const key = block ? `${block.pos}:${block.kind}` : null
     // Another block chosen with the caret (it moved into one) opens its bar; the same one keeps the bar as it was, so
     // after Esc it stays closed until a press in the block. A change from the bar (Turn into, a move) keeps it open.

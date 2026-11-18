@@ -6,6 +6,7 @@ import * as fsp from 'fs/promises';
 import { parseFrontmatterFromText, serializeFrontmatter, discoverCommands } from './agent/discovery';
 import type { CardPages } from './taskBoard/cardPages';
 import type { DeckPages } from './decks/deckPages';
+import { openButtonLink } from './decks/openInLink';
 import type { ThemePages } from './decks/themePages';
 import { isDeckPath, ModeFixedPerView } from './decks/deckMode';
 import { cardTabWrite } from './taskBoard/cardFile';
@@ -1216,6 +1217,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           case 'openExternal':
             // Open only explicit external browser targets.
             this.openSafeExternalTarget(message.url);
+            return;
+
+          case 'openButtonLink':
+            // Sprint 163 PR 3: a Button block's Open: a full https address only, opened as written.
+            openButtonLink(message.url);
             return;
 
           case 'openInternalLink':
