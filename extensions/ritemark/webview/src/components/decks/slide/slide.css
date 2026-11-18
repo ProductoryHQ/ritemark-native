@@ -176,6 +176,13 @@
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > table { align-self: flex-start; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > :is(.blk-pic, img) { flex: 0 1 auto; min-height: 96px; align-self: flex-start; object-position: left center; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > .blk-pic.empty { align-self: stretch; }
+/* A picture alone on a slide is centred (experience 49, 18 November): with nothing else, in the middle both ways; under
+   its title only, in the middle of the space under the title. Its auto margins share the column's free height; an
+   Align the person set is its inline align-self and object-position, a Size its inline width, and both win. The
+   `.deck-slide` prefix and the `:is()` (a class's weight, for an img too) outrank the stage's own picture margins and its
+   first and last child's (decks.css). */
+.deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic) .blk-flow > :is(.blk-pic, img) { margin-top: auto; margin-bottom: auto; }
+.deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic) .blk-flow > :is(.blk-pic, img):not(.empty) { align-self: center; object-position: center; }
 /* A picture whose file is gone (17 November): its place says so, with the file's name. */
 .deck-sl .blk-pic.is-missing, .deck-sl .photo.is-missing { display: flex; align-items: center; justify-content: center; text-align: center; }
 .deck-sl .blk-missing { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; padding: 12px; box-sizing: border-box; }
