@@ -10,7 +10,7 @@ import { Button } from '../ui/button'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { Icon } from '../ui/Icon'
-import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog'
 import type { ProjectView, ProviderView, WelcomeKeyName, WelcomeProviderId } from '../../../../src/welcome/protocol'
 import { COPY, OPENCODE_SET_UP_TIP, PLAN_LINES, PROVIDER_NAMES, browserOpened, stopWaitingTip } from './welcomeCopy'
 import { send } from './welcomeClient'
@@ -405,7 +405,7 @@ export function KeySheet({
     // Experience 31's dialog (the Experience lead, 18 October): a title, the words, the fields, Cancel and Done;
     // no icon, no X, no dividers. Escape and Cancel close it.
     <Dialog open={target !== null} onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="rw-dialog" overlayClassName="rw-dim" aria-describedby="rw-keys-note" onOpenAutoFocus={(event) => {
+      <DialogContent className="rw-dialog" overlayClassName="rw-dim" onOpenAutoFocus={(event) => {
         event.preventDefault()
         ;(document.querySelector('.rw-keyfield input') as HTMLInputElement | null)?.focus()
       }} onCloseAutoFocus={(event) => {
@@ -414,11 +414,11 @@ export function KeySheet({
       }}>
         <DialogTitle className="rw-dialog-title">{target === 'claude' ? COPY.apiKeys : 'Set up OpenCode'}</DialogTitle>
         <div>
-          <p className="rw-keynote" id="rw-keys-note">
+          <DialogDescription className="rw-keynote">
             {target === 'claude'
               ? 'Use Claude with an Anthropic API key of your own. You can change it later in Settings.'
               : 'OpenCode uses your own provider accounts. Add at least one key; you can change them later in Settings.'}
-          </p>
+          </DialogDescription>
           {fields.map((field) => (
             <div className="rw-keyfield" key={field}>
               <label htmlFor={`rw-key-${field}`}>

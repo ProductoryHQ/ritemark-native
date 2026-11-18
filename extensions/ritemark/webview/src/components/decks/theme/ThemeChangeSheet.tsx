@@ -7,14 +7,16 @@
  * Bank"): the deck's first slide, and the first with Boxes, Steps or Columns (or the second). Before is drawn with the old
  * theme by the strip's own renderer (`SlideCanvas`), After with the new. Undo and Close (Esc, or a press outside).
  */
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { parseTheme } from '../../../../../src/decks/deckTheme'
 import { ratioWords, type ThemeChangeView } from '../../../../../src/decks/themeChange'
+import type { AgendaEntry } from '../../../../../src/decks/blocks/agenda'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
+import { AgendaContext, agendaEntriesFrom, useAgendaEntries } from '../slide/agendaContext'
 import './themeChangeSheet.css'
 
 /** A change as the host sends it, checked field by field; null for anything else. */
@@ -28,6 +30,7 @@ export function themeChangeFrom(value: unknown): ThemeChangeView | null {
     before: change.before!,
     after: change.after!,
     slides: change.slides.slice(0, 2),
+    ...(change.agenda !== undefined ? { agenda: agendaEntriesFrom(change.agenda) } : {}),
     borderless: change.borderless === true,
     assets: change.assets && typeof change.assets === 'object' ? change.assets : {},
     undone: change.undone === true,
@@ -36,6 +39,7 @@ export function themeChangeFrom(value: unknown): ThemeChangeView | null {
 }
 
 const HEX = /^#[0-9A-F]{6}$/i
+const NO_AGENDA: AgendaEntry[] = []
 
 /** A colour fix's moved pairs, checked field by field; null when there are none. */
 function movedFrom(value: unknown): ThemeChangeView['moved'] | null {
@@ -73,8 +77,14 @@ export function ThemeChangeSheet({ change, onUndo, onClose, style }: { change: T
   const before = parseTheme(change.before.text)
   const after = parseTheme(change.after.text)
   const slideWidth = Math.max(120, Math.min(MAX_SLIDE, Math.floor((width - PAD * 2 - GAP) / 2)))
+  // Small details 14: an Agenda lists the deck's sections: the deck view's own around the sheet (live, unsaved edits
+  // too), else (a theme's tab) the host's list
+  const around = useContext(AgendaContext)
+  const sent = useAgendaEntries(change.agenda ?? NO_AGENDA)
+  const agenda = around ?? sent
 
   return (
+    <AgendaContext.Provider value={agenda}>
     <div ref={ref} className="theme-change-sheet" role="dialog" aria-label="What changed" tabIndex={-1} style={style}>
       <div className="theme-change-head">
         <span className="theme-change-title">What changed</span>
@@ -122,5 +132,6 @@ export function ThemeChangeSheet({ change, onUndo, onClose, style }: { change: T
         </Tooltip>
       </div>
     </div>
+    </AgendaContext.Provider>
   )
 }

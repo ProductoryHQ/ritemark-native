@@ -6,7 +6,8 @@
  */
 import { frontMatterLook } from './deckFormat';
 import { deckName } from './DeckLibrary';
-import { slidePicturePaths } from './blocks/slideRenderer';
+import { agendaOf, slidePicturePaths } from './blocks/slideRenderer';
+import type { AgendaEntry } from './blocks/agenda';
 import { presentSlidesOf, type PresentSlide } from './present/presentSession';
 import { wallSlideOf, type WallSlide } from './present/presentProtocol';
 
@@ -33,11 +34,17 @@ export function previewSlidesOf(slides: readonly PresentSlide[]): PresentSlide[]
   return shown.filter(slide => taken.has(slide));
 }
 
-/** A deck's preview: its name, its look, its six slides as the room sees them, and the pictures they name. */
-export function deckPreview(path: string | null, text: string): { deck: string | null; borderless: boolean; slides: WallSlide[]; pictures: string[] } {
-  const slides = previewSlidesOf(presentSlidesOf(text)).map(wallSlideOf);
+/**
+ * A deck's preview: its name, its look, its six slides as the room sees them, the pictures they name, and (small
+ * details 14) its Agenda's list, from every section slide the room sees, not only the six shown, as the wall lists it.
+ */
+export function deckPreview(path: string | null, text: string): { deck: string | null; borderless: boolean; slides: WallSlide[]; pictures: string[]; agenda: AgendaEntry[] } {
+  const all = presentSlidesOf(text);
+  const shown = new Map(all.filter(slide => !slide.skip).map(slide => [slide, wallSlideOf(slide)]));
+  const slides = previewSlidesOf(all).map(slide => shown.get(slide)!);
   const pictures = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))].sort();
-  return { deck: path === null ? null : deckName(path), borderless: frontMatterLook(text) === 'borderless', slides, pictures };
+  const agenda = agendaOf([...shown.values()]);
+  return { deck: path === null ? null : deckName(path), borderless: frontMatterLook(text) === 'borderless', slides, pictures, agenda };
 }
 
 /** The sample a theme previews on in a project with no deck: four slides of the common kinds, no pictures. */

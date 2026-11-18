@@ -5,6 +5,7 @@
  */
 import type { LogoGround } from './deckTheme';
 import type { WallSlide } from './present/presentProtocol';
+import type { AgendaEntry } from './blocks/agenda';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
 import { logoKindOfName, MAX_LOGO_BYTES } from './themeLogo';
 import type { ThemeChangeView } from './themeChange';
@@ -75,6 +76,8 @@ export interface ThemePreview {
   borderless: boolean;
   slides: WallSlide[];
   assets: Record<string, string>;
+  /** Small details 14: the deck's sections, for an Agenda slide among the six (`deckPreview`). */
+  agenda: AgendaEntry[];
 }
 
 export type ThemeHostMessage =

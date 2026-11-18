@@ -11,6 +11,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
+import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
+import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
 import '../decks.css'
 
 interface LibrarySlide {
@@ -29,6 +31,8 @@ interface LibraryDeck {
   borderless: boolean
   modified: number
   slides: LibrarySlide[]
+  /** The deck's sections, for an Agenda's tile (from all its slides; a search sends only some). */
+  agenda?: unknown
 }
 
 interface ActiveDeck {
@@ -137,6 +141,13 @@ export function SlideLibraryPanel() {
     [state],
   )
 
+  // Small details 14: each deck's Agenda list, as its tiles draw it (no hint: the editor's only), once per state.
+  const agendaOfDeck = useMemo(() => {
+    const drawings = new Map<string, AgendaDrawing>()
+    for (const deck of state?.decks ?? []) drawings.set(deck.path, { entries: agendaEntriesFrom(deck.agenda), hint: false })
+    return drawings
+  }, [state])
+
   // Each theme read once per state.
   const themeOf = useMemo(() => {
     const parsed = new Map<string, DeckTheme>()
@@ -178,6 +189,7 @@ export function SlideLibraryPanel() {
           <span className="deck-lib-count">{deck.slides.length}</span>
         </button>
         {expanded ? (
+          <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
           <div className="deck-lib-grid">
             {deck.slides.map((slide) => {
               const key = `${deck.path}#${slide.id ?? slide.index}`
@@ -216,6 +228,7 @@ export function SlideLibraryPanel() {
               )
             })}
           </div>
+          </AgendaContext.Provider>
         ) : null}
       </div>
     )

@@ -188,7 +188,6 @@ export function PublishSheetView({
         ref={sheetRef}
         overlayClassName="hidden"
         className={IN_SHEET}
-        aria-describedby="publish-sheet-subtitle"
         onKeyDown={(event) => {
           // Enter on the sheet itself presses the default button; on a button or link, that control's own press
           if (event.key === 'Enter' && event.target === event.currentTarget && !event.nativeEvent.isComposing) {
@@ -199,7 +198,7 @@ export function PublishSheetView({
       >
         <div className="px-5 pt-4 pb-1">
           <DialogTitle className="text-[15px] font-semibold leading-5">Publish {model.title}</DialogTitle>
-          <DialogDescription id="publish-sheet-subtitle" className="mt-1 text-[13px] leading-[18px]">{subtitleFor(Boolean(model.deck))}</DialogDescription>
+          <DialogDescription className="mt-1 text-[13px] leading-[18px]">{subtitleFor(Boolean(model.deck))}</DialogDescription>
         </div>
         <div className="flex-1 overflow-y-auto px-5 pb-1">
           {model.destination && (
@@ -394,7 +393,6 @@ export function SetupSheetView({ setup, onAnswer }: { setup: PublishSetupModel; 
         ref={sheetRef}
         overlayClassName="hidden"
         className={IN_SHEET}
-        aria-describedby="publish-setup-lede"
         onKeyDown={(event) => {
           // Enter on the sheet itself presses Set up, the default button; on a button, that control's own press
           if (event.key === 'Enter' && event.target === event.currentTarget && !event.nativeEvent.isComposing) {
@@ -405,7 +403,7 @@ export function SetupSheetView({ setup, onAnswer }: { setup: PublishSetupModel; 
       >
         <div className="px-5 pt-4 pb-1">
           <DialogTitle className="text-[15px] font-semibold leading-5">{SETUP_COPY.title}</DialogTitle>
-          <DialogDescription id="publish-setup-lede" className="mt-1 text-[13px] leading-[18px]">{SETUP_COPY.lede}</DialogDescription>
+          <DialogDescription className="mt-1 text-[13px] leading-[18px]">{SETUP_COPY.lede}</DialogDescription>
         </div>
         <div className="px-5 pb-1">
           <div className="mt-2 flex items-center gap-3 rounded-md border border-hairline px-3 py-2.5">

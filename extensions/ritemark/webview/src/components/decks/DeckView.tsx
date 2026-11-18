@@ -490,6 +490,9 @@ export function DeckView({
   const count = slides.length
   // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
   const agendaDrawing = useAgendaDrawing(slides.map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 })), true)
+  // Copy as picture (its own React root) reads the same list when it is asked for.
+  const agendaRef = useRef(agendaDrawing)
+  agendaRef.current = agendaDrawing
   const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
@@ -1248,7 +1251,9 @@ export function DeckView({
       const entry = editor ? slidesOf(editor.state.doc)[index] : undefined
       if (!entry) return
       const look = lookRef.current
-      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing })
+      // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
+      const agenda = { entries: agendaRef.current.entries, hint: false }
+      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda })
         .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
     },
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.

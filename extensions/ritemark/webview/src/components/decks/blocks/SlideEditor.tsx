@@ -36,7 +36,7 @@ import { closeHistory } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, logoCanvasMarks, sidePictureOf, stepsTagOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, stepsTagOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -984,7 +984,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
   // Sprint 162 PR 4: a top-right logo's room for the title, as every other view draws it (`logoCanvasMarks`).
   const logoMarks = logoCanvasMarks(themeSlideLogo(theme, borderless), isCoverSlide(shownMarkdown))
-  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', logoMarks.cls].filter(Boolean).join(' ')
+  // 18 November: a picture alone on the slide (or under its title only) is centred, as every other view draws it.
+  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), logoMarks.cls].filter(Boolean).join(' ')
   return (
     <>
     <ContextMenu>

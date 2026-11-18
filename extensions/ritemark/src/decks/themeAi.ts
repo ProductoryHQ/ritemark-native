@@ -24,7 +24,7 @@ import { projectThemeFiles, readProjectTheme, readThemeOrEvening, resolveAssetsI
 import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, parseTheme, pathKey, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER } from './deckTheme';
 import { presentSlidesOf } from './present/presentSession';
 import { wallSlideOf } from './present/presentProtocol';
-import { slidePicturePaths } from './blocks/slideRenderer';
+import { agendaOf, slidePicturePaths } from './blocks/slideRenderer';
 import { readPptxTheme } from './pptxTheme';
 import {
   aiThemeText, changeSlideIndexes, checkWords, colourFixes, colourPairs, PAIR_FIELD_NAMES, pairsReport, suggestedFixes, ThemeChangeLedger, themeChangesOf, themeLineFor,
@@ -523,11 +523,13 @@ export class ThemeAi implements vscode.Disposable {
     const deck = record.decks[0];
     const beforeText = record.kind === 'draft' ? record.themeBefore ?? BUILT_IN_THEME_TEXT : deck?.themeBefore ?? record.themeBefore ?? BUILT_IN_THEME_TEXT;
     let slides: ThemeChangeView['slides'] = [];
+    let agenda: ThemeChangeView['agenda'];
     let assets: Record<string, string> = {};
     let borderless = false;
     if (text !== null) {
       const shown = presentSlidesOf(text).filter(slide => !slide.skip).map(wallSlideOf);
       slides = changeSlideIndexes(shown).map(index => shown[index]);
+      agenda = agendaOf(shown);
       borderless = frontMatterLook(text) === 'borderless';
       const pictures = [...new Set(slides.flatMap(slide => slidePicturePaths(slide.data)))];
       if (folder && pictures.length) assets = resolveAssetsIn(folder, webview, pictures);
@@ -546,6 +548,7 @@ export class ThemeAi implements vscode.Disposable {
       before: { name: parseTheme(beforeText).name, text: beforeText },
       after: { name: afterName, text: record.themeAfter },
       slides,
+      ...(agenda ? { agenda } : {}),
       borderless,
       assets,
       undone: record.undone,

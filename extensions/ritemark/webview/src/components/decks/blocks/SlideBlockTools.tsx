@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
-import { Dialog, DialogBody, DialogButton, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog'
+import { Dialog, DialogBody, DialogButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog'
 import { Icon } from '../../ui/Icon'
 import { Input } from '../../ui/input'
 import { IconGridItems } from '../slide/IconGrid'
@@ -162,7 +162,7 @@ export function WebPageDialog({ open, onAdd, onClose }: { open: boolean; onAdd: 
           <DialogTitle>Web page</DialogTitle>
         </DialogHeader>
         <DialogBody>
-          <p className="text-sm text-[var(--r-ink-strong)] m-0 mb-3">The page's address goes on the slide as a link.</p>
+          <DialogDescription className="text-sm text-[var(--r-ink-strong)] m-0 mb-3">The page's address goes on the slide as a link.</DialogDescription>
           <Input
             ref={inputRef}
             aria-label="The page's address"

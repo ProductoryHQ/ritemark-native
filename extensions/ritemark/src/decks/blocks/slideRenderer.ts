@@ -417,6 +417,36 @@ function coverOf(markdown: string): boolean {
   return false;
 }
 
+/**
+ * Experience 49, 18 November: a picture alone on a slide is centred. `alone`: the slide draws one picture and nothing
+ * else, so it sits in the middle both ways; `titled`: only a title above it, so it sits in the middle of the space under
+ * the title, across and down (Keynote's Title & Photo). Null for any other slide. A comment never counts; a picture
+ * beside or behind is something else on the slide (the caller leaves it out). The Align or Size the person set still
+ * wins: its inline style (`outerStyle`) outranks the centring (slide.css's `.is-lone-pic`, `.is-titled-pic`).
+ */
+export type LonePicture = 'alone' | 'titled';
+
+const loneCache = new Map<string, LonePicture | null>();
+
+export function lonePictureOf(markdown: string): LonePicture | null {
+  if (loneCache.has(markdown)) return loneCache.get(markdown) ?? null;
+  if (loneCache.size > 500) loneCache.clear();
+  const blocks = drawnBlocksOf(markdown);
+  const onePicture = (token: Token | undefined) => token?.type === 'paragraph' && isPictureParagraph(token as Tokens.Paragraph)
+    && ((token as Tokens.Paragraph).tokens ?? []).filter(part => part.type === 'image').length === 1;
+  const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
+  const lone: LonePicture | null = blocks.length === 1 && onePicture(blocks[0]) ? 'alone' : blocks.length === 2 && isTitle(blocks[0]) && onePicture(blocks[1]) ? 'titled' : null;
+  loneCache.set(markdown, lone);
+  return lone;
+}
+
+/** The canvas class for a lone picture (`lonePictureOf`), or '' (also for a slide with a picture beside or behind). */
+export function lonePictureClass(markdown: string, side: string | null): string {
+  if (side) return '';
+  const lone = lonePictureOf(markdown);
+  return lone === 'alone' ? 'is-lone-pic' : lone === 'titled' ? 'is-titled-pic' : '';
+}
+
 const sectionCache = new Map<string, string | null>();
 
 /**
@@ -705,7 +735,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const cover = isCoverSlide(markdown);
   const marks = logoCanvasMarks(options.logo, cover);
   Object.assign(inner, marks.style);
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', marks.cls].filter(Boolean).join(' ');
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
     + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal })}</div>`
