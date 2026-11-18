@@ -21,6 +21,8 @@
  * `scriptBuildsReferences` stays false (the test checks).
  */
 
+import { PAGE_TABS_FIT } from '../blocks/tabsFit';
+
 /** The deck view's scroll rule (`scrollRule.ts`), as plain JavaScript. Kept the same by `pageScript.test.ts`. */
 export const PAGE_SCROLL_RULE = String.raw`
   var READ_LINE = 0.28, TOP_SNAP = 26, PART_TOP_GAP = 6;
@@ -526,4 +528,4 @@ const PAGE_BEHAVIOUR = String.raw`
 `;
 
 /** The whole script, in its own scope. */
-export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_PLACE_RULE}${PAGE_EDGE_RULE}${PAGE_BEHAVIOUR}})();`;
+export const PAGE_SCRIPT = `(function () {\n  'use strict';\n${PAGE_SCROLL_RULE}${PAGE_PLACE_RULE}${PAGE_EDGE_RULE}${PAGE_BEHAVIOUR}${PAGE_TABS_FIT}})();`;

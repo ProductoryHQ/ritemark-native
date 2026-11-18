@@ -14,7 +14,8 @@
  * inside are skipped. An unclosed div, a stray `:::` or an attribute block this reader can't read is text.
  *
  * Pure and dependency-free: the slide renderer (host and webview) and the slide editor's own scoped `marked` read the
- * same lines with it. It is never registered on the document editor, so a Text document's `:::` lines stay text.
+ * same lines with it. It is never registered on the document editor, so a Text document's `:::` lines stay text; the one
+ * exception is a Tabs block (Sprint 163, `tabset.ts`), which every editor reads through its own tokenizer.
  */
 
 /** An opening fence: 3+ colons, then a bare word or a `{…}` attribute block, then optional trailing colons. */

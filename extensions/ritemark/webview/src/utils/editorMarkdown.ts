@@ -43,6 +43,7 @@ import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNod
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
+import { TabPane, TabsBlock, addTabsTurndownRules, tabsMarkedExtension } from '../extensions/tabs/tabsMarkdown'
 import { preprocessTaskListHTML } from './taskListRoundTrip'
 import {
   annotateAsWritten,
@@ -73,6 +74,9 @@ editorMarked.use(asWrittenMarkedExtension)
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 // Experience 49: a picture's size, crop and caption, kept in the block after its image line.
 editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
+// Sprint 163: the Tabs block (`::: {.panel-tabset}`), one block in a slide, a handout and a Text document. Only that
+// `:::` block: any other `:::` line in a Text document stays text.
+editorMarked.use(tabsMarkedExtension as Parameters<typeof editorMarked.use>[0])
 
 let commentMarkedRegistered = false
 
@@ -326,6 +330,8 @@ export interface EditorExtensionSlots {
   mathBlock?: TipTapNode
   /** Sprint 157: a deck's slide node and its guard, only when the document opens as a deck. */
   deck?: AnyExtension[]
+  /** Sprint 163: the Tabs block's two nodes; the editors pass them with their node views. */
+  tabs?: AnyExtension[]
 }
 
 /**
@@ -408,6 +414,8 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     LiteralDollar,
     // Sprint 157: the deck's slide node, after math, only in a deck.
     ...(slots.deck ?? []),
+    // Sprint 163: the Tabs block, everywhere (its file form is read in every document).
+    ...(slots.tabs ?? [TabsBlock, TabPane]),
     // Sprint 137 (#539): inline code no longer excludes every other mark, so
     // a link, bold, italic or strikethrough around code keeps its mark
     // (``[`file.md`](file.md)``, ``**`name` is vendored**``). It comes last, so
@@ -467,6 +475,8 @@ export function createEditorTurndownService(): TurndownService {
   addCommentTurndownRules(service)
   // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
   addDeckTurndownRules(service)
+  // Sprint 163: the Tabs block. Harmless without one, like the rules above.
+  addTabsTurndownRules(service)
   return service
 }
 

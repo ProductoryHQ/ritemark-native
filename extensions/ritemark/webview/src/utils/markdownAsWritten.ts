@@ -108,6 +108,9 @@ function walkBlocks(tokens: Token[], tabs: boolean): void {
     } else if (token.type === 'slideDiv') {
       // Sprint 161: a block slide's `:::` block (only the slide editor's own `marked` makes one) holds blocks too.
       walkBlocks((token as unknown as { tokens: Token[] }).tokens, tabs)
+    } else if (token.type === 'tabsBlock') {
+      // Sprint 163: each tab's pane holds blocks, read on their own (the pane's first block follows its heading).
+      for (const pane of (token as unknown as { tabs: Array<{ tokens: Token[] }> }).tabs) walkBlocks(pane.tokens, tabs)
     }
   })
 }

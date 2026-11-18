@@ -39,7 +39,7 @@ import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { themeStyle, themeVars } from '../../../webview/src/components/decks/theme/themeVars';
 import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
-import { MARKED_OPTIONS, lexHandout, type PublicDeck, type PublicSlide } from './publicDeck';
+import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, type PublicSlide } from './publicDeck';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { PAGE_SCRIPT } from './pageScript';
 import { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses } from '../blocks/codeTools';
@@ -343,9 +343,20 @@ function handoutParts(markdown: string, options: { partKey: string; exercise: bo
   // The parser only renders tokens; the lexer above is where the handout is read, and the one place raw mode is kept out.
   // Experience 49: a picture drawn with its look (size, alignment, crop, caption), its block never as words.
   const parser = new marked.Parser({ ...MARKED_OPTIONS, renderer, extensions: handoutPictureExtensions });
-  let out = '';
-  tokens.forEach((token: Token, index: number) => {
-    if (token.type === 'list' && token.ordered && options.exercise) {
+  const blocks = (list: Token[], exercise: boolean): string => {
+    let out = '';
+    list.forEach((token: Token, index: number) => { out += block(token, index, list, exercise); });
+    return out;
+  };
+  const block = (token: Token, index: number, tokens: Token[], exercise: boolean): string => {
+    let out = '';
+    // Sprint 163: a Tabs block shows every tab, one after another, each under its name (the page's player brings the
+    // tabs themselves, PR 4). A tab's steps are never an exercise's ticks: those are the part's own numbered list.
+    if (token.type === 'handoutTabs') {
+      const tabs = (token as unknown as HandoutTabsToken).tabs;
+      return `<div class="tabset">${tabs.map(tab => `<section class="tabsec"><div class="tabname">${esc(tab.name)}</div>${blocks(tab.tokens as Token[], false)}</section>`).join('')}</div>\n`;
+    }
+    if (token.type === 'list' && token.ordered && exercise) {
       for (const item of token.items) {
         item.task = true;
         item.checked = false;
@@ -355,18 +366,19 @@ function handoutParts(markdown: string, options: { partKey: string; exercise: bo
       // A block of raw HTML is shown as its words, a paragraph of its own; a comment alone leaves nothing.
       const words = sanitizeHtml(token.text).trim();
       if (words) out += `<p>${words}</p>\n`;
-      return;
+      return out;
     }
     if (token.type === 'paragraph' && PROMPT_LABEL.test(token.text.trim())) {
       const next = tokens.slice(index + 1).find(entry => entry.type !== 'space');
       if (next?.type === 'code') {
         out += `<div class="k">${parser.parseInline(token.tokens ?? [])}</div>\n`;
-        return;
+        return out;
       }
     }
     out += parser.parse([token] as Parameters<typeof parser.parse>[0]);
-  });
-  return { html: out, ownHeading };
+    return out;
+  };
+  return { html: blocks(tokens, options.exercise), ownHeading };
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +497,11 @@ svg { flex: none; }
 .nopic { color: var(--muted); font-style: italic; }
 .k { margin: 6px 0 8px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--label); }
 .prompt { position: relative; margin: 0 0 16px; }
+/* Sprint 163: a Tabs block in the text shows every tab, one after another, each under its name (the player's tabs come
+   with PR 4). */
+.tabset { margin: 0 0 16px; }
+.tabsec { margin: 0 0 14px; padding: 0 0 0 14px; box-shadow: inset 2px 0 0 var(--line); }
+.tabname { margin: 0 0 6px; font: 700 12px/16px 'Sofia Sans', sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--label); }
 .prompt pre { margin: 0; padding: 14px 16px; padding-right: 104px; border-radius: 12px; background: var(--soft); white-space: pre-wrap; overflow-wrap: anywhere; }
 .prompt pre code { font: 400 14px/1.6 ui-monospace, Menlo, Consolas, monospace; color: var(--ink); background: none; padding: 0; }
 .copy { position: absolute; right: 10px; top: 10px; display: inline-flex; align-items: center; height: 30px; padding: 0 11px; border-radius: 8px; background: var(--ink); color: #fff; font: 700 12.5px/30px 'Sofia Sans', sans-serif; white-space: nowrap; }
@@ -608,6 +625,20 @@ export const PRINT_CSS = `
   .paddr { display: inline; overflow-wrap: anywhere; }
   .foot > span + .paddr::before { content: ' · '; }
   .paddr:empty { display: none; }
+  /* Sprint 163: a slide with tabs prints every tab, one after another, each under its name: the slide grows down to
+     hold them, and nothing scrolls or fades on paper. */
+  .layer:has(.blk-tabs), .layer:has(.blk-tabs) > .deck-slide { height: auto; }
+  .layer:has(.blk-tabs) .deck-sl { position: relative; height: auto; min-height: 540px; }
+  .layer:has(.blk-tabs) .deck-sl.is-blocks .blk-flow { position: relative; inset: auto; display: block; margin: 46px 64px 34px; overflow: visible; }
+  .layer:has(.blk-tabs) .deck-sl.is-blocks.pic-left .blk-flow { margin-left: 432px; }
+  .layer:has(.blk-tabs) .deck-sl.is-blocks.pic-right .blk-flow { margin-right: 432px; }
+  .layer .deck-sl.is-blocks .blk-tabbar { display: none; }
+  .layer .deck-sl.is-blocks .blk-tabpanes { display: block; }
+  .layer .deck-sl.is-blocks .blk-tabpane { display: block; visibility: visible; overflow: visible; }
+  .layer .deck-sl.is-blocks .blk-tabpane + .blk-tabpane { border-top: 1px solid var(--s-boxl, rgba(255,255,255,.12)); }
+  .layer .deck-sl.is-blocks .blk-tabname { display: block; margin: 0 0 .4em; font-weight: 700; color: var(--s-hd, #fff); }
+  .layer .deck-sl.is-blocks :is(.blk-tabpane, .blk-column) { overflow: visible; animation: none; -webkit-mask-image: none; mask-image: none; }
+  .tabsec { break-inside: avoid; page-break-inside: avoid; }
 }
 `;
 

@@ -26,14 +26,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, type BarKind, type Box,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
+  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
+import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 
-const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar' }
-const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '' }
+const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar', tabs: 'tabs' }
+const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '', tabs: 'Add a tab' }
 
 export interface SlideBlockBarProps {
   editor: TipTapEditor | null
@@ -310,10 +311,22 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
     return now && now.kind === chosen.kind ? make(now.pos) : null
   }
   const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
-  const add = () => run(act(pos => addItem(editor.state, pos)))
+  const add = () => {
+    // Sprint 163: a new tab opens with its name chosen, so typing names it (its band reads the pending name).
+    if (chosen.kind === 'tabs') {
+      const now = chosenBlockAt(editor.state)
+      const made = now?.kind === 'tabs' ? addTab(editor.state, now.pos) : null
+      if (now && made) { setPendingRename(editor.view, now.pos, made.index); apply(made.tr) }
+      return
+    }
+    run(act(pos => addItem(editor.state, pos)))
+  }
   // The Agenda (small details 14) is one piece: no item to add, and no other kind to turn into.
   const agenda = chosen.kind === 'agenda'
+  const tabs = chosen.kind === 'tabs'
   const canAdd = !agenda && (chosen.kind !== 'columns' || columns < MAX_COLUMNS)
+  // Sprint 163: a Tabs block in a column moves with its column; only a block on the slide itself has the ⋮.
+  const nested = editor.state.doc.resolve(Math.min(chosen.pos, editor.state.doc.content.size)).depth > 0
 
   // ---- The ⋮ drag: where the block lands, by the lines between the slide's blocks.
   const startMove = (event: ReactPointerEvent<HTMLElement>) => {
@@ -424,14 +437,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
       {createPortal(showing ? (
         <>
           <div className="deck-block-ring" style={{ left: block.left - ring, top: block.top - ring, width: block.width + ring * 2, height: block.height + ring * 2, ...hidden }} aria-hidden="true" />
-          <div className="deck-block-at" style={at(grip)}>
-            <Tooltip label="Drag to move the block on the slide" suppressed={!!drag}>
-              <Button variant="ghost" className="deck-block-grip" style={handleSize} aria-label="Move the block" onPointerDown={startMove} onMouseDown={event => event.preventDefault()}>
-                <Icon name="dots-six-vertical" size={14} tone="inherit" />
-              </Button>
-            </Tooltip>
-          </div>
-          {canAdd ? (
+          {nested ? null : (
+            <div className="deck-block-at" style={at(grip)}>
+              <Tooltip label="Drag to move the block on the slide" suppressed={!!drag}>
+                <Button variant="ghost" className="deck-block-grip" style={handleSize} aria-label="Move the block" onPointerDown={startMove} onMouseDown={event => event.preventDefault()}>
+                  <Icon name="dots-six-vertical" size={14} tone="inherit" />
+                </Button>
+              </Tooltip>
+            </div>
+          )}
+          {/* A Tabs block's + is at its band's end (its node view's). */}
+          {canAdd && !tabs ? (
             <div className="deck-block-at" style={at(plus)}>
               <Tooltip label={ADD_LABEL[chosen.kind]} suppressed={!!drag}>
                 <Button variant="outline" className="deck-block-plus" style={handleSize} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
@@ -508,7 +524,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                   </DropdownMenuTrigger>
                 </Tooltip>
                 <DropdownMenuContent align="start" onCloseAutoFocus={event => { event.preventDefault(); editor.view.focus() }}>
-                  {BAR_KINDS.map(kind => (
+                  {typeMenuKinds(chosen.kind, nested).map(kind => (
                     <DropdownMenuItem
                       key={kind}
                       className="gap-2"
@@ -561,7 +577,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                   ]} />
                 </>
               ) : null}
-              {agenda ? null : (
+              {agenda || tabs ? null : (
                 <>
                   <Sep />
                   {/* README item 18: one toggle, pressed when on; off (All at once, the default) writes nothing. Folded,

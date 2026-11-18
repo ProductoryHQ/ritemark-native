@@ -198,7 +198,9 @@
    presenter view's row and Next). The stage's slide and Now take them. */
 .deck-thumb .cb-tools, .wall-grid .cb-tools, .pv-row .cb-tools, .pv-side .cb-tools { pointer-events: none; }
 /* A place to fill in, [like this]: in the accent, so the reader knows to change it after pasting. */
-.deck-sl.is-blocks .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
+/* One look for a place to fill in wherever the code block stands (a tab's pane included): its own colour, never the
+   words' around it. */
+.deck-sl.is-blocks .cb-fill, .deck-sl.is-blocks :is(pre, code) .cb-fill { padding: 0 .12em; border-radius: .2em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
@@ -328,3 +330,77 @@
 .deck-slide.is-borderless .deck-sl.is-blocks th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
 .deck-slide.is-borderless .deck-sl.is-blocks td { border-top-color: var(--s-row, #ECEDF5); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-pic.empty { box-shadow: inset 0 0 0 3px var(--s-emp, #E2E3EE); }
+
+/* ---- Sprint 163: the Tabs block (decks README "Tabs are a block of their own", "A tab's pane is ordinary Markdown";
+   the Tabs editor prototype). The tabs are the block's header on a lighter band; the chosen tab has the same ground as
+   its pane and joins it like a folder's tab, with no line under its words. The others are plain words: brighter under
+   the pointer, a soft fill when pressed, the accent's ring for the keyboard. Every pane stands in the same place, so the
+   block is as tall as its tallest tab; only the chosen one shows (`data-active`, the renderer's and the stage's alike). */
+.deck-sl.is-blocks .blk-tabs { position: relative; display: flex; flex-direction: column; min-width: 0; margin: .3em 0 .55em; border-radius: var(--s-r, 14px); background: var(--s-tband, rgba(255,255,255,.07)); overflow: hidden; }
+/* Its edge over the band and the pane alike (a shadow on the block itself would go under the pane's ground). */
+.deck-sl.is-blocks .blk-tabs::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--s-boxl, rgba(255,255,255,.12)); pointer-events: none; }
+.deck-sl.is-blocks .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.deck-sl.is-blocks .blk-tabbar::-webkit-scrollbar { display: none; }
+.deck-sl.is-blocks .blk-tab { flex: none; position: relative; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 1.1em; border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
+.deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #fff); background: var(--s-tpane, #0E0F2C); }
+/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 16 to 10 (slide units),
+   then the label steps down from 14.5 to 13, then 12, the tab keeping its 38 height; only then does the band scroll,
+   with its fade (`tabsFit.ts` measures and sets `data-fit`). */
+.deck-sl.is-blocks .blk-tabs[data-fit="1"] > .blk-tabbar > .blk-tab { padding: 0 .69em; }
+.deck-sl.is-blocks .blk-tabs[data-fit="2"] > .blk-tabbar > .blk-tab { font-size: .5417em; height: 2.92em; padding: 0 .77em; }
+.deck-sl.is-blocks .blk-tabs[data-fit="3"] > .blk-tabbar > .blk-tab { font-size: .5em; height: 3.17em; padding: 0 .83em; }
+.deck-sl.is-blocks .blk-tabpanes { flex: 0 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); background: var(--s-tpane, #0E0F2C); }
+.deck-sl.is-blocks .blk-tabpane { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: hidden auto; box-sizing: border-box; padding: 1.07em 1.2em 1.2em; visibility: hidden; color: var(--s-tx, #D5D8F2); font-size: .625em; line-height: 1.47; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
+.deck-sl.is-blocks .blk-tabpane > :last-child { margin-bottom: 0; }
+.deck-sl.is-blocks .blk-tabpane h3 { font-size: 1.15em; }
+.deck-sl.is-blocks .blk-tabname { display: none; }
+/* The chosen pane: the first by default, the presenter's choice in Present, the person's on the stage. The renderer and
+   the stage mark it `is-active`; the numbered rules draw it before the stage's mark is on (a first paint). */
+.deck-sl.is-blocks .blk-tabs > .blk-tabpanes > .blk-tabpane.is-active,
+.deck-sl.is-blocks .blk-tabs:not([data-active]) > .blk-tabpanes > .blk-tabpane:first-child,
+.deck-sl.is-blocks .blk-tabs[data-active="0"] > .blk-tabpanes > .blk-tabpane:nth-child(1), .deck-sl.is-blocks .blk-tabs[data-active="1"] > .blk-tabpanes > .blk-tabpane:nth-child(2),
+.deck-sl.is-blocks .blk-tabs[data-active="2"] > .blk-tabpanes > .blk-tabpane:nth-child(3), .deck-sl.is-blocks .blk-tabs[data-active="3"] > .blk-tabpanes > .blk-tabpane:nth-child(4),
+.deck-sl.is-blocks .blk-tabs[data-active="4"] > .blk-tabpanes > .blk-tabpane:nth-child(5), .deck-sl.is-blocks .blk-tabs[data-active="5"] > .blk-tabpanes > .blk-tabpane:nth-child(6),
+.deck-sl.is-blocks .blk-tabs[data-active="6"] > .blk-tabpanes > .blk-tabpane:nth-child(7), .deck-sl.is-blocks .blk-tabs[data-active="7"] > .blk-tabpanes > .blk-tabpane:nth-child(8),
+.deck-sl.is-blocks .blk-tabs[data-active="8"] > .blk-tabpanes > .blk-tabpane:nth-child(9), .deck-sl.is-blocks .blk-tabs[data-active="9"] > .blk-tabpanes > .blk-tabpane:nth-child(10),
+.deck-sl.is-blocks .blk-tabs[data-active="10"] > .blk-tabpanes > .blk-tabpane:nth-child(11), .deck-sl.is-blocks .blk-tabs[data-active="11"] > .blk-tabpanes > .blk-tabpane:nth-child(12),
+.deck-sl.is-blocks .blk-tabs[data-active="12"] > .blk-tabpanes > .blk-tabpane:nth-child(13), .deck-sl.is-blocks .blk-tabs[data-active="13"] > .blk-tabpanes > .blk-tabpane:nth-child(14),
+.deck-sl.is-blocks .blk-tabs[data-active="14"] > .blk-tabpanes > .blk-tabpane:nth-child(15), .deck-sl.is-blocks .blk-tabs[data-active="15"] > .blk-tabpanes > .blk-tabpane:nth-child(16),
+.deck-sl.is-blocks .blk-tabs[data-active="16"] > .blk-tabpanes > .blk-tabpane:nth-child(17), .deck-sl.is-blocks .blk-tabs[data-active="17"] > .blk-tabpanes > .blk-tabpane:nth-child(18),
+.deck-sl.is-blocks .blk-tabs[data-active="18"] > .blk-tabpanes > .blk-tabpane:nth-child(19), .deck-sl.is-blocks .blk-tabs[data-active="19"] > .blk-tabpanes > .blk-tabpane:nth-child(20),
+.deck-sl.is-blocks .blk-tabs[data-active="20"] > .blk-tabpanes > .blk-tabpane:nth-child(21), .deck-sl.is-blocks .blk-tabs[data-active="21"] > .blk-tabpanes > .blk-tabpane:nth-child(22),
+.deck-sl.is-blocks .blk-tabs[data-active="22"] > .blk-tabpanes > .blk-tabpane:nth-child(23), .deck-sl.is-blocks .blk-tabs[data-active="23"] > .blk-tabpanes > .blk-tabpane:nth-child(24) { visibility: visible; z-index: 1; }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #1C1F4A); }
+/* A slide with a Tabs or Columns block lays its blocks out in a column where only those two give way: a Tabs block is
+   as tall as its tallest tab, never taller than its room, and a pane or a column that holds more scrolls (README "On a
+   slide"). The words are never made smaller for it. Flex margins don't collapse, so these blocks keep no top margin of
+   their own: the block before them gives the space, as it did. */
+.deck-sl.is-blocks .blk-flow:has(> .blk-tabs, > .blk-columns) { display: flex; flex-direction: column; }
+.deck-sl.is-blocks .blk-flow:has(> .blk-tabs, > .blk-columns) > * { flex: none; }
+.deck-sl.is-blocks .blk-flow:has(> .blk-tabs, > .blk-columns) > :is(table, .tableWrapper) { align-self: flex-start; }
+.deck-sl.is-blocks .blk-flow > :is(.blk-tabs, .blk-columns) { flex: 0 1 auto; min-height: 0; margin-top: 0; }
+.deck-sl.is-blocks .blk-flow > .blk-columns { grid-template-rows: minmax(0, 1fr); }
+.deck-sl.is-blocks .blk-flow > .blk-columns > .blk-column { min-height: 0; overflow: hidden auto; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
+/* A Tabs block in a column (an exercise: the steps on the left, the prompts in tabs on the right) gives way in it too. */
+.deck-sl.is-blocks .blk-column:has(> .blk-tabs) { display: flex; flex-direction: column; }
+.deck-sl.is-blocks .blk-column:has(> .blk-tabs) > * { flex: none; }
+.deck-sl.is-blocks .blk-column > .blk-tabs { flex: 0 1 auto; min-height: 0; }
+.deck-sl.is-blocks .blk-column > .blk-tabs:first-child { margin-top: 0; }
+/* The soft fade at the foot of a pane or a column that scrolls, gone once it is scrolled to the end; a browser without
+   scroll-driven animations shows none. */
+@property --blk-fade { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@keyframes blk-fade-foot { from { --blk-fade: 3em; } 94% { --blk-fade: 3em; } to { --blk-fade: 0px; } }
+@keyframes blk-fade-end { from { --blk-fade: 2.2em; } 94% { --blk-fade: 2.2em; } to { --blk-fade: 0px; } }
+@supports (animation-timeline: scroll()) {
+  /* A band whose tabs don't fit fades at its right end until it is scrolled there. */
+  .blk-tabs .blk-tabbar {
+    animation: blk-fade-end linear both; animation-timeline: scroll(self inline);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - var(--blk-fade)), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - var(--blk-fade)), transparent);
+  }
+  .deck-sl.is-blocks :is(.blk-tabpane, .blk-flow > .blk-columns > .blk-column) {
+    animation: blk-fade-foot linear both; animation-timeline: scroll(self block);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--blk-fade)), transparent);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--blk-fade)), transparent);
+  }
+}

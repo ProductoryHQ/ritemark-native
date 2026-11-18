@@ -59,9 +59,11 @@ import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slid
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { PILL_PLACEHOLDER, SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
+import { tabsWithViews } from '../../../extensions/tabs/TabsView'
+import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
 import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -331,7 +333,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     },
   }), [])
   const SlideSlash = useMemo(() => SlashCommands.configure({
-    itemsFor: () => SLIDE_ITEMS,
+    // Sprint 163: in a tab's pane, never Tabs or the slide's own items; never Tabs in a box, Steps or a table cell.
+    itemsFor: current => slideItemsAt(current.state),
     run: (_editor, range, item) => toolsRef.current?.runItem(range, item),
     pluginKey: slideSlashKey,
   }), [])
@@ -355,6 +358,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource)],
+    // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
+    tabs: tabsWithViews('slide'),
   }).map(extension => {
     if (extension.name === 'starterKit') return extension.configure({ history: false })
     if (extension.name === 'commentNode') return SlideCommentNode.extend()
@@ -367,6 +372,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     editorProps: {
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
+      // Sprint 163: a Tabs block pasted where none may go (another's pane, a box, Steps, a table cell) comes in as its
+      // tabs' words, each under its name.
+      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : pastedWithoutTabs(view.state.schema, slice)),
       // The slide never scrolls (the lead on #769: at the fit's floor the caret at the bottom scrolled the slide's words up
       // and cut its title at the top): it may overflow at the bottom only. See also the flow's scroll reset below.
       handleScrollToSelection: () => true,
@@ -735,6 +743,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind, tag)); return true }).run()
           return
         }
+        case 'tabs':
+          // Sprint 163: "Tab 1" and "Tab 2", the first name chosen so typing names it (its band reads the pending name).
+          chain().command(({ tr }) => {
+            insertSlideBlock(tr, range.from, tabsBlockNode(editor.schema))
+            const at = tabsPosAtSelection(tr)
+            if (at !== null) setPendingRename(editor.view, at, 0)
+            return true
+          }).run()
+          return
         case 'agenda':
           // One block line pair, an undo step of its own; the list is the deck's, drawn where it stands.
           chain().command(({ tr }) => { insertSlideBlock(tr, range.from, agendaNode(editor.schema)); return true }).run()

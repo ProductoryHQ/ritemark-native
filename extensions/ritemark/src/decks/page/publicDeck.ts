@@ -33,6 +33,8 @@ import { Marked, marked, Tokenizer, type Token } from 'marked';
 import { blockTitleOf, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
+import { scanFencedDiv } from '../blocks/fencedDiv';
+import { tabsetOf, tabsetStart } from '../blocks/tabset';
 import type { DeckTheme } from '../deckTheme';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
@@ -209,14 +211,41 @@ function handoutTokenizer(): Tokenizer {
 
 /** A handout's Markdown as tokens, read the one way the page reads it (`pageFile.ts` finds its pictures with it too). */
 export function lexHandout(markdown: string): ReturnType<typeof marked.lexer> {
-  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer(), extensions: PICTURE_EXTENSIONS });
+  return marked.lexer(markdown, { ...MARKED_OPTIONS, tokenizer: handoutTokenizer(), extensions: HANDOUT_EXTENSIONS });
 }
+
+/**
+ * Sprint 163: a Tabs block in the handout (`::: {.panel-tabset}`, `tabset.ts`), each tab's pane read as blocks. Its
+ * `tokens` are every pane's, so whatever walks the tokens (the private notes' check, the pictures) reaches them.
+ */
+export interface HandoutTabsToken {
+  type: 'handoutTabs';
+  raw: string;
+  tabs: Array<{ name: string; tokens: Token[] }>;
+  tokens: Token[];
+}
+
+const handoutTabsTokenizer = {
+  name: 'handoutTabs',
+  level: 'block' as const,
+  start: tabsetStart,
+  tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: Token[]) => Token[] } }, src: string): HandoutTabsToken | undefined {
+    const scan = scanFencedDiv(src);
+    const tabset = scan ? tabsetOf(scan) : null;
+    if (!scan || !tabset?.tabs.length) return undefined;
+    const tabs = tabset.tabs.map(tab => ({ name: tab.name, tokens: this.lexer.blockTokens(tab.markdown, []) }));
+    return { type: 'handoutTabs', raw: scan.raw, tabs, tokens: tabs.flatMap(tab => tab.tokens) } as HandoutTabsToken;
+  },
+};
 
 /**
  * Experience 49: a picture's attribute block (`{width=50% crop=16:9}`, `pictureLook.ts`) is read as the picture's, so it
  * never shows on the page as words; the page draws the picture with its look (`pageHtml.ts`).
  */
 export const PICTURE_EXTENSIONS = new Marked().use({ extensions: [pictureBlockTokenizer] }).defaults.extensions;
+
+/** The handout's own blocks: a picture's look, and a Tabs block (Sprint 163). */
+const HANDOUT_EXTENSIONS = new Marked().use({ extensions: [pictureBlockTokenizer, handoutTabsTokenizer] }).defaults.extensions;
 
 // ---------------------------------------------------------------------------
 // A handout's Markdown
