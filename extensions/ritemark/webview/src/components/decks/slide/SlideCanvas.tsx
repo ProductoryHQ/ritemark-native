@@ -65,6 +65,11 @@ interface SlideCanvasProps {
    * One by one blocks show; the rest keep their places, hidden. Left out, every item shows, as everywhere else.
    */
   reveal?: number
+  /**
+   * Sprint 163, in Present only (the wall, the presenter view's Now): the tab each Tabs block shows, as Now chose it. Left
+   * out, each shows its first tab, as everywhere else.
+   */
+  tabs?: readonly number[]
 }
 
 const px = (style: BoxStyle | undefined): CSSProperties | undefined => {
@@ -305,7 +310,7 @@ function overflows(canvas: HTMLElement): boolean {
  * (`blocks/SlideEditor.tsx`); this canvas draws the strip, the wall and the rest. The fit steps the words down while
  * they overflow (`--fit`, 100 to 60 %), and again once the fonts load.
  */
-const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing, at, reveal }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
+const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, borderless, assets, missing, at, reveal, tabs }: Omit<SlideCanvasProps, 'kind' | 'editing'>) {
   const slideRef = useRef<HTMLDivElement>(null)
   const markdown = data.markdown ?? ''
   // Small details 14: the deck around an Agenda block; a slide without one draws nothing new when the sections change.
@@ -340,9 +345,11 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   const ground = theme.bg
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const logo = useMemo(() => themeSlideLogo(theme, borderless), [logoUrl, logoPlace, logoOn, logoAspect, secondUrl, secondAspect, secondGround, ground, borderless])
+  // The same choice of tabs in a new array draws nothing new.
+  const tabsKey = tabs?.join(',') ?? ''
   const html = useMemo(
-    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt, reveal }),
-    [data, step, width, assets, missing, logo, agenda, agendaAt, reveal],
+    () => blockCanvasMarkup(data, { step, width, pictureUrl: path => assets[path] ?? null, missing: missing ? path => missing.has(path) : undefined, logo, agenda, at: agendaAt, reveal, tabs: tabsKey ? tabsKey.split(',').map(Number) : null }),
+    [data, step, width, assets, missing, logo, agenda, agendaAt, reveal, tabsKey],
   )
   // The stage's one measure (`fitFlow`), from the top: words past the top, the bottom or a right edge step it down.
   useLayoutEffect(() => {
@@ -373,8 +380,8 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   )
 })
 
-export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing, at, reveal }: SlideCanvasProps) {
-  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} at={at} reveal={reveal} />
+export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme, borderless, assets, missing, editing, at, reveal, tabs }: SlideCanvasProps) {
+  if (isBlockSlide(kind)) return <BlockSlideCanvas data={data} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} at={at} reveal={reveal} tabs={tabs} />
   // PR 2 (decision 8 of the approved plan): a v1 slide of the nine kinds is drawn as the block slide its first edit
   // writes (`legacyToBlocks`), so the strip, the wall and the stage show what the conversion will write.
   if (drawsAsBlocks(kind)) return <BlockSlideCanvas data={blockDataOf(kind, data)} width={width} theme={theme} borderless={borderless} assets={assets} missing={missing} />

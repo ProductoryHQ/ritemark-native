@@ -22,6 +22,9 @@ import { MathBlockWithView, MathEditing, MathInlineWithView } from '../extension
 import { countEquations } from '../extensions/math/mathCount'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
+import { Slice } from '@tiptap/pm/model'
+import { tabsWithViews } from '../extensions/tabs/TabsView'
+import { canHoldTabs, flattenTabs, tabPanePlaceholderOf } from '../extensions/tabs/tabsCommands'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
@@ -157,7 +160,13 @@ export function Editor({
       codeBlock: CodeBlockWithCopyExtension,
       beforeLink: [
         Placeholder.configure({
-          placeholder: placeholder,
+          // Sprint 163: an empty tab's pane says what goes in it, as on the slide.
+          // Anything else nested keeps none, as before (its children were never given one).
+          placeholder: ({ editor: current, node, pos }) => {
+            const parent = pos > 0 ? current.state.doc.resolve(pos).parent : null
+            return tabPanePlaceholderOf(node, parent) ?? (!parent || parent.type.name === 'doc' ? placeholder : '')
+          },
+          includeChildren: true,
         }),
       ],
       onLinkClick: (href) => {
@@ -187,6 +196,8 @@ export function Editor({
       mathBlock: MathBlockWithView,
       // Sprint 157: a deck's slide node and its guard, only in a deck.
       deck: extensions,
+      // Sprint 163: the Tabs block with its band (a Text document's, a handout's).
+      tabs: tabsWithViews('text'),
     }),
     content: initialContent,
     onCreate: ({ editor }) => {
@@ -230,6 +241,8 @@ export function Editor({
         }
         return false
       },
+      // Sprint 163: a Tabs block pasted where none may go (another's pane, a table cell) comes in as its tabs' words.
+      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : new Slice(flattenTabs(view.state.schema, slice.content), slice.openStart, slice.openEnd)),
       handlePaste: (_view, event) => {
         const file = getClipboardImageFile(event.clipboardData)
         if (file && !shouldPreferTextPaste(event.clipboardData)) {

@@ -4,7 +4,9 @@
  */
 
 import type { PhosphorIconName } from '../components/ui/Icon'
+import type { Transaction } from '@tiptap/pm/state'
 import { sendToExtension, emitInternalEvent } from '../bridge'
+import { insertTabsBlock } from './tabs/tabsCommands'
 
 export interface BlockItemDef {
   title: string
@@ -28,6 +30,8 @@ export const PICTURE_KEYWORDS = ['image', 'img', 'photo', 'pic', 'screenshot', '
 export const BULLET_LIST_KEYWORDS = ['list', 'bullets', 'ul', 'loend', 'täpploend']
 export const NUMBERED_LIST_KEYWORDS = ['list', 'numbers', 'ol', 'loend', 'nummerdatud']
 export const TABLE_KEYWORDS = ['grid', 'tabel']
+/** Sprint 163: the Tabs block's (decks README "Tabs in the editor"). */
+export const TABS_KEYWORDS = ['tab', 'tabs', 'tabset', 'sakid', 'sakk', 'vahelehed']
 
 export const blockItems: BlockItemDef[] = [
   { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },
@@ -42,6 +46,8 @@ export const blockItems: BlockItemDef[] = [
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
   { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
+  // Sprint 163: tabs, each pane ordinary blocks; the same block as on a slide (decks README "Tabs, one block everywhere").
+  { title: 'Tabs', description: 'Insert tabs, each with its own text', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
   { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio', keywords: ['drawio', 'draw.io', 'chart', 'skeem'] },
   // Experience 22 (18 November): one name for a picture, as experience 49 made it one picture editor; "image" finds it.
@@ -128,6 +134,12 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     return
   }
 
+  // Sprint 163: "Tab 1" and "Tab 2", the first name chosen so typing names it.
+  if (item.nodeType === 'tabs') {
+    editor.chain().focus().deleteRange(range).command(({ tr }: { tr: Transaction }) => { insertTabsBlock(tr, range.from, editor.view); return true }).run()
+    return
+  }
+
   const chain = editor.chain().focus().deleteRange(range)
 
   switch (item.nodeType) {
@@ -186,6 +198,12 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
 
   if (item.nodeType === 'table') {
     editor.chain().focus().setTextSelection(pos).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    return
+  }
+
+  // Sprint 163: a new Tabs block at the position, its first name chosen.
+  if (item.nodeType === 'tabs') {
+    editor.chain().focus().command(({ tr }: { tr: Transaction }) => { insertTabsBlock(tr, pos, editor.view); return true }).run()
     return
   }
 

@@ -169,6 +169,8 @@ import {
   SquareSplitVertical,
   Article,
   Columns,
+  Tabs,
+  CopySimple,
   PlusSquare,
   Scissors,
   TrayArrowDown,
@@ -386,6 +388,9 @@ const iconMap = {
   'crop': Crop,
   'rectangle': Rectangle,
   'square-half': SquareHalf,
+  // Sprint 163: the Tabs block (the / menu, its bar) and a tab's Duplicate.
+  'tabs': Tabs,
+  'copy-simple': CopySimple,
 } as const satisfies Record<string, PhosphorIconComponent>
 
 export type PhosphorIconName = keyof typeof iconMap

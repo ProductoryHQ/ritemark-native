@@ -26,9 +26,11 @@
  * The reader keeps unknown keys and lines as they were written, and the writer rewrites only the lines whose value
  * changed, so a slide nobody touched saves byte for byte.
  *
- * Pure, with no imports: the extension host (the library, the tools) and the webview (the deck view) use this one
+ * Pure; its one import is the Tabs block's line reader (Sprint 163), itself pure: the extension host (the library, the tools) and the webview (the deck view) use this one
  * parser and writer.
  */
+
+import { tabsetDepthTracker } from './blocks/tabset';
 
 /** The nine kinds a slide can have (README decision 8). A slide of any other kind is kept as written. */
 export const SLIDE_KINDS = ['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table'] as const;
@@ -768,6 +770,7 @@ export function blockTitleOf(markdown: string): string {
   let fence: { char: string; size: number } | null = null;
   let comment = false;
   let first = '';
+  const tabs = tabsetDepthTracker();
   const lines = markdown.split('\n');
   for (let index = 0; index < lines.length; index++) {
     let line = lines[index].replace(/\r$/, '');
@@ -790,6 +793,8 @@ export function blockTitleOf(markdown: string): string {
     }
     const open = /^ {0,3}(`{3,}|~{3,})/.exec(line);
     if (open) { fence = { char: open[1][0], size: open[1].length }; continue; }
+    // Sprint 163: a tab's heading inside a Tabs block is the tab's name, never the slide's title.
+    if (tabs.line(line)) continue;
     const atx = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/.exec(line);
     let level = 0;
     let words = '';

@@ -26,6 +26,8 @@ import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtensio
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
 import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
 import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
+import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
+import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
@@ -50,7 +52,8 @@ export const slideDivMarkedExtension = {
       start: fencedDivStart,
       tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: unknown[]) => unknown[] } }, src: string): SlideDivToken | undefined {
         const scan = scanFencedDiv(src)
-        if (!scan) return undefined
+        // Sprint 163: a Tabs block is the Tabs tokenizer's (`tabsMarkdown.ts`).
+        if (!scan || tabsetOf(scan)?.tabs.length) return undefined
         // The Agenda draws from the deck: what it holds is kept as written, never edited (`SlideAgenda`).
         if (isAgendaClasses(scan.attrs.classes)) return { type: 'slideDiv', raw: scan.raw, scan, tokens: [] }
         return { type: 'slideDiv', raw: scan.raw, scan, tokens: this.lexer.blockTokens(scan.inner.replace(/^\n+/, ''), []) }
@@ -75,6 +78,8 @@ slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
 slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// Sprint 163: the Tabs block, as the Text editor reads it.
+slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 
 let slideComments = false
 
@@ -102,9 +107,11 @@ export function withColumnPlaces(html: string): string {
   return html.replace(/(<div data-fdiv=""[^>]*\sdata-class="column"[^>]*>)(<\/div>)/g, '$1<h3></h3><p></p>$2')
 }
 
-/** The faint words an empty line on the stage shows: the title's, and an empty column's heading and text. */
+/** The faint words an empty line on the stage shows: the title's, an empty column's heading and text, an empty pane's. */
 export function slidePlaceholderOf(node: PMNode, parent: PMNode | null, isTitle: boolean): string {
   if (isTitle) return 'Title'
+  // Sprint 163: an empty tab's pane says what goes in it (README "Adding it").
+  if (parent?.type.name === 'tabPane') return node.type.name === 'paragraph' && parent.childCount === 1 ? PANE_PLACEHOLDER : ''
   if (parent?.type.name !== 'slideDiv' || String(parent.attrs.class ?? '').split(' ')[0] !== 'column') return ''
   if (node.type.name === 'heading') return 'Heading'
   return node.type.name === 'paragraph' ? 'Text' : ''

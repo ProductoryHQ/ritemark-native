@@ -24,6 +24,7 @@ import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDiv
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
+import { tabsetOf, type Tabset } from './tabset';
 
 export { sidePictureOf };
 
@@ -65,6 +66,13 @@ interface SlideDivToken {
   tokens: Token[];
 }
 
+/** Sprint 163: a Tabs block (`tabset.ts`), each tab's pane read as blocks. */
+interface SlideTabsToken {
+  type: 'slideTabs';
+  raw: string;
+  tabs: Array<{ type: 'slideTabPane'; raw: string; name: string; tokens: Token[] }>;
+}
+
 /** The renderer's state while one slide is drawn: where pictures come from, and the Boxes look a box is under. */
 interface RenderState {
   pictureUrl: (path: string) => string | null;
@@ -82,9 +90,14 @@ interface RenderState {
   reveal: { next: number; shown: number | null };
   /** The `:::` blocks being drawn, innermost last: a box or a column is an item when its block reveals. */
   parents: Array<{ kind: string | null; reveal: boolean }>;
+  /**
+   * Sprint 163: the tab each Tabs block shows, by the block's place among the slide's Tabs blocks (from 0, as they are
+   * drawn): Present's choice on the presenter view; the first tab for any other. `next` counts the blocks drawn.
+   */
+  tabs: { chosen: readonly number[] | null; next: number };
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, reveal: { next: 0, shown: null }, parents: [] });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
 
 let state: RenderState = freshState();
 
@@ -168,8 +181,9 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
   if (isAgendaClasses(token.attrs.classes)) return agendaHtml(state.agenda, state.at);
   const kind = slideBlockClassOf(token.attrs);
   const parent = state.parents[state.parents.length - 1];
-  // README item 18: a block set to One by one, never one inside another such block (its items arrive whole).
-  const insideReveal = state.parents.some(entry => entry.reveal);
+  // README item 18: a block set to One by one, never one inside another such block (its items arrive whole), nor in a
+  // tab's pane (Sprint 163: a Tabs block is one item).
+  const insideReveal = state.parents.some(entry => entry.reveal || entry.kind === 'tabs');
   const listWrapper = !insideReveal && kind === null && isRevealListToken(token);
   const reveals = listWrapper || (!insideReveal && (kind === 'boxes' || kind === 'steps' || kind === 'columns') && revealsOne(token.attrs));
   const revealMark = reveals ? ' data-reveal="one"' : '';
@@ -219,6 +233,32 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       return `<div class="blk-group"${revealMark}>${listWrapper ? markListItems(body) : body}</div>\n`;
     }
   }
+}
+
+/**
+ * Sprint 163: a Tabs block, as the slide, the strip, the wall and the page draw it: its tabs as the block's header on a
+ * lighter band, and every pane in the same place (the block is as tall as its tallest tab, `slide.css`), the chosen one
+ * shown. Each pane carries its tab's name, for print, which shows every tab under its name. Static: nothing navigates.
+ */
+function tabsHtml(token: SlideTabsToken, inner: (tokens: Token[]) => string): string {
+  const index = state.tabs.next++;
+  const wanted = state.tabs.chosen?.[index];
+  const active = typeof wanted === 'number' && Number.isInteger(wanted) && wanted >= 0 && wanted < token.tabs.length ? wanted : 0;
+  const band = token.tabs.map((tab, at) => `<span class="blk-tab${at === active ? ' is-active' : ''}">${esc(tab.name)}</span>`).join('');
+  state.parents.push({ kind: 'tabs', reveal: false });
+  try {
+    const panes = token.tabs.map((tab, at) => `<div class="blk-tabpane${at === active ? ' is-active' : ''}" data-tab-name="${esc(tab.name)}"><div class="blk-tabname">${esc(tab.name)}</div>${inner(tab.tokens)}</div>`).join('');
+    return `<div class="blk-tabs" data-active="${active}" data-tabs-index="${index}"><div class="blk-tabbar">${band}</div><div class="blk-tabpanes">${panes}</div></div>
+`;
+  } finally {
+    state.parents.pop();
+  }
+}
+
+/** A Tabs block's token, its panes lexed as blocks; undefined for a div that isn't one (`tabsetOf`). */
+function tabsToken(lexer: { blockTokens: (src: string, tokens?: Token[]) => Token[] }, raw: string, tabset: Tabset | null): SlideTabsToken | undefined {
+  if (!tabset || !tabset.tabs.length) return undefined;
+  return { type: 'slideTabs', raw, tabs: tabset.tabs.map(tab => ({ type: 'slideTabPane', raw: tab.markdown, name: tab.name, tokens: lexer.blockTokens(tab.markdown, []) })) };
 }
 
 /**
@@ -295,12 +335,33 @@ function createSlideMarked(): Marked {
         return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
       },
     }, {
+      // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.
+      name: 'slideTabs',
+      level: 'block',
+      start: fencedDivStart,
+      tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: Token[]) => Token[] } }, src: string) {
+        const scan = scanFencedDiv(src);
+        return scan ? tabsToken(this.lexer, scan.raw, tabsetOf(scan)) : undefined;
+      },
+      renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
+        return tabsHtml(token as unknown as SlideTabsToken, tokens => this.parser.parse(tokens));
+      },
+      childTokens: ['tabs'],
+    }, {
+      name: 'slideTabPane',
+      level: 'block',
+      // Never read from the text: only a Tabs block makes one (so `walkTokens` reaches a pane's pictures).
+      tokenizer: () => undefined,
+      renderer: () => '',
+      childTokens: ['tokens'],
+    }, {
       name: 'slideDiv',
       level: 'block',
       start: fencedDivStart,
       tokenizer(this: { lexer: { blockTokens: (src: string, tokens?: Token[]) => Token[] } }, src: string) {
         const scan = scanFencedDiv(src);
-        if (!scan) return undefined;
+        // A Tabs block is the rule above's (marked tries the rules registered later first).
+        if (!scan || tabsetOf(scan)?.tabs.length) return undefined;
         // The Agenda draws from the deck: what someone wrote between its lines is kept in the file and never read, so no
         // picture or Steps block in it reaches the page (as the slide editor keeps it: `slideEditorMarkdown`).
         if (isAgendaClasses(scan.attrs.classes)) return { type: 'slideDiv', raw: scan.raw, attrs: scan.attrs, tokens: [] } as SlideDivToken;
@@ -555,13 +616,18 @@ export interface BlockDrawingContext {
    * rest are drawn hidden, in their places. Left out: every item shows.
    */
   reveal?: number | null;
+  /**
+   * Sprint 163, in Present: the tab each Tabs block shows (by the block's place among the slide's Tabs blocks), as the
+   * presenter view's Now chose it. Left out: each shows its first tab.
+   */
+  tabs?: readonly number[] | null;
 }
 
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
 export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
-  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, reveal: { next: 0, shown } };
+  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -714,7 +780,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'> & { reveal?: number | null }): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'> & { reveal?: number | null; tabs?: readonly number[] | null }): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -738,7 +804,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal })}</div>`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, tabs: options.tabs })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

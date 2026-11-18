@@ -5,6 +5,7 @@ import Suggestion from '@tiptap/suggestion'
 import tippy from 'tippy.js'
 import { CommandsList } from './CommandsList'
 import { executeSlashCommand, filterSlashItems, slashItemsFor, type BlockItemDef } from './blockItems'
+import { canHoldTabs } from './tabs/tabsCommands'
 
 export type { BlockItemDef as Command }
 
@@ -48,7 +49,8 @@ export const SlashCommands = Extension.create<SlashCommandsOptions>({
         },
         items: ({ query, editor }: any) => {
           // A deck's handout has the slide node in its schema (Sprint 157): its Divider starts a new slide.
-          const items = itemsFor ? itemsFor(editor) : slashItemsFor(!!editor?.schema?.nodes?.deckSlide)
+          // Sprint 163: never Tabs inside another Tabs block or a table cell (the slide's own list says so itself).
+          const items = itemsFor ? itemsFor(editor) : slashItemsFor(!!editor?.schema?.nodes?.deckSlide).filter(item => item.nodeType !== 'tabs' || !editor || canHoldTabs(editor.state))
           // Experience 22: by the name's words and the item's hidden ones, name matches first.
           return filterSlashItems(items, query ?? '')
         },

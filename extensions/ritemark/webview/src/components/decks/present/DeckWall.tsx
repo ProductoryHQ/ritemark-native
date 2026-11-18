@@ -462,9 +462,10 @@ export function DeckWall() {
   const dotShownAt = dot ?? lastDot.current
   const dotAt = dotShownAt ? dotPlace(dotShownAt, frame) : null
 
+  // Sprint 163: the slide on the wall shows the tabs chosen on the presenter view's Now (a leaving one, its first).
   const layer = (slide: WallSlide, className: string, key: string, going: boolean, reveal: number | undefined) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} tabs={going ? undefined : state.tabs} />
     </div>
   )
 

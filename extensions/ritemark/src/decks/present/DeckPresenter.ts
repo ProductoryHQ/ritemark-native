@@ -67,6 +67,8 @@ import {
   type WallBlank,
   type WallFocus,
   NO_FOCUS,
+  tabsOf,
+  withTab,
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
@@ -118,6 +120,8 @@ interface Running {
   blank: WallBlank | null;
   /** Decks README items 11 and 16: the spotlit item and the picture filling the wall, until a move (never saved). */
   focus: WallFocus;
+  /** Sprint 163: the tab each Tabs block on the wall's slide shows, chosen on the presenter view, until a move. */
+  tabs: number[];
   /** The system's clock, read once at the start, for the presenter view's time of day (the webview's own until then). */
   clock: ClockLocale;
   /** The deck's published page, by its address (Q shows its QR code), or null while it isn't published. */
@@ -254,6 +258,7 @@ export class DeckPresenter implements vscode.Disposable {
       presenterSerial: 0,
       blank: null,
       focus: NO_FOCUS,
+      tabs: [],
       clock: { locale: null, hourCycle: null },
       page: null,
       blankSerial: 0,
@@ -484,6 +489,12 @@ export class DeckPresenter implements vscode.Disposable {
         running.timer = request.minutes === null ? null : { endsAt: Date.now() + request.minutes * 60_000, minutes: request.minutes };
         await this.showSameSlide(running);
         return;
+      case 'present/tab':
+        // Sprint 163: a tab chosen on the presenter view's Now shows on the wall; not a move, and only from there.
+        if (screen !== running.presenter) return;
+        running.tabs = withTab(running.tabs, request.block, request.tab);
+        await this.showSameSlide(running);
+        return;
       case 'present/pointer':
         // Item 12: the presenter view's dot, relayed to the wall as it comes; nothing is kept, and nothing else is sent.
         if (screen !== running.presenter) return;
@@ -501,6 +512,8 @@ export class DeckPresenter implements vscode.Disposable {
         running.blankSerial++;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
         running.focus = NO_FOCUS;
+        // Sprint 163: and every Tabs block shows its first tab again.
+        running.tabs = [];
         const move = moveOf(request);
         // README item 18: → shows the slide's next item and ← hides the last one shown, on the slide the wall has (an
         // edit since waits for the next move, as for blanking); past the first or the last, the press moves.
@@ -566,10 +579,11 @@ export class DeckPresenter implements vscode.Disposable {
     const count = revealCountOf(wallSlideOf(view.current));
     running.reveal = running.arrival ? revealOnArrival(count, running.arrival) : revealKept(running.reveal, count);
     running.arrival = null;
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal);
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal, running.tabs);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
-      state = { ...state, spot: null, fill: null };
+      running.tabs = [];
+      state = { ...state, spot: null, fill: null, tabs: [] };
     }
     running.wallState = state;
     await post(running.wall.panel.webview, state);
@@ -587,7 +601,7 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, timer: running.timer, reveal: running.reveal };
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, timer: running.timer, reveal: running.reveal, tabs: tabsOf(running.tabs) };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -617,6 +631,7 @@ export class DeckPresenter implements vscode.Disposable {
       startedAt: running.startedAt,
       blank: running.blank,
       focus: running.focus,
+      tabs: running.tabs,
       // Before the wall has a state, no step is known yet: Now and Next show whole until it comes.
       reveal: onWall ? running.reveal : null,
       clock: running.clock,

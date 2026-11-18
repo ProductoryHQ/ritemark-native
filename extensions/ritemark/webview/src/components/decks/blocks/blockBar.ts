@@ -32,15 +32,27 @@ import { NodeSelection, Selection, TextSelection, type EditorState, type Transac
 import { liftTarget } from '@tiptap/pm/transform'
 import { OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
+import { addTab, columnsToTabs, tabsAround, tabsToColumns } from '../../../extensions/tabs/tabsCommands'
 
 /**
  * The kinds of block the bar is for; its type menu lists `BAR_KINDS`, in that order. The Agenda (small details 14) has a
  * bar of its own type and Delete only: it is one piece, drawn from the deck, and turns into nothing.
  */
-export type BarKind = 'boxes' | 'steps' | 'columns' | 'list' | 'numbered' | 'agenda'
+export type BarKind = 'boxes' | 'steps' | 'columns' | 'list' | 'numbered' | 'agenda' | 'tabs'
 export const BAR_KINDS: readonly BarKind[] = ['boxes', 'steps', 'columns', 'list', 'numbered']
 /** The type menu's names. */
-export const BAR_KIND_LABEL: Readonly<Record<BarKind, string>> = { boxes: 'Boxes', steps: 'Steps', columns: 'Columns', list: 'List', numbered: 'Numbered', agenda: 'Agenda' }
+export const BAR_KIND_LABEL: Readonly<Record<BarKind, string>> = { boxes: 'Boxes', steps: 'Steps', columns: 'Columns', list: 'List', numbered: 'Numbered', agenda: 'Agenda', tabs: 'Tabs' }
+
+/**
+ * Sprint 163 (README "Tabs in the editor"): the type menu's kinds for a block. Tabs turn into Columns and back, and
+ * nothing else (a tab's pane holds any blocks, which a box or a list item can't); a Tabs block inside a column only
+ * stays Tabs.
+ */
+export function typeMenuKinds(kind: BarKind, nested: boolean): readonly BarKind[] {
+  if (kind === 'tabs') return nested ? ['tabs'] : ['tabs', 'columns']
+  if (kind === 'columns') return [...BAR_KINDS, 'tabs']
+  return BAR_KINDS
+}
 /** The Agenda's tooltip on its bar (the decks README, small details 14). */
 export const AGENDA_TIP = "Lists this deck's sections"
 
@@ -99,6 +111,7 @@ export function revealWrappedList(node: PMNode): PMNode | null {
 /** The bar's kind of a top-level block, or null for a block it isn't for (a title, a line, a table, a picture). */
 export function barKindOf(node: PMNode): BarKind | null {
   if (node.type.name === 'slideAgenda') return 'agenda'
+  if (node.type.name === 'tabsBlock') return 'tabs'
   const list = isList(node) ? node : revealWrappedList(node)
   if (list) return list.type.name === 'bulletList' ? 'list' : 'numbered'
   const kind = divKind(node)
@@ -111,7 +124,8 @@ const listIsInside = (block: { node: PMNode; kind: BarKind }) => block.kind === 
 /** Is the block set to One by one (README item 18)? */
 export function revealsOneBlock(block: { node: PMNode; kind: BarKind }): boolean {
   if (block.kind === 'list' || block.kind === 'numbered') return !isList(block.node)
-  if (block.kind === 'agenda') return false
+  // A Tabs block is one item in a reveal (README "Present"), and the Agenda one piece.
+  if (block.kind === 'agenda' || block.kind === 'tabs') return false
   return revealsOne(divAttributesOf(block.node))
 }
 
@@ -122,7 +136,7 @@ export function revealsOneBlock(block: { node: PMNode; kind: BarKind }): boolean
  */
 export function setReveal(state: EditorState, pos: number, one: boolean): Transaction | null {
   const block = blockAt(state, pos)
-  if (!block || block.kind === 'agenda' || revealsOneBlock(block) === one) return null
+  if (!block || block.kind === 'agenda' || block.kind === 'tabs' || revealsOneBlock(block) === one) return null
   if (block.kind !== 'list' && block.kind !== 'numbered') {
     const open = String(block.node.attrs.open ?? '')
     const next = withFenceValue(open, REVEAL_KEY, one ? REVEAL_ONE : null)
@@ -167,6 +181,9 @@ export function chosenBlockAt(state: EditorState): ChosenBlock | null {
     const kind = barKindOf(selection.node)
     return kind ? { pos: selection.from, node: selection.node, kind } : null
   }
+  // Sprint 163: the caret in a Tabs block chooses that block, wherever it stands (an exercise's tabs are in a column).
+  const tabs = tabsAround(state)
+  if (tabs) return { pos: tabs.pos, node: tabs.node, kind: 'tabs' }
   const $head = selection.$head
   if ($head.depth < 1) return null
   const node = $head.node(1)
@@ -373,6 +390,10 @@ export function turnInto(state: EditorState, pos: number, kind: BarKind, tag: st
   const block = blockAt(state, pos)
   // The Agenda holds no items to carry, and no block turns into one.
   if (!block || block.kind === kind || block.kind === 'agenda' || kind === 'agenda') return null
+  // Sprint 163: Columns ⇄ Tabs, and nothing else for Tabs.
+  if (block.kind === 'columns' && kind === 'tabs') return columnsToTabs(state, pos)
+  if (block.kind === 'tabs') return kind === 'columns' && state.doc.resolve(pos).depth === 0 ? tabsToColumns(state, pos) : null
+  if (kind === 'tabs') return null
   const parts = partsOf(block)
   let made: PMNode
   try {
@@ -407,6 +428,8 @@ export function itemCount(node: PMNode, kind: BarKind): number {
 export function addItem(state: EditorState, pos: number): Transaction | null {
   const block = blockAt(state, pos)
   if (!block || block.kind === 'agenda') return null
+  // Sprint 163: a tab at the end (the stage then names it: `addTab`'s index).
+  if (block.kind === 'tabs') return addTab(state, pos)?.tr ?? null
   const schema = state.schema
   const tr = state.tr
   const end = pos + block.node.nodeSize - 1
@@ -446,7 +469,8 @@ export function deleteBlock(state: EditorState, pos: number): Transaction | null
   if (!block) return null
   const notes = notesIn(block.node)
   const tr = state.tr
-  const keep = notes.length || state.doc.childCount > 1 ? notes : [state.schema.nodes.paragraph.create()]
+  // A block that is its parent's only one (the slide's, or a column's: Sprint 163's Tabs in a column) leaves an empty line.
+  const keep = notes.length || state.doc.resolve(pos).parent.childCount > 1 ? notes : [state.schema.nodes.paragraph.create()]
   tr.replaceWith(pos, pos + block.node.nodeSize, keep)
   tr.setSelection(Selection.near(tr.doc.resolve(Math.min(pos, tr.doc.content.size)), -1))
   return tr.setMeta(SLIDE_COMMAND, true)

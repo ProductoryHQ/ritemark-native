@@ -15,6 +15,7 @@ import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 import { transitionOf, type DeckTransition } from './deckTransition';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
+import { isTab, tabsOf, type WallTabs } from './wallTabs';
 
 export type { WallReveal };
 
@@ -43,6 +44,8 @@ export interface WallFocus {
 }
 
 export const NO_FOCUS: WallFocus = { spot: null, fill: null };
+
+export { isTab, tabsOf, withTab, type WallTabs } from './wallTabs';
 
 /**
  * Decks README item 9 (17 November): the timer for an exercise, started from the presenter view. It ends at `endsAt`
@@ -121,6 +124,8 @@ export interface WallState {
    * slide shows whole.
    */
   reveal: WallReveal | null;
+  /** Sprint 163: the tab each Tabs block shows, as the presenter view chose it (`WallTabs`); empty: each its first. */
+  tabs: WallTabs;
 }
 
 /**
@@ -168,6 +173,8 @@ export interface PresenterState {
   clock: ClockLocale;
   /** README item 9: the exercise's timer, shown on the wall, with Restart and Stop here; or null. */
   timer: WallTimer | null;
+  /** Sprint 163: Now shows the tabs the wall shows (`WallTabs`). */
+  tabs: WallTabs;
 }
 
 /** The host's answer to a typed number: the title of the slide with that number, or null when the deck has none. */
@@ -210,7 +217,9 @@ export type WallRequest =
   /** Item 9: the presenter view starts (or restarts) the exercise's timer for `minutes`, or stops it (null). */
   | { type: 'present/timer'; minutes: number | null }
   /** Item 12: L held over the presenter view's Now: the dot's place on the slide, or none (null). */
-  | { type: 'present/pointer'; at: WallPoint | null };
+  | { type: 'present/pointer'; at: WallPoint | null }
+  /** Sprint 163: a tab chosen on the presenter view's Now: Tabs block `block` of the slide shows its tab `tab`. */
+  | { type: 'present/tab'; block: number; tab: number };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
 export interface DeckPresentRequest {
@@ -277,6 +286,7 @@ export function wallStateOf(
   focus: WallFocus = NO_FOCUS,
   timer: WallTimer | null = null,
   reveal: WallReveal | null = null,
+  tabs: readonly number[] = [],
 ): WallState {
   const address = wallPageAddress(page);
   return {
@@ -297,8 +307,11 @@ export function wallStateOf(
     transition: transitionOf(look.transition),
     timer: timerOf(timer),
     reveal: revealOf(reveal),
+    tabs: tabsOf(tabs),
   };
 }
+
+
 
 /** The pictures the presenter view names: the wall's, the next slide's, and the one on the slide the wall last got. */
 export function presenterPicturePaths(view: PresentView, onWall?: WallSlide): string[] {
@@ -317,7 +330,7 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null; reveal?: WallReveal | null },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null; reveal?: WallReveal | null; tabs?: readonly number[] },
   onWall?: WallSlide,
 ): PresenterState {
   const address = wallPageAddress(session.page ?? null);
@@ -352,6 +365,7 @@ export function presenterStateOf(
     fill: itemOf(session.focus?.fill ?? null),
     clock: { locale: session.clock?.locale ?? null, hourCycle: session.clock?.hourCycle ?? null },
     timer: timerOf(session.timer ?? null),
+    tabs: tabsOf(session.tabs ?? []),
   };
 }
 
@@ -438,6 +452,8 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
       return exactKeys(input, ['type', 'item']) && (input.item === null || isItem(input.item)) ? { type: input.type, item: itemOf(input.item) } : null;
     case 'present/timer':
       return exactKeys(input, ['type', 'minutes']) && (input.minutes === null || isTimerMinutes(input.minutes)) ? { type: 'present/timer', minutes: input.minutes as number | null } : null;
+    case 'present/tab':
+      return exactKeys(input, ['type', 'block', 'tab']) && isTab(input.block) && isTab(input.tab) ? { type: 'present/tab', block: input.block, tab: input.tab } : null;
     case 'present/pointer': {
       if (!exactKeys(input, ['type', 'at'])) return null;
       if (input.at === null) return { type: 'present/pointer', at: null };
