@@ -4,7 +4,7 @@
  */
 
 // Helper to read a File as base64 data URL
-export function readFileAsBase64(file: File): Promise<string> {
+export function readFileAsBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)

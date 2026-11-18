@@ -1,0 +1,30 @@
+Decks: several pictures dropped on the strip, and Copy as picture (items 8 and 15 of the decks README)
+
+One isolated dev instance (scripts/qa/dev-launch-isolated.sh), 1440 x 900, AI pane folded, a synthetic
+"Demo project" with a three-slide deck on a theme with Fraunces headings and a logo.
+
+1-three-pictures-dropped.png
+  Three PNGs (team-photo.png, results_q3-final.png, Õppepäev_Tartus.png) dropped on the strip between
+  slides 1 and 2 as a DOM drop (a DataTransfer of three Files; a real Finder drag can't be automated).
+  The drag over drew the strip's line at gap 1; the drop made slides 2, 3 and 4, titled "team photo",
+  "results q3 final" and "Õppepäev Tartus", in the files' order, the first one current.
+  images/ then held team-photo.png, results_q3-final.png and Oppepaev_Tartus.png (the cleaned name paste
+  writes too). deck-drop.diff.txt is the file's change.
+
+  One Cmd+Z on the strip (a keydown dispatched on the strip: CDP's key event didn't reach the webview)
+  took all three slides back, and the file was byte for byte the file before the drop (cmp). Cmd+Shift+Z
+  put them back.
+
+  A single picture dropped on the strip (DOM drop) was not taken: no slide, no file, as before.
+
+2-menu-copy-as-picture.png
+  Slide 4's menu: Duplicate, Move up, Move down; Skip slide, Add to library…, Copy as picture, Slide
+  settings…; Delete slide. Copy as picture has no key.
+
+3-copied-note.png
+  After a real click on Copy as picture: the bar says "Slide 4 is copied as a picture."
+
+4-copied-from-clipboard-1920x1080.png
+  The PNG read back from the macOS clipboard (osascript, «class PNGf»): PNG image data, 1920 x 1080,
+  8-bit RGBA. The slide in Fern: Fraunces heading with its Estonian letters, the picture and the logo.
+  The webview writes it itself (ClipboardItem): no host path was needed.

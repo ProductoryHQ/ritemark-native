@@ -1,0 +1,39 @@
+3a4
+> handout: text
+14a16,17
+> ## A day with the assistants
+> 
+18a22,48
+> id: zkek
+> ---
+> # team photo
+> 
+> ![](images/team-photo.png)
+> ```
+> 
+> ```slide
+> ---
+> id: vqjd
+> ---
+> # results q3 final
+> 
+> ![](images/results_q3-final.png)
+> ```
+> 
+> ```slide
+> ---
+> id: jnxx
+> ---
+> # Õppepäev Tartus
+> 
+> ![](images/Oppepaev_Tartus.png)
+> ```
+> 
+> ```slide
+> ---
+27a58,59
+> ## Where assistants help
+> 
+38a71,72
+> ## What we learned
+> 

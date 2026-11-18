@@ -155,7 +155,7 @@ assert.equal(menu.find(item => item.key === 'delete')?.keyHint, '⌫')
 // ---- 18 November (the Experience lead): Move up ⌘↑ and Move down ⌘↓ under Duplicate, then a line; Move up off on the
 //      first slide and Move down on the last, as a Mac menu has them, each saying why in its tooltip
 assert.deepEqual(menu.map(item => `${item.separated ? '| ' : ''}${item.label}${item.keyHint ? ` ${item.keyHint}` : ''}`),
-  ['Duplicate ⌘D', 'Move up ⌘↑', 'Move down ⌘↓', '| Skip slide', 'Add to library…', 'Slide settings…', '| Delete slide ⌫'])
+  ['Duplicate ⌘D', 'Move up ⌘↑', 'Move down ⌘↓', '| Skip slide', 'Add to library…', 'Copy as picture', 'Slide settings…', '| Delete slide ⌫'])
 const offs = (index: number, count: number) => menuOf(index, count).filter(item => item.key === 'up' || item.key === 'down').map(item => `${item.key}${item.disabled ? ' off' : ''}`)
 assert.deepEqual(offs(1, 3), ['up', 'down'], 'a slide in the middle moves both ways')
 assert.deepEqual(offs(0, 3), ['up off', 'down'], 'the first slide')
