@@ -56,9 +56,9 @@ import { useDeckAssets, useDeckTheme } from './deckBridge'
 import { PART_TOP_GAP, currentPart, scrollTopFor, wheelStop } from './scrollRule'
 import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMessage'
 import { DeckGuard } from './handout/deckGuard'
-import { CONVERSION_NOTICE, DeckConvert, commentNodeAt, conversionNoticeFor, conversionStateOf, needsConversion, pictureIntoSlide } from './handout/deckConvert'
+import { CONVERSION_NOTICE, DeckConvert, DeckFrontMatterSteps, commentNodeAt, conversionNoticeFor, conversionStateOf, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
-import { blockDataOf, drawsAsBlocks, saysBlockDeck, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
+import { blockDataOf, drawsAsBlocks, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
 import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
@@ -67,7 +67,7 @@ import { DeckSlideWithPartHead, partMenuSlots, type PartMenuSlot } from './hando
 import { railPick, rowCaret, trackHeight } from './handout/partRail'
 import { DECK_REMOVED, DeckRemove, joinMarkOf, removalNotice, type DeckRemoval } from './handout/deckRemove'
 import { DeckLines } from './handout/deckLines'
-import { DeckDrawnHeadings, handoutMarkFor, hasDrawnHeadings } from './handout/drawnHeadings'
+import { DeckDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
@@ -409,62 +409,43 @@ export function DeckView({
   textHandoutRef.current = textHandout
   const editorRef = useRef<TipTapEditor | null>(null)
   editorRef.current = editor
-  // The mark this view wrote with the first edit: taken out again when Undo brings the drawn headings back.
-  const markAdded = useRef(false)
+  // What this view wrote into the front matter with the first edit (`handout: text`, `deck: 2`), and the step that did:
+  // that step's Undo takes it out again (`DeckFrontMatterSteps`, review of #796).
+  const frontMatterSteps = useRef(new DeckFrontMatterSteps())
   // Whether the document's last change was an undo or a redo (the mark is taken out only by one).
   const lastWasHistory = useRef(false)
   useEffect(() => {
     if (!editor) return
     const onTransaction = ({ transaction }: { transaction: Transaction }) => {
-      if (transaction.docChanged) lastWasHistory.current = isHistoryTransaction(transaction)
+      if (!transaction.docChanged) return
+      lastWasHistory.current = isHistoryTransaction(transaction)
+      frontMatterSteps.current.transaction(lastWasHistory.current, undoDepth(editor.state))
     }
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
   }, [editor])
-  // Sprint 161 (PR 2): `deck: 2` is written with the first block slide (the conversion at the first real edit), in the
-  // same change; an undo that brings this view's v1 slides back puts the deck's version back as it was.
+  // Sprint 161 (PR 2): `deck: 2` is written with the first edit after which the deck holds a block slide (the
+  // conversion at the first real edit, or any edit of a deck of block slides), in the same change; that edit's Undo puts
+  // the deck's version back as it was.
   const deckVersionRef = useRef(properties.deck)
   deckVersionRef.current = properties.deck
-  const versionBefore = useRef<{ value: unknown } | null>(null)
   const handleChange = useCallback((markdown: string) => {
-    const marked = textHandoutRef.current
-    const doc = editorRef.current?.state.doc
-    const changes: Array<(properties: DocumentProperties) => DocumentProperties> = []
-    const mark = handoutMarkFor({ marked, drawn: !doc || hasDrawnHeadings(doc), addedHere: markAdded.current, undo: lastWasHistory.current })
-    if (mark === 'add') {
-      // The first real edit of the handout: its headings are written, and the mark goes with them, in this one edit.
-      // Nothing is drawn from now on, whatever runs before the view renders again.
-      markAdded.current = true
-      textHandoutRef.current = true
-      changes.push(properties => ({ ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE }))
-    } else if (mark === 'remove') {
-      markAdded.current = false
-      textHandoutRef.current = false
-      changes.push(properties => {
-        const next = { ...properties }
-        delete next[TEXT_HANDOUT_KEY]
-        return next
-      })
+    const state = editorRef.current?.state
+    const change = frontMatterSteps.current.change({
+      marked: textHandoutRef.current,
+      version: deckVersionRef.current,
+      doc: state?.doc ?? null,
+      undo: lastWasHistory.current,
+      depth: state ? undoDepth(state) : null,
+    })
+    if (!change) {
+      onChange(markdown)
+      return
     }
-    const version = deckVersionRef.current
-    const hasBlocks = !!doc && slidesOf(doc).some(entry => isBlockSlide(entry.kind))
-    if (hasBlocks && !saysBlockDeck(version === undefined || version === null ? null : String(version))) {
-      if (!versionBefore.current) versionBefore.current = { value: version }
-      deckVersionRef.current = 2
-      changes.push(properties => ({ ...properties, deck: 2 }))
-    } else if (versionBefore.current && lastWasHistory.current && doc && !hasBlocks && needsConversion(doc)) {
-      const before = versionBefore.current.value
-      versionBefore.current = null
-      deckVersionRef.current = before
-      changes.push(properties => {
-        const next = { ...properties }
-        if (before === undefined) delete next.deck
-        else next.deck = before as DocumentProperties[string]
-        return next
-      })
-    }
-    if (changes.length === 0) onChange(markdown)
-    else onChange(markdown, properties => changes.reduce((current, change) => change(current), properties))
+    // Nothing is drawn from now on once the mark is written, whatever runs before the view renders again.
+    textHandoutRef.current = change.marked
+    deckVersionRef.current = change.version
+    onChange(markdown, change.apply)
   }, [onChange])
 
 
