@@ -62,6 +62,8 @@ import {
   type WallRequest,
   type ClockLocale,
   type WallBlank,
+  type WallFocus,
+  NO_FOCUS,
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
@@ -110,6 +112,8 @@ interface Running {
   presenterSerial: number;
   /** B, "." or W blanked the wall (until any key, a click or a move); the presenter view says so. */
   blank: WallBlank | null;
+  /** Decks README items 11 and 16: the spotlit item and the picture filling the wall, until a move (never saved). */
+  focus: WallFocus;
   /** The system's clock, read once at the start, for the presenter view's time of day (the webview's own until then). */
   clock: ClockLocale;
   /** The deck's published page, by its address (Q shows its QR code), or null while it isn't published. */
@@ -239,6 +243,7 @@ export class DeckPresenter implements vscode.Disposable {
       refresh: null,
       presenterSerial: 0,
       blank: null,
+      focus: NO_FOCUS,
       clock: { locale: null, hourCycle: null },
       page: null,
       blankSerial: 0,
@@ -433,15 +438,24 @@ export class DeckPresenter implements vscode.Disposable {
         // Q: the page's QR code, only for a deck that is published now (Publish asked again, never an old address).
         // Refused, the windows still get a state, so the ask they keep settles (`settleAsked`).
         if (request.to === 'page' && !(await this.readPage(running))) {
-          if (!running.ended && serial === running.blankSerial) await this.showBlank(running);
+          if (!running.ended && serial === running.blankSerial) await this.showSameSlide(running);
           return;
         }
         // A key or a move that came while Q was asking wins: the code never shows after the slide came back.
         if (running.ended || serial !== running.blankSerial) return;
         running.blank = request.to;
-        await this.showBlank(running);
+        await this.showSameSlide(running);
         return;
       }
+      case 'present/spot':
+        // A new spotlight (or none) is never a filled wall.
+        running.focus = { spot: request.item, fill: null };
+        await this.showSameSlide(running);
+        return;
+      case 'present/fill':
+        running.focus = { ...running.focus, fill: request.item };
+        await this.showSameSlide(running);
+        return;
       case 'present/peek': {
         running.session.read(running.origin.document.getText());
         const slide = running.session.slideNumbered(request.number);
@@ -452,6 +466,8 @@ export class DeckPresenter implements vscode.Disposable {
         // A move (a button, the row, the grid) brings the slide back too, on the slide it moves to.
         running.blank = null;
         running.blankSerial++;
+        // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
+        running.focus = NO_FOCUS;
         running.session.move(running.origin.document.getText(), moveOf(request));
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
         // wall and then in the presenter view.
@@ -492,23 +508,31 @@ export class DeckPresenter implements vscode.Disposable {
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
     const presenter = { available: this.presenterAvailable(running), on: !!running.presenter };
-    const state = wallStateOf(view, look, assets, presenter, running.blank, running.page);
+    // An item's place names an item of the slide the wall has: when this draw brings the slide in another form (an edit
+    // since, drawn now by a reload, the presenter view turned on or off), the spotlight and a filled wall go, rather
+    // than land on another item (review of #790).
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus);
+    if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
+      running.focus = NO_FOCUS;
+      state = { ...state, spot: null, fill: null };
+    }
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
   }
 
   /**
-   * Blanking is not a move: the wall gets the slide it last got, blank or not, so an edit made since still waits for the
-   * next move (and a key that brings the slide back never looks like a step).
+   * Blanking, the spotlight and a filled wall are not moves: the wall gets the slide it last got, so an edit made since
+   * still waits for the next move (a key that brings the slide back never looks like a step), and an item's place names
+   * the same item on the wall and in the presenter view's Now.
    */
-  private async showBlank(running: Running): Promise<void> {
+  private async showSameSlide(running: Running): Promise<void> {
     const onWall = running.wallState;
     if (!onWall) {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page };
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -537,6 +561,7 @@ export class DeckPresenter implements vscode.Disposable {
       length: lengthMinutesOf(frontMatterValue(running.origin.document.getText(), 'ritemark-length')),
       startedAt: running.startedAt,
       blank: running.blank,
+      focus: running.focus,
       clock: running.clock,
       page: running.page,
     }, onWall?.slide));
@@ -558,7 +583,7 @@ export class DeckPresenter implements vscode.Disposable {
       running.page = page;
       if (!page && running.blank === 'page') running.blank = null;
       // Before the wall's first state, that state carries it.
-      if (running.wallState) await this.showBlank(running);
+      if (running.wallState) await this.showSameSlide(running);
     }
     return page;
   }

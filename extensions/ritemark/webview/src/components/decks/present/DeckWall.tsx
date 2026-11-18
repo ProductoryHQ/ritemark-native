@@ -21,6 +21,12 @@
  *  - Small details item 3: for a published deck, Q (or the presenter view's "Show the page") shows the page's QR code
  *    and its short address on the theme's ground (`PageCode`), the same way: any key or a click brings the slide back
  *    without a step. An unpublished deck's Q does nothing.
+ *  - The spotlight (decks README item 16): a click acts on what it hits (`spotClickOf`). A click on an item spotlights
+ *    it and the rest of the slide dims (`useSpotlight`); a click on the spotlit item or outside any item clears it; with
+ *    no spotlight a click outside any item goes on, as before. F, Tab, Shift+Tab and Esc (`spotKeyOf`).
+ *  - A click on a spotlit picture (a picture alone on its slide: the first click) fills the wall with it, whole, on
+ *    the theme's ground (item 11). Any key or click
+ *    returns to the slide, and does nothing else (`fillKeyOf`).
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
@@ -36,7 +42,8 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
-import { blankKeyOf, blankNow, countLabel, goToKey, settleAsked, wallBleed, wallKeyOf, wallSlideSize, type WallBlank } from './wallKeys'
+import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
+import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
 import './wall.css'
 
@@ -53,6 +60,9 @@ const GRID_THUMB_MAX = 300
 const GRID_GAP = 28
 
 type Move = 'present/next' | 'present/back' | 'present/first' | 'present/last' | 'present/stop'
+
+/** The wall's slide now, in its frame (not the one fading out). */
+const SLIDE_NOW = '.wall-slide:not(.is-leaving)'
 
 function useScreenSize(): { width: number; height: number } {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
@@ -88,6 +98,14 @@ export function DeckWall() {
   const askedBlank = useRef<{ to: WallBlank | null } | null>(null)
   // The colour the wall last blanked to, kept while the blank fades out.
   const lastBlank = useRef<WallBlank>('ground')
+  // Items 11 and 16: the spotlight and the filled wall this window last asked for, until the host's state carries them.
+  const focus = useFocusAsks()
+  const frameRef = useRef<HTMLDivElement | null>(null)
+  // The picture filling the wall (its address in the slide on the wall), kept while it fades out.
+  const [fillUrl, setFillUrl] = useState<string | null>(null)
+  const fillShown = useRef(false)
+  fillShown.current = fillUrl !== null
+  const lastFillUrl = useRef<string | null>(null)
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
   const bleed = wallBleed(frame, CANVAS_WIDTH)
@@ -105,6 +123,8 @@ export function DeckWall() {
       const next = message as unknown as WallState
       askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       const previous = stateRef.current
+      // Another slide has no spotlight: an ask made on the one before is let go.
+      focus.settle(next, !previous || previous.slide.number === next.slide.number)
       if (previous && previous.slide.number !== next.slide.number) {
         const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
         const from = Number.isFinite(shown) ? shown : 1
@@ -131,12 +151,37 @@ export function DeckWall() {
     return () => window.clearTimeout(timer)
   }, [leaving])
 
-  const send = useCallback((type: Move) => sendToExtension(type), [])
+  // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
+  const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
+  const send = useCallback((type: Move) => {
+    letGo()
+    sendToExtension(type)
+  }, [letGo])
   const askBlank = useCallback((to: WallBlank | null) => {
     askedBlank.current = { to }
     sendToExtension('present/blank', { to })
   }, [])
-  const goTo = useCallback((number: number) => sendToExtension('present/go', { number }), [])
+  const askSpot = useCallback((item: number | null) => askSpotWith(item, sendToExtension), [askSpotWith])
+  const askFill = useCallback((item: number | null) => askFillWith(item, sendToExtension), [askFillWith])
+  const goTo = useCallback((number: number) => {
+    letGo()
+    sendToExtension('present/go', { number })
+  }, [letGo])
+  const actOnClick = useCallback((click: SpotClick) => {
+    if (!click) return
+    if (click.type === 'spot') askSpot(click.item)
+    else if (click.type === 'clear') askSpot(null)
+    else if (click.type === 'fill') askFill(click.item)
+    else send('present/next')
+  }, [askSpot, askFill, send])
+
+  // ---- the spotlight on the slide now, and the picture that fills the wall (read from the slide as it is drawn)
+  useSpotlight(frameRef, SLIDE_NOW, state?.spot ?? null)
+  const fill = state?.fill ?? null
+  const fillSlide = state?.slide.number
+  useLayoutEffect(() => {
+    setFillUrl(fillUrlIn(frameRef.current?.querySelector(SLIDE_NOW) ?? null, fill))
+  }, [fill, fillSlide, serial])
 
   // ---- the bar: shown when the pointer moves, faded 2 s after it stops (not while the pointer is on it)
   const showBar = useCallback(() => {
@@ -174,6 +219,15 @@ export function DeckWall() {
       // A blank wall: any key brings the slide back and does nothing else; B, "." or W blanks it. The grid, open over a
       // blank wall, keeps its own keys (Esc closes it, Return goes to the slide, which brings the slide back).
       if (event.repeat && heldKey.current === event.key) { take(); return }
+      // A picture fills the wall (item 11): any key returns to the slide and does nothing else (not while it is blank:
+      // that key brings the slide back first).
+      if (!gridOpen && !blankNow(current.blank, askedBlank.current) && fillKeyOf(event, fillNow(current.fill, fillShown.current))) {
+        take()
+        heldKey.current = event.key
+        if (digits !== null) { setDigits(null); setPeeked(null) }
+        askFill(null)
+        return
+      }
       const blankStep = gridOpen ? null : blankKeyOf(event, blankNow(current.blank, askedBlank.current), current.page !== null)
       if (blankStep) {
         take()
@@ -212,6 +266,13 @@ export function DeckWall() {
         return
       }
       if (digits !== null) { setDigits(null); setPeeked(null) }
+      // The spotlight (item 16): F, Tab and Shift+Tab, and Esc while one is on. → and a clicker go on, which clears it.
+      const spotStep = spotKeyOf(event, spotNow(current.spot), spotItems(frameRef.current?.querySelector(SLIDE_NOW) ?? null).length)
+      if (spotStep) {
+        take()
+        askSpot(spotStep.type === 'spot' ? spotStep.item : null)
+        return
+      }
       const key = wallKeyOf(event)
       if (!key || key.type === 'digit') return
       take()
@@ -225,15 +286,21 @@ export function DeckWall() {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [digits, gridOpen, gridPick, goTo, send, askBlank, screen.width])
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width])
 
-  // A click on the slide goes on (not on the bar, the box or the grid); on a blank wall it only brings the slide back.
+  // A click acts on what it hits (not on the bar, the box or the grid): an item spotlights, the spotlit picture fills
+  // the wall, outside any item it clears the spotlight or, with none, goes on. On a blank or filled wall it only
+  // brings the slide back.
   const onWallClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('.wall-bar, .wall-goto, .wall-grid')) return
     if (event.button !== 0) return
-    if (stateRef.current && blankNow(stateRef.current.blank, askedBlank.current)) askBlank(null)
-    else send('present/next')
-  }, [send, askBlank])
+    const current = stateRef.current
+    if (!current) return
+    if (blankNow(current.blank, askedBlank.current)) { askBlank(null); return }
+    if (fillNow(current.fill, fillShown.current) !== null) { askFill(null); return }
+    const hit = spotHit(frameRef.current?.querySelector(SLIDE_NOW) ?? null, event.clientX, event.clientY)
+    actOnClick(spotClickOf(hit, spotNow(current.spot), 'next'))
+  }, [askBlank, askFill, actOnClick, spotNow, fillNow])
 
   // Small details 14: the shown slides' sections, for an Agenda on the wall (its progress from the slide's own place).
   const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
@@ -247,6 +314,8 @@ export function DeckWall() {
   if (blank) lastBlank.current = blank
   const blankShown = blank ?? lastBlank.current
   const blankColour = blankShown === 'white' ? '#FFFFFF' : ground
+  if (fillUrl) lastFillUrl.current = fillUrl
+  const filledUrl = fillUrl ?? lastFillUrl.current
 
   const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
     <div
@@ -269,13 +338,19 @@ export function DeckWall() {
       onClick={onWallClick}
     >
       <div
-        className="wall-frame"
+        ref={frameRef}
+        className="wall-frame deck-spot"
         style={{ left: frame.left, top: frame.top, width: frame.width, height: frame.height, '--wall-bleed-x': `${bleed.x}px`, '--wall-bleed-y': `${bleed.y}px` } as CSSProperties}
         aria-live="polite"
-        aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
+        aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
         {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
+      </div>
+
+      {/* Item 11: the picture whole and uncropped on the theme's ground, over the whole screen, under the blank. */}
+      <div className={`wall-fill${fillUrl ? ' is-shown' : ''}`} style={{ background: ground }} aria-hidden="true">
+        {filledUrl ? <img src={filledUrl} alt="" draggable={false} /> : null}
       </div>
 
       {/* The blank: the theme's ground (the wall's own, white on Borderless) or white, over the whole screen; for Q, the
