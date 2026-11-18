@@ -1,0 +1,57 @@
+[
+ {
+  "at": 0,
+  "what": "before, on slide 1",
+  "slide": "Slide 1 of 4: The harbour",
+  "running": 0,
+  "runningAt": [],
+  "ghost": false,
+  "leaving": false,
+  "hiddenOnSlide": 0
+ },
+ {
+  "at": 106,
+  "what": "100 ms into the smooth move to slide 2",
+  "slide": "Slide 2 of 4: The harbour",
+  "running": 4,
+  "runningAt": [
+   102,
+   102,
+   102,
+   102
+  ],
+  "ghost": true,
+  "leaving": true,
+  "hiddenOnSlide": 4
+ },
+ {
+  "at": 107,
+  "what": "right after the press (same task)",
+  "slide": "Slide 2 of 4: The harbour",
+  "running": 0,
+  "runningAt": [],
+  "ghost": false,
+  "leaving": true,
+  "hiddenOnSlide": 0
+ },
+ {
+  "at": 110,
+  "what": "slide 3 arrives from the host: its own step starts",
+  "slide": "Slide 3 of 4: Today",
+  "running": 0,
+  "runningAt": [],
+  "ghost": false,
+  "leaving": true,
+  "hiddenOnSlide": 0
+ },
+ {
+  "at": 612,
+  "what": "500 ms later: settled",
+  "slide": "Slide 3 of 4: Today",
+  "running": 0,
+  "runningAt": [],
+  "ghost": false,
+  "leaving": false,
+  "hiddenOnSlide": 0
+ }
+]

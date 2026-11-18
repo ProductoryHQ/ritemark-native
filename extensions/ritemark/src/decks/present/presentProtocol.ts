@@ -13,6 +13,7 @@ import { slidePicturePaths } from '../blocks/slideRenderer';
 import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
+import { transitionOf, type DeckTransition } from './deckTransition';
 
 /** The webview panel that is the wall. */
 export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
@@ -83,6 +84,11 @@ export interface WallState {
   /** Items 11 and 16: the spotlit item and the picture filling the wall (`WallFocus`). */
   spot: number | null;
   fill: number | null;
+  /**
+   * README item 19: how the wall goes from one slide to the next (`transition:` in the deck's front matter, Fade without
+   * it). Only the wall moves: the presenter view's state has none.
+   */
+  transition: DeckTransition;
 }
 
 /**
@@ -210,7 +216,7 @@ export function wallPicturePaths(view: PresentView): string[] {
 /** The wall's state after a move. */
 export function wallStateOf(
   view: PresentView,
-  look: { borderless: boolean; theme: DeckTheme },
+  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition },
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
@@ -233,6 +239,7 @@ export function wallStateOf(
     page: address,
     spot: itemOf(focus.spot),
     fill: itemOf(focus.fill),
+    transition: transitionOf(look.transition),
   };
 }
 
