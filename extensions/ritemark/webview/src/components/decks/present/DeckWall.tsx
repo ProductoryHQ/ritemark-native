@@ -53,7 +53,8 @@ import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spot
 import { directionOf, MOTION_MS, MotionRun, stepOf, transitionOf, type MotionDirection } from './wallMotion'
 import { motionPairsOf, playStep, prefersReducedMotion } from './playMotion'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
-import { dotPlace, pointerKeyStep, pointOnSlide, timerLook, timerNextTick } from './pointerTimer'
+import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
+import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './wall.css'
 
@@ -121,15 +122,18 @@ export function DeckWall() {
   fillShown.current = fillUrl !== null
   const lastFillUrl = useRef<string | null>(null)
   // Item 12: L held in this window, the pointer's place on the slide (this window's own), and the presenter view's dot.
-  const [pointing, setPointing] = useState(false)
+  const [pointing, setPointingState] = useState(false)
+  // The one place `pointing` is known between renders (the key and pointer handlers read it); set only by setPointing.
   const pointingRef = useRef(false)
-  pointingRef.current = pointing
   const [ownDot, setOwnDot] = useState<WallPoint | null>(null)
   const [relayedDot, setRelayedDot] = useState<WallPoint | null>(null)
   const lastPointer = useRef<{ x: number; y: number } | null>(null)
   const lastDot = useRef<WallPoint | null>(null)
   const screen = useScreenSize()
   const frame = wallSlideSize(screen.width, screen.height)
+  // The handlers read the frame from here, so a resize never takes the window's key listeners down and up again.
+  const boxRef = useRef(frame)
+  boxRef.current = frame
   const bleed = wallBleed(frame, CANVAS_WIDTH)
 
   // The ground, worked out once per theme and look (the wall draws again at every pointer move).
@@ -246,6 +250,18 @@ export function DeckWall() {
     barTimer.current = window.setTimeout(() => setBarShown(false), BAR_MS)
   }, [])
   useEffect(() => () => { if (barTimer.current !== null) window.clearTimeout(barTimer.current) }, [])
+
+  // Item 12: L held here. While it is, the bar goes (it would sit beside the dot) and the pointer hides with it.
+  const setPointing = useCallback((on: boolean) => {
+    if (pointingRef.current === on) return
+    pointingRef.current = on
+    setPointingState(on)
+    if (on) {
+      if (barTimer.current !== null) window.clearTimeout(barTimer.current)
+      barTimer.current = null
+      setBarShown(false)
+    }
+  }, [])
   const barVisible = barShown || overBar
 
   // ---- the go-to box: the host names the slide; a pause closes it
@@ -329,7 +345,7 @@ export function DeckWall() {
         if (!pointingRef.current) {
           setPointing(true)
           const at = lastPointer.current
-          setOwnDot(at ? pointOnSlide(frame, at.x, at.y, true) : null)
+          setOwnDot(at ? pointOnSlide(boxRef.current, at.x, at.y, true) : null)
         }
         return
       }
@@ -364,17 +380,17 @@ export function DeckWall() {
       window.removeEventListener('keyup', onKeyUp, true)
       window.removeEventListener('blur', onBlur)
     }
-  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width, frame.left, frame.top, frame.width, frame.height])
+  }, [digits, gridOpen, gridPick, goTo, send, askBlank, askSpot, askFill, spotNow, fillNow, screen.width, setPointing])
 
   // Item 12: the pointer's place, always kept, so L shows the dot at once; while L is held the bar stays away.
   const onWallPointerMove = useCallback((event: { clientX: number; clientY: number }) => {
     lastPointer.current = { x: event.clientX, y: event.clientY }
     if (pointingRef.current) {
-      setOwnDot(pointOnSlide(frame, event.clientX, event.clientY, true))
+      setOwnDot(pointOnSlide(boxRef.current, event.clientX, event.clientY, true))
       return
     }
     showBar()
-  }, [frame.left, frame.top, frame.width, frame.height, showBar])
+  }, [showBar])
 
   // A click acts on what it hits (not on the bar, the box or the grid): an item spotlights, the spotlit picture fills
   // the wall, outside any item it clears the spotlight or, with none, goes on. On a blank or filled wall it only
@@ -519,14 +535,7 @@ export function DeckWall() {
  * stays and pulses three times, not with reduced motion.
  */
 function WallCountdown({ timer, frame }: { timer: WallTimer; frame: { left: number; top: number; width: number; height: number } }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const wait = timerNextTick(timer, now)
-    if (wait <= 0) return
-    const id = window.setTimeout(() => setNow(Date.now()), wait)
-    return () => window.clearTimeout(id)
-  }, [timer, now])
-  const look = timerLook(timer, now, prefersReducedMotion())
+  const look = timerLook(timer, useTimerNow(timer), prefersReducedMotion())
   return (
     <div
       className={`wall-timer${look.done ? ' is-done' : ''}${look.pulse ? ' is-pulsing' : ''}`}

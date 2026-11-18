@@ -362,6 +362,22 @@ async function main(): Promise<void> {
     assert.equal(last(wall, 'present/pointer').at, null, 'a place off the slide, or from the wall itself, is not relayed');
     assert.equal(wall.posted.filter(message => message.type === 'present/wall').length, wallStatesBeforeDot, 'the dot is no state');
     assert.equal(document.text, textBeforeTimer, 'the dot writes nothing to the file');
+    // The presenter view's page loaded again (Swap displays) while L was held: the wall's dot goes.
+    presenterView.send({ type: 'present/pointer', at: { x: 0.5, y: 0.5 } });
+    await settle();
+    presenterView.send({ type: 'present/ready' });
+    await settle();
+    assert.equal(last(wall, 'present/pointer').at, null, 'a reloaded presenter view holds no dot');
+    // The presenter view turned off while a timer runs: the timer goes too, since only that view can stop it.
+    presenterView.send({ type: 'present/timer', minutes: 10 });
+    await settle();
+    assert.equal((last(wall, 'present/wall').timer as { minutes: number }).minutes, 10);
+    wall.send({ type: 'present/presenter' });
+    await settle();
+    assert.equal(last(wall, 'present/wall').timer, null, 'no timer left on the wall without the view that stops it');
+    // On again, as the person last chose (the next start opens it too).
+    wall.send({ type: 'present/presenter' });
+    await settle(50);
 
     presenter.dispose();
     await settle();

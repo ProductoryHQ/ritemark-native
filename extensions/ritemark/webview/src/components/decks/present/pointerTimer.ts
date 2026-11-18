@@ -17,6 +17,7 @@
  */
 import type { WallPoint, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { blockStepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { exerciseTagOf, isBlockSlide } from '../../../../../src/decks/deckFormat'
 import type { KeyInput } from './wallKeys'
 
 // ---- Item 12: the pointer dot
@@ -118,8 +119,8 @@ export interface TimerSlide {
  * v1 Exercise read as it is counts too.
  */
 export function stepsLabelOf(slide: TimerSlide): string | null {
-  if (slide.kind === 'exercise') return typeof slide.data.tag === 'string' ? slide.data.tag : 'Exercise'
-  if (slide.kind !== '' || typeof slide.data.markdown !== 'string') return null
+  if (slide.kind === 'exercise') return exerciseTagOf(slide.data)
+  if (!isBlockSlide(slide.kind) || typeof slide.data.markdown !== 'string') return null
   return blockStepsTagOf(slide.data.markdown)
 }
 

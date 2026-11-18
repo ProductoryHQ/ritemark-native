@@ -337,7 +337,9 @@ export class DeckPresenter implements vscode.Disposable {
         if (screen === running.wall) void this.end(running);
         else if (running.presenter === screen) {
           running.presenter = null;
-          // A dot the presenter view was showing goes with it (item 12).
+          // A dot the presenter view was showing goes with it (item 12), and so does the timer (item 9): only the
+          // presenter view can stop it, so it never stays on the wall with nothing to stop it.
+          running.timer = null;
           void post(running.wall.panel.webview, { type: 'present/pointer', at: null } satisfies WallPointer);
           void this.showWall(running);
         }
@@ -426,7 +428,11 @@ export class DeckPresenter implements vscode.Disposable {
         screen.loads++;
         for (const resolve of screen.loaded.splice(0)) resolve();
         if (screen === running.wall) await this.showWall(running);
-        else await this.showPresenter(running);
+        else {
+          // The presenter view's page loaded again (Swap displays): an L it held is gone, and so is its dot.
+          await post(running.wall.panel.webview, { type: 'present/pointer', at: null } satisfies WallPointer);
+          await this.showPresenter(running);
+        }
         return;
       case 'present/stop':
         this.stop();

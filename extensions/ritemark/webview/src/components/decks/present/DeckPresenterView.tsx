@@ -38,7 +38,8 @@ import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, clockText, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
-import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerNextTick, timerOfferOf, TIMER_MINUTES } from './pointerTimer'
+import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerOfferOf, TIMER_MINUTES } from './pointerTimer'
+import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './presenter.css'
 
@@ -69,15 +70,8 @@ function useScreenSize(): { width: number; height: number } {
  * the same minutes, and Stop.
  */
 function PresenterTimer({ timer, onRestart, onStop }: { timer: WallTimer; onRestart: () => void; onStop: () => void }) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const wait = timerNextTick(timer, now)
-    if (wait <= 0) return
-    const id = window.setTimeout(() => setNow(Date.now()), wait)
-    return () => window.clearTimeout(id)
-  }, [timer, now])
   // Here the words are enough: nothing pulses in the presenter view.
-  const look = timerLook(timer, now, true)
+  const look = timerLook(timer, useTimerNow(timer), true)
   return (
     <div className="pv-timer is-running">
       <span className="pv-label">{`Timer · ${timer.minutes} min, on the wall`}</span>
@@ -144,8 +138,10 @@ export function DeckPresenterView() {
   fillShown.current = fillUrl !== null
   // Item 12: L held here, the pointer's place on Now's slide, and the place last sent to the wall (once a frame).
   const [pointing, setPointing] = useState(false)
+  // The one place `pointing` is known between renders; set only by setPointer.
   const pointingRef = useRef(false)
-  pointingRef.current = pointing
+  // The pointer's last place in this window, so L held before the pointer moves still finds it over Now.
+  const lastClient = useRef<{ x: number; y: number } | null>(null)
   const [nowDot, setNowDot] = useState<WallPoint | null>(null)
   const overNow = useRef<WallPoint | null>(null)
   const sentDot = useRef<WallPoint | null>(null)
@@ -199,8 +195,19 @@ export function DeckPresenterView() {
     if (pointingRef.current === on) return
     pointingRef.current = on
     setPointing(on)
+    if (on) {
+      // Where the pointer is now, over Now's slide as it is drawn now (a step may have drawn another since it moved).
+      const rect = nowRef.current?.querySelector<HTMLElement>(NOW_SLIDE)?.getBoundingClientRect()
+      const at = lastClient.current
+      overNow.current = rect && at ? pointOnSlide(rect, at.x, at.y) : null
+    }
     sendDot(on ? overNow.current : null)
   }, [sendDot])
+  useEffect(() => {
+    const track = (event: PointerEvent) => { lastClient.current = { x: event.clientX, y: event.clientY } }
+    window.addEventListener('pointermove', track, true)
+    return () => window.removeEventListener('pointermove', track, true)
+  }, [])
   const onNowPointer = useCallback((event: { clientX: number; clientY: number }) => {
     const rect = nowRef.current?.querySelector<HTMLElement>(NOW_SLIDE)?.getBoundingClientRect()
     overNow.current = rect ? pointOnSlide(rect, event.clientX, event.clientY) : null

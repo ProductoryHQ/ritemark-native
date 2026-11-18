@@ -71,7 +71,7 @@
 /* Decks README item 12: the pointer dot, a soft accent dot about 14 px wide, over the slide, a spotlight, the blank and
    the filled wall, under the bar. Its place never animates (no trail); it fades in and out in 0.12 s, at once with
    reduced motion. */
-.wall-dot { position: absolute; z-index: 4; left: -40px; top: -40px; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+.wall-dot { position: absolute; z-index: 2; left: -40px; top: -40px; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
   background: var(--wall-accent, #F2B544); box-shadow: 0 0 6px 2px color-mix(in srgb, var(--wall-accent, #F2B544) 55%, transparent), 0 0 0 1px rgba(255, 255, 255, 0.35);
   opacity: 0; pointer-events: none; transition: opacity 0.12s ease; }
 .wall-dot.is-shown { opacity: 0.95; }

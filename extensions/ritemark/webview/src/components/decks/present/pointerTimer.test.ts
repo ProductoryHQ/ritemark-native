@@ -79,6 +79,8 @@ assert.equal(stepsLabelOf(steps('::: steps')), 'Exercise', 'a Steps block withou
 assert.equal(stepsLabelOf(steps('::: {.steps tag="Harjutus · 20 minutit"}')), 'Harjutus · 20 minutit')
 assert.equal(stepsLabelOf({ kind: '', data: { markdown: '# Points\n\n- One\n- Two\n' } }), null, 'no Steps block, no timer')
 assert.equal(stepsLabelOf({ kind: 'exercise', data: { tag: 'Pair work · 15 min' } }), 'Pair work · 15 min', 'a v1 Exercise read as it is')
+assert.equal(stepsLabelOf({ kind: 'exercise', data: { tag: '  ' } }), '', 'a pill of spaces is no pill (exerciseTagOf)')
+assert.equal(stepsLabelOf({ kind: 'exercise', data: {} }), 'Exercise')
 assert.equal(timerOfferOf({ kind: '', data: { markdown: '# Points\n\n- One 20 min\n' } }), null)
 assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Exercise · 20 min"}')), { minutes: 20 }, 'English label')
 assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Harjutus · 20 minutit"}')), { minutes: 20 }, 'Estonian label')
