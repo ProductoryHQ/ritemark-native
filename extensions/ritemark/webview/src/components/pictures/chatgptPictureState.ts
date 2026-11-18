@@ -6,7 +6,17 @@
 export type PictureMode = 'new' | 'change'
 
 /** The place a picture is made for: a picture in an editor's words (followed through edits), or a slide's side. */
-export type PicturePlaceRef = { kind: 'flow'; pos: number; /** The picture's path there now, as written. */ path?: string } | { kind: 'side' }
+export type PicturePlaceRef =
+  | {
+    kind: 'flow'
+    pos: number
+    /** The picture's path there now, as written. */
+    path?: string
+    /** Which of the words' pictures with that path, in their order: how the place is found again when its editor went. */
+    nth?: number
+  }
+  /** The slide's own beside or behind; `path`: the picture there when its editor went ('' an empty place). */
+  | { kind: 'side'; path?: string }
 
 export interface PictureAsk {
   place: PicturePlaceRef
@@ -26,7 +36,8 @@ export type MakerPhase =
   | { phase: 'checking'; ask: PictureAsk }
   | { phase: 'asking'; ask: PictureAsk }
   | { phase: 'making'; ask: PictureAsk; description: string; requestId: string }
-  | { phase: 'done'; ask: PictureAsk; description: string }
+  /** `undo`: the strip's Undo for a picture that came while its editor was gone (`picturesAway.ts`). */
+  | { phase: 'done'; ask: PictureAsk; description: string; undo?: () => void }
   | { phase: 'failed'; ask: PictureAsk; description: string; problem: string }
   | { phase: 'sign-in'; ask: PictureAsk }
 
@@ -88,8 +99,9 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   }
   if (current.phase !== 'making' || message.requestId !== current.requestId) return undefined
   if (message.state === 'made' && typeof message.path === 'string' && typeof message.url === 'string') {
-    // The place now holds the made picture: it is followed by that picture's path.
-    const place = current.ask.place.kind === 'flow' ? { ...current.ask.place, path: message.path } : current.ask.place
+    // The place now holds the made picture: it is followed by that picture's path (a slide's side too, so Try another
+    // replaces the made one).
+    const place = current.ask.place.kind === 'flow' || current.ask.place.path !== undefined ? { ...current.ask.place, path: message.path } : current.ask.place
     return { phase: 'done', ask: { ...current.ask, place }, description: current.description }
   }
   if (message.state === 'sign-in') return { phase: 'sign-in', ask: current.ask }
@@ -99,6 +111,14 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
   return { phase: 'idle' }
 }
 
+/**
+ * Where a made picture goes: the place as it was asked for, with the path of the picture standing there (the editor
+ * checks it is still that picture), not the done state's place, which already follows the made picture's path.
+ */
+export function placeOfMade(current: MakerPhase, next: MakerPhase): PicturePlaceRef {
+  if (current.phase === 'making') return current.ask.place
+  return next.phase === 'idle' ? { kind: 'side' } : next.ask.place
+}
 
 /** What `followPicture` reads of a ProseMirror document and mapping. */
 export interface PictureDoc { content: { size: number }; nodeAt: (pos: number) => { type: { name: string }; attrs?: Record<string, unknown> } | null | undefined }
