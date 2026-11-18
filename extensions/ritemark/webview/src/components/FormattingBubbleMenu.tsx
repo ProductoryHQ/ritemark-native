@@ -3,6 +3,7 @@ import { BubbleMenu, type Editor as TipTapEditor } from '@tiptap/react'
 import { useState, useEffect, useRef } from 'react'
 import { Icon } from './ui/Icon'
 import * as Dialog from '@radix-ui/react-dialog'
+import { DialogDescription } from './ui/dialog'
 import { Button } from '@/components/ui/button'
 import { modKey } from '@/hooks/usePlatform'
 import { openExternalUrl, openInternalLink } from '../bridge'
@@ -554,6 +555,7 @@ export function FormattingBubbleMenu({
             <Dialog.Title className="text-lg font-semibold mb-4">
               {editingLink ? 'Edit Link' : 'Add Link'}
             </Dialog.Title>
+            <DialogDescription className="sr-only">The link's address: a web page, or a file in the project.</DialogDescription>
             <div className="space-y-4">
               <div>
                 <div className="flex gap-2">

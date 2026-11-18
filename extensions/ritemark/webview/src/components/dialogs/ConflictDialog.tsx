@@ -6,6 +6,7 @@ import {
   DialogBody,
   DialogFooter,
   DialogTitle,
+  DialogDescription,
   DialogButton,
 } from '../ui/dialog'
 
@@ -39,6 +40,8 @@ export function ConflictDialog({
         </DialogHeader>
 
         <DialogBody>
+          {/* The dialog's words are its description, for a screen reader (Radix's `aria-describedby`) */}
+          <DialogDescription asChild>
           {isDiskConflict ? (
             <div className="text-sm text-[var(--r-ink-muted)] leading-relaxed space-y-3">
               <p className="m-0">You have unsaved edits in Ritemark.</p>
@@ -53,6 +56,7 @@ export function ConflictDialog({
               <p className="m-0">Refreshing will discard them.</p>
             </div>
           )}
+          </DialogDescription>
         </DialogBody>
 
         <DialogFooter>

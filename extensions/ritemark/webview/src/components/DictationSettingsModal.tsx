@@ -11,6 +11,7 @@ import {
   DialogBody,
   DialogFooter,
   DialogTitle,
+  DialogDescription,
   DialogButton,
 } from './ui/dialog'
 
@@ -146,6 +147,7 @@ export function DictationSettingsModal({ isOpen, onClose, mode = 'live' }: Dicta
       <DialogContent>
         <DialogHeader icon={<Icon name="gear" size={20} />} onClose={onClose}>
           <DialogTitle>Dictation Settings</DialogTitle>
+          <DialogDescription className="sr-only">The speech model dictation uses, and how it processes your audio.</DialogDescription>
         </DialogHeader>
 
         <DialogBody>
