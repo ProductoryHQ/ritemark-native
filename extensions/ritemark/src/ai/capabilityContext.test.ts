@@ -176,6 +176,22 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
   }
 });
 
+// ── Sprint 163 PR 5: prompts as code blocks, Tabs, Button and the exercise's layout, for every AI with the deck tools ──
+test('deck guidance teaches prompts, Tabs, Button and the exercise layout', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    for (const needle of [
+      'A prompt to copy goes in a code block with no language', 'Copy and ↗ Open in', 'in square brackets, `[the client\'s name]`',
+      '`::: {.panel-tabset}` with a `## ` heading per tab', '"put these four prompts in tabs" means one Tabs block',
+      'Never put Tabs inside Tabs, a box, a step or a table cell',
+      '`[Open the sample](https://…){.button}`', 'Only a full https address', 'never copy a file into the project',
+      'An exercise slide is one Columns block, with no title above it', '`{.column width="35%"}`', 'holds `# ` the title, then its `::: steps`', 'the material\'s Button right under it',
+    ]) {
+      assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
 // ── 17 November: "this slide", "here" or "siin" is the slide the person is on, for every AI with the deck tools ──
 test('deck guidance says what "this slide" means', () => {
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {

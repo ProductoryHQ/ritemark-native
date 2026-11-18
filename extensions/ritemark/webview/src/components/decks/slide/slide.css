@@ -207,6 +207,13 @@
    (`buttonBlock.buttonHtml`): the strip, the wall, the presenter view and the page. Canvas pixels times the fit. */
 .deck-sl.is-blocks .blk-button { display: flex; align-items: center; gap: calc(16px * var(--fit, 1)); margin: 0 0 .55em; padding: calc(10px * var(--fit, 1)) calc(12px * var(--fit, 1)) calc(10px * var(--fit, 1)) calc(18px * var(--fit, 1));
   border-radius: calc(12px * var(--fit, 1)); background: var(--s-box, rgba(255,255,255,.06)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.12)); box-sizing: border-box; }
+/* A narrow card stacks (the Experience lead, 18 November): narrower than 420 slide units, the words go above the button
+   at the card's full width and the button sits under them, left-aligned, 10 units below; at 420 or wider they sit
+   beside it. The card is its own container (a solo button's fit-content box is not one: it has no width of its own),
+   and the query reads its content box, so 390 is the card's 420 less its 30 of side padding. */
+.deck-sl.is-blocks .blk-button { flex-wrap: wrap; row-gap: calc(10px * var(--fit, 1)); }
+.deck-sl.is-blocks .blk-button:not(.is-solo:not(.is-chosen)) { container: blk-button / inline-size; }
+@container blk-button (width < 390px) { .deck-sl.is-blocks .blk-button > .blk-button-words { flex-basis: 100%; } }
 .deck-sl.is-blocks .blk-button.is-solo:not(.is-chosen) { width: fit-content; max-width: 100%; padding: 0; background: none; box-shadow: none; }
 .deck-sl.is-blocks .blk-button.is-solo:not(.is-chosen) > .blk-button-words { display: none; }
 .deck-sl.is-blocks .blk-button-words { flex: 1; min-width: 0; margin: 0; font-size: calc(14px * var(--fit, 1)); line-height: 1.36; color: var(--s-sub, #C7CAEB); }
@@ -284,6 +291,16 @@
 .deck-sl.is-blocks .blk-boxes[data-look="line"] > .blk-box::before { content: ''; display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
 /* Steps: the pill, then numbered steps in circles (frame 26). */
 .deck-sl.is-blocks .blk-pill { display: inline-block; max-width: 100%; margin: 0 0 .5em; padding: 3px 12px; border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 14px/22px var(--s-fb, 'Sofia Sans'); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+/* Sprint 163 PR 5, an exercise's layout (the decks README: "the left column holds the title as its heading"): a column
+   that opens with its heading and then its Steps draws the pill above the heading, as an Exercise slide has it. The
+   pill leaves the flow for the column's top (its left stays where it stands, the column's own); the column makes room
+   for it: the pill's 28 px and a 10 px gap. A hidden pill (the stage's, emptied) or none takes no room. */
+.deck-sl.is-blocks .blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden])) { position: relative; padding-top: calc(.2em + 38px); }
+.deck-sl.is-blocks .blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute; top: calc(4.8px * var(--fit, 1)); margin: 0; }
+/* The slide's title in such a column, and its steps, at the prototype's sizes (workbook.html: 38 and 18 slide units),
+   so the title, the pill and four steps fit a third of the slide and the tabs keep the rest. */
+.deck-sl.is-blocks .blk-column > h1:first-child:has(+ .blk-steps) { font-size: 1.58em; }
+.deck-sl.is-blocks .blk-column > h1:first-child + .blk-steps { font-size: .75em; }
 .deck-sl.is-blocks .blk-steps ol { list-style: none; padding: 0; counter-reset: blk-step; }
 .deck-sl.is-blocks .blk-steps ol > li { position: relative; counter-increment: blk-step; padding-left: 2.1em; margin-bottom: .55em; font-weight: 600; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks .blk-steps ol > li::before { content: counter(blk-step); position: absolute; left: 0; top: .05em; width: 1.45em; height: 1.45em; border-radius: 50%; display: grid; place-items: center; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font-weight: 700; font-size: .8em; }
