@@ -27,7 +27,8 @@ import { SLIDE_ITEMS } from '../../components/decks/blocks/slideCommands'
 import { blockItems, filterSlashItems } from '../blockItems'
 import { newTabsetMarkdown } from '../../../../src/decks/blocks/tabset'
 import { tabNameOf } from './tabsMarkdown'
-import { addTab, canHoldTabs, columnsToTabs, deleteTab, duplicateTab, flattenTabs, moveTab, renameTab, tabsBlockNode, tabsToColumns } from './tabsCommands'
+import { addTab, canHoldTabs, columnsToTabs, deleteTab, duplicateTab, flattenTabs, hasMisplacedTabs, insertTabsBlock, moveTab, paneSelection, pastedWithoutTabs, renameTab, tabsBlockNode, tabsToColumns } from './tabsCommands'
+import { Slice } from '@tiptap/pm/model'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -309,6 +310,38 @@ test('the / menus find Tabs by its hidden words, in the slide\'s Blocks group an
   // "tab" starts Table's name too, which stands before Tabs in the menu; every longer word is Tabs' alone.
   for (const word of ['tabs', 'tabset', 'sakid', 'sakk', 'vahelehed']) assert.equal(filterSlashItems(SLIDE_ITEMS, word)[0]?.title, 'Tabs')
   assert.equal(SLIDE_ITEMS.find(item => item.title === 'Tabs')?.group, 'Blocks')
+})
+
+test('review: the block menu\'s + puts Tabs between top-level blocks; a pane whose first block is a picture keeps the caret in it', () => {
+  const state = stateOf('# Title\n\nWords')
+  const pending = {}
+  const tr = insertTabsBlock(state.tr, state.doc.child(0).nodeSize, pending)
+  assert.ok(tr.docChanged, 'a Tabs block is put in at a place between blocks')
+  assert.ok(save(state.apply(tr)).includes('::: {.panel-tabset}'))
+  const pictured = stateOf(`${'::: {.panel-tabset}'}\n## A\n\n![](images/a.png)\n\n## B\n\nWords\n:::`)
+  const pos = firstTabs(pictured)
+  const block = pictured.doc.nodeAt(pos)!
+  const selection = paneSelection(pictured.doc, pos, 0)!
+  assert.ok(selection.from > pos && selection.to < pos + 1 + block.child(0).nodeSize, 'the caret stays in the first pane')
+})
+
+test('review: a pasted Tabs block flattened where none may go is a closed slice; a nested one is found', () => {
+  const doc = slideSchema.nodes.doc.create(null, [tabsBlockNode(slideSchema, ['A', 'B'])])
+  const slice = pastedWithoutTabs(slideSchema, new Slice(doc.content, 3, 3))
+  assert.equal(slice.openStart, 0)
+  assert.equal(slice.openEnd, 0)
+  assert.equal(hasMisplacedTabs(doc), false)
+  const nested = slideSchema.nodes.doc.create(null, [tabsBlockNode(slideSchema, ['A', 'B'], [[tabsBlockNode(slideSchema)]])])
+  assert.equal(hasMisplacedTabs(nested), true)
+})
+
+test('review: a sixth-level heading in a sixth-level Tabs block never loops the editor', () => {
+  const markdown = '::: {.panel-tabset}\n###### A\n\nWords\n\n###### B\n:::'
+  const state = EditorState.create({ schema: slideSchema, doc: loadSlide(markdown), plugins: slideSchemaPlugins() })
+  let at = -1
+  state.doc.descendants((node, pos) => { if (at < 0 && node.type.name === 'paragraph') at = pos; return at < 0 })
+  const next = state.applyTransaction(state.tr.setNodeMarkup(at, slideSchema.nodes.heading, { level: 6 }))
+  assert.ok(next.transactions.length < 5)
 })
 
 function slideSchemaPlugins() {

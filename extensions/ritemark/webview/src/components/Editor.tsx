@@ -22,9 +22,8 @@ import { MathBlockWithView, MathEditing, MathInlineWithView } from '../extension
 import { countEquations } from '../extensions/math/mathCount'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import GlobalDragHandle from 'tiptap-extension-global-drag-handle'
-import { Slice } from '@tiptap/pm/model'
 import { tabsWithViews } from '../extensions/tabs/TabsView'
-import { canHoldTabs, flattenTabs, tabPanePlaceholderOf } from '../extensions/tabs/tabsCommands'
+import { canHoldTabs, pastedWithoutTabs, tabPanePlaceholderOf } from '../extensions/tabs/tabsCommands'
 import AutoJoiner from 'tiptap-extension-auto-joiner'
 import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
@@ -242,7 +241,7 @@ export function Editor({
         return false
       },
       // Sprint 163: a Tabs block pasted where none may go (another's pane, a table cell) comes in as its tabs' words.
-      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : new Slice(flattenTabs(view.state.schema, slice.content), slice.openStart, slice.openEnd)),
+      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : pastedWithoutTabs(view.state.schema, slice)),
       handlePaste: (_view, event) => {
         const file = getClipboardImageFile(event.clipboardData)
         if (file && !shouldPreferTextPaste(event.clipboardData)) {

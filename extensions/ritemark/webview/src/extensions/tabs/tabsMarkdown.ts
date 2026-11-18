@@ -18,6 +18,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import type TurndownService from 'turndown'
 import { scanFencedDiv, type FenceScan } from '../../../../src/decks/blocks/fencedDiv'
 import { TAB_LEVEL, TABSET_CLOSE, TABSET_OPEN, tabHeadingOf, tabMarkdown, tabsetOf, tabsetStart } from '../../../../src/decks/blocks/tabset'
+import { OPEN_FENCE, parseFenceAttributes, slideBlockClassOf } from '../../../../src/decks/blocks/fencedDiv'
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -126,7 +127,7 @@ export const TabsBlock = Node.create({
     return ['div', mergeAttributes({ 'data-tabs': '' }, HTMLAttributes), 0]
   },
   addProseMirrorPlugins() {
-    return [tabPaneHeadings()]
+    return [tabPaneHeadings(), noTabsDroppedInside()]
   },
 })
 
@@ -153,6 +154,23 @@ export const TabPane = Node.create({
 })
 
 const tabPaneHeadingsKey = new PluginKey('tabPaneHeadings')
+const noTabsInsideKey = new PluginKey('noTabsDroppedInside')
+
+/**
+ * A Tabs block never goes inside another, a box, Steps or a table cell (README "Adding it"): a drop or a paste that
+ * would put one there is not made (a paste's tabs are flattened before, `pastedWithoutTabs`; a drag has no such step).
+ * A file that holds one already opens as it is.
+ */
+function noTabsDroppedInside(): Plugin {
+  return new Plugin({
+    key: noTabsInsideKey,
+    filterTransaction(tr, state) {
+      const event = tr.getMeta('uiEvent')
+      if (!tr.docChanged || (event !== 'drop' && event !== 'paste')) return true
+      return !hasMisplacedTabs(tr.doc) || hasMisplacedTabs(state.doc)
+    },
+  })
+}
 
 /**
  * A heading at the tabs' own level as a pane's own block would read back as a new tab (a higher one is the pane's, as
@@ -167,9 +185,12 @@ function tabPaneHeadings(): Plugin {
       const heading = state.schema.nodes.heading
       if (!heading) return null
       const tr = state.tr
+      // Blocks only: never into a line's words.
       state.doc.descendants((node, pos) => {
-        if (node.type.name !== 'tabsBlock') return true
+        if (node.type.name !== 'tabsBlock') return !node.isTextblock && !node.isLeaf
         const level = tabsLevelOf(node)
+        // At the sixth level there is none under it: such a heading stays (it reads back as a tab, as written).
+        if (level >= 6) return true
         node.forEach((pane, paneOffset) => {
           pane.forEach((child, childOffset) => {
             if (child.type !== heading || child.attrs.level !== level) return
@@ -181,6 +202,28 @@ function tabPaneHeadings(): Plugin {
       return tr.docChanged ? tr : null
     },
   })
+}
+
+/** A `:::` block's slide class (`box`, `steps`), read from its opening line; null for any other node. */
+function slideDivClass(node: PMNode): string | null {
+  if (node.type.name !== 'slideDiv') return null
+  const open = OPEN_FENCE.exec(String(node.attrs.open ?? ''))
+  const attrs = open ? parseFenceAttributes(open[2]) : null
+  return attrs ? slideBlockClassOf(attrs) : null
+}
+
+/** Is there a Tabs block where none may go (inside another, a box, Steps or a table cell)? */
+export function hasMisplacedTabs(doc: PMNode): boolean {
+  let found = false
+  const walk = (node: PMNode, inside: boolean) => {
+    node.forEach(child => {
+      if (found || child.isTextblock || child.isLeaf) return
+      if (child.type.name === 'tabsBlock' && inside) { found = true; return }
+      walk(child, inside || child.type.name === 'tabPane' || child.type.name === 'tableCell' || child.type.name === 'tableHeader' || ['box', 'boxes', 'steps'].includes(slideDivClass(child) ?? ''))
+    })
+  }
+  walk(doc, false)
+  return found
 }
 
 /** A DOM node (this file's `Node` is TipTap's). */

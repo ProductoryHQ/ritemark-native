@@ -13,12 +13,14 @@
  *  - **Columns ⇄ Tabs** (the type menu): each column becomes a tab, its heading the tab's name and the rest its pane;
  *    each tab a column, its name the column's heading. One step; ⌘Z undoes it.
  */
-import { Fragment, type Node as PMNode, type Schema } from '@tiptap/pm/model'
+import { Fragment, Slice, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { OPEN_FENCE, parseFenceAttributes, slideBlockClassOf } from '../../../../src/decks/blocks/fencedDiv'
 import { PANE_PLACEHOLDER, TAB_LEVEL, TABSET_CLOSE, TABSET_OPEN, newTabName, renamedTabLine, tabHeadingLine } from '../../../../src/decks/blocks/tabset'
-import { tabNameOf, tabsLevelOf } from './tabsMarkdown'
+import { hasMisplacedTabs, tabNameOf, tabsLevelOf } from './tabsMarkdown'
+
+export { hasMisplacedTabs }
 
 /** The slide's own-undo-step meta (`slideCommands.SLIDE_COMMAND`), named here so the Text editor needs no deck code. */
 export const TABS_STEP_META = 'deckSlideCommand'
@@ -68,12 +70,24 @@ export function panePos(block: PMNode, pos: number, index: number): number {
   return at
 }
 
-/** The caret at the start of pane `index`'s first line. */
+/**
+ * The first place in pane `index` of the block at `pos` for the caret: its first line, or its first block when that is
+ * a picture (selected whole). Never a place in another pane: the caret there would open that tab instead.
+ */
+export function paneSelection(doc: PMNode, pos: number, index: number): Selection | null {
+  const block = doc.nodeAt(pos)
+  if (!block || block.type.name !== 'tabsBlock' || !block.childCount) return null
+  const at = Math.max(0, Math.min(index, block.childCount - 1))
+  const start = panePos(block, pos, at)
+  const end = start + block.child(at).nodeSize
+  const found = Selection.findFrom(doc.resolve(start + 1), 1)
+  return found && found.from > start && found.to < end ? found : null
+}
+
+/** The caret at the start of pane `index`. */
 function intoPane(tr: Transaction, pos: number, index: number): Transaction {
-  const block = tr.doc.nodeAt(pos)
-  if (!block || block.type.name !== 'tabsBlock') return tr
-  const start = panePos(block, pos, Math.max(0, Math.min(index, block.childCount - 1)))
-  return tr.setSelection(Selection.findFrom(tr.doc.resolve(start + 1), 1, true) ?? Selection.near(tr.doc.resolve(start + 1)))
+  const selection = paneSelection(tr.doc, pos, index)
+  return selection ? tr.setSelection(selection) : tr
 }
 
 /** The innermost Tabs block holding a change's selection (a block just put in), by its place; null outside one. */
@@ -129,6 +143,11 @@ export function insertTabsBlock(tr: Transaction, at: number, view: EditorView | 
       placed = $pos.before()
       tr.replaceWith(placed, $pos.after(), node)
     }
+  }
+  // A place between the top level's blocks (the block menu's +).
+  if (placed < 0 && $pos.depth === 0 && tr.doc.canReplaceWith($pos.index(0), $pos.index(0), node.type)) {
+    placed = $pos.pos
+    tr.insert(placed, node)
   }
   for (let depth = $pos.depth - 1; placed < 0 && depth >= 0; depth--) {
     const index = $pos.index(depth) + 1
@@ -320,6 +339,16 @@ export function tabsToColumns(state: EditorState, pos: number): Transaction | nu
  * as a line of its own over them, so nothing pasted is lost and no tab stands inside another.
  */
 export function flattenTabs(schema: Schema, content: Fragment): Fragment {
+  return flattenTabsIn(schema, content)
+}
+
+/** A pasted slice where no Tabs block may go: flattened, and closed at both ends when that changed its depth. */
+export function pastedWithoutTabs(schema: Schema, slice: Slice): Slice {
+  const content = flattenTabsIn(schema, slice.content)
+  return content === slice.content ? slice : new Slice(content, 0, 0)
+}
+
+function flattenTabsIn(schema: Schema, content: Fragment): Fragment {
   const out: PMNode[] = []
   let changed = false
   content.forEach(node => {
@@ -333,7 +362,7 @@ export function flattenTabs(schema: Schema, content: Fragment): Fragment {
       return
     }
     if (node.isLeaf || node.isTextblock) { out.push(node); return }
-    const inner = flattenTabs(schema, node.content)
+    const inner = flattenTabsIn(schema, node.content)
     if (inner !== node.content) { changed = true; out.push(node.copy(inner)) } else out.push(node)
   })
   return changed ? Fragment.from(out) : content

@@ -304,7 +304,9 @@
 .deck-sl.is-blocks .blk-tabpane pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 .deck-sl.is-blocks .blk-tabpane h3 { font-size: 1.15em; }
 .deck-sl.is-blocks .blk-tabname { display: none; }
-/* The chosen pane: the first by default, the presenter's choice in Present, the person's on the stage (up to 24 tabs). */
+/* The chosen pane: the first by default, the presenter's choice in Present, the person's on the stage. The renderer and
+   the stage mark it `is-active`; the numbered rules draw it before the stage's mark is on (a first paint). */
+.deck-sl.is-blocks .blk-tabs > .blk-tabpanes > .blk-tabpane.is-active,
 .deck-sl.is-blocks .blk-tabs:not([data-active]) > .blk-tabpanes > .blk-tabpane:first-child,
 .deck-sl.is-blocks .blk-tabs[data-active="0"] > .blk-tabpanes > .blk-tabpane:nth-child(1), .deck-sl.is-blocks .blk-tabs[data-active="1"] > .blk-tabpanes > .blk-tabpane:nth-child(2),
 .deck-sl.is-blocks .blk-tabs[data-active="2"] > .blk-tabpanes > .blk-tabpane:nth-child(3), .deck-sl.is-blocks .blk-tabs[data-active="3"] > .blk-tabpanes > .blk-tabpane:nth-child(4),

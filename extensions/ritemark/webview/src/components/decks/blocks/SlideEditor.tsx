@@ -28,7 +28,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { EditorContent, useEditor, type Editor as TipTapEditor } from '@tiptap/react'
 import { Extension, createNodeFromContent, getHTMLFromFragment, type Editor as CoreEditor } from '@tiptap/core'
-import { Slice, type Schema } from '@tiptap/pm/model'
+import type { Schema } from '@tiptap/pm/model'
 import Placeholder from '@tiptap/extension-placeholder'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
@@ -61,7 +61,7 @@ import { PILL_PLACEHOLDER, SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, l
 import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
-import { canHoldTabs, flattenTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
+import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
 import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -370,7 +370,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
       // Sprint 163: a Tabs block pasted where none may go (another's pane, a box, Steps, a table cell) comes in as its
       // tabs' words, each under its name.
-      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : new Slice(flattenTabs(view.state.schema, slice.content), slice.openStart, slice.openEnd)),
+      transformPasted: (slice, view) => (canHoldTabs(view.state) ? slice : pastedWithoutTabs(view.state.schema, slice)),
       // The slide never scrolls (the lead on #769: at the fit's floor the caret at the bottom scrolled the slide's words up
       // and cut its title at the top): it may overflow at the bottom only. See also the flow's scroll reset below.
       handleScrollToSelection: () => true,

@@ -17,7 +17,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as Rea
 import { createRoot, type Root } from 'react-dom/client'
 import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { Selection, type Transaction } from '@tiptap/pm/state'
+import type { Transaction } from '@tiptap/pm/state'
 import type { EditorView, NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { Button } from '../../components/ui/button'
 import { Tooltip } from '../../components/ui/tooltip'
@@ -25,7 +25,7 @@ import { Icon, type PhosphorIconName } from '../../components/ui/Icon'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../../components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { TabPane, TabsBlock, tabNameOf } from './tabsMarkdown'
-import { addTab, deleteTab, duplicateTab, moveTab, panePos, renameTab, setPendingRename, takePendingRename } from './tabsCommands'
+import { addTab, deleteTab, duplicateTab, moveTab, paneSelection, renameTab, setPendingRename, takePendingRename } from './tabsCommands'
 
 export type TabsVariant = 'slide' | 'text'
 
@@ -345,6 +345,7 @@ class TabsNodeView implements NodeView {
     const count = this.node.childCount
     if (this.active >= count) this.active = Math.max(0, count - 1)
     this.dom.setAttribute('data-active', String(this.active))
+    this.markPanes()
     this.root.render(
       <TabBand
         names={this.names()}
@@ -362,14 +363,24 @@ class TabsNodeView implements NodeView {
     )
   }
 
-  /** The caret at the start of pane `index`, the editor focused when asked. */
+  /** The caret at the start of pane `index` (never in another pane), the editor focused when asked. */
   private intoPane(index: number, focus: boolean) {
     const pos = this.pos()
     if (pos === null) return
-    const start = panePos(this.node, pos, index)
-    const selection = Selection.findFrom(this.view.state.doc.resolve(start + 1), 1, true)
+    const selection = paneSelection(this.view.state.doc, pos, index)
     if (selection) this.view.dispatch(this.view.state.tr.setSelection(selection))
     if (focus) this.view.focus()
+  }
+
+  /**
+   * The open pane marked `is-active` (as the renderer marks it), past the CSS's numbered rules: ProseMirror draws the
+   * panes, so the mark is put on after it has (a pane drawn again loses it).
+   */
+  private markPanes() {
+    queueMicrotask(() => {
+      if (this.destroyed) return
+      Array.from(this.contentDOM.children).forEach((pane, index) => pane.classList.toggle('is-active', index === this.active))
+    })
   }
 
   private pick = (index: number) => {
@@ -497,9 +508,4 @@ export function tabsWithViews(variant: TabsVariant) {
       },
     }),
   ]
-}
-
-/** A new Tabs block was put in: its first tab's name is chosen for typing (README "Adding it"). */
-export function nameNewTabs(view: EditorView, pos: number): void {
-  setPendingRename(view, pos, 0)
 }

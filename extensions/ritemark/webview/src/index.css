@@ -1181,6 +1181,7 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 .blk-tabs.is-text .blk-tabpane > :first-child { margin-top: 0; }
 .blk-tabs.is-text .blk-tabpane > :last-child { margin-bottom: 0; }
 .blk-tabs.is-text .blk-tabpane > p.is-empty:only-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--r-ink-faint); }
+.blk-tabs.is-text > .blk-tabpanes > .blk-tabpane.is-active,
 .blk-tabs.is-text:not([data-active]) > .blk-tabpanes > .blk-tabpane:first-child,
 .blk-tabs.is-text[data-active="0"] > .blk-tabpanes > .blk-tabpane:nth-child(1), .blk-tabs.is-text[data-active="1"] > .blk-tabpanes > .blk-tabpane:nth-child(2),
 .blk-tabs.is-text[data-active="2"] > .blk-tabpanes > .blk-tabpane:nth-child(3), .blk-tabs.is-text[data-active="3"] > .blk-tabpanes > .blk-tabpane:nth-child(4),
