@@ -11,7 +11,8 @@
  * wall is blank or a picture fills it, L brings the slide back, as any key does, and does nothing else.
  *
  * Item 9, the timer. On a slide with a Steps block the presenter view offers a Timer of 5, 10, 15, 20 or 30 min; a
- * number in the Steps label or on the slide picks the default ("20 min", "20 minutes", "20 minutit"). Start shows a
+ * number in the Steps label or on the slide picks the default ("20 min", "20 minutes", "20 minutit"). A number the row
+ * doesn't have joins it as its own choice, in order (25: 5 · 10 · 15 · 20 · 25 · 30), since the person meant it. Start shows a
  * quiet mm:ss countdown at the wall's bottom right, in the accent, across slides until stopped. At 0:00 it pulses gently
  * three times, with no sound; with reduced motion it doesn't pulse (`timerLook`).
  */
@@ -98,13 +99,14 @@ export function minutesIn(text: string): number | null {
   return minutes >= 1 ? minutes : null
 }
 
-/** The offered minutes nearest to `minutes` (a tie goes to the longer: an exercise rarely ends early). */
-export function nearestTimerMinutes(minutes: number): number {
-  let best: number = TIMER_MINUTES[0]
-  for (const offered of TIMER_MINUTES) {
-    if (Math.abs(offered - minutes) <= Math.abs(best - minutes)) best = offered
-  }
-  return best
+/** The longest time a slide may name for its timer; a larger number is taken for no time (the default then). */
+export const TIMER_MAX_NAMED = 90
+
+/** The row of minutes for a slide that names `named`: the offered ones, and the named one in its place when it isn't. */
+export function timerChoicesOf(named: number | null): number[] {
+  const choices: number[] = [...TIMER_MINUTES]
+  if (named !== null && !choices.includes(named)) choices.push(named)
+  return choices.sort((a, b) => a - b)
 }
 
 /** A slide as the presenter view gets it (`WallSlide`): a block slide's Markdown, or a v1 slide's words. */
@@ -137,14 +139,16 @@ function slideWords(slide: TimerSlide): string {
 }
 
 /**
- * The timer a slide offers: null without a Steps block; else its default minutes, from the Steps label first, then
- * the slide's words, snapped to the offered ones; else 10.
+ * The timer a slide offers: null without a Steps block; else its minutes, from the Steps label first, then the slide's
+ * words, as written (a number the row doesn't have joins it, in order: the Experience lead, 18 November); a number over
+ * 90, or none, gives 10. `choices` is the row the presenter view shows, the default among them.
  */
-export function timerOfferOf(slide: TimerSlide): { minutes: number } | null {
+export function timerOfferOf(slide: TimerSlide): { minutes: number; choices: number[] } | null {
   const label = stepsLabelOf(slide)
   if (label === null) return null
-  const named = minutesIn(label) ?? minutesIn(slideWords(slide))
-  return { minutes: named === null ? TIMER_DEFAULT : nearestTimerMinutes(named) }
+  const found = minutesIn(label) ?? minutesIn(slideWords(slide))
+  const named = found !== null && found <= TIMER_MAX_NAMED ? found : null
+  return { minutes: named ?? TIMER_DEFAULT, choices: timerChoicesOf(named) }
 }
 
 /** The time left as mm:ss, counted up to the next whole second, so it starts at "20:00" and ends at "00:00". */

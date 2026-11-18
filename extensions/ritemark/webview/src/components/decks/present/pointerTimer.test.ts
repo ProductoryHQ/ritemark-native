@@ -3,7 +3,7 @@
  * Run with `npx tsx webview/src/components/decks/present/pointerTimer.test.ts`.
  */
 import { strict as assert } from 'node:assert'
-import { dotPlace, isPointerKey, minutesIn, nearestTimerMinutes, pointerKeyStep, pointOnSlide, samePoint, stepsLabelOf, TIMER_DEFAULT, TIMER_MINUTES, TIMER_PULSE_MS, TIMER_PULSES, timerLook, timerNextTick, timerOfferOf, timerText } from './pointerTimer'
+import { dotPlace, isPointerKey, minutesIn, pointerKeyStep, pointOnSlide, samePoint, stepsLabelOf, TIMER_DEFAULT, TIMER_MINUTES, TIMER_PULSE_MS, TIMER_PULSES, timerChoicesOf, timerLook, timerNextTick, timerOfferOf, timerText } from './pointerTimer'
 import { blankKeyOf, fillKeyOf, spotKeyOf, wallKeyOf } from './wallKeys'
 
 // ---- Item 12: L down and up
@@ -67,12 +67,12 @@ assert.equal(minutesIn('3 steps, 20 people'), null, 'a number that is no time')
 assert.equal(minutesIn('20 minds'), null)
 assert.equal(minutesIn('1.5 min'), null, 'not a whole number of minutes')
 assert.equal(minutesIn('0 min'), null)
-assert.equal(nearestTimerMinutes(20), 20)
-assert.equal(nearestTimerMinutes(12), 10)
-assert.equal(nearestTimerMinutes(25), 30, 'a tie goes to the longer')
-assert.equal(nearestTimerMinutes(45), 30)
-assert.equal(nearestTimerMinutes(2), 5)
 assert.deepEqual([...TIMER_MINUTES], [5, 10, 15, 20, 30])
+assert.deepEqual(timerChoicesOf(null), [5, 10, 15, 20, 30])
+assert.deepEqual(timerChoicesOf(20), [5, 10, 15, 20, 30], 'an offered number adds nothing')
+assert.deepEqual(timerChoicesOf(25), [5, 10, 15, 20, 25, 30], 'another joins the row, in order')
+assert.deepEqual(timerChoicesOf(2), [2, 5, 10, 15, 20, 30])
+assert.deepEqual(timerChoicesOf(45), [5, 10, 15, 20, 30, 45])
 
 const steps = (open: string, body = '1. Write a prompt\n2. Try it\n3. Compare') => ({ kind: '', data: { markdown: `# Try it\n\n${open}\n${body}\n:::\n` } })
 assert.equal(stepsLabelOf(steps('::: steps')), 'Exercise', 'a Steps block without a label has the default pill')
@@ -82,13 +82,18 @@ assert.equal(stepsLabelOf({ kind: 'exercise', data: { tag: 'Pair work · 15 min'
 assert.equal(stepsLabelOf({ kind: 'exercise', data: { tag: '  ' } }), '', 'a pill of spaces is no pill (exerciseTagOf)')
 assert.equal(stepsLabelOf({ kind: 'exercise', data: {} }), 'Exercise')
 assert.equal(timerOfferOf({ kind: '', data: { markdown: '# Points\n\n- One 20 min\n' } }), null)
-assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Exercise · 20 min"}')), { minutes: 20 }, 'English label')
-assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Harjutus · 20 minutit"}')), { minutes: 20 }, 'Estonian label')
-assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Exercise · 15 minutes"}')), { minutes: 15 })
-assert.deepEqual(timerOfferOf(steps('::: steps', '1. Read the brief (5 minutes)\n2. Write for 30 minutes')), { minutes: 5 }, 'the slide’s first time, when the label names none')
-assert.deepEqual(timerOfferOf(steps('::: {.steps tag="10 min"}', '1. Work for 30 minutes')), { minutes: 10 }, 'the label wins over the slide')
-assert.deepEqual(timerOfferOf(steps('::: steps')), { minutes: TIMER_DEFAULT }, 'no time named: 10 min')
-assert.deepEqual(timerOfferOf(steps('::: {.steps tag="25 min"}')), { minutes: 30 }, 'snapped to the offered')
+const row = [5, 10, 15, 20, 30]
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Exercise · 20 min"}')), { minutes: 20, choices: row }, 'English label')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Harjutus · 20 minutit"}')), { minutes: 20, choices: row }, 'Estonian label')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Exercise · 15 minutes"}')), { minutes: 15, choices: row })
+assert.deepEqual(timerOfferOf(steps('::: steps', '1. Read the brief (5 minutes)\n2. Write for 30 minutes')), { minutes: 5, choices: row }, 'the slide’s first time, when the label names none')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="10 min"}', '1. Work for 30 minutes')), { minutes: 10, choices: row }, 'the label wins over the slide')
+assert.deepEqual(timerOfferOf(steps('::: steps')), { minutes: TIMER_DEFAULT, choices: row }, 'no time named: 10 min')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="25 min"}')), { minutes: 25, choices: [5, 10, 15, 20, 25, 30] }, '25 means 25: it joins the row, picked')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="Harjutus · 25 minutit"}')), { minutes: 25, choices: [5, 10, 15, 20, 25, 30] }, 'in Estonian too')
+assert.deepEqual(timerOfferOf(steps('::: steps', '1. Work for 45 minutes')), { minutes: 45, choices: [5, 10, 15, 20, 30, 45] })
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="90 min"}')), { minutes: 90, choices: [5, 10, 15, 20, 30, 90] }, '90 is the longest taken')
+assert.deepEqual(timerOfferOf(steps('::: {.steps tag="120 min"}')), { minutes: TIMER_DEFAULT, choices: row }, 'over 90 is ignored: 10 min')
 
 // ---- Item 9: the countdown, with a fake clock
 const start = 1_000_000

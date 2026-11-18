@@ -446,7 +446,7 @@ export function DeckPresenterView() {
                 aria-label="The exercise’s minutes"
                 value={String(timerMinutes)}
                 onValueChange={value => setPicked({ slide: state.current.number, minutes: Number(value) })}
-                options={TIMER_MINUTES.map(minutes => ({ value: String(minutes), label: String(minutes) }))}
+                options={offer.choices.map(minutes => ({ value: String(minutes), label: String(minutes) }))}
               />
               <span className="pv-timer-unit">min</span>
               <span className="pv-grow" />
