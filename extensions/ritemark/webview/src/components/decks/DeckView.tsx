@@ -37,6 +37,8 @@ import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
 import { ThemeMenu, themePickedNotice } from './ThemeMenu'
+import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from './TransitionPreview'
+import { transitionOf, transitionValue } from './present/wallMotion'
 import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
 import type { ThemeChangeView } from '../../../../src/decks/themeChange'
 import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
@@ -346,6 +348,27 @@ export function DeckView({
     if (look === 'borderless') next.look = 'borderless'
     else delete next.look
     onPropertiesChange(next)
+  }, [editor, onPropertiesChange])
+
+  // README item 19: the deck's transition on the wall, chosen in the Theme menu. Fade writes nothing; any other writes
+  // `transition: <it>`, as one step of the deck's Undo (the same property step as the look). Choosing one plays it once
+  // on the stage (`TransitionPreview`).
+  const transition = transitionOf(properties.transition)
+  const [transitionPreview, setTransitionPreview] = useState<TransitionPreviewRequest | null>(null)
+  const setTransition = useCallback((value: string) => {
+    const chosen = transitionOf(value)
+    const before = propertyValue(propertiesRef.current, 'transition')
+    const after = transitionValue(chosen)
+    if (!sameValue(before, after)) {
+      if (editor && !editor.isDestroyed) editor.view.dispatch(propertyTransaction(editor.state, 'transition', before, after))
+      else {
+        const next: DocumentProperties = { ...propertiesRef.current }
+        if (after.present) next.transition = after.value
+        else delete next.transition
+        onPropertiesChange(next)
+      }
+    }
+    setTransitionPreview(previous => ({ serial: (previous?.serial ?? 0) + 1, transition: chosen }))
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
@@ -1760,7 +1783,7 @@ export function DeckView({
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
         {/* Sprint 162 (frame 12): the deck's one look control, on the right before Saved. */}
-        <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} onPick={pickTheme} newTheme={newTheme} />
+        <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} transition={transition} onTransition={setTransition} onPick={pickTheme} newTheme={newTheme} />
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
         ) : (
@@ -1851,6 +1874,19 @@ export function DeckView({
                   onSlideSettings={stageSettings}
                   splitRequest={splitRequest}
                   picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
+                />
+              ) : null}
+              {slide && bigWidth > 0 ? (
+                <TransitionPreview
+                  request={transitionPreview}
+                  target={() => stageRef.current?.querySelector<HTMLElement>('.deck-big') ?? null}
+                  from={slide}
+                  to={previewTarget(slides, shown)?.to ?? null}
+                  direction={previewTarget(slides, shown)?.direction ?? 'next'}
+                  width={bigWidth}
+                  theme={theme}
+                  borderless={borderless}
+                  assets={assets}
                 />
               ) : null}
             </div>
