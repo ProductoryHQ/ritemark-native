@@ -13,6 +13,10 @@
  * The host makes the picture and saves it into `images/` (`src/pictures/chatgptPictureHost.ts`). Where the picture goes
  * is each editor's: `beforeMake` readies the place (a slide's replace target, the deck's slide id) and `placeMade`
  * puts a made picture in a document. Only ChatGPT is named, because Claude doesn't make pictures.
+ *
+ * Only Cancel and a closed editor stop a request. A slide left while its picture is made lets the request go on
+ * (`away`, `picturesAway.ts`): it lands on that slide in the deck, and the strip is back when the slide is. A place gone
+ * (the picture deleted or replaced meanwhile) places nothing; the made picture stays in `images/`.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -25,6 +29,7 @@ import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
 import { doneWords, followPicture, madeDescription, makeMessage, pictureKey, phaseAfterStatus, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
+import { PicturesAway, type AwayLanding } from './picturesAway'
 
 export type { MakerPhase, PictureAsk, PictureMode, PicturePlaceRef } from './chatgptPictureState'
 
@@ -35,8 +40,13 @@ export interface PictureMakerOptions {
   rectOf: (place: PicturePlaceRef) => DOMRect | null
   /** Before each request: ready the place; `slideId` in a deck. Null: the place is gone, nothing is asked. */
   beforeMake: (ask: PictureAsk) => { slideId?: string } | null
-  /** A made picture into its place, in a document (a deck places it as a saved picture). */
-  placeMade?: (place: PicturePlaceRef, picture: { path: string; url: string }, describe: Describe) => void
+  /** A made picture into its place, in a document (a deck places it as a saved picture). False: the place is gone. */
+  placeMade?: (place: PicturePlaceRef, picture: { path: string; url: string }, describe: Describe) => boolean | void
+  /**
+   * A deck's slide: a request still being made when the slide goes (another slide shown) goes on without it, and its
+   * picture lands on this slide in the deck. Absent: the request stops with its editor.
+   */
+  away?: PictureAwayOptions
   /** Undo on the strip: the editor's own undo. */
   undo: () => void
   /** A request ended with no picture (Cancel, a failure, sign-in, the place gone): what `beforeMake` readied is let go. */
@@ -48,6 +58,37 @@ export interface PictureMakerOptions {
  * person wrote their own (`madeDescription`).
  */
 export type Describe = (currentAlt: string, currentPath: string | null) => string
+
+export interface PictureAwayOptions {
+  /** The editor's own, kept across its going and coming back: a slide's id. */
+  key: string
+  /** The request's place as it can be found with the editor gone, or null when it can't (the request stops then). */
+  leave: (place: PicturePlaceRef) => PicturePlaceRef | null
+  /** The made picture into that place, in the document, or null when it is gone (nothing is written then). */
+  land: (place: PicturePlaceRef, picture: { path: string; url: string }, describe: Describe) => AwayLanding | null
+  /** The place in this editor now (it came back), or null when it isn't in its words. */
+  find: (place: PicturePlaceRef) => PicturePlaceRef | null
+}
+
+// The words each picture ChatGPT made was made with, by its path, for the whole webview: a change knows the
+// description is still ChatGPT's, on whichever slide or editor the picture was made.
+const madeWith = new Map<string, string>()
+
+/** The made picture's description, from the words `asked`; the words are kept by the made picture's path. */
+function describing(asked: string): Describe {
+  return (currentAlt, currentPath) => madeDescription(currentAlt, asked, currentPath ? madeWith.get(pictureKey(currentPath)) : undefined)
+}
+
+// Requests let go by their editors: answered here until their editor is back (`picturesAway.ts`).
+let awayRequests: PicturesAway | null = null
+function picturesAway(): PicturesAway {
+  if (!awayRequests) {
+    const away = new PicturesAway()
+    onMessage(message => { if (message.type === 'picture/status') away.status(message as Record<string, unknown>) })
+    awayRequests = away
+  }
+  return awayRequests
+}
 
 let serial = 0
 const newRequestId = () => `picture-${Date.now().toString(36)}-${(serial += 1)}`
@@ -77,11 +118,9 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const path = current.ask.place.path
       const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos, path ? attrs => sameRelativeImagePath(imagePathOf(attrs) ?? '', path) : undefined)
       if (pos === null) {
-        // The picture went: a request still running is stopped, and nothing stays anchored on nothing.
-        if (current.phase === 'making') {
-          sendToExtension('picture/cancel', { requestId: current.requestId })
-          latest.current.onSettled?.(current.ask)
-        }
+        // The picture went: nothing stays anchored on nothing. A request still running goes on, and its picture, never
+        // placed, stays in images/ (the person's words aren't lost because a place was).
+        if (current.phase === 'making') latest.current.onSettled?.(current.ask)
         setState({ phase: 'idle' })
         return
       }
@@ -90,9 +129,6 @@ export function usePictureMaker(options: PictureMakerOptions) {
     editor.on('transaction', follow)
     return () => { editor.off('transaction', follow) }
   }, [options.editor])
-
-  // The words each picture this editor made was made with, by its path (Change knows ChatGPT's own description).
-  const madeWith = useRef(new Map<string, string>())
 
   // The host's answers for this editor's request.
   const asked = useRef<string | null>(null)
@@ -106,25 +142,54 @@ export function usePictureMaker(options: PictureMakerOptions) {
     if (next.phase === 'done' && typeof status.path === 'string' && typeof status.url === 'string') {
       // The words a picture was made with, by its path: a later change knows the description is still ChatGPT's.
       const asked = current.phase === 'making' ? current.description : ''
-      const madePath = status.path
-      latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url }, (currentAlt, currentPath) =>
-        madeDescription(currentAlt, asked, currentPath ? madeWith.current.get(pictureKey(currentPath)) : undefined))
-      madeWith.current.set(pictureKey(madePath), asked)
+      const placed = latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url }, describing(asked))
+      if (placed === false) {
+        // The place went (the picture replaced by hand meanwhile): nothing is placed; the picture stays in images/.
+        setState({ phase: 'idle' })
+        return
+      }
+      madeWith.set(pictureKey(status.path), asked)
     } else if (current.phase === 'making') {
       latest.current.onSettled?.(current.ask)
     }
     setState(next)
   }), [])
 
-  // An editor that goes while its picture is made (a slide left for another): its place goes with it, so the request
-  // stops and nothing is placed where the person no longer looks.
+  // An editor that goes while its picture is made. A slide left for another (`away`): the request goes on, its picture
+  // lands on that slide in the deck, and the slide shows the strip again when it is back. Any other editor: the
+  // request stops with it.
   useEffect(() => () => {
     const current = stateRef.current
-    if (current.phase === 'making') {
-      sendToExtension('picture/cancel', { requestId: current.requestId })
-      latest.current.onSettled?.(current.ask)
+    if (current.phase !== 'making') return
+    const away = latest.current.away
+    const place = away?.leave(current.ask.place) ?? null
+    if (away && place) {
+      const asked = current.description
+      picturesAway().hand({
+        requestId: current.requestId,
+        key: away.key,
+        ask: { ...current.ask, place },
+        description: asked,
+        land: picture => {
+          const landing = away.land(place, picture, describing(asked))
+          if (landing) madeWith.set(pictureKey(picture.path), asked)
+          return landing
+        },
+      })
+      return
     }
+    sendToExtension('picture/cancel', { requestId: current.requestId })
+    latest.current.onSettled?.(current.ask)
   }, [])
+
+  // Back on a slide whose picture was being made: its strip as if the person had stayed (making, or done with Undo).
+  const awayKey = options.away?.key
+  useEffect(() => {
+    const away = latest.current.away
+    if (!options.editor || !away || stateRef.current.phase !== 'idle') return
+    const resumed = picturesAway().take(away.key, place => latest.current.away?.find(place) ?? null)
+    if (resumed) setState(resumed)
+  }, [options.editor, awayKey])
 
   /** Make a new picture… or Change this picture…: ChatGPT's readiness first (its sign-in card when it isn't). */
   const start = useCallback((ask: PictureAsk) => {
@@ -167,8 +232,11 @@ export function usePictureMaker(options: PictureMakerOptions) {
   }, [make])
 
   const undo = useCallback(() => {
+    const current = stateRef.current
     setState({ phase: 'idle' })
-    latest.current.undo()
+    // A picture that came while the slide was away has its own Undo (other edits may have come after it).
+    if (current.phase === 'done' && current.undo) current.undo()
+    else latest.current.undo()
   }, [])
 
   const close = useCallback(() => setState({ phase: 'idle' }), [])

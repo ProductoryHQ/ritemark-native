@@ -6,7 +6,17 @@
 export type PictureMode = 'new' | 'change'
 
 /** The place a picture is made for: a picture in an editor's words (followed through edits), or a slide's side. */
-export type PicturePlaceRef = { kind: 'flow'; pos: number; /** The picture's path there now, as written. */ path?: string } | { kind: 'side' }
+export type PicturePlaceRef =
+  | {
+    kind: 'flow'
+    pos: number
+    /** The picture's path there now, as written. */
+    path?: string
+    /** Which of the words' pictures with that path, in their order: how the place is found again when its editor went. */
+    nth?: number
+  }
+  /** The slide's own beside or behind; `path`: the picture there when its editor went ('' an empty place). */
+  | { kind: 'side'; path?: string }
 
 export interface PictureAsk {
   place: PicturePlaceRef
@@ -26,7 +36,8 @@ export type MakerPhase =
   | { phase: 'checking'; ask: PictureAsk }
   | { phase: 'asking'; ask: PictureAsk }
   | { phase: 'making'; ask: PictureAsk; description: string; requestId: string }
-  | { phase: 'done'; ask: PictureAsk; description: string }
+  /** `undo`: the strip's Undo for a picture that came while its editor was gone (`picturesAway.ts`). */
+  | { phase: 'done'; ask: PictureAsk; description: string; undo?: () => void }
   | { phase: 'failed'; ask: PictureAsk; description: string; problem: string }
   | { phase: 'sign-in'; ask: PictureAsk }
 
