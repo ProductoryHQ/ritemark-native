@@ -11,7 +11,7 @@ import type {
   ThinkingEffortCapability,
 } from './thinkingEffort';
 import type { RuntimeFailureKind } from './runtimeErrorPresentation';
-import type { DynamicToolDefinition } from '../codex/codexProtocol';
+import type { DynamicToolDefinition, MadePicture } from '../codex/codexProtocol';
 import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 
 export type { AgentId };
@@ -184,6 +184,13 @@ export interface RuntimeSessionConfig {
      * (Codex: completed `fileChange` items; OpenCode: completed `edit` tool calls).
      */
     filesModified?: string[];
+    /**
+     * Pictures with ChatGPT (experience 49): the pictures the turn's own image tool made (Codex's `image_gen`), each the
+     * file the runtime saved it to or its bytes. Never a file the turn wrote some other way.
+     */
+    picturesMade?: MadePicture[];
+    /** Why the image tool made no picture, when it said (`usageLimitExceeded`, …). */
+    pictureFailure?: string;
   }) => void;
   /** Codex approval policy (passed to threadStart) */
   codexApprovalPolicy?: string;

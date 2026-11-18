@@ -69,8 +69,10 @@ import { isMac } from '../../../hooks/usePlatform'
 import { TableHandles, tableHandlesEnabled, tableMenuTargetAt } from '../../../extensions/tables/TableHandles'
 import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
-import { PictureTools } from '../../pictures/PictureTools'
-import { chosenPicture, chosenPictureUnder, leavePicture, replacePicture as pictureReplaced } from '../../../extensions/pictures/pictureCommands'
+import { PictureTools, stageBounds } from '../../pictures/PictureTools'
+import { PictureMakerView, usePictureMaker, type PicturePlaceRef } from '../../pictures/ChatgptPicture'
+import { chosenPicture, chosenPictureUnder, leavePicture, replacePictureKeepingCaret } from '../../../extensions/pictures/pictureCommands'
+import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
@@ -828,7 +830,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     if (replacing !== null && old?.type.name === 'image') {
       // A / menu picture still on its way keeps its place (review of #771). Experience 49: its size and words stay, a
       // crop made for the old picture's shape goes.
-      apply(pictureReplaced(editor.state, replacing, { src: picture.url, title: picture.path }))
+      apply(replacePictureKeepingCaret(editor.state, replacing, { src: picture.url, title: picture.path }))
       return
     }
     const at = Math.min(pictureAt.current ?? editor.state.doc.content.size, editor.state.doc.content.size)
@@ -921,6 +923,62 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     setSideChosen(true)
   }
 
+  // Pictures with ChatGPT (experience 46 and 49): Make a new picture… and Change this picture…, for a picture in the
+  // words or the slide's own beside or behind. The host saves the made picture; this editor puts it in the place the
+  // request was for, followed through edits (never through the shared paste and / menu channels), as one undo step on
+  // the deck: ⌘Z brings the old picture back.
+  const pictureRect = useCallback((place: PicturePlaceRef): DOMRect | null => {
+    if (place.kind === 'side') return frameRef.current?.querySelector('.photo')?.getBoundingClientRect() ?? null
+    if (!editor || editor.isDestroyed) return null
+    const dom = editor.view.nodeDOM(place.pos) as HTMLElement | null
+    return dom?.isConnected ? dom.getBoundingClientRect() : null
+  }, [editor])
+  const pictureMaker = usePictureMaker({
+    editor,
+    rectOf: pictureRect,
+    // The slide's id marks the request as a deck's (its pictures are written `images/…`).
+    beforeMake: ask => {
+      const slideId = slideRef.current.data.id || 'slide'
+      if (ask.place.kind === 'side') return { slideId }
+      if (!editor || editor.isDestroyed || editor.state.doc.nodeAt(ask.place.pos)?.type.name !== 'image') return null
+      return { slideId }
+    },
+    placeMade: (place, made, describe) => {
+      if (place.kind === 'side') {
+        // The side keeps its place; its focus point starts fresh, and its description is the words asked unless the
+        // person wrote their own (#800).
+        const alt = describe(header.alt ?? '', header.image?.trim() || null)
+        writeSlide(null, { image: made.path, alt: alt || undefined, focus: undefined })
+        return
+      }
+      if (!editor || editor.isDestroyed) return
+      const old = editor.state.doc.nodeAt(place.pos)
+      const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
+      apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))
+    },
+    undo: () => { if (!outerRef.current.isDestroyed) outerRef.current.commands.undo() },
+  })
+  /** The slide's title and words, for ChatGPT: the title starts the field and names the file; the words are context. */
+  const slideWords = (): { title: string; words: string } => {
+    if (!editor || editor.isDestroyed) return { title: '', words: '' }
+    const range = titleRange(editor.state.doc)
+    const title = range ? editor.state.doc.textBetween(range.from, range.to, ' ').trim() : ''
+    return { title, words: editor.getText({ blockSeparator: '\n' }).trim().slice(0, 4000) }
+  }
+  const startPictureMaker = (place: PicturePlaceRef, mode: 'new' | 'change', source: string | null) => {
+    const { title, words } = slideWords()
+    pictureMaker.start({
+      place: place.kind === 'flow' && source ? { ...place, path: source } : place,
+      mode,
+      suggestion: mode === 'new' ? title : '',
+      ...(words ? { words } : {}),
+      ...(title ? { name: title } : {}),
+      ...(mode === 'change' && source ? { source } : {}),
+    })
+  }
+  const makerOnSide = pictureMaker.state.phase !== 'idle' && pictureMaker.state.ask.place.kind === 'side'
+  const makerInWords = pictureMaker.state.phase !== 'idle' && pictureMaker.state.ask.place.kind === 'flow'
+
   const side = sidePictureOf(header)
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
@@ -971,6 +1029,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
                   if (editor && !editor.isDestroyed) startSlideComment(editor, { kind: 'slide' })
                 }}
                 onReplace={() => choosePicture(false)}
+                onChatgpt={mode => startPictureMaker({ kind: 'side' }, mode, header.image?.trim() || null)}
+                chatgptCanChange={isRelativeImagePath(header.image?.trim() ?? '')}
+                barHidden={makerOnSide}
                 onReveal={() => { if (header.image?.trim()) sendToExtension('revealImage', { relativePath: header.image.trim() }) }}
                 onRemove={() => writeSlide(null, EMPTY_SIDE)}
                 onFocus={focus => writeSlide(null, { focus })}
@@ -1084,6 +1145,19 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         choosePicture(true, true)
       }}
       onPlace={placeFlowPicture}
+      onChatgpt={(pos, mode) => {
+        const node = editor?.state.doc.nodeAt(pos)
+        startPictureMaker({ kind: 'flow', pos }, mode, node ? imagePathOf(node.attrs) : null)
+      }}
+      chatgptCanChange={pos => isRelativeImagePath((editor && imagePathOf(editor.state.doc.nodeAt(pos)?.attrs ?? {})) ?? '')}
+      barHidden={makerInWords}
+    />
+    {/* Pictures with ChatGPT: the field, the pulse and the strip on the picture's place. */}
+    <PictureMakerView
+      maker={pictureMaker}
+      rectOf={pictureRect}
+      insideOf={place => place.kind === 'side'}
+      boundsOf={() => (frameRef.current ? stageBounds(frameRef.current) : undefined)}
     />
     {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
     <PillField

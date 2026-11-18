@@ -545,3 +545,56 @@ export function changedFilesOfCodexItem(item: unknown): string[] {
   }
   return files;
 }
+
+// ============================================================================
+// Pictures with ChatGPT: a completed image generation (app-server v2 `ThreadItem::ImageGeneration`)
+// ============================================================================
+
+/**
+ * The picture Codex's built-in image tool (`image_gen`, on the ChatGPT plan) made, as the bundled app-server (0.160)
+ * names the item's fields: `{ type: 'imageGeneration', id, status, revisedPrompt, result, savedPath, failure, ... }`.
+ * The tool saves the picture under `$CODEX_HOME/generated_images/` itself, and `savedPath` names that file. Read from
+ * the binary's own serde names, since the item only comes with a signed-in ChatGPT account.
+ */
+export interface ImageGenerationThreadItem {
+  type: 'imageGeneration';
+  id: string;
+  status?: string;
+  revisedPrompt?: string | null;
+  /** The picture itself, base64, when the app-server sends it. */
+  result?: string | null;
+  savedPath?: string | null;
+  failure?: unknown;
+}
+
+/** A picture a turn made: the file Codex saved it to, or its bytes (base64) when only those came. */
+export interface MadePicture {
+  savedPath?: string;
+  base64?: string;
+}
+
+/**
+ * The picture a completed item made: an `imageGeneration` that finished with a saved file or its bytes. A failed one
+ * (a usage limit, a refusal) or anything else made none.
+ */
+export function madePictureOfCodexItem(item: unknown): MadePicture | null {
+  if (!item || typeof item !== 'object') return null;
+  const candidate = item as Partial<ImageGenerationThreadItem>;
+  if (candidate.type !== 'imageGeneration') return null;
+  if (candidate.failure || (typeof candidate.status === 'string' && /fail|error|cancel|declin/i.test(candidate.status))) return null;
+  const savedPath = typeof candidate.savedPath === 'string' && candidate.savedPath.trim() ? candidate.savedPath : undefined;
+  const base64 = typeof candidate.result === 'string' && candidate.result.trim() ? candidate.result : undefined;
+  if (!savedPath && !base64) return null;
+  return { ...(savedPath ? { savedPath } : {}), ...(base64 ? { base64 } : {}) };
+}
+
+/** Why an image generation made no picture, as Codex names it (`usageLimitExceeded`, …), or null. */
+export function pictureFailureOfCodexItem(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  const candidate = item as Partial<ImageGenerationThreadItem>;
+  if (candidate.type !== 'imageGeneration' || !candidate.failure) return null;
+  const failure = candidate.failure;
+  if (typeof failure === 'string') return failure;
+  if (typeof failure === 'object' && typeof (failure as { type?: unknown }).type === 'string') return (failure as { type: string }).type;
+  return 'failed';
+}

@@ -53,6 +53,12 @@ export interface PictureToolsProps {
   onReplace: (pos: number) => void
   /** The slide's Place group: the same picture moved beside or behind the words. */
   onPlace?: (pos: number, place: PicturePlace) => void
+  /** ChatGPT: Make a new picture… or Change this picture… for the picture at `pos`. */
+  onChatgpt?: (pos: number, mode: 'new' | 'change') => void
+  /** Whether ChatGPT can change the picture at `pos` (a file in the project). */
+  chatgptCanChange?: (pos: number) => boolean
+  /** ChatGPT's field or strip is on this editor's picture: the bar gives it the place. */
+  barHidden?: boolean
 }
 
 /** The parts of a chosen picture's view the tools measure and draw against. */
@@ -133,7 +139,7 @@ interface CropDrag {
   scale: number
 }
 
-export function PictureTools({ editor, context, comments, onComment, onReplace, onPlace }: PictureToolsProps) {
+export function PictureTools({ editor, context, comments, onComment, onReplace, onPlace, onChatgpt, chatgptCanChange, barHidden }: PictureToolsProps) {
   const [, redraw] = useReducer((count: number) => count + 1, 0)
   const resize = useRef<ResizeDrag | null>(null)
   /** A corner handle is being dragged: the bar hides until the drop (experience 49). */
@@ -364,7 +370,7 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
     <>
       {createPortal(layer, host)}
       <PictureBar
-        anchor={resizing ? null : anchor}
+        anchor={resizing || barHidden ? null : anchor}
         bounds={context === 'slide' ? stageBounds(host) : undefined}
         context={context}
         kind="flow"
@@ -385,6 +391,8 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
         onPlace={onPlace ? place => onPlace(pos, place) : undefined}
         onWords={(alt, caption) => dispatch(setPictureWords(editor.state, pos, alt, caption))}
         onComment={onComment ? () => onComment(pos) : undefined}
+        onChatgpt={onChatgpt ? mode => onChatgpt(pos, mode) : undefined}
+        chatgptCanChange={chatgptCanChange ? chatgptCanChange(pos) : true}
         onReplace={() => onReplace(pos)}
         onCopy={() => void copyPicture(image, editor)}
         onReveal={() => {

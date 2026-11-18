@@ -4,7 +4,7 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
-import type { AgentSidebarProtocolMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
+import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
@@ -576,5 +576,6 @@ export type ExtensionMessage =
   | { type: 'onboarding:install-progress'; dependency: OnboardingDependency; state: OnboardingInstallState; error?: string }
   // Sprint 160 (#696): a sign-in card's page and line
   | SheetSignInMessage
+  | SheetSignInAttentionMessage
   // Agent pinning (Launch Chat + @mention)
   | { type: 'pin-agent'; agentId: string | null; content?: string };

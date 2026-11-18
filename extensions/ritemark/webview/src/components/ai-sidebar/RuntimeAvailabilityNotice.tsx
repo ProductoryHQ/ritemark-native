@@ -1,3 +1,4 @@
+import { useSignInAttention } from './signInAttention';
 import { useMemo } from 'react';
 import { useActiveConversation, useAISidebarStore } from './store';
 import {
@@ -72,6 +73,8 @@ export function RuntimeAvailabilityNotice({
   const startCodexLogin = useAISidebarStore((s) => s.startCodexLogin);
   const repairCodex = useAISidebarStore((s) => s.repairCodex);
   const openAgentSettings = useAISidebarStore((s) => s.openAgentSettings);
+  // Pictures with ChatGPT (#800): ChatGPT's notice is the card a ChatGPT item asked to be found.
+  const ring = useSignInAttention('chatgpt');
 
   const alternativeModel = useMemo(() => {
     if (!alternativeRuntime) return '';
@@ -145,6 +148,7 @@ export function RuntimeAvailabilityNotice({
   const progress = availability.state === 'auth-in-progress';
   return (
     <div className="px-3 pb-2">
+      <div className={runtimeId === 'codex' && ring ? `${ring} rounded-xl` : undefined}>
       <RuntimeNotice
         tone={progress ? 'progress' : 'warning'}
         title={stateTitle(runtimeId, availability)}
@@ -153,6 +157,7 @@ export function RuntimeAvailabilityNotice({
         secondaryAction={alternativeAction ? recoveryAction : undefined}
         primaryAction={alternativeAction ?? recoveryAction}
       />
+      </div>
     </div>
   );
 }
