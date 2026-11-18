@@ -14,6 +14,7 @@ import { NodeSelection, TextSelection, type EditorState, type Transaction } from
 import { joinBackward, joinForward, selectNodeBackward, selectNodeForward } from '@tiptap/pm/commands'
 import type { SlideAnchor, SlideBlockShape } from '../../../../../src/decks/blocks/slideComments'
 import { OPEN_FENCE, parseFenceAttributes, slideBlockClassOf, type SlideBlockClass } from '../../../../../src/decks/blocks/fencedDiv'
+import { revealWrappedList } from './blockBar'
 
 /** What a new comment on the slide is on: the words selected, a block (its top-level position), or the whole slide. */
 export type SlideTarget = { kind: 'words' } | { kind: 'block'; pos: number } | { kind: 'slide' }
@@ -184,6 +185,8 @@ export function shapeOfNode(doc: PMNode, pos: number): SlideBlockShape {
     case 'horizontalRule':
       return { kind: 'rule' }
     case 'slideDiv': {
+      // README item 18: a list in its `::: incremental` wrapper is the list, to a person.
+      if (revealWrappedList(node)) return { kind: 'list' }
       const kind = divClass(node)
       if (kind === 'columns' || kind === 'boxes') {
         let count = 0

@@ -406,7 +406,8 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.match(wallSource, /stepOf\(transition, still, pairs\.length > 0\)/)
   // A spotlight or a filled wall asked during a step puts the step at its end first.
   assert.match(wallSource, /const askSpot = useCallback\(\(item: number \| null\) => \{ jump\(\); askSpotWith/)
-  assert.match(wallSource, /moves\.current \+= 1\n\s+setLeaving\(\{ slide: previous\.slide, serial: moves\.current, direction \}\)/)
+  // (README item 18: the slide going carries the step it was left at.)
+  assert.match(wallSource, /moves\.current \+= 1\n(?:\s+\/\/[^\n]*\n)*\s+setLeaving\(\{ slide: previous\.slide, serial: moves\.current, direction, reveal: previous\.reveal\?\.shown \}\)/)
   // A deck naming no theme, or a missing one, has Evening ticked.
   assert.equal(body(undefined).querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')
   assert.equal(body('Slide library/Themes/Gone.theme.md').querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')

@@ -20,7 +20,7 @@ import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '..
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
@@ -74,9 +74,19 @@ interface RenderState {
   /** The decks README, small details 14: the deck's sections an Agenda block lists, and the slide's place for Present. */
   agenda: AgendaDrawing | null;
   at: number | null;
+  /**
+   * README item 18: the items of One by one blocks, numbered from 0 across the slide as they are drawn
+   * (`data-reveal-item`); in Present, those from `shown` on are drawn hidden (`data-reveal-hidden`), each in its place.
+   * `shown` null: every item shows (the editor, the strip, the handout, the page, print).
+   */
+  reveal: { next: number; shown: number | null };
+  /** The `:::` blocks being drawn, innermost last: a box or a column is an item when its block reveals. */
+  parents: Array<{ kind: string | null; reveal: boolean }>;
 }
 
-let state: RenderState = { pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null };
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, reveal: { next: 0, shown: null }, parents: [] });
+
+let state: RenderState = freshState();
 
 /** A picture's file name, from the path the slide names. */
 export function pictureFileName(path: string): string {
@@ -115,21 +125,75 @@ function columnChildren(token: SlideDivToken): FenceAttributes[] | null {
   return columns;
 }
 
+/** A list's reveal wrapper: `incremental` (or `reveal="one"`) around one list and nothing else drawn. */
+export function isRevealListToken(token: { attrs: FenceAttributes; tokens: Token[] }): boolean {
+  if (!isRevealWrapperAttrs(token.attrs)) return false;
+  const drawn = token.tokens.filter(child => child.type !== 'space' && !isCommentBlock(child));
+  // A bullet or numbered list, as the slide editor's bar reads it (`revealWrappedList`): never a task list.
+  return drawn.length === 1 && drawn[0].type === 'list' && !(drawn[0] as Tokens.List).items.some(item => item.task);
+}
+
+/** The next item of a One by one block: its number, and hidden while Present hasn't shown it yet. */
+function revealItemAttributes(): string {
+  const index = state.reveal.next++;
+  const hidden = state.reveal.shown !== null && index >= state.reveal.shown;
+  return ` data-reveal-item="${index}"${hidden ? ' data-reveal-hidden=""' : ''}`;
+}
+
+/**
+ * The items of the first list drawn in `html` (its own `<li>`s, never a nested list's), marked as a block's items; with
+ * `only`, the first top-level list of that kind (a Steps block's steps are its numbered list, whatever stands before it).
+ */
+function markListItems(html: string, only?: 'ol'): string {
+  let depth = 0;
+  let marking = false;
+  let done = false;
+  // The renderer's own markup: every word in it is escaped, so a tag here is one it drew.
+  return html.replace(/<(\/?)(ul|ol|li)\b([^>]*)>/g, (tag, close: string, name: string, rest: string) => {
+    if (done) return tag;
+    if (name === 'li') return marking && !close && depth === 1 ? `<li${revealItemAttributes()}${rest}>` : tag;
+    if (close) {
+      depth -= 1;
+      if (marking && depth === 0) done = true;
+    } else {
+      if (depth === 0 && (!only || name === only)) marking = true;
+      depth += 1;
+    }
+    return tag;
+  });
+}
+
 function divHtml(token: SlideDivToken, inner: () => string): string {
   // The Agenda (small details 14): drawn from the deck, never from what the block holds (nothing, as `/Agenda` writes it).
   if (isAgendaClasses(token.attrs.classes)) return agendaHtml(state.agenda, state.at);
   const kind = slideBlockClassOf(token.attrs);
+  const parent = state.parents[state.parents.length - 1];
+  // README item 18: a block set to One by one, never one inside another such block (its items arrive whole).
+  const insideReveal = state.parents.some(entry => entry.reveal);
+  const listWrapper = !insideReveal && kind === null && isRevealListToken(token);
+  const reveals = listWrapper || (!insideReveal && (kind === 'boxes' || kind === 'steps' || kind === 'columns') && revealsOne(token.attrs));
+  const revealMark = reveals ? ' data-reveal="one"' : '';
+  // A box of a revealing Boxes block and a column of a revealing Columns block are its items.
+  const item = parent?.reveal && ((kind === 'box' && parent.kind === 'boxes') || (kind === 'column' && parent.kind === 'columns')) ? revealItemAttributes() : '';
+  const within = () => {
+    state.parents.push({ kind, reveal: reveals });
+    try {
+      return inner();
+    } finally {
+      state.parents.pop();
+    }
+  };
   switch (kind) {
     case 'columns':
-      return `<div class="blk-columns"${drawnAttributes(columnsDrawnAttributes(token.attrs, columnChildren(token)))}>${inner()}</div>\n`;
+      return `<div class="blk-columns"${drawnAttributes(columnsDrawnAttributes(token.attrs, columnChildren(token)))}${revealMark}>${within()}</div>\n`;
     case 'column':
-      return `<div class="blk-${kind}">${inner()}</div>\n`;
+      return `<div class="blk-${kind}"${item}>${within()}</div>\n`;
     case 'boxes': {
       const look = token.attrs.values.look ?? 'boxes';
       state.looks.push(look);
       try {
         const boxes = token.tokens.filter(child => child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box').length;
-        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes))}>${inner()}</div>\n`;
+        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes))}${revealMark}>${within()}</div>\n`;
       } finally {
         state.looks.pop();
       }
@@ -142,14 +206,18 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
         const name = slideIcon(token.attrs.values.icon)?.phosphor;
         if (name && isPageIconName(name)) mark = `<span class="blk-icon">${iconSvg(name, 28)}</span>`;
       }
-      return `<div class="blk-box">${mark}${inner()}</div>\n`;
+      return `<div class="blk-box"${item}>${mark}${within()}</div>\n`;
     }
     case 'steps': {
       const tag = stepsTagOf(token.attrs);
-      return `<div class="blk-steps">${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${inner()}</div>\n`;
+      const body = within();
+      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${reveals ? markListItems(body, 'ol') : body}</div>\n`;
     }
-    default:
-      return `<div class="blk-group">${inner()}</div>\n`;
+    default: {
+      const body = within();
+      // A list's reveal wrapper is drawn as the list is: a plain block around it, of the list's own size (slide.css).
+      return `<div class="blk-group"${revealMark}>${listWrapper ? markListItems(body) : body}</div>\n`;
+    }
   }
 }
 
@@ -452,17 +520,47 @@ export interface BlockDrawingContext {
   agenda?: AgendaDrawing | null;
   /** The slide's place in the deck (from 1), in Present only: an Agenda marks the sections passed and the next one. */
   at?: number | null;
+  /**
+   * README item 18, in Present only: how many items of the slide's One by one blocks show (of `blockRevealCount`); the
+   * rest are drawn hidden, in their places. Left out: every item shows.
+   */
+  reveal?: number | null;
 }
 
 /** A block slide's Markdown as the slide's inner HTML (the flow's children). */
 export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
-  state = { pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), looks: [], agenda: options.agenda ?? null, at: options.at ?? null };
+  const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
+  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, reveal: { next: 0, shown } };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
     state = previous;
   }
+}
+
+const revealCountCache = new Map<string, number>();
+
+/**
+ * README item 18: how many items a block slide's One by one blocks hold together (0: none, the slide shows whole), as
+ * the renderer numbers them, so Present's steps and the drawing never disagree. Read once per Markdown.
+ */
+export function blockRevealCount(markdown: string): number {
+  if (!markdown.includes(':::')) return 0;
+  const cached = revealCountCache.get(markdown);
+  if (cached !== undefined) return cached;
+  if (revealCountCache.size > 500) revealCountCache.clear();
+  const previous = state;
+  state = freshState();
+  let count = 0;
+  try {
+    slideMarked.parse(markdown, { async: false });
+    count = state.reveal.next;
+  } finally {
+    state = previous;
+  }
+  revealCountCache.set(markdown, count);
+  return count;
 }
 
 export interface BlockSlideMarkupOptions {
@@ -586,7 +684,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'>): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at'> & { reveal?: number | null }): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -610,7 +708,7 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at })}</div>`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

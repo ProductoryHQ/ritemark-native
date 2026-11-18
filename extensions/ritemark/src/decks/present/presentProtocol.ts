@@ -14,6 +14,9 @@ import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 import { transitionOf, type DeckTransition } from './deckTransition';
+import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
+
+export type { WallReveal };
 
 /** The webview panel that is the wall. */
 export const DECK_WALL_VIEW_TYPE = 'ritemark.deckWall';
@@ -113,6 +116,11 @@ export interface WallState {
   transition: DeckTransition;
   /** README item 9: the exercise's countdown at the wall's bottom right, or null. */
   timer: WallTimer | null;
+  /**
+   * README item 18: how many items of the slide's One by one blocks show, of how many (`revealSteps.ts`); null: the
+   * slide shows whole.
+   */
+  reveal: WallReveal | null;
 }
 
 /**
@@ -121,9 +129,16 @@ export interface WallState {
  */
 export interface PresenterState {
   type: 'present/presenter';
-  /** The slide on the wall now, and the one Next shows (null at the end). */
+  /**
+   * The slide on the wall now, and the one Next shows (null at the end). README item 18: while the slide on the wall
+   * has an item still to show, Next is that slide with its next item (`nextIsItem`), else the next slide as it opens.
+   */
   current: WallSlide;
   next: WallSlide | null;
+  /** Item 18: how many items Now shows ("Shown 2 of 4" under it), and how many Next does; null: whole. */
+  reveal: WallReveal | null;
+  nextReveal: WallReveal | null;
+  nextIsItem: boolean;
   /** Sprint 161: the current slide's part's comments, in order ("Your comments"). Only the presenter view gets them. */
   comments: PartComment[];
   position: number | null;
@@ -261,6 +276,7 @@ export function wallStateOf(
   page: string | null = null,
   focus: WallFocus = NO_FOCUS,
   timer: WallTimer | null = null,
+  reveal: WallReveal | null = null,
 ): WallState {
   const address = wallPageAddress(page);
   return {
@@ -280,6 +296,7 @@ export function wallStateOf(
     fill: itemOf(focus.fill),
     transition: transitionOf(look.transition),
     timer: timerOf(timer),
+    reveal: revealOf(reveal),
   };
 }
 
@@ -300,14 +317,23 @@ export function presenterStateOf(
   view: PresentView,
   look: { borderless: boolean; theme: DeckTheme },
   assets: Record<string, string>,
-  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null },
+  session: { wallDisplay: string | null; canSwap: boolean; length: number | null; startedAt: number; blank?: WallBlank | null; clock?: ClockLocale; page?: string | null; focus?: WallFocus; timer?: WallTimer | null; reveal?: WallReveal | null },
   onWall?: WallSlide,
 ): PresenterState {
   const address = wallPageAddress(session.page ?? null);
+  const current = onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current);
+  // Item 18: Next shows the slide now with its next item while one is still to show, else the next slide as it opens.
+  const reveal = revealOf(session.reveal ?? null);
+  const nextIsItem = !!reveal && reveal.shown < reveal.count;
+  const nextSlide = nextIsItem ? current : view.next ? wallSlideOf(view.next) : null;
+  const nextReveal = nextIsItem && reveal ? { shown: reveal.shown + 1, count: reveal.count } : nextSlide ? revealOnArrival(revealCountOf(nextSlide), 'first') : null;
   return {
     type: 'present/presenter',
-    current: onWall ? { ...onWall, number: view.current.index + 1 } : wallSlideOf(view.current),
-    next: view.next ? wallSlideOf(view.next) : null,
+    current,
+    next: nextSlide,
+    reveal,
+    nextReveal,
+    nextIsItem,
     comments: partComments(view.current.handout, view.current.converted),
     position: view.position,
     count: view.count,

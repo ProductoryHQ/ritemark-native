@@ -39,6 +39,8 @@ export function itemAt(rects: readonly SpotRect[], x: number, y: number): number
 const FLOW_ITEMS = '.blk-box, .blk-column, li, table, .blk-pic'
 
 function isFlowItem(element: Element): boolean {
+  // README item 18: an item Present hasn't shown yet (and whatever is in it) is no item to spotlight.
+  if (element.closest('[data-reveal-hidden]')) return false
   if (!element.classList.contains('blk-pic')) return true
   // An empty picture place, the picture inside its frame (the frame is the item), a small picture in a line of words.
   if (element.classList.contains('empty')) return false
