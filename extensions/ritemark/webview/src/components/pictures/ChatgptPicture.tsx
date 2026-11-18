@@ -18,7 +18,7 @@
  * (`away`, `picturesAway.ts`): it lands on that slide in the deck, and the strip is back when the slide is. A place gone
  * (the picture deleted or replaced meanwhile) places nothing; the made picture stays in `images/`.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import { onMessage, sendToExtension } from '../../bridge'
@@ -29,7 +29,7 @@ import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
 import { doneWords, followPicture, madeDescription, makeMessage, pictureKey, phaseAfterStatus, placeOfMade, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
-import { PicturesAway, type AwayLanding } from './picturesAway'
+import { PicturesAway, PicturesMaking, type AwayLanding } from './picturesAway'
 
 export type { MakerPhase, PictureAsk, PictureMode, PicturePlaceRef } from './chatgptPictureState'
 
@@ -88,6 +88,29 @@ function picturesAway(): PicturesAway {
     awayRequests = away
   }
   return awayRequests
+}
+
+// The slides a picture is being made for, shown or left: the strip's spinner on their thumbnails (`PicturesMaking`).
+let makingSlides: PicturesMaking | null = null
+function picturesMaking(): PicturesMaking {
+  if (!makingSlides) {
+    const making = new PicturesMaking()
+    onMessage(message => { if (message.type === 'picture/status') making.status(message as Record<string, unknown>) })
+    makingSlides = making
+  }
+  return makingSlides
+}
+
+/** The keys (`slidePictureKey`) of the deck's slides ChatGPT is making a picture for now. */
+export function useSlidesMakingPictures(): ReadonlySet<string> {
+  const making = picturesMaking()
+  return useSyncExternalStore(useCallback(listener => making.subscribe(listener), [making]), () => making.keys())
+}
+
+/** Stops a request: the host is told, and its slide's spinner goes. */
+function cancelRequest(requestId: string): void {
+  sendToExtension('picture/cancel', { requestId })
+  picturesMaking().end(requestId)
 }
 
 let serial = 0
@@ -179,7 +202,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
       })
       return
     }
-    sendToExtension('picture/cancel', { requestId: current.requestId })
+    cancelRequest(current.requestId)
     latest.current.onSettled?.(current.ask)
   }, [])
 
@@ -196,7 +219,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
   const start = useCallback((ask: PictureAsk) => {
     const current = stateRef.current
     if (current.phase === 'making') {
-      sendToExtension('picture/cancel', { requestId: current.requestId })
+      cancelRequest(current.requestId)
       latest.current.onSettled?.(current.ask)
     }
     const requestId = newRequestId()
@@ -214,13 +237,15 @@ export function usePictureMaker(options: PictureMakerOptions) {
     if (!ready) { setState({ phase: 'idle' }); return }
     const requestId = newRequestId()
     setState({ phase: 'making', ask: target, description: words, requestId })
+    const slideKey = latest.current.away?.key
+    if (slideKey) picturesMaking().begin(requestId, slideKey)
     sendToExtension('picture/make', makeMessage(target, words, requestId, ready.slideId))
   }, [])
 
   const cancel = useCallback(() => {
     const current = stateRef.current
     if (current.phase === 'making') {
-      sendToExtension('picture/cancel', { requestId: current.requestId })
+      cancelRequest(current.requestId)
       latest.current.onSettled?.(current.ask)
     }
     setState({ phase: 'idle' })

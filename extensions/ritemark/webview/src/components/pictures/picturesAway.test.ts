@@ -18,7 +18,7 @@ import { slidesOf } from '../decks/deckDocument'
 import { loadSlide, saveSlide } from '../decks/blocks/slideEditorHarness'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, type SlideDocKit, type SlidePictureTarget } from '../decks/blocks/slidePictureSwap'
 import { madeDescription, phaseAfterStatus, placeOfMade, type MakerPhase, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
-import { PicturesAway, type AwayLanding } from './picturesAway'
+import { PicturesAway, PicturesMaking, slidePictureKey, type AwayLanding } from './picturesAway'
 
 installTestDocument()
 
@@ -221,6 +221,56 @@ check('review of #803: answers for slides never shown again are not kept forever
   }
   assert.equal(away.heldFor('id:k0'), 0, 'the oldest answer went')
   assert.equal(away.heldFor(`id:k${PicturesAway.KEPT + 4}`), 1, 'the newest stays')
+})
+
+// The strip's spinner on a thumbnail (the Experience lead on #803): it follows the request, shown or left.
+check('the spinner: a request starts it, the picture landing ends it', () => {
+  const making = new PicturesMaking()
+  let changes = 0
+  making.subscribe(() => { changes += 1 })
+  const empty = making.keys()
+  assert.equal(empty.size, 0)
+  making.begin('m1', slidePictureKey({ id: 's2', index: 1 }))
+  assert.deepEqual([...making.keys()], ['id:s2'])
+  assert.equal(changes, 1)
+  const shown = making.keys()
+  assert.equal(making.keys(), shown, 'the same set until something changes (useSyncExternalStore)')
+  making.status({ requestId: 'other', state: 'made', path: 'images/x.png', url: 'u' })
+  assert.equal(making.keys(), shown, "another request's answer changes nothing")
+  making.status({ requestId: 'm1', state: 'ready' })
+  assert.ok(making.keys().has('id:s2'), "a check's 'ready' is no answer to a make")
+  making.status({ requestId: 'm1', state: 'made', path: 'images/x.png', url: 'u' })
+  assert.equal(making.keys().size, 0, 'the picture landed: the spinner goes')
+  assert.equal(changes, 2)
+})
+
+check('the spinner: Cancel, a failure, sign-in and the host cancelling each end it', () => {
+  const making = new PicturesMaking()
+  making.begin('c', 'id:a')
+  making.end('c')
+  assert.equal(making.keys().size, 0, 'Cancel')
+  making.begin('f', 'id:a')
+  making.status({ requestId: 'f', state: 'failed', problem: 'No' })
+  assert.equal(making.keys().size, 0, 'failed')
+  making.begin('s', 'id:a')
+  making.status({ requestId: 's', state: 'sign-in' })
+  assert.equal(making.keys().size, 0, 'sign-in')
+  making.begin('x', 'id:a')
+  making.status({ requestId: 'x', state: 'cancelled' })
+  assert.equal(making.keys().size, 0, 'the host cancelled it')
+})
+
+check('the spinner: one per slide, while any of its requests is being made; a slide without an id by its place', () => {
+  const making = new PicturesMaking()
+  making.begin('a1', 'id:a')
+  making.begin('b1', slidePictureKey({ index: 3 }))
+  making.begin('a2', 'id:a')
+  assert.deepEqual([...making.keys()].sort(), ['id:a', 'index:3'])
+  making.end('a1')
+  assert.ok(making.keys().has('id:a'), 'its other request is still made')
+  making.end('a2')
+  making.end('a2')
+  assert.deepEqual([...making.keys()], ['index:3'])
 })
 
 if (failures) {

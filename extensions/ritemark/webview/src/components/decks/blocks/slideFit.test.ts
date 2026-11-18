@@ -201,4 +201,16 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(!/blk-flow[^{]*\{[^}]*(?:overflow-wrap|word-wrap): (?:anywhere|break-word)/.test(decks), 'the stage adds no breaking of its own')
 }
 
+// Every slide heading is balanced (the Experience lead, 19 November), in the one style sheet the slide, the strip, the
+// wall, the presenter view and the page draw with, and no other rule there or on the stage unbalances one.
+{
+  const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(css.includes('.deck-sl :is(h1, h2, h3, h4, h5, h6, .st, .stc, .bh) { text-wrap: balance; }'), 'headings balanced on every slide')
+  assert.equal((css.match(/text-wrap:/g) ?? []).length, 1, 'no other text-wrap on a slide')
+  const decks = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  assert.ok(!/text-wrap:/.test(decks), 'the stage sets none of its own')
+  const page = readFileSync(new URL('../../../../../src/decks/page/pageAssets.ts', import.meta.url), 'utf8')
+  assert.ok(page.includes("import slideCss from '../../../webview/src/components/decks/slide/slide.css'"), 'the page draws its slides with the same sheet')
+}
+
 console.log('slideFit.test.ts: passed')
