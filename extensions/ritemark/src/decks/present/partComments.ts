@@ -53,6 +53,8 @@ function visit(tokens: Token[], out: PartComment[]): void {
         continue;
       }
       case 'blockquote':
+      // Sprint 163: a Tabs block in the handout (`publicDeck.HandoutTabsToken`): its `tokens` are every pane's.
+      case 'handoutTabs':
         visit((token as { tokens: Token[] }).tokens, out);
         continue;
       case 'list':

@@ -6,7 +6,7 @@
  *  - https only, everywhere: the address check, the sheet's Done, the renderer (the strip, the wall), the page, the
  *    wall's request and the host's deck check never let `javascript:`, `data:`, `file:` or `http:` through;
  *  - the icon follows the address;
- *  - the hidden words find Button in both / menus, after Table.
+ *  - the hidden words find Button in both / menus, after Tabs; a Button works in a Tabs pane.
  */
 import { strict as assert } from 'node:assert'
 import { getSchema } from '@tiptap/core'
@@ -339,19 +339,58 @@ assert.equal(decodeWallRequest({ type: 'present/open-link', url: 42 }), null)
 }
 
 // ---------------------------------------------------------------------------
-// The / menus: Button in Blocks after Table, found by its hidden words
+// The / menus: Button in Blocks after Tabs, found by its hidden words
 // ---------------------------------------------------------------------------
 
 {
   const blocks = SLIDE_ITEMS.filter(item => item.group === 'Blocks').map(item => item.title)
-  assert.ok(blocks.indexOf('Button') === blocks.indexOf('Table') + 1, `Button after Table: ${blocks.join(', ')}`)
+  assert.ok(blocks.indexOf('Button') === blocks.indexOf('Tabs') + 1, `Button after Tabs: ${blocks.join(', ')}`)
   const textTitles = blockItems.map(item => item.title)
-  assert.ok(textTitles.indexOf('Button') === textTitles.indexOf('Table') + 1, 'the Text editor: Button after Table')
+  assert.ok(textTitles.indexOf('Button') === textTitles.indexOf('Tabs') + 1, 'the Text editor: Button after Tabs')
   for (const word of ['link', 'file', 'material', 'download', 'nupp', 'fail', 'materjal', 'button', 'butt']) {
     assert.ok(filterSlashItems(SLIDE_ITEMS, word).some(item => item.title === 'Button'), `/${word} finds Button on a slide`)
     assert.ok(filterSlashItems(blockItems, word).some(item => item.title === 'Button'), `/${word} finds Button in a Text document`)
   }
   assert.equal(filterSlashItems(SLIDE_ITEMS, 'nupp')[0].title, 'Button')
+}
+
+// ---------------------------------------------------------------------------
+// A Button in a Tabs pane (#805): the editors, the renderer (the wall) and the page
+// ---------------------------------------------------------------------------
+
+{
+  const tabs = '::: {.panel-tabset}\n\n## 1 · Plan\n\nUse the sample. [Open the sample](https://example.com/a.pdf){.button}\n\n## 2 · Collect\n\n[Open the emails](https://example.com/inbox.docx){.button}\n\n:::'
+  // On a slide: opens as buttons in the panes, byte for byte.
+  const slide = `# Exercise\n\n${tabs}`
+  const doc = loadSlide(slide)
+  const inPanes: string[] = []
+  doc.descendants((node, _pos, parent) => { if (node.type.name === BUTTON_NODE) inPanes.push(parent?.type.name ?? '') })
+  assert.deepEqual(inPanes, ['tabPane', 'tabPane'], "a slide's Tabs panes hold the buttons")
+  assert.equal(saveSlide(doc), slide, 'a Tabs block with buttons, on a slide: byte for byte')
+  // A Text document.
+  const text = `# Material\n\n${tabs}\n`
+  const opened = openDocument(text)
+  let count = 0
+  opened.doc.descendants((node, _pos, parent) => { if (node.type.name === BUTTON_NODE && parent?.type.name === 'tabPane') count++ })
+  assert.equal(count, 2, "a Text document's Tabs panes hold the buttons")
+  assert.equal(saveDocument(opened), text, 'a Tabs block with buttons, in a Text document: byte for byte')
+  // The wall (the renderer): the first tab's button carries its address for the host.
+  const wall = blockSlideHtml(slide)
+  assert.match(wall, /<span class="blk-btn" role="link" data-href="https:\/\/example\.com\/a\.pdf"/)
+  assert.ok(!/\{\.button\}/.test(wall), 'no attribute words on the wall')
+  // The page: a real link, in the slide and in the handout's tabs.
+  assert.match(blockSlideHtml(slide, { buttonLinks: true }), /<a class="blk-btn" href="https:\/\/example\.com\/a\.pdf" target="_blank" rel="noopener noreferrer"/)
+  const handout = handoutHtml(tabs, { partKey: 'p', exercise: false, pictureUrl: () => null })
+  assert.match(handout, /<a class="blk-btn" href="https:\/\/example\.com\/inbox\.docx" target="_blank" rel="noopener noreferrer">/, "the page's text: the second tab's button")
+  assert.deepEqual(blockButtonAddresses(slide), ['https://example.com/a.pdf', 'https://example.com/inbox.docx'], 'Present opens a pane\'s button')
+  // / → Button in a pane puts it in the pane.
+  let pane = -1
+  doc.descendants((node, pos) => { if (pane < 0 && node.type.name === 'tabPane') pane = pos })
+  const state = EditorState.create({ doc })
+  const empty = state.tr.insert(pane + 1, state.schema.nodes.paragraph.create())
+  insertButton(empty, pane + 2)
+  const placed = buttonAt(EditorState.create({ doc: empty.doc, selection: empty.selection }))
+  assert.ok(placed && empty.doc.resolve(placed.pos).parent.type.name === 'tabPane', '/ → Button in a pane: in the pane')
 }
 
 console.log('buttonBlock: all passed')

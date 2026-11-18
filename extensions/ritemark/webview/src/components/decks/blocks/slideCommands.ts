@@ -24,11 +24,12 @@ import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
 import { SLIDE_COMMAND, placeBlock } from '../../../extensions/blockPlacement'
-import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, TABS_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
+import { canHoldTabs } from '../../../extensions/tabs/tabsCommands'
 
 /** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own (`blockPlacement`). */
 export { SLIDE_COMMAND }
@@ -50,6 +51,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes', keywords: ['cards', 'tiles', 'grid', 'kastid', 'kaardid'] },
   { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps', keywords: ['process', 'timeline', 'flow', 'sammud', 'protsess'] },
   { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
+  // Sprint 163: tabs, each pane ordinary blocks (decks README "Tabs in the editor").
+  { group: 'Blocks', title: 'Tabs', description: '', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
   // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
   { group: 'Blocks', title: 'Button', description: '', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
@@ -59,6 +62,23 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Slides', title: 'New slide below', description: '', icon: 'plus-square', nodeType: 'newSlideBelow', keywords: ['slide', 'new slide', 'page', 'uus slaid'] },
   { group: 'Slides', title: 'Split slide here', description: '', icon: 'scissors', nodeType: 'splitSlide', shortcut: '***', keywords: ['split', 'break', 'divide', 'poolita', 'jaga'] },
 ]
+
+/** The slide's own items, which a tab's pane never offers (README "In the pane"): the title and the slides' items. */
+const NOT_IN_A_PANE = new Set(['agenda', 'newSlideBelow', 'splitSlide', 'tabs'])
+
+/**
+ * Sprint 163: the slide's / menu where the caret is. In a tab's pane, never Tabs, the Title or the slide's own items;
+ * in a box, Steps or a table cell, never Tabs (`canHoldTabs`).
+ */
+export function slideItemsAt(state: EditorState): BlockItemDef[] {
+  const inPane = (() => {
+    const $from = state.selection.$from
+    for (let depth = $from.depth; depth > 0; depth--) if ($from.node(depth).type.name === 'tabPane') return true
+    return false
+  })()
+  if (inPane) return SLIDE_ITEMS.filter(item => !NOT_IN_A_PANE.has(item.nodeType) && !(item.nodeType === 'heading' && item.attrs?.level === 1))
+  return canHoldTabs(state) ? SLIDE_ITEMS : SLIDE_ITEMS.filter(item => item.nodeType !== 'tabs')
+}
 
 export type SlideBlockKind = 'columns' | 'boxes' | 'steps' | 'table'
 

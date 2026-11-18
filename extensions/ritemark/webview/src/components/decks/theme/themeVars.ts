@@ -109,6 +109,9 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
       pic: lift(0.05, 0.04),
       emp: rgba(ink, dark ? 0.22 : 0.18),
       empt: rgba(ink, dark ? 0.6 : 0.5),
+      // Sprint 163: a Tabs block's band, lighter than the slide, and the ground its chosen tab shares with its pane.
+      tband: dark ? rgba(WHITE, 0.07) : rgba(ink, paper ? 0.05 : 0.06),
+      tpane: dark ? mix(bg, '#000000', 0.42) : paper ? mix(bg, ink, 0.025) : WHITE,
     }
   } else {
     const x = theme.borderless ?? {}
@@ -147,6 +150,9 @@ export function themeVars(theme: DeckTheme, borderless: boolean): Record<string,
       pic: x.pic || mix(hd, WHITE, 0.96),
       emp: x.emp || mix(hd, WHITE, 0.88),
       empt: x.empt || mix(hd, WHITE, 0.5),
+      // Sprint 163: a Tabs block's band and the ground its chosen tab shares with its pane, on the white slide.
+      tband: mix(hd, WHITE, 0.94),
+      tpane: WHITE,
     }
   }
   return {

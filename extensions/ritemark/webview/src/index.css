@@ -1135,3 +1135,71 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
     background-color: CanvasText !important;
   }
 }
+
+/* ---- Sprint 163: the Tabs block in an editor (decks README "Tabs in the editor"; the Tabs editor prototype). The
+   slide's own look is slide.css's (`.deck-sl.is-blocks .blk-tabs`); these are the band's tools, on the slide and in a
+   Text document alike, and the Text document's own look (`.blk-tabs.is-text`). */
+.blk-tabs { position: relative; }
+.blk-tabbar { position: relative; user-select: none; -webkit-user-select: none; }
+.blk-tabbar .blk-tab { position: relative; cursor: pointer; outline: none; }
+.blk-tabbar .blk-tab.is-renaming { cursor: text; }
+.blk-tabbar .blk-tab-words { pointer-events: none; }
+.blk-tabbar .blk-tab.is-lifted { opacity: .45; }
+:where(:root:not([data-input-mode="pointer"])) .blk-tabbar .blk-tab:focus-visible { box-shadow: inset 0 0 0 2px var(--s-acc, var(--r-accent)); }
+/* The ⌄ on the open tab: quiet until the tab is pointed at or its menu is open. */
+.blk-tabbar .blk-tab-dd { position: absolute; right: .2em; top: 50%; display: inline-grid; place-items: center; width: 1.1em; height: 1.1em; min-width: 0; min-height: 0; margin: -.55em 0 0; padding: 0; border-radius: 4px; color: inherit; background: transparent; opacity: 0; transition: opacity .12s; }
+.blk-tabbar .blk-tab-dd:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+.blk-tabbar .blk-tab.is-active:hover .blk-tab-dd, .blk-tabbar .blk-tab.has-menu .blk-tab-dd { opacity: 1; }
+/* + at the band's end. */
+.blk-tabbar .blk-tab-add { flex: none; align-self: center; display: inline-grid; place-items: center; width: 1.75em; height: 1.75em; min-width: 0; min-height: 0; margin: 0 0 0 .35em; padding: 0; border-radius: 50%; color: inherit; background: color-mix(in srgb, currentColor 9%, transparent); }
+.blk-tabbar .blk-tab-add:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
+.blk-tabbar .blk-tab-add:active { background: color-mix(in srgb, currentColor 26%, transparent); }
+/* A tab's name typed in place, and the line where a dragged tab lands. */
+.blk-tabbar .blk-tab-input { box-sizing: content-box; min-width: 3ch; padding: .3em .5em; border: 0; border-radius: 6px; outline: 2px solid var(--s-acc, var(--r-accent)); background: color-mix(in srgb, currentColor 8%, transparent); color: inherit; font: inherit; }
+.blk-tabbar .blk-tab-drop { position: absolute; width: 2px; border-radius: 1px; background: var(--s-acc, var(--r-accent)); pointer-events: none; }
+.blk-tabmenu-hint { margin-left: 12px; color: var(--r-ink-muted); font-size: 12px; }
+.blk-tabmenu-danger { color: var(--r-error); }
+/* On the slide's stage: the band's words at the slide's size (`.blk-tab` is .6em of the slide's 24 px). */
+.deck-sl.is-blocks .blk-tabbar[role="tablist"] .blk-tab:not(.is-active):hover, .tabs-pickable .deck-sl.is-blocks .blk-tab:not(.is-active):hover { color: var(--s-tx, #E4E6F7); background: color-mix(in srgb, var(--s-hd, #fff) 6%, transparent); }
+.deck-sl.is-blocks .blk-tabbar[role="tablist"] .blk-tab:not(.is-active):active, .tabs-pickable .deck-sl.is-blocks .blk-tab:not(.is-active):active { background: color-mix(in srgb, var(--s-hd, #fff) 11%, transparent); }
+/* The presenter view's Now: a click on a tab shows it on the wall. */
+.tabs-pickable .deck-sl.is-blocks .blk-tab { cursor: pointer; }
+.deck-sl.is-blocks .blk-tabbar .blk-tab-add { font-size: .6em; width: 1.95em; height: 1.95em; color: var(--s-sub, #C7CAEB); }
+/* The + on the tab names' line (the lead on PR 2): a 28 circle, centred on the tabs' own 38 height, 6 after the last tab
+   (the band's 2 gap and 4). */
+.deck-sl.is-blocks .blk-tabbar .blk-tab-add { align-self: flex-end; margin: 0 0 .35em .28em; }
+.deck-sl.is-blocks .blk-tabbar .blk-tab-input { padding: .25em .5em; outline-color: var(--s-acc, #F2B544); }
+.deck-sl.is-blocks.is-editing .blk-tabpane { cursor: text; }
+/* In a Text document: the tabs as the block's header on a lighter band, the open tab on the pane's ground. The open
+   pane alone shows, and grows with what it holds. */
+.blk-tabs.is-text { display: flex; flex-direction: column; margin: 1.2em 0; border-radius: 12px; background: var(--r-surface-soft); overflow: hidden; }
+.blk-tabs.is-text::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--r-hairline); pointer-events: none; }
+.blk-tabs.is-text .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; font-size: 14px; }
+.blk-tabs.is-text .blk-tabbar::-webkit-scrollbar { display: none; }
+.blk-tabs.is-text .blk-tab { flex: none; display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 9px 9px 0 0; color: var(--r-ink-muted); font: 600 14px/1 'Sofia Sans', var(--vscode-font-family, sans-serif); white-space: nowrap; transition: background-color .12s, color .12s; }
+.blk-tabs.is-text .blk-tab:not(.is-active):hover { color: var(--r-ink-body); background: color-mix(in srgb, var(--r-ink-strong) 5%, transparent); }
+.blk-tabs.is-text .blk-tab:not(.is-active):active { background: color-mix(in srgb, var(--r-ink-strong) 9%, transparent); }
+.blk-tabs.is-text .blk-tab.is-active { color: var(--r-ink-strong); background: var(--r-surface); }
+.blk-tabs.is-text .blk-tabbar .blk-tab-add { align-self: flex-end; width: 24px; height: 24px; margin: 0 0 5px 4px; color: var(--r-ink-muted); }
+.blk-tabs.is-text[data-fit="1"] .blk-tab { padding: 0 10px; }
+.blk-tabs.is-text[data-fit="2"] .blk-tab { padding: 0 10px; font-size: 13px; }
+.blk-tabs.is-text[data-fit="3"] .blk-tab { padding: 0 10px; font-size: 12px; }
+.blk-tabs.is-text .blk-tabpanes { background: var(--r-surface); }
+.blk-tabs.is-text .blk-tabpane { display: none; padding: 12px 18px 14px; }
+.blk-tabs.is-text .blk-tabpane > :first-child { margin-top: 0; }
+.blk-tabs.is-text .blk-tabpane > :last-child { margin-bottom: 0; }
+.blk-tabs.is-text .blk-tabpane > p.is-empty:only-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--r-ink-faint); }
+.blk-tabs.is-text > .blk-tabpanes > .blk-tabpane.is-active,
+.blk-tabs.is-text:not([data-active]) > .blk-tabpanes > .blk-tabpane:first-child,
+.blk-tabs.is-text[data-active="0"] > .blk-tabpanes > .blk-tabpane:nth-child(1), .blk-tabs.is-text[data-active="1"] > .blk-tabpanes > .blk-tabpane:nth-child(2),
+.blk-tabs.is-text[data-active="2"] > .blk-tabpanes > .blk-tabpane:nth-child(3), .blk-tabs.is-text[data-active="3"] > .blk-tabpanes > .blk-tabpane:nth-child(4),
+.blk-tabs.is-text[data-active="4"] > .blk-tabpanes > .blk-tabpane:nth-child(5), .blk-tabs.is-text[data-active="5"] > .blk-tabpanes > .blk-tabpane:nth-child(6),
+.blk-tabs.is-text[data-active="6"] > .blk-tabpanes > .blk-tabpane:nth-child(7), .blk-tabs.is-text[data-active="7"] > .blk-tabpanes > .blk-tabpane:nth-child(8),
+.blk-tabs.is-text[data-active="8"] > .blk-tabpanes > .blk-tabpane:nth-child(9), .blk-tabs.is-text[data-active="9"] > .blk-tabpanes > .blk-tabpane:nth-child(10),
+.blk-tabs.is-text[data-active="10"] > .blk-tabpanes > .blk-tabpane:nth-child(11), .blk-tabs.is-text[data-active="11"] > .blk-tabpanes > .blk-tabpane:nth-child(12),
+.blk-tabs.is-text[data-active="12"] > .blk-tabpanes > .blk-tabpane:nth-child(13), .blk-tabs.is-text[data-active="13"] > .blk-tabpanes > .blk-tabpane:nth-child(14),
+.blk-tabs.is-text[data-active="14"] > .blk-tabpanes > .blk-tabpane:nth-child(15), .blk-tabs.is-text[data-active="15"] > .blk-tabpanes > .blk-tabpane:nth-child(16),
+.blk-tabs.is-text[data-active="16"] > .blk-tabpanes > .blk-tabpane:nth-child(17), .blk-tabs.is-text[data-active="17"] > .blk-tabpanes > .blk-tabpane:nth-child(18),
+.blk-tabs.is-text[data-active="18"] > .blk-tabpanes > .blk-tabpane:nth-child(19), .blk-tabs.is-text[data-active="19"] > .blk-tabpanes > .blk-tabpane:nth-child(20),
+.blk-tabs.is-text[data-active="20"] > .blk-tabpanes > .blk-tabpane:nth-child(21), .blk-tabs.is-text[data-active="21"] > .blk-tabpanes > .blk-tabpane:nth-child(22),
+.blk-tabs.is-text[data-active="22"] > .blk-tabpanes > .blk-tabpane:nth-child(23), .blk-tabs.is-text[data-active="23"] > .blk-tabpanes > .blk-tabpane:nth-child(24) { display: block; }

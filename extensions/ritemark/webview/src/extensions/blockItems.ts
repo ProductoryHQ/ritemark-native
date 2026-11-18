@@ -4,7 +4,9 @@
  */
 
 import type { PhosphorIconName } from '../components/ui/Icon'
+import type { Transaction } from '@tiptap/pm/state'
 import { sendToExtension, emitInternalEvent } from '../bridge'
+import { insertTabsBlock } from './tabs/tabsCommands'
 import { insertButton } from './buttonBlock/buttonCommands'
 
 export interface BlockItemDef {
@@ -29,6 +31,8 @@ export const PICTURE_KEYWORDS = ['image', 'img', 'photo', 'pic', 'screenshot', '
 export const BULLET_LIST_KEYWORDS = ['list', 'bullets', 'ul', 'loend', 'täpploend']
 export const NUMBERED_LIST_KEYWORDS = ['list', 'numbers', 'ol', 'loend', 'nummerdatud']
 export const TABLE_KEYWORDS = ['grid', 'tabel']
+/** Sprint 163: the Tabs block's (decks README "Tabs in the editor"). */
+export const TABS_KEYWORDS = ['tab', 'tabs', 'tabset', 'sakid', 'sakk', 'vahelehed']
 /** Sprint 163 PR 1: Code Block's words, shared with the slide's Code block (both / menus find it by them). */
 export const CODE_BLOCK_KEYWORDS = ['code', 'snippet', 'kood']
 /** Sprint 163 PR 3: the Button block's hidden words (the decks README), the same in both / menus. */
@@ -47,6 +51,8 @@ export const blockItems: BlockItemDef[] = [
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
   { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
+  // Sprint 163: tabs, each pane ordinary blocks; the same block as on a slide (decks README "Tabs, one block everywhere").
+  { title: 'Tabs', description: 'Insert tabs, each with its own text', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
   // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
   { title: 'Button', description: 'A button that opens an address', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
@@ -135,6 +141,12 @@ export function executeSlashCommand(editor: any, range: any, item: BlockItemDef)
     return
   }
 
+  // Sprint 163: "Tab 1" and "Tab 2", the first name chosen so typing names it.
+  if (item.nodeType === 'tabs') {
+    editor.chain().focus().deleteRange(range).command(({ tr }: { tr: Transaction }) => { insertTabsBlock(tr, range.from, editor.view); return true }).run()
+    return
+  }
+
   // Sprint 163 PR 3: the button where the / was, its address sheet open at once (`ButtonBlockTools`).
   if (item.nodeType === 'button') {
     editor.chain().focus().deleteRange(range).command(({ tr }: { tr: Parameters<typeof insertButton>[0] }) => { insertButton(tr, range.from); return true }).run()
@@ -199,6 +211,12 @@ export function executeBlockInsert(editor: any, pos: number, item: BlockItemDef)
 
   if (item.nodeType === 'table') {
     editor.chain().focus().setTextSelection(pos).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+    return
+  }
+
+  // Sprint 163: a new Tabs block at the position, its first name chosen.
+  if (item.nodeType === 'tabs') {
+    editor.chain().focus().command(({ tr }: { tr: Transaction }) => { insertTabsBlock(tr, pos, editor.view); return true }).run()
     return
   }
 

@@ -159,6 +159,12 @@ function visit(tokens: Token[], container: SlideAnchor, out: SlideComment[], tit
       visit((token as unknown as SlideDivToken).tokens, { kind: 'block', block: shape }, out, titleSeen);
       continue;
     }
+    // Sprint 163: a Tabs block's panes hold blocks too; a comment in one is on the block it stands before, or on the
+    // Tabs block.
+    if (token.type === 'slideTabs') {
+      for (const pane of (token as unknown as { tabs: Array<{ tokens: Token[] }> }).tabs) visit(pane.tokens, { kind: 'block', block: shape }, out, titleSeen);
+      continue;
+    }
     wordsComments(token, shape, out);
   }
 }

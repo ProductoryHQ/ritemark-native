@@ -270,12 +270,26 @@ async function main(): Promise<void> {
     wall.send({ type: 'present/spot', item: 0 });
     await settle();
     assert.equal(last(wall, 'present/wall').fill, null);
+    // Sprint 163: a tab chosen on Now shows on the wall; only the presenter view chooses, it is no move, and a move
+    // starts every Tabs block at its first tab again (below).
+    presenterView.send({ type: 'present/tab', block: 0, tab: 2 });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'the wall shows the tab Now chose');
+    assert.deepEqual(last(presenterView, 'present/presenter').tabs, [2], 'Now shows it too');
+    assert.equal((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'a tab is not a move');
+    wall.send({ type: 'present/tab', block: 0, tab: 1 });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'the wall never chooses a tab');
+    presenterView.send({ type: 'present/tab', block: 0, tab: -1 });
+    await settle();
+    assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'a place that is not one is not a request');
     // → clears it and goes on, once.
     const spotStates = wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length;
     wall.send({ type: 'present/next' });
     await settle();
     assert.equal(last(wall, 'present/wall').spot, null, 'a move clears the spotlight');
     assert.equal(last(presenterView, 'present/presenter').spot, null);
+    assert.deepEqual(last(wall, 'present/wall').tabs, [], 'a move starts every Tabs block at its first tab');
     assert.notEqual((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'and goes on');
     assert.equal(wall.posted.filter(message => (message as { type?: string }).type === 'present/wall').length, spotStates + 1, 'in one press');
     // The wall drawn again without a move keeps the spotlight on the same slide, and lets it go when the slide comes

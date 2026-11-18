@@ -31,6 +31,7 @@ import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { PresenterState, WallPoint, WallSlide, WallTimer } from '../../../../../src/decks/present/presentProtocol'
+import { withTab } from '../../../../../src/decks/present/wallTabs'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
 import { Button } from '../../ui/button'
@@ -124,8 +125,23 @@ function useClock(startedAt: number | null): { now: number; elapsed: number; pau
 
 const NO_SLIDES: WallSlide[] = []
 
+/**
+ * Sprint 163: the tab a click on Now hits: its Tabs block's place among the slide's Tabs blocks and its own place in
+ * the band, as the renderer numbers them; null for a click anywhere else.
+ */
+function tabHit(target: EventTarget | null): { block: number; tab: number } | null {
+  const tab = target instanceof Element ? target.closest('.blk-tab') : null
+  const block = tab?.closest('.blk-tabs')
+  if (!tab || !block) return null
+  const index = Number(block.getAttribute('data-tabs-index'))
+  const place = Array.from(tab.parentElement?.children ?? []).indexOf(tab)
+  return Number.isInteger(index) && index >= 0 && place >= 0 ? { block: index, tab: place } : null
+}
+
 export function DeckPresenterView() {
   const [state, setState] = useState<PresenterState | null>(null)
+  // Sprint 163: the tabs this window last chose on Now's slide, shown until the host's state carries them.
+  const [chosenTabs, setChosenTabs] = useState<{ slide: number; tabs: number[] } | null>(null)
   const [noteSize, setNoteSize] = useState(DEFAULT_NOTE_SIZE)
   const [digits, setDigits] = useState<string | null>(null)
   const [peeked, setPeeked] = useState<{ number: number; title: string | null } | null>(null)
@@ -171,6 +187,8 @@ export function DeckPresenterView() {
       focus.settle(next, shownNumber.current === null || shownNumber.current === next.current.number)
       shownNumber.current = next.current.number
       setState(next)
+      // Sprint 163: the host's state carries the tabs chosen (or a move's first tabs) from here on.
+      setChosenTabs(null)
     }
     else if (message.type === 'present/peeked' && typeof message.number === 'number') {
       setPeeked({ number: message.number, title: typeof message.title === 'string' ? message.title : null })
@@ -332,12 +350,19 @@ export function DeckPresenterView() {
       return
     }
     if (fillNow(state.fill, fillShown.current) !== null) { askFill(null); return }
+    // Sprint 163: a tab clicked in Now shows on the wall (never a spotlight: the block is one item).
+    const tab = tabHit(event.target)
+    if (tab) {
+      setChosenTabs(current => ({ slide: state.current.number, tabs: withTab(current?.slide === state.current.number ? current.tabs : state.tabs, tab.block, tab.tab) }))
+      send('present/tab', tab)
+      return
+    }
     const hit = spotHit(nowRef.current?.querySelector(NOW_SLIDE) ?? null, event.clientX, event.clientY)
     const click = spotClickOf(hit, spotNow(state.spot), 'none')
     if (!click || click.type === 'next') return
     if (click.type === 'fill') askFill(click.item)
     else askSpot(click.type === 'spot' ? click.item : null)
-  }, [state, askSpot, askFill, spotNow, fillNow])
+  }, [state, askSpot, askFill, spotNow, fillNow, send])
 
   // The row keeps the current slide in view.
   useLayoutEffect(() => {
@@ -373,11 +398,13 @@ export function DeckPresenterView() {
   // Item 12: the dot in Now, where the room sees it on the wall.
   const nowDotAt = pointing && nowDot ? dotPlace(nowDot, { left: 0, top: 0, width: nowWidth, height: nowHeight }) : null
   // README item 18: Now and Next are drawn at their step (`reveal`); the row shows every slide whole.
-  const canvas = (slide: WallSlide, width: number, reveal?: number) => (
+  const canvas = (slide: WallSlide, width: number, reveal?: number, tabs?: readonly number[]) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} tabs={tabs} />
     </div>
   )
+  // Sprint 163: Now shows the tab just clicked at once, then the host's state (the same, unless a move came first).
+  const nowTabs = chosenTabs?.slide === state.current.number ? chosenTabs.tabs : state.tabs
   const shownLine = revealLabel(state.reveal)
 
   return (
@@ -387,13 +414,13 @@ export function DeckPresenterView() {
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
         <div
           ref={nowRef}
-          className={`pv-now deck-spot${pointing ? ' is-pointing' : ''}`}
+          className={`pv-now deck-spot tabs-pickable${pointing ? ' is-pointing' : ''}`}
           onClick={onNowClick}
           onPointerMove={onNowPointer}
           onPointerEnter={onNowPointer}
           onPointerLeave={onNowLeave}
         >
-          {canvas(state.current, nowWidth, state.reveal?.shown)}
+          {canvas(state.current, nowWidth, state.reveal?.shown, nowTabs)}
           {nowDotAt ? <span className="pv-dot" style={{ left: nowDotAt.left, top: nowDotAt.top, background: state.theme.accent }} aria-hidden="true" /> : null}
           {fillUrl && !state.blank ? (
             // Item 11: what the room sees, the picture whole on the theme's ground, and how to return.
