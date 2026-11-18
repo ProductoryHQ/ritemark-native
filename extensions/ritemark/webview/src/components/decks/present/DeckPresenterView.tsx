@@ -14,6 +14,11 @@
  *  - The spotlight (decks README item 16): a click on an item in Now spotlights it on the wall, and Now shows the same
  *    dimming; the wall's click rule (`spotClickOf`), except that a click outside any item never steps. A click on the
  *    spotlit picture fills the wall with it (item 11), and Now says so; any key or a click on Now returns.
+ *  - The pointer dot (decks README item 12): while L is held, the pointer over Now shows a soft accent dot at the same
+ *    place on the wall (`present/pointer`, at most once a frame), and in Now; off Now, or L let go, it goes.
+ *  - The timer for an exercise (item 9): on a slide with a Steps block, Timer offers 5, 10, 15, 20 or 30 min, the
+ *    default from a number in the Steps label or on the slide; Start puts the countdown on the wall. While it runs it is
+ *    shown here on every slide, with Restart and Stop (`pointerTimer.ts`).
  *  - Back, Next (the one bright button), Swap displays (with two displays) and Stop.
  *  - "Claude and notices wait until you stop.": the main window, with the AI and the notices, stays behind.
  *
@@ -22,17 +27,20 @@
  */
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
-import type { PresenterState, WallSlide } from '../../../../../src/decks/present/presentProtocol'
+import type { PresenterState, WallPoint, WallSlide, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
 import { Button } from '../../ui/button'
 import { Icon } from '../../ui/Icon'
+import { SegmentedControl } from '../../ui/segmented-control'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, clockText, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
+import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerOfferOf, TIMER_MINUTES } from './pointerTimer'
+import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './presenter.css'
 
@@ -56,6 +64,36 @@ function useScreenSize(): { width: number; height: number } {
     return () => window.removeEventListener('resize', update)
   }, [])
   return size
+}
+
+/**
+ * Item 9: the timer while it runs, on every slide: the time left as the wall shows it (or that it is up), Restart for
+ * the same minutes, and Stop.
+ */
+function PresenterTimer({ timer, onRestart, onStop }: { timer: WallTimer; onRestart: () => void; onStop: () => void }) {
+  // Here the words are enough: nothing pulses in the presenter view.
+  const look = timerLook(timer, useTimerNow(timer), true)
+  return (
+    <div className="pv-timer is-running">
+      <span className="pv-label">{`Timer · ${timer.minutes} min, on the wall`}</span>
+      <div className="pv-timer-row">
+        <span className={`pv-timer-left${look.done ? ' is-done' : ''}`} role="timer">{look.done ? 'Time is up' : `${look.text} left`}</span>
+        <span className="pv-grow" />
+        <Tooltip label={`Start the ${timer.minutes} minutes again`}>
+          <Button variant="outline" onClick={onRestart}>
+            <Icon name="arrow-counter-clockwise" size={16} tone="inherit" />
+            Restart
+          </Button>
+        </Tooltip>
+        <Tooltip label="Stop the timer and take it off the wall">
+          <Button variant="outline" onClick={onStop}>
+            <Icon name="square" size={16} tone="inherit" />
+            Stop timer
+          </Button>
+        </Tooltip>
+      </div>
+    </div>
+  )
 }
 
 /** The clock: elapsed since the start, with Pause and Reset of its own. */
@@ -101,6 +139,18 @@ export function DeckPresenterView() {
   const [fillUrl, setFillUrl] = useState<string | null>(null)
   const fillShown = useRef(false)
   fillShown.current = fillUrl !== null
+  // Item 12: L held here, the pointer's place on Now's slide, and the place last sent to the wall (once a frame).
+  const [pointing, setPointing] = useState(false)
+  // The one place `pointing` is known between renders; set only by setPointer.
+  const pointingRef = useRef(false)
+  // The pointer's last place in this window, so L held before the pointer moves still finds it over Now.
+  const lastClient = useRef<{ x: number; y: number } | null>(null)
+  const [nowDot, setNowDot] = useState<WallPoint | null>(null)
+  const overNow = useRef<WallPoint | null>(null)
+  const sentDot = useRef<WallPoint | null>(null)
+  const dotFrame = useRef<number | null>(null)
+  // Item 9: the minutes chosen for this slide's timer (the slide's default until one is chosen).
+  const [picked, setPicked] = useState<{ slide: number; minutes: number } | null>(null)
   // The time of day's format, made again only when the system's clock changes.
   const clockLocale = state?.clock.locale ?? null
   const hourCycle = state?.clock.hourCycle ?? null
@@ -130,6 +180,46 @@ export function DeckPresenterView() {
     sendToExtension(type, data)
   }, [letGo])
   const askSpot = useCallback((item: number | null) => askSpotWith(item, sendToExtension), [askSpotWith])
+
+  // ---- item 12: the dot's place goes to the wall at most once a frame, and only when it moved
+  const sendDot = useCallback((at: WallPoint | null) => {
+    setNowDot(at)
+    if (dotFrame.current !== null) return
+    dotFrame.current = window.requestAnimationFrame(() => {
+      dotFrame.current = null
+      const latest = pointingRef.current ? overNow.current : null
+      if (samePoint(latest, sentDot.current)) return
+      sentDot.current = latest
+      sendToExtension('present/pointer', { at: latest })
+    })
+  }, [])
+  useEffect(() => () => { if (dotFrame.current !== null) window.cancelAnimationFrame(dotFrame.current) }, [])
+  const setPointer = useCallback((on: boolean) => {
+    if (pointingRef.current === on) return
+    pointingRef.current = on
+    setPointing(on)
+    if (on) {
+      // Where the pointer is now, over Now's slide as it is drawn now (a step may have drawn another since it moved).
+      const rect = nowRef.current?.querySelector<HTMLElement>(NOW_SLIDE)?.getBoundingClientRect()
+      const at = lastClient.current
+      overNow.current = rect && at ? pointOnSlide(rect, at.x, at.y) : null
+    }
+    sendDot(on ? overNow.current : null)
+  }, [sendDot])
+  useEffect(() => {
+    const track = (event: PointerEvent) => { lastClient.current = { x: event.clientX, y: event.clientY } }
+    window.addEventListener('pointermove', track, true)
+    return () => window.removeEventListener('pointermove', track, true)
+  }, [])
+  const onNowPointer = useCallback((event: { clientX: number; clientY: number }) => {
+    const rect = nowRef.current?.querySelector<HTMLElement>(NOW_SLIDE)?.getBoundingClientRect()
+    overNow.current = rect ? pointOnSlide(rect, event.clientX, event.clientY) : null
+    if (pointingRef.current) sendDot(overNow.current)
+  }, [sendDot])
+  const onNowLeave = useCallback(() => {
+    overNow.current = null
+    if (pointingRef.current) sendDot(null)
+  }, [sendDot])
   const askFill = useCallback((item: number | null) => askFillWith(item, sendToExtension), [askFillWith])
 
   // Now shows the wall's spotlight, and the picture that fills the wall (read from Now's own drawing of the slide).
@@ -185,6 +275,13 @@ export function DeckPresenterView() {
         return
       }
       if (digits !== null) { setDigits(null); setPeeked(null) }
+      // The pointer dot (item 12): L held shows it on the wall where the pointer is over Now; its repeats change nothing.
+      const pointerStep = pointerKeyStep(pointingRef.current, 'down', event)
+      if (pointerStep) {
+        take()
+        setPointer(true)
+        return
+      }
       // The spotlight (item 16): F, Tab and Shift+Tab, and Esc while one is on. Without one, Tab reaches this view's
       // buttons as usual.
       const spotStep = spotKeyOf(event, spotNow(state.spot), spotItems(nowRef.current?.querySelector(NOW_SLIDE) ?? null).length)
@@ -200,14 +297,25 @@ export function DeckPresenterView() {
       take()
       send(key.type === 'stop' ? 'present/stop' : `present/${key.type}`)
     }
-    const onKeyUp = (event: KeyboardEvent) => { if (heldKey.current === event.key) heldKey.current = null }
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (heldKey.current === event.key) heldKey.current = null
+      const pointerStep = pointerKeyStep(pointingRef.current, 'up', event)
+      if (pointerStep) {
+        if (pointerStep.take) { event.preventDefault(); event.stopPropagation() }
+        setPointer(false)
+      }
+    }
+    // L let go in another window never comes here: the dot goes when this window loses the keys.
+    const onBlur = () => setPointer(false)
     window.addEventListener('keydown', onKey, true)
     window.addEventListener('keyup', onKeyUp, true)
+    window.addEventListener('blur', onBlur)
     return () => {
       window.removeEventListener('keydown', onKey, true)
       window.removeEventListener('keyup', onKeyUp, true)
+      window.removeEventListener('blur', onBlur)
     }
-  }, [state, digits, send, askSpot, askFill, spotNow, fillNow])
+  }, [state, digits, send, askSpot, askFill, spotNow, fillNow, setPointer])
 
   // A click on Now acts on what it hits, on the wall (`spotClickOf`); on a blank or filled wall it brings the slide back.
   const onNowClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -251,6 +359,12 @@ export function DeckPresenterView() {
     askedBlank.current = { to }
     send('present/blank', { to })
   }
+  // Item 9: the timer this slide offers (a Steps block), with the minutes chosen for it, and the one running.
+  const offer = timerOfferOf(state.current)
+  const timerMinutes = picked?.slide === state.current.number ? picked.minutes : offer?.minutes ?? null
+  const startTimer = (minutes: number) => send('present/timer', { minutes })
+  // Item 12: the dot in Now, where the room sees it on the wall.
+  const nowDotAt = pointing && nowDot ? dotPlace(nowDot, { left: 0, top: 0, width: nowWidth, height: nowHeight }) : null
   const canvas = (slide: WallSlide, width: number) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
       <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
@@ -262,8 +376,16 @@ export function DeckPresenterView() {
     <div className="deck-presenter dark">
       <div className="pv-main" style={{ width: nowWidth }}>
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
-        <div ref={nowRef} className="pv-now deck-spot" onClick={onNowClick}>
+        <div
+          ref={nowRef}
+          className={`pv-now deck-spot${pointing ? ' is-pointing' : ''}`}
+          onClick={onNowClick}
+          onPointerMove={onNowPointer}
+          onPointerEnter={onNowPointer}
+          onPointerLeave={onNowLeave}
+        >
           {canvas(state.current, nowWidth)}
+          {nowDotAt ? <span className="pv-dot" style={{ left: nowDotAt.left, top: nowDotAt.top, background: state.theme.accent }} aria-hidden="true" /> : null}
           {fillUrl && !state.blank ? (
             // Item 11: what the room sees, the picture whole on the theme's ground, and how to return.
             <div className="pv-blank">
@@ -314,6 +436,29 @@ export function DeckPresenterView() {
       <div className="pv-side">
         <div className="pv-label">Next</div>
         {state.next ? canvas(state.next, SIDE_WIDTH) : <div className="pv-end">The end of the deck</div>}
+        {state.timer ? (
+          <PresenterTimer timer={state.timer} onRestart={() => startTimer(state.timer?.minutes ?? TIMER_MINUTES[1])} onStop={() => send('present/timer', { minutes: null })} />
+        ) : offer && timerMinutes !== null ? (
+          <div className="pv-timer">
+            <span className="pv-label">Timer</span>
+            <div className="pv-timer-row">
+              <SegmentedControl
+                aria-label="The exercise’s minutes"
+                value={String(timerMinutes)}
+                onValueChange={value => setPicked({ slide: state.current.number, minutes: Number(value) })}
+                options={offer.choices.map(minutes => ({ value: String(minutes), label: String(minutes) }))}
+              />
+              <span className="pv-timer-unit">min</span>
+              <span className="pv-grow" />
+              <Tooltip label={`Show a ${timerMinutes}-minute countdown on the wall, at the bottom right`}>
+                <Button variant="outline" onClick={() => startTimer(timerMinutes)}>
+                  <Icon name="timer" size={16} tone="inherit" />
+                  Start
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
+        ) : null}
         <div className="pv-notes-head">
           <span className="pv-label">Your comments</span>
           <span className="pv-sizes">
