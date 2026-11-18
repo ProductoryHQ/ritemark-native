@@ -40,8 +40,13 @@ import { playStep } from './playMotion'
     assert.equal(stepOf(transition, true, false), 'none', `${transition} with reduced motion`)
     assert.equal(stepOf(transition, true, true), 'none', `${transition} with reduced motion and a match`)
     assert.equal(stepOf(transition, false, false), transition)
+  }
+  for (const transition of ['fade', 'push', 'zoom'] as const) {
     assert.equal(stepOf(transition, false, true), 'move', 'where elements match, the move takes the place of the transition')
   }
+  // README item 19 (18 November): None is a cut, with no glide and no fade, even where elements match.
+  assert.equal(stepOf('none', false, true), 'none', 'None never glides')
+  assert.equal(MOTION_MS[stepOf('none', false, true)], 0, 'and takes no time')
   assert.equal(directionOf(3, 4), 'next')
   assert.equal(directionOf(4, 3), 'back')
   assert.equal(directionOf(2, 9), 'next', 'a go-to forward')

@@ -9,7 +9,8 @@
  *    else cross-fades. Where things match, the move takes the place of the deck's transition for that step.
  *  - A press during a transition or a move jumps it to its end at once and goes on (`MotionRun.finish`), so a press
  *    never waits.
- *  - Reduced motion means None, whatever the deck says (`stepOf`).
+ *  - Reduced motion means None, whatever the deck says (`stepOf`). A deck whose transition is None never moves: no glide
+ *    either, even where elements match.
  *
  * Pure but for the reading of a drawn slide (`motionKeysOf`, which takes the elements it is given), so the tests drive
  * the same rules the wall runs. The drawing of a step is `playMotion.ts`.
@@ -52,10 +53,11 @@ export function transitionValue(transition: DeckTransition): { present: true; va
 
 /**
  * What a step does: nothing moves with reduced motion, or while the wall is covered (blank, the page's QR code, a picture
- * filling it: `still`); where elements match, the smooth move; else the deck's own.
+ * filling it: `still`), or in a deck whose transition is None (a cut, with no glide and no fade, even where elements
+ * match: README item 19, the Experience lead, 18 November); where elements match, the smooth move; else the deck's own.
  */
 export function stepOf(transition: DeckTransition, still: boolean, matched: boolean): MotionStep {
-  if (still) return 'none'
+  if (still || transition === 'none') return 'none'
   if (matched) return 'move'
   return transition
 }

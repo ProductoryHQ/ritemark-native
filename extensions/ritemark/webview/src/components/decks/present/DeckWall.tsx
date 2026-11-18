@@ -170,8 +170,10 @@ export function DeckWall() {
       // when it is shown again.
       const covered = current.blank !== null || current.fill !== null || fillShown.current
       const still = prefersReducedMotion() || covered
-      const pairs = still ? [] : motionPairsOf(before, now)
-      const step = stepOf(transitionOf(current.transition), still, pairs.length > 0)
+      const transition = transitionOf(current.transition)
+      // None is a cut, even where elements match: nothing to look for.
+      const pairs = still || transition === 'none' ? [] : motionPairsOf(before, now)
+      const step = stepOf(transition, still, pairs.length > 0)
       const direction = leavingDirection.current
       const drawing = playStep(step, direction, { leaving: before, entering: now, distance: window.innerWidth }, pairs)
       run.begin(MOTION_MS[step], drawing, () => setLeaving(value => (value?.serial === leavingSerial ? null : value)))
