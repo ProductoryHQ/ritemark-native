@@ -119,6 +119,31 @@ export interface SheetSignInMessage {
 /** What the sheet keeps of it, per AI. */
 export type SheetSignInView = Pick<SheetSignInMessage, 'page' | 'line'>;
 
+/**
+ * Pictures with ChatGPT (the Experience lead on #800): a ChatGPT item opened the sheet on ChatGPT's sign-in card, so
+ * the card takes one soft accent ring for `SIGN_IN_ATTENTION_MS` (none with reduced motion), to be found at once.
+ */
+export interface SheetSignInAttentionMessage {
+  type: 'onboarding:sign-in-attention';
+  ai: SheetSignInAi;
+}
+
+/** How long the ring shows. */
+export const SIGN_IN_ATTENTION_MS = 1_500;
+
+/** The AI whose card is to be found, from a host message; null for anything else. */
+export function signInAttentionOf(message: unknown): SheetSignInAi | null {
+  if (!message || typeof message !== 'object') return null;
+  const value = message as { type?: unknown; ai?: unknown };
+  if (value.type !== 'onboarding:sign-in-attention') return null;
+  return value.ai === 'claude' || value.ai === 'chatgpt' ? value.ai : null;
+}
+
+/** Whether a ring that started at `since` (ms) still shows at `now`. */
+export function signInAttentionShows(since: number | null | undefined, now: number): boolean {
+  return typeof since === 'number' && now >= since && now - since < SIGN_IN_ATTENTION_MS;
+}
+
 /** Sprint 160 (#696): the card's Cancel and its "Open the page again", from the sheet to the host. */
 export interface SheetSignInRequest {
   type: 'onboarding:cancel-sign-in' | 'onboarding:reopen-sign-in';

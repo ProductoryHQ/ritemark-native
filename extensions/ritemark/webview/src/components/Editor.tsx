@@ -10,7 +10,7 @@ import { sendToExtension, onMessage } from '../bridge'
 import { getClipboardImageFile, getUniqueImageFilename, readFileAsBase64, shouldPreferTextPaste } from '../lib/pastedImage'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CodeBlockWithCopyExtension } from '../extensions/CodeBlockWithCopyExtension'
-import { sameRelativeImagePath } from '../../../src/utils/imagePaths'
+import { isRelativeImagePath, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 import { ImageExtension } from '../extensions/imageExtensions'
 import { SlashCommands } from '../extensions/SlashCommands'
 import { FileLinkSuggestions } from '../extensions/FileLinkSuggestions'
@@ -27,7 +27,9 @@ import { FormattingBubbleMenu } from './FormattingBubbleMenu'
 import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
 import { PictureTools } from './pictures/PictureTools'
-import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture } from '../extensions/pictures/pictureCommands'
+import { PictureMakerView, usePictureMaker, type PictureMode, type PicturePlaceRef } from './pictures/ChatgptPicture'
+import { imagePathOf } from '../extensions/pictures/PictureNode'
+import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture, replacePictureKeepingCaret } from '../extensions/pictures/pictureCommands'
 import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
 import { cellAtSelection, deleteColumn, deleteRow, insertColumn, insertRow } from '../extensions/tables/tableOps'
@@ -380,6 +382,40 @@ export function Editor({
       onSelectionChange(editorSelection)
     }
   }, [editorSelection, onSelectionChange])
+
+  // Pictures with ChatGPT (experience 49): Make a new picture… and Change this picture… on a chosen picture. The made
+  // picture takes its place as one undo step, keeping its size, as Replace picture… does.
+  const pictureRect = React.useCallback((place: PicturePlaceRef): DOMRect | null => {
+    if (!editor || editor.isDestroyed || place.kind !== 'flow') return null
+    const dom = editor.view.nodeDOM(place.pos) as HTMLElement | null
+    const root = (dom?.firstElementChild ?? dom) as HTMLElement | null
+    return root?.isConnected ? root.getBoundingClientRect() : null
+  }, [editor])
+  const pictureMaker = usePictureMaker({
+    editor,
+    rectOf: pictureRect,
+    beforeMake: ask => (ask.place.kind === 'flow' && editor && !editor.isDestroyed && editor.state.doc.nodeAt(ask.place.pos)?.type.name === 'image' ? {} : null),
+    placeMade: (place, picture, describe) => {
+      if (!editor || editor.isDestroyed || place.kind !== 'flow') return
+      const old = editor.state.doc.nodeAt(place.pos)
+      const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
+      const tr = replacePictureKeepingCaret(editor.state, place.pos, { src: picture.url, title: picture.path }, alt)
+      if (tr) editor.view.dispatch(tr)
+    },
+    undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run() },
+  })
+  const startPictureMaker = (pos: number, mode: PictureMode) => {
+    const node = editor?.state.doc.nodeAt(pos)
+    if (!node) return
+    const alt = String(node.attrs.alt ?? '')
+    pictureMaker.start({
+      place: { kind: 'flow', pos, path: imagePathOf(node.attrs) ?? undefined },
+      mode,
+      // A new picture starts from the old one's description; a change from nothing.
+      suggestion: mode === 'new' ? alt : '',
+      ...(mode === 'change' ? { source: imagePathOf(node.attrs) ?? '' } : {}),
+    })
+  }
 
   // Experience 49: the picture being replaced follows its place through edits made while the host saves the new one.
   useEffect(() => {
@@ -818,7 +854,11 @@ export function Editor({
               replaceImagePosRef.current = pos
               sendToExtension('selectImageFile')
             }}
+            onChatgpt={startPictureMaker}
+            chatgptCanChange={pos => isRelativeImagePath(imagePathOf(editor.state.doc.nodeAt(pos)?.attrs ?? {}) ?? '')}
+            barHidden={pictureMaker.state.phase !== 'idle'}
           />
+          <PictureMakerView maker={pictureMaker} rectOf={pictureRect} />
           {/* Block insertion menu (triggered by + button) */}
           {showBlockMenu && (
             <div

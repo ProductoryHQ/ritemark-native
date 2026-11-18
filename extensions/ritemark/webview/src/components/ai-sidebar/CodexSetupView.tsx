@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { EnvironmentStatusNotice } from './EnvironmentStatusNotice';
 import { useAISidebarStore } from './store';
+import { useSignInAttention } from './signInAttention';
 
 export function CodexSetupView() {
   const codexStatus = useAISidebarStore((s) => s.codexStatus);
@@ -11,6 +12,7 @@ export function CodexSetupView() {
   const logoutCodex = useAISidebarStore((s) => s.logoutCodex);
   const repairCodex = useAISidebarStore((s) => s.repairCodex);
   const reloadWindow = useAISidebarStore((s) => s.reloadWindow);
+  const ring = useSignInAttention('chatgpt');
 
   if (codexStatus.state === 'ready') {
     return null;
@@ -47,7 +49,7 @@ export function CodexSetupView() {
 
   return (
     <div className="flex-1 overflow-y-auto px-3 py-4">
-      <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4">
+      <div className={`rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 ${ring}`}>
         <div className="flex items-start gap-3">
           <div className="mt-0.5 shrink-0">
             {isChecking ? (

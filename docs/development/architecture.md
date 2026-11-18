@@ -197,6 +197,7 @@ extensions/ritemark/src/
 ├── update/          Seamless updates — feed, resolver, installer, integrity, status bar
 ├── welcome/         The welcome (Sprint 133) — profile kind, provider states, protocol, landing, new project, sample project
 ├── analytics/       PostHog through one consent gate (consent.ts, Sprint 133), events, reactions
+├── pictures/        Pictures with ChatGPT (experience 49): the picture bar's Make a new picture… / Change this picture…, one Codex one-shot with its image tool, the picture saved into images/
 └── [editors]        ritemarkEditor.ts, docxEditorProvider.ts, pdfEditorProvider.ts, excelEditorProvider.ts, drawioEditorProvider.ts, transcriptWorkbenchProvider.ts
 ```
 
@@ -492,6 +493,7 @@ Each project folder has one task board. Its cards are Markdown files in the fold
 | `taskBoard/CardTaskStore.ts` + `CardHandoffLedger.ts` | Give to agent: one record per card under `<globalStorage>/task-board/v1/<project key>/`, the turn's lifecycle from the AI sidebar's task events, the result written back onto the card |
 | `taskBoard/boardPrompt.ts` | The one card prompt: `displayText` (the user's request) and `prompt` (adds the card line when the runtime has the board tools) |
 | `taskBoard/ideaReview.ts` | Review with {Agent}: one tool-free call through `runtime/oneShotTurn.ts` (shared with conversation titles), strict JSON parsing |
+| `pictures/chatgptPicture.ts` + `chatgptPictureHost.ts` | Pictures with ChatGPT (2026-11-18): the picture bar's `picture/check`, `picture/make` and `picture/cancel`, for a document and a deck. ChatGPT's readiness first (not signed in: the AI's sheet opens on ChatGPT's own sign-in card, nothing sent), then one read-only, approval-refusing Codex turn through `runOneShotTurnResult` (it takes `attachments` and an abort `signal`, and returns `picturesMade`: Codex's `imageGeneration` items, reported by `CodexRuntime` through `onCodexComplete`). The saved file is read only from a `generated_images` folder and only when it is a picture, then written into `images/` beside the file under a free name; the editor that asked places it in the place it followed (one undo step, the caret left where the person works), never through the shared paste channel. A development build's stand-in (`RITEMARK_PICTURE_STANDIN`, `VSCODE_DEV=1` only) answers with a fixture. No runtime-specific approval type, no model ID: the turn runs on the catalog's Codex default |
 | `taskBoard/protocol.ts` + `boardSurface.ts` | The exact-field `board/*` request union and decoder, snapshots, and the routing shared by all three surfaces |
 | `taskBoard/cardPages.ts` | Card pages: one reused tab, `cardModeFor`, the active page for the side bar's highlight, pages of deleted cards closed |
 | `taskBoard/taskBoardHost.ts` | Composition: store, ledger, controller, reviewer, watcher, badge, commands, surfaces; sets the board-tool controller |

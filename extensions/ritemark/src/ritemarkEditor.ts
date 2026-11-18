@@ -35,6 +35,7 @@ import { canonicalMarkdownProjection } from './editorSync/state';
 import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
 import { isRelativeImagePath, pictureFileInside } from './utils/imagePaths';
+import { ChatgptPictureHost } from './pictures/chatgptPictureHost';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
 import { resolveProjectScope } from './conversations/projectScope';
 import type { CommentTaskProjectionV1 } from './commentTasks/types';
@@ -128,6 +129,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   /** Resolvers for insertDiagram waiting on the webview's imageInserted ack. */
   private pendingInsertAcks: Map<string, () => void> = new Map();
   private static _unifiedViewProvider: UnifiedViewProvider | null = null;
+  /** Pictures with ChatGPT: the picture bar's Make a new picture… and Change this picture…, through the AI's sheet. */
+  private static readonly chatgptPictures = new ChatgptPictureHost(() => RitemarkEditorProvider._unifiedViewProvider);
   private static _wordCountStatusBar: vscode.StatusBarItem | null = null;
   /** Last word count reported by each Markdown panel (GH #378). */
   private static readonly _wordCounts = new Map<vscode.WebviewPanel, number>();
@@ -941,6 +944,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
           return;
         }
 
+        // Pictures with ChatGPT (experience 49): Make a new picture… and Change this picture…, in a document or a deck.
+        if (typeof message.type === 'string' && message.type.startsWith('picture/')) {
+          RitemarkEditorProvider.chatgptPictures.handle(document, webview, message);
+          return;
+        }
+
         // Sprint 157: a deck view's requests, decoded and answered to this webview by the deck pages.
         // Sprint 159 (PR 2): only from a panel that is a deck view; anything else's `deck/` message is dropped.
         if (typeof message.type === 'string' && message.type.startsWith('deck/')) {
@@ -1278,6 +1287,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
         if (remaining.size === 0) { RitemarkEditorProvider.commentTaskWebviews.delete(commentTaskKey); }
       }
       imageWatcher.dispose();
+      RitemarkEditorProvider.chatgptPictures.disposeFor(webview);
       cardPage?.dispose();
       deckPage?.dispose();
       themePage?.dispose();
