@@ -67,6 +67,9 @@ assert.ok(!layers.some(layer => layer.querySelector('.deck-sl[aria-hidden]')), '
 assert.equal(layers.filter(layer => layer.classList.contains('on')).length, 1);
 assert.ok(layers[0].classList.contains('on'));
 assert.ok(layers.every(layer => layer.querySelector('.deck-slide.is-borderless .deck-sl')), 'each layer holds the deck view\'s slide');
+// A slide not shown is out of the page (display, not visibility): a Tabs block's pane sets its own visibility, and showed
+// through on the next slide when the slide around it was only invisible.
+assert.ok(PAGE_CSS.includes('.layer:not(.on):not(.leaving) { display: none; }'));
 const parts = root.querySelectorAll('#side .part');
 assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);
 assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3', '4']);

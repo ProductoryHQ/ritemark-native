@@ -413,8 +413,9 @@ svg { flex: none; }
 .wrap { position: relative; z-index: 1; }
 .view { position: fixed; left: 0; top: 0; right: 0; bottom: var(--line-h); z-index: 1; }
 .frame { position: absolute; left: 0; top: 0; width: 960px; height: 540px; }
-.layer { position: absolute; inset: 0; visibility: hidden; }
-.layer.on, .layer.leaving { visibility: visible; }
+.layer { position: absolute; inset: 0; }
+/* A slide not shown is out of the page, not only invisible: a tab's pane shows itself (visibility: visible). */
+.layer:not(.on):not(.leaving) { display: none; }
 .layer.leaving { pointer-events: none; z-index: 0; }
 .layer.on { z-index: 1; }
 .layer > .deck-slide { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
@@ -442,7 +443,8 @@ svg { flex: none; }
 /* Every button says what it does (the page's own tooltip, above the line; never the browser's). */
 .fb[data-tip]:focus-visible::after, .tick[data-tip]:focus-visible::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 40; padding: 5px 9px; border-radius: 7px; background: #1E1B4B; color: #fff; font: 600 12.5px/16px 'Sofia Sans', sans-serif; white-space: nowrap; pointer-events: none; box-shadow: 0 8px 20px -8px rgba(0,0,0,.5); }
 @media (hover: hover) { .fb[data-tip]:hover::after, .tick[data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 40; padding: 5px 9px; border-radius: 7px; background: #1E1B4B; color: #fff; font: 600 12.5px/16px 'Sofia Sans', sans-serif; white-space: nowrap; pointer-events: none; box-shadow: 0 8px 20px -8px rgba(0,0,0,.5); } }
-.tick[data-tip]::after { left: 0; right: auto !important; letter-spacing: 0; }
+.tick[data-tip]::after { left: 0; right: auto !important; letter-spacing: 0; animation: tip-in .12s ease .6s both; }
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
 .fb[aria-expanded="true"]::after { display: none; }
 .line .pos { min-width: 54px; text-align: center; font: 600 13.5px/1 'Sofia Sans', sans-serif; color: var(--lbtn); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .line .sep { width: 1px; height: 18px; margin: 0 6px; background: var(--lsep); }
@@ -660,6 +662,7 @@ export const PRINT_CSS = `
   .view, .frame, .side { display: contents !important; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
   .layer { position: relative; inset: auto; display: block; width: 576px; height: 324px; margin: 0 0 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--slidebg); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: auto; }
+  .layer:not(.on):not(.leaving) { display: block; }
   body.bl .layer { border-radius: 0; background: transparent; box-shadow: inset 0 0 0 1px #E7E8F2; }
   /* In the flow and zoomed, not scaled: a transformed 960 x 540 canvas keeps its full height in the layout, and a page
      break below a slide drew a sliver of it at the foot of the page. */
