@@ -1163,24 +1163,28 @@ export function Editor({
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .hljs-selector-id { color: #61afef !important; }
 
         /* Sprint 163 PR 1: Copy, the same pill as a slide's code block (slide.css .cb-copy): its icon and "Copy", then
-           "Copied", at the block's top right. In a Text document it shows under the pointer and the keyboard, and
-           while it says Copied. The tooltip is ui/tooltip.tsx's. */
+           "Copied", at the block's top right, always shown, the words flowing around it, as on a slide. The tooltip
+           is ui/tooltip.tsx's. The code runs inline for that (a block of its own would stand beside the pill), and a
+           long word wraps rather than scroll. */
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.cb::after {
+          content: '' !important;
+          display: block !important;
+          clear: both !important;
+        }
+        .wysiwyg-editor .ProseMirror pre.tiptap-code-block.cb > code {
+          display: inline !important;
+          overflow: visible !important;
+          overflow-wrap: anywhere !important;
+        }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools {
-          position: absolute !important;
-          top: 8px !important;
-          right: 8px !important;
-          z-index: 10 !important;
+          float: right !important;
+          position: relative !important;
+          z-index: 1 !important;
           display: inline-flex !important;
           align-items: center !important;
           gap: 4px !important;
-          opacity: 0 !important;
-          transition: opacity 0.15s !important;
+          margin: -6px -8px 4px 12px !important;
           user-select: none !important;
-        }
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block:hover .cb-tools,
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools:focus-within,
-        .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-tools:has(.ok) {
-          opacity: 1 !important;
         }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy {
           height: 28px !important;

@@ -158,8 +158,14 @@
    slide editor (`CodeBlockWithCopy`, `surface: 'slide'`) and wherever the renderer draws the slide (`codeTools.ts`):
    the strip, the wall, the presenter view and the page. Sizes are `em`s of the slide's, so the fit takes them too. */
 .deck-sl.is-blocks pre.cb::after { content: ''; display: block; clear: both; }
+/* The words run inline, so they flow around Copy (the slide editor's own code rule makes its code a block of its own,
+   which would stand beside the float); in the slide's text colour, wherever it is drawn.
+   The block takes the code's own type, so its lines are the code's wherever it is drawn (inline words would otherwise
+   take the slide's taller line, and the wall's block would run longer than the stage's). */
+.deck-sl.is-blocks pre.cb { padding: .7em .95em; color: var(--s-tx, #E4E6F7); font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; }
+.deck-sl.is-blocks pre.cb > code { display: inline; overflow: visible; color: inherit; font: inherit; }
 .deck-sl.is-blocks .cb-tools { float: right; position: relative; z-index: 1; display: inline-flex; align-items: center; gap: .3em; margin: -.2em -.4em .25em .7em;
-  font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+  font: 600 .7em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; user-select: none; -webkit-user-select: none; }
 .deck-sl.is-blocks .cb-copy, .deck-sl.is-blocks .cb-open { display: inline-flex; align-items: center; justify-content: center; gap: .4em; height: 2.05em; min-width: 0;
   margin: 0; padding: 0 .9em; border: 0; border-radius: 999px; background: var(--s-ring, rgba(255,255,255,.14)); color: var(--s-hd, #fff); font: inherit;
   cursor: pointer; box-shadow: none; transform: none; }

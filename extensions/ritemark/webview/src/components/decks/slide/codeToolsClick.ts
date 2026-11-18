@@ -46,6 +46,9 @@ export function codeToolsClick(target: EventTarget | null, root: ParentNode, act
   const element = target && typeof (target as Element).closest === 'function' ? target as Element : null
   const tools = element?.closest('.cb-tools') ?? null
   if (!tools) return closeCodeMenus(root) ? 'used' : 'none'
+  // A pressed control keeps no focus: the wall shows no ring once its menu closes (the keyboard never reaches them).
+  const active = tools.ownerDocument?.activeElement as (Element & { blur?: () => void }) | null | undefined
+  if (active && tools.contains(active)) active.blur?.()
   const item = element!.closest('a.cb-item')
   if (item) {
     const href = item.getAttribute('href')

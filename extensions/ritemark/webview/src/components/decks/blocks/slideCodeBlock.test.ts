@@ -43,6 +43,10 @@ const SLIDE = `# Plan the summary\n\n\`\`\`\n${PROMPT}\n\`\`\`\n\nThen check it.
 {
   // The slide editor's own pipeline: the slide's Markdown as written, and stable on a second open.
   assert.equal(saveSlide(loadSlide(SLIDE)), SLIDE, 'a slide with a code block reads back as written')
+  // The editor's block holds the prompt's words and nothing more (no empty last line of marked's): what Copy takes.
+  let inEditor: string | null = null
+  loadSlide(SLIDE).descendants(node => { if (node.type.name === 'codeBlock') inEditor = node.textContent; return true })
+  assert.equal(inEditor, PROMPT)
   const fenced = SLIDE.replace('```\n', '```text\n')
   assert.equal(saveSlide(loadSlide(fenced)), fenced, 'with its language too')
   // The deck's file: the slide's fence is longer than the code block's, so the code block is the slide's own.

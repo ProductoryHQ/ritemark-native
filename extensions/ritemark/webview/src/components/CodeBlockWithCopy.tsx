@@ -9,10 +9,10 @@
  *
  * Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"): one code block for a
  * Text document and a slide. Copy is a small pill at the block's top right (its icon and "Copy", then "Copied"), and it
- * takes the whole block. On a slide (`surface: 'slide'`) it always shows and the words flow around it, and beside it a
- * ↗ ("Open in…") opens Open in Claude and Open in ChatGPT, for a deck without `open-in: none`; the host opens the
- * address in the person's own browser. The strip, the wall and the page draw the same controls from the one slide
- * renderer (`src/decks/blocks/codeTools.ts`). In a Text document Copy shows under the pointer and the keyboard, as it did.
+ * takes the whole block. It always shows and the words flow around it. On a slide (`surface: 'slide'`) a ↗
+ * ("Open in…") beside it opens Open in Claude and Open in ChatGPT, for a deck without `open-in: none`; the host opens
+ * the address in the person's own browser. The strip, the wall and the page draw the same controls from the one slide
+ * renderer (`src/decks/blocks/codeTools.ts`).
  */
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
@@ -130,7 +130,8 @@ export function CodeBlockWithCopy({ node, extension }: CodeBlockWithCopyProps) {
   }, [node.textContent, isMermaid, uniqueId])
 
   const handleCopy = useCallback(() => {
-    const text = node.textContent
+    // The block's words, without the empty line the editor keeps at a code block's end (Sprint 163 PR 1)
+    const text = node.textContent.replace(/\n$/, '')
     if (!text) return
     sendToExtension('copyToClipboard', { text })
     setCopied(true)
@@ -549,7 +550,8 @@ export function CodeBlockWithCopy({ node, extension }: CodeBlockWithCopyProps) {
   }
 
   // Every other code block: Copy, and on a slide its ↗ Open in… (Sprint 163 PR 1).
-  const links = onSlide && deckOpenIn && node.textContent.trim() ? openInAddresses(node.textContent) : []
+  const words = node.textContent.replace(/\n$/, '')
+  const links = onSlide && deckOpenIn && words.trim() ? openInAddresses(words) : []
   return (
     <NodeViewWrapper
       as="pre"
