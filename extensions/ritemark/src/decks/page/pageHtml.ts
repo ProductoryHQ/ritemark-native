@@ -583,8 +583,8 @@ svg { flex: none; }
    number is a checkbox. 38 x 38 on the 960 slide with a 9 radius; under the pointer an inset accent ring, pressed a
    stronger fill, the keyboard's 2 px accent ring; ticked, a check on the accent and the step's words go quiet. */
 .layer .deck-sl.is-blocks .blk-steps ol > li:has(> .tick)::before { content: none; }
-.layer .deck-sl.is-blocks .blk-steps .tick { position: absolute; left: 0; top: calc(-2px * var(--fit, 1)); width: calc(38px * var(--fit, 1)); height: calc(38px * var(--fit, 1)); display: grid; place-items: center; border-radius: calc(9px * var(--fit, 1)); background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 calc(18px * var(--fit, 1))/1 var(--s-fh, 'Sofia Sans'), sans-serif; transition: background-color .12s, color .12s, box-shadow .12s; }
-.layer .deck-sl.is-blocks .blk-steps .tick svg { display: none; width: calc(20px * var(--fit, 1)); height: calc(20px * var(--fit, 1)); }
+.layer .deck-sl.is-blocks .blk-steps .tick { position: absolute; left: 0; top: -.111em; width: 2.111em; height: 2.111em; display: grid; place-items: center; border-radius: .5em; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font: 700 .75em/1 var(--s-fh, 'Sofia Sans'), sans-serif; transition: background-color .12s, color .12s, box-shadow .12s; }
+.layer .deck-sl.is-blocks .blk-steps .tick svg { display: none; width: 1.111em; height: 1.111em; }
 .layer .deck-sl.is-blocks .blk-steps .tick:hover { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--s-acc, #F2B544) 65%, transparent); }
 .layer .deck-sl.is-blocks .blk-steps .tick:active { background: color-mix(in srgb, var(--s-acc, #F2B544) 32%, transparent); }
 .layer .deck-sl.is-blocks .blk-steps .tick:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: 2px; }
@@ -648,6 +648,9 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks .cb-copy { height: 28px; padding: 0 11px; font-size: 13px; }
   .layer.flow .deck-sl.is-blocks .cb-open { width: 28px; height: 28px; padding: 0; }
   .layer.flow .deck-sl.is-blocks .cb-tools svg { width: 15px; height: 15px; }
+  /* An exercise's column (Sprint 163 PR 5) draws its steps smaller to fit a third of the slide; in one column they read at
+     the column's size, as every other block does. */
+  .layer.flow .deck-sl.is-blocks .blk-column > h1:first-child + .blk-steps { font-size: 1em; }
   .side { position: relative; inset: auto; z-index: 1; width: auto; padding: 4px 16px calc(var(--line-h) + 16px); background: none; box-shadow: none; overflow: visible; }
   .side .sclose { display: none; }
   .line { background: var(--lbar); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 -1px 0 var(--lsep); padding-left: 16px; }
