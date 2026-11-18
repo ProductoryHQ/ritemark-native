@@ -26,14 +26,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
+  AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
   gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, ringGap, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
 
-const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers' }
-const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item' }
+const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar' }
+const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '' }
 
 export interface SlideBlockBarProps {
   editor: TipTapEditor | null
@@ -310,7 +310,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
   }
   const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
   const add = () => run(act(pos => addItem(editor.state, pos)))
-  const canAdd = chosen.kind !== 'columns' || columns < MAX_COLUMNS
+  // The Agenda (small details 14) is one piece: no item to add, and no other kind to turn into.
+  const agenda = chosen.kind === 'agenda'
+  const canAdd = !agenda && (chosen.kind !== 'columns' || columns < MAX_COLUMNS)
 
   // ---- The ⋮ drag: where the block lands, by the lines between the slide's blocks.
   const startMove = (event: ReactPointerEvent<HTMLElement>) => {
@@ -486,6 +488,14 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
               aria-label={`${BAR_KIND_LABEL[chosen.kind]} block`}
               style={{ left: barAt?.left ?? -9999, top: barAt?.top ?? -9999 }}
             >
+              {agenda ? (
+                <Tooltip label={AGENDA_TIP}>
+                  <span className="deck-bar-type deck-bar-type-fixed" tabIndex={0} aria-label={`${BAR_KIND_LABEL.agenda}: ${AGENDA_TIP}`}>
+                    <Icon name={KIND_ICON.agenda} size={16} tone="inherit" />
+                    {BAR_KIND_LABEL.agenda}
+                  </span>
+                </Tooltip>
+              ) : (
               <DropdownMenu modal={false}>
                 <Tooltip label="Turn this block into another kind">
                   <DropdownMenuTrigger asChild>
@@ -510,6 +520,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
               {look ? (
                 <>
                   <Sep />
@@ -550,12 +561,14 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                 </>
               ) : null}
               <Sep />
-              <Tooltip label={canAdd ? ADD_LABEL[chosen.kind] : `A Columns block holds ${MAX_COLUMNS} columns at most`}>
-                <Button variant="toolbar" size="compact" disabled={!canAdd} onMouseDown={event => event.preventDefault()} onClick={add}>
-                  <Icon name="plus" size={16} tone="inherit" />
-                  Add
-                </Button>
-              </Tooltip>
+              {agenda ? null : (
+                <Tooltip label={canAdd ? ADD_LABEL[chosen.kind] : `A Columns block holds ${MAX_COLUMNS} columns at most`}>
+                  <Button variant="toolbar" size="compact" disabled={!canAdd} onMouseDown={event => event.preventDefault()} onClick={add}>
+                    <Icon name="plus" size={16} tone="inherit" />
+                    Add
+                  </Button>
+                </Tooltip>
+              )}
               <Tooltip label="Delete this block">
                 <Button variant="toolbar" size="compact" aria-label="Delete this block" onMouseDown={event => event.preventDefault()} onClick={() => run(act(pos => deleteBlock(editor.state, pos)))}>
                   <Icon name="trash" size={16} tone="inherit" />

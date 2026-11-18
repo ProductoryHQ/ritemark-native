@@ -7,11 +7,11 @@ import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTML, installTestDocument } from '../../../utils/markdownFidelity'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { SlideDiv, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
+import { SlideAgenda, SlideDiv, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
 
 installTestDocument()
 
-export const slideSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv] }))
+export const slideSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda] }))
 
 function elementFromString(html: string): HTMLElement {
   const body = createDocument(`<body>${html}</body>`).body as unknown as HTMLElement
@@ -37,7 +37,7 @@ export function saveSlide(doc: PMNode): string {
 }
 
 /** Sprint 161: the slide editor's schema with the comment flag on (the comment mark and note), as the stage has it. */
-export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv], commentCallouts: true }))
+export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda], commentCallouts: true }))
 
 /**
  * A block slide's Markdown as the slide editor's document with comments on (`ensureSlideCommentPipeline` first: the

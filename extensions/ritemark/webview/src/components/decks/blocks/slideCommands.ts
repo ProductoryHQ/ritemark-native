@@ -3,7 +3,7 @@
  * slide editor's document. Pure ProseMirror, so the tests drive the same steps the stage takes.
  *
  *  - **The / menu** (frame 22) in four groups: Text (Title, Heading, Bullet list, Numbered list, with their Markdown
- *    shortcuts), Blocks (Columns, Boxes, Steps, Table), Media (Picture, Web page) and Slides (New slide below, Split
+ *    shortcuts), Blocks (Columns, Boxes, Steps, Table, and the Agenda of small details 14), Media (Picture, Web page) and Slides (New slide below, Split
  *    slide here). Web page is a link to the page, in the picture's group; no live page is drawn.
  *  - **A block** goes where the / was typed: in place of the empty line, else after the block the caret is in. Its
  *    lines are the ones the conversion writes (`:::: columns`, `::: box`, `::: steps`), so a new block saves as an AI
@@ -27,6 +27,7 @@ import type { BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
 
 /** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own. */
 export const SLIDE_COMMAND = 'deckSlideCommand'
@@ -46,6 +47,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes' },
   { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps' },
   { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table' },
+  // Small details 14: the deck's section slides, listed and numbered by themselves.
+  { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda' },
   { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture' },
   { group: 'Media', title: 'Web page', description: '', icon: 'globe', nodeType: 'webPage' },
   { group: 'Slides', title: 'New slide below', description: '', icon: 'plus-square', nodeType: 'newSlideBelow' },
@@ -114,6 +117,11 @@ export function insertSlideBlock(tr: Transaction, at: number, node: PMNode): Tra
   if (placed < 0) return tr
   tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(placed + 1, tr.doc.content.size))))
   return tr.setMeta(SLIDE_COMMAND, true).scrollIntoView()
+}
+
+/** The Agenda (small details 14): `::: agenda` and `:::`, its list drawn from the deck's sections, never written. */
+export function agendaNode(schema: Schema): PMNode {
+  return schema.nodes.slideAgenda.create({ raw: `${AGENDA_OPEN}\n${AGENDA_CLOSE}` })
 }
 
 /** A link to a web page, as its own line where the / was: the address as its words (no live page is drawn). */

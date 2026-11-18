@@ -23,6 +23,7 @@ import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
+import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
@@ -506,6 +507,8 @@ export function DeckView({
   }, [editor])
 
   const count = slides.length
+  // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
+  const agendaDrawing = useAgendaDrawing(slides.map(entry => ({ kind: entry.kind, data: entry.data, number: entry.index + 1 })), true)
   const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
@@ -1812,6 +1815,7 @@ export function DeckView({
   )
 
   return (
+    <AgendaContext.Provider value={agendaDrawing}>
     <div className="deck-view h-screen bg-surface flex flex-col">
       <header className="deck-bar">
         <Tooltip label={stripShown ? 'Hide the slides' : 'Show the slides'}>
@@ -2093,5 +2097,6 @@ export function DeckView({
       </Popover>
       {dialogs}
     </div>
+    </AgendaContext.Provider>
   )
 }

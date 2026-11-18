@@ -548,6 +548,8 @@ type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' |
 function blockKind(node: Element): BlockKind {
   // Sprint 161: a block slide's `:::` block, which only the slide editor's own pipeline makes (never a Text document's).
   if (node.nodeName === 'DIV' && node.hasAttribute('data-fdiv')) return 'fdiv'
+  // The decks README, small details 14: the Agenda, a `:::` block too (`::: agenda`, `:::`).
+  if (node.nodeName === 'DIV' && node.hasAttribute('data-agenda')) return 'fdiv'
   switch (node.nodeName) {
     case 'P': case 'IMG': return 'paragraph'
     case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': return 'heading'
