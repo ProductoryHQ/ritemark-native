@@ -9,6 +9,7 @@
  */
 import { createContext, useEffect, type RefObject } from 'react'
 import { isOpenInAddress } from '../../../../../src/decks/blocks/codeTools'
+import { sendToExtension } from '../../../bridge'
 
 export interface CodeToolsActions {
   copy: (text: string) => void
@@ -24,7 +25,28 @@ export const DeckOpenInContext = createContext(true)
 /** How long Copy says Copied. */
 export const COPIED_MS = 1600
 
+/** Present's: Copy and Open in done by the host (the clipboard, the person's own browser), for the wall and the presenter view. */
+export const PRESENT_CODE_ACTIONS: CodeToolsActions = {
+  copy: text => sendToExtension('present/copy', { text }),
+  open: url => sendToExtension('present/open-in', { url }),
+}
+
 const MENU_OPEN = '.cb-menu:not([hidden])'
+
+/**
+ * Open a ↗'s menu below it, or above it when the slide's flow (which clips) has no room below and more above (a prompt
+ * is often a slide's last block).
+ */
+export function placeCodeMenu(menu: Element): void {
+  menu.classList.remove('is-up')
+  const flow = menu.closest('.blk-flow')
+  if (!flow || typeof (menu as HTMLElement).getBoundingClientRect !== 'function') return
+  const room = flow.getBoundingClientRect()
+  const box = menu.getBoundingClientRect()
+  const opener = menu.parentElement?.querySelector('.cb-open')?.getBoundingClientRect()
+  if (!opener || box.bottom <= room.bottom) return
+  if (opener.top - room.top > room.bottom - opener.bottom) menu.classList.add('is-up')
+}
 
 /** Close every open ↗ menu under `root` (but `keep`); true when one was open. */
 export function closeCodeMenus(root: ParentNode, keep: Element | null = null): boolean {
@@ -64,7 +86,10 @@ export function codeToolsClick(target: EventTarget | null, root: ParentNode, act
     if (words) {
       actions.copy(words)
       copy.classList.add('ok')
-      setTimeout(() => copy.classList.remove('ok'), COPIED_MS)
+      // A second Copy says Copied as long as the first did (the page's Copy keeps its timer the same way).
+      const held = copy as Element & { okTimer?: ReturnType<typeof setTimeout> }
+      clearTimeout(held.okTimer)
+      held.okTimer = setTimeout(() => copy.classList.remove('ok'), COPIED_MS)
     }
     return 'used'
   }
@@ -73,19 +98,39 @@ export function codeToolsClick(target: EventTarget | null, root: ParentNode, act
   if (open && menu) {
     const opening = menu.hasAttribute('hidden')
     closeCodeMenus(root, menu)
-    if (opening) menu.removeAttribute('hidden')
-    else menu.setAttribute('hidden', '')
+    if (opening) {
+      menu.removeAttribute('hidden')
+      placeCodeMenu(menu)
+    } else menu.setAttribute('hidden', '')
     open.setAttribute('aria-expanded', opening ? 'true' : 'false')
   }
   return 'used'
 }
 
+let escapeInstalled = false
+
+/**
+ * Esc closes an open ↗ menu and goes no further (Present would stop on it). Its listener is the window's first, put in
+ * once while the view first draws, before any effect of the view adds its own keys (review of #804: an effect's listener
+ * came after the wall's, which stopped Present).
+ */
+function installMenuEscape(): void {
+  if (escapeInstalled || typeof window === 'undefined') return
+  escapeInstalled = true
+  window.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !closeCodeMenus(document)) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }, true)
+}
+
 /**
  * The wall's and the presenter view's code block controls under `ref`: clicks taken before the view's own (so a Copy
  * never moves the wall on), and Esc closing an open menu before anything else hears it. `ready`: the element under
- * `ref` is drawn (a view that draws an empty frame first).
+ * `ref` is drawn (a view that draws an empty frame first). A thumbnail's controls are drawn only (`slide.css`).
  */
 export function useCodeToolsClicks(ref: RefObject<HTMLElement | null>, actions: CodeToolsActions, ready = true): void {
+  installMenuEscape()
   useEffect(() => {
     const root = ref.current
     if (!root) return
@@ -95,16 +140,7 @@ export function useCodeToolsClicks(ref: RefObject<HTMLElement | null>, actions: 
       event.preventDefault()
       event.stopPropagation()
     }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !closeCodeMenus(root)) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-    }
     root.addEventListener('click', onClick, true)
-    window.addEventListener('keydown', onKey, true)
-    return () => {
-      root.removeEventListener('click', onClick, true)
-      window.removeEventListener('keydown', onKey, true)
-    }
+    return () => root.removeEventListener('click', onClick, true)
   }, [ref, actions, ready])
 }

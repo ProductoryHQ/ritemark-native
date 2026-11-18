@@ -16,13 +16,13 @@
  */
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
-import { useState, useCallback, useContext, useEffect, useId, useRef } from 'react'
+import { useState, useCallback, useContext, useEffect, useId, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from './ui/Icon'
 import { Button } from './ui/button'
 import { Tooltip } from './ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu'
-import { DeckOpenInContext } from './decks/slide/codeToolsClick'
+import { COPIED_MS, DeckOpenInContext } from './decks/slide/codeToolsClick'
 import { CODE_TOOLS_WORDS, openInAddresses } from '../../../src/decks/blocks/codeTools'
 import { renderMermaid, renderMermaidToPngDataUrl } from '../lib/mermaid'
 import { sendToExtension } from '../bridge'
@@ -75,13 +75,11 @@ interface CodeBlockWithCopyProps {
   extension?: { options?: { surface?: string } }
 }
 
-/** How long Copy says Copied (the wall's and the page's Copy say it as long). */
-const COPIED_MS = 1600
-
 export function CodeBlockWithCopy({ node, extension }: CodeBlockWithCopyProps) {
   const [copied, setCopied] = useState(false)
-  const isMermaid = node.attrs.language === 'mermaid'
   const onSlide = extension?.options?.surface === 'slide'
+  // A slide draws a Mermaid block as its code, as the wall and the page do (the renderer draws no diagram).
+  const isMermaid = !onSlide && node.attrs.language === 'mermaid'
   const deckOpenIn = useContext(DeckOpenInContext)
 
   // Mermaid rendering state
@@ -551,7 +549,7 @@ export function CodeBlockWithCopy({ node, extension }: CodeBlockWithCopyProps) {
 
   // Every other code block: Copy, and on a slide its ↗ Open in… (Sprint 163 PR 1).
   const words = node.textContent.replace(/\n$/, '')
-  const links = onSlide && deckOpenIn && words.trim() ? openInAddresses(words) : []
+  const links = useMemo(() => (onSlide && deckOpenIn && words.trim() ? openInAddresses(words) : []), [onSlide, deckOpenIn, words])
   return (
     <NodeViewWrapper
       as="pre"

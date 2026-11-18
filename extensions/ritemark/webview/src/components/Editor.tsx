@@ -1195,7 +1195,6 @@ export function Editor({
           background: rgba(255, 255, 255, 0.12) !important;
           color: #fff !important;
           font: 600 13px/1 'Sofia Sans', var(--ritemark-ui-font-family), sans-serif !important;
-          cursor: pointer !important;
         }
         .wysiwyg-editor .ProseMirror pre.tiptap-code-block .cb-copy svg {
           width: 14px !important;

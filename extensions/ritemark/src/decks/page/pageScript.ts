@@ -405,6 +405,13 @@ const PAGE_BEHAVIOUR = String.raw`
     closeCodeMenus(menu);
     menu.hidden = !opening;
     opener.setAttribute('aria-expanded', opening ? 'true' : 'false');
+    // Below the arrow, or above it when the slide (which clips) has no room below and more above.
+    menu.classList.remove('is-up');
+    var flow = opening ? menu.closest('.blk-flow') : null;
+    if (flow) {
+      var room = flow.getBoundingClientRect(), at = opener.getBoundingClientRect();
+      if (menu.getBoundingClientRect().bottom > room.bottom && at.top - room.top > room.bottom - at.bottom) menu.classList.add('is-up');
+    }
   });
   window.addEventListener('keydown', function (event) {
     if (event.key === 'Escape' && closeCodeMenus(null)) event.stopPropagation();

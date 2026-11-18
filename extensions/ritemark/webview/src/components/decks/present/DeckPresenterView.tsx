@@ -28,7 +28,7 @@
  * the only source of state; this is the one window that gets the notes.
  */
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
-import { useCodeToolsClicks } from '../slide/codeToolsClick'
+import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { PresenterState, WallPoint, WallSlide, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
@@ -47,12 +47,6 @@ import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerOffe
 import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './presenter.css'
-
-/** Sprint 163 PR 1: a code block's Copy and ↗ Open in… on a slide here, done by the host (the clipboard, the person's browser). */
-const CODE_ACTIONS = {
-  copy: (text: string) => sendToExtension('present/copy', { text }),
-  open: (url: string) => sendToExtension('present/open-in', { url }),
-}
 
 
 /** The notes' type sizes (A− and A+ step through them); the drawing's 22 first. */
@@ -353,7 +347,7 @@ export function DeckPresenterView() {
   // Small details 14: the shown slides' sections, for an Agenda in Now, Next and the row (progress from each one's place).
   const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
   // Sprint 163 PR 1: Now's code block controls take their click before Now's own (spotlight).
-  useCodeToolsClicks(nowRef, CODE_ACTIONS, !!state)
+  useCodeToolsClicks(nowRef, PRESENT_CODE_ACTIONS, !!state)
 
   if (!state) return <div className="deck-presenter dark" />
 

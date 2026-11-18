@@ -60,15 +60,9 @@ import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './pla
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
 import { useTimerNow } from './useTimerNow'
-import { useCodeToolsClicks } from '../slide/codeToolsClick'
+import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import '../decks.css'
 import './wall.css'
-
-/** Sprint 163 PR 1: a code block's Copy and ↗ Open in… on a slide here, done by the host (the clipboard, the person's browser). */
-const CODE_ACTIONS = {
-  copy: (text: string) => sendToExtension('present/copy', { text }),
-  open: (url: string) => sendToExtension('present/open-in', { url }),
-}
 
 /** The bar fades this long after the pointer last moved; the go-to box closes after this pause. */
 const BAR_MS = 2000
@@ -453,7 +447,7 @@ export function DeckWall() {
   const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
   // Sprint 163 PR 1: a code block's controls take their click before the wall's own (a Copy never moves the wall on).
   const wallRef = useRef<HTMLDivElement>(null)
-  useCodeToolsClicks(wallRef, CODE_ACTIONS, !!state)
+  useCodeToolsClicks(wallRef, PRESENT_CODE_ACTIONS, !!state)
 
   if (!state) return <div className="deck-wall" />
 
@@ -642,7 +636,7 @@ function WallGrid({ state, width, picked, onPick, onGo }: {
             onClick={() => onGo(slide.number)}
           >
             <div className={`wall-grid-slide${state.borderless ? ' is-borderless' : ''}`}>
-              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
+              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} openIn={state.openIn} />
             </div>
             <span className="wall-grid-number">{slide.number}</span>
           </div>

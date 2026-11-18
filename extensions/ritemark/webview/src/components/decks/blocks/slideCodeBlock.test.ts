@@ -147,6 +147,26 @@ const icons = { copy: '<svg data-i="copy"></svg>', check: '<svg data-i="check"><
   codeToolsClick(q('.cb-open'), root, actions)
   assert.equal(closeCodeMenus(root), true, 'Esc closes an open menu')
   assert.equal(closeCodeMenus(root), false)
+  // A second Copy restarts Copied's time (review of #804): the first one's timer no longer takes it off.
+  const copyButton = q('.cb-copy') as Element & { okTimer?: unknown }
+  codeToolsClick(copyButton, root, actions)
+  const first = copyButton.okTimer
+  codeToolsClick(copyButton, root, actions)
+  assert.ok(copyButton.okTimer !== first && copyButton.classList.contains('ok'))
+  clearTimeout(copyButton.okTimer as ReturnType<typeof setTimeout>)
+  // A prompt at the slide's foot opens its menu upward, where the flow (which clips) has room (review of #804).
+  const flowDoc = createDocument(`<body><div class="blk-flow" id="f">${blockSlideHtml(SLIDE)}</div></body>`)
+  const flow = flowDoc.getElementById('f') as unknown as Element
+  const rect = (top: number, bottom: number) => () => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) })
+  Object.assign(flow, { getBoundingClientRect: rect(0, 500) })
+  Object.assign(flow.querySelector('.cb-open')!, { getBoundingClientRect: rect(440, 470) })
+  Object.assign(flow.querySelector('.cb-menu')!, { getBoundingClientRect: rect(480, 560) })
+  codeToolsClick(flow.querySelector('.cb-open'), flow, actions)
+  assert.ok(flow.querySelector('.cb-menu')!.classList.contains('is-up'), 'no room below: it opens upward')
+  codeToolsClick(flow.querySelector('.cb-open'), flow, actions)
+  Object.assign(flow.querySelector('.cb-menu')!, { getBoundingClientRect: rect(480, 490) })
+  codeToolsClick(flow.querySelector('.cb-open'), flow, actions)
+  assert.ok(!flow.querySelector('.cb-menu')!.classList.contains('is-up'), 'room below: it opens downward')
 }
 
 // ---- The slide editor marks the places to fill in as the renderer does.

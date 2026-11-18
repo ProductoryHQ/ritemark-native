@@ -1256,7 +1256,7 @@ export function DeckView({
       const look = lookRef.current
       // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
       const agenda = { entries: agendaRef.current.entries, hint: false }
-      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda })
+      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda, openIn })
         .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
     },
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
