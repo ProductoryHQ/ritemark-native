@@ -484,6 +484,9 @@ svg { flex: none; }
 .part code, .pre code { font: 400 .9em/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); padding: 1px 5px; border-radius: 5px; }
 .tw { overflow-x: auto; margin: 0 0 14px; scrollbar-width: thin; scrollbar-color: rgba(30, 27, 75, .3) transparent; container-type: inline-size; } /* the thumb only, no track behind it (Jarmo: "system scrollbaridel ei tohi olla tausta"); the frame a column's stored share counts against (handoutTableHtml) */
 .tw .fl { display: block; height: 0; } /* a text column's floor (handoutTableHtml): a width, no height */
+.tw.is-scrollable-left, .tw.is-scrollable-right { --fade-l: #000; --fade-r: #000; -webkit-mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; } /* a soft 24 px edge on the side with more to scroll to, as in the handout (PAGE_EDGE_RULE sets the classes); the second layer keeps a classic scrollbar whole */
+.tw.is-scrollable-left { --fade-l: transparent; }
+.tw.is-scrollable-right { --fade-r: transparent; }
 .tw table { border-collapse: collapse; font-size: 14.5px; }
 .tw th, .tw td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .tw th { color: var(--ink); font-weight: 700; }

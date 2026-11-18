@@ -11,7 +11,8 @@ import { strict as assert } from 'node:assert';
 import * as vm from 'node:vm';
 import { scriptBuildsReferences } from '../../publish/references';
 import * as editor from '../../../webview/src/components/decks/scrollRule';
-import { PAGE_PLACE_RULE, PAGE_SCRIPT, PAGE_SCROLL_RULE } from './pageScript';
+import * as editorEdges from '../../../webview/src/extensions/tables/tableEdges';
+import { PAGE_EDGE_RULE, PAGE_PLACE_RULE, PAGE_SCRIPT, PAGE_SCROLL_RULE } from './pageScript';
 
 interface Rule {
   partStarts: typeof editor.partStarts;
@@ -182,7 +183,7 @@ interface PageRun {
  * Six parts of 400 px under a 59 px bar (part 3 has no text when `slideOnly`: its place only, 0 px high, as #780's
  * slide-only parts are), run with the address's hash and what this browser keeps.
  */
-function runPage(options: { hash?: string; kept?: Record<string, string>; storage?: 'ok' | 'throws' | 'refused'; replaceThrows?: boolean; slideOnly?: boolean }): PageRun {
+function runPage(options: { hash?: string; kept?: Record<string, string>; storage?: 'ok' | 'throws' | 'refused'; replaceThrows?: boolean; slideOnly?: boolean; frames?: unknown[] }): PageRun {
   const BAR = 59;
   const tops: number[] = [];
   let top = 28, shift = 0;
@@ -226,7 +227,7 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; storag
     // A frame at once; it answers 0 because it has already run (the script then waits for no frame).
     requestAnimationFrame(run: () => void) { run(); return 0; },
     matchMedia: () => ({ matches: false }),
-    getComputedStyle: () => ({ paddingBottom: '0px' }),
+    getComputedStyle: () => ({ paddingBottom: '0px', overflowX: 'auto' }),
     setTimeout(run: () => void, ms: number) { timers.set(++ids, { at: now + ms, run }); return ids; },
     clearTimeout(id: number) { timers.delete(id); },
   });
@@ -243,6 +244,7 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; storag
     getElementById: (id: string) => byId[id] ?? null,
 
     querySelector: (selector: string) => (selector === '.top' ? header : selector === '.stage' ? stage : null),
+    querySelectorAll: (selector: string) => (selector === '.tw' ? options.frames ?? [] : []),
   });
   Object.defineProperty(document, 'activeElement', { get: () => active });
   (restart as unknown as { focusNow(): void }).focusNow = () => { active = restart; };
@@ -426,6 +428,38 @@ for (const value of ['1', '7', 'junk']) {
   assert.equal((page.document as unknown as { activeElement: unknown }).activeElement !== page.restart, true);
   assert.equal(page.restart.hidden, true);
 }
+// ---- A wide table's soft edges (the Experience lead on #781): the page's copy of the editor's rule gives the same
+// answers, and the page's script watches every table frame it has.
+{
+  const pageEdges = new Function(`${PAGE_EDGE_RULE}\nreturn { tableEdges, EDGE_SLACK };`)() as { tableEdges: typeof editorEdges.tableEdges; EDGE_SLACK: number };
+  assert.equal(pageEdges.EDGE_SLACK, editorEdges.EDGE_SLACK);
+  const edgeNext = random(781);
+  for (let probe = 0; probe < 2000; probe++) {
+    const clientWidth = Math.round(edgeNext() * 900) + 100;
+    const scrollWidth = clientWidth + Math.round((edgeNext() - 0.3) * 600) + (edgeNext() < 0.2 ? edgeNext() : 0);
+    const room = Math.max(0, scrollWidth - clientWidth);
+    const scrollLeft = edgeNext() < 0.15 ? 0 : edgeNext() < 0.15 ? room : edgeNext() * room * (edgeNext() < 0.1 ? -1 : 1);
+    assert.deepEqual(pageEdges.tableEdges(scrollLeft, scrollWidth, clientWidth), editorEdges.tableEdges(scrollLeft, scrollWidth, clientWidth), `edges ${scrollLeft}/${scrollWidth}/${clientWidth}`);
+  }
+  const classes = new Set<string>();
+  let onScroll: (() => void) | null = null;
+  const frame = {
+    isConnected: true, scrollLeft: 0, scrollWidth: 820, clientWidth: 720, offsetHeight: 100, clientHeight: 100,
+    firstElementChild: {},
+    classList: { toggle(name: string, on: boolean) { if (on) classes.add(name); else classes.delete(name); } },
+    style: { setProperty() { /* */ }, removeProperty() { /* */ } },
+    addEventListener(type: string, listener: () => void, options: { passive?: boolean }) { if (type === 'scroll') { assert.equal(options.passive, true); onScroll = listener; } },
+  };
+  runPage({ frames: [frame] });
+  assert.deepEqual([...classes], ['is-scrollable-right'], 'at the start of a wide table, its right side fades');
+  frame.scrollLeft = 50;
+  onScroll!();
+  assert.deepEqual([...classes].sort(), ['is-scrollable-left', 'is-scrollable-right'], 'in the middle, both sides');
+  frame.scrollLeft = 100;
+  onScroll!();
+  assert.deepEqual([...classes], ['is-scrollable-left'], 'at the end, the left side only');
+}
+
 // Nothing leaves the page: the script still loads nothing and builds no address beyond its own fragment.
 assert.ok(!/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource|navigator\.(?!clipboard)/.test(PAGE_SCRIPT), 'nothing is sent anywhere');
 
