@@ -1,0 +1,19 @@
+A theme's second logo, for the other ground (step-3-themes.md, "Logo", 18 November). Proof from one isolated dev
+instance (scripts/qa/dev-launch-isolated.sh, the patches applied to the worktree's own vscode copy) on a synthetic
+project: a dark theme "Night Harbour" (#14213D) whose logo is a made-up "HARBOUR" mark in white and amber, and a navy
+version of it for light slides, 18 November 2026.
+
+01  The theme's tab: the dark theme offered "Add a version for light slides" under its logo. The navy SVG was dropped
+    on it (a DOM drop of the file, as the Finder's): the host copied it beside the theme as "Night Harbour logo for
+    light slides.svg" (cmp: the same bytes as the dropped file), the draft got one line,
+    "logo-for-light: Night Harbour logo for light slides.svg", and Save wrote it. The two boxes: the first logo on the
+    theme's ground, "For dark slides"; the second on white, "For light slides"; each with Replace and Remove.
+02  The Card deck: its dark slide draws the logo for dark slides (the `logo:` file), top right.
+03  The same deck's words in Borderless (a second deck file with `look: borderless`): the white slide draws the version
+    for light slides. Read in the webviews: the Card deck's stage and strip name only "Night Harbour logo.svg".
+
+The page carrying only the file its slides draw, the choice by ground (dark Card, light Card, Borderless, one file
+only, a missing second file), the field's write, read-back and remove, and an untouched theme byte for byte are
+unit-tested in src/decks/themeLogo.test.ts.
+
+The instance was stopped (LEFT=0) and its run folder deleted.

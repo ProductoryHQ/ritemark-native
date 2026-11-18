@@ -34,12 +34,12 @@ import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '.
 import { PAGE_BEING_PUBLISHED, WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
 import { splitFrontMatter } from '../editorSync/frontMatter';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
-import { parseDeck, publishText } from './deckFormat';
+import { frontMatterLook, parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
 import { deckThemeAndLogo } from './deckPages';
 import type { DeckHostMessage, DeckPageState } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
-import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoFile, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
+import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
@@ -458,13 +458,14 @@ export class DeckPublisher implements vscode.Disposable {
 
   /**
    * The theme the deck names, read as the deck view reads it (`deckThemeAndLogo`), or the built-in one; and its logo as
-   * the page's file (Sprint 162 PR 4), only when the theme has one and its file is there and can go.
+   * the page's file (Sprint 162 PR 4), only when the theme has one and its file is there and can go. The page carries
+   * the one logo its slides draw (18 November, `pageLogoOf`): the second version only when the deck's look uses it.
    */
   private async lookFor(deckPath: string, text: string): Promise<{ theme: DeckTheme; logo: PageFile | null }> {
     const named = parseDeck(text.replace(/^\uFEFF/, '')).theme;
     const read = await deckThemeAndLogo(deckPath, themePathOf(named));
     const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
-    return { theme, logo: theme.logo && read.logo.state === 'found' ? pageLogoFile(read.logo.bytes, read.logo.kind) : null };
+    return { theme, logo: pageLogoOf(theme, frontMatterLook(text) === 'borderless', read.logo, read.secondLogo) };
   }
 
   dispose(): void {

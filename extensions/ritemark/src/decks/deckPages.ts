@@ -718,10 +718,10 @@ export type ThemeLogoFile =
 /** The logo files read lately, by their real path and name, with the time and size they were read at. */
 const logoFileCache = new Map<string, { modified: number; size: number; answer: ThemeLogoFile }>();
 
-export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>): Promise<ThemeLogoFile> {
-  const logo = theme.logo;
-  if (!logo) return { state: 'none' };
-  const file = logo.file;
+export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>, second = false): Promise<ThemeLogoFile> {
+  // `second`: the logo's second version (18 November), found, checked and refused by the same rules.
+  const file = second ? theme.logo?.second?.file : theme.logo?.file;
+  if (!file) return { state: 'none' };
   const refused = (problem: string): ThemeLogoFile => ({ state: 'refused', file, problem });
   const kind = logoKindOfName(file);
   if (!kind) return refused('A logo is an SVG or a PNG picture.');
@@ -761,24 +761,41 @@ export function logoWebviewUri(webview: vscode.Webview, found: Extract<ThemeLogo
 
 /**
  * The theme a deck at `deckPath` draws, as the deck view and the wall are sent it: the theme
- * file's text (null: the built-in theme), and its logo's address in this webview (null: none, or a missing file).
+ * file's text (null: the built-in theme), and its logo's address in this webview (null: none, or a missing file), and
+ * its second version's (18 November), each with its width to its height. Which one a slide draws is the drawer's
+ * (`themeSlideLogo`), which knows the deck's look.
  */
-export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<{ text: string | null; logo: string | null; logoAspect: number | null }> {
+export async function deckThemeFor(deckPath: string, themePath: string, webview: vscode.Webview): Promise<DeckThemeAddresses> {
   const root = themeRootOf(deckPath);
   const read = await readThemeFileOrEvening(root, themePath);
-  if (!read) return { text: null, logo: null, logoAspect: null };
-  const found = await themeLogoFile(root, read.path, parseTheme(read.text));
-  return found.state === 'found'
-    ? { text: read.text, logo: logoWebviewUri(webview, found), logoAspect: found.aspect }
-    : { text: read.text, logo: null, logoAspect: null };
+  if (!read) return { text: null, logo: null, logoAspect: null, secondLogo: null, secondLogoAspect: null };
+  const theme = parseTheme(read.text);
+  const [found, second] = await Promise.all([themeLogoFile(root, read.path, theme), themeLogoFile(root, read.path, theme, true)]);
+  return {
+    text: read.text,
+    logo: found.state === 'found' ? logoWebviewUri(webview, found) : null,
+    logoAspect: found.state === 'found' ? found.aspect : null,
+    secondLogo: second.state === 'found' ? logoWebviewUri(webview, second) : null,
+    secondLogoAspect: second.state === 'found' ? second.aspect : null,
+  };
 }
 
-/** The theme a deck at `deckPath` draws, and its logo file (Sprint 162 PR 4: the page carries it). */
-export async function deckThemeAndLogo(deckPath: string, themePath: string): Promise<{ text: string | null; logo: ThemeLogoFile }> {
+export interface DeckThemeAddresses {
+  text: string | null;
+  logo: string | null;
+  logoAspect: number | null;
+  secondLogo: string | null;
+  secondLogoAspect: number | null;
+}
+
+/** The theme a deck at `deckPath` draws, and its logo file and its second version's (Sprint 162 PR 4: the page carries one). */
+export async function deckThemeAndLogo(deckPath: string, themePath: string): Promise<{ text: string | null; logo: ThemeLogoFile; secondLogo: ThemeLogoFile }> {
   const root = themeRootOf(deckPath);
   const read = await readThemeFileOrEvening(root, themePath);
-  if (!read) return { text: null, logo: { state: 'none' } };
-  return { text: read.text, logo: await themeLogoFile(root, read.path, parseTheme(read.text)) };
+  if (!read) return { text: null, logo: { state: 'none' }, secondLogo: { state: 'none' } };
+  const theme = parseTheme(read.text);
+  const [logo, secondLogo] = await Promise.all([themeLogoFile(root, read.path, theme), themeLogoFile(root, read.path, theme, true)]);
+  return { text: read.text, logo, secondLogo };
 }
 
 /** The folder a deck at `deckPath` reads its theme from: its project folder, or its own folder when it has none. */

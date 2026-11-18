@@ -132,6 +132,20 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 .theme-tab .theme-logo-box .theme-logo-act:hover { background: var(--r-surface-soft); color: var(--r-ink-strong); }
 .theme-logo-problem { margin: 8px 0 0; font-size: 12px; line-height: 17px; color: var(--r-warning-ink); }
 .theme-logo-box + .theme-logo-problem + .theme-row, .theme-logo-box + .theme-row { margin-top: 4px; }
+/* 18 November: the logo's second version, for the other ground, under the first: a quiet line to add it, then a box of
+   its own; with both, each box says which slides it is for. */
+.theme-tab .theme-logo-add,
+.theme-tab .theme-logo-add:hover {
+  display: flex; align-items: center; justify-content: flex-start; gap: 6px; width: 100%; height: 34px; margin-top: 6px; padding: 0 12px;
+  border-radius: 9px; box-shadow: inset 0 0 0 1px var(--r-hairline-strong); background: transparent;
+  font-size: 12.5px; line-height: 17px; font-weight: 500; color: var(--r-accent); white-space: nowrap;
+}
+.theme-tab .theme-logo-add:hover { box-shadow: inset 0 0 0 1.5px var(--r-accent); background: var(--r-surface-soft); }
+.theme-tab .theme-logo-add.is-over { box-shadow: inset 0 0 0 2px var(--r-accent); background: var(--r-surface-soft); }
+.theme-logo-box + .theme-logo-box, .theme-logo-problem + .theme-logo-box { margin-top: 6px; }
+/* With the caption beside it, a wide picture gives way (kept whole, from the left) so Replace and Remove stay in the box. */
+.theme-logo-box.has-caption .theme-logo-picture { flex: 0 1 auto; min-width: 48px; }
+.theme-logo-for { flex: none; margin-right: 2px; padding: 2px 7px; border-radius: 6px; background: var(--r-surface); font-size: 11.5px; line-height: 15px; color: var(--r-ink-muted); white-space: nowrap; }
 
 .theme-note { display: flex; gap: 8px; margin: 22px 0 0; font-size: 12px; line-height: 17px; color: var(--r-ink-muted); }
 .theme-note > svg { flex: none; margin-top: 1px; }

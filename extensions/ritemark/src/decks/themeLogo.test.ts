@@ -9,6 +9,9 @@
  *  - An SVG stays an `<img>`, on the page too, and an SVG with scripts or links in it is no logo.
  *  - The page carries the file beside it, as it carries fonts: `logos/logo-<hash>.svg`, create-only, never over another
  *    file, gathered with the page; the page's digest and the sheet's words count it.
+ *  - A second logo for light slides (18 November, option (a): dark themes only): its `logo-for-light:` line written, read
+ *    back and removed; the logo chosen by the slides' ground (a Card deck its theme's, Borderless white); the page
+ *    carrying only the file its slides draw; a theme with no second logo unchanged, byte for byte.
  *
  * Run: npx tsx src/decks/themeLogo.test.ts
  */
@@ -17,13 +20,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from '../publish/gather';
-import { BUILT_IN_THEME_TEXT, isLogoPath, parseTheme } from './deckTheme';
+import { BUILT_IN_THEME_TEXT, drawsSecondLogo, groundOf, isLogoPath, offersSecondLogo, parseTheme, secondLogoGround, themeWithLogoAddresses } from './deckTheme';
 import { isThemeChanges, themeTextWith } from './themeFile';
 import { logoAspectOf, logoKindOfName, logoNames, logoProblem, MAX_LOGO_BYTES, svgProblem, themeStem } from './themeLogo';
 import { decodeThemeRequest, ThemeProtocolError } from './themeProtocol';
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, FLOW_BOTTOM, FLOW_TOP, LOGO_CLEARANCE, LOGO_GAP, LOGO_HEIGHT, LOGO_MAX_WIDTH, blockCanvasMarkup, logoDrop, blockSlideMarkup, drawsLogo, logoTitleMargin, slideLogoHtml, themeSlideLogo } from './blocks/slideRenderer';
 import { slideMarkup } from '../../webview/src/components/decks/slide/slideMarkup';
-import { LOGO_PLACE, PAGE_FONTS, buildDeckPage, foreignLogoLine, nodeFontFs, nodePageFs, pageLogoFile, removePageFonts, writeDeckPage, writePageFonts } from './page/pageFile';
+import { LOGO_PLACE, PAGE_FONTS, buildDeckPage, foreignLogoLine, nodeFontFs, nodePageFs, pageLogoFile, pageLogoOf, removePageFonts, writeDeckPage, writePageFonts } from './page/pageFile';
 import type { PageAssets } from './page/pageHtml';
 import { deckCounts, deckSheetRows } from './page/sheetRows';
 
@@ -194,10 +197,10 @@ async function main(): Promise<void> {
     assert.equal(logoAspectOf(Buffer.from('<svg width="80" height="40"></svg>'), 'svg'), 2);
     assert.equal(logoAspectOf(Buffer.from('<svg></svg>'), 'svg'), null);
     const theme = { ...parseTheme(themeTextWith(FERN, { logo: 'L.svg' })), logoUrl: 'L.svg', logoAspect: 172 / 32 };
-    const logo = themeSlideLogo(theme)!;
+    const logo = themeSlideLogo(theme, false)!;
     assert.equal(logo.width, 139.75);
-    assert.equal(themeSlideLogo({ ...theme, logoAspect: 20 })!.width, LOGO_MAX_WIDTH, 'a very wide logo counts at its widest');
-    assert.equal(themeSlideLogo({ ...theme, logoAspect: undefined })!.width, LOGO_MAX_WIDTH, 'an unknown shape counts at its widest');
+    assert.equal(themeSlideLogo({ ...theme, logoAspect: 20 }, false)!.width, LOGO_MAX_WIDTH, 'a very wide logo counts at its widest');
+    assert.equal(themeSlideLogo({ ...theme, logoAspect: undefined }, false)!.width, LOGO_MAX_WIDTH, 'an unknown shape counts at its widest');
     // A two-line title that runs to the right edge: the first block's right edge is the logo's left edge less 16 px.
     const title = { markdown: '# Mõõdame, kuidas meeskonna päevaplaan, kõnede jagamine ja õhtune ülevaade tegelikult toimivad\n\n- One\n- Two' };
     const canvas = blockCanvasMarkup(title, { logo });
@@ -249,10 +252,10 @@ async function main(): Promise<void> {
   // ---- The place and title-only rules, and a missing file
   await test('the logo in its corner, on every slide or on title slides only; no address draws nothing', () => {
     const theme = parseTheme(themeTextWith(FERN, { logo: 'L.svg' }));
-    assert.equal(themeSlideLogo(theme), null, 'a missing file (no address): no logo');
-    assert.equal(slideLogoHtml(themeSlideLogo(theme), true), '');
+    assert.equal(themeSlideLogo(theme, false), null, 'a missing file (no address): no logo');
+    assert.equal(slideLogoHtml(themeSlideLogo(theme, false), true), '');
     const drawn = { ...theme, logoUrl: 'https://file.test/L.svg?v=1' };
-    const every = themeSlideLogo(drawn)!;
+    const every = themeSlideLogo(drawn, false)!;
     assert.deepEqual(every, { url: 'https://file.test/L.svg?v=1', place: 'top-right', on: 'every-slide', width: 190 });
     assert.ok(drawsLogo(every, false) && drawsLogo(every, true));
     const titles = { ...every, on: 'title-slides' as const };
@@ -287,9 +290,9 @@ async function main(): Promise<void> {
     const canvas = read('webview/src/components/decks/slide/SlideCanvas.tsx');
     assert.match(canvas, /<img className=\{`slide-logo is-\$\{logo\.place\}`\} src=\{logo\.url\} alt="" draggable=\{false\} \/>/);
     assert.match(canvas, /element\.classList\.contains\('slide-logo'\)\) continue/, 'the old slides\' fit never counts the logo');
-    assert.match(read('webview/src/components/decks/blocks/SlideEditor.tsx'), /<SlideLogoImage logo=\{themeSlideLogo\(theme\)\} cover=\{isCoverSlide\(shownMarkdown\)\} \/>/, 'the stage');
+    assert.match(read('webview/src/components/decks/blocks/SlideEditor.tsx'), /<SlideLogoImage logo=\{themeSlideLogo\(theme, borderless\)\} cover=\{isCoverSlide\(shownMarkdown\)\} \/>/, 'the stage');
     const row = read('webview/src/components/decks/theme/LogoRow.tsx');
-    assert.match(row, /<img className="theme-logo-picture" src=\{logo\.url\}/);
+    assert.match(row, /<img className="theme-logo-picture" src=\{url\}/);
     for (const source of [canvas, row]) assert.doesNotMatch(source.replace(/\/\*\*[\s\S]*?\*\//g, ''), /dangerouslySetInnerHTML=\{\{ __html: (logo|theme\.logo)/);
     const css = read('webview/src/components/decks/slide/slide.css');
     assert.match(css, /\.deck-sl \.slide-logo \{ position: absolute; display: block; height: 26px; width: auto; max-width: 190px;[^}]*pointer-events: none;/);
@@ -358,6 +361,188 @@ async function main(): Promise<void> {
     assert.match(deckSheetRows(deckCounts(DECK, theme, [], true)).goes, /^2 slides and their handout, the pictures they use, and the theme's logo\.$/);
     assert.match(deckSheetRows(deckCounts(DECK, theme, fonts)).goes, /and the theme's fonts\.$/, 'no logo: as before');
     assert.equal(deckCounts(DECK, theme, fonts).logo, undefined);
+  });
+
+  // ---- A second logo for the other ground (step-3-themes.md, "Logo", 18 November)
+  const DARK_LOGO = themeTextWith(BUILT_IN_THEME_TEXT, { logo: 'Evening logo.svg', logoAt: 'top-left' });
+  const LIGHT_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 50"><path fill="#1C1F4A" d="M0 0h100v50H0z"/></svg>';
+
+  await test('the second logo is one line, read back with the ground it is for, and Remove gives the file back', () => {
+    assert.equal(groundOf(parseTheme(BUILT_IN_THEME_TEXT).bg), 'dark');
+    assert.equal(groundOf(parseTheme(FERN).bg), 'light');
+    // A dark theme adds a version for light slides; a light theme is offered none (option (a)).
+    assert.equal(secondLogoGround(parseTheme(DARK_LOGO)), 'light');
+    assert.ok(offersSecondLogo(parseTheme(DARK_LOGO)));
+    assert.ok(!offersSecondLogo(parseTheme(themeTextWith(FERN, { logo: 'L.svg' }))));
+    const added = themeTextWith(DARK_LOGO, { logoForLight: 'Evening logo for light slides.svg' });
+    const extra = added.split('\n').filter(line => !DARK_LOGO.split('\n').includes(line));
+    assert.deepEqual(extra, ['logo-for-light: Evening logo for light slides.svg'], 'one line');
+    assert.ok(added.indexOf('logo-for-light:') < added.indexOf('card:'), 'before the shade sections');
+    assert.deepEqual(parseTheme(added).logo, { file: 'Evening logo.svg', place: 'top-left', on: 'every-slide', second: { file: 'Evening logo for light slides.svg', ground: 'light' } });
+    assert.equal(parseTheme(added).card?.g1, parseTheme(DARK_LOGO).card?.g1, 'a logo is no colour change: the shades stay');
+    // Replace: the one line changes. Remove: that line goes, and the file is as it was, byte for byte.
+    const replaced = themeTextWith(added, { logoForLight: 'Evening logo for light slides 2.png' });
+    assert.equal(parseTheme(replaced).logo?.second?.file, 'Evening logo for light slides 2.png');
+    assert.equal(replaced.split('\n').length, added.split('\n').length);
+    assert.equal(themeTextWith(added, { logoForLight: null }), DARK_LOGO);
+    assert.equal(themeTextWith(replaced, { logoForLight: null }), DARK_LOGO);
+    assert.equal(themeTextWith(DARK_LOGO, { logoForLight: null }), DARK_LOGO, 'nothing to remove: the same text');
+    // The logo's Remove takes its second version with it.
+    assert.equal(themeTextWith(added, { logo: null }), BUILT_IN_THEME_TEXT);
+    // No logo: no second version is written.
+    assert.equal(themeTextWith(BUILT_IN_THEME_TEXT, { logoForLight: 'X.svg' }), BUILT_IN_THEME_TEXT);
+    // The reader takes only a picture beside the theme, from its `logo-for-light:` line, whatever the theme's ground
+    // (a theme turned light keeps it); a hand-written `logo-for-dark:` is no second version (option (a)).
+    assert.equal(parseTheme(withLines('logo: L.svg', 'logo-for-light: ../x.svg')).logo?.second, undefined);
+    assert.deepEqual(parseTheme(withLines('logo: L.svg', 'logo-for-light: Light.svg')).logo?.second, { file: 'Light.svg', ground: 'light' }, 'kept on a light theme');
+    assert.equal(parseTheme(withLines('logo: L.svg', 'logo-for-dark: Dark.svg')).logo?.second, undefined);
+    assert.equal(parseTheme(withLines('logo-for-light: Light.svg')).logo, undefined, 'a second version alone is no logo');
+    // A file naming both: Remove takes both lines, so the other never shows up in its place (the review of #798).
+    const both = withLines('logo: L.svg', 'logo-for-light: Light.svg', 'logo-for-dark: Dark.svg');
+    assert.equal(themeTextWith(both, { logoForLight: null }), withLines('logo: L.svg'));
+    // The tab may only take a second version out; the host names the picture.
+    assert.ok(isThemeChanges({ logoForLight: null }) && isThemeChanges({ logoForDark: null }));
+    assert.ok(!isThemeChanges({ logoForLight: 'Evil.svg' }) && !isThemeChanges({ logoForDark: '../x.svg' }));
+    // Its file beside the theme: named for the slides it is for, never over another picture.
+    const names = logoNames('Evening.theme.md', 'svg', 'light');
+    assert.deepEqual([names.next().value, names.next().value], ['Evening logo for light slides.svg', 'Evening logo for light slides 2.svg']);
+    assert.equal(logoNames('Fernhollow Bank.theme.md', 'png', 'dark').next().value, 'Fernhollow Bank logo for dark slides.png');
+    // The tab's messages say which logo a file is for.
+    assert.deepEqual(decodeThemeRequest({ type: 'theme/choose-logo', second: true }), { type: 'theme/choose-logo', second: true });
+    assert.deepEqual(decodeThemeRequest({ type: 'theme/choose-logo' }), { type: 'theme/choose-logo' });
+    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(LIGHT_SVG).toString('base64')}`;
+    assert.deepEqual(decodeThemeRequest({ type: 'theme/logo-file', dataUrl, filename: 'Dark.svg', second: true }), { type: 'theme/logo-file', dataUrl, filename: 'Dark.svg', second: true });
+    assert.deepEqual(decodeThemeRequest({ type: 'theme/logo-file', dataUrl, filename: 'Dark.svg' }), { type: 'theme/logo-file', dataUrl, filename: 'Dark.svg' });
+    for (const bad of [false, 'yes', 1]) {
+      assert.throws(() => decodeThemeRequest({ type: 'theme/choose-logo', second: bad }), ThemeProtocolError);
+      assert.throws(() => decodeThemeRequest({ type: 'theme/logo-file', dataUrl, filename: 'Dark.svg', second: bad }), ThemeProtocolError);
+    }
+  });
+
+  await test('the logo by ground: a dark Card deck, a light Card deck, Borderless, and one file only', () => {
+    const dark = themeWithLogoAddresses(parseTheme(themeTextWith(DARK_LOGO, { logoForLight: 'Light.svg' })), 'u://Evening logo.svg', 172 / 32, 'u://Light.svg', 2);
+    // A dark Card deck: the logo for its own ground (the `logo:` file). Borderless, always on white: the light-slide one.
+    assert.equal(themeSlideLogo(dark, false)!.url, 'u://Evening logo.svg');
+    assert.equal(themeSlideLogo(dark, false)!.width, 139.75);
+    assert.deepEqual(themeSlideLogo(dark, true), { url: 'u://Light.svg', place: 'top-left', on: 'every-slide', width: 52 }, 'at its own size');
+    assert.ok(drawsSecondLogo(dark, true) && !drawsSecondLogo(dark, false));
+    // The room the words keep is the drawn logo's: a top-right logo's margin follows the light-slide one on Borderless.
+    const topRight = { ...dark, logo: { ...dark.logo!, place: 'top-right' as const } };
+    const title = { markdown: '# A long title that runs right across the slide\n\n- One\n- Two' };
+    const card = blockSlideMarkup(title, { theme: topRight, borderless: false });
+    const white = blockSlideMarkup(title, { theme: topRight, borderless: true });
+    assert.match(card, /src="u:\/\/Evening logo\.svg"/);
+    assert.match(white, /src="u:\/\/Light\.svg"/);
+    assert.doesNotMatch(white, /Evening logo\.svg/, 'one file on a slide');
+    assert.equal(Number(/--logo-room:(\d+)px/.exec(white)?.[1]), logoTitleMargin({ width: 52 }));
+    assert.equal(Number(/--logo-room:(\d+)px/.exec(card)?.[1]), logoTitleMargin({ width: 139.75 }));
+    // An old slide's markup draws the same one.
+    assert.match(slideMarkup('title', { title: 'T' }, { theme: dark, borderless: true }), /src="u:\/\/Light\.svg"/);
+    assert.match(slideMarkup('title', { title: 'T' }, { theme: dark, borderless: false }), /src="u:\/\/Evening logo\.svg"/);
+    // Its file missing (no address): the first is drawn, as with one file only.
+    const gone = themeWithLogoAddresses(parseTheme(themeTextWith(DARK_LOGO, { logoForLight: 'Light.svg' })), 'u://Evening logo.svg', 172 / 32, null);
+    assert.equal(themeSlideLogo(gone, true)!.url, 'u://Evening logo.svg');
+    // Option (a): a light Card deck and Borderless both draw the `logo:` file on a light theme.
+    const light = themeWithLogoAddresses(parseTheme(themeTextWith(FERN, { logo: 'L.svg' })), 'u://L.svg', 2);
+    assert.equal(themeSlideLogo(light, false)!.url, 'u://L.svg');
+    assert.equal(themeSlideLogo(light, true)!.url, 'u://L.svg');
+    // One file only: used everywhere, as before.
+    const one = themeWithLogoAddresses(parseTheme(DARK_LOGO), 'u://Evening logo.svg', 172 / 32, 'u://ignored.svg');
+    assert.equal(one.secondLogoUrl, undefined, 'a theme naming no second version gets no second address');
+    assert.equal(themeSlideLogo(one, false)!.url, 'u://Evening logo.svg');
+    assert.equal(themeSlideLogo(one, true)!.url, 'u://Evening logo.svg');
+    // The views pass the deck's look.
+    const read = (file: string) => fs.readFileSync(path.join(extension, file), 'utf8');
+    assert.match(read('webview/src/components/decks/slide/SlideCanvas.tsx'), /themeSlideLogo\(theme, borderless\), \[[^\]]*secondUrl[^\]]*borderless\]/);
+    assert.match(read('webview/src/components/decks/slide/slideMarkup.ts'), /themeSlideLogo\(options\.theme, options\.borderless\)/);
+    assert.match(read('webview/src/components/decks/theme/ThemeTab.tsx'), /state\.logo\.second\.file === parsed\.logo\?\.second\?\.file/, 'the preview draws the host\'s second picture only while the draft names it');
+    assert.match(read('src/decks/present/DeckPresenter.ts'), /themeWithLogoAddresses\(theme, read\.logo, read\.logoAspect, read\.secondLogo, read\.secondLogoAspect\)/, 'the wall');
+  });
+
+  await test('option (a): only a dark theme offers the second logo; a theme turned light keeps it, unused, until dark again', () => {
+    const withSecond = themeTextWith(DARK_LOGO, { logoForLight: 'Light.svg' });
+    // Turned light: the line stays, byte for byte but for the colour, and the slides and the page draw the first.
+    const turnedText = themeTextWith(withSecond, { bg: '#F4F8F5' });
+    assert.ok(turnedText.includes('\nlogo-for-light: Light.svg\n'), 'the line stays');
+    assert.equal(turnedText.split('\n').filter(line => !withSecond.split('\n').includes(line)).length, 1, 'only the background line changed');
+    const turned = themeWithLogoAddresses(parseTheme(turnedText), 'u://Evening logo.svg', 2, 'u://Light.svg', 2);
+    assert.ok(!offersSecondLogo(turned), 'not offered, and not shown');
+    assert.deepEqual(turned.logo?.second, { file: 'Light.svg', ground: 'light' }, 'kept');
+    for (const borderless of [false, true]) {
+      assert.ok(!drawsSecondLogo(turned, borderless));
+      assert.equal(themeSlideLogo(turned, borderless)!.url, 'u://Evening logo.svg');
+    }
+    const first = { state: 'found' as const, bytes: Buffer.from(SVG), kind: 'svg' as const };
+    const secondFile = { state: 'found' as const, bytes: Buffer.from(LIGHT_SVG), kind: 'svg' as const };
+    assert.equal(pageLogoOf(parseTheme(turnedText), true, first, secondFile)!.address, pageLogoFile(first.bytes, 'svg').address);
+    // Dark again: it is back on Borderless.
+    const back = themeWithLogoAddresses(parseTheme(themeTextWith(turnedText, { bg: '#14213D' })), 'u://Evening logo.svg', 2, 'u://Light.svg', 2);
+    assert.ok(offersSecondLogo(back));
+    assert.equal(themeSlideLogo(back, true)!.url, 'u://Light.svg');
+    assert.equal(themeSlideLogo(back, false)!.url, 'u://Evening logo.svg');
+    // The tab: no second row on a light theme, and the host takes no second file for one.
+    const row = fs.readFileSync(path.join(extension, 'webview/src/components/decks/theme/LogoRow.tsx'), 'utf8');
+    assert.match(row, /const offered = offersSecondLogo\(theme\)/);
+    assert.match(row, /\{!offered \? null : second \?/);
+    assert.match(fs.readFileSync(path.join(extension, 'src/decks/themePages.ts'), 'utf8'), /if \(second && !offersSecondLogo\(draft\)\)/);
+  });
+
+  await test('the page carries only the logo its slides draw', async () => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'deck-logo2-')));
+    try {
+      const deckPath = path.join(root, 'Harbour.deck.md');
+      fs.writeFileSync(deckPath, DECK);
+      const theme = parseTheme(themeTextWith(DARK_LOGO, { logoForLight: 'Light.svg' }));
+      const first = { state: 'found' as const, bytes: Buffer.from(SVG), kind: 'svg' as const };
+      const second = { state: 'found' as const, bytes: Buffer.from(LIGHT_SVG), kind: 'svg' as const };
+      const firstFile = pageLogoFile(first.bytes, 'svg');
+      const secondFile = pageLogoFile(second.bytes, 'svg');
+      assert.equal(pageLogoOf(theme, false, first, second)!.address, firstFile.address, 'a dark Card deck: the first');
+      assert.equal(pageLogoOf(theme, true, first, second)!.address, secondFile.address, 'Borderless: the light-slide one');
+      assert.equal(pageLogoOf(theme, true, first, second)!.aspect, 2);
+      assert.equal(pageLogoOf(theme, true, first, { state: 'missing' })!.address, firstFile.address, 'its file missing: the first');
+      assert.equal(pageLogoOf(theme, false, { state: 'missing' }, second), null, 'a Card deck whose logo is missing: none');
+      assert.equal(pageLogoOf(parseTheme(DARK_LOGO), true, first, second)!.address, firstFile.address, 'one file only: that one');
+      assert.equal(pageLogoOf(parseTheme(BUILT_IN_THEME_TEXT), true, first, second), null, 'no logo: none');
+      // The page names that one file, never the other.
+      for (const borderless of [false, true]) {
+        const logo = pageLogoOf(theme, borderless, first, second)!;
+        const text = borderless ? DECK.replace('deck: 2\n', 'deck: 2\nlook: borderless\n') : DECK;
+        const built = await buildDeckPage({ deckPath, text, theme }, { ...assets, logo: { address: logo.address, aspect: logo.aspect } });
+        const named = new Set([...built.html.matchAll(/logos\/logo-[0-9a-f]{16}\.svg/g)].map(match => match[0]));
+        assert.deepEqual([...named], [logo.address], borderless ? 'Borderless' : 'Card');
+      }
+      // The publisher picks it by the deck's look, and writes only it (`logoFiles = look.logo ? [look.logo] : []`).
+      const publish = fs.readFileSync(path.join(extension, 'src/decks/deckPublish.ts'), 'utf8');
+      assert.match(publish, /pageLogoOf\(theme, frontMatterLook\(text\) === 'borderless', read\.logo, read\.secondLogo\)/);
+      assert.match(publish, /logoFiles = look\.logo \? \[look\.logo\] : \[\];/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  await test('a theme with no second logo is unchanged, byte for byte', async () => {
+    // Opened and changed elsewhere, its text keeps every other byte, and reads with no second version at all.
+    assert.equal(themeTextWith(DARK_LOGO, {}), DARK_LOGO);
+    assert.equal(themeTextWith(DARK_LOGO, { logoAt: 'top-left', logoOn: 'every-slide' }), DARK_LOGO);
+    assert.equal(themeTextWith(FERN, { logoForDark: null, logoForLight: null }), FERN);
+    assert.ok(!('second' in parseTheme(DARK_LOGO).logo!), 'no `second` field, so a page made before keeps its digest');
+    const drawn = themeWithLogoAddresses(parseTheme(DARK_LOGO), 'u://a.svg', 2);
+    assert.deepEqual(Object.keys(drawn).filter(key => key.startsWith('second')), []);
+    // Its page: the same file and the same digest in either look's choice as with one file before (`pageLogoOf` is the
+    // `logo:` file, the address the page had).
+    const deckPath = path.join(os.tmpdir(), 'Harbour.deck.md');
+    const file = pageLogoFile(Buffer.from(SVG), 'svg');
+    const found = { state: 'found' as const, bytes: Buffer.from(SVG), kind: 'svg' as const };
+    const theme = parseTheme(DARK_LOGO);
+    const before = await buildDeckPage({ deckPath, text: DECK, theme }, { ...assets, logo: { address: file.address, aspect: file.aspect } });
+    const chosen = pageLogoOf(theme, false, found, { state: 'none' })!;
+    const now = await buildDeckPage({ deckPath, text: DECK, theme }, { ...assets, logo: { address: chosen.address, aspect: chosen.aspect } });
+    assert.equal(now.digest, before.digest);
+    assert.equal(now.html, before.html);
+    // A theme gaining a second version doesn't change a Card deck's page either: it draws the same file.
+    const withSecond = parseTheme(themeTextWith(DARK_LOGO, { logoForLight: 'Light.svg' }));
+    assert.equal(pageLogoOf(withSecond, false, found, { state: 'found', bytes: Buffer.from(LIGHT_SVG), kind: 'svg' })!.address, file.address);
   });
 
   console.log(`themeLogo.test.ts — ${passed} groups passed`);

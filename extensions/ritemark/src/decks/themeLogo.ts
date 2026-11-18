@@ -14,7 +14,7 @@
  *
  * Pure: no `vscode`, no file system.
  */
-import { isLogoPath } from './deckTheme';
+import { isLogoPath, type LogoGround } from './deckTheme';
 
 /** A logo is a small picture: anything larger is refused. */
 export const MAX_LOGO_BYTES = 5 * 1024 * 1024;
@@ -126,13 +126,15 @@ export function themeStem(themeFile: string): string {
 
 /**
  * The names a theme's logo may take beside it, in order: `<stem> logo.<kind>`, then `<stem> logo 2.<kind>`, … Each is a
- * name a theme's `logo:` line can hold (`isLogoPath`), within a file name's 255 bytes.
+ * name a theme's `logo:` line can hold (`isLogoPath`), within a file name's 255 bytes. The logo's second version (18
+ * November) is named for the slides it is for: `<stem> logo for light slides.<kind>`, `… for light slides 2.<kind>`.
  */
-export function* logoNames(themeFile: string, kind: LogoKind): Generator<string> {
+export function* logoNames(themeFile: string, kind: LogoKind, ground?: LogoGround): Generator<string> {
   let stem = themeStem(themeFile);
   while (new TextEncoder().encode(stem).length > 200) stem = stem.slice(0, -1);
+  const base = ground ? `${stem} logo for ${ground} slides` : `${stem} logo`;
   for (let index = 1; index < 1000; index++) {
-    const name = `${stem} logo${index === 1 ? '' : ` ${index}`}.${kind}`;
+    const name = `${base}${index === 1 ? '' : ` ${index}`}.${kind}`;
     if (isLogoPath(name)) yield name;
   }
 }
