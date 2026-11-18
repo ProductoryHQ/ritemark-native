@@ -14,8 +14,10 @@
  *    pointer hides with it.
  *  - Typing a number opens the go-to box at the top: "4 · Go to <title> ↵". The host names the slide (`present/peek`).
  *  - All slides: a grid of the slides shown; a click (or Return) goes there.
- *  - One 0.3 s fade between slides, the one before fading out as the next fades in (the ground under both stays), none
- *    with reduced motion.
+ *  - Between slides, the deck's transition (README item 19: Fade, the default 0.3 s fade, the one before fading out as
+ *    the next fades in over the one ground; Push; Zoom; None), or the smooth move where elements match (item 17). A
+ *    press during either jumps it to its end at once and goes on; with reduced motion nothing moves. The rules are
+ *    `wallMotion.ts`, the drawing `playMotion.ts`.
  *  - B or "." blanks the wall to the theme's ground (white on Borderless), W to white, with the same fade. Any key or a
  *    click brings the slide back, and does nothing else (`blankKeyOf`); the presenter view says the wall is blank.
  *  - Small details item 3: for a published deck, Q (or the presenter view's "Show the page") shows the page's QR code
@@ -43,6 +45,8 @@ import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
+import { directionOf, MOTION_MS, MotionRun, stepOf, transitionOf, type MotionDirection } from './wallMotion'
+import { motionPairsOf, playStep, prefersReducedMotion } from './playMotion'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
 import './wall.css'
@@ -50,8 +54,6 @@ import './wall.css'
 /** The bar fades this long after the pointer last moved; the go-to box closes after this pause. */
 const BAR_MS = 2000
 const GOTO_MS = 3000
-/** The fade between two slides. */
-const FADE_MS = 300
 /** The go-to box sits this far below the slide's top edge (51 of the drawing's 810), the bar this far above its bottom. */
 const GOTO_FROM_TOP = 51
 const BAR_FROM_BOTTOM = 27
@@ -62,7 +64,7 @@ const GRID_GAP = 28
 type Move = 'present/next' | 'present/back' | 'present/first' | 'present/last' | 'present/stop'
 
 /** The wall's slide now, in its frame (not the one fading out). */
-const SLIDE_NOW = '.wall-slide:not(.is-leaving)'
+const SLIDE_NOW = '.wall-slide:not(.is-leaving):not(.is-ghost)'
 
 function useScreenSize(): { width: number; height: number } {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }))
@@ -78,10 +80,18 @@ const NO_SLIDES: WallSlide[] = []
 
 export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
-  // The slide before the last move, fading out as the new one fades in, from the opacity it had (a move during a
-  // fade takes the half-shown slide out from where it was, never from full, so nothing flashes).
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; from: number } | null>(null)
+  // The slide before the last move, going as the new one comes (README 19, the deck's transition, or 17's smooth move).
+  // A move during a step first jumps that step to its end (`MotionRun`), so the slide going is always the whole one.
+  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection } | null>(null)
   const enteringRef = useRef<HTMLDivElement | null>(null)
+  const leavingRef = useRef<HTMLDivElement | null>(null)
+  const motion = useRef<MotionRun | null>(null)
+  if (!motion.current) motion.current = new MotionRun({ setTimeout: (run, ms) => window.setTimeout(run, ms), clearTimeout: id => window.clearTimeout(id) })
+  // A press never waits: whatever is moving is put at its end at once, and the press goes on.
+  const jump = useCallback(() => { motion.current?.finish() }, [])
+  // Each move's own number, only ever counting up: a move that arrives as the step before ends (its end clears the
+  // slide going) still gets a new number, so its own step always starts (review of #792).
+  const moves = useRef(0)
   const [serial, setSerial] = useState(0)
   const [barShown, setBarShown] = useState(false)
   const [overBar, setOverBar] = useState(false)
@@ -126,10 +136,12 @@ export function DeckWall() {
       // Another slide has no spotlight: an ask made on the one before is let go.
       focus.settle(next, !previous || previous.slide.number === next.slide.number)
       if (previous && previous.slide.number !== next.slide.number) {
-        const shown = enteringRef.current ? Number.parseFloat(getComputedStyle(enteringRef.current).opacity) : 1
-        const from = Number.isFinite(shown) ? shown : 1
+        // A step still running (a press from the presenter view, say) ends first, at its end.
+        motion.current?.finish()
+        const direction = directionOf(previous.slide.number, next.slide.number)
         setSerial(value => value + 1)
-        setLeaving(leavingNow => ({ slide: previous.slide, serial: (leavingNow?.serial ?? 0) + 1, from }))
+        moves.current += 1
+        setLeaving({ slide: previous.slide, serial: moves.current, direction })
       }
       setState(next)
       return
@@ -144,29 +156,56 @@ export function DeckWall() {
     sendToExtension('present/ready')
   }, [])
 
-  // The slide that left is taken away once the fade is over.
-  useEffect(() => {
-    if (!leaving) return
-    const timer = window.setTimeout(() => setLeaving(null), FADE_MS + 50)
-    return () => window.clearTimeout(timer)
-  }, [leaving])
+  // The step from the slide before to this one, started once both are drawn (and fitted) and before they are painted;
+  // the slide before is taken away when it ends, at its time or at a press.
+  const leavingSerial = leaving?.serial
+  const leavingDirection = useRef<MotionDirection>('next')
+  leavingDirection.current = leaving?.direction ?? 'next'
+  useLayoutEffect(() => {
+    if (leavingSerial === undefined) return
+    const run = motion.current
+    const frame = window.requestAnimationFrame(() => {
+      const before = leavingRef.current
+      const now = enteringRef.current
+      const current = stateRef.current
+      if (!run || !before || !now || !current) { setLeaving(null); return }
+      // Nothing moves under a blank wall, the page's QR code or a picture filling the wall: the slide is simply there
+      // when it is shown again.
+      const covered = current.blank !== null || current.fill !== null || fillShown.current
+      const still = prefersReducedMotion() || covered
+      const transition = transitionOf(current.transition)
+      // None is a cut, even where elements match: nothing to look for.
+      const pairs = still || transition === 'none' ? [] : motionPairsOf(before, now)
+      const step = stepOf(transition, still, pairs.length > 0)
+      const direction = leavingDirection.current
+      const drawing = playStep(step, direction, { leaving: before, entering: now, distance: window.innerWidth }, pairs)
+      run.begin(MOTION_MS[step], drawing, () => setLeaving(value => (value?.serial === leavingSerial ? null : value)))
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [leavingSerial])
+  useEffect(() => () => { motion.current?.finish() }, [])
 
   // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
   const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
+  // A press never waits: whatever is moving is put at its end first (`jump`).
   const send = useCallback((type: Move) => {
+    jump()
     letGo()
     sendToExtension(type)
-  }, [letGo])
+  }, [jump, letGo])
   const askBlank = useCallback((to: WallBlank | null) => {
+    jump()
     askedBlank.current = { to }
     sendToExtension('present/blank', { to })
-  }, [])
-  const askSpot = useCallback((item: number | null) => askSpotWith(item, sendToExtension), [askSpotWith])
-  const askFill = useCallback((item: number | null) => askFillWith(item, sendToExtension), [askFillWith])
+  }, [jump])
+  // A spotlight or a filled wall asked during a step: the step is put at its end first, then the ask goes on.
+  const askSpot = useCallback((item: number | null) => { jump(); askSpotWith(item, sendToExtension) }, [jump, askSpotWith])
+  const askFill = useCallback((item: number | null) => { jump(); askFillWith(item, sendToExtension) }, [jump, askFillWith])
   const goTo = useCallback((number: number) => {
+    jump()
     letGo()
     sendToExtension('present/go', { number })
-  }, [letGo])
+  }, [jump, letGo])
   const actOnClick = useCallback((click: SpotClick) => {
     if (!click) return
     if (click.type === 'spot') askSpot(click.item)
@@ -317,13 +356,8 @@ export function DeckWall() {
   if (fillUrl) lastFillUrl.current = fillUrl
   const filledUrl = fillUrl ?? lastFillUrl.current
 
-  const layer = (slide: WallSlide, className: string, key: string, from?: number) => (
-    <div
-      key={key}
-      ref={from === undefined ? enteringRef : undefined}
-      className={`wall-slide ${className}`}
-      style={from === undefined ? undefined : ({ '--wall-fade-from': from } as CSSProperties)}
-    >
+  const layer = (slide: WallSlide, className: string, key: string, going: boolean) => (
+    <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
       <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
     </div>
   )
@@ -344,8 +378,8 @@ export function DeckWall() {
         aria-live="polite"
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, leaving.from) : null}
-        {layer(state.slide, leaving ? 'is-entering' : '', `slide-${serial}`)}
+        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true) : null}
+        {layer(state.slide, '', `slide-${serial}`, false)}
       </div>
 
       {/* Item 11: the picture whole and uncropped on the theme's ground, over the whole screen, under the blank. */}

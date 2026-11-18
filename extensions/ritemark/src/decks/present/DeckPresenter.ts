@@ -67,7 +67,7 @@ import {
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
-import { deckLookOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type PresentMove } from './presentSession';
+import { deckLookOf, deckTransitionOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type DeckTransition, type PresentMove } from './presentSession';
 
 /** Where the presentation was started from: the deck's document, and its view to return to. */
 interface DeckOrigin {
@@ -477,7 +477,7 @@ export class DeckPresenter implements vscode.Disposable {
   }
 
   /** The deck's look as its front matter has it now. */
-  private async look(running: Running): Promise<{ borderless: boolean; theme: DeckTheme }> {
+  private async look(running: Running): Promise<{ borderless: boolean; theme: DeckTheme; transition: DeckTransition }> {
     const text = running.origin.document.getText();
     const themePath = parseDeck(text).theme;
     if (running.theme.path !== themePath) {
@@ -487,7 +487,7 @@ export class DeckPresenter implements vscode.Disposable {
       const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
       running.theme = { path: themePath, value: read.logo ? { ...theme, logoUrl: read.logo, ...(read.logoAspect ? { logoAspect: read.logoAspect } : {}) } : theme };
     }
-    return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value };
+    return { borderless: deckLookOf(text) === 'borderless', theme: running.theme.value, transition: deckTransitionOf(text) };
   }
 
   /** The pictures as a window's URIs, looked up on disk only when the document or the pictures changed. */
