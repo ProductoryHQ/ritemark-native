@@ -27,7 +27,7 @@ import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
   AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, HANDLE_SIZE, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, ringGap, setColumnCount, setColumnSplit, snapSplit, splitPlace, turnInto, type BarKind, type Box,
+  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
@@ -300,6 +300,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
   const look = chosen.kind === 'boxes' ? boxesLookOf(attrs) : null
   const fill = look?.fill ?? theme.boxes
   const columns = chosen.kind === 'columns' ? columnCount(chosen.node) : 0
+  const reveal = revealsOneBlock(chosen)
   /**
    * A change on the chosen block as it is now: found again from the caret, so a change that came in meanwhile (an AI's
    * edit, an undo) never makes the bar act on another block's place. Nothing when the block is gone.
@@ -560,6 +561,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                   ]} />
                 </>
               ) : null}
+              {agenda ? null : (
+                <>
+                  <Sep />
+                  {/* README item 18: how the block's items arrive in Present. All at once writes nothing. */}
+                  <span className="deck-bar-label" aria-hidden="true">Reveal</span>
+                  <Group label="Reveal" folded={fold >= 1} options={[
+                    { key: 'all', on: !reveal, label: 'All at once', tip: 'In Present, every item shows when the slide opens', pick: () => run(act(pos => setReveal(editor.state, pos, false))) },
+                    { key: 'one', on: reveal, label: 'One by one', tip: 'In Present, the slide opens with the first item, and each → or clicker press shows the next', pick: () => run(act(pos => setReveal(editor.state, pos, true))) },
+                  ]} />
+                </>
+              )}
               <Sep />
               {agenda ? null : (
                 <Tooltip label={canAdd ? ADD_LABEL[chosen.kind] : `A Columns block holds ${MAX_COLUMNS} columns at most`}>

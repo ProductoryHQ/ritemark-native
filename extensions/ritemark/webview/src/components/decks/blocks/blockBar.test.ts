@@ -36,7 +36,7 @@ import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  setColumnCount, setColumnSplit, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
+  revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
 installTestDocument()
@@ -588,4 +588,103 @@ stable(COLUMNS, 'three columns')
   assert.equal(markableBox(null), null)
 }
 
-console.log('blockBar: Turn into, Width, Style, alignment, Columns, the split, Add, Delete, the drag, Tab and the handles pass')
+// ---- README item 18, Reveal: All at once · One by one. Boxes, Steps and Columns write `reveal="one"` on their own
+// line; a list is wrapped in `::: incremental`, its own lines never changing. Read back byte for byte, one Undo each.
+{
+  const LIST = ['# Plan', '', '- Open the file', '- Ask the question', '  with a second line', '- Check the answer', '', 'After the list.'].join('\n')
+  const NUMBERED = ['# Plan', '', '3) Open the file', '4) Ask the question', '5) Check the answer'].join('\n')
+  const STEPS = ['# Plan', '', '::: {.steps tag="Try it"}', '1. Open the file', '2. Ask the question', ':::'].join('\n')
+  const COLUMNS = ['# Plan', '', ':::: columns', '::: column', '### Before', 'Old way', ':::', '', '::: column', '### After', 'New way', ':::', '::::'].join('\n')
+  const wrap = (markdown: string, list: string) => markdown.replace(list, `::: incremental\n${list}\n:::`)
+  const listOf = (markdown: string) => markdown.split('\n').filter(line => /^(\s+\S|[-*]|\d+[.)])/.test(line)).join('\n')
+  for (const [label, markdown, caret, oneLine] of [
+    ['Boxes', AGENDA, 'Desktop', (text: string) => text.replace(':::: boxes', ':::: {.boxes reveal="one"}')],
+    ['Steps', STEPS, 'Ask', (text: string) => text.replace('::: {.steps tag="Try it"}', '::: {.steps tag="Try it" reveal="one"}')],
+    ['Columns', COLUMNS, 'New', (text: string) => text.replace(':::: columns', ':::: {.columns reveal="one"}')],
+    ['List', LIST, 'Ask', (text: string) => wrap(text, listOf(LIST))],
+    ['Numbered', NUMBERED, 'Ask', (text: string) => wrap(text, listOf(NUMBERED))],
+  ] as const) {
+    stable(markdown, label)
+    const state = stateWith(markdown, caret)
+    const block = chosenBlockAt(state)!
+    assert.equal(revealsOneBlock(block), false, `${label}: All at once to begin with`)
+    assert.equal(setReveal(state, block.pos, false), null, `${label}: All at once again changes nothing`)
+    const one = setReveal(state, block.pos, true)
+    assert.equal(one!.getMeta(SLIDE_COMMAND), true, `${label}: one undo step of its own`)
+    const written = after(one)
+    assert.equal(written, oneLine(markdown), `${label}: One by one is written as item 18 says`)
+    stable(written, `${label} one by one`)
+    // Read back: the bar sees the same kind, now One by one, with the caret where it was.
+    const back = stateWith(written, caret)
+    const chosen = chosenBlockAt(back)!
+    assert.equal(chosen.kind, block.kind, `${label}: still a ${block.kind} to the bar`)
+    assert.equal(revealsOneBlock(chosen), true, `${label}: reads back as One by one`)
+    assert.equal(one!.selection.$head.parent.textContent.startsWith(caret), true, `${label}: the caret stays in its item`)
+    assert.equal(setReveal(back, chosen.pos, true), null, `${label}: One by one again changes nothing`)
+    // All at once writes nothing: the bytes it had.
+    assert.equal(after(setReveal(back, chosen.pos, false)), markdown, `${label}: All at once gives the same bytes back`)
+    // The deck: one Undo gives the file back.
+    const text = DECK(markdown)
+    const deck = openDeck(text)
+    const stage = stageOn(deck, 0)
+    stage.caretIn(caret)
+    stage.apply(setReveal(stage.inner, blockPos(stage.inner), true))
+    assert.equal(stage.save(), DECK(written), `${label}: the deck's file has the one change`)
+    stage.undo()
+    assert.equal(stage.save(), text, `${label}: one Undo gives the file back`)
+  }
+
+  // A list wrapped either way survives open and save byte for byte, as a slide and as a deck; `{reveal="one"}` is read
+  // as One by one too, and All at once unwraps it.
+  const written = wrap(LIST, listOf(LIST))
+  const otherForm = written.replace('::: incremental', '::: {reveal="one"}')
+  for (const form of [written, otherForm]) {
+    stable(form, form.split('\n')[2])
+    const deck = openDeck(DECK(form))
+    assert.equal(deck.save(deck.state.doc), DECK(form), `${form.split('\n')[2]}: the deck opens and saves byte for byte`)
+    const state = stateWith(form, 'Ask')
+    const chosen = chosenBlockAt(state)!
+    assert.equal(chosen.kind, 'list')
+    assert.equal(revealsOneBlock(chosen), true)
+    assert.equal(after(setReveal(state, chosen.pos, false)), LIST, `${form.split('\n')[2]}: All at once unwraps to the bare list`)
+  }
+  // A wrapper holding more than one list is no reveal wrapper: the bar is not for it, and it is kept as written.
+  const two = ['# Plan', '', '::: incremental', '- One', '', 'Words between.', ':::'].join('\n')
+  stable(two, 'a wrapper with more than a list')
+  assert.equal(chosenBlockAt(stateWith(two, 'One')), null, 'a wrapper with words beside its list is no list to the bar')
+
+  // The bar sees through the wrapper: Add puts the item in the list, Turn into carries One by one, Delete takes both.
+  {
+    const state = stateWith(written, 'Ask')
+    const pos = blockPos(state)
+    const added = after(addItem(state, pos))
+    assert.equal(added, written.replace('- Check the answer\n:::', '- Check the answer\n-\n:::'), `Add: a new item inside the wrapper\n${added}`)
+    const boxes = after(turnInto(state, pos, 'boxes'))
+    assert.ok(boxes.includes(':::: {.boxes reveal="one"}'), `Turn into Boxes carries One by one:\n${boxes}`)
+    const again = stateWith(boxes, 'Ask')
+    const listAgain = after(turnInto(again, blockPos(again), 'list'))
+    assert.ok(listAgain.startsWith('# Plan\n\n::: incremental\n- Open the file'), `and back to a list, still One by one:\n${listAgain}`)
+    // The same list as the bare one's round trip writes (a box's second line makes a loose list), in its wrapper.
+    const bareBoxes = stateWith(LIST, 'Ask')
+    const bareAgain = stateWith(after(turnInto(bareBoxes, blockPos(bareBoxes), 'boxes')), 'Ask')
+    const unwrapped = stateWith(listAgain, 'Ask')
+    assert.equal(after(setReveal(unwrapped, blockPos(unwrapped), false)), after(turnInto(bareAgain, blockPos(bareAgain), 'list')), 'the wrapper adds nothing else')
+    const numbered = after(turnInto(state, pos, 'numbered'))
+    assert.ok(numbered.startsWith('# Plan\n\n::: incremental\n1. Open the file'), `List → Numbered keeps its wrapper:\n${numbered}`)
+    assert.equal(after(deleteBlock(state, pos)), '# Plan\n\nAfter the list.', 'Delete takes the list and its wrapper')
+    const moved = after(moveBlock(state, pos, 3))
+    assert.equal(moved, `# Plan\n\nAfter the list.\n\n${written.split('\n\n').slice(1, -1).join('\n\n')}`, `the ⋮ drag moves the wrapper with its list\n${moved}`)
+  }
+
+  // Drawn as the bare list is, everywhere: the same list in a plain block of its size, its items numbered for Present.
+  {
+    const bare = blockSlideHtml(LIST)
+    const html = blockSlideHtml(written)
+    assert.ok(html.includes('<div class="blk-group" data-reveal="one"><ul>\n<li data-reveal-item="0">'), html)
+    assert.equal(html.replace(/ data-reveal-item="\d+"/g, '').replace('<div class="blk-group" data-reveal="one">', '').replace('</ul>\n</div>\n', '</ul>\n'), bare, 'the same list, drawn as the bare one')
+    assert.ok(!html.includes('data-reveal-hidden'), 'the editor, the strip and the page show every item')
+    assert.equal(blockSlideHtml(otherForm), html, '{reveal="one"} draws the same')
+  }
+}
+
+console.log('blockBar: Turn into, Width, Style, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')

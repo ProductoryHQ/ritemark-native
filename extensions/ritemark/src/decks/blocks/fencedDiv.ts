@@ -260,3 +260,32 @@ export function columnsDrawnAttributes(attrs: FenceAttributes, columns: Readonly
   if (template) out.style = template;
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Reveal (decks README item 18, 18 November): items arrive one by one in Present. Boxes, Steps and Columns carry it as
+// one value on their own line (`:::: {.boxes reveal="one"}`); a List or Numbered list, which has no line of its own,
+// is wrapped in Pandoc's own form, `::: incremental` … `:::`, which Pandoc and Quarto read the same way. A list wrapped
+// in `::: {reveal="one"}` is read the same too, but `incremental` is what is written. All at once writes nothing.
+// ---------------------------------------------------------------------------
+
+/** The value Boxes, Steps and Columns carry on their own line, and the class a list's wrapper carries. */
+export const REVEAL_KEY = 'reveal';
+export const REVEAL_ONE = 'one';
+export const REVEAL_LIST_CLASS = 'incremental';
+/** The wrapper's opening and closing lines, as One by one writes them around a list. */
+export const REVEAL_LIST_OPEN = `::: ${REVEAL_LIST_CLASS}`;
+export const REVEAL_LIST_CLOSE = ':::';
+
+/** Does a block's own line say One by one (`reveal="one"`)? */
+export function revealsOne(attrs: FenceAttributes): boolean {
+  return attrs.values[REVEAL_KEY]?.trim().toLowerCase() === REVEAL_ONE;
+}
+
+/**
+ * Is this a list's reveal wrapper: a `:::` block of no slide class that is `incremental` or says `reveal="one"`? It is
+ * one only while it holds one list and nothing else drawn (comments aside); the renderer and the slide editor check that.
+ */
+export function isRevealWrapperAttrs(attrs: FenceAttributes): boolean {
+  if (slideBlockClassOf(attrs) !== null || attrs.classes.includes('agenda')) return false;
+  return attrs.classes.includes(REVEAL_LIST_CLASS) || revealsOne(attrs);
+}

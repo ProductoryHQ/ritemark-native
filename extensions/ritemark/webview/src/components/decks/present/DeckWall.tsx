@@ -29,6 +29,9 @@
  *  - A click on a spotlit picture (a picture alone on its slide: the first click) fills the wall with it, whole, on
  *    the theme's ground (item 11). Any key or click
  *    returns to the slide, and does nothing else (`fillKeyOf`).
+ *  - Items one by one (item 18): the slide is drawn at the host's step (`reveal`), the items not shown yet hidden in their
+ *    places; the item a press shows rises in, 8 px in 0.2 s (`playReveal`, run by `MotionRun`, so a press during it puts
+ *    it at its end); with reduced motion, or under a blank or filled wall, it is simply there.
  *
  * The host is the only source of state: every move is a request, and the wall draws what the host sends back.
  */
@@ -45,8 +48,8 @@ import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
-import { directionOf, MOTION_MS, MotionRun, stepOf, transitionOf, type MotionDirection } from './wallMotion'
-import { motionPairsOf, playStep, prefersReducedMotion } from './playMotion'
+import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, stepOf, transitionOf, type MotionDirection } from './wallMotion'
+import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import '../decks.css'
 import './wall.css'
@@ -82,7 +85,9 @@ export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
   // The slide before the last move, going as the new one comes (README 19, the deck's transition, or 17's smooth move).
   // A move during a step first jumps that step to its end (`MotionRun`), so the slide going is always the whole one.
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection } | null>(null)
+  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection; reveal: number | undefined } | null>(null)
+  // README item 18: the items a press just showed, rising in on the slide now (one step's own number, as a move's).
+  const [arriving, setArriving] = useState<{ from: number; to: number; serial: number } | null>(null)
   const enteringRef = useRef<HTMLDivElement | null>(null)
   const leavingRef = useRef<HTMLDivElement | null>(null)
   const motion = useRef<MotionRun | null>(null)
@@ -141,7 +146,16 @@ export function DeckWall() {
         const direction = directionOf(previous.slide.number, next.slide.number)
         setSerial(value => value + 1)
         moves.current += 1
-        setLeaving({ slide: previous.slide, serial: moves.current, direction })
+        // The slide going is drawn as the room last saw it: at its step (README item 18).
+        setLeaving({ slide: previous.slide, serial: moves.current, direction, reveal: previous.reveal?.shown })
+      } else {
+        // README item 18: a press that showed the next item on this slide; it rises in once it is drawn.
+        const arrivals = revealArrivals(previous?.reveal ?? null, next.reveal, !!previous)
+        if (arrivals) {
+          motion.current?.finish()
+          moves.current += 1
+          setArriving({ ...arrivals, serial: moves.current })
+        }
       }
       setState(next)
       return
@@ -184,6 +198,20 @@ export function DeckWall() {
     return () => window.cancelAnimationFrame(frame)
   }, [leavingSerial])
   useEffect(() => () => { motion.current?.finish() }, [])
+
+  // README item 18: the item a press showed rises in, 8 px in 0.2 s, once it is drawn; a press during it puts it at its
+  // end (`jump`), as for a move. Under a blank or filled wall, or with reduced motion, it is simply there.
+  const arrivingSerial = arriving?.serial
+  useLayoutEffect(() => {
+    if (!arriving || arrivingSerial === undefined) return
+    const run = motion.current
+    const current = stateRef.current
+    const covered = !current || current.blank !== null || current.fill !== null || fillShown.current
+    if (!run || covered || prefersReducedMotion()) { setArriving(null); return }
+    const drawing = playReveal(frameRef.current?.querySelector(SLIDE_NOW) ?? null, arriving)
+    run.begin(drawing ? REVEAL_MS : 0, drawing, () => setArriving(value => (value?.serial === arrivingSerial ? null : value)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrivingSerial])
 
   // A move clears the spotlight and the filled wall (the host's rule), so an ask still waiting is let go.
   const { letGo, askSpot: askSpotWith, askFill: askFillWith, spotNow, fillNow } = focus
@@ -356,9 +384,9 @@ export function DeckWall() {
   if (fillUrl) lastFillUrl.current = fillUrl
   const filledUrl = fillUrl ?? lastFillUrl.current
 
-  const layer = (slide: WallSlide, className: string, key: string, going: boolean) => (
+  const layer = (slide: WallSlide, className: string, key: string, going: boolean, reveal: number | undefined) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
     </div>
   )
 
@@ -378,8 +406,8 @@ export function DeckWall() {
         aria-live="polite"
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true) : null}
-        {layer(state.slide, '', `slide-${serial}`, false)}
+        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true, leaving.reveal) : null}
+        {layer(state.slide, '', `slide-${serial}`, false, state.reveal?.shown)}
       </div>
 
       {/* Item 11: the picture whole and uncropped on the theme's ground, over the whole screen, under the blank. */}

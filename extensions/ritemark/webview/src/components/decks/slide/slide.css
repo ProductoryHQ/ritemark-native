@@ -143,6 +143,12 @@
 .deck-sl.is-blocks li { margin-bottom: .32em; }
 .deck-sl.is-blocks li > p { margin: 0; }
 .deck-sl.is-blocks li::marker { color: var(--s-acc, #F2B544); font-weight: 700; }
+/* Decks README item 18: a list set to One by one is wrapped in `::: incremental`, a plain block of the list's own size,
+   so it looks as the bare list does everywhere (its margins reach the flow's edges as the list's own would). In Present,
+   an item not shown yet keeps its place, hidden (`data-reveal-hidden`, the renderer's), so nothing moves as it arrives. */
+.deck-sl.is-blocks .blk-flow > .blk-group[data-reveal]:first-child > :first-child { margin-top: 0; }
+.deck-sl.is-blocks .blk-flow > .blk-group[data-reveal]:last-child > :last-child { margin-bottom: 0; }
+.deck-sl.is-blocks [data-reveal-hidden] { visibility: hidden; }
 .deck-sl.is-blocks strong { font-weight: 700; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
 .deck-sl.is-blocks pre { margin: 0 0 .55em; padding: .6em .8em; border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }

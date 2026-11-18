@@ -20,7 +20,7 @@ import { quotedForAI, slideTitleLine, type CurrentSlideEntry, type SlideAtSend }
 import { isDeckPath, splitFileName } from '../deckFileName';
 import { isCurrentSlideId } from '../deckProtocol';
 import { slideBlockClassOf, type FenceAttributes } from './fencedDiv';
-import { isCommentBlock, lexBlockSlide } from './slideRenderer';
+import { isCommentBlock, isRevealListToken, lexBlockSlide } from './slideRenderer';
 import { commentsWrittenIn } from '../writtenComments';
 
 /** What a block on a slide is, as a person names it. */
@@ -82,6 +82,8 @@ export function blockShapeOf(token: Token, firstTitle = true): SlideBlockShape {
       return { kind: 'rule' };
     case 'slideDiv': {
       const div = token as unknown as SlideDivToken;
+      // README item 18: a list in its `::: incremental` wrapper is the list, to a person.
+      if (isRevealListToken(div)) return { kind: 'list' };
       const kind = slideBlockClassOf(div.attrs);
       if (kind === 'columns' || kind === 'boxes') {
         const count = div.tokens.filter(child => child.type === 'slideDiv').length;

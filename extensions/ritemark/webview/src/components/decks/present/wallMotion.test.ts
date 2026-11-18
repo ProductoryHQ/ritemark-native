@@ -6,18 +6,23 @@
  *     file (in the flow or beside it), a block of the same type with the same item headings; nothing else.
  *   - A press during a transition or a move jumps it to its end at once and goes on: the step ends once, there and then,
  *     every animation put at its end, and the next step starts from the whole slide.
+ *   - README item 18: an item shown by → rises in (8 px, 0.2 s), a press during it jumps it to its end, the spotlight
+ *     reaches only the items shown, and reduced motion shows the item at once.
  * Run with `npx tsx webview/src/components/decks/present/wallMotion.test.ts`.
  */
 import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
+import { URL as NodeURL, fileURLToPath } from 'node:url'
 import { createDocument } from '@mixmark-io/domino'
 import { blockCanvasMarkup } from '../../../../../src/decks/blocks/slideRenderer'
 import { deckTransitionOf } from '../../../../../src/decks/present/presentSession'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import {
-  DECK_TRANSITIONS, MOTION_MS, MotionRun, directionOf, matchMotion, motionKeysOf, previewTarget, stepOf, transitionOf, transitionValue,
+  DECK_TRANSITIONS, MOTION_MS, MotionRun, REVEAL_MS, REVEAL_RISE, directionOf, matchMotion, motionKeysOf, previewTarget, revealArrivals, stepOf, transitionOf, transitionValue,
   type MotionClock, type MotionElement,
 } from './wallMotion'
-import { playStep } from './playMotion'
+import { playReveal, playStep } from './playMotion'
+import { spotItems } from './spotlight'
 
 // ---- The deck's transition, and the menu's four
 {
@@ -190,6 +195,61 @@ class FakeClock implements MotionClock {
   playStep('none', 'next', { leaving, entering: element(), distance: 1440 })
   assert.equal(made.length, 0, 'None draws nothing')
   assert.equal(leaving.style.visibility, 'hidden', 'and the slide before is gone at once')
+}
+
+// ---- README item 18: items arrive one by one. Which items rise in, the spotlight on the shown items only, the rise
+// itself, a press during it, and reduced motion.
+{
+  assert.deepEqual(revealArrivals({ shown: 1 }, { shown: 2 }, true), { from: 1, to: 2 }, '→: the second item rises in')
+  assert.equal(revealArrivals({ shown: 2 }, { shown: 1 }, true), null, '←: the item hides at once')
+  assert.equal(revealArrivals({ shown: 1 }, { shown: 1 }, true), null, 'a blank, a spotlight: no step')
+  assert.equal(revealArrivals({ shown: 4 }, { shown: 1 }, false), null, 'another slide: its transition draws it')
+  assert.equal(revealArrivals(null, { shown: 1 }, true), null)
+
+  const BOXES = ['# Four ideas', '', ':::: {.boxes reveal="one"}', ...['One', 'Two', 'Three', 'Four'].flatMap(word => ['::: box', `### ${word}`, ':::', '']), '::::', '', 'A line after them.'].join('\n')
+  const drawn = (reveal?: number) => createDocument(`<body>${blockCanvasMarkup({ markdown: BOXES }, { reveal })}</body>`).body as unknown as HTMLElement
+  // The spotlight's items are the shown ones: F, Tab and a click never reach an item still to come.
+  const words = (root: HTMLElement) => spotItems(root).map(item => (item.textContent ?? '').trim())
+  assert.deepEqual(words(drawn()), ['One', 'Two', 'Three', 'Four'], 'every item, as everywhere but Present')
+  assert.deepEqual(words(drawn(2)), ['One', 'Two'], 'Present at 2 of 4: the two shown')
+
+  // The rise: the item shown fades in as it rises 8 px in 0.2 s; one press jumps it to its end, once.
+  const slide = drawn(3)
+  const made: Array<{ keyframes: Keyframe[]; options: KeyframeAnimationOptions; finished: number }> = []
+  for (const item of Array.from(slide.querySelectorAll('[data-reveal-item]')) as HTMLElement[]) {
+    (item as unknown as { animate: unknown }).animate = (keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
+      const animation = { keyframes, options, finished: 0, finish() { this.finished += 1 } }
+      made.push(animation)
+      return animation
+    }
+  }
+  const drawing = playReveal(slide, { from: 2, to: 3 })
+  assert.ok(drawing, 'something to draw')
+  assert.equal(made.length, 1, 'only the item just shown moves')
+  assert.deepEqual(made[0].keyframes, [{ opacity: 0, transform: `translateY(${REVEAL_RISE}px)` }, { opacity: 1, transform: 'translateY(0)' }])
+  assert.equal(made[0].options.duration, REVEAL_MS)
+  assert.equal(REVEAL_MS, 200)
+  assert.equal(REVEAL_RISE, 8)
+  const clock = new FakeClock()
+  const run = new MotionRun(clock)
+  let ended = 0
+  run.begin(REVEAL_MS, drawing, () => { ended += 1 })
+  clock.advance(80)
+  // The press mid-reveal (#792's rule): the item is at its end at once, and the press goes on.
+  assert.equal(run.finish(), true)
+  assert.equal(made[0].finished, 1, 'at its end there and then')
+  assert.equal(ended, 1)
+  clock.advance(1000)
+  assert.equal(ended, 1, 'and it never ends twice')
+  assert.equal(playReveal(slide, { from: 5, to: 6 }), null, 'no such item: nothing to draw')
+  assert.equal(playReveal(null, { from: 0, to: 1 }), null)
+
+  // The wall: reduced motion (or a covered wall) shows the item at once, without the rise; a press first jumps it.
+  const wallSource = readFileSync(fileURLToPath(new NodeURL('./DeckWall.tsx', import.meta.url)), 'utf8')
+  assert.match(wallSource, /if \(!run \|\| covered \|\| prefersReducedMotion\(\)\) \{ setArriving\(null\); return \}/)
+  assert.match(wallSource, /const send = useCallback\(\(type: Move\) => \{\n\s+jump\(\)/)
+  // The slide on the wall and the one going are drawn at their steps; the editor's canvases never are.
+  assert.match(wallSource, /layer\(state\.slide, '', `slide-\$\{serial\}`, false, state\.reveal\?\.shown\)/)
 }
 
 console.log('wallMotion: all tests passed')

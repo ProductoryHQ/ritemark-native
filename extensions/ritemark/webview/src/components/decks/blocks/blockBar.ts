@@ -19,12 +19,17 @@
  *    each column's `width` on its own line (`::: {.column width="33%"}`, Pandoc's and Quarto's form).
  *  - **Add, the +, Delete and the ⋮ drag.** A comment note before the block moves with it; Delete keeps the block's
  *    comments (they are words), where the block stood.
+ *  - **Reveal** (decks README item 18): All at once · One by one, for every kind but the Agenda (`setReveal`). Boxes,
+ *    Steps and Columns write `reveal="one"` on their own line; a list is wrapped in `::: incremental` (`::: {reveal="one"}`
+ *    is read the same), which the bar sees through (`revealWrappedList`): to it, the block is still a List. Turn into
+ *    carries One by one to the new kind.
  *  - **Tab** in a box or a column goes to the start of the next one (Shift+Tab the one before); in the last it stays.
  *    In a list item, a code box or a table cell, Tab is theirs (indent, the next cell).
  */
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { OPEN_FENCE, columnWidthOf, parseFenceAttributes, slideBlockClassOf, withFenceValue, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { liftTarget } from '@tiptap/pm/transform'
+import { OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
 
 /**
@@ -57,13 +62,71 @@ const divKind = (node: PMNode) => (node.type.name === 'slideDiv' ? slideBlockCla
 const isNote = (node: PMNode) => node.type.name === 'commentNode'
 const isEmptyText = (node: PMNode) => node.isTextblock && node.content.size === 0
 
+const isList = (node: PMNode) => node.type.name === 'bulletList' || node.type.name === 'orderedList'
+
+/**
+ * README item 18: a list set to One by one, wrapped in `::: incremental` (or `::: {reveal="one"}`): its list, when the
+ * wrapper holds one list and nothing else but comment notes; null for anything else. To the bar it is the list.
+ */
+export function revealWrappedList(node: PMNode): PMNode | null {
+  if (node.type.name !== 'slideDiv' || !isRevealWrapperAttrs(divAttributesOf(node))) return null
+  let list: PMNode | null = null
+  let other = false
+  node.forEach(child => {
+    if (isNote(child)) return
+    if (!list && isList(child)) list = child
+    else other = true
+  })
+  return other ? null : list
+}
+
 /** The bar's kind of a top-level block, or null for a block it isn't for (a title, a line, a table, a picture). */
 export function barKindOf(node: PMNode): BarKind | null {
   if (node.type.name === 'slideAgenda') return 'agenda'
-  if (node.type.name === 'bulletList') return 'list'
-  if (node.type.name === 'orderedList') return 'numbered'
+  const list = isList(node) ? node : revealWrappedList(node)
+  if (list) return list.type.name === 'bulletList' ? 'list' : 'numbered'
   const kind = divKind(node)
   return kind === 'boxes' || kind === 'steps' || kind === 'columns' ? kind : null
+}
+
+/** A block whose items are one level down, in a list of its own: Steps, and a list in its reveal wrapper. */
+const listIsInside = (block: { node: PMNode; kind: BarKind }) => block.kind === 'steps' || ((block.kind === 'list' || block.kind === 'numbered') && !isList(block.node))
+
+/** Is the block set to One by one (README item 18)? */
+export function revealsOneBlock(block: { node: PMNode; kind: BarKind }): boolean {
+  if (block.kind === 'list' || block.kind === 'numbered') return !isList(block.node)
+  if (block.kind === 'agenda') return false
+  return revealsOne(divAttributesOf(block.node))
+}
+
+/**
+ * Reveal on the bar (README item 18): One by one (`one`) or All at once. Boxes, Steps and Columns write `reveal="one"`
+ * on their own line, or take it out; a List or Numbered list is wrapped in `::: incremental` … `:::`, or unwrapped, its
+ * own lines never changing. One transaction, one ⌘Z; null when nothing changes.
+ */
+export function setReveal(state: EditorState, pos: number, one: boolean): Transaction | null {
+  const block = blockAt(state, pos)
+  if (!block || block.kind === 'agenda' || revealsOneBlock(block) === one) return null
+  if (block.kind !== 'list' && block.kind !== 'numbered') {
+    const open = String(block.node.attrs.open ?? '')
+    const next = withFenceValue(open, REVEAL_KEY, one ? REVEAL_ONE : null)
+    if (next === null || next === open) return null
+    return state.tr.setNodeMarkup(pos, undefined, { ...block.node.attrs, open: next }).setMeta(SLIDE_COMMAND, true)
+  }
+  const tr = state.tr
+  if (one) {
+    const range = state.doc.resolve(pos).blockRange(state.doc.resolve(pos + block.node.nodeSize))
+    if (!range) return null
+    const wrapper = slideDivNode(state.schema, REVEAL_LIST_OPEN, REVEAL_LIST_CLOSE, [block.node])
+    tr.wrap(range, [{ type: wrapper.type, attrs: wrapper.attrs }])
+  } else {
+    // A wrapper read as `::: {reveal="one"}` is unwrapped the same: All at once writes nothing.
+    const range = state.doc.resolve(pos + 1).blockRange(state.doc.resolve(pos + block.node.nodeSize - 1))
+    const target = range ? liftTarget(range) : null
+    if (!range || target === null) return null
+    tr.lift(range, target)
+  }
+  return tr.setMeta(SLIDE_COMMAND, true)
 }
 
 /** The block the bar is for: its place, its node and its kind. */
@@ -113,20 +176,22 @@ interface Parts {
   after: PMNode[]
   /** The list the items came from (List, Numbered, Steps): what it was written as, for a list it turns into. */
   list: PMNode | null
+  /** README item 18: the block was set to One by one; the kind it turns into is too. */
+  reveal: boolean
 }
 
 function partsOf(block: ChosenBlock): Parts {
-  const parts: Parts = { items: [], before: [], after: [], list: null }
+  const parts: Parts = { items: [], before: [], after: [], list: null, reveal: revealsOneBlock(block) }
   const fromList = (list: PMNode) => { parts.list = list; list.forEach(item => parts.items.push({ from: 'li', node: item })) }
-  if (block.kind === 'list' || block.kind === 'numbered') {
+  if ((block.kind === 'list' || block.kind === 'numbered') && !listIsInside(block)) {
     fromList(block.node)
     return parts
   }
-  if (block.kind === 'steps') {
+  if (listIsInside(block)) {
     let listed = false
     block.node.forEach(child => {
       // What stands before the list stays before the block, and what follows it after: the reading order holds.
-      if (!listed && child.type.name === 'orderedList') { fromList(child); listed = true }
+      if (!listed && (block.kind === 'steps' ? child.type.name === 'orderedList' : isList(child))) { fromList(child); listed = true }
       else if (!listed) parts.before.push(child)
       else parts.after.push(child)
     })
@@ -216,29 +281,32 @@ function divChild(schema: Schema, kind: 'box' | 'column', content: PMNode[]): PM
 
 /** The block of `kind` holding `parts`' items. `tag`: a new Steps block's label (the deck's last, as the / menu's). */
 function build(schema: Schema, kind: BarKind, parts: Parts, tag: string | null): PMNode {
+  // README item 18: One by one goes with the items into the new kind, written as that kind writes it.
+  const revealed = (open: string) => (parts.reveal ? withFenceValue(open, REVEAL_KEY, REVEAL_ONE)! : open)
+  const wrapped = (list: PMNode) => (parts.reveal ? div(schema, REVEAL_LIST_OPEN, REVEAL_LIST_CLOSE, [list]) : list)
   if (kind === 'boxes' || kind === 'columns') {
     const child = kind === 'boxes' ? 'box' : 'column'
     const children = parts.items.map(item => divChild(schema, child, itemAsDivContent(schema, item)))
     if (!children.length) children.push(divChild(schema, child, []))
-    return div(schema, `:::: ${kind}`, '::::', children)
+    return div(schema, revealed(`:::: ${kind}`), '::::', children)
   }
   const items = parts.items.map(item => itemAsListItem(schema, item))
   if (!items.length) items.push(schema.nodes.listItem.create(null, [schema.nodes.paragraph.create()]))
   // A list into a list of its own kind keeps what it was written as: a numbered list's start and `)`, between Numbered
   // and Steps (Codex on #773). A bullet list never turns into another bullet list, so its `*` has nowhere to go.
   const same = (type: string) => (parts.list?.type.name === type ? parts.list.attrs : null)
-  if (kind === 'list') return schema.nodes.bulletList.createChecked(same('bulletList'), items)
+  if (kind === 'list') return wrapped(schema.nodes.bulletList.createChecked(same('bulletList'), items))
   const list = schema.nodes.orderedList.createChecked(same('orderedList'), items)
-  if (kind === 'numbered') return list
-  return div(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [list])
+  if (kind === 'numbered') return wrapped(list)
+  return div(schema, revealed(tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!), ':::', [list])
 }
 
 /** Which item the caret is in (its index), or 0. */
 function caretItem(state: EditorState, block: ChosenBlock): number {
   const $head = state.selection.$head
   if ($head.depth < 2 || $head.before(1) !== block.pos) return 0
-  // The list's items are one level deeper in Steps.
-  const depth = block.kind === 'steps' ? 3 : 2
+  // The list's items are one level deeper in Steps, and in a list's reveal wrapper.
+  const depth = listIsInside(block) ? 3 : 2
   if ($head.depth < depth) return 0
   let index = $head.index(depth - 1)
   if (block.kind === 'boxes' || block.kind === 'columns') {
@@ -255,9 +323,9 @@ function itemStart(doc: PMNode, pos: number, kind: BarKind, index: number): Sele
   const block = doc.nodeAt(pos)!
   let holder = block
   let start = pos + 1
-  if (kind === 'steps') {
+  if (listIsInside({ node: block, kind })) {
     let offset = 0
-    block.forEach((child, childOffset) => { if (holder === block && child.type.name === 'orderedList') { holder = child; offset = childOffset } })
+    block.forEach((child, childOffset) => { if (holder === block && (kind === 'steps' ? child.type.name === 'orderedList' : isList(child))) { holder = child; offset = childOffset } })
     start = pos + 1 + offset + 1
   }
   let seen = 0
@@ -297,9 +365,9 @@ export function turnInto(state: EditorState, pos: number, kind: BarKind, tag: st
 
 /** How many items a block holds. */
 export function itemCount(node: PMNode, kind: BarKind): number {
-  if (kind === 'steps') {
+  if (listIsInside({ node, kind })) {
     let count = 0
-    node.forEach(child => { if (child.type.name === 'orderedList') count = Math.max(count, child.childCount) })
+    node.forEach(child => { if (kind === 'steps' ? child.type.name === 'orderedList' : isList(child)) count = Math.max(count, child.childCount) })
     return count
   }
   let count = 0
@@ -327,9 +395,9 @@ export function addItem(state: EditorState, pos: number): Transaction | null {
     return tr.setMeta(SLIDE_COMMAND, true)
   }
   let listEnd = end
-  if (block.kind === 'steps') {
+  if (listIsInside(block)) {
     let found = -1
-    block.node.forEach((child, offset) => { if (child.type.name === 'orderedList') found = pos + 1 + offset + child.nodeSize - 1 })
+    block.node.forEach((child, offset) => { if (block.kind === 'steps' ? child.type.name === 'orderedList' : isList(child)) found = pos + 1 + offset + child.nodeSize - 1 })
     if (found < 0) return null
     listEnd = found
   }

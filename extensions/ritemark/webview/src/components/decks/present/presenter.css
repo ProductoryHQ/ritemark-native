@@ -30,6 +30,9 @@
 
 .pv-row { display: flex; gap: 12px; margin: 45px 0 0 -7px; padding: 7px; overflow-x: auto; scrollbar-width: none; }
 .pv-row::-webkit-scrollbar { display: none; }
+/* Decks README item 18: "Shown 2 of 4" under Now, in the gap above the row, so the row stays where it is. */
+.pv-shown { height: 18px; margin-top: 12px; font-size: 13px; font-weight: 500; line-height: 18px; color: #C7D2FE; font-variant-numeric: tabular-nums; }
+.pv-shown + .pv-row { margin-top: 15px; }
 .pv-thumb { flex: none; opacity: 0.8; }
 .pv-thumb .pv-slide { border-radius: 6px; }
 .pv-thumb.is-past { opacity: 0.45; }

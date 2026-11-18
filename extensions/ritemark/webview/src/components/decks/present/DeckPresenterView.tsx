@@ -14,6 +14,8 @@
  *  - The spotlight (decks README item 16): a click on an item in Now spotlights it on the wall, and Now shows the same
  *    dimming; the wall's click rule (`spotClickOf`), except that a click outside any item never steps. A click on the
  *    spotlit picture fills the wall with it (item 11), and Now says so; any key or a click on Now returns.
+ *  - Items one by one (decks README item 18): Now is drawn at the wall's step, with "Shown 2 of 4" under it; Next shows
+ *    the slide now with its next item while one is still to show, else the next slide as it opens.
  *  - Back, Next (the one bright button), Swap displays (with two displays) and Stop.
  *  - "Claude and notices wait until you stop.": the main window, with the AI and the notices, stays behind.
  *
@@ -33,6 +35,7 @@ import { wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, clockText, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, timeOfDayFormat, wallKeyOf, type WallBlank } from './wallKeys'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
+import { revealLabel } from '../../../../../src/decks/present/revealSteps'
 import '../decks.css'
 import './presenter.css'
 
@@ -251,11 +254,13 @@ export function DeckPresenterView() {
     askedBlank.current = { to }
     send('present/blank', { to })
   }
-  const canvas = (slide: WallSlide, width: number) => (
+  // README item 18: Now and Next are drawn at their step (`reveal`); the row shows every slide whole.
+  const canvas = (slide: WallSlide, width: number, reveal?: number) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
     </div>
   )
+  const shownLine = revealLabel(state.reveal)
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
@@ -263,7 +268,7 @@ export function DeckPresenterView() {
       <div className="pv-main" style={{ width: nowWidth }}>
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
         <div ref={nowRef} className="pv-now deck-spot" onClick={onNowClick}>
-          {canvas(state.current, nowWidth)}
+          {canvas(state.current, nowWidth, state.reveal?.shown)}
           {fillUrl && !state.blank ? (
             // Item 11: what the room sees, the picture whole on the theme's ground, and how to return.
             <div className="pv-blank">
@@ -295,6 +300,8 @@ export function DeckPresenterView() {
             </div>
           ) : null}
         </div>
+        {/* README item 18: how far the slide on the wall has come, under Now. */}
+        {shownLine ? <div className="pv-shown" role="status">{shownLine}</div> : null}
         <div ref={rowRef} className="pv-row" role="listbox" aria-label="Slides">
           {state.slides.map((slide, index) => (
             <div
@@ -312,8 +319,9 @@ export function DeckPresenterView() {
       </div>
 
       <div className="pv-side">
-        <div className="pv-label">Next</div>
-        {state.next ? canvas(state.next, SIDE_WIDTH) : <div className="pv-end">The end of the deck</div>}
+        {/* Item 18: the slide now with its next item while one is still to show, else the next slide as it opens. */}
+        <div className="pv-label">{state.nextIsItem ? 'Next item' : 'Next'}</div>
+        {state.next ? canvas(state.next, SIDE_WIDTH, state.nextReveal?.shown) : <div className="pv-end">The end of the deck</div>}
         <div className="pv-notes-head">
           <span className="pv-label">Your comments</span>
           <span className="pv-sizes">
@@ -366,13 +374,13 @@ export function DeckPresenterView() {
         </Tooltip>
         <span className="pv-grow" />
         <span className="pv-count">{state.skipped ? 'Skipped slide' : `Slide ${countLabel(state.position, state.count, false)}`}</span>
-        <Tooltip label="The slide before (←)">
+        <Tooltip label={state.reveal && state.reveal.shown > 1 ? 'Hide the last item shown (←)' : 'The slide before (←)'}>
           <Button variant="outline" onClick={() => send('present/back')}>
             <Icon name="caret-left" size={16} tone="inherit" />
             Back
           </Button>
         </Tooltip>
-        <Tooltip label="The next slide (→)">
+        <Tooltip label={state.nextIsItem ? 'Show the next item (→)' : 'The next slide (→)'}>
           <Button className="pv-next" onClick={() => send('present/next')}>
             Next
             <Icon name="caret-right" size={16} tone="inherit" />

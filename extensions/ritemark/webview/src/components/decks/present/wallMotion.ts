@@ -43,6 +43,20 @@ export const MOVE_FADE_MS = MOTION_MS.fade
 /** Zoom's new slide starts at this size. */
 export const ZOOM_FROM = 0.96
 
+/** README item 18: an item shown by → arrives in 0.2 s, rising this far (on the 960 slide) as it fades in. */
+export const REVEAL_MS = 200
+export const REVEAL_RISE = 8
+
+/**
+ * The items that arrive with a state from the host (README item 18): those from the step before up to the step now, on
+ * the same slide, when the step went on (one item for a press). Null for another slide (its transition draws it), a
+ * step back (the item hides at once) or none; with reduced motion the wall shows them without the rise.
+ */
+export function revealArrivals(before: { shown: number } | null, now: { shown: number } | null, sameSlide: boolean): { from: number; to: number } | null {
+  if (!sameSlide || !before || !now || now.shown <= before.shown) return null
+  return { from: before.shown, to: now.shown }
+}
+
 /**
  * The front-matter change for a choice: Fade writes nothing (the line taken out), any other writes `transition: <it>`.
  * As `{ present, value }`, the shape the deck's property steps carry (`theme/themePick.ts`).

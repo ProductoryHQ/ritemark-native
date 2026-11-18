@@ -80,7 +80,13 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'skipped', 'slide', 'slides', 'spot', 'theme', 'transition', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'theme', 'transition', 'type']);
+  // README item 18: no step unless the host gives one, and only a step that is one gets through.
+  assert.equal(state.reveal, null);
+  assert.deepEqual(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, { shown: 2, count: 4 }).reveal, { shown: 2, count: 4 });
+  for (const bad of [{ shown: 5, count: 4 }, { shown: 0, count: 4 }, { shown: 1.5, count: 4 }, { shown: '2', count: 4 }]) {
+    assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, bad as never).reveal, null, `not a step: ${JSON.stringify(bad)}`);
+  }
   // Items 11 and 16: no spotlight and no filled wall unless asked; only an item's place gets through.
   assert.equal(state.spot, null);
   assert.equal(state.fill, null);
@@ -182,7 +188,7 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   const clock = { wallDisplay: 'Projector', canSwap: true, length: 45, startedAt: 1000 };
   const first = presenterStateOf(session.view(), look, {}, clock);
-  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'page', 'position', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
+  assert.deepEqual(Object.keys(first).sort(), ['assets', 'blank', 'borderless', 'canSwap', 'clock', 'comments', 'count', 'current', 'fill', 'length', 'next', 'nextIsItem', 'nextReveal', 'page', 'position', 'reveal', 'skipped', 'slides', 'spot', 'startedAt', 'theme', 'type', 'wallDisplay']);
   assert.equal(first.spot, null);
   assert.equal(presenterStateOf(session.view(), look, {}, { ...clock, focus: { spot: 1, fill: null } }).spot, 1, 'Now shows the wall\'s spotlight');
   assert.equal(first.blank, null);

@@ -67,6 +67,7 @@ import {
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
+import { arrivalOf, revealCountOf, revealKept, revealOnArrival, revealStepOf, type RevealArrival, type WallReveal } from './revealSteps';
 import { deckLookOf, deckTransitionOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type DeckTransition, type PresentMove } from './presentSession';
 
 /** Where the presentation was started from: the deck's document, and its view to return to. */
@@ -120,6 +121,10 @@ interface Running {
   page: string | null;
   /** Each blank request and move takes a number: a Q still asking for the page gives way to a later key or move. */
   blankSerial: number;
+  /** Decks README item 18: how many items of the slide on the wall show (`revealSteps.ts`), never saved. */
+  reveal: WallReveal | null;
+  /** How the slide the next wall state brings opens (a move just reached it), or null: the same slide, its step kept. */
+  arrival: RevealArrival | null;
 }
 
 /** The shell's commands (patch 018). */
@@ -247,6 +252,9 @@ export class DeckPresenter implements vscode.Disposable {
       clock: { locale: null, hourCycle: null },
       page: null,
       blankSerial: 0,
+      // The first slide opens with its first item (README item 18), as one reached with → does.
+      reveal: null,
+      arrival: 'first',
     };
     this.running = running;
     // Whether the deck is published, and where: the wall and the presenter view get it once it is known, and again
@@ -468,7 +476,20 @@ export class DeckPresenter implements vscode.Disposable {
         running.blankSerial++;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
         running.focus = NO_FOCUS;
-        running.session.move(running.origin.document.getText(), moveOf(request));
+        const move = moveOf(request);
+        // README item 18: → shows the slide's next item and ← hides the last one shown, on the slide the wall has (an
+        // edit since waits for the next move, as for blanking); past the first or the last, the press moves.
+        const step = move.type === 'next' || move.type === 'back' ? revealStepOf(running.reveal, move.type) : null;
+        if (step) {
+          running.reveal = step;
+          await this.showSameSlide(running);
+          return;
+        }
+        const moved = running.session.move(running.origin.document.getText(), move);
+        // Home, End and a number reach the slide they name even when the wall is on it already (it opens again as they
+        // open it); → and ← at the deck's ends go nowhere, and the step stays.
+        const named = move.type === 'first' || move.type === 'last' || (move.type === 'go' && running.session.slideNumbered(move.number) !== undefined);
+        if (moved || named) running.arrival = arrivalOf(move.type);
         // Even a move that goes nowhere (the last slide, a number with no slide) draws the deck as it is now, on the
         // wall and then in the presenter view.
         await this.showWall(running);
@@ -516,6 +537,12 @@ export class DeckPresenter implements vscode.Disposable {
       running.focus = NO_FOCUS;
       state = { ...state, spot: null, fill: null };
     }
+    // README item 18: a slide a move just reached opens as the move opens it (its first item, or whole); the same slide
+    // drawn again keeps its step, within its items now.
+    const count = revealCountOf(state.slide);
+    running.reveal = running.arrival ? revealOnArrival(count, running.arrival) : revealKept(running.reveal, count);
+    running.arrival = null;
+    state = { ...state, reveal: running.reveal };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -532,7 +559,7 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill };
+    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, reveal: running.reveal };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);
@@ -562,6 +589,8 @@ export class DeckPresenter implements vscode.Disposable {
       startedAt: running.startedAt,
       blank: running.blank,
       focus: running.focus,
+      // Before the wall has a state, no step is known yet: Now and Next show whole until it comes.
+      reveal: onWall ? running.reveal : null,
       clock: running.clock,
       page: running.page,
     }, onWall?.slide));
