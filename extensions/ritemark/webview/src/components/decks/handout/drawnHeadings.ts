@@ -34,12 +34,16 @@ export function hasDrawnHeadings(doc: PMNode): boolean {
 
 /**
  * The deck's `handout: text` mark for an edit the editor reports (16 November): added with the first edit after which
- * no heading is drawn (its headings written), and taken out again only when an undo brings drawn headings back, if this
- * view added it. Null: the front matter stays as it is.
+ * no heading is drawn (its headings written), and taken out again only by an undo of the step that added it, if this
+ * view added it (`added`: the undo history's depth right after that step; `depth`: after this change). Null: the front
+ * matter stays as it is.
+ *
+ * The step's undo, not the drawn headings coming back: a deck whose parts all have their own headings draws nothing, so
+ * after the Undo of its first edit no heading is drawn either, and the mark stayed (the file came back one line longer).
  */
-export function handoutMarkFor(input: { marked: boolean; drawn: boolean; addedHere: boolean; undo: boolean }): 'add' | 'remove' | null {
+export function handoutMarkFor(input: { marked: boolean; drawn: boolean; added: number | null; undo: boolean; depth: number }): 'add' | 'remove' | null {
   if (!input.marked && !input.drawn) return 'add'
-  if (input.marked && input.drawn && input.addedHere && input.undo) return 'remove'
+  if (input.marked && input.added !== null && input.undo && input.depth < input.added) return 'remove'
   return null
 }
 

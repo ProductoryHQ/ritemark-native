@@ -19,7 +19,7 @@
 import { Extension } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { convertSlide, convertsToBlocks, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
+import { convertSlide, convertsToBlocks, drawsAsBlocks, saysBlockDeck } from '../../../../../src/decks/blocks/convertDeck'
 import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, isSlideNode, slidesOf } from '../deckDocument'
@@ -37,6 +37,32 @@ export interface DeckConversion {
   comments: number
   /** The note of the first comment it made, in the deck's order (the notice's Show opens it); null without one. */
   firstComment: string | null
+}
+
+/** The `deck:` line as it was before the deck view wrote `deck: 2`, and the undo depth right after the step that did. */
+export interface DeckVersionWritten {
+  value: unknown
+  depth: number
+}
+
+/**
+ * The deck's `deck:` line for an edit the editor reports (Sprint 161, PR 2): `deck: 2` is written with the first edit
+ * after which the deck holds a block slide (the conversion, or any edit of a deck whose slides are block slides
+ * already), and an undo of that step puts the line back as it was, so the edit and its Undo are one step. Null: the
+ * front matter stays as it is.
+ *
+ * "That step is undone" is the undo history's own count (`depth`, `undoDepth` after the change) falling below the one
+ * right after the write, not what the slides look like: a deck whose slides were block slides before the edit has
+ * block slides after its Undo too (the backlog's `deck: 1` deck of block slides kept `deck: 2`).
+ */
+export function deckVersionFor(input: { version: unknown; blocks: boolean; undo: boolean; depth: number; written: DeckVersionWritten | null }):
+  { write: 2; written: DeckVersionWritten } | { restore: unknown } | null {
+  const { version, written } = input
+  if (input.blocks && !saysBlockDeck(version === undefined || version === null ? null : String(version))) {
+    return { write: 2, written: written ?? { value: version, depth: input.depth } }
+  }
+  if (written && input.undo && input.depth < written.depth) return { restore: written.value }
+  return null
 }
 
 /** Does the document hold a slide the conversion would change: a v1 slide of one of the nine kinds? */

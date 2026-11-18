@@ -12,10 +12,10 @@ import { createDocument } from '@mixmark-io/domino'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
-import { history, undo, redo } from '@tiptap/pm/history'
+import { closeHistory, history, undo, redo, undoDepth } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { slideDataOf, withWrittenHandout } from '../../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, isBlockSlide, slideDataOf, withWrittenHandout } from '../../../../../src/decks/deckFormat'
 import { slideStamp, slideStamps } from '../../../../../src/decks/deckLibraryFormat'
 import { convertDeckText } from '../../../../../src/decks/blocks/convertDeck'
 import { publicDeck } from '../../../../../src/decks/page/publicDeck'
@@ -23,10 +23,10 @@ import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
 import { DeckSlide } from './deckSchema'
-import { DeckDrawnHeadings, drawnHeadingsFollow } from './drawnHeadings'
+import { DeckDrawnHeadings, drawnHeadingsFollow, handoutMarkFor, hasDrawnHeadings } from './drawnHeadings'
 import { deckGuardPlugin } from './deckGuard'
 import { deckLinesPlugin } from './deckLines'
-import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, needsConversion } from './deckConvert'
+import { CONVERSION_NOTICE, commentNodeAt, conversionNoticeFor, pictureIntoSlide, handoutMarkdownOf, convertDeckInto, conversionStateOf, deckConvertPlugin, deckVersionFor, needsConversion, type DeckVersionWritten } from './deckConvert'
 import { derivedHeadings, slidesOf } from '../deckDocument'
 import { documentReplacement } from '../../../lib/documentUpdate'
 
@@ -320,6 +320,121 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   let undone = now
   undo(now, back => { undone = now.apply(back) })
   assert.equal(save(undone.doc), sectioned, 'one Undo')
+}
+
+// ---- The front matter the deck view writes with the first edit (`deck: 2`, `handout: text`) goes with it: one Undo
+// gives the file back byte for byte, whatever the deck held. The view's `handleChange` as DeckView runs it, and the
+// host's join with the file as it is now (ritemarkEditor.ts `serializeFrontMatter`), edit after edit.
+function deckView(text: string) {
+  let state = stateOf(text, deckPlugins()).state
+  let file = text
+  let properties: Record<string, unknown> = JSON.parse(JSON.stringify(splitFrontMatter(text).properties))
+  let markAdded: number | null = null
+  let written: DeckVersionWritten | null = null
+  const change = (next: EditorState, history: boolean) => {
+    state = next
+    const doc = next.doc
+    const depth = undoDepth(next)
+    const mark = handoutMarkFor({ marked: properties[TEXT_HANDOUT_KEY] === TEXT_HANDOUT_VALUE, drawn: hasDrawnHeadings(doc), added: markAdded, undo: history, depth })
+    if (mark === 'add') { markAdded = depth; properties = { ...properties, [TEXT_HANDOUT_KEY]: TEXT_HANDOUT_VALUE } }
+    else if (mark === 'remove') { markAdded = null; properties = { ...properties }; delete properties[TEXT_HANDOUT_KEY] }
+    const version = deckVersionFor({
+      version: properties.deck,
+      blocks: slidesOf(doc).some(entry => isBlockSlide(entry.kind)),
+      undo: history,
+      depth,
+      written,
+    })
+    if (version && 'write' in version) { written = version.written; properties = { ...properties, deck: 2 } }
+    else if (version) {
+      written = null
+      properties = { ...properties }
+      if (version.restore === undefined) delete properties.deck
+      else properties.deck = version.restore
+    }
+    file = joinFrontMatter(properties as never, editorMarkdown(doc), file)
+    return file
+  }
+  return {
+    type: (words: string, after: string, own = false) => {
+      const tr = state.tr.insertText(words, endOf(state.doc, after))
+      return change(state.apply(own ? closeHistory(tr) : tr), false)
+    },
+    undo: () => { let next = state; assert.ok(undo(state, tr => { next = state.apply(tr) }), 'something to undo'); return change(next, true) },
+    redo: () => { let next = state; assert.ok(redo(state, tr => { next = state.apply(tr) }), 'something to redo'); return change(next, true) },
+  }
+}
+const blockSlide = '```slide\n---\nid: b1\n---\n# Already blocks\n```\n\n## Already blocks\n\nText.\n'
+{
+  // A `deck: 1` deck whose slides are block slides already (the backlog's case): the edit writes `deck: 2`, its Undo
+  // the `deck: 1` it had.
+  const one = `---\ndeck: 1\nhandout: text\n---\n\n${blockSlide}`
+  const view = deckView(one)
+  assert.equal(view.type('!', 'Text.'), one.replace('deck: 1', 'deck: 2').replace('Text.', 'Text.!'))
+  assert.equal(view.undo(), one, 'deck: 1 of block slides, one Undo: byte for byte')
+  assert.equal(view.redo(), one.replace('deck: 1', 'deck: 2').replace('Text.', 'Text.!'), 'Redo writes deck: 2 again')
+  assert.equal(view.undo(), one, 'and its Undo takes it out again')
+}
+{
+  // Two steps of their own: the first Undo keeps `deck: 2` (the first step still holds), the second takes it out.
+  const one = `---\ndeck: 1\nhandout: text\n---\n\n${blockSlide}`
+  const view = deckView(one)
+  view.type('!', 'Text.')
+  const second = view.type('?', 'Text.!', true)
+  assert.ok(second.includes('deck: 2') && second.includes('Text.!?'))
+  assert.equal(view.undo(), one.replace('deck: 1', 'deck: 2').replace('Text.', 'Text.!'), 'one Undo: the first step stays, deck: 2 with it')
+  assert.equal(view.undo(), one, 'two: the file as it was')
+}
+{
+  // No `deck:` line: the one the edit adds is taken out again.
+  const bare = `---\nhandout: text\n---\n\n${blockSlide}`
+  const view = deckView(bare)
+  assert.equal(view.type('!', 'Text.'), bare.replace('handout: text', 'handout: text\ndeck: 2').replace('Text.', 'Text.!'))
+  assert.equal(view.undo(), bare, 'no deck line, one Undo: byte for byte')
+}
+{
+  // A mixed `deck: 1` deck (a v1 slide and a block slide): the conversion and `deck: 2` both go with one Undo.
+  const mixed = `---\ndeck: 1\nhandout: text\n---\n\n\`\`\`slide points\nid: p1\ntitle: Plain\nitems:\n- heading: One\n\`\`\`\n\n## Plain\n\nWords.\n\n${blockSlide}`
+  const view = deckView(mixed)
+  const edited = view.type('!', 'Words.')
+  assert.ok(edited.startsWith('---\ndeck: 2\nhandout: text\n---\n') && !edited.includes('```slide points'), 'converted, deck: 2')
+  assert.equal(view.undo(), mixed, 'mixed deck, one Undo: byte for byte')
+}
+{
+  // Today's slides only (Sprint 161's case, as before): the conversion, `deck: 2` and `handout: text` go with one Undo.
+  const view = deckView(DECK)
+  assert.ok(view.type('!', 'Compare them.').startsWith('---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\nhandout: text\n---\n'))
+  assert.equal(view.undo(), DECK, 'v1 deck, one Undo: byte for byte')
+}
+{
+  // A `deck: 2` deck: its line is never touched, an edit and its Undo alike.
+  const two = `---\ndeck: 2\nhandout: text\n---\n\n${blockSlide}`
+  const view = deckView(two)
+  assert.equal(view.type('!', 'Text.'), two.replace('Text.', 'Text.!'))
+  assert.equal(view.undo(), two)
+}
+{
+  // The `handout: text` mark the first edit adds goes with its Undo too, when nothing was drawn (every part has its
+  // own heading): before, only drawn headings coming back took it out, and the file came back one line longer.
+  const unmarked = `---\ndeck: 2\n---\n\n${blockSlide}`
+  const view = deckView(unmarked)
+  assert.equal(view.type('!', 'Text.'), unmarked.replace('deck: 2', 'deck: 2\nhandout: text').replace('Text.', 'Text.!'))
+  assert.equal(view.undo(), unmarked, 'unmarked deck, nothing drawn, one Undo: byte for byte')
+  // A `deck: 1` deck of block slides with no mark: both lines go with the Undo.
+  const both = `---\ndeck: 1\n---\n\n${blockSlide}`
+  const second = deckView(both)
+  assert.equal(second.type('!', 'Text.'), '---\ndeck: 2\nhandout: text\n---\n\n' + blockSlide.replace('Text.', 'Text.!'))
+  assert.equal(second.undo(), both, 'deck: 1, unmarked, one Undo: byte for byte')
+  // A deck with no front matter at all gets it with the edit and loses it with the Undo.
+  const none = `${blockSlide}`
+  const third = deckView(none)
+  assert.ok(third.type('!', 'Text.').startsWith('---\nhandout: text\ndeck: 2\n---\n'))
+  assert.equal(third.undo(), none, 'no front matter, one Undo: byte for byte')
+  // An older deck whose headings are drawn: the mark still goes with the Undo that brings them back.
+  const older = '```slide points\nid: p001\ntitle: Agents act\n```\n\nAn agent is given a goal.\n'
+  const fourth = deckView(older)
+  assert.ok(fourth.type(' It acts.', 'An agent is given a goal.').includes('handout: text'))
+  assert.equal(fourth.undo(), older, 'drawn headings, one Undo: byte for byte')
 }
 
 console.log('deckConvert: passed')
