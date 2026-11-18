@@ -341,6 +341,12 @@
 .deck-sl.is-blocks .blk-tabbar::-webkit-scrollbar { display: none; }
 .deck-sl.is-blocks .blk-tab { flex: none; position: relative; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 1.1em; border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
 .deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #fff); background: var(--s-tpane, #0E0F2C); }
+/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 16 to 10 (slide units),
+   then the label steps down from 14.5 to 13, then 12, the tab keeping its 38 height; only then does the band scroll,
+   with its fade (`tabsFit.ts` measures and sets `data-fit`). */
+.deck-sl.is-blocks .blk-tabs[data-fit="1"] > .blk-tabbar > .blk-tab { padding: 0 .69em; }
+.deck-sl.is-blocks .blk-tabs[data-fit="2"] > .blk-tabbar > .blk-tab { font-size: .5417em; height: 2.92em; padding: 0 .77em; }
+.deck-sl.is-blocks .blk-tabs[data-fit="3"] > .blk-tabbar > .blk-tab { font-size: .5em; height: 3.17em; padding: 0 .83em; }
 .deck-sl.is-blocks .blk-tabpanes { flex: 0 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); background: var(--s-tpane, #0E0F2C); }
 .deck-sl.is-blocks .blk-tabpane { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: hidden auto; box-sizing: border-box; padding: 1.07em 1.2em 1.2em; visibility: hidden; color: var(--s-tx, #D5D8F2); font-size: .625em; line-height: 1.47; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
 .deck-sl.is-blocks .blk-tabpane > :last-child { margin-bottom: 0; }

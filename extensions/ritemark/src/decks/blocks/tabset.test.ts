@@ -19,6 +19,7 @@ import { tabsOf, withTab } from '../present/wallTabs';
 import { slideCommentsOf } from './slideComments';
 import { partComments } from '../present/partComments';
 import { plainTabName } from './tabset';
+import { PAGE_SCRIPT } from '../page/pageScript';
 
 let passed = 0;
 function test(name: string, run: () => void): void {
@@ -239,6 +240,12 @@ test('a comment inside a tab\'s pane is found, on the slide and in the handout (
   const slideMarkdown = `${TABSET_OPEN}\n## A\n\n<!-- {id:c1} Check this prompt -->\nWords\n:::`;
   assert.equal(slideCommentsOf(slideMarkdown).length, 1, 'found in the pane');
   assert.equal(partComments(`${TABSET_OPEN}\n## A\n\n<!-- A note for me -->\n\nWords\n:::\n`).length, 1);
+});
+
+test('the page fits a band\'s tabs before it scrolls, as the editor and the wall do (the lead on PR 2)', () => {
+  assert.ok(PAGE_SCRIPT.includes('function fitTabBands()'));
+  assert.ok(PAGE_SCRIPT.includes("block.setAttribute('data-fit', String(step))"));
+  assert.ok(!/\.innerHTML|\.src\s*=|\.href\s*=/.test(PAGE_SCRIPT.slice(PAGE_SCRIPT.indexOf('function fitTabBands'))), 'it writes no HTML and loads nothing');
 });
 
 console.log(`tabset: ${passed} passed`);

@@ -1163,6 +1163,9 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 /* The presenter view's Now: a click on a tab shows it on the wall. */
 .tabs-pickable .deck-sl.is-blocks .blk-tab { cursor: pointer; }
 .deck-sl.is-blocks .blk-tabbar .blk-tab-add { font-size: .6em; width: 1.95em; height: 1.95em; color: var(--s-sub, #C7CAEB); }
+/* The + on the tab names' line (the lead on PR 2): a 28 circle, centred on the tabs' own 38 height, 6 after the last tab
+   (the band's 2 gap and 4). */
+.deck-sl.is-blocks .blk-tabbar .blk-tab-add { align-self: flex-end; margin: 0 0 .35em .28em; }
 .deck-sl.is-blocks .blk-tabbar .blk-tab-input { padding: .25em .5em; outline-color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing .blk-tabpane { cursor: text; }
 /* In a Text document: the tabs as the block's header on a lighter band, the open tab on the pane's ground. The open
@@ -1175,7 +1178,10 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 .blk-tabs.is-text .blk-tab:not(.is-active):hover { color: var(--r-ink-body); background: color-mix(in srgb, var(--r-ink-strong) 5%, transparent); }
 .blk-tabs.is-text .blk-tab:not(.is-active):active { background: color-mix(in srgb, var(--r-ink-strong) 9%, transparent); }
 .blk-tabs.is-text .blk-tab.is-active { color: var(--r-ink-strong); background: var(--r-surface); }
-.blk-tabs.is-text .blk-tabbar .blk-tab-add { width: 24px; height: 24px; color: var(--r-ink-muted); }
+.blk-tabs.is-text .blk-tabbar .blk-tab-add { align-self: flex-end; width: 24px; height: 24px; margin: 0 0 5px 4px; color: var(--r-ink-muted); }
+.blk-tabs.is-text[data-fit="1"] .blk-tab { padding: 0 10px; }
+.blk-tabs.is-text[data-fit="2"] .blk-tab { padding: 0 10px; font-size: 13px; }
+.blk-tabs.is-text[data-fit="3"] .blk-tab { padding: 0 10px; font-size: 12px; }
 .blk-tabs.is-text .blk-tabpanes { background: var(--r-surface); }
 .blk-tabs.is-text .blk-tabpane { display: none; padding: 12px 18px 14px; }
 .blk-tabs.is-text .blk-tabpane > :first-child { margin-top: 0; }

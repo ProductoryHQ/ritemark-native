@@ -25,6 +25,7 @@ import { Icon, type PhosphorIconName } from '../../components/ui/Icon'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '../../components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { TabPane, TabsBlock, tabNameOf } from './tabsMarkdown'
+import { fitTabBands } from '../../../../src/decks/blocks/tabsFit'
 import { addTab, deleteTab, duplicateTab, moveTab, paneSelection, renameTab, setPendingRename, takePendingRename } from './tabsCommands'
 
 export type TabsVariant = 'slide' | 'text'
@@ -268,6 +269,8 @@ class TabsNodeView implements NodeView {
   private renaming: number | null = null
   private focusActive = 0
   private destroyed = false
+  private fitFrame = 0
+  private readonly resize: ResizeObserver | null
 
   constructor(
     private node: PMNode,
@@ -295,6 +298,10 @@ class TabsNodeView implements NodeView {
       this.band.append(tab)
     }
     this.root = createRoot(this.band)
+    // A tab is never cut (the lead on PR 2): the band fits again whenever the block's width changes (a column's split
+    // dragged, the stage resized).
+    this.resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.fit())
+    this.resize?.observe(this.dom)
     this.takeRename()
     this.editor.on('selectionUpdate', this.follow)
     this.render()
@@ -346,6 +353,7 @@ class TabsNodeView implements NodeView {
     if (this.active >= count) this.active = Math.max(0, count - 1)
     this.dom.setAttribute('data-active', String(this.active))
     this.markPanes()
+    this.fit()
     this.root.render(
       <TabBand
         names={this.names()}
@@ -376,6 +384,12 @@ class TabsNodeView implements NodeView {
    * The open pane marked `is-active` (as the renderer marks it), past the CSS's numbered rules: ProseMirror draws the
    * panes, so the mark is put on after it has (a pane drawn again loses it).
    */
+  /** The band fitted (`fitTabBands`) once React has drawn it. */
+  private fit() {
+    cancelAnimationFrame(this.fitFrame)
+    this.fitFrame = requestAnimationFrame(() => { if (!this.destroyed) fitTabBands(this.dom) })
+  }
+
   private markPanes() {
     queueMicrotask(() => {
       if (this.destroyed) return
@@ -458,6 +472,8 @@ class TabsNodeView implements NodeView {
 
   destroy() {
     this.destroyed = true
+    cancelAnimationFrame(this.fitFrame)
+    this.resize?.disconnect()
     this.editor.off('selectionUpdate', this.follow)
     const root = this.root
     // Never while React draws (a node view may go in the middle of an editor's own render).

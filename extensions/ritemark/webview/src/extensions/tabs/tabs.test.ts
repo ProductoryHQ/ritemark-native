@@ -95,7 +95,7 @@ test('a Text document with a Tabs block opens and saves byte for byte, its other
   assert.equal(headings, 2, 'a tab\'s name is never a heading node')
 })
 
-test('Quarto\'s own form and a new block round trip in a Text document', () => {
+test('opening a Quarto .md that holds a tabset writes nothing: its Markdown read back is the file, byte for byte (the editor publishes a change only when they differ)', () => {
   for (const text of [`${newTabsetMarkdown()}\n`, `Words\n\n${newTabsetMarkdown(['R', 'Python'])}\n`, '::: {.panel-tabset}\n## R\n\n```r\n## not a tab\n```\n\n## Python\n\n```python\nx = 1\n```\n\n:::\n']) {
     assert.equal(openAndSave(text), text)
   }
