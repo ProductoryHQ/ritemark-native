@@ -10,7 +10,8 @@ import { strict as assert } from 'node:assert'
 import { createDocument } from '@mixmark-io/domino'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
-import { EditorState, Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { EditorState, NodeSelection, Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { AGENDA_TIP, BAR_KINDS, BAR_KIND_LABEL, addItem, chosenBlockAt, deleteBlock, turnInto } from './blockBar'
 import { closeHistory, history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
@@ -661,6 +662,31 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assertStable(saved, 'Agenda')
   stage.undo()
   assert.equal(stage.save(), DECK, 'one Undo takes the Agenda back')
+}
+
+// ---- The Agenda is one piece in the editor (18 November): chosen whole, its bar the type and Delete, never typed in;
+// words written inside it by hand stay in the file, unshown, byte for byte.
+{
+  const text = DECK.replace('Three jobs every week\n```', 'Three jobs every week\n\n::: agenda\nWritten by hand\n:::\n```')
+  const deck = openDeck(text)
+  assert.equal(deck.save(deck.state.doc), text, 'opened and saved: byte for byte, the words inside it too')
+  const stage = stageOn(deck, 0)
+  const doc = stage.inner.doc
+  assert.ok(!doc.textContent.includes('Written by hand'), 'its words are not on the stage')
+  let at = -1
+  doc.forEach((node, offset) => { if (node.type.name === 'slideAgenda') at = offset })
+  assert.ok(at >= 0 && doc.nodeAt(at)!.isAtom, 'one piece: an atom, nothing to type in')
+  const chosen = chosenBlockAt(stage.inner.apply(stage.inner.tr.setSelection(NodeSelection.create(doc, at))))
+  assert.equal(chosen?.kind, 'agenda', 'the bar is for it')
+  assert.equal(BAR_KIND_LABEL.agenda, 'Agenda')
+  assert.equal(AGENDA_TIP, "Lists this deck's sections")
+  assert.ok(!BAR_KINDS.includes('agenda'), 'nothing turns into an Agenda')
+  assert.equal(turnInto(stage.inner, at, 'boxes'), null, 'and it turns into nothing')
+  assert.equal(addItem(stage.inner, at), null, 'no Add')
+  stage.apply(deleteBlock(stage.inner, at)!)
+  assert.equal(stage.save(), DECK, 'Delete takes the block and its words, nothing else')
+  stage.undo()
+  assert.equal(stage.save(), text, 'one Undo brings it back as it was written')
 }
 
 console.log('slideCommands: passed')

@@ -580,7 +580,9 @@ body.bl .stage { border-right: 1px solid var(--line); padding-right: 40px; }
  *  - A slide stays with its text (`break-after: avoid`), and a part is kept off two pages where it fits
  *    (`break-inside: avoid`; a part longer than a page breaks as it must).
  *  - A prompt keeps its box as a line around it (backgrounds may not print); a step's tick box likewise.
- *  - The page's address (`#paddr`, written by the script) goes in the handout's footer, under the client and the session.
+ *  - The page's address (`#paddr`, written by the script) goes in the handout's footer, beside the client and the session.
+ *  - **A section** (18 November) starts a new page and prints as its band ("SECTION 2" over its title), not as a slide
+ *    picture, so its words aren't printed twice; the next part follows on the same page, so no page holds a section alone.
  *
  * The order (`printOrderCss`): the stage, its slide box and the text column give their children to the page's one
  * column, and each slide and part is given its place there: slide 1, part 1, slide 2, part 2, then the foot.
@@ -604,7 +606,7 @@ export const PRINT_CSS = `
   .part, .part.dim, .sect.dim > * { opacity: 1; transition: none; }
   .part { padding: 0 0 7mm; margin: 0; border-top: 0; break-inside: avoid; page-break-inside: avoid; }
   .part.only { height: auto; padding: 0 0 4mm; }
-  .sect { margin: 0; padding: 0 0 7mm; border-radius: 0; background: none; }
+  .sect { margin: 0 0 6mm; padding: 0 0 4mm; border-radius: 0; background: none; border-bottom: 1.5px solid #DADCE4; break-after: avoid; page-break-after: avoid; }
   .part h2 { font-size: 15pt; }
   .sect h2 { font-size: 17pt; }
   .part img, .pre img, .part .pic, .tw { break-inside: avoid; page-break-inside: avoid; }
@@ -623,12 +625,17 @@ export const PRINT_CSS = `
 
 /**
  * Each slide and part's place in the printed column (`PRINT_CSS`): slide n before part n (`#s<n>`), after the
- * preamble. Only numbers reach it.
+ * preamble. A section (its place in `sections`) prints as its band alone: its slide is left out and its part starts a
+ * page. Only numbers reach it.
  */
-export function printOrderCss(count: number): string {
+export function printOrderCss(count: number, sections: ReadonlySet<number> = new Set()): string {
   const rules: string[] = [];
   for (let index = 0; index < count; index++) {
-    rules.push(`.slidebox>.layer:nth-child(${index + 1}){order:${index * 2 + 1}}#s${index + 1}{order:${index * 2 + 2}}`);
+    const layer = `.slidebox>.layer:nth-child(${index + 1})`;
+    const part = `#s${index + 1}`;
+    rules.push(sections.has(index)
+      ? `${layer}{display:none}${part}{order:${index * 2 + 2};break-before:page;page-break-before:always}`
+      : `${layer}{order:${index * 2 + 1}}${part}{order:${index * 2 + 2}}`);
   }
   return rules.length ? `@media print{${rules.join('')}}` : '';
 }
@@ -804,6 +811,8 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   const titles = new Map<string, number>();
   // Which slides have no handout: read once, for the text and for Contents.
   const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));
+  // Small details 13 (18 November): the sections printed as their bands (a section whose part shows nothing keeps its slide).
+  const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && !slideOnly[index] ? [index] : [])));
   const parts = deck.slides.map((slide, index) => {
     const title = titleOf(slide);
     const nth = (titles.get(title) ?? 0) + 1;
@@ -825,7 +834,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title)}</title>`,
-    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${PRINT_CSS}\n${printOrderCss(count)}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${PRINT_CSS}\n${printOrderCss(count, printedSections)}\n</style>`,
     '</head>',
     `<body class="${borderless ? 'bl' : 'card'}">`,
     // "Start from the beginning" (small details 7): shown by the script for 5 s when the page returns to a reader's place.

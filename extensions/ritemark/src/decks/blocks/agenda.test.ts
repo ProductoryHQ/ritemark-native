@@ -118,7 +118,11 @@ const assets: PageAssets = {
   // The print rules come after the page's and the slide's own, so they win.
   const style = root.querySelector('style')!.text;
   assert.ok(style.indexOf(PRINT_CSS.trim()) > style.indexOf('.deck-sl.is-blocks .blk-flow'), 'print after the slide CSS');
-  assert.ok(style.includes(printOrderCss(deck.slides.length)));
+  // The page's sections (slides 3, 5, 7 and 9 of the deck's ten; the skipped one is not on the page) print as bands.
+  const sectionPlaces = new Set([2, 4, 5, 7]);
+  assert.ok(style.includes(printOrderCss(deck.slides.length, sectionPlaces)), 'the page prints its sections as bands');
+  assert.equal(root.querySelector('#s3')!.getAttribute('class'), 'part sect', 'the band the section prints as is the page\'s own');
+  assert.equal(root.querySelector('#s3 .eyebrow')!.text, 'Section 1');
   // The address in the handout's footer: an element the script fills as text, never shown on screen.
   const foot = root.querySelector('.foot')!;
   assert.ok(foot.querySelector('#paddr'), 'the address sits in the footer');
@@ -158,6 +162,10 @@ const assets: PageAssets = {
   // The order: slide n, then part n.
   assert.equal(printOrderCss(2), '@media print{.slidebox>.layer:nth-child(1){order:1}#s1{order:2}.slidebox>.layer:nth-child(2){order:3}#s2{order:4}}');
   assert.equal(printOrderCss(0), '');
+  // A section (18 November): its slide is left out and its part starts a page, as its band; the next part follows it.
+  assert.equal(printOrderCss(3, new Set([1])), '@media print{.slidebox>.layer:nth-child(1){order:1}#s1{order:2}.slidebox>.layer:nth-child(2){display:none}#s2{order:4;break-before:page;page-break-before:always}.slidebox>.layer:nth-child(3){order:5}#s3{order:6}}');
+  assert.match(rule('.sect'), /break-after: avoid;/, 'no page holds a section alone');
+  assert.match(rule('.sect'), /background: none;/, 'its band in the page\'s section style, printable');
 }
 
 console.log('agenda and print: passed');

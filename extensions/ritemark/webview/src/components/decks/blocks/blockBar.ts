@@ -27,11 +27,16 @@ import { NodeSelection, Selection, TextSelection, type EditorState, type Transac
 import { OPEN_FENCE, columnWidthOf, parseFenceAttributes, slideBlockClassOf, withFenceValue, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
 
-/** The kinds of block the bar is for, in the order its type menu lists them. */
-export type BarKind = 'boxes' | 'steps' | 'columns' | 'list' | 'numbered'
+/**
+ * The kinds of block the bar is for; its type menu lists `BAR_KINDS`, in that order. The Agenda (small details 14) has a
+ * bar of its own type and Delete only: it is one piece, drawn from the deck, and turns into nothing.
+ */
+export type BarKind = 'boxes' | 'steps' | 'columns' | 'list' | 'numbered' | 'agenda'
 export const BAR_KINDS: readonly BarKind[] = ['boxes', 'steps', 'columns', 'list', 'numbered']
 /** The type menu's names. */
-export const BAR_KIND_LABEL: Readonly<Record<BarKind, string>> = { boxes: 'Boxes', steps: 'Steps', columns: 'Columns', list: 'List', numbered: 'Numbered' }
+export const BAR_KIND_LABEL: Readonly<Record<BarKind, string>> = { boxes: 'Boxes', steps: 'Steps', columns: 'Columns', list: 'List', numbered: 'Numbered', agenda: 'Agenda' }
+/** The Agenda's tooltip on its bar (the decks README, small details 14). */
+export const AGENDA_TIP = "Lists this deck's sections"
 
 /** A Columns block holds two to four columns from the bar (more can be written, and are kept). */
 export const MIN_COLUMNS = 2
@@ -54,6 +59,7 @@ const isEmptyText = (node: PMNode) => node.isTextblock && node.content.size === 
 
 /** The bar's kind of a top-level block, or null for a block it isn't for (a title, a line, a table, a picture). */
 export function barKindOf(node: PMNode): BarKind | null {
+  if (node.type.name === 'slideAgenda') return 'agenda'
   if (node.type.name === 'bulletList') return 'list'
   if (node.type.name === 'orderedList') return 'numbered'
   const kind = divKind(node)
@@ -273,7 +279,8 @@ function itemStart(doc: PMNode, pos: number, kind: BarKind, index: number): Sele
  */
 export function turnInto(state: EditorState, pos: number, kind: BarKind, tag: string | null = null): Transaction | null {
   const block = blockAt(state, pos)
-  if (!block || block.kind === kind) return null
+  // The Agenda holds no items to carry, and no block turns into one.
+  if (!block || block.kind === kind || block.kind === 'agenda' || kind === 'agenda') return null
   const parts = partsOf(block)
   let made: PMNode
   try {
@@ -307,7 +314,7 @@ export function itemCount(node: PMNode, kind: BarKind): number {
 /** Add (the bar) and the + at the block's edge: one more item at the end, the caret in it. Null at four columns. */
 export function addItem(state: EditorState, pos: number): Transaction | null {
   const block = blockAt(state, pos)
-  if (!block) return null
+  if (!block || block.kind === 'agenda') return null
   const schema = state.schema
   const tr = state.tr
   const end = pos + block.node.nodeSize - 1
