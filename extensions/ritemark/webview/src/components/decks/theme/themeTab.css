@@ -143,6 +143,8 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 .theme-tab .theme-logo-add:hover { box-shadow: inset 0 0 0 1.5px var(--r-accent); background: var(--r-surface-soft); }
 .theme-tab .theme-logo-add.is-over { box-shadow: inset 0 0 0 2px var(--r-accent); background: var(--r-surface-soft); }
 .theme-logo-box + .theme-logo-box, .theme-logo-problem + .theme-logo-box { margin-top: 6px; }
+/* With the caption beside it, a wide picture gives way (kept whole, from the left) so Replace and Remove stay in the box. */
+.theme-logo-box .theme-logo-picture { flex: 0 1 auto; min-width: 48px; }
 .theme-logo-for { flex: none; margin-right: 2px; padding: 2px 7px; border-radius: 6px; background: var(--r-surface); font-size: 11.5px; line-height: 15px; color: var(--r-ink-muted); white-space: nowrap; }
 
 .theme-note { display: flex; gap: 8px; margin: 22px 0 0; font-size: 12px; line-height: 17px; color: var(--r-ink-muted); }
