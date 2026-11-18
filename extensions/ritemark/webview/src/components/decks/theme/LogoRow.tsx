@@ -7,15 +7,15 @@
  *     bottom right) and On (every slide, or the title slides only), each one field line in the draft.
  *   - A logo whose file is missing (or can't be the logo): the line says so, with Choose a file… and Remove; the
  *     slides draw no logo meanwhile.
- *   - A second version for the other ground (18 November): under the logo, "Add a version for light slides" on a dark
- *     theme, "… for dark slides" on a light one, takes a second file the same way (drop or choose, the same checks,
+ *   - A second version for the other ground (18 November): under the logo, "Add a version for light slides", on a dark
+ *     theme only (option (a); a theme turned light keeps it, not shown), takes a second file the same way (drop or choose, the same checks,
  *     copied beside the theme). Then it is a box of its own on its ground, with Replace and Remove, and each box says
  *     which slides it is for. A Card deck draws the one for its theme's ground, a Borderless deck the light-slide one.
  *
  * The picture is always an `<img>`: an SVG logo is never put into the tab as markup.
  */
 import { useState, type DragEvent } from 'react'
-import { BUILT_IN_THEME, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, groundOf, otherGround, secondLogoGround, type DeckTheme, type LogoGround, type LogoOn, type LogoPlace } from '../../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, groundOf, offersSecondLogo, otherGround, secondLogoGround, type DeckTheme, type LogoGround, type LogoOn, type LogoPlace } from '../../../../../src/decks/deckTheme'
 import { SECOND_LOGO_FIELDS, type ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeLogoState } from '../../../../../src/decks/themeProtocol'
 import { LOGO_TOO_LARGE, logoKindOfName, MAX_LOGO_BYTES } from '../../../../../src/decks/themeLogo'
@@ -184,21 +184,23 @@ export function LogoRows({ theme, logo, ground, onChange }: LogoRowsProps) {
   const secondGround = secondLogoGround(theme)
   const secondState = second && logo?.second?.file === second.file ? logo.second : null
   const secondProblem = extra.wrong ?? secondState?.problem ?? null
+  // Only a dark theme offers or shows it (option (a)); a theme turned light keeps its line and file, not shown.
+  const offered = offersSecondLogo(theme)
   return (
     <>
       <LogoBox
         file={theme.logo.file}
         url={logo?.url ?? null}
         alt={`${theme.name}'s logo`}
-        ground={second ? logoBoxGround(theme, otherGround(second.ground)) : ground}
-        caption={second ? `For ${groundWords(otherGround(second.ground))}` : null}
+        ground={second && offered ? logoBoxGround(theme, otherGround(second.ground)) : ground}
+        caption={second && offered ? `For ${groundWords(otherGround(second.ground))}` : null}
         replaceTip="Choose another SVG or PNG picture, or drop one here"
-        removeTip={second ? 'Take the logo off the theme, both versions; the pictures stay beside the theme file' : 'Take the logo off the theme; the picture stays beside the theme file'}
+        removeTip={second && offered ? 'Take the logo off the theme, both versions; the pictures stay beside the theme file' : 'Take the logo off the theme; the picture stays beside the theme file'}
         onRemove={() => onChange({ logo: null })}
         dropping={main}
       />
       {problem ? <p className="theme-logo-problem" role="status">{problem}</p> : null}
-      {second ? (
+      {!offered ? null : second ? (
         <LogoBox
           file={second.file}
           url={secondState?.url ?? null}
@@ -211,16 +213,14 @@ export function LogoRows({ theme, logo, ground, onChange }: LogoRowsProps) {
           dropping={extra}
         />
       ) : (
-        <Tooltip label={secondGround === 'light'
-          ? 'A version that reads on white, for a Borderless deck. Choose an SVG or a PNG picture, or drop one here'
-          : 'A version that reads on a dark ground, for when the theme is dark. Choose an SVG or a PNG picture, or drop one here'} className="flex w-full">
+        <Tooltip label="A version that reads on white, for a Borderless deck. Choose an SVG or a PNG picture, or drop one here" className="flex w-full">
           <Button variant="ghost" className={`theme-logo-add${extra.over ? ' is-over' : ''}`} onClick={extra.choose} {...extra.drop}>
             <Icon name="plus" size={14} tone="inherit" />
             <span>Add a version for {groundWords(secondGround)}</span>
           </Button>
         </Tooltip>
       )}
-      {secondProblem ? <p className="theme-logo-problem" role="status">{secondProblem}</p> : null}
+      {offered && secondProblem ? <p className="theme-logo-problem" role="status">{secondProblem}</p> : null}
       <div className="theme-row">
         <span className="theme-row-label">Where</span>
         <Tooltip label="The corner of the slide the logo sits in" className="theme-seg">

@@ -66,9 +66,9 @@ export interface ThemeLogo {
   place: LogoPlace;
   on: LogoOn;
   /**
-   * The logo's version for the other ground (18 November): `logo-for-light:` on a dark theme (a dark logo, for the
-   * white of a Borderless deck), `logo-for-dark:` on a light one. Its ground is the slides it is for; the `logo:` file
-   * is then the other ground's. Absent with one file only, which is used everywhere.
+   * The logo's version for light slides (18 November, the Experience lead's option (a)): `logo-for-light:`, a dark
+   * theme's logo for the white of a Borderless deck; the `logo:` file is then the dark slides'. Drawn only while the
+   * theme is dark (`drawsSecondLogo`). Absent with one file only, which is used everywhere.
    */
   second?: { file: string; ground: LogoGround };
 }
@@ -110,15 +110,22 @@ export function slideGroundOf(theme: Pick<DeckTheme, 'bg'>, borderless: boolean)
  */
 export function drawsSecondLogo(theme: Pick<DeckTheme, 'logo' | 'bg'>, borderless: boolean): boolean {
   const second = theme.logo?.second;
-  return !!second && second.ground === slideGroundOf(theme, borderless);
+  // Only a dark theme's (the Experience lead's option (a), 18 November): a theme turned light keeps the line and the
+  // file, unused, until it turns dark again.
+  return !!second && offersSecondLogo(theme) && second.ground === slideGroundOf(theme, borderless);
 }
 
 /**
- * The ground the logo's second version is for, as the tab adds or replaces it: the one the theme names already, else
- * the ground the theme isn't on ("Add a version for light slides" on a dark theme, "… for dark slides" on a light one).
+ * Does the tab offer (and show) the logo's second version? Only on a dark theme, as "Add a version for light slides"
+ * (the Experience lead's option (a), step-3-themes.md, 18 November); a light theme's slides all draw the `logo:` file.
  */
+export function offersSecondLogo(theme: Pick<DeckTheme, 'bg'>): boolean {
+  return groundOf(theme.bg) === 'dark';
+}
+
+/** The ground the logo's second version is for: light slides, the white of a Borderless deck (option (a)). */
 export function secondLogoGround(theme: Pick<DeckTheme, 'logo' | 'bg'>): LogoGround {
-  return theme.logo?.second?.ground ?? otherGround(groundOf(theme.bg));
+  return theme.logo?.second?.ground ?? 'light';
 }
 
 /**
@@ -345,23 +352,19 @@ export function parseTheme(text: string, fallback: DeckTheme = EVENING_DEFAULTS)
       file: top.logo.trim(),
       place: LOGO_PLACES.includes(top['logo-place'] as LogoPlace) ? top['logo-place'] as LogoPlace : DEFAULT_LOGO_PLACE,
       on: LOGO_ONS.includes(top['logo-on'] as LogoOn) ? top['logo-on'] as LogoOn : DEFAULT_LOGO_ON,
-      ...secondLogoOf(top, bg),
+      ...secondLogoOf(top),
     } } : {}),
   };
 }
 
 /**
- * The logo's second version a theme file names (18 November), as `ThemeLogo.second`: the other ground's line first
- * (what the tab writes), else one for the theme's own ground (a theme whose background has since changed ground). None
- * when it names neither.
+ * The logo's second version a theme file names (18 November), as `ThemeLogo.second`: its `logo-for-light:` line, read
+ * whatever the theme's ground, so a theme turned light keeps it (unused, `drawsSecondLogo`) for when it turns dark
+ * again. None when it names none.
  */
-function secondLogoOf(top: Record<string, string>, bg: string): { second?: ThemeLogo['second'] } {
-  const own = groundOf(bg);
-  for (const ground of [otherGround(own), own]) {
-    const value = top[SECOND_LOGO_KEYS[ground]];
-    if (isLogoPath(value)) return { second: { file: value.trim(), ground } };
-  }
-  return {};
+function secondLogoOf(top: Record<string, string>): { second?: ThemeLogo['second'] } {
+  const value = top[SECOND_LOGO_KEYS.light];
+  return isLogoPath(value) ? { second: { file: value.trim(), ground: 'light' } } : {};
 }
 
 /** The built-in theme, read from its own text. */

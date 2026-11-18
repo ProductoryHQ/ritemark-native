@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
-import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, parseTheme, secondLogoGround, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type LogoGround, type ThemeEntry } from './deckTheme';
+import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, offersSecondLogo, parseTheme, secondLogoGround, themeEntries, themeKeyOf, themeOfEntry, THEMES_FOLDER, type LogoGround, type ThemeEntry } from './deckTheme';
 import { frontMatterField } from './deckFormat';
 import { themeModeOf } from './deckMode';
 import { deckName, type DeckLibrary } from './DeckLibrary';
@@ -390,6 +390,11 @@ export class ThemePages implements vscode.Disposable {
     const draft = parseTheme(view.document.getText());
     if (second && !draft.logo) {
       await say('Add the logo first; its version for the other slides goes with it.');
+      return;
+    }
+    // Only a dark theme takes one (option (a)): its light slides are a Borderless deck's.
+    if (second && !offersSecondLogo(draft)) {
+      await say('A version for light slides is for a dark theme. This theme\'s slides are light, so they use the logo itself.');
       return;
     }
     const ground = second ? chosenGround ?? secondLogoGround(draft) : undefined;
