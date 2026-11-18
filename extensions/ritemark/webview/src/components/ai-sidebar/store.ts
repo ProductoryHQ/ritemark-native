@@ -72,7 +72,7 @@ import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import { appendStreamedText } from '../../../../src/agent/types';
 import type { StartingPlace } from '../../../../src/guidance/startingPlace';
-import type { SheetSignInAi, SheetSignInRequest, SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
+import { signInAttentionOf, type SheetSignInAi, type SheetSignInRequest, type SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
 import { slideAtSendOf, type CurrentSlide, type SlideAtSend } from '../../../../src/decks/currentSlide';
 import type {
@@ -444,6 +444,8 @@ interface AISidebarState {
    * (`onboarding:sign-in`): whether the running sign-in's page can open again, and the card's line.
    */
   sheetSignIns: Record<SheetSignInAi, SheetSignInView>;
+  /** Pictures with ChatGPT (#800): the card to be found, and since when (`signInAttention.ts`). */
+  signInAttention: { ai: SheetSignInAi; since: number } | null;
 
   // ── Discovered agents/commands from .claude/ (APP-GLOBAL) ──
   discoveredAgents: DiscoveredAgent[];
@@ -1160,6 +1162,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       'codex-cli': 'unknown',
     },
     sheetSignIns: { claude: { page: false, line: null }, chatgpt: { page: false, line: null } },
+    signInAttention: null,
 
     chatFontSize: 13,
     discoveredAgents: [],
@@ -3717,6 +3720,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (s.claudeCliInstalled) installStates['claude-cli'] = 'installed';
           if (s.codexCliInstalled) installStates['codex-cli'] = 'installed';
           set({ onboardingStatus: s, onboardingInstallStates: installStates });
+          break;
+        }
+
+        case 'onboarding:sign-in-attention': {
+          // Pictures with ChatGPT (#800): a ChatGPT item opened the sheet on this card; it takes one soft ring
+          const ai = signInAttentionOf(message);
+          if (ai) set({ signInAttention: { ai, since: Date.now() } });
           break;
         }
 

@@ -11,6 +11,7 @@ import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { useAISidebarStore } from './store';
+import { useSignInAttention } from './signInAttention';
 import { deriveRuntimeAvailabilities } from './runtimeAvailability';
 import type { OnboardingDependency, OnboardingInstallState, OnboardingStatus } from './types';
 import { COPY, PLAN_LINES, browserOpened, reopenTip, stopWaitingTip } from '../welcome/welcomeCopy';
@@ -353,11 +354,12 @@ function SignInCard({
 }) {
   const { waiting, signIn } = card;
   const name = PROVIDER_NAMES[ai];
+  const ring = useSignInAttention(ai);
   const ended = !waiting && signIn.line !== null && signIn.line !== 'not-opened' ? signIn.line : null;
   // The line: frame 2's while it waits; why the last sign-in ended; else which plans work
   const line = waiting ? browserOpened(ai) : ended ? signInProblem(ai, ended) : PLAN_LINES[ai];
   return (
-    <div className="rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4" aria-busy={waiting || undefined}>
+    <div className={`rounded-xl border border-[var(--r-hairline)] bg-[var(--vscode-editor-background)] p-4 ${ring}`} aria-busy={waiting || undefined}>
       <div className="text-sm font-semibold mb-1">Sign in to {name}</div>
       <p className="text-xs leading-5 opacity-75 mb-3" role={waiting || ended ? 'status' : undefined}>
         {line}

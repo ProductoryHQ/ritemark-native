@@ -142,9 +142,12 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
  * does, but the caret stays where it is (the AI never moves what the person works on): the new picture is chosen
  * only when the old one still was. Otherwise the next key typed would replace the chosen picture.
  */
-export function replacePictureKeepingCaret(state: EditorState, pos: number, picture: { src: string; title: string }): Transaction | null {
+export function replacePictureKeepingCaret(state: EditorState, pos: number, picture: { src: string; title: string }, alt?: string): Transaction | null {
   const tr = replacePicture(state, pos, picture)
   if (!tr) return null
+  // The made picture's description (#800), in the same step.
+  const placed = tr.doc.nodeAt(pos)
+  if (alt !== undefined && placed) tr.setNodeMarkup(pos, undefined, { ...placed.attrs, alt: alt.replace(/[\r\n]+/g, ' ') })
   const before = state.selection
   if (!(before instanceof NodeSelection && before.from === pos)) tr.setSelection(before.map(tr.doc, tr.mapping))
   return tr

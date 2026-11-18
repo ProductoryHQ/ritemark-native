@@ -24,7 +24,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
-import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
+import { doneWords, followPicture, madeDescription, makeMessage, pictureKey, phaseAfterStatus, sentWords, type MakerPhase, type PictureDoc, type PictureMapping, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
 
 export type { MakerPhase, PictureAsk, PictureMode, PicturePlaceRef } from './chatgptPictureState'
 
@@ -36,12 +36,18 @@ export interface PictureMakerOptions {
   /** Before each request: ready the place; `slideId` in a deck. Null: the place is gone, nothing is asked. */
   beforeMake: (ask: PictureAsk) => { slideId?: string } | null
   /** A made picture into its place, in a document (a deck places it as a saved picture). */
-  placeMade?: (place: PicturePlaceRef, picture: { path: string; url: string }) => void
+  placeMade?: (place: PicturePlaceRef, picture: { path: string; url: string }, describe: Describe) => void
   /** Undo on the strip: the editor's own undo. */
   undo: () => void
   /** A request ended with no picture (Cancel, a failure, sign-in, the place gone): what `beforeMake` readied is let go. */
   onSettled?: (ask: PictureAsk) => void
 }
+
+/**
+ * The made picture's description from the one standing there now (its words and path): the words asked, unless the
+ * person wrote their own (`madeDescription`).
+ */
+export type Describe = (currentAlt: string, currentPath: string | null) => string
 
 let serial = 0
 const newRequestId = () => `picture-${Date.now().toString(36)}-${(serial += 1)}`
@@ -85,6 +91,9 @@ export function usePictureMaker(options: PictureMakerOptions) {
     return () => { editor.off('transaction', follow) }
   }, [options.editor])
 
+  // The words each picture this editor made was made with, by its path (Change knows ChatGPT's own description).
+  const madeWith = useRef(new Map<string, string>())
+
   // The host's answers for this editor's request.
   const asked = useRef<string | null>(null)
   useEffect(() => onMessage(message => {
@@ -95,7 +104,12 @@ export function usePictureMaker(options: PictureMakerOptions) {
     if (!next) return
     if (current.phase === 'checking') asked.current = null
     if (next.phase === 'done' && typeof status.path === 'string' && typeof status.url === 'string') {
-      latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url })
+      // The words a picture was made with, by its path: a later change knows the description is still ChatGPT's.
+      const asked = current.phase === 'making' ? current.description : ''
+      const madePath = status.path
+      latest.current.placeMade?.(next.ask.place, { path: status.path, url: status.url }, (currentAlt, currentPath) =>
+        madeDescription(currentAlt, asked, currentPath ? madeWith.current.get(pictureKey(currentPath)) : undefined))
+      madeWith.current.set(pictureKey(madePath), asked)
     } else if (current.phase === 'making') {
       latest.current.onSettled?.(current.ask)
     }

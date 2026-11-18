@@ -943,14 +943,18 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (!editor || editor.isDestroyed || editor.state.doc.nodeAt(ask.place.pos)?.type.name !== 'image') return null
       return { slideId }
     },
-    placeMade: (place, made) => {
+    placeMade: (place, made, describe) => {
       if (place.kind === 'side') {
-        // The side keeps its place; the new picture's description and focus point start fresh (as a paste's).
-        writeSlide(null, { image: made.path, alt: undefined, focus: undefined })
+        // The side keeps its place; its focus point starts fresh, and its description is the words asked unless the
+        // person wrote their own (#800).
+        const alt = describe(header.alt ?? '', header.image?.trim() || null)
+        writeSlide(null, { image: made.path, alt: alt || undefined, focus: undefined })
         return
       }
       if (!editor || editor.isDestroyed) return
-      apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }))
+      const old = editor.state.doc.nodeAt(place.pos)
+      const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
+      apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))
     },
     undo: () => { if (!outerRef.current.isDestroyed) outerRef.current.commands.undo() },
   })

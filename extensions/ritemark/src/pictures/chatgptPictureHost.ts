@@ -30,6 +30,8 @@ export interface PictureSheet {
   codexAuthMethod?(): Promise<'apiKey' | 'chatgpt' | null>;
   oneShotSettings(runtimeId: AgentId): Promise<OneShotSettings>;
   openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void>;
+  /** The sheet on ChatGPT's own card, with its ring (`openLandingChat` alone where the sheet has none). */
+  openChatgptSignIn?(placeholder: string): Promise<void>;
 }
 
 export const PICTURE_STANDIN_SETTING = 'RITEMARK_PICTURE_STANDIN';
@@ -105,7 +107,8 @@ export class ChatgptPictureHost {
         return (await sheet.runtimeAvailability('codex')).usable;
       },
       openSignIn: async () => {
-        await sheet?.openLandingChat('codex', SIGN_IN_PLACEHOLDER);
+        if (sheet?.openChatgptSignIn) await sheet.openChatgptSignIn(SIGN_IN_PLACEHOLDER);
+        else await sheet?.openLandingChat('codex', SIGN_IN_PLACEHOLDER);
       },
       ...(standIn || !sheet?.codexAuthMethod ? {} : { authMethod: () => sheet.codexAuthMethod!() }),
       generatedFolder: generatedImagesFolder(this.env, os.homedir()),

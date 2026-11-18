@@ -737,6 +737,18 @@ body {
   animation: rm-picture-making 1.6s ease-in-out infinite;
 }
 @keyframes rm-picture-making { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+/* Pictures with ChatGPT (#800): ChatGPT's sign-in card on the AI's sheet takes one soft accent ring for 1.5 s when a
+   ChatGPT item opened it (signInAttention.ts); none with reduced motion. */
+.rm-signin-attention {
+  animation: rm-signin-attention 1.5s ease-out 1;
+}
+@keyframes rm-signin-attention {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--r-accent, #4f46e5) 0%, transparent); }
+  20% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-accent, #4f46e5) 45%, transparent); }
+  70% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--r-accent, #4f46e5) 30%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .rm-signin-attention { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .picture-making-pulse { animation: none; opacity: 0.7; } }
 /* The chosen side picture's ring and its focus dot sit over the veil and the words (a picture Behind lies under both). */
 .deck-sl .photo.is-chosen::after {

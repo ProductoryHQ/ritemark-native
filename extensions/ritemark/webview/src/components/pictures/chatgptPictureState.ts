@@ -41,6 +41,25 @@ export function sentWords(ask: Pick<PictureAsk, 'mode' | 'words'>): string {
   return ask.words ? 'ChatGPT gets these words and the slide\'s words.' : 'ChatGPT gets these words.'
 }
 
+/**
+ * The made picture's description (the Experience lead on #800): the words ChatGPT was given, so a screen reader and
+ * the page have it, unless the person has written their own. `madeWith`: the words of the request that made the
+ * picture standing there now, when ChatGPT made it; a description that still holds them is ChatGPT's, and a change
+ * replaces it. Never more than one line.
+ */
+export function madeDescription(current: string, asked: string, madeWith?: string): string {
+  const words = asked.replace(/[\r\n]+/g, ' ').trim()
+  const now = current.trim()
+  if (!now) return words
+  if (madeWith !== undefined && now === madeWith.replace(/[\r\n]+/g, ' ').trim()) return words
+  return current
+}
+
+/** A picture's path as a key: `./images/a.png` and `images/a.png` are the same file. */
+export function pictureKey(path: string): string {
+  return path.trim().replace(/\\/g, '/').replace(/^(\.\/)+/, '')
+}
+
 /** The `picture/make` message for a request: the words, and what the place adds (the slide, the picture to change). */
 export function makeMessage(ask: PictureAsk, description: string, requestId: string, slideId?: string): Record<string, unknown> {
   return {

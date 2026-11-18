@@ -12,6 +12,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { editorMarkdown, openDocument } from '../../utils/markdownFidelity'
 import { chosenPicture, replacePicture, replacePictureKeepingCaret } from '../../extensions/pictures/pictureCommands'
 import { imagePathOf } from '../../extensions/pictures/PictureNode'
+import { madeDescription, pictureKey } from './chatgptPictureState'
 import { doneWords, followPicture, makeMessage, phaseAfterStatus, sentWords, type MakerPhase, type PictureAsk } from './chatgptPictureState'
 
 let failures = 0
@@ -123,6 +124,26 @@ check('a picture that comes back while the person types elsewhere never takes th
   waited = waited.apply(waited.tr.setSelection(NodeSelection.create(waited.doc, pos)))
   waited = waited.apply(replacePictureKeepingCaret(waited, pos, { src: 'u', title: './images/made.png' })!)
   assert.equal(chosenPicture(waited)?.pos, pos)
+})
+
+check('a made picture is described by the words asked, unless the person wrote their own (#800)', () => {
+  assert.equal(madeDescription('', 'The quay at night'), 'The quay at night', 'no description: the words asked')
+  assert.equal(madeDescription('  ', 'Two lines\nof words'), 'Two lines of words', 'one line, always')
+  assert.equal(madeDescription('Our crane crew at work', 'The quay at night'), 'Our crane crew at work', 'the person\'s own words stay')
+  // Change this picture…: ChatGPT's own words (the request that made it) are replaced; the person's stay.
+  assert.equal(madeDescription('The quay at night', 'Busier, with a ship', 'The quay at night'), 'Busier, with a ship')
+  assert.equal(madeDescription('The quay at night, edited', 'Busier, with a ship', 'The quay at night'), 'The quay at night, edited')
+  assert.equal(pictureKey('./images/a.png'), pictureKey('images/a.png'))
+})
+
+check('the description goes in with the made picture, in the same undo step', () => {
+  const text = 'Before.\n\n![](images/agents.png){width=50%}\n\nAfter.\n'
+  let state = EditorState.create({ doc: openDocument(text).doc, plugins: [history()] })
+  const pos = firstPicture(state.doc)
+  state = state.apply(replacePictureKeepingCaret(state, pos, { src: 'u', title: './images/the-quay-at-night.png' }, 'The quay at night')!)
+  assert.equal(editorMarkdown(state.doc), 'Before.\n\n![The quay at night](./images/the-quay-at-night.png){width=50%}\n\nAfter.')
+  undo(state, tr => { state = state.apply(tr) })
+  assert.equal(editorMarkdown(state.doc), 'Before.\n\n![](images/agents.png){width=50%}\n\nAfter.', 'one Undo takes both back')
 })
 
 if (failures) {

@@ -8,6 +8,7 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
 import { makeTempDir } from '../testing/tempDir';
+import { SIGN_IN_ATTENTION_MS, signInAttentionOf, signInAttentionShows } from '../views/agentSidebarProtocol';
 import type { AgentRuntime, RuntimeSession, RuntimeSessionConfig, RuntimeTurnConfig } from '../runtime/AgentRuntime';
 import { ONE_SHOT_CANCELLED, runOneShotTurnResult, type OneShotTurnResult } from '../runtime/oneShotTurn';
 import {
@@ -239,6 +240,19 @@ async function main(): Promise<void> {
     await assert.rejects(runOneShotTurnResult(runtime(), { ...input, signal: early.signal }), (error: Error) => error.message === ONE_SHOT_CANCELLED);
     assert.strictEqual(seen.disposed, 2, 'a turn cancelled before it starts makes no session');
     console.log('✓ the one-shot: read-only, approvals refused, the picture attached, Cancel stops it');
+  }
+
+  // ── The sign-in card to be found (#800): the host's message, and the ring's 1.5 s.
+  {
+    assert.strictEqual(signInAttentionOf({ type: 'onboarding:sign-in-attention', ai: 'chatgpt' }), 'chatgpt');
+    assert.strictEqual(signInAttentionOf({ type: 'onboarding:sign-in-attention', ai: 'gemini' }), null);
+    assert.strictEqual(signInAttentionOf({ type: 'onboarding:sign-in', ai: 'chatgpt' }), null);
+    assert.strictEqual(SIGN_IN_ATTENTION_MS, 1500);
+    assert.strictEqual(signInAttentionShows(1000, 1000), true);
+    assert.strictEqual(signInAttentionShows(1000, 2499), true);
+    assert.strictEqual(signInAttentionShows(1000, 2500), false, 'gone after 1.5 s');
+    assert.strictEqual(signInAttentionShows(null, 1000), false);
+    console.log('✓ the sign-in card\'s ring: the message, and 1.5 s');
   }
 
   console.log('\nAll ChatGPT picture tests passed.');

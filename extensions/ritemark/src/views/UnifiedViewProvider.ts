@@ -65,6 +65,7 @@ import {
   type BrowserShareQuestionClearMessage,
   type BrowserShareQuestionMessage,
   type SheetSignInAi,
+  type SheetSignInAttentionMessage,
   type SheetSignInLine,
   type SheetSignInMessage,
 } from './agentSidebarProtocol';
@@ -294,6 +295,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * window is.
    */
   private _pendingLandingChat: { runtimeId: AgentId; placeholder: string } | null = null;
+  /** Pictures with ChatGPT: a sign-in card to ring once the sidebar's page is ready. */
+  private _pendingSignInAttention: SheetSignInAi | null = null;
   /** Sprint 140 (R5): a chat Home's ready request asked for before the sidebar's page was ready. */
   private _pendingChatStart: ChatStartRequest | null = null;
   /** Sprint 140 (R8): the empty sheet's starting place, sent again whenever the page (re)loads. */
@@ -754,6 +757,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             const landing = this._pendingLandingChat;
             this._pendingLandingChat = null;
             void webviewView.webview.postMessage({ type: 'landing:new-chat', ...landing });
+          }
+          if (this._pendingSignInAttention) {
+            const ai = this._pendingSignInAttention;
+            this._pendingSignInAttention = null;
+            void webviewView.webview.postMessage({ type: 'onboarding:sign-in-attention', ai } satisfies SheetSignInAttentionMessage);
           }
           if (this._pendingSelectConversation) {
             const conversationId = this._pendingSelectConversation;
@@ -2774,6 +2782,20 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   public async runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability> {
     const probe = await this._probeRuntimeAvailability(runtimeId);
     return probe.ok ? probe.availability : { state: 'error', usable: false, detail: probe.message };
+  }
+
+  /**
+   * Pictures with ChatGPT: a ChatGPT item found ChatGPT not ready. The sheet opens on a new ChatGPT chat, which shows
+   * ChatGPT's own card (sign in, set up), and that card takes one soft ring so it is found at once (the Experience
+   * lead on #800). Held until the sidebar's page is ready, like the landing.
+   */
+  public async openChatgptSignIn(placeholder: string): Promise<void> {
+    await this.openLandingChat('codex', placeholder);
+    if (this._view && this._sidebarReady) {
+      void this._view.webview.postMessage({ type: 'onboarding:sign-in-attention', ai: 'chatgpt' } satisfies SheetSignInAttentionMessage);
+      return;
+    }
+    this._pendingSignInAttention = 'chatgpt';
   }
 
   /**

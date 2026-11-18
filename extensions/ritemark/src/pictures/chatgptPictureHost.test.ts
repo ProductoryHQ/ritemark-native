@@ -172,6 +172,18 @@ async function main(): Promise<void> {
     console.log('✓ an API-key Codex is told at once');
   }
 
+  // ── A sheet that can ring the card opens ChatGPT's card with its ring (#800).
+  {
+    const rung: string[] = [];
+    const ringing = new ChatgptPictureHost(() => ({ ...sheet, openChatgptSignIn: async (placeholder: string) => { rung.push(placeholder); } }) as never, {}, 5);
+    const { posted, view } = webview();
+    ringing.handle(doc, view, { type: 'picture/check', requestId: 'c4' });
+    await until(() => posted.length === 1);
+    assert.equal(posted[0].state, 'sign-in');
+    assert.equal(rung.length, 1, 'the card is opened with its ring');
+    console.log('✓ not signed in: ChatGPT\'s card is opened with its ring');
+  }
+
   // ── Without the stand-in, the real path asks the AI's sheet whether ChatGPT is ready (here: signed out).
   {
     const real = new ChatgptPictureHost(() => sheet, {});

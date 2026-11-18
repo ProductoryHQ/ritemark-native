@@ -395,9 +395,11 @@ export function Editor({
     editor,
     rectOf: pictureRect,
     beforeMake: ask => (ask.place.kind === 'flow' && editor && !editor.isDestroyed && editor.state.doc.nodeAt(ask.place.pos)?.type.name === 'image' ? {} : null),
-    placeMade: (place, picture) => {
+    placeMade: (place, picture, describe) => {
       if (!editor || editor.isDestroyed || place.kind !== 'flow') return
-      const tr = replacePictureKeepingCaret(editor.state, place.pos, { src: picture.url, title: picture.path })
+      const old = editor.state.doc.nodeAt(place.pos)
+      const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
+      const tr = replacePictureKeepingCaret(editor.state, place.pos, { src: picture.url, title: picture.path }, alt)
       if (tr) editor.view.dispatch(tr)
     },
     undo: () => { if (editor && !editor.isDestroyed) editor.chain().focus().undo().run() },
