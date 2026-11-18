@@ -132,7 +132,7 @@ Esc            Close menu
 
 ## Slash Commands
 
-Type `/` to open the command menu, then type to filter:
+Type `/` to open the command menu, then type to filter. Other words find items too, in English or Estonian, such as `/image` or `/pilt` for Picture:
 
 | Type | Inserts |
 |------|---------|
@@ -147,6 +147,7 @@ Type `/` to open the command menu, then type to filter:
 | `/code` | Code block |
 | `/divider` | Horizontal line |
 | `/table` | Table |
+| `/picture` | Picture from a file (`/image` works too) |
 
 Press Enter to insert the selected item.
 

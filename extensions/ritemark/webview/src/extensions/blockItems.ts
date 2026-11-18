@@ -16,25 +16,34 @@ export interface BlockItemDef {
   group?: string
   /** Sprint 161 (PR 3): the Markdown shortcut shown at the item's right (`#`, `1.`, `***`). */
   shortcut?: string
+  /**
+   * Hidden search words (experience 22, Jarmo 18 November): typing one after / finds the item, as in Gamma. Never shown.
+   * English and Estonian, since people write both; a word may be a phrase ("two columns").
+   */
+  keywords?: string[]
 }
 
+/** A picture's hidden words, the same in both menus (experience 22). */
+export const PICTURE_KEYWORDS = ['image', 'img', 'photo', 'pic', 'screenshot', 'pilt', 'foto']
+
 export const blockItems: BlockItemDef[] = [
-  { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph' },
-  { title: 'Heading 1', description: 'Large heading', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 } },
-  { title: 'Heading 2', description: 'Medium heading', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 } },
-  { title: 'Heading 3', description: 'Small heading', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 } },
-  { title: 'Bullet List', description: 'Create a bulleted list', icon: 'list', nodeType: 'bulletList' },
-  { title: 'Numbered List', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList' },
-  { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList' },
-  { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote' },
-  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock' },
+  { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },
+  { title: 'Heading 1', description: 'Large heading', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, keywords: ['h1', 'title', 'pealkiri'] },
+  { title: 'Heading 2', description: 'Medium heading', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, keywords: ['h2', 'title', 'pealkiri'] },
+  { title: 'Heading 3', description: 'Small heading', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, keywords: ['h3', 'title', 'pealkiri'] },
+  { title: 'Bullet List', description: 'Create a bulleted list', icon: 'list', nodeType: 'bulletList', keywords: ['list', 'bullets', 'ul', 'loend', 'täpploend'] },
+  { title: 'Numbered List', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList', keywords: ['list', 'numbers', 'ol', 'loend', 'nummerdatud'] },
+  { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList', keywords: ['todo', 'checklist', 'checkbox', 'ülesanded'] },
+  { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote', keywords: ['blockquote', 'citation', 'tsitaat'] },
+  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock', keywords: ['code', 'snippet', 'kood'] },
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
-  { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock' },
-  { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table' },
-  { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid' },
-  { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio' },
-  { title: 'Image', description: 'Insert an image from file', icon: 'image', nodeType: 'image' },
-  { title: 'Divider', description: 'Horizontal rule', icon: 'minus', nodeType: 'horizontalRule' },
+  { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
+  { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: ['grid', 'tabel'] },
+  { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
+  { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio', keywords: ['drawio', 'draw.io', 'chart', 'skeem'] },
+  // Experience 22 (18 November): one name for a picture, as experience 49 made it one picture editor; "image" finds it.
+  { title: 'Picture', description: 'Insert a picture from a file', icon: 'image', nodeType: 'image', keywords: PICTURE_KEYWORDS },
+  { title: 'Divider', description: 'Horizontal rule', icon: 'minus', nodeType: 'horizontalRule', keywords: ['line', 'hr', 'rule', 'separator', 'eraldaja'] },
 ]
 
 /** Divider's name in a deck's / menu, where the line starts a new slide (experience 46, 16 November). */
@@ -46,7 +55,50 @@ export const DECK_DIVIDER_TITLE = 'Divider · a new slide'
  */
 export function slashItemsFor(inDeck: boolean): BlockItemDef[] {
   if (!inDeck) return blockItems
-  return blockItems.map(item => (item.nodeType === 'horizontalRule' ? { ...item, title: DECK_DIVIDER_TITLE } : item))
+  return blockItems.map(item => (item.nodeType === 'horizontalRule'
+    ? { ...item, title: DECK_DIVIDER_TITLE, keywords: [...(item.keywords ?? []), 'slide', 'new slide'] }
+    : item))
+}
+
+/** Lower case, without accents: "Täpploend" and "tapploend" are the same word here. */
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+}
+
+/** Letters and digits only: "heading1" finds "Heading 1", "drawio" finds "draw.io". */
+const compact = (text: string) => text.replace(/[^\p{L}\p{N}]/gu, '')
+
+/** Does `query` (folded) start the phrase at any of its words, the whole phrase included? */
+function startsAWord(phrase: string, query: string): boolean {
+  const folded = fold(phrase)
+  const wanted = compact(query)
+  for (let at = 0; at < folded.length; at++) {
+    const wordStart = at === 0 || !/[\p{L}\p{N}]/u.test(folded[at - 1])
+    if (!wordStart || !/[\p{L}\p{N}]/u.test(folded[at])) continue
+    const rest = folded.slice(at)
+    if (rest.startsWith(query) || compact(rest).startsWith(wanted)) return true
+  }
+  return false
+}
+
+/**
+ * The / menu's filter (experience 22, Jarmo 18 November): what's typed after / finds an item when it starts any word of
+ * its name or of its hidden words, in any case and without accents. Items whose name starts with it come first, then the
+ * other matches, each in the menu's own order. An empty query keeps the whole menu.
+ */
+export function filterSlashItems(items: BlockItemDef[], query: string): BlockItemDef[] {
+  const wanted = fold(query.trim())
+  if (!wanted) return items
+  // Only marks typed ("/-"): the name's start alone, as before.
+  if (!compact(wanted)) return items.filter(item => fold(item.title).startsWith(wanted))
+  const first: BlockItemDef[] = []
+  const rest: BlockItemDef[] = []
+  for (const item of items) {
+    const title = fold(item.title)
+    if (title.startsWith(wanted) || compact(title).startsWith(compact(wanted))) first.push(item)
+    else if ([item.title, ...(item.keywords ?? [])].some(phrase => startsAWord(phrase, wanted))) rest.push(item)
+  }
+  return [...first, ...rest]
 }
 
 /**

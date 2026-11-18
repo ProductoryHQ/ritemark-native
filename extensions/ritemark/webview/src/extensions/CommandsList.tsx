@@ -53,6 +53,11 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
     },
   }))
 
+  // Experience 22: a search puts name matches first, which can split a group; its heading is then left out rather
+  // than shown twice.
+  const groupRuns = props.items.filter((item, index) => item.group && item.group !== props.items[index - 1]?.group).map(item => item.group)
+  const showGroups = new Set(groupRuns).size === groupRuns.length
+
   return (
     <div ref={listRef}
       className="slash-command-menu rounded-lg border shadow-lg p-1 min-w-[320px] max-h-[400px] overflow-y-auto"
@@ -66,7 +71,7 @@ export const CommandsList = forwardRef((props: CommandsListProps, ref) => {
         props.items.map((item, index) => (
           <Fragment key={index}>
           {/* Sprint 161 (PR 3): the slide's / menu stands in groups (frame 22); the Text editor's items have none. */}
-          {item.group && item.group !== props.items[index - 1]?.group ? (
+          {showGroups && item.group && item.group !== props.items[index - 1]?.group ? (
             <div
               className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide${index > 0 ? ' mt-1 pt-2 border-t' : ' pt-1'}`}
               style={{ color: 'var(--vscode-descriptionForeground, #666666)', borderColor: 'var(--vscode-panel-border, #e0e0e0)' }}

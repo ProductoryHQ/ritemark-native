@@ -23,7 +23,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
-import type { BlockItemDef } from '../../../extensions/blockItems'
+import { PICTURE_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
 import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
@@ -37,22 +37,22 @@ export function isOwnStep(tr: Transaction): boolean {
   return tr.getMeta(SLIDE_COMMAND) === true || tr.getMeta(TABLE_COMMAND) === true
 }
 
-/** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows. */
+/** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows and its hidden search words (18 November). */
 export const SLIDE_ITEMS: BlockItemDef[] = [
-  { group: 'Text', title: 'Title', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#' },
-  { group: 'Text', title: 'Heading', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##' },
-  { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-' },
-  { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.' },
-  { group: 'Blocks', title: 'Columns', description: '', icon: 'columns', nodeType: 'columns' },
-  { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes' },
-  { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps' },
-  { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table' },
+  { group: 'Text', title: 'Title', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['h1', 'heading 1', 'pealkiri'] },
+  { group: 'Text', title: 'Heading', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['h2', 'subheading', 'alapealkiri'] },
+  { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: ['list', 'bullets', 'ul', 'loend', 'täpploend'] },
+  { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: ['list', 'numbers', 'ol', 'loend', 'nummerdatud'] },
+  { group: 'Blocks', title: 'Columns', description: '', icon: 'columns', nodeType: 'columns', keywords: ['column', 'cols', 'two columns', 'layout', 'veerud', 'veerg'] },
+  { group: 'Blocks', title: 'Boxes', description: '', icon: 'squares-four', nodeType: 'boxes', keywords: ['cards', 'tiles', 'grid', 'kastid', 'kaardid'] },
+  { group: 'Blocks', title: 'Steps', description: '', icon: 'list-checks', nodeType: 'steps', keywords: ['process', 'timeline', 'flow', 'sammud', 'protsess'] },
+  { group: 'Blocks', title: 'Table', description: '', icon: 'table', nodeType: 'table', keywords: ['grid', 'tabel'] },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
-  { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda' },
-  { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture' },
-  { group: 'Media', title: 'Web page', description: '', icon: 'globe', nodeType: 'webPage' },
-  { group: 'Slides', title: 'New slide below', description: '', icon: 'plus-square', nodeType: 'newSlideBelow' },
-  { group: 'Slides', title: 'Split slide here', description: '', icon: 'scissors', nodeType: 'splitSlide', shortcut: '***' },
+  { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda', keywords: ['contents', 'toc', 'sisukord', 'päevakava'] },
+  { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture', keywords: PICTURE_KEYWORDS },
+  { group: 'Media', title: 'Web page', description: '', icon: 'globe', nodeType: 'webPage', keywords: ['link', 'url', 'website', 'embed', 'veebileht'] },
+  { group: 'Slides', title: 'New slide below', description: '', icon: 'plus-square', nodeType: 'newSlideBelow', keywords: ['slide', 'new slide', 'page', 'uus slaid'] },
+  { group: 'Slides', title: 'Split slide here', description: '', icon: 'scissors', nodeType: 'splitSlide', shortcut: '***', keywords: ['split', 'break', 'divide', 'poolita', 'jaga'] },
 ]
 
 export type SlideBlockKind = 'columns' | 'boxes' | 'steps' | 'table'
