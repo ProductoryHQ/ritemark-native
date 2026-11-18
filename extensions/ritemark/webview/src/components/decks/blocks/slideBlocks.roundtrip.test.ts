@@ -72,6 +72,20 @@ One line
 Another line
 :::
 ::::`],
+  ['an agenda (small details 14)', `# Today
+
+::: agenda
+:::
+
+Then lunch.`],
+  ['an agenda, tight, in the attribute form, with words someone wrote in it', `# Today
+::: {.agenda}
+Kept as written
+:::
+- one`],
+  ['an agenda with a blank line inside', `::: agenda
+
+:::`],
   ['steps with tag', `# Exercise
 ::: {.steps tag="Harjutus"}
 1. Open the file

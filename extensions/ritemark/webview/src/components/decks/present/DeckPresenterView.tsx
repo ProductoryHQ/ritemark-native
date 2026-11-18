@@ -20,6 +20,7 @@
  * The keys are the wall's (`wallKeys.ts`): the presenter's keyboard or clicker moves the wall from here. The host is
  * the only source of state; this is the one window that gets the notes.
  */
+import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { PresenterState, WallSlide } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
@@ -77,6 +78,8 @@ function useClock(startedAt: number | null): { now: number; elapsed: number; pau
     reset: () => setOffset(value => ({ start: Date.now(), pausedAt: value.pausedAt === null ? null : Date.now(), pausedFor: 0 })),
   }
 }
+
+const NO_SLIDES: WallSlide[] = []
 
 export function DeckPresenterView() {
   const [state, setState] = useState<PresenterState | null>(null)
@@ -228,6 +231,9 @@ export function DeckPresenterView() {
     rowRef.current?.querySelector<HTMLElement>('.pv-thumb.is-current')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [state?.current.number])
 
+  // Small details 14: the shown slides' sections, for an Agenda in Now, Next and the row (progress from each one's place).
+  const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
+
   if (!state) return <div className="deck-presenter dark" />
 
   // The slide now takes what the right column and the row leave, at 16:9.
@@ -247,11 +253,12 @@ export function DeckPresenterView() {
   }
   const canvas = (slide: WallSlide, width: number) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
     </div>
   )
 
   return (
+    <AgendaContext.Provider value={agendaDrawing}>
     <div className="deck-presenter dark">
       <div className="pv-main" style={{ width: nowWidth }}>
         <div className="pv-label">{state.wallDisplay ? `Now, on ${state.wallDisplay}` : 'Now, on the wall'}</div>
@@ -392,5 +399,6 @@ export function DeckPresenterView() {
         </Tooltip>
       </div>
     </div>
+    </AgendaContext.Provider>
   )
 }
