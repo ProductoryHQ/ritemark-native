@@ -36,7 +36,9 @@ function outlineOfHTML(html: string): Outline {
       if (tag === 'span') continue // the Steps pill, a box's icon: the renderer's own drawing, no block of the file
       if (['ul', 'ol', 'table', 'thead', 'tbody', 'tr', 'blockquote'].includes(tag)) { out.push(`${depth}:${tag}`); walk(child, depth + 1); continue }
       if (tag === 'li' || tag === 'th' || tag === 'td') { out.push(`${depth}:${tag} ${words(child)}`); continue }
-      if (/^(h[1-6]|p|pre)$/.test(tag)) { out.push(`${depth}:${tag} ${words(child)}`); continue }
+      // A code block's Copy and ↗ (Sprint 163 PR 1) are the renderer's own drawing: its words are its code's.
+      if (tag === 'pre') { const code = child.querySelector('code'); out.push(`${depth}:pre ${code ? words(code) : words(child)}`); continue }
+      if (/^(h[1-6]|p)$/.test(tag)) { out.push(`${depth}:${tag} ${words(child)}`); continue }
       if (tag === 'img') { out.push(`${depth}:img ${child.getAttribute('src')}`); continue }
       walk(child, depth)
     }
@@ -99,6 +101,8 @@ const SPIKE = [
   '# Plan\n\n:::: {.boxes reveal="one"}\n::: box\n### One\n:::\n::: box\n### Two\n:::\n::::',
   '# Plan\n\n::: incremental\n- Open the file\n- Ask the question\n:::\n\nAfter the list.',
   '# Plan\n\n::: {reveal="one"}\n1. Open the file\n2. Ask the question\n:::',
+  // Sprint 163 PR 1: a prompt in a code block, with a place to fill in, in a column too.
+  '# Prompt\n\n```\nSummarise [the report] & stop.\n```\n\n:::: columns\n::: column\n```text\nOne [place]\n```\n:::\n::: column\nB\n:::\n::::',
 ]
 
 const here = path.dirname(fileURLToPath(import.meta.url))

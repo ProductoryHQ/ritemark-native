@@ -23,6 +23,7 @@ import type { DocumentApplyTarget } from '../../types/documentSync'
 import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
+import { DeckOpenInContext } from './slide/codeToolsClick'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
@@ -49,7 +50,7 @@ import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValu
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
-import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
+import { OPEN_IN_KEY, OPEN_IN_NONE, TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction, undoDepth } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
@@ -348,6 +349,8 @@ export function DeckView({
   // Card or Borderless is the deck's own choice, in its front matter (Jarmo, 15 November: both are offered). Since 16
   // November it was chosen in the Slide settings popover; since Sprint 162 in the Theme menu on the bar (ThemeMenu).
   const borderless = properties.look === 'borderless'
+  // Sprint 163 PR 1: the code blocks' ↗ Open in… on the stage and the strip, off for a deck with `open-in: none` (as its page).
+  const openIn = String((properties as Record<string, unknown>)[OPEN_IN_KEY] ?? '').trim() !== OPEN_IN_NONE
   // Copy as picture draws the slide in the look the strip shows, read when it is asked for.
   const lookRef = useRef({ theme, borderless, assets, missing: missingPictures })
   lookRef.current = { theme, borderless, assets, missing: missingPictures }
@@ -1253,7 +1256,7 @@ export function DeckView({
       const look = lookRef.current
       // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
       const agenda = { entries: agendaRef.current.entries, hint: false }
-      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda })
+      void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda, openIn })
         .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
     },
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
@@ -1802,6 +1805,7 @@ export function DeckView({
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
+    <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
       <header className="deck-bar">
         <Tooltip label={stripShown ? 'Hide the slides' : 'Show the slides'}>
@@ -2083,6 +2087,7 @@ export function DeckView({
       </Popover>
       {dialogs}
     </div>
+    </DeckOpenInContext.Provider>
     </AgendaContext.Provider>
   )
 }

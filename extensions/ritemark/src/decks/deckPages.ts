@@ -10,6 +10,7 @@
  * With the flag off nothing here applies: a `.deck.md` opens as an ordinary document, its slide blocks as code.
  */
 
+import { openInBrowser } from './openInLink';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -391,6 +392,9 @@ export class DeckPages implements vscode.Disposable {
       throw error;
     }
     switch (request.type) {
+      case 'deck/open-in':
+        openInBrowser(request.url);
+        return;
       case 'deck/assets': {
         const assets = resolveAssets(document, webview, request.paths);
         await this.post(webview, { type: 'deck/assets', assets, missing: missingPictures(request.paths, assets) });

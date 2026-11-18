@@ -19,7 +19,7 @@ function slideIconNames() {
 }
 
 /** The page's own icons, and the arrow the Arrows look draws. */
-export const PAGE_ONLY = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'folder', 'file-text'];
+export const PAGE_ONLY = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'folder', 'file-text', 'arrow-up-right'];
 
 export function iconNames() {
   return [...new Set([...slideIconNames(), ...PAGE_ONLY])].sort();

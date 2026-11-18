@@ -28,6 +28,8 @@ export const PICTURE_KEYWORDS = ['image', 'img', 'photo', 'pic', 'screenshot', '
 export const BULLET_LIST_KEYWORDS = ['list', 'bullets', 'ul', 'loend', 'täpploend']
 export const NUMBERED_LIST_KEYWORDS = ['list', 'numbers', 'ol', 'loend', 'nummerdatud']
 export const TABLE_KEYWORDS = ['grid', 'tabel']
+/** Sprint 163 PR 1: Code Block's words, shared with the slide's Code block (both / menus find it by them). */
+export const CODE_BLOCK_KEYWORDS = ['code', 'snippet', 'kood']
 
 export const blockItems: BlockItemDef[] = [
   { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },
@@ -38,7 +40,7 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Numbered List', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList', keywords: NUMBERED_LIST_KEYWORDS },
   { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList', keywords: ['todo', 'checklist', 'checkbox', 'ülesanded'] },
   { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote', keywords: ['blockquote', 'citation', 'tsitaat'] },
-  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock', keywords: ['code', 'snippet', 'kood'] },
+  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock', keywords: CODE_BLOCK_KEYWORDS },
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
   { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },

@@ -28,6 +28,7 @@
  * the only source of state; this is the one window that gets the notes.
  */
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
+import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import type { PresenterState, WallPoint, WallSlide, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
@@ -46,6 +47,7 @@ import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerOffe
 import { useTimerNow } from './useTimerNow'
 import '../decks.css'
 import './presenter.css'
+
 
 /** The notes' type sizes (A− and A+ step through them); the drawing's 22 first. */
 const NOTE_SIZES = [18, 22, 26, 30, 36, 42]
@@ -344,6 +346,8 @@ export function DeckPresenterView() {
 
   // Small details 14: the shown slides' sections, for an Agenda in Now, Next and the row (progress from each one's place).
   const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
+  // Sprint 163 PR 1: Now's code block controls take their click before Now's own (spotlight).
+  useCodeToolsClicks(nowRef, PRESENT_CODE_ACTIONS, !!state)
 
   if (!state) return <div className="deck-presenter dark" />
 
@@ -371,7 +375,7 @@ export function DeckPresenterView() {
   // README item 18: Now and Next are drawn at their step (`reveal`); the row shows every slide whole.
   const canvas = (slide: WallSlide, width: number, reveal?: number) => (
     <div className={`pv-slide${state.borderless ? ' is-borderless' : ''}`} style={{ width }}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} />
     </div>
   )
   const shownLine = revealLabel(state.reveal)

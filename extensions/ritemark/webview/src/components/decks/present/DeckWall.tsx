@@ -60,6 +60,7 @@ import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './pla
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
 import { useTimerNow } from './useTimerNow'
+import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import '../decks.css'
 import './wall.css'
 
@@ -444,6 +445,9 @@ export function DeckWall() {
 
   // Small details 14: the shown slides' sections, for an Agenda on the wall (its progress from the slide's own place).
   const agendaDrawing = useAgendaDrawing(state?.slides ?? NO_SLIDES, false)
+  // Sprint 163 PR 1: a code block's controls take their click before the wall's own (a Copy never moves the wall on).
+  const wallRef = useRef<HTMLDivElement>(null)
+  useCodeToolsClicks(wallRef, PRESENT_CODE_ACTIONS, !!state)
 
   if (!state) return <div className="deck-wall" />
 
@@ -464,13 +468,14 @@ export function DeckWall() {
 
   const layer = (slide: WallSlide, className: string, key: string, going: boolean, reveal: number | undefined) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} />
     </div>
   )
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
     <div
+      ref={wallRef}
       className={`deck-wall${(barVisible && !pointing) || gridOpen ? '' : ' is-idle'}`}
       // The slide's ground on the whole screen: no band, no edge where the 16:9 area ends (a Borderless deck's white).
       style={{ background: ground, '--wall-accent': state.theme.accent } as CSSProperties}
@@ -631,7 +636,7 @@ function WallGrid({ state, width, picked, onPick, onGo }: {
             onClick={() => onGo(slide.number)}
           >
             <div className={`wall-grid-slide${state.borderless ? ' is-borderless' : ''}`}>
-              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} />
+              <SlideCanvas kind={slide.kind} data={slide.data} width={thumb} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} openIn={state.openIn} />
             </div>
             <span className="wall-grid-number">{slide.number}</span>
           </div>
