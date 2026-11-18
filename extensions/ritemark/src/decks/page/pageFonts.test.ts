@@ -152,11 +152,11 @@ async function main(): Promise<void> {
         assert.ok(rule, `a rule for ${selector}`);
         return /font(?:-family)?:([^;]*)/.exec(rule![1])?.[1] ?? '';
       };
-      for (const heading of ['.top .who span', '.toc button', '.part h2', '.part h3', '.part h4, .part h5', '.pre h1, .pre h2, .pre h3, .pre h4, .pre h5']) {
+      for (const heading of ['.toc button', '.part h2', '.part h3', '.part h4, .part h5', '.pre h1, .pre h2, .pre h3, .pre h4, .pre h5']) {
         assert.match(fontOf(heading), /var\(--fh\)/, `${heading} in the theme's heading font`);
       }
-      assert.match(fontOf('.text'), /var\(--fb\)/, 'the handout\'s text in the theme\'s text font');
-      for (const control of ['.top .who b', '.top .pos', '.cbtn', '.toc .hd', '.under', '.part .lab', '.k', '.copy', '.sect .eyebrow', '.foot', '.toast']) {
+      assert.match(fontOf('.side'), /var\(--fb\)/, 'the handout\'s text (More) in the theme\'s text font');
+      for (const control of ['.line', '.fb', '.line .pos', '.toc .hd', '.part .lab', '.k', '.copy', '.sect .eyebrow', '.toast, .restart']) {
         assert.match(fontOf(control), /'Sofia Sans'/, `${control} keeps Sofia Sans`);
         assert.doesNotMatch(fontOf(control), /var\(--f[hb]\)/);
       }

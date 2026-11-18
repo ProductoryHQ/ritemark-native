@@ -30,12 +30,13 @@
 import { createHash } from 'node:crypto';
 import { pictureBlockTokenizer } from '../../markdown/pictureLook';
 import { Marked, marked, Tokenizer, type Token } from 'marked';
-import { blockTitleOf, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
+import { blockTitleOf, frontMatterField, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
 import { scanFencedDiv } from '../blocks/fencedDiv';
 import { tabsetOf, tabsetStart } from '../blocks/tabset';
 import type { DeckTheme } from '../deckTheme';
+import { transitionOf, type DeckTransition } from '../present/deckTransition';
 import { MAX_STEP } from '../../../webview/src/components/decks/slide/layoutSlide';
 
 export interface PublicSlide {
@@ -58,7 +59,10 @@ export interface PublicSlide {
 }
 
 export interface PublicDeck {
-  /** The title slide's title, or the deck's name when no shown slide is a title slide. */
+  /**
+   * The session's title (Sprint 163 PR 4): the deck's own words, never its file's name: its front matter's `title:`,
+   * else its title slide's title (a shown one); '' when it has neither, and the line shows the client alone.
+   */
   title: string;
   /** The deck's folder name: the client, on the page's top line. */
   client: string;
@@ -78,13 +82,21 @@ export interface PublicDeck {
    * its prompts keep Copy only. Left out for every other deck, whose prompts get both. The front matter stays private.
    */
   openInOff?: true;
+  /**
+   * Sprint 163 PR 4: the deck's transition (its front matter's `transition:`), which the page plays as the wall does.
+   * Left out for Fade, the default, so a deck's digest stays as it was.
+   */
+  transition?: Exclude<DeckTransition, 'fade'>;
 }
 
 export interface PublicDeckOptions {
   /** The deck's folder's name (the client line). */
   folderName: string;
-  /** The deck's file name without `.deck.md`: the title when no shown slide is a title slide. */
-  deckName: string;
+  /**
+   * The deck's file name without `.deck.md`. Never shown since Sprint 163 PR 4 (the page's top bar showed it in place of
+   * the session's title); kept so callers stay as they are.
+   */
+  deckName?: string;
   /** The theme the deck names, read and parsed by the host (or the built-in theme). */
   theme: DeckTheme;
   /** The open deck view's fit steps, by the slide's place in the deck (skipped slides counted). */
@@ -434,8 +446,9 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
   // The title slide's title; in a deck of block slides, a first slide that is only a title (the cover look).
   const titleSlide = slides.find((slide, index) => (slide.kind === 'title' || writtenKinds[index] === 'title') && (slide.data.title ?? '').trim())
     ?? (slides[0] && isBlockSlide(writtenKinds[0] ?? slides[0].kind) && isCoverSlide(slides[0].data.markdown ?? '') && (slides[0].data.title ?? '').trim() ? slides[0] : undefined);
+  const transition = transitionOf(frontMatterField(text.replace(/^\uFEFF/, ''), 'transition'));
   return {
-    title: (titleSlide?.data.title ?? '').trim() || options.deckName.trim(),
+    title: sessionTitleOf(text, titleSlide),
     client: options.folderName.trim(),
     // Card or Borderless as the deck view draws it; the rest of the front matter is private.
     look: frontMatterLook(text),
@@ -444,7 +457,24 @@ export function publicDeck(input: string, options: PublicDeckOptions): PublicDec
     slides,
     ...(isTextHandout(text) ? { textHandout: true as const } : {}),
     ...(isOpenInOff(text) ? { openInOff: true as const } : {}),
+    ...(transition !== 'fade' ? { transition } : {}),
   };
+}
+
+/**
+ * The session's title, from the deck's own words only (Sprint 163 PR 4: the page's top bar showed the deck's file name):
+ * the front matter's `title:` when it has words, else the shown title slide's title, else ''.
+ */
+export function sessionTitleOf(text: string, slide: { data: SlideData } | undefined): string {
+  const written = (frontMatterField(text.replace(/^\uFEFF/, ''), 'title') ?? '').trim();
+  if (written) return written;
+  return (slide?.data.title ?? '').trim();
+}
+
+/** The quiet line's words for a deck (the page's, and the wall's): the client and the session. */
+export function sessionLineOf(text: string, folderName: string, theme: DeckTheme): { client: string; session: string } {
+  const deck = publicDeck(text, { folderName, theme });
+  return { client: deck.client, session: deck.title };
 }
 
 /** Keys in a fixed order, so the same deck always hashes the same. */

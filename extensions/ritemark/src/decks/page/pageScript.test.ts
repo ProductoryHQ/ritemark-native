@@ -1,29 +1,29 @@
 /**
- * Sprint 159 (technical plan §6): the page's scroll rule is the deck view's. `PAGE_SCROLL_RULE` (plain JavaScript in the
- * page) and `scrollRule.ts` (the editor's) are run over generated states and must agree on every answer; and the
- * whole script compiles, never closes its own tag, and builds no file names. Small details 7: an address names a part
- * (`#6`), the address follows the part being read, and the page returns to a reader's last part with "Start from the
- * beginning" for 5 s, also when the browser keeps nothing.
+ * Sprint 163 PR 4: the published page's one script, the reader's seat of Present's player. Its motion has the wall's own
+ * numbers and steps (`wallMotion.ts`, `revealSteps.ts`); the whole script compiles, never closes its own tag, builds no
+ * file names and sends nothing; and run over a real page (`pageHtml`, in domino's DOM) it opens the slide an address
+ * names (`#N`) with its text, steps a slide's items one by one on the reader's press and shows a slide whole on a jump
+ * or going back, keeps the ticks per deck, slide and step, marks a finished exercise in Contents, and keeps More's choice.
+ * Small details 7: an address names a slide, the address follows it, and the page returns to a reader's last slide with
+ * "Start from the beginning" for 5 s.
  *
  * Run: npx tsx src/decks/page/pageScript.test.ts
  */
 import { strict as assert } from 'node:assert';
 import * as vm from 'node:vm';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+// @ts-expect-error: domino has no types of its own here (the webview declares them)
+import domino from '@mixmark-io/domino';
 import { scriptBuildsReferences } from '../../publish/references';
-import * as editor from '../../../webview/src/components/decks/scrollRule';
 import * as editorEdges from '../../../webview/src/extensions/tables/tableEdges';
-import { PAGE_EDGE_RULE, PAGE_PLACE_RULE, PAGE_SCRIPT, PAGE_SCROLL_RULE } from './pageScript';
-
-interface Rule {
-  partStarts: typeof editor.partStarts;
-  currentPart: typeof editor.currentPart;
-  wheelStop: typeof editor.wheelStop;
-  scrollTopFor: typeof editor.scrollTopFor;
-  constants: { READ_LINE: number; TOP_SNAP: number; PART_TOP_GAP: number };
-}
-const page = new Function(`${PAGE_SCROLL_RULE}\nreturn { partStarts, currentPart, wheelStop, scrollTopFor, constants: { READ_LINE, TOP_SNAP, PART_TOP_GAP } };`)() as Rule;
-
-assert.deepEqual(page.constants, { READ_LINE: editor.READ_LINE, TOP_SNAP: editor.TOP_SNAP, PART_TOP_GAP: editor.PART_TOP_GAP });
+import { MOTION_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { revealOnArrival as hostRevealOnArrival, revealStepOf } from '../present/revealSteps';
+import { BUILT_IN_THEME } from '../deckTheme';
+import { blockSlideMarkup } from '../blocks/slideRenderer';
+import { PAGE_EDGE_RULE, PAGE_MOTION_RULE, PAGE_PLACE_RULE, PAGE_SCRIPT } from './pageScript';
+import { pageHtml, type PageAssets } from './pageHtml';
+import { deckDigest, publicDeck } from './publicDeck';
 
 /** A small seeded generator, so a failure names a state that can be run again. */
 function random(seed: number): () => number {
@@ -34,46 +34,44 @@ function random(seed: number): () => number {
   };
 }
 
-const next = random(159);
-const int = (low: number, high: number) => low + Math.floor(next() * (high - low + 1));
-let states = 0;
-for (let round = 0; round < 400; round++) {
-  // Parts from a title alone (40 px) to a long handout (1400 px), a window from a phone's to a desktop's.
-  const count = int(0, 14);
-  const partTops: number[] = [];
-  let top = int(0, 120);
-  for (let index = 0; index < count; index++) {
-    partTops.push(top);
-    top += int(40, 1400);
-  }
-  const clientHeight = int(300, 1100);
-  const scrollHeight = Math.max(clientHeight, top + int(40, clientHeight));
-  for (let probe = 0; probe < 25; probe++) {
-    const scrollTop = int(0, Math.max(0, scrollHeight - clientHeight));
-    const writing = next() < 0.1 ? int(-1, count + 1) : null;
-    const state = { partTops, scrollTop, clientHeight, scrollHeight, writing };
-    const label = `seed 159, round ${round}, probe ${probe}: ${JSON.stringify(state)}`;
-    assert.deepEqual(page.partStarts(partTops, clientHeight), editor.partStarts(partTops, clientHeight), label);
-    assert.equal(page.currentPart(state), editor.currentPart(state), label);
-    const shown = editor.currentPart({ ...state, writing: null }) ?? 0;
-    const delta = int(-900, 900);
-    assert.equal(page.wheelStop({ ...state, writing: null }, delta, shown), editor.wheelStop({ ...state, writing: null }, delta, shown), `${label}, wheel ${delta}`);
-    assert.equal(page.scrollTopFor(partTops[0] ?? scrollTop), editor.scrollTopFor(partTops[0] ?? scrollTop), label);
-    states++;
-  }
+// ---- the wall's motion, with the wall's numbers (README items 18 to 20)
+interface Motion {
+  MOTION: { fade: number; push: number; zoom: number };
+  ZOOM_FROM: number;
+  REVEAL_MS: number;
+  REVEAL_RISE: number;
+  rowDelays(n: number, lead: number, push: boolean): number[];
+  revealOnArrival(count: number, onward: boolean): number | null;
+  revealStep(shown: number | null, count: number, forward: boolean): number | null;
+  stillFor(transition: string, reduced: boolean): boolean;
 }
-assert.ok(states === 10_000);
-
-// The rule's own promises, through the page's copy: scrolling down never skips a part and never goes back.
+const motion = new Function(`${PAGE_MOTION_RULE}\nreturn { MOTION, ZOOM_FROM, REVEAL_MS, REVEAL_RISE, rowDelays, revealOnArrival, revealStep, stillFor };`)() as Motion;
 {
-  const state = { partTops: [10, 400, 900, 980, 1500], clientHeight: 600, scrollHeight: 3000, writing: null };
-  let last = 0;
-  for (let scrollTop = 0; scrollTop <= 2400; scrollTop++) {
-    const part = page.currentPart({ ...state, scrollTop })!;
-    assert.ok(part === last || part === last + 1, `at ${scrollTop}: ${last} → ${part}`);
-    last = part;
+  assert.deepEqual(motion.MOTION, { fade: MOTION_MS.fade, push: MOTION_MS.push, zoom: MOTION_MS.zoom }, 'the wall\'s transitions');
+  assert.equal(motion.ZOOM_FROM, ZOOM_FROM);
+  assert.equal(motion.REVEAL_MS, REVEAL_MS);
+  assert.equal(motion.REVEAL_RISE, REVEAL_RISE);
+  // Item 20: 70 ms apart up to eight pieces; with more, the gap shrinks (28 ms at least); from the 14th on, with the 14th.
+  assert.deepEqual(motion.rowDelays(4, 140, false), [140, 210, 280, 350]);
+  assert.deepEqual(motion.rowDelays(8, 0, false), [0, 70, 140, 210, 280, 350, 420, 490]);
+  const many = motion.rowDelays(30, 0, false);
+  assert.equal(many[1], 28, 'never closer than 28 ms');
+  assert.equal(many[13], many[29], 'the 14th and every one after it together');
+  assert.ok(many[29] + 480 <= 900, 'a slide settles within about 0.9 s');
+  assert.deepEqual(motion.rowDelays(3, 0, true), [0, 30, 60], 'Push: the pieces come on the slide\'s heels, 30 ms apart');
+  // Item 18, as the host's own steps (`revealSteps.ts`): going on opens with the first item, any other way whole.
+  for (const count of [0, 1, 4]) {
+    assert.equal(motion.revealOnArrival(count, true), hostRevealOnArrival(count, 'first')?.shown ?? null);
+    assert.equal(motion.revealOnArrival(count, false), hostRevealOnArrival(count, 'whole')?.shown ?? null);
+    for (let shown = 1; shown <= count; shown++) {
+      for (const forward of [true, false]) assert.equal(motion.revealStep(shown, count, forward), revealStepOf({ shown, count }, forward ? 'next' : 'back')?.shown ?? null, `${shown}/${count} ${forward}`);
+    }
   }
-  assert.equal(last, 4);
+  assert.equal(motion.revealStep(null, 4, true), null, 'a slide shown whole moves on');
+  // None and reduced motion: everything at once.
+  assert.equal(motion.stillFor('none', false), true);
+  assert.equal(motion.stillFor('fade', true), true);
+  assert.equal(motion.stillFor('push', false), false);
 }
 
 // The whole script compiles, stays in its own scope, never closes its own <script>, and builds no file names, so 2.2's
@@ -88,9 +86,10 @@ assert.ok(!/[^\x00-\x7f]/.test(PAGE_SCRIPT), 'plain ASCII, so the page reads the
 
 // Run in a page with none of its parts, it stops quietly.
 {
-  const sandbox = { document: { getElementById: () => null, querySelector: () => null, documentElement: {} }, window: {} };
+  const sandbox = { document: { getElementById: () => null, querySelector: () => null, documentElement: {}, body: null }, window: {} };
   assert.doesNotThrow(() => vm.runInNewContext(PAGE_SCRIPT, sandbox));
 }
+
 
 // ---- Small details 7: the part an address names, the address a part has, and the part kept in this browser
 interface Place {
@@ -137,301 +136,225 @@ const place = new Function(`${PAGE_PLACE_RULE}\nreturn { linkedPart, addressFor,
   assert.equal(place.storageOf({ localStorage: storage }), storage);
 }
 
-// ---- the whole script, run in a small stand-in page: where it opens, the address, the notice
-type Listener = (event: Record<string, unknown>) => void;
-class Node {
-  hidden = false;
-  disabled = false;
-  textContent = '';
-  style: Record<string, unknown> = { setProperty() { /* the slide's scale */ } };
-  listeners = new Map<string, Listener[]>();
-  classes = new Set<string>();
-  classList = {
-    toggle: (name: string, on?: boolean) => { const add = on ?? !this.classes.has(name); if (add) this.classes.add(name); else this.classes.delete(name); return add; },
-    add: (name: string) => { this.classes.add(name); },
-    remove: (name: string) => { this.classes.delete(name); },
-    contains: (name: string) => this.classes.has(name),
-  };
-  constructor(private attrs: Record<string, string> = {}, private rect: () => { top: number; bottom: number } = () => ({ top: 0, bottom: 0 }), private found: Record<string, Node[]> = {}) {}
-  getAttribute(name: string) { return name in this.attrs ? this.attrs[name] : null; }
-  hasAttribute(name: string) { return name in this.attrs; }
-  setAttribute(name: string, value: string) { this.attrs[name] = value; }
-  addEventListener(type: string, listener: Listener) { this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]); }
-  fire(type: string, extra: Record<string, unknown> = {}) { for (const listener of this.listeners.get(type) ?? []) listener({ type, target: this, preventDefault() { /* */ }, stopPropagation() { /* */ }, ...extra }); }
-  querySelectorAll(selector: string) { return this.found[selector] ?? []; }
-  querySelector(selector: string) { return (this.found[selector] ?? [])[0] ?? null; }
-  getBoundingClientRect() { return this.rect(); }
-  get clientWidth() { return 600; }
-  focus() { /* */ }
-}
 
-interface PageRun {
-  shown(): number;
-  scrollY(): number;
-  hash(): string;
-  addresses: string[];
-  restart: Node;
+// ---- the whole script over a real page (domino's DOM, no layout, reduced motion so nothing animates)
+const extension = path.resolve(__dirname, '..', '..', '..');
+const assets: PageAssets = {
+  slideCss: fs.readFileSync(path.join(extension, 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8'),
+  fonts: [],
+};
+const slide = (body: string) => ['```slide', body, '```'].join('\n');
+const DECK = [
+  '---', 'deck: 2', 'title: AI assistants and agents', 'handout: text', '---', '',
+  slide('# AI assistants and agents\n\nA morning'), '', '## Welcome', '', 'Welcome words.', '',
+  slide('# Triage the inbox\n\n::: steps\n1. Open the ten emails.\n2. Ask for three groups.\n:::'), '', '## Why triage', '', 'TRIAGETEXT words for the second slide.', '',
+  slide('# Your list\n\n::: incremental\n- One\n- Two\n- Three\n:::'), '',
+  slide('# Prompts\n\n::: {.panel-tabset}\n## Plan\n\nPLANWORDS\n\n## Write\n\nWRITEWORDS\n:::'), '',
+].join('\n');
+const deck = publicDeck(DECK, { folderName: 'Fernhollow Bank', deckName: 'training-2026-11-20', theme: BUILT_IN_THEME });
+const html = pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl: () => null });
+
+interface Run {
+  doc: Document;
   kept: Map<string, string>;
+  hash(): string;
+  key(key: string, target?: Element): void;
+  click(element: Element): void;
+  on(): number;
   advance(ms: number): void;
-  window: Node & Record<string, unknown>;
-  document: Node & Record<string, unknown>;
-  /** A layout change above the parts (a picture loading): every part moves down by `by`. */
-  grow(by: number): void;
 }
-
-/**
- * Six parts of 400 px under a 59 px bar (part 3 has no text when `slideOnly`: its place only, 0 px high, as #780's
- * slide-only parts are), run with the address's hash and what this browser keeps.
- */
-function runPage(options: { hash?: string; kept?: Record<string, string>; storage?: 'ok' | 'throws' | 'refused'; replaceThrows?: boolean; slideOnly?: boolean; frames?: unknown[] }): PageRun {
-  const BAR = 59;
-  const tops: number[] = [];
-  let top = 28, shift = 0;
-  for (let index = 0; index < 6; index++) {
-    tops.push(top);
-    top += options.slideOnly && index === 2 ? 0 : 400;
-  }
-  const end = top;
-  let scrollY = 0;
-  const location = { hash: options.hash ?? '', pathname: '/deck/index.html', search: '' };
-  const addresses: string[] = [];
+function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number } = {}): Run {
+  const doc = domino.createDocument(html, true) as Document;
+  // The page's own script element stays out: the test runs the same text itself.
+  doc.querySelector('script')?.remove();
   const kept = new Map(Object.entries(options.kept ?? {}));
+  const location = { hash: options.hash ?? '', pathname: '/deck/index.html', search: '', protocol: 'https:', origin: 'https://pages.example' };
+  const listeners = new Map<string, Array<(event: unknown) => void>>();
   const timers = new Map<number, { at: number; run: () => void }>();
   let now = 0, ids = 0;
-  const parts = tops.map((partTop, index) => new Node({ 'data-i': String(index) }, () => ({ top: partTop + shift - scrollY + BAR, bottom: partTop + shift - scrollY + BAR })));
-  const layers = tops.map((_, index) => new Node({ 'data-title': `Slide ${index + 1}` }));
-  const text = new Node({ 'data-store': 'ritemark-ticks-abc', 'data-place': 'ritemark-place-abc' }, () => ({ top: BAR - scrollY, bottom: end + 900 - scrollY + BAR }), { '.part[data-i]': parts, 'input[data-tick]': [] });
-  const box = new Node({}, undefined, { '.layer': layers });
-  const header = new Node({}, () => ({ top: 0, bottom: BAR }));
-  const stage = new Node({}, () => ({ top: BAR, bottom: 400 }));
-  const restart = new Node();
-  restart.hidden = true;
-  const byId: Record<string, Node> = { slidebox: box, text, restart, pos: new Node(), bar: new Node(), stitle: new Node(), prev: new Node(), next: new Node() };
-  const storage = { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => { kept.set(key, value); } };
-  const throwing = { getItem: () => { throw new Error('SecurityError'); }, setItem: () => { throw new Error('SecurityError'); } };
-  const win = new Node() as Node & Record<string, unknown>;
-  Object.defineProperty(win, 'scrollY', { get: () => scrollY });
-  Object.assign(win, {
+  const width = options.width ?? 1440;
+  const win: Record<string, unknown> = {
+    innerWidth: width,
     innerHeight: 900,
-    innerWidth: 1440,
     location,
-    history: {
-      state: null,
-      replaceState(_state: unknown, _title: string, url: string) {
-        if (options.replaceThrows) throw new Error('SecurityError');
-        addresses.push(url);
-        location.hash = url.startsWith('#') ? url : '';
-      },
-    },
-    scrollTo(to: number | { top: number }) { scrollY = Math.max(0, typeof to === 'number' ? to : to.top); },
-    // A frame at once; it answers 0 because it has already run (the script then waits for no frame).
-    requestAnimationFrame(run: () => void) { run(); return 0; },
-    matchMedia: () => ({ matches: false }),
-    getComputedStyle: () => ({ paddingBottom: '0px', overflowX: 'auto' }),
+    history: { replaceState(_state: unknown, _title: string, url: string) { location.hash = url.startsWith('#') ? url : ''; } },
+    localStorage: { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => { kept.set(key, value); } },
+    // Reduced motion (nothing animates in a DOM without layout), and the width's own one-column rule.
+    matchMedia: (query: string) => ({ matches: query.includes('reduced-motion') || (query.includes('max-width: 860px') && width <= 860) }),
+    addEventListener(type: string, listener: (event: unknown) => void) { listeners.set(type, [...(listeners.get(type) ?? []), listener]); },
     setTimeout(run: () => void, ms: number) { timers.set(++ids, { at: now + ms, run }); return ids; },
     clearTimeout(id: number) { timers.delete(id); },
-  });
-  if (options.storage === 'refused') Object.defineProperty(win, 'localStorage', { get() { throw new Error('SecurityError'); } });
-  else win.localStorage = options.storage === 'throws' ? throwing : storage;
-  const document = new Node() as Node & Record<string, unknown>;
-  let active: unknown = null;
-  restart.focus = () => { active = restart; };
-  const tocbtn = new Node();
-  tocbtn.focus = () => { active = tocbtn; };
-  byId.tocbtn = tocbtn;
-  Object.assign(document, {
-    documentElement: { get scrollHeight() { return end + 900 + BAR; } },
-    getElementById: (id: string) => byId[id] ?? null,
-
-    querySelector: (selector: string) => (selector === '.top' ? header : selector === '.stage' ? stage : null),
-    querySelectorAll: (selector: string) => (selector === '.tw' ? options.frames ?? [] : []),
-  });
-  Object.defineProperty(document, 'activeElement', { get: () => active });
-  (restart as unknown as { focusNow(): void }).focusNow = () => { active = restart; };
-  vm.runInNewContext(PAGE_SCRIPT, { window: win, document, navigator: {} });
+    scrollTo() { /* one column */ },
+    getComputedStyle: () => ({ overflowX: 'auto', direction: 'ltr' }),
+    requestAnimationFrame(run: () => void) { run(); return 0; },
+    cancelAnimationFrame() { /* */ },
+  };
+  vm.runInNewContext(PAGE_SCRIPT, { window: win, document: doc, navigator: {} });
   return {
-    shown: () => layers.findIndex(layer => layer.classes.has('on')),
-    scrollY: () => scrollY,
-    hash: () => location.hash,
-    addresses,
-    restart,
+    doc,
     kept,
+    hash: () => location.hash,
+    key(key: string, target?: Element) {
+      for (const listener of listeners.get('keydown') ?? []) listener({ key, target: target ?? doc.body, preventDefault() { /* */ }, stopPropagation() { /* */ } });
+    },
+    click(element: Element) {
+      const event = doc.createEvent('Event');
+      event.initEvent('click', true, true);
+      element.dispatchEvent(event);
+    },
+    on: () => Array.from(doc.querySelectorAll('#frame > .layer')).findIndex(layer => layer.classList.contains('on')),
     advance(ms: number) {
       now += ms;
       for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.run(); }
     },
-    window: win,
-    document,
-    grow(by: number) { shift += by; },
   };
 }
 
-// A first visit: the top, no notice, the address as it was.
+// #2 opens slide 2 whole, with its text in More once More is on (the bug of #26: the text stayed at the page's end).
 {
-  const page = runPage({});
-  assert.equal(page.shown(), 0);
-  assert.equal(page.scrollY(), 0);
-  assert.equal(page.restart.hidden, true);
-  assert.deepEqual(page.addresses, [], 'the top part keeps the page\'s own address');
-  // The address follows the part being read, in place, and the part is kept.
-  page.window.scrollTo(28 + 3 * 400 - 6);
-  page.window.fire('scroll');
-  assert.equal(page.shown(), 3);
-  assert.equal(page.hash(), '#4');
-  assert.equal(page.kept.get('ritemark-place-abc'), '4');
-  page.window.scrollTo(0);
-  page.window.fire('scroll');
-  assert.equal(page.shown(), 0);
-  assert.equal(page.hash(), '', 'back at the top, the address is the page\'s own again');
-  assert.deepEqual(page.addresses, ['#4', '/deck/index.html']);
-  assert.equal(page.kept.get('ritemark-place-abc'), '1');
+  const run = runPage({ hash: '#2' });
+  assert.equal(run.on(), 1, '#2 shows slide 2');
+  assert.equal(run.doc.getElementById('pos')!.textContent, '2 / 4');
+  const side = run.doc.getElementById('side')!;
+  assert.ok(side.hasAttribute('hidden'), 'More starts closed');
+  const more = run.doc.getElementById('morebtn')!;
+  assert.ok(!more.hasAttribute('hidden'), 'a slide with text offers More');
+  run.click(more);
+  assert.ok(!side.hasAttribute('hidden'), 'More opens the text beside the slide');
+  assert.ok(run.doc.getElementById('t2')!.classList.contains('on'), 'the text shown is slide 2\'s');
+  assert.ok(!run.doc.getElementById('t1')!.classList.contains('on'));
+  assert.equal(more.getAttribute('aria-expanded'), 'true');
+  const placeKey = run.doc.body.getAttribute('data-place')!;
+  assert.equal(run.kept.get(`${placeKey}-more`), '1', 'the choice stays on the device');
+  // The next reader's visit at #2 opens with More as it was left.
+  const again = runPage({ hash: '#2', kept: Object.fromEntries(run.kept) });
+  assert.ok(!again.doc.getElementById('side')!.hasAttribute('hidden'), 'More kept open');
+  // A slide with no text has no More.
+  again.key('ArrowRight');
+  assert.equal(again.on(), 2);
+  assert.ok(again.doc.getElementById('morebtn')!.hasAttribute('hidden'), 'no text: no More');
+  assert.ok(again.doc.getElementById('side')!.hasAttribute('hidden'));
+  assert.equal(again.hash(), '#3', 'the address follows the slide');
 }
 
-// Opened again without a link: the last part read, with "Start from the beginning" for 5 s.
+// One by one on the reader's press: going on opens slide 3 with its first item; each press shows the next; back hides
+// the last; going back to it from slide 4 shows it whole; a jump shows it whole.
 {
-  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
-  assert.equal(page.shown(), 3);
-  assert.equal(page.scrollY(), 28 + 3 * 400 - 6);
-  assert.equal(page.hash(), '#4');
-  assert.equal(page.restart.hidden, false, 'the notice shows');
-  page.advance(4999);
-  assert.equal(page.restart.hidden, false);
-  page.advance(1);
-  assert.equal(page.restart.hidden, true, 'and goes after 5 s');
+  const run = runPage({ hash: '#2' });
+  const hidden = () => run.doc.querySelectorAll('#s3 [data-reveal-hidden]').length;
+  assert.equal(run.doc.getElementById('s3')!.getAttribute('data-items'), '3');
+  run.key('ArrowRight');
+  assert.equal(run.on(), 2);
+  assert.equal(hidden(), 2, 'the first item only');
+  run.key(' ');
+  assert.equal(hidden(), 1, 'the space bar shows the next');
+  run.click(run.doc.getElementById('next')!);
+  assert.equal(hidden(), 0, 'the next button too');
+  run.key('ArrowLeft');
+  assert.equal(hidden(), 1, 'back hides the last shown');
+  run.key('ArrowRight');
+  run.key('ArrowRight');
+  assert.equal(run.on(), 3, 'after the last item, the next slide');
+  run.key('ArrowLeft');
+  assert.equal(run.on(), 2);
+  assert.equal(hidden(), 0, 'going back shows the slide whole');
+  run.key('Home');
+  run.click(run.doc.querySelector('#toc [data-go="2"]')!);
+  assert.equal(run.on(), 2);
+  assert.equal(hidden(), 0, 'Contents shows the slide whole');
+  const linked = runPage({ hash: '#3' });
+  assert.equal(linked.doc.querySelectorAll('#s3 [data-reveal-hidden]').length, 0, 'a link shows the slide whole');
 }
-// It waits while the pointer is on it, and goes when the pointer leaves.
+
+// The ticks: a tap on a step's number checks it, kept per deck, slide and step; Contents shows the exercise finished.
 {
-  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
-  page.restart.fire('mouseenter');
-  page.advance(6000);
-  assert.equal(page.restart.hidden, false, 'held under the pointer');
-  page.restart.fire('mouseleave');
-  assert.equal(page.restart.hidden, true);
+  const run = runPage({ hash: '#2' });
+  const ticks = Array.from(run.doc.querySelectorAll('#s2 .tick'));
+  assert.equal(ticks.length, 2);
+  assert.deepEqual(ticks.map(tick => [tick.getAttribute('role'), tick.getAttribute('aria-checked'), tick.getAttribute('aria-label')]), [['checkbox', 'false', 'Step 1 done'], ['checkbox', 'false', 'Step 2 done']]);
+  const row = run.doc.querySelector('#toc [data-go="1"]')!;
+  run.click(ticks[0]);
+  assert.equal(ticks[0].getAttribute('aria-checked'), 'true');
+  assert.ok(ticks[0].parentElement!.classList.contains('done'), 'the step\'s words go quiet');
+  assert.ok(!row.classList.contains('finished'), 'one of two: not finished');
+  run.click(ticks[1]);
+  assert.ok(row.classList.contains('finished'), 'Contents shows a check in place of the tag');
+  const store = run.doc.body.getAttribute('data-store')!;
+  const saved = JSON.parse(run.kept.get(store)!) as Record<string, boolean>;
+  const key = run.doc.getElementById('s2')!.getAttribute('data-key');
+  assert.deepEqual(Object.keys(saved).sort(), [`slide:${key}:0.1`, `slide:${key}:0.2`], 'per deck (the store), slide and step');
+  run.click(ticks[1]);
+  assert.equal(ticks[1].getAttribute('aria-checked'), 'false', 'a second tap undoes it');
+  assert.ok(!row.classList.contains('finished'));
+  // Opened again, the reader's ticks are there.
+  const again = runPage({ hash: '#2', kept: Object.fromEntries(run.kept) });
+  assert.deepEqual(Array.from(again.doc.querySelectorAll('#s2 .tick')).map(tick => tick.getAttribute('aria-checked')), ['true', 'false']);
 }
-// A click on it goes to the top, and the top is kept.
+
+// Tabs: a click or the keyboard chooses a tab and shows its pane, as on the presenter view.
 {
-  const page = runPage({ kept: { 'ritemark-place-abc': '5' } });
-  assert.equal(page.shown(), 4);
-  page.restart.fire('click');
-  assert.equal(page.restart.hidden, true);
-  assert.equal(page.shown(), 0);
-  assert.equal(page.scrollY(), 0);
-  assert.equal(page.hash(), '');
-  assert.equal(page.kept.get('ritemark-place-abc'), '1');
+  const run = runPage({ hash: '#4' });
+  const block = run.doc.querySelector('#s4 .blk-tabs')!;
+  const tabs = Array.from(block.querySelectorAll('.blk-tab'));
+  assert.equal(block.querySelector('.blk-tabbar')!.getAttribute('role'), 'tablist');
+  assert.deepEqual(tabs.map(tab => [tab.getAttribute('role'), tab.getAttribute('aria-selected'), tab.getAttribute('tabindex')]), [['tab', 'true', '0'], ['tab', 'false', '-1']]);
+  run.click(tabs[1]);
+  assert.equal(block.getAttribute('data-active'), '1');
+  assert.ok(tabs[1].classList.contains('is-active') && !tabs[0].classList.contains('is-active'));
+  assert.ok(block.querySelectorAll('.blk-tabpane')[1].classList.contains('is-active'));
+  assert.equal(block.querySelectorAll('.blk-tabpane')[0].getAttribute('aria-hidden'), 'true');
+  const event = run.doc.createEvent('Event');
+  event.initEvent('keydown', true, true);
+  (event as unknown as { key: string }).key = 'ArrowLeft';
+  tabs[1].dispatchEvent(event);
+  assert.equal(block.getAttribute('data-active'), '0', 'the arrow keys move between the tabs');
 }
-// A link opens its part, over the kept place and without the notice; 2.2's #s3 too.
+
+// Small details 7: opened again without a link, the last slide, with "Start from the beginning" for 5 s.
 {
-  const page = runPage({ hash: '#2', kept: { 'ritemark-place-abc': '5' } });
-  assert.equal(page.shown(), 1);
-  assert.equal(page.scrollY(), 28 + 400 - 6);
-  assert.equal(page.restart.hidden, true, 'a link is no return: no notice');
-  assert.equal(page.kept.get('ritemark-place-abc'), '2');
-  assert.equal(runPage({ hash: '#s3' }).shown(), 2);
+  const first = runPage();
+  assert.equal(first.on(), 0);
+  first.key('ArrowRight');
+  const placeKey = first.doc.body.getAttribute('data-place')!;
+  assert.equal(first.kept.get(placeKey), '2');
+  const back = runPage({ kept: Object.fromEntries(first.kept) });
+  assert.equal(back.on(), 1, 'the reader\'s last slide');
+  const restart = back.doc.getElementById('restart')!;
+  assert.ok(!restart.hasAttribute('hidden'));
+  back.advance(5000);
+  assert.ok(restart.hasAttribute('hidden'), 'gone after 5 s');
+  const restarted = runPage({ kept: Object.fromEntries(first.kept) });
+  restarted.click(restarted.doc.getElementById('restart')!);
+  assert.equal(restarted.on(), 0, 'it goes to the first slide');
+  // A link wins over the kept place, without the notice.
+  const linked = runPage({ hash: '#4', kept: Object.fromEntries(first.kept) });
+  assert.equal(linked.on(), 3);
+  assert.ok(linked.doc.getElementById('restart')!.hasAttribute('hidden'));
 }
-// A part that doesn't exist opens the top, and the address is the page's own again.
+
+// One column: the frame is left to the CSS (no size set), and the page still steps.
 {
-  const page = runPage({ hash: '#9', kept: { 'ritemark-place-abc': '5' } });
-  assert.equal(page.shown(), 0);
-  assert.equal(page.scrollY(), 0);
-  assert.equal(page.restart.hidden, true);
-  assert.equal(page.hash(), '');
+  const run = runPage({ hash: '#2', width: 720 });
+  assert.equal(run.doc.getElementById('frame')!.getAttribute('style') ?? '', '', 'no scale in one column');
+  run.key('ArrowRight');
+  assert.equal(run.on(), 2);
 }
-// A slide-only part has no text: its link opens its slide, at its place in the deck order.
+
+// The wall never shows ticks: the same slide drawn for the wall (no `ticks`) has none, and its canvas is a picture.
 {
-  const page = runPage({ hash: '#3', slideOnly: true });
-  assert.equal(page.shown(), 2, 'slide 3 in the band');
-  assert.equal(page.scrollY(), 28 + 2 * 400 - 6, 'at its place, between parts 2 and 4');
-  assert.equal(page.hash(), '#3');
+  const steps = { kind: '', data: { markdown: '# Triage\n\n::: steps\n1. Open.\n2. Ask.\n:::' } };
+  const wall = blockSlideMarkup(steps.data, { theme: BUILT_IN_THEME, borderless: false });
+  assert.ok(!wall.includes('class="tick"') && !wall.includes('role="checkbox"'), 'no ticks on the wall');
+  assert.ok(/<div class="deck-sl[^"]*"[^>]*aria-hidden="true"/.test(wall), 'a picture of the slide on the wall');
+  const page = blockSlideMarkup(steps.data, { theme: BUILT_IN_THEME, borderless: false, ticks: true, readable: true });
+  assert.equal((page.match(/class="tick"/g) ?? []).length, 2);
+  assert.ok(!/<div class="deck-sl[^"]*"[^>]*aria-hidden/.test(page), 'the page\'s slide is read');
 }
-// A part's address typed while the page is open goes to it.
-{
-  const page = runPage({});
-  (page.window.location as { hash: string }).hash = '#5';
-  page.window.fire('hashchange');
-  assert.equal(page.shown(), 4);
-  (page.window.location as { hash: string }).hash = '#42';
-  page.window.fire('hashchange');
-  assert.equal(page.shown(), 0);
-  assert.equal(page.scrollY(), 0, 'a part that does not exist opens the page\'s top');
-  assert.equal(page.hash(), '');
-}
-// A browser that keeps nothing (a private window, blocked site data): the page opens at the top and works.
-for (const storage of ['throws', 'refused'] as const) {
-  const page = runPage({ storage });
-  assert.equal(page.shown(), 0, storage);
-  assert.equal(page.restart.hidden, true, storage);
-  page.window.scrollTo(28 + 2 * 400 - 6);
-  assert.doesNotThrow(() => page.window.fire('scroll'), storage);
-  assert.equal(page.shown(), 2, storage);
-  assert.equal(page.hash(), '#3', storage);
-  assert.equal(runPage({ storage, hash: '#4' }).shown(), 3, `${storage}: a link still opens its part`);
-}
-// An address that can't change (replaceState refused) leaves the page working.
-{
-  const page = runPage({ replaceThrows: true, kept: { 'ritemark-place-abc': '3' } });
-  assert.equal(page.shown(), 2);
-  assert.equal(page.restart.hidden, false);
-}
-// A kept place the page no longer has, or the top, is no return.
-for (const value of ['1', '7', 'junk']) {
-  const page = runPage({ kept: { 'ritemark-place-abc': value } });
-  assert.equal(page.shown(), 0, value);
-  assert.equal(page.restart.hidden, true, value);
-}
-// Back to the page's own address (an empty hash) goes to the top; a part's address hides the notice and keeps the
-// reader there, even when the fonts settle afterwards.
-{
-  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
-  assert.equal(page.restart.hidden, false);
-  (page.window.location as { hash: string }).hash = '#2';
-  page.window.fire('hashchange');
-  assert.equal(page.shown(), 1);
-  assert.equal(page.restart.hidden, true, 'the notice goes when the reader goes elsewhere');
-  page.document.fire('load', { target: { tagName: 'IMG' } });
-  assert.equal(page.shown(), 1, 'a picture loading later doesn\'t pull the reader back to the kept place');
-  (page.window.location as { hash: string }).hash = '';
-  page.window.fire('hashchange');
-  assert.equal(page.shown(), 0);
-  assert.equal(page.scrollY(), 0);
-}
-// A picture loading above the opening part moves it down: the page goes back to it until the reader moves.
-{
-  const page = runPage({ hash: '#5' });
-  assert.equal(page.scrollY(), 28 + 4 * 400 - 6);
-  page.grow(240);
-  page.document.fire('load', { target: { tagName: 'IMG' } });
-  assert.equal(page.scrollY(), 28 + 240 + 4 * 400 - 6, 'back at part 5');
-  assert.equal(page.shown(), 4);
-  // The reader scrolls (a dragged scroll bar fires only scroll): the page leaves the place to them.
-  page.window.scrollTo(500);
-  page.window.fire('scroll');
-  page.grow(100);
-  page.document.fire('load', { target: { tagName: 'IMG' } });
-  assert.equal(page.scrollY(), 500, 'the reader\'s own scroll stays');
-}
-// The notice is held by the pointer and by the focus separately; the pointer leaving doesn't hide it under the focus.
-{
-  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
-  page.restart.fire('focus');
-  page.restart.fire('mouseenter');
-  page.advance(6000);
-  page.restart.fire('mouseleave');
-  assert.equal(page.restart.hidden, false, 'still focused');
-  page.restart.fire('blur');
-  assert.equal(page.restart.hidden, true);
-}
-// A click with the focus on it gives the focus to Contents beside it before it goes.
-{
-  const page = runPage({ kept: { 'ritemark-place-abc': '4' } });
-  (page.restart as unknown as { focusNow(): void }).focusNow();
-  page.restart.fire('click');
-  assert.equal((page.document as unknown as { activeElement: unknown }).activeElement !== page.restart, true);
-  assert.equal(page.restart.hidden, true);
-}
+
 // ---- A wide table's soft edges (the Experience lead on #781): the page's copy of the editor's rule gives the same
-// answers, and the page's script watches every table frame it has.
+// answers, and it watches a table frame.
 {
-  const pageEdges = new Function(`${PAGE_EDGE_RULE}\nreturn { tableEdges, EDGE_SLACK };`)() as { tableEdges: typeof editorEdges.tableEdges; EDGE_SLACK: number };
+  const pageEdges = new Function(`${PAGE_EDGE_RULE}\nreturn { tableEdges, EDGE_SLACK, watchTableEdges };`)() as { tableEdges: typeof editorEdges.tableEdges; EDGE_SLACK: number; watchTableEdges: (frame: unknown, content: unknown, win: unknown) => () => void };
   assert.equal(pageEdges.EDGE_SLACK, editorEdges.EDGE_SLACK);
   const edgeNext = random(781);
   for (let probe = 0; probe < 2000; probe++) {
@@ -451,7 +374,7 @@ for (const value of ['1', '7', 'junk']) {
     style: { setProperty() { /* */ }, removeProperty() { /* */ } },
     addEventListener(type: string, listener: () => void, options: { passive?: boolean }) { if (type === 'scroll') { assert.equal(options.passive, true); onScroll = listener; } },
   };
-  runPage({ frames: [frame] });
+  pageEdges.watchTableEdges(frame, frame.firstElementChild, { getComputedStyle: () => ({ overflowX: 'auto', direction: 'ltr' }), requestAnimationFrame(run: () => void) { run(); return 0; }, cancelAnimationFrame() { /* */ } });
   assert.deepEqual([...classes], ['is-scrollable-right'], 'at the start of a wide table, its right side fades');
   frame.scrollLeft = 50;
   onScroll!();

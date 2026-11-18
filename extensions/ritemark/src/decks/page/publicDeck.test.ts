@@ -9,7 +9,7 @@ import { publishText } from '../deckFormat';
 import { BUILT_IN_THEME, parseTheme } from '../deckTheme';
 import { joinFrontMatter, splitFrontMatter } from '../../editorSync/frontMatter';
 import { deckLookOf } from '../present/presentSession';
-import { deckDigest, drawnData, publicDeck, publicMarkdown, publicSlide, type PublicDeck } from './publicDeck';
+import { deckDigest, drawnData, publicDeck, publicMarkdown, publicSlide, sessionLineOf, type PublicDeck } from './publicDeck';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
 
 const options = { folderName: 'Harbour Logistics', deckName: 'AI assistants and agents', theme: BUILT_IN_THEME };
@@ -68,9 +68,16 @@ assert.equal(publicDeck('---\ndeck: 1\n---\n\n<!-- only a note -->\n\n```slide t
   assert.equal(publicDeck('---\n---\nHello public intro\n\n```slide points\ntitle: P\n```\n', options).preamble, 'Hello public intro');
 }
 
-// A deck with no title slide shown takes its name; a skipped title slide's title stays private.
-assert.equal(publicDeck('```slide points\ntitle: Agenda\n```\n', options).title, 'AI assistants and agents');
-assert.equal(publicDeck('```slide title\ntitle: Secret\nskip: true\n```\n\n```slide points\ntitle: Agenda\n```\n', options).title, 'AI assistants and agents');
+// Sprint 163 PR 4: the session's title is the deck's own words, never its file's name (the page's top bar showed the
+// file's name): with no title slide shown and no `title:` it is empty; a skipped title slide's title stays private.
+assert.equal(publicDeck('```slide points\ntitle: Agenda\n```\n', options).title, '');
+assert.equal(publicDeck('```slide title\ntitle: Secret\nskip: true\n```\n\n```slide points\ntitle: Agenda\n```\n', options).title, '');
+assert.ok(!JSON.stringify(publicDeck('```slide points\ntitle: Agenda\n```\n', options)).includes(options.deckName), 'the file\'s name is nowhere in what goes public');
+// The front matter's `title:` names the session, before a title slide's title.
+assert.equal(publicDeck('---\ndeck: 2\ntitle: "Writing with AI: day 2"\n---\n\n```slide title\ntitle: Welcome\n```\n', options).title, 'Writing with AI: day 2');
+assert.equal(publicDeck('---\ndeck: 2\ntitle: "  "\n---\n\n```slide title\ntitle: Welcome\n```\n', options).title, 'Welcome', 'an empty title: is no title');
+assert.equal(sessionLineOf('---\ntitle: Day 2\n---\n', 'Fernhollow Bank', BUILT_IN_THEME).session, 'Day 2', 'the wall\'s line reads the same');
+assert.equal(sessionLineOf('---\ntitle: Day 2\n---\n', 'Fernhollow Bank', BUILT_IN_THEME).client, 'Fernhollow Bank');
 
 // A kind this build doesn't know draws its title alone, and its other words stay.
 {

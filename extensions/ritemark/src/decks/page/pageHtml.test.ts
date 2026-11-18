@@ -55,25 +55,28 @@ assert.ok(!root.querySelector('body')!.text.includes('Ritemark'), 'nothing of Ri
 assert.equal(root.querySelector('.who b')!.text, 'Harbour Logistics');
 assert.equal(root.querySelector('body')!.getAttribute('class'), 'bl', 'the deck\'s look (Borderless) holds');
 
-// Every shown slide is drawn once, in order, the first one on; each has its part in the text.
-const layers = root.querySelectorAll('.slidebox > .layer');
+// Sprint 163 PR 4: every shown slide is drawn once, in order, one at a time (the first one on), as the wall draws it;
+// each has its part in More, and each is a slide to a screen reader, named by its number and title.
+const layers = root.querySelectorAll('#frame > .layer');
 assert.equal(layers.length, deck.slides.length);
-assert.deepEqual(layers.map(layer => layer.getAttribute('data-title')), ['Harbour title', 'Why agents?', 'Build an assistant for one task', 'Assistant or agent?', 'Read the room']);
+assert.deepEqual(layers.map(layer => layer.getAttribute('aria-label')), ['Slide 1 of 5: Harbour title', 'Slide 2 of 5: Why agents?', 'Slide 3 of 5: Build an assistant for one task', 'Slide 4 of 5: Assistant or agent?', 'Slide 5 of 5: Read the room']);
+assert.deepEqual(layers.map(layer => layer.getAttribute('id')), ['s1', 's2', 's3', 's4', 's5']);
+assert.ok(layers.every(layer => layer.getAttribute('aria-roledescription') === 'slide'));
+assert.deepEqual(layers.map(layer => layer.hasAttribute('aria-hidden')), [false, true, true, true, true], 'only the slide shown is read');
+assert.ok(!layers.some(layer => layer.querySelector('.deck-sl[aria-hidden]')), 'the slide is the page\'s text, never hidden from a screen reader');
 assert.equal(layers.filter(layer => layer.classList.contains('on')).length, 1);
 assert.ok(layers[0].classList.contains('on'));
 assert.ok(layers.every(layer => layer.querySelector('.deck-slide.is-borderless .deck-sl')), 'each layer holds the deck view\'s slide');
-const parts = root.querySelectorAll('#text .part');
-assert.deepEqual(parts.map(part => part.getAttribute('id')), ['s1', 's2', 's3', 's4', 's5']);
+const parts = root.querySelectorAll('#side .part');
+assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);
 assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3', '4']);
 assert.equal(root.querySelector('#pos')!.text, '1 / 5');
 
-// A Section is the grey band with "Section N" over its title; the other parts say "Slide N", an exercise marked.
-const band = root.querySelector('#s2')!;
+// A Section's text says "Section N" over its title.
+const band = root.querySelector('#t2')!;
 assert.ok(band.classList.contains('sect'));
 assert.equal(band.querySelector('.eyebrow')!.text, 'Section 1');
 assert.equal(band.querySelector('h2')!.text, 'Why agents?');
-assert.equal(root.querySelector('#s3 .lab')!.text, 'Slide 3Exercise');
-assert.equal(root.querySelector('#s1 .lab')!.text, 'Slide 1');
 
 // Contents: every part by its title, the exercise marked, with a tick for when it is done.
 const goers = root.querySelectorAll('#toc [data-go]');
@@ -82,12 +85,12 @@ assert.ok(root.querySelector('#toc')!.hasAttribute('hidden'));
 assert.ok(goers[2].querySelector('.tag') && goers[2].querySelector('.done svg'));
 assert.ok(goers[1].querySelector('.sec'), 'a section is bold in Contents');
 
-// The text before the first slide is at the top of the text, as in the deck view's handout.
-assert.equal(root.querySelector('#text > .pre')!.text.trim(), 'Before the first slide: PREAMBLEPUBLIC, for everyone.');
+// The text before the first slide is at the top of the first slide's text, as in the deck view's handout.
+assert.equal(root.querySelector('#side > .pre[data-i="0"]')!.text.trim(), 'Before the first slide: PREAMBLEPUBLIC, for everyone.');
 
 // Every prompt has Copy; the label before it is the prompt's label; an exercise's numbered steps have ticks.
 const prompts = root.querySelectorAll('.prompt');
-assert.equal(prompts.length, root.querySelectorAll('pre').length, 'every code block is a prompt');
+assert.equal(prompts.length, root.querySelectorAll('#side pre').length, 'every code block in the text is a prompt');
 assert.equal(prompts.length, 2);
 for (const prompt of prompts) assert.ok(prompt.querySelector('button.copy'), 'with Copy');
 // Decks README item 10: Copy first, then Open in Claude and Open in ChatGPT, each a link to a new tab with the prompt's
@@ -104,31 +107,21 @@ for (const prompt of prompts) {
   const hrefs = links.map(link => link.getAttribute('href')!.replace(/&amp;/g, '&').replace(/&#39;/g, "'"));
   assert.deepEqual(hrefs, [`https://claude.ai/new?q=${encodeURIComponent(words)}`, `https://chatgpt.com/?q=${encodeURIComponent(words)}`]);
 }
-assert.equal(root.querySelector('#s3 .k')!.text, 'PROMPT');
-const steps = root.querySelectorAll('#s3 ol.steps > li.step input[type="checkbox"][data-tick]');
+assert.equal(root.querySelector('#t3 .k')!.text, 'PROMPT');
+const steps = root.querySelectorAll('#t3 ol.steps > li.step input[type="checkbox"][data-tick]');
 assert.equal(steps.length, 2);
 assert.notEqual(steps[0].getAttribute('data-tick'), steps[1].getAttribute('data-tick'));
-assert.match(root.querySelector('#text')!.getAttribute('data-store')!, /^ritemark-ticks-[0-9a-f]{12}$/);
+assert.match(root.querySelector('body')!.getAttribute('data-store')!, /^ritemark-ticks-[0-9a-f]{12}$/);
 // Small details 7: the reader's place is kept under the page's own name (the ticks' name), and "Start from the beginning"
-// waits hidden in the bar for the script.
-assert.equal(root.querySelector('#text')!.getAttribute('data-place')!.replace('ritemark-place-', ''), root.querySelector('#text')!.getAttribute('data-store')!.replace('ritemark-ticks-', ''));
-const restart = root.querySelector('.top #restart')!;
+// waits hidden for the script, over the line.
+assert.equal(root.querySelector('body')!.getAttribute('data-place')!.replace('ritemark-place-', ''), root.querySelector('body')!.getAttribute('data-store')!.replace('ritemark-ticks-', ''));
+const restart = root.querySelector('#restart')!;
 assert.equal(restart.text, 'Start from the beginning');
 assert.ok(restart.hasAttribute('hidden') && restart.getAttribute('type') === 'button');
-// Under 600 px the notice leaves the bar (the client's name stays whole): a pill at the bottom centre, above the safe area.
+// The notice is a pill over the quiet line, above the safe area, at every width.
 {
-  const phone = /@media \(max-width: 599px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS);
-  assert.ok(phone, 'the page has a phone rule for the notice');
-  const pill = /\.restart \{([^}]*)\}/.exec(phone![1])![1];
-  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(16px + env(safe-area-inset-bottom, 0px))', 'border-radius: 999px']) assert.ok(pill.includes(rule), rule);
-  // The page's ink with white words, like a phone toast, the same shadow; never white on white, hovered or not.
-  for (const rule of ['background: #1E1B4B', 'color: #fff', 'box-shadow: 0 0 0 1px var(--line), 0 10px 26px -10px rgba(28,31,74,.45)']) assert.ok(pill.includes(rule), rule);
-  const hover = /\.restart:hover \{([^}]*)\}/.exec(phone![1])![1];
-  assert.ok(hover.includes('background: #1E1B4B') && hover.includes('color: #fff'), 'the pill stays ink when hovered');
-  // The bar's backdrop filter would make it the pill's containing block (the pill would sit in the bar): none there.
-  assert.match(phone![1], /\.top \{[^}]*backdrop-filter: none/);
-  // At 600 px and up it stays in the bar.
-  assert.ok(!/\.restart \{[^}]*position: fixed/.test(PAGE_CSS.replace(phone![0], '')), 'only the phone rule takes it out of the bar');
+  const pill = /\.toast, \.restart \{([^}]*)\}/.exec(PAGE_CSS)![1];
+  for (const rule of ['position: fixed', 'left: 50%', 'transform: translateX(-50%)', 'bottom: calc(var(--line-h) + 12px + env(safe-area-inset-bottom, 0px))']) assert.ok(pill.includes(rule), rule);
 }
 // A prompt that shows a comment shows it as words.
 assert.ok(html.includes('&lt;!-- a prompt that shows a comment stays as written --&gt;'));
@@ -431,15 +424,18 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.equal(isSlideOnly(deckOnly.slides[3], true), false, 'a picture is something to see');
   const bytes = pageHtml(deckOnly, assets, { digest: deckDigest(deckOnly), pictureUrl });
   const page = parse(bytes);
-  assert.equal(page.querySelectorAll('.slidebox > .layer').length, 4, 'the slide stays in the deck');
-  assert.equal(page.querySelectorAll('.slidebox > .layer')[1].getAttribute('data-title'), 'Copilot or Cursor?');
+  assert.equal(page.querySelectorAll('#frame > .layer').length, 4, 'the slide stays in the deck');
+  assert.equal(page.querySelectorAll('#frame > .layer')[1].getAttribute('aria-label'), 'Slide 2 of 4: Copilot or Cursor?');
   const parts = page.querySelectorAll('.part[data-i]');
   assert.deepEqual(parts.map(part => part.getAttribute('data-i')), ['0', '1', '2', '3'], "every slide keeps its place in the text's order");
   const only = parts[1];
   assert.ok(only.classList.contains('only') && only.getAttribute('aria-hidden') === 'true' && only.innerHTML === '', 'its place only, with nothing in it');
-  assert.ok(!page.querySelector('#text')!.text.includes('Copilot or Cursor?'), 'no title in the text');
-  assert.deepEqual(page.querySelectorAll('[data-go]').map(row => row.getAttribute('data-go')), ['0', '2', '3'], 'no Contents entry');
-  assert.ok(/\.part\.only \{ height: 0; padding: 0; border-top: 0; overflow: hidden; \}/.test(bytes), 'no height of its own');
+  assert.ok(!page.querySelector('#side')!.text.includes('Copilot or Cursor?'), 'no title in the text');
+  // Sprint 163 PR 4: one slide at a time, so Contents lists every slide; More isn't offered on one with no text, and
+  // print shows its slide alone.
+  assert.deepEqual(page.querySelectorAll('[data-go]').map(row => row.getAttribute('data-go')), ['0', '1', '2', '3'], 'every slide in Contents');
+  assert.ok(PAGE_SCRIPT.includes("return (!!part && !part.classList.contains('only'))"), 'More only where there is text');
+  assert.ok(/\.side > \.part\.only \{ display: none; \}/.test(bytes), 'nothing of it printed but its slide');
   // A deck written before 16 November shows a part's slide title as its heading, so an empty part is no slide-only one;
   // a slide with no title and no handout shows nothing either way.
   const older = publicDeck(text.replace('handout: text\n', '').replace('##\n\n', ''), { folderName: 'Harbour Logistics', deckName: 'Deck', theme: BUILT_IN_THEME });

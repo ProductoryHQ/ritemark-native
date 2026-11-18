@@ -129,6 +129,25 @@ export interface WallState {
   tabs: WallTabs;
   /** Sprint 163 PR 1: the code blocks' ↗ Open in… (false for a deck with `open-in: none`). */
   openIn: boolean;
+  /**
+   * Sprint 163 PR 4 (the decks README, "The quiet line"): the words of the line the wall shows at its foot, as the page
+   * does, without its buttons: the client (the deck's folder) and the session (`publicDeck.sessionTitleOf`).
+   */
+  line: WallLine;
+}
+
+/** The quiet line's words. */
+export interface WallLine {
+  client: string;
+  session: string;
+}
+/** Each of the line's words is cut to this many characters, so a long title can't fill the message. */
+const LINE_MAX = 300;
+
+/** A line as the wall may be sent: two strings, their white space as one, trimmed and cut to `LINE_MAX`. */
+export function lineOf(line: { client?: unknown; session?: unknown } | null | undefined): WallLine {
+  const text = (value: unknown) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, LINE_MAX) : '');
+  return { client: text(line?.client), session: text(line?.session) };
 }
 
 /**
@@ -287,7 +306,7 @@ export function wallPicturePaths(view: PresentView): string[] {
 /** The wall's state after a move. */
 export function wallStateOf(
   view: PresentView,
-  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition; openIn?: boolean },
+  look: { borderless: boolean; theme: DeckTheme; transition?: DeckTransition; openIn?: boolean; line?: Partial<WallLine> },
   assets: Record<string, string>,
   presenter: { available: boolean; on: boolean } = { available: false, on: false },
   blank: WallBlank | null = null,
@@ -318,6 +337,7 @@ export function wallStateOf(
     reveal: revealOf(reveal),
     tabs: tabsOf(tabs),
     openIn: look.openIn !== false,
+    line: lineOf(look.line),
   };
 }
 

@@ -44,7 +44,7 @@
  */
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
-import type { WallPoint, WallSlide, WallState, WallTimer } from '../../../../../src/decks/present/presentProtocol'
+import type { WallLine, WallPoint, WallSlide, WallState, WallTimer } from '../../../../../src/decks/present/presentProtocol'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
 import { Button } from '../../ui/button'
@@ -52,7 +52,7 @@ import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
-import { wallGround } from '../theme/themeVars'
+import { themeVars, wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
 import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
@@ -70,6 +70,8 @@ const GOTO_MS = 3000
 /** The go-to box sits this far below the slide's top edge (51 of the drawing's 810), the bar this far above its bottom. */
 const GOTO_FROM_TOP = 51
 const BAR_FROM_BOTTOM = 27
+/** The quiet line at the wall's foot (the published page's `.line`): 44 px high. */
+export const WALL_LINE_HEIGHT = 44
 /** The grid's thumbnails: at most this wide, with this gap. */
 const GRID_THUMB_MAX = 300
 const GRID_GAP = 28
@@ -140,11 +142,17 @@ export function DeckWall() {
   const lastPointer = useRef<{ x: number; y: number } | null>(null)
   const lastDot = useRef<WallPoint | null>(null)
   const screen = useScreenSize()
-  const frame = wallSlideSize(screen.width, screen.height)
+  // Sprint 163 PR 4: the slide keeps its 16:9 area above the quiet line, as on the published page (one player).
+  const frame = wallSlideSize(screen.width, Math.max(0, screen.height - WALL_LINE_HEIGHT))
   // The handlers read the frame from here, so a resize never takes the window's key listeners down and up again.
   const boxRef = useRef(frame)
   boxRef.current = frame
-  const bleed = wallBleed(frame, CANVAS_WIDTH)
+  // The band under the slide holds the line, so the ground and a picture run past it to the screen's edge too.
+  const frameBottom = Math.max(0, screen.height - frame.top - frame.height)
+  const bleed = wallBleed({ ...frame, top: Math.max(frame.top, frameBottom) }, CANVAS_WIDTH)
+
+  // The quiet line's words take the slide's ink on its ground (the theme's heading colour; on Borderless, on white).
+  const lineInk = useMemo(() => (state ? themeVars(state.theme, state.borderless).hd : '#FFFFFF'), [state?.theme, state?.borderless])
 
   // The ground, worked out once per theme and look (the wall draws again at every pointer move).
   const theme = state?.theme
@@ -515,6 +523,10 @@ export function DeckWall() {
         aria-hidden="true"
       />
 
+      {/* Sprint 163 PR 4: the quiet line, the page's own without its buttons: the client, the session and "7 / 12", with
+          the accent's line for how far along it is (the decks README, "The page and Present are one player"). */}
+      <WallQuietLine line={state.line} position={state.position} count={state.count} ink={lineInk} />
+
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">
           <span className="wall-goto-number">{digits}</span>
@@ -525,7 +537,7 @@ export function DeckWall() {
 
       <div
         className={`wall-bar dark${barVisible ? ' is-shown' : ''}`}
-        style={{ bottom: frame.top + BAR_FROM_BOTTOM }}
+        style={{ bottom: frameBottom + BAR_FROM_BOTTOM }}
         onPointerEnter={() => setOverBar(true)}
         onPointerLeave={() => { setOverBar(false); showBar() }}
         aria-hidden={barVisible ? undefined : true}
@@ -643,6 +655,27 @@ function WallGrid({ state, width, picked, onPick, onGo }: {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Sprint 163 PR 4: the quiet line on the wall, the published page's line without its buttons (Jarmo: yes). A participant
+ * sees 7 on the wall and goes to 7 on the page. Under the blank, the QR code and a filled wall, as the slide is.
+ */
+function WallQuietLine({ line, position, count, ink }: { line: WallLine | undefined; position: number | null; count: number; ink: string }) {
+  const client = line?.client ?? ''
+  const session = line?.session ?? ''
+  const progress = position !== null && count > 0 ? Math.min(100, (position / count) * 100) : 0
+  return (
+    <div className="wall-line" style={{ '--wall-line-ink': ink } as CSSProperties} aria-hidden="true">
+      <span className="wall-line-who">
+        {client ? <b>{client}</b> : null}
+        {client && session ? <span className="wall-line-dot"> · </span> : null}
+        {session ? <span>{session}</span> : null}
+      </span>
+      <span className="wall-line-pos">{position !== null ? `${position} / ${count}` : `– / ${count}`}</span>
+      <i className="wall-line-progress" style={{ width: `${progress}%` }} />
     </div>
   )
 }
