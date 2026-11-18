@@ -142,7 +142,7 @@ const assets: PageAssets = {
   assert.match(PRINT_CSS, /^\s*\.paddr, \.foot\.addr-only \{ display: none; \}/, 'the address never on screen');
   assert.ok(print.includes('.foot.addr-only:has(> .paddr:empty) { display: none; }'), 'no empty footer in print (a page opened from disk, with no client or title)');
   // No bar, no Contents, no arrows, no Copy, no Open in links.
-  for (const control of ['.top', '.toc', '.under', '.copy', '.prompt .open']) assert.ok(rule('.top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open').includes('display: none !important') && print.includes(control), control);
+  for (const control of ['.top', '.toc', '.under', '.copy', '.prompt .open', '.cb-tools']) assert.ok(rule('.top, .toc, .under, .toast, .zoom, .restart, .copy, .prompt .open, .cb-tools').includes('display: none !important') && print.includes(control), control);
   // Each slide stays with its part; a part is kept off two pages where it fits.
   assert.match(rule('.layer'), /break-inside: avoid; break-after: avoid;/);
   assert.match(rule('.part'), /break-inside: avoid/);
