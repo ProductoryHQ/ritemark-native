@@ -24,9 +24,9 @@ import { deckGuardPlugin } from './handout/deckGuard'
 import { deckLinesPlugin } from './handout/deckLines'
 import { deckConvertPlugin } from './handout/deckConvert'
 import { derivedHeadings, sealHistory, slidesOf } from './deckDocument'
-import { STRIP_PICTURES_MIN, draggedPictureCount, droppedPictures, insertPictureSlides, newSlideIds, pictureTitleOf } from './stripPictures'
+import { STRIP_PICTURES_MIN, draggedPictureCount, dropPlaceNow, droppedPictures, insertPictureSlides, newSlideIds, pictureTitleOf } from './stripPictures'
 import { slideMenuItems } from './slideMenuItems'
-import { COPY_FAILED_NOTE, PICTURE_HEIGHT, PICTURE_WIDTH, copiedNote, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+import { COPY_FAILED_NOTE, PICTURE_HEIGHT, PICTURE_WIDTH, copiedNote, customProperties, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -136,6 +136,25 @@ const DECK = [
   assert.equal(deck.save(), before, 'one Undo gives the deck back, byte for byte')
 }
 
+// ---- Review of #794: the drop place follows the slide it was dropped before while the pictures are saved
+{
+  assert.equal(dropPlaceNow(['a1', 'b2', 'c3'], 'b2', 1), 1, 'nothing moved')
+  assert.equal(dropPlaceNow(['b2', 'c3'], 'b2', 1), 0, 'a slide above it deleted: still before it')
+  assert.equal(dropPlaceNow(['a1', 'c3', 'b2'], 'b2', 1), 2, 'it moved down: still before it')
+  assert.equal(dropPlaceNow(['a1', 'c3'], 'b2', 1), 1, 'it is gone: the place it was dropped at')
+  assert.equal(dropPlaceNow(['a1'], 'b2', 5), 1, 'within the deck')
+  assert.equal(dropPlaceNow(['a1', 'b2'], null, 2), 2, 'dropped at the end: the end, however long the deck is now')
+  assert.equal(dropPlaceNow(['a1', undefined, 'c3'], undefined, 1), 1, 'a slide without an id: the place')
+  // Two drops at once never take the same ids.
+  const deck = openDeck(DECK)
+  // The same random sequence for both: without the first drop's ids, the second would take the same ones.
+  const sequence = () => { let n = 0; return () => ((n++ * 0.37) % 1) }
+  const first = newSlideIds(deck.state.doc, 3, sequence())
+  const second = newSlideIds(deck.state.doc, 3, sequence(), first)
+  assert.deepEqual(newSlideIds(deck.state.doc, 3, sequence()), first, 'the sequence repeats')
+  assert.equal(new Set([...first, ...second]).size, 6)
+}
+
 // ---- At the start and at the end; a gap past the end is the end
 {
   const deck = openDeck(DECK)
@@ -190,7 +209,9 @@ const DECK = [
   const view = readFileSync(join(here, 'DeckView.tsx'), 'utf8')
   const strip = readFileSync(join(here, 'SlideStrip.tsx'), 'utf8')
   assert.match(view, /sendToExtension\('deck\/save-image', \{ slideId: ids\[index\], dataUrl, filename: getUniqueImageFilename\(file\) \}\)/, 'saved in images/ as a dropped picture is')
-  assert.match(view, /dispatchStepRef\.current\(insertPictureSlides\(target\.state, drop\.at, saved, textHandoutRef\.current\)\)/, 'one undo step')
+  assert.match(view, /inserted = dispatchStepRef\.current\(insertPictureSlides\(target\.state, at, saved, textHandoutRef\.current\)\)/, 'one undo step')
+  assert.match(view, /const at = dropPlaceNow\(slidesOf\(target\.state\.doc\)\.map\(entry => entry\.data\.id\), drop\.before, drop\.at\)/, 'before the slide it was dropped before')
+  assert.match(view, /const at = dropPlaceNow\(slidesOf\(target\.state\.doc\)\.map\(entry => entry\.data\.id\), drop\.before, drop\.at\)/, 'before the slide it was dropped before')
   assert.match(strip, /if \(draggedPictureCount\(event\.dataTransfer\) < STRIP_PICTURES_MIN\) return/, 'a single picture is left as it was')
   assert.match(strip, /if \(files\.length < STRIP_PICTURES_MIN\) return\n\s+event\.preventDefault\(\)/)
 }
@@ -221,6 +242,14 @@ const DECK = [
   assert.equal(COPY_FAILED_NOTE, 'The slide could not be copied as a picture.')
   assert.equal(matchableSelector('.deck-sl .pts li::marker'), '.deck-sl .pts li')
   assert.equal(matchableSelector('.a:empty::before, .b:hover'), '.a:empty, .b:hover')
+  // Review of #794: Tailwind's reset lists pseudo-elements alone; each stands for any element, so the list stays valid.
+  assert.equal(matchableSelector('*, ::after, ::before, ::backdrop, ::file-selector-button'), '*, *, *, *, *')
+  assert.equal(matchableSelector('input:placeholder-shown'), 'input:placeholder-shown', 'a pseudo-class that starts like one stays')
+  assert.equal(matchableSelector(':is(h1, h2)::after, [data-x="a,b"]'), ':is(h1, h2), [data-x="a,b"]', 'commas inside brackets are no list')
+  const props = ['color', '--ritemark-accent', '--vscode-font-size']
+  const values: Record<string, string> = { '--ritemark-accent': ' #4338CA', '--vscode-font-size': '13px' }
+  assert.equal(customProperties({ length: props.length, item: index => props[index], getPropertyValue: name => values[name] ?? '' }), '--ritemark-accent: #4338CA;--vscode-font-size: 13px;', 'only custom properties, as they resolve')
+  assert.match(slidePictureSvg('', '', '--x: a<b&c;'), /--x: a&lt;b&amp;c;/, 'escaped for the attribute')
   assert.deepEqual(familiesOf('"Sofia Sans", Lora, sans-serif'), ['Sofia Sans', 'Lora', 'sans-serif'])
   // The PNG's own size is read back from the clipboard in the proof (docs/.../decks-strip-pictures/proof/).
 }

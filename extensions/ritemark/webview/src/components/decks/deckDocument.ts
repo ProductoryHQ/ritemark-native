@@ -250,16 +250,17 @@ export function sealHistory(state: EditorState): Transaction {
 }
 
 /** Where a part placed "before part `at`" goes: that part's start, or the document's end. */
-function insertPoint(doc: PMNode, at: number): number {
+export function insertPoint(doc: PMNode, at: number): number {
   const slides = slidesOf(doc)
   if (at <= 0 && slides[0]) return slides[0].pos
   return slides[at]?.pos ?? doc.content.size
 }
 
-const operation = (tr: Transaction) => tr.setMeta(DECK_OPERATION, true)
+/** A strip operation's mark: the guard lets it through. */
+export const operation = (tr: Transaction) => tr.setMeta(DECK_OPERATION, true)
 
 /** The ids the deck's slides carry. */
-function idsOf(doc: PMNode): string[] {
+export function idsOf(doc: PMNode): string[] {
   return slidesOf(doc).map(slide => slide.data.id).filter((id): id is string => !!id)
 }
 

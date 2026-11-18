@@ -432,6 +432,12 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
   // Item 8: pictures from the computer over the strip. Only a drag of several is the strip's: one picture keeps the way
   // it went before, so its drag over is left alone and the drop never comes here.
   const [pictureGap, setPictureGap] = useState<number | null>(null)
+  // How deep the drag is inside the strip: each element it enters counts, each it leaves takes one off, so the line goes
+  // only when the drag has left the strip itself (a leave's related element isn't always given; review of #794).
+  const pictureDepth = useRef(0)
+  const onPictureEnter = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (draggedPictureCount(event.dataTransfer) >= STRIP_PICTURES_MIN) pictureDepth.current++
+  }
   const onPictureOver = (event: ReactDragEvent<HTMLDivElement>) => {
     if (draggedPictureCount(event.dataTransfer) < STRIP_PICTURES_MIN) return
     event.preventDefault()
@@ -439,11 +445,13 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
     const at = gapAt(event.clientY)
     if (at !== pictureGap) setPictureGap(at)
   }
-  const onPictureLeave = (event: ReactDragEvent<HTMLDivElement>) => {
-    // Out of the strip, not into one of its thumbnails.
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPictureGap(null)
+  const onPictureLeave = () => {
+    if (pictureDepth.current === 0) return
+    pictureDepth.current--
+    if (pictureDepth.current === 0) setPictureGap(null)
   }
   const onPictureDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    pictureDepth.current = 0
     setPictureGap(null)
     const files = droppedPictures(event.dataTransfer)
     if (files.length < STRIP_PICTURES_MIN) return
@@ -464,6 +472,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
       tabIndex={0}
       onKeyDownCapture={onKeyCapture}
       onKeyDown={onKey}
+      onDragEnter={onPictureEnter}
       onDragOver={onPictureOver}
       onDragLeave={onPictureLeave}
       onDrop={onPictureDrop}

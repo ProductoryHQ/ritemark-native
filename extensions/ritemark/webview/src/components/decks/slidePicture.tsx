@@ -12,7 +12,8 @@ import { flushSync } from 'react-dom'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { SlideCanvas } from './slide/SlideCanvas'
-import { PICTURE_HEIGHT, PICTURE_WIDTH, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+import { PICTURE_HEIGHT, PICTURE_WIDTH, customProperties, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+import { readFileAsBase64 } from '../../lib/pastedImage'
 
 export { COPY_FAILED_NOTE, PICTURE_HEIGHT, PICTURE_WIDTH, copiedNote } from './slidePictureSvg'
 
@@ -30,13 +31,7 @@ const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() =>
 async function asDataUrl(url: string): Promise<string | null> {
   if (url.startsWith('data:')) return url
   try {
-    const blob = await (await fetch(url)).blob()
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(blob)
-    })
+    return await readFileAsBase64(await (await fetch(url)).blob())
   } catch {
     return null
   }
@@ -152,7 +147,9 @@ export async function renderSlidePicture(input: SlidePictureInput): Promise<Blob
     const css = await cssFor(host, families)
     const copy = slide.cloneNode(true) as HTMLElement
     await inlinePictures(copy)
-    const svg = slidePictureSvg(new XMLSerializer().serializeToString(copy), css, document.documentElement.getAttribute('style') ?? '')
+    // The document's custom properties as they resolve (VS Code's, and the :root rules' tokens), which the slide's
+    // rules may read: the picture has no <html> of its own (review of #794).
+    const svg = slidePictureSvg(new XMLSerializer().serializeToString(copy), css, customProperties(getComputedStyle(document.documentElement)))
     const image = new Image()
     image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
     await image.decode()

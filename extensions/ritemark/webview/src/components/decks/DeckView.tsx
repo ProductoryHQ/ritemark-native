@@ -34,7 +34,7 @@ import { SourceLines, type CopySource } from './library/SourceLines'
 import { AddToLibrarySheet, type LibraryTopic } from './library/AddToLibrarySheet'
 import { onMessage, sendToExtension } from '../../bridge'
 import { getUniqueImageFilename, readFileAsBase64 } from '../../lib/pastedImage'
-import { insertPictureSlides, newSlideIds, pictureTitleOf, type SavedPicture } from './stripPictures'
+import { dropPlaceNow, insertPictureSlides, newSlideIds, pictureTitleOf, type SavedPicture } from './stripPictures'
 import { COPY_FAILED_NOTE, copiedNote, copySlidePicture } from './slidePicture'
 import { convertKind, hiddenNote } from './slide/convertKind'
 import { setPath, undoKeyOf } from './slide/slideEdits'
@@ -117,14 +117,20 @@ const UPDATED_MS = 4000
 /** The start card's distance below the first part's text, and above the room's end (frame 20). */
 const START_CARD_GAP = 8
 
-/** A notice in the deck's bar, with one action (Undo) when it has one. */
-/** Item 8: one drop of pictures on the strip, before part `at`; each picture's saved path (null: not saved) by its slide id. */
+/**
+ * Item 8: one drop of pictures on the strip, before part `at` when it was dropped: before the slide with id `before`
+ * (null: at the end), wherever that slide stands once every picture is saved. Each picture's saved path (null: not
+ * saved) by its slide id.
+ */
 interface PictureDrop {
   at: number
+  /** Undefined when that slide had no id: the place it was dropped at, then. */
+  before: string | null | undefined
   pictures: Array<{ id: string; title: string }>
   paths: Map<string, string | null>
 }
 
+/** A notice in the deck's bar, with one action (Undo) when it has one. */
 interface Notice {
   text: string
   action?: { label: string; tip: string; run: () => void }
@@ -1127,14 +1133,17 @@ export function DeckView({
     })
     const failed = drop.pictures.length - saved.length
     const target = editorRef.current
+    let inserted = false
     if (saved.length && target && !target.isDestroyed) {
+      // Before the slide it was dropped before, where that slide stands now: slides moved or deleted while the pictures
+      // were saved don't move the drop place (review of #794). That slide gone, the place it was dropped at.
+      const at = dropPlaceNow(slidesOf(target.state.doc).map(entry => entry.data.id), drop.before, drop.at)
       // One transaction, an undo step of its own: one Cmd+Z takes every slide of the drop back.
-      if (dispatchStepRef.current(insertPictureSlides(target.state, drop.at, saved, textHandoutRef.current))) {
-        const first = Math.min(drop.at, slidesOf(target.state.doc).length - saved.length)
-        requestAnimationFrame(() => pickRef.current(first))
-      }
+      inserted = dispatchStepRef.current(insertPictureSlides(target.state, at, saved, textHandoutRef.current))
+      if (inserted) requestAnimationFrame(() => pickRef.current(at))
     }
-    if (failed) setNotice({ text: failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.` })
+    if (saved.length && !inserted) setNotice({ text: 'The pictures are saved in images/, but their slides could not be added.' })
+    else if (failed) setNotice({ text: failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.` })
     return true
   }, [])
 
@@ -1238,9 +1247,12 @@ export function DeckView({
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
     dropPictures: (at, files) => {
       if (!editor || files.length === 0) return
-      const ids = newSlideIds(editor.state.doc, files.length)
+      // Never an id another drop still waits to use.
+      const ids = newSlideIds(editor.state.doc, files.length, Math.random, pictureDrops.current.keys())
       const pictures = files.map((file, index) => ({ id: ids[index], title: pictureTitleOf(file.name) }))
-      const drop: PictureDrop = { at, pictures, paths: new Map() }
+      const standing = slidesOf(editor.state.doc)[at]
+      const before = standing ? standing.data.id : null
+      const drop: PictureDrop = { at, before, pictures, paths: new Map() }
       for (const id of ids) pictureDrops.current.set(id, drop)
       files.forEach((file, index) => {
         void readFileAsBase64(file).then(
@@ -1410,9 +1422,10 @@ export function DeckView({
   }, [editor, idOf, shown])
 
   useEffect(() => onMessage(message => {
-    if (!editor || editor.isDestroyed) return
+    // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
     if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
       && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null)) return
+    if (!editor || editor.isDestroyed) return
     if (message.type === 'deck/image-failed') {
       setNotice({ text: typeof message.message === 'string' ? message.message : 'The picture could not be saved.' })
       return
