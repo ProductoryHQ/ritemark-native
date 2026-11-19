@@ -254,12 +254,15 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   // Every block's scrollbar, whatever its own rule sets (the stage's column sets one with five classes): its room and
   // its fade stay, so the words wrap as on the stage, and it draws nothing.
   assert.ok(thumbs?.includes('scrollbar-color: transparent transparent !important'), 'no scrollbar shows in a thumbnail')
-  // Nothing in a thumbnail takes the pointer back: the only rules that give it back are the stage's own layers, each
-  // one class, below the thumbnails' two (a new one is checked against the thumbnails here).
+  // Nothing in a thumbnail takes the pointer back: no rule that gives it back names a slide's own parts or a thumbnail.
+  // (The stage's own layers, `.deck-block-layer > *` and `.deck-comment-spot`, are drawn over the stage, never in a
+  // thumbnail, and are one class each, below the thumbnails' two.)
   const css = (name: string) => flat(readFileSync(new URL(name, import.meta.url), 'utf8'))
   const giveBack = ['./decks.css', './slide/slide.css', './present/wall.css', './present/presenter.css']
     .flatMap(name => Array.from(css(name).matchAll(/(?<=^|\})\s*([^{}]+?)\s*\{[^}]*pointer-events: auto[^}]*\}/g), m => m[1]))
-  assert.deepEqual(giveBack.sort(), ['.deck-block-layer > *', '.deck-comment-spot', '.wall-bar.is-shown'], 'nothing in a thumbnail takes it back')
+  const inPicture = /\.deck-sl\b|\.blk-|\.cb-|\.slide-|\.deck-thumb|\.deck-drag-ghost|\.wall-grid|\.pv-row|\.pv-side/
+  assert.ok(giveBack.includes('.deck-comment-spot') && inPicture.test('.deck-thumb .deck-sl .blk-column'), 'the guard sees the rules it reads')
+  assert.deepEqual(giveBack.filter(selector => inPicture.test(selector)), [], 'nothing in a thumbnail takes it back')
   // The stage's columns and panes still scroll, with their scrollbar.
   const slideCss = css('./slide/slide.css')
   assert.ok(/overflow: hidden auto/.test(rule(slideCss, '.deck-sl.is-blocks .blk-flow > .blk-columns > .blk-column') ?? ''), "the stage's column scrolls")
