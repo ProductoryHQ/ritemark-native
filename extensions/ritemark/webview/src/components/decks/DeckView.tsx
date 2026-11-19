@@ -75,7 +75,7 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish } from './DeckPublish'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
-import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
+import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
 import { isMac } from '../../hooks/usePlatform'
 import './decks.css'
@@ -982,9 +982,12 @@ export function DeckView({
   }, [orientation, pick])
 
   // The full slide view (Jarmo, 16 November): with the handout hidden, the wheel anywhere over the stage (the slide and
-  // the empty bands around it) and the keys move between slides (slideNav.ts), through the strip's own path. With the
-  // handout shown, the scroll rule stays.
+  // the empty bands around it) and the keys move between slides (slideNav.ts), through the strip's own path. A gesture
+  // means the same in every view, by side of the room (#855, the Experience lead): beside the handout too, the wheel
+  // anywhere on the slide's side moves one slide and the handout scrolls to its part, as a thumbnail's click does; on
+  // the handout's side it scrolls the text (the scroll rule's).
   const fullSlide = slideShown && !handoutShown
+  const stageWheel = stageWheelOf(slideShown, handoutShown)
   const goTo = useCallback((index: number) => {
     const count = countRef.current
     if (count === 0) return
@@ -993,23 +996,29 @@ export function DeckView({
   }, [pick])
   useEffect(() => {
     const stage = stageRef.current
-    if (!fullSlide || !stage) return
+    if (!stageWheel || !stage) return
     let gesture = NO_GESTURE
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const delta = wheelPixels(event, stage.clientHeight)
-      // A pane or a column that holds more than its room scrolls first, and so does the stage under the empty bands
-      // while it can (a short window); everything else moves the slide, one per gesture (#824). What is under the
-      // pointer is asked only while the gesture is undecided, not through a flick's momentum.
-      const takerOf = () => wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY)
+      // A pane or a column that holds more than its room scrolls first, then the stage while it can (a short window; in
+      // Slide only, under the bands alone, as the slide fits there); everything else on the slide's side moves the
+      // slide, one per gesture (#824, #855). What is under the pointer is asked only while the gesture is undecided,
+      // not through a flick's momentum.
+      const takerOf = () => wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY, stageWheel)
       const route = wheelRoute(gesture, delta, event.timeStamp, takerOf)
       gesture = route.gesture
       if (!route.scroll) event.preventDefault()
-      if (route.move !== 0) goTo(Math.min(currentRef.current, countRef.current - 1) + route.move)
+      if (route.move !== 0) {
+        const from = Math.min(currentRef.current, countRef.current - 1)
+        goTo(from + route.move)
+        // The new slide is seen from where the gesture goes on (a pane taller than its room); at the deck's ends nothing moves.
+        if (Math.min(currentRef.current, countRef.current - 1) !== from) stage.scrollTop = stageScrollAfter(route.move, stage)
+      }
     }
     stage.addEventListener('wheel', onWheel, { passive: false })
     return () => stage.removeEventListener('wheel', onWheel)
-  }, [fullSlide, goTo])
+  }, [stageWheel, goTo])
   useEffect(() => {
     if (!fullSlide) return
     const onKey = (event: KeyboardEvent) => {

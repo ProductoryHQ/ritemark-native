@@ -2,7 +2,9 @@
  * Moving between slides in the full slide view (Jarmo, 16 November: "full slide views peaks mouse scroll ja arrows
  * navigeerima slaidide vahel edasi-tagasi"). With the handout hidden, the slide fills the deck view, and there is no
  * handout to scroll: the wheel over the slide and the keys go to the next or previous slide instead. Skipped slides
- * count, since this is editing, not Present. With the handout shown, scrolling stays the scroll rule's.
+ * count, since this is editing, not Present. A gesture means the same in every view, by side of the room (#855, the
+ * Experience lead): beside the handout too, the wheel anywhere on the slide's side (the slide and the space around it
+ * in its pane) moves one slide, while on the handout's side it scrolls the text (the scroll rule's).
  *
  * Pure functions, kept apart from the deck view so they can be tested on their own.
  */
@@ -85,20 +87,47 @@ export function boxScrolls(box: Pick<WheelBox, 'scrollTop' | 'scrollHeight' | 'c
 }
 
 /**
- * The box that takes a wheel event over the stage in the full slide view, or null when nothing under the pointer
- * scrolls that way and the slide moves. A box is a pane or a column on the slide that holds more than its room (the
- * design: it scrolls, in the editor too), or, outside the slide, the stage itself when it is taller than its room. Over
- * the slide the stage never counts, so the slide always moves there, as before; over the empty bands the stage scrolls
- * to its end first and the next gesture moves the slide (before, the bands did nothing once the stage could scroll).
+ * Where the stage's wheel moves the slide: 'alone' in Slide only, 'beside' in Slide and handout (#855). In both, the
+ * slide's side of the room (the slide and the space around it in its pane) means slides, and the handout's side means
+ * text (the Experience lead, 19 November). They differ only over the slide itself: in Slide only the slide fits its
+ * pane, so the pane never scrolls first there; beside the handout it can be taller than its pane, which then does
+ * (`wheelTaker`). Null with no slide shown (Handout only), where there is no stage.
  */
-export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string): T | null {
+export type StageWheel = 'alone' | 'beside'
+
+export function stageWheelOf(slideShown: boolean, handoutShown: boolean): StageWheel | null {
+  return !slideShown ? null : handoutShown ? 'beside' : 'alone'
+}
+
+/**
+ * The box that takes a wheel event over the stage, or null when nothing under the pointer scrolls that way and the
+ * slide moves. A box is a pane or a column on the slide that holds more than its room (the design: it scrolls, in the
+ * editor too), or the stage itself, the slide's pane, while it is taller than its room and can scroll that way: it
+ * scrolls first, and at its end the next gesture moves the slide (before #824, the bands did nothing once the stage
+ * could scroll). Everywhere else on the slide's side the slide moves. In Slide only the slide fits the stage, so over
+ * the slide the stage never counts; beside the handout the slide keeps its width however short the window, so the
+ * stage can be shorter than the slide, and it scrolls first over the slide too, so the slide's foot can be reached
+ * (review of #871).
+ */
+export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string, view: StageWheel = 'alone'): T | null {
   let overSlide = false
   for (let box: T | null = target; box && box !== stage; box = box.parentElement as T | null) {
     if (box.classList?.contains('deck-big')) overSlide = true
     // The cheap reads first: only a box with room left that way is asked for its style.
     if (hasRoom(box, delta) && boxScrolls(box, overflowOf(box), delta)) return box
   }
-  return !overSlide && hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
+  if (overSlide && view === 'alone') return null
+  return hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
+}
+
+/**
+ * Where the slide's pane stands after the wheel moved the slide: at its top going on, at its end going back, so the
+ * new slide is seen from where the gesture goes on and a pane taller than its room scrolls through each slide before
+ * the next step (review of #871: kept where it was, going on showed every new slide from its foot and the next gesture
+ * skipped it).
+ */
+export function stageScrollAfter(move: -1 | 1, pane: Pick<WheelBox, 'scrollHeight' | 'clientHeight'>): number {
+  return move > 0 ? 0 : Math.max(0, pane.scrollHeight - pane.clientHeight)
 }
 
 /**
@@ -113,7 +142,8 @@ export function wheelRoute(gesture: WheelGesture, delta: number, now: number, ta
   const current = gestureAt(gesture, delta, now)
   if (current.held) return { gesture: { ...current, last: now }, move: 0, scroll: hasRoom(current.held, delta) }
   const box = !current.spent && Number.isFinite(delta) && delta !== 0 ? takerOf() : null
-  if (box) return { gesture: { sum: 0, spent: false, last: now, held: box }, move: 0, scroll: true }
+  // The browser scrolls the box while it has room (a box is taken only with room, so at the start it always has).
+  if (box) return { gesture: { sum: 0, spent: false, last: now, held: box }, move: 0, scroll: hasRoom(box, delta) }
   return { ...wheelStep(current, delta, now), scroll: false }
 }
 
