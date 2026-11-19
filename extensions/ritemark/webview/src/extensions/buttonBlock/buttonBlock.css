@@ -40,5 +40,7 @@
 
 /* ---- Both: the button's own empty words say "Button", faint, while they wait. */
 .blk-btn[data-empty] .blk-btn-text::before { content: 'Button'; opacity: .6; pointer-events: none; }
-/* The words beside it: their faint words sit at the caret, never after an empty line's break. */
-.blk-button-words[data-empty]::before { float: left; height: 0; white-space: nowrap; }
+/* The words beside it: their faint words sit at the caret, never after an empty line's break, and wrap inside the card
+   as the words do (the smoke run of 19 November): the card's full width, taking no room on the caret's line
+   (margin-right: -100%), and as tall as they are (the words are a flex item, so the float counts in its height). */
+.blk-button-words[data-empty]::before { float: left; width: 100%; margin-right: -100%; white-space: normal; overflow-wrap: anywhere; }

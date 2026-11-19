@@ -26,12 +26,9 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { TabPane, TabsBlock, tabNameOf } from './tabsMarkdown'
 import { fitTabBands } from '../../../../src/decks/blocks/tabsFit'
-import { addTab, deleteTab, duplicateTab, moveTab, paneSelection, renameTab, setPendingRename, takePendingRename } from './tabsCommands'
+import { addTab, deleteTab, duplicateTab, moveTab, paneSelection, renameTab, setPendingRename, takePendingRename, type TabAction } from './tabsCommands'
 
 export type TabsVariant = 'slide' | 'text'
-
-/** What a tab's menu does. */
-type TabAction = 'rename' | 'duplicate' | 'left' | 'right' | 'delete'
 
 interface BandProps {
   names: string[]
@@ -39,7 +36,8 @@ interface BandProps {
   renaming: number | null
   /** The band's tabs take the keyboard's focus after a change made from the keys (the arrows). */
   focusActive: number
-  onPick: (index: number) => void
+  /** A tab opened: by the keys (the arrows, Home, End: the band keeps the focus) or by the pointer. */
+  onPick: (index: number, fromKeys: boolean) => void
   onRenameStart: (index: number) => void
   onRenameEnd: (index: number, name: string | null, how: 'enter' | 'blur' | 'escape') => void
   onAction: (action: TabAction, index: number) => void
@@ -126,8 +124,13 @@ function TabBand({ names, active, renaming, focusActive, onPick, onRenameStart, 
   const dragged = useRef(false)
   const [menuFor, setMenuFor] = useState<number | null>(null)
 
+  // The open tab takes the focus only when asked (`focusActive` counted up), never because another tab opened: after a
+  // tab's menu (Delete tab, Duplicate, a move) the editor keeps it (the smoke run of 19 November).
+  const focused = useRef(focusActive)
   useEffect(() => {
-    if (focusActive > 0) tabs.current[active]?.focus()
+    if (focusActive === focused.current) return
+    focused.current = focusActive
+    tabs.current[active]?.focus()
   }, [focusActive, active])
 
   // A drag sideways moves the tab; a line in the accent shows where it lands. A press that doesn't move is a click.
@@ -175,10 +178,10 @@ function TabBand({ names, active, renaming, focusActive, onPick, onRenameStart, 
   const onKeyDown = (index: number) => (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault()
-      onPick((index + (event.key === 'ArrowRight' ? 1 : -1) + names.length) % names.length)
+      onPick((index + (event.key === 'ArrowRight' ? 1 : -1) + names.length) % names.length, true)
     } else if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault()
-      onPick(event.key === 'Home' ? 0 : names.length - 1)
+      onPick(event.key === 'Home' ? 0 : names.length - 1, true)
     } else if (event.key === 'Enter' || event.key === 'F2') {
       event.preventDefault()
       onRenameStart(index)
@@ -213,10 +216,11 @@ function TabBand({ names, active, renaming, focusActive, onPick, onRenameStart, 
                 onClick={event => {
                   if ((event.target as HTMLElement).closest('.blk-tab-dd')) return
                   if (dragged.current) { dragged.current = false; return }
-                  onPick(index)
+                  // A click while the band has the keys (after the arrows) moves them to the tab it opens.
+                  onPick(index, !!event.currentTarget.parentElement?.contains(document.activeElement))
                 }}
                 onDoubleClick={event => { if (!(event.target as HTMLElement).closest('.blk-tab-dd')) onRenameStart(index) }}
-                onContextMenu={event => { event.stopPropagation(); onPick(index) }}
+                onContextMenu={event => { event.stopPropagation(); onPick(index, false) }}
                 onKeyDown={onKeyDown(index)}
               >
                 <span className="blk-tab-words">{name}</span>
@@ -267,6 +271,8 @@ class TabsNodeView implements NodeView {
   private readonly root: Root
   private active = 0
   private renaming: number | null = null
+  /** The name being typed was asked for from the tab's menu: Esc then goes back to the editor, not to the band. */
+  private renameFromMenu = false
   private focusActive = 0
   private destroyed = false
   private fitFrame = 0
@@ -397,29 +403,45 @@ class TabsNodeView implements NodeView {
     })
   }
 
-  private pick = (index: number) => {
-    const keyboard = this.band.contains(document.activeElement)
+  private pick = (index: number, fromKeys: boolean) => {
     this.active = index
-    if (keyboard) this.focusActive++
+    if (fromKeys) this.focusActive++
     // The caret goes into the open pane, so it is where the next words go and nothing else opens another tab.
     this.intoPane(index, false)
     this.render()
   }
 
-  private startRename = (index: number) => {
+  private startRename = (index: number, fromMenu = false) => {
     this.active = index
     this.renaming = index
+    this.renameFromMenu = fromMenu
     this.render()
   }
 
   private endRename = (index: number, name: string | null, how: 'enter' | 'blur' | 'escape') => {
     this.renaming = null
+    const fromMenu = this.renameFromMenu
+    this.renameFromMenu = false
     const pos = this.pos()
     if (pos !== null && name !== null) run(this.view, renameTab(this.view.state, pos, index, name))
     this.render()
-    // Enter goes into the pane (a new block: its name typed, then its words); Esc back to the tab.
-    if (how === 'enter') this.intoPane(index, true)
+    // Enter goes into the pane (a new block: its name typed, then its words); Esc back to the tab, or to the pane when
+    // the menu asked for the name (the keys and ⌘Z are the editor's again at once).
+    if (how === 'enter' || (how === 'escape' && fromMenu)) this.toEditor(index)
     else if (how === 'escape') { this.focusActive++; this.render() }
+  }
+
+  /**
+   * After a change from the band (the tab's menu, a rename): the editor takes the keys again, so ⌘Z and typing work at
+   * once; the caret goes to pane `index` (a rename), else stays where the change put it. Once more after the menu has
+   * closed, which may otherwise leave the focus on a tab.
+   */
+  private toEditor(index: number | null) {
+    const pos = this.destroyed ? null : this.pos()
+    if (index !== null && pos !== null) this.intoPane(index, false)
+    this.view.focus()
+    const view = this.view
+    requestAnimationFrame(() => { if (!view.isDestroyed && document.activeElement !== view.dom) view.focus() })
   }
 
   private add = () => {
@@ -438,16 +460,29 @@ class TabsNodeView implements NodeView {
     }
   }
 
+  /** A move from the tab's menu: as a drag, and the editor takes the keys back, in the moved tab's pane. */
+  private moveFromMenu = (from: number, to: number) => {
+    this.move(from, to)
+    this.toEditor(null)
+  }
+
   private act = (action: TabAction, index: number) => {
     const pos = this.pos()
     if (pos === null) return
     const state = this.view.state
-    if (action === 'rename') { this.startRename(index); return }
-    if (action === 'duplicate') { if (run(this.view, duplicateTab(state, pos, index))) { this.active = index + 1; this.render() } return }
-    if (action === 'left' || action === 'right') { this.move(index, action === 'left' ? index - 1 : index + 1); return }
+    if (action === 'rename') { this.startRename(index, true); return }
+    // Each change puts the caret in its tab's pane itself (the copy, the moved tab, the one that opens after a delete, or
+    // the words left when the block dissolves): the editor only takes the keys back.
+    if (action === 'duplicate') {
+      if (run(this.view, duplicateTab(state, pos, index))) { this.active = index + 1; this.render() }
+      this.toEditor(null)
+      return
+    }
+    if (action === 'left' || action === 'right') { this.moveFromMenu(index, action === 'left' ? index - 1 : index + 1); return }
     if (action === 'delete') {
+      // The tab after it opens (the one before at the end); with one tab left the block dissolves into its words.
       run(this.view, deleteTab(state, pos, index))
-      this.view.focus()
+      this.toEditor(null)
     }
   }
 

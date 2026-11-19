@@ -58,7 +58,7 @@ Type `/` anywhere to open the command menu:
 | `/picture` | Picture from a file (`/image` works too) |
 | `/button` | A button that opens a full `https://` address in a new tab, such as a SharePoint or Drive link, with words beside it if you write them (`/link`, `/file` and `/nupp` work too) |
 
-Start typing to filter. Other words find items too, in English or Estonian: `/list` finds the lists, `/pilt` finds Picture, `/ulesanded` finds Task List. Press Enter to insert.
+Start typing to filter. Other words find items too, in English or Estonian: `/list` finds the lists, `/pilt` finds Picture, `/ulesanded` finds Task list. Press Enter to insert.
 
 ### Block Reordering
 

@@ -182,7 +182,8 @@ interface Run {
   doc: Document;
   kept: Map<string, string>;
   hash(): string;
-  key(key: string, target?: Element): void;
+  key(key: string, target?: Element, extra?: Record<string, unknown>): boolean;
+  fire(type: string): void;
   click(element: Element): void;
   on(): number;
   advance(ms: number): void;
@@ -198,7 +199,7 @@ function recordAnimations(doc: Document, played: Played[]): void {
   };
   if (!proto.getBoundingClientRect) proto.getBoundingClientRect = () => ({ width: 1440, height: 810, left: 0, top: 0 });
 }
-function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number; motion?: boolean; transition?: string; played?: Played[]; page?: string } = {}): Run {
+function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number; motion?: boolean; transition?: string; played?: Played[]; page?: string; print?: () => void } = {}): Run {
   const doc = domino.createDocument(options.page ?? html, true) as Document;
   // The page's own script element stays out: the test runs the same text itself.
   doc.querySelector('script')?.remove();
@@ -225,14 +226,20 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
     getComputedStyle: () => ({ overflowX: 'auto', direction: 'ltr' }),
     requestAnimationFrame(run: () => void) { run(); return 0; },
     cancelAnimationFrame() { /* */ },
+    print: options.print ?? (() => { /* */ }),
   };
   vm.runInNewContext(PAGE_SCRIPT, { window: win, document: doc, navigator: {} });
   return {
     doc,
     kept,
     hash: () => location.hash,
-    key(key: string, target?: Element) {
-      for (const listener of listeners.get('keydown') ?? []) listener({ key, target: target ?? doc.body, preventDefault() { /* */ }, stopPropagation() { /* */ } });
+    key(key: string, target?: Element, extra: Record<string, unknown> = {}) {
+      let prevented = false;
+      for (const listener of listeners.get('keydown') ?? []) listener({ key, target: target ?? doc.body, preventDefault() { prevented = true; }, stopPropagation() { /* */ }, ...extra });
+      return prevented;
+    },
+    fire(type: string) {
+      for (const listener of listeners.get(type) ?? []) listener({ type });
     },
     click(element: Element) {
       const event = doc.createEvent('Event');
@@ -534,4 +541,72 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
 // Nothing leaves the page: the script still loads nothing and builds no address beyond its own fragment.
 assert.ok(!/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource|navigator\.(?!clipboard)/.test(PAGE_SCRIPT), 'nothing is sent anywhere');
 
-console.log('pageScript: passed');
+// The smoke run of 19 November (E): print waits for every picture. A slide not yet shown never fetched its ground, and a
+// picture in the text waits until it is near: the page fetches them all once it has loaded, and Cmd+P (Ctrl+P) prints
+// once every picture is in (at most 3 s). With every picture in, Cmd+P is the browser's own.
+async function printWaits(): Promise<void> {
+  const ticks = async () => { for (let at = 0; at < 6; at++) await Promise.resolve(); };
+  const pictured = publicDeck([
+    '---', 'deck: 2', 'title: T', '---', '',
+    slide('# First'), '',
+    slide('---\nid: p2\npicture: right\nimage: images/room.jpg\n---\n# Second'), '',
+    '## Second', '', '![The board](images/board.png)', '',
+  ].join('\n'), { folderName: 'F', deckName: 'd', theme: BUILT_IN_THEME });
+  const page = pageHtml(pictured, assets, { digest: deckDigest(pictured), pictureUrl: (picture: string) => `pictures/${picture.replace(/^images\//, '')}` });
+  const start = (printed: { count: number }) => {
+    const run = runPage({ page, print: () => { printed.count += 1; } });
+    const pictures = Array.from(run.doc.querySelectorAll('img')) as unknown as Array<HTMLImageElement & Record<string, unknown>>;
+    for (const img of pictures) {
+      Object.defineProperty(img, 'complete', { value: false, writable: true, configurable: true });
+      Object.defineProperty(img, 'naturalWidth', { value: 0, writable: true, configurable: true });
+      Object.defineProperty(img, 'loading', { value: img.getAttribute('loading') ?? 'auto', writable: true, configurable: true });
+      Object.defineProperty(img, 'decode', { value: () => Promise.resolve(), configurable: true });
+    }
+    const arrive = () => {
+      for (const img of pictures) {
+        img.complete = true;
+        img.naturalWidth = 640;
+        const event = run.doc.createEvent('Event');
+        event.initEvent('load', false, false);
+        img.dispatchEvent(event);
+      }
+    };
+    return { run, pictures, arrive };
+  };
+  {
+    const printed = { count: 0 };
+    const { run, pictures, arrive } = start(printed);
+    assert.ok(pictures.some(img => img.closest('.prefetch')), 'the hidden slide\'s ground is a picture of its own');
+    assert.ok(pictures.some(img => img.loading === 'lazy'), 'the text\'s picture waits until it is near');
+    run.fire('load');
+    assert.ok(pictures.every(img => img.loading !== 'lazy'), 'once the page has loaded, every picture is fetched');
+    assert.equal(run.key('p', undefined, { metaKey: true }), true, 'Cmd+P with a picture still coming: the page prints itself');
+    await ticks();
+    assert.equal(printed.count, 0, 'not before the pictures are in');
+    assert.equal(run.key('p', undefined, { ctrlKey: true }), true, 'a second press while waiting prints once');
+    arrive();
+    await ticks();
+    assert.equal(printed.count, 1, 'printed once every picture is in');
+    assert.equal(run.key('p', undefined, { metaKey: true }), false, 'every picture in: the browser prints as always');
+    assert.equal(run.key('p', undefined, { metaKey: true, shiftKey: true }), false, 'another shortcut is left alone');
+  }
+  {
+    const printed = { count: 0 };
+    const { run } = start(printed);
+    assert.equal(run.key('P', undefined, { ctrlKey: true }), true);
+    run.advance(2999);
+    await ticks();
+    assert.equal(printed.count, 0);
+    run.advance(1);
+    await ticks();
+    assert.equal(printed.count, 1, 'a picture that never comes holds print 3 s at most');
+  }
+  {
+    const printed = { count: 0 };
+    const { run, pictures } = start(printed);
+    run.fire('beforeprint');
+    assert.ok(pictures.every(img => img.loading !== 'lazy'), 'a print from the menu starts them all');
+  }
+}
+
+printWaits().then(() => console.log('pageScript: passed'), (error) => { console.error(error); process.exit(1); });

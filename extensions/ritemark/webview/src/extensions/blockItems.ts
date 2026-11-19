@@ -43,11 +43,11 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Heading 1', description: 'Large heading', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, keywords: ['h1', 'title', 'pealkiri'] },
   { title: 'Heading 2', description: 'Medium heading', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, keywords: ['h2', 'title', 'pealkiri'] },
   { title: 'Heading 3', description: 'Small heading', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, keywords: ['h3', 'title', 'pealkiri'] },
-  { title: 'Bullet List', description: 'Create a bulleted list', icon: 'list', nodeType: 'bulletList', keywords: BULLET_LIST_KEYWORDS },
-  { title: 'Numbered List', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList', keywords: NUMBERED_LIST_KEYWORDS },
-  { title: 'Task List', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList', keywords: ['todo', 'checklist', 'checkbox', 'ülesanded'] },
+  { title: 'Bullet list', description: 'Create a bulleted list', icon: 'list', nodeType: 'bulletList', keywords: BULLET_LIST_KEYWORDS },
+  { title: 'Numbered list', description: 'Create a numbered list', icon: 'list-numbers', nodeType: 'orderedList', keywords: NUMBERED_LIST_KEYWORDS },
+  { title: 'Task list', description: 'Create a checklist', icon: 'check-square', nodeType: 'taskList', keywords: ['todo', 'checklist', 'checkbox', 'ülesanded'] },
   { title: 'Quote', description: 'Insert a blockquote', icon: 'quotes', nodeType: 'blockquote', keywords: ['blockquote', 'citation', 'tsitaat'] },
-  { title: 'Code Block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock', keywords: CODE_BLOCK_KEYWORDS },
+  { title: 'Code block', description: 'Insert a code block', icon: 'code', nodeType: 'codeBlock', keywords: CODE_BLOCK_KEYWORDS },
   // Sprint 138 (#481): an equation block, open for writing (experience 38, frame 5).
   { title: 'Equation', description: 'Insert an equation', icon: 'function', nodeType: 'mathBlock', keywords: ['math', 'formula', 'latex', 'valem'] },
   { title: 'Table', description: 'Insert a 3×3 table', icon: 'table', nodeType: 'table', keywords: TABLE_KEYWORDS },
@@ -55,7 +55,7 @@ export const blockItems: BlockItemDef[] = [
   { title: 'Tabs', description: 'Insert tabs, each with its own text', icon: 'tabs', nodeType: 'tabs', keywords: TABS_KEYWORDS },
   // Sprint 163 PR 3: a button that opens a full address in a new tab (the decks README, "The Button block").
   { title: 'Button', description: 'A button that opens an address', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
-  { title: 'Mermaid Diagram', description: 'Insert a mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
+  { title: 'Mermaid diagram', description: 'Insert a Mermaid diagram', icon: 'git-branch', nodeType: 'mermaid', keywords: ['mermaid', 'flowchart'] },
   { title: 'Diagram', description: 'Insert a draw.io diagram', icon: 'graph', nodeType: 'drawio', keywords: ['drawio', 'draw.io', 'chart', 'skeem'] },
   // Experience 22 (18 November): one name for a picture, as experience 49 made it one picture editor; "image" finds it.
   { title: 'Picture', description: 'Insert a picture from a file', icon: 'image', nodeType: 'image', keywords: PICTURE_KEYWORDS },

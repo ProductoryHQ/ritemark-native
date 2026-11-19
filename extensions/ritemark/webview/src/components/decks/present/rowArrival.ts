@@ -161,6 +161,26 @@ export function rowPlayer(row: RowNumbers): RowPlayer {
         played.animations.push((element as HTMLElement).animate(keyframes, { duration: ms, delay, easing, fill }))
         played.end = Math.max(played.end, delay + ms)
       }
+      // Push (the smoke run of 19 November): a piece coming in is cut only by the window's edge, never by the words' own
+      // box. The flow clips what doesn't fit (`overflow: hidden`), so for the row alone it clips above and below only,
+      // and is as it was once the last piece is in place (or the row is jumped to its end, or stopped). A flow drawn
+      // unclipped (the page's reading layout) is left as it is.
+      const flow = push && played.animations.length ? (entering.querySelector('.deck-sl.is-blocks .blk-flow') as HTMLElement | null) : null
+      const view = flow && flow.ownerDocument ? flow.ownerDocument.defaultView : null
+      // A row already open on it (the same slide arriving again) counts as clipped: its inline 'visible' is the row's own.
+      if (flow && flow.style && view && typeof view.getComputedStyle === 'function' && (flow.hasAttribute('data-row-open') || view.getComputedStyle(flow).overflow !== 'visible')) {
+        const mark = String(Number(flow.getAttribute('data-row-open') || '0') + 1)
+        flow.setAttribute('data-row-open', mark)
+        flow.style.overflow = 'visible'
+        flow.style.clipPath = 'inset(0px -100000px)'
+        Promise.all(played.animations.map(function (animation) { return animation.finished })).catch(function () { return null }).then(function () {
+          // Only the latest row puts it back (a slide arriving again before the last row ended keeps its own).
+          if (flow.getAttribute('data-row-open') !== mark) return
+          flow.removeAttribute('data-row-open')
+          flow.style.overflow = ''
+          flow.style.clipPath = ''
+        })
+      }
       return played
     },
   }

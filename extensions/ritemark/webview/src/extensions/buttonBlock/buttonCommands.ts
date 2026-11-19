@@ -7,6 +7,8 @@
  * document's history takes it as any change.
  */
 import type { Node as PMNode, ResolvedPos, Schema } from '@tiptap/pm/model'
+import { closeHistory, undo, undoDepth } from '@tiptap/pm/history'
+import { ReplaceStep } from '@tiptap/pm/transform'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { buttonDestination, isButtonAddress } from '../../../../src/decks/blocks/buttonBlock'
 import { SLIDE_COMMAND, placeBlock } from '../blockPlacement'
@@ -16,6 +18,9 @@ const OWN_STEP = SLIDE_COMMAND
 
 /** Meta on the transaction that adds a button: its address sheet opens at once (`ButtonBlockTools`). */
 export const BUTTON_ASK = 'buttonAskAddress'
+/** Meta on the transaction that takes away a new button left without an address (`dropNewButton`): a slide writes it
+ *  to the deck out of the undo history too. */
+export const BUTTON_DROP = 'buttonDropNew'
 
 export const BUTTON_NODE = 'buttonBlock'
 export const BUTTON_WORDS_NODE = 'buttonWords'
@@ -106,7 +111,89 @@ export function insertButton(tr: Transaction, at: number): Transaction {
   const placed = placeBlock(tr, at, buttonNode(tr.doc.type.schema))
   if (placed < 0) return tr
   tr.setSelection(TextSelection.create(tr.doc, placed + 2))
+  // An undo step of its own in a Text document (never joined to the typing before it), so a new button left without an
+  // address can be taken back exactly (`takeBackNewButton`).
+  closeHistory(tr)
   return tr.setMeta(OWN_STEP, true).setMeta(BUTTON_ASK, true).scrollIntoView()
+}
+
+/** The address sheet's width (`buttonBlock.css`: 360, never wider than the window less 8 a side). */
+export function sheetWidth(windowWidth: number): number {
+  return Math.max(0, Math.min(360, windowWidth - 16))
+}
+
+/**
+ * Where the address sheet's left edge goes (the smoke run of 19 November; the Experience lead): under the button's card,
+ * lined up with its left edge; where that would run past the editor's right edge (a card in a right-hand box), lined up
+ * with the card's right edge instead. Never out of the editor's visible area (`bounds`, 8 in from the window's edges), so
+ * Done is always in view.
+ */
+export function sheetLeft(card: { left: number; right: number }, width: number, bounds: { left: number; right: number }): number {
+  const left = card.left + width <= bounds.right ? card.left : card.right - width
+  return Math.max(bounds.left, Math.min(left, bounds.right - width))
+}
+
+/**
+ * A new button left before it has an address (its sheet closed with Esc or a press elsewhere): taken away as if it had
+ * never been added, so no empty button is written. Out of the undo history (`addToHistory: false`), so ⌘Z never brings
+ * the empty button back. Null when the button has an address, or isn't there.
+ */
+export function dropNewButton(state: EditorState, pos: number): Transaction | null {
+  const node = buttonAtPos(state, pos)
+  if (!node || String(node.attrs.href ?? '')) return null
+  const tr = deleteButton(state, pos)
+  return tr ? tr.setMeta(OWN_STEP, false).setMeta('addToHistory', false).setMeta(BUTTON_DROP, true) : null
+}
+
+/**
+ * A new button as it was added (`BUTTON_ASK`): where, the editor's undo depth just after it (0 with no history of its
+ * own: a slide's, whose history is the deck's), and the `/` words its adding took away, if any.
+ */
+export interface NewButton {
+  pos: number
+  depth: number
+  query: { from: number; to: number; text: string } | null
+}
+
+/** Read off the transaction that added a button, in the state just after it. */
+export function newButtonOf(transaction: Transaction, after: EditorState, pos: number): NewButton {
+  const first = transaction.steps[0]
+  const query = first instanceof ReplaceStep && first.slice.size === 0 && first.from < first.to
+    ? { from: first.from, to: first.to, text: transaction.docs[0].textBetween(first.from, first.to) }
+    : null
+  return { pos, depth: undoDepth(after), query }
+}
+
+/**
+ * A new button left before it has an address (the smoke run of 19 November; the Experience lead: no dead ⌘Z). When
+ * nothing has changed since it was added, its own undo step is undone, and the `/` words that step had taken away go
+ * again, out of the history: no step is left, and the next ⌘Z brings back the person's last change. Otherwise (an edit
+ * came in meanwhile, or the editor keeps no history) it goes as `dropNewButton` takes it. False: it was not there.
+ */
+export function takeBackNewButton(view: { state: EditorState; dispatch: (tr: Transaction) => void }, added: NewButton, exact: boolean): boolean {
+  const node = buttonAtPos(view.state, added.pos)
+  if (!node || String(node.attrs.href ?? '')) return false
+  if (exact && added.depth > 0 && undoDepth(view.state) === added.depth && undo(view.state, view.dispatch)) {
+    const query = added.query
+    const state = view.state
+    if (query && query.to <= state.doc.content.size && state.doc.textBetween(query.from, query.to) === query.text) {
+      // The `/` words came back with that undo. Typed as a step of their own, they are undone too; typed with other
+      // words, they go out of the history, and the step keeps the other words for the next ⌘Z.
+      let typed: Transaction | null = null
+      undo(state, tr => { typed = tr })
+      const step = (typed as Transaction | null)?.steps.length === 1 ? (typed as unknown as Transaction).steps[0] : null
+      if (typed && step instanceof ReplaceStep && step.from === query.from && step.to === query.to && step.slice.size === 0) view.dispatch(typed)
+      else {
+        const tr = state.tr.delete(query.from, query.to).setMeta('addToHistory', false)
+        view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(query.from))))
+      }
+    }
+    return true
+  }
+  const drop = dropNewButton(view.state, added.pos)
+  if (!drop) return false
+  view.dispatch(drop)
+  return true
 }
 
 /** Where the caret is: in a button's words beside it, or on its button, with the button around it. */

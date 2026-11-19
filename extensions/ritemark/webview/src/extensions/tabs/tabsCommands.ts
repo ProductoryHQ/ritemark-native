@@ -235,6 +235,10 @@ export function deleteTab(state: EditorState, pos: number, index: number): Trans
   return step(intoPane(tr, pos, Math.min(index, block.childCount - 2)))
 }
 
+/** What a tab's menu does. */
+export type TabAction = 'rename' | 'duplicate' | 'left' | 'right' | 'delete'
+
+
 /** The block taken away, tab `index`'s blocks left where it was. */
 export function dissolveTabs(state: EditorState, pos: number, index: number): Transaction | null {
   const block = tabsAt(state, pos)

@@ -104,4 +104,18 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
   assert.equal(pictureFileInside('/p/docs', '/p', outside, posix), null, String(outside));
 }
 
+// The smoke run of 19 November (E): a slide's ground (its picture on the side or Behind) is drawn as a background, which
+// a hidden slide never fetches, so a first print could miss it. The page carries each ground once more as a hidden
+// picture, which loads with the page; nothing new is named (the same address), and the second slide's too.
+{
+  const photo = root.querySelector('.layer .deck-sl .photo')!.getAttribute('style') ?? '';
+  const ground = /background-image:url\("(.*?)"\)/.exec(photo)![1];
+  const kept = Array.from(root.querySelectorAll('.prefetch[hidden] img')).map(img => img.getAttribute('src'));
+  assert.deepEqual(kept, [ground], 'the ground, once, as a hidden picture');
+  assert.equal(root.querySelector('.prefetch')!.getAttribute('aria-hidden'), 'true');
+  assert.equal(root.querySelectorAll('.prefetch img[loading="lazy"]').length, 1, 'never before the page\'s first paint: the script fetches them once it has loaded');
+  const none = pageHtml(publicDeck('---\ndeck: 2\n---\n\n```slide\n# No picture\n```\n', { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest: 'd', pictureUrl });
+  assert.ok(!none.includes('class="prefetch"'), 'no ground, no hidden pictures');
+}
+
 console.log('pagePictures: passed');

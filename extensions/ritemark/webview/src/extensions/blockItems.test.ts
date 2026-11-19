@@ -42,15 +42,15 @@ assert.deepEqual(titles(SLIDE_ITEMS, 'img'), ['Picture'])
 
 // The start of any word of the name: "/list" finds both lists, in the menu's order.
 assert.deepEqual(titles(SLIDE_ITEMS, 'list'), ['Bullet list', 'Numbered list'])
-assert.deepEqual(titles(text, 'list'), ['Bullet List', 'Numbered List', 'Task List'])
+assert.deepEqual(titles(text, 'list'), ['Bullet list', 'Numbered list', 'Task list'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'below'), ['New slide below'])
 // Only the start of a word: "ist" is inside "list", not at a word's start.
 assert.deepEqual(titles(text, 'ist'), [])
 
-// Case and accents: "tapploend" finds täpploend, "ulesanded" finds Task List, "PAEVAKAVA" finds Agenda.
+// Case and accents: "tapploend" finds täpploend, "ulesanded" finds Task list, "PAEVAKAVA" finds Agenda.
 assert.deepEqual(titles(SLIDE_ITEMS, 'tapploend'), ['Bullet list'])
-assert.deepEqual(titles(text, 'täpploend'), ['Bullet List'])
-assert.deepEqual(titles(text, 'ulesanded'), ['Task List'])
+assert.deepEqual(titles(text, 'täpploend'), ['Bullet list'])
+assert.deepEqual(titles(text, 'ulesanded'), ['Task list'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'PAEVAKAVA'), ['Agenda'])
 assert.deepEqual(titles(text, 'PiCtU'), ['Picture'])
 
@@ -65,7 +65,7 @@ assert.deepEqual(titles(SLIDE_ITEMS, 'h1'), ['Title'])
 
 // Names that start with the query come first, then the other matches, each in the menu's own order.
 assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Code block', 'Tabs', 'Agenda', 'Picture', 'New slide below'])
-assert.deepEqual(titles(text, 'ta'), ['Task List', 'Table', 'Tabs', 'Bullet List'])
+assert.deepEqual(titles(text, 'ta'), ['Task list', 'Table', 'Tabs', 'Bullet list'])
 assert.deepEqual(titles(text, 'title'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'grid'), ['Boxes', 'Table'])
 

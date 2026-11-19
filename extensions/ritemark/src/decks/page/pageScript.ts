@@ -720,6 +720,37 @@ const PAGE_BEHAVIOUR = String.raw`
   finished();
   if (returned !== null) offerRestart();
   if (doc.fonts && doc.fonts.ready) doc.fonts.ready.then(function () { layout(); });
+
+  // ---- print waits for every picture (the smoke run of 19 November: a first print once had a flat panel where a
+  // picture was). A slide not yet shown is hidden, so its picture on the side or Behind was never fetched; the page
+  // carries each such picture once more, hidden (\`.prefetch\`), and once the page has loaded they are all fetched, with
+  // the text's pictures that wait until they are near. Cmd+P (Ctrl+P) prints once every picture is in (at most 3 s, so
+  // the print still follows the key press); a print from the browser's menu finds them in, or starts them
+  // (\`beforeprint\`).
+  var PRINT_WAIT_MS = 3000;
+  var pictures = function () { return list(doc.querySelectorAll('img')); };
+  var eagerPictures = function () { pictures().forEach(function (img) { if (img.loading === 'lazy') img.loading = 'eager'; }); };
+  var picturesIn = function () {
+    return Promise.all(pictures().map(function (img) {
+      if (img.complete && img.naturalWidth > 0) return typeof img.decode === 'function' ? img.decode().catch(function () { return null; }) : null;
+      if (img.complete) return null;
+      return new Promise(function (done) { img.addEventListener('load', done, { once: true }); img.addEventListener('error', done, { once: true }); });
+    }));
+  };
+  var printing = false;
+  window.addEventListener('load', eagerPictures);
+  window.addEventListener('beforeprint', eagerPictures);
+  window.addEventListener('keydown', function (event) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || String(event.key).toLowerCase() !== 'p') return;
+    var waiting = pictures().some(function (img) { return !img.complete; });
+    if (!waiting && !printing) return;
+    event.preventDefault();
+    if (printing) return;
+    printing = true;
+    eagerPictures();
+    var waited = new Promise(function (done) { window.setTimeout(done, PRINT_WAIT_MS); });
+    Promise.race([picturesIn(), waited]).then(function () { printing = false; window.print(); });
+  }, true);
 `;
 
 /** The whole script, in its own scope. */

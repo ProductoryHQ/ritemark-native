@@ -14,11 +14,11 @@ Every piece of content in Ritemark is a "block" - a paragraph, heading, list, or
 | Heading 1 | `/heading1` | Large section title |
 | Heading 2 | `/heading2` | Subsection title |
 | Heading 3 | `/heading3` | Minor heading |
-| Bullet List | `/bullet` | Unordered list |
-| Numbered List | `/numbered` | Ordered list |
-| Task List | `/task` | Checklist with checkboxes |
+| Bullet list | `/bullet` | Unordered list |
+| Numbered list | `/numbered` | Ordered list |
+| Task list | `/task` | Checklist with checkboxes |
 | Blockquote | `/quote` | Quoted text |
-| Code Block | `/code` | Syntax-highlighted code |
+| Code block | `/code` | Syntax-highlighted code |
 | Equation | `/equation` | A formula, written in LaTeX and shown typeset |
 | Table | `/table` | Grid of rows and columns |
 | Divider | `/divider` | Horizontal line |
@@ -50,7 +50,7 @@ Three heading levels for document structure:
 
 ## Lists
 
-### Bullet Lists
+### Bullet lists
 
 Unordered lists for items without sequence:
 
@@ -64,7 +64,7 @@ Unordered lists for items without sequence:
 
 **Shortcut:** Cmd+Shift+8
 
-### Numbered Lists
+### Numbered lists
 
 Ordered lists for sequential items:
 
@@ -78,7 +78,7 @@ Ordered lists for sequential items:
 
 **Shortcut:** Cmd+Shift+7
 
-### Task Lists
+### Task lists
 
 Checklists with toggleable checkboxes:
 
@@ -114,7 +114,7 @@ Blockquotes appear in gray italic styling.
 
 ---
 
-## Code Blocks
+## Code blocks
 
 For code with syntax highlighting:
 

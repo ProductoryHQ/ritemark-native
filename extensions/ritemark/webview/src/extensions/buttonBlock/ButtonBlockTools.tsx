@@ -7,8 +7,10 @@
  *    stage size, so it goes in `document.body`, as the slide block's bar does, and follows its button.
  *  - **The sheet:** the address, "A full address, such as a SharePoint or Drive link. It opens in a new tab." An address
  *    that isn't a full https one is refused: "Use a full address that starts with https://". Done or Enter keeps it and
- *    puts the caret on the button's words; Esc or a press outside leaves the address as it was.
- *  - A new button (`BUTTON_ASK`) opens its sheet at once.
+ *    puts the caret on the button's words; Esc or a press outside leaves the address as it was. The sheet lines up with
+ *    the card's left edge, or its right edge where it would run past the editor's (`sheetLeft`): Done is always in view.
+ *  - A new button (`BUTTON_ASK`) opens its sheet at once. Left with Esc or a press outside before it has an address, it
+ *    goes, as if it had never been added (`dropNewButton`; the smoke run of 19 November).
  *
  * Every button has a tooltip and one line of words; a press on the bar never takes the caret out of the editor. ⌘Z is
  * the editor's (a slide's: the deck's): each change is an undo step of its own.
@@ -23,7 +25,7 @@ import { Button } from '../../components/ui/button'
 import { Tooltip } from '../../components/ui/tooltip'
 import { Icon } from '../../components/ui/Icon'
 import { useDismissOnOutside } from '../../lib/dismissOnOutside'
-import { BUTTON_ASK, buttonAt, deleteButton, setButtonAddress } from './buttonCommands'
+import { BUTTON_ASK, BUTTON_DROP, buttonAt, deleteButton, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton, type NewButton } from './buttonCommands'
 import { unchooseButton } from './ButtonBlock'
 import './buttonBlock.css'
 
@@ -31,17 +33,25 @@ import './buttonBlock.css'
 const GAP = 12
 /** Between the bar and the sheet. */
 const SHEET_GAP = 8
+/** The chosen button's ring, out from its card: every chosen block's (`blockBar.ringGap`). */
+const RING_GAP = 8
 
 export interface ButtonBlockToolsProps {
   editor: TipTapEditor | null
   /** The slide's frame (a slide editor's): the bar goes over the button at the slide's foot. A Text document: none. */
   frame?: HTMLElement | null
+  /**
+   * A slide's: take a new button back through the deck's own history (its adding is the deck's last undo step), so no
+   * step is left. False when that can't be done exactly; the button then goes as `dropNewButton` takes it.
+   */
+  takeBackNew?: () => boolean
 }
 
 interface Placed {
   pos: number
   href: string
   left: number
+  right: number
   top: number
   bottom: number
 }
@@ -53,10 +63,14 @@ export function openButtonAddress(href: string): boolean {
   return true
 }
 
-export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps) {
+export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBlockToolsProps) {
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [focused, setFocused] = useState(false)
-  const [sheet, setSheet] = useState<{ pos: number } | null>(null)
+  /**
+   * The open sheet; for a new button (just added, no address yet), how it was added, and whether nothing else has
+   * changed since (`exact`: its adding can be undone as it was).
+   */
+  const [sheet, setSheet] = useState<{ pos: number; added: NewButton | null; exact: boolean } | null>(null)
   const [draft, setDraft] = useState('')
   const [refused, setRefused] = useState(false)
   const [barAt, setBarAt] = useState<{ left: number; top: number; above: boolean } | null>(null)
@@ -75,8 +89,8 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
       return
     }
     const rect = dom.getBoundingClientRect()
-    const next: Placed = { pos: found.pos, href: String(found.node.attrs.href ?? ''), left: rect.left, top: rect.top, bottom: rect.bottom }
-    setPlaced(current => (current && current.pos === next.pos && current.href === next.href && current.left === next.left && current.top === next.top && current.bottom === next.bottom ? current : next))
+    const next: Placed = { pos: found.pos, href: String(found.node.attrs.href ?? ''), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+    setPlaced(current => (current && current.pos === next.pos && current.href === next.href && current.left === next.left && current.right === next.right && current.top === next.top && current.bottom === next.bottom ? current : next))
   }, [editor])
 
   useEffect(() => {
@@ -90,10 +104,17 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
         // Measured now, with the sheet: a sheet whose button isn't placed yet would close at once.
         measure()
         if (found) {
-          setSheet({ pos: found.pos })
+          setSheet({ pos: found.pos, added: newButtonOf(transaction, editor.state, found.pos), exact: true })
           setDraft(String(found.node.attrs.href ?? ''))
           setRefused(false)
         }
+      } else if (transaction.docChanged && !transaction.getMeta(BUTTON_DROP)) {
+        // Anything else changed: the sheet follows its button, and its adding is no longer the last step.
+        setSheet(current => {
+          if (!current) return current
+          const pos = transaction.mapping.map(current.pos)
+          return { pos, added: current.added ? { ...current.added, pos } : null, exact: false }
+        })
       }
       later()
     }
@@ -119,10 +140,6 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
     }
   }, [editor, measure])
 
-  // The sheet belongs to its button: the caret leaving it (another button, other words) closes it.
-  useEffect(() => {
-    if (sheet && (!placed || placed.pos !== sheet.pos)) setSheet(null)
-  }, [placed, sheet])
 
   const showing = !!placed && (focused || !!sheet)
 
@@ -146,14 +163,37 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
     return () => cancelAnimationFrame(id)
   }, [sheet])
 
+  /** A new button left before it has an address goes, leaving no undo step (one that has an address keeps it). */
+  const takeBack = useCallback((was: { pos: number; added: NewButton | null; exact: boolean } | null): boolean => {
+    if (!editor || editor.isDestroyed || !was?.added) return false
+    const node = editor.state.doc.nodeAt(was.pos)
+    if (!node || node.type.name !== 'buttonBlock' || String(node.attrs.href ?? '')) return false
+    if (was.exact && takeBackNew?.()) return true
+    return takeBackNewButton(editor.view, was.added, was.exact)
+  }, [editor, takeBackNew])
+
+  // The sheet belongs to its button: the caret leaving it (another button, other words) closes it, and a new button
+  // left so goes too.
+  useEffect(() => {
+    if (sheet && (!placed || placed.pos !== sheet.pos)) {
+      setSheet(null)
+      takeBack(sheet)
+    }
+  }, [placed, sheet, takeBack])
+
   const closeSheet = useCallback((refocus: boolean) => {
+    const was = sheet
     setSheet(null)
     setRefused(false)
     if (!editor || editor.isDestroyed) return
+    if (takeBack(was)) {
+      if (refocus) editor.view.focus()
+      return
+    }
     if (refocus) editor.view.focus()
     // A press elsewhere: the focus went with it, so the button is no longer chosen.
     else if (!editor.view.hasFocus()) unchooseButton(editor.view)
-  }, [editor])
+  }, [editor, sheet, takeBack])
 
   useDismissOnOutside(sheetRef, () => closeSheet(false), { trigger: () => addressRef.current, enabled: !!sheet })
 
@@ -188,12 +228,21 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
 
   const canOpen = isButtonAddress(placed.href)
   const hidden = barAt ? {} : { visibility: 'hidden' as const }
+  const sheetAt = sheetLeft(placed, sheetWidth(window.innerWidth), { left: 8, right: window.innerWidth - 8 })
   const sheetStyle = barAt
-    ? (barAt.above ? { left: barAt.left, top: barAt.top - SHEET_GAP, transform: 'translateY(-100%)' } : { left: barAt.left, top: barAt.top + (barRef.current?.offsetHeight ?? 38) + SHEET_GAP })
+    ? (barAt.above ? { left: sheetAt, top: barAt.top - SHEET_GAP, transform: 'translateY(-100%)' } : { left: sheetAt, top: barAt.top + (barRef.current?.offsetHeight ?? 38) + SHEET_GAP })
     : { visibility: 'hidden' as const }
+
+  // On a slide, the chosen button's ring is every chosen block's (`.deck-block-ring`, 8 px out, in the frame), not
+  // an amber outline of its own (the Experience lead, 19 November).
+  const origin = frame ? frame.getBoundingClientRect() : null
+  const ring = frame && origin
+    ? createPortal(<div className="deck-block-ring" style={{ left: placed.left - origin.left - RING_GAP, top: placed.top - origin.top - RING_GAP, width: placed.right - placed.left + RING_GAP * 2, height: placed.bottom - placed.top + RING_GAP * 2 }} aria-hidden="true" />, frame)
+    : null
 
   return createPortal(
     <>
+      {ring}
       <div ref={barRef} className="btn-block-bar" role="toolbar" aria-label="The button" style={{ left: barAt?.left ?? 0, top: barAt?.top ?? 0, ...hidden }}>
         <Tooltip label={BUTTON_WORDS.addressTip}>
           <span ref={addressRef} className="inline-flex">
@@ -207,7 +256,7 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
                 if (sheet) { closeSheet(true); return }
                 setDraft(placed.href)
                 setRefused(false)
-                setSheet({ pos: placed.pos })
+                setSheet({ pos: placed.pos, added: null, exact: false })
               }}
             >
               <Icon name="link" size={16} tone="inherit" />

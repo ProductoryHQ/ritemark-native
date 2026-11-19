@@ -237,6 +237,22 @@ test('Delete tab takes the tab and its pane without asking, and ⌘Z brings them
   assert.equal(save(restored!), TABS)
 })
 
+test('after the tab\'s menu the caret is in the chosen tab\'s pane, so ⌘Z there brings a deleted tab back (the smoke run of 19 November)', () => {
+  let state = stateOf(TABS)
+  const pos = firstTabs(state)
+  // Delete tab: the tab after it opens, the caret in its pane (the editor then takes the keys, TabsView.toEditor).
+  state = apply(state, deleteTab(state, pos, 1))
+  assert.equal(state.doc.resolve(state.selection.from).node(2).attrs.line, '## 3 · Picture', 'the caret is in the pane that opened')
+  let restored: EditorState | null = null
+  undo(state, tr => { restored = state.apply(tr) })
+  assert.equal(save(restored!), TABS, '⌘Z, with the caret in the editor, brings the tab back')
+  // Duplicate and a move: the caret in the copy, in the moved tab.
+  const copied = apply(stateOf(TABS), duplicateTab(stateOf(TABS), pos, 0))
+  assert.equal(copied.doc.resolve(copied.selection.from).node(2).attrs.line, '## 1 · Plan copy')
+  const moved = apply(stateOf(TABS), moveTab(stateOf(TABS), pos, 2, 1))
+  assert.equal(moved.doc.resolve(moved.selection.from).node(2).attrs.line, '## 3 · Picture')
+})
+
 test('with one tab left the block dissolves: that tab\'s blocks stay as ordinary blocks, and ⌘Z brings the block back', () => {
   let state = stateOf(`# Title\n\n${newTabsetMarkdown(['Only', 'Gone'])}`)
   const pos = firstTabs(state)

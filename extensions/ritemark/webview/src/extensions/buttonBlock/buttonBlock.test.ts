@@ -9,9 +9,13 @@
  *  - the hidden words find Button in both / menus, after Tabs; a Button works in a Tabs pane.
  */
 import { strict as assert } from 'node:assert'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
-import { EditorState, TextSelection } from '@tiptap/pm/state'
+import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { history, undo } from '@tiptap/pm/history'
 import { createDocument } from '@mixmark-io/domino'
 import { canonicalMarkdownProjection } from '../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../src/editorSync/frontMatter'
@@ -26,7 +30,7 @@ import { DeckSlide } from '../../components/decks/handout/deckSchema'
 import { loadSlide, saveSlide } from '../../components/decks/blocks/slideEditorHarness'
 import { SLIDE_ITEMS } from '../../components/decks/blocks/slideCommands'
 import { blockItems, filterSlashItems } from '../blockItems'
-import { BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, deleteButton, insertButton, labelEnd, setButtonAddress } from './buttonCommands'
+import { BUTTON_DROP, BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, deleteButton, dropNewButton, insertButton, labelEnd, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton } from './buttonCommands'
 import type { Tokens } from 'marked'
 
 installTestDocument()
@@ -265,6 +269,108 @@ for (const form of FORMS) {
   const named = setButtonAddress(EditorState.create({ doc: tr.doc, selection: tr.selection }), placed.pos, 'https://example.com/a.pdf')!
   const label = EditorState.create({ doc: named.doc, selection: named.selection }).tr.insertText('Open the sample')
   assert.equal(saveSlide(label.doc), '# Exercise\n\nText\n\n[Open the sample](https://example.com/a.pdf){.button}')
+}
+
+// The smoke run of 19 November (B): a new button left before it has an address (Esc, a press elsewhere) goes, as if it
+// had never been added: the slide is written as it was, out of the undo history. One with an address keeps it.
+{
+  const before = '# Exercise\n\nText'
+  const state = EditorState.create({ doc: loadSlide(before) })
+  const tr = state.tr.insert(state.doc.content.size, state.schema.nodes.paragraph.create())
+  insertButton(tr, tr.doc.content.size - 1)
+  const added = EditorState.create({ doc: tr.doc, selection: tr.selection })
+  const placed = buttonAt(added)!
+  assert.equal(saveSlide(added.doc), '# Exercise\n\nText\n\n[](){.button}')
+  const dropped = dropNewButton(added, placed.pos)!
+  assert.ok(dropped, 'an empty new button is taken away')
+  assert.equal(saveSlide(dropped.doc), before, 'no empty button is written')
+  assert.equal(dropped.getMeta('addToHistory'), false, '⌘Z never brings the empty button back')
+  assert.equal(dropped.getMeta(BUTTON_DROP), true, 'a slide writes it out of the deck\'s history too')
+  assert.equal(dropped.getMeta('deckSlideCommand'), false, 'not an undo step of its own')
+  // With an address: Esc keeps it.
+  const named = setButtonAddress(added, placed.pos, 'https://example.com/a.pdf')!
+  assert.equal(dropNewButton(EditorState.create({ doc: named.doc, selection: named.selection }), placed.pos), null, 'a button with an address stays')
+  assert.equal(dropNewButton(added, placed.pos + 1), null, 'nothing that isn\'t a button')
+}
+
+// The Experience lead (19 November): no dead ⌘Z. A new button left without an address leaves no undo step at all: the
+// next ⌘Z brings back the person's last real change. In a Text document, its own history: the button's step is undone,
+// and the `/button` words with it (their own step, or out of the history when typed with other words).
+{
+  const opened = openDocument('Intro\n')
+  type View = { state: EditorState; dispatch: (tr: Transaction) => void }
+  const viewOf = (state: EditorState): View => { const view: View = { state, dispatch: tr => { view.state = view.state.apply(tr) } }; return view }
+  const typeAt = (view: View, text: string, at: number, gap: number) => {
+    // Typing, as the editor's history groups it: a pause of `gap` ms before it.
+    view.dispatch(view.state.tr.insertText(text, at).setTime(Date.now() + gap))
+  }
+  const slashButton = (view: View, from: number, to: number) => {
+    const tr = view.state.tr.delete(from, to)
+    insertButton(tr, from)
+    view.dispatch(tr)
+    return tr
+  }
+  const scenarios: Array<{ name: string; slashTogether: boolean }> = [{ name: '/button typed on its own', slashTogether: false }, { name: '/button typed with other words', slashTogether: true }]
+  for (const { name, slashTogether } of scenarios) {
+    const view = viewOf(EditorState.create({ doc: opened.doc, plugins: [history()] }))
+    const end = view.state.doc.content.size
+    view.dispatch(view.state.tr.insert(end, view.state.schema.nodes.paragraph.create()).setMeta('addToHistory', false))
+    const line = view.state.doc.content.size - 1
+    typeAt(view, 'Words ', line, 0)
+    const before = saveDocument(opened, view.state.doc)
+    // `/button` right after the words (one step with them), or after a pause (a step of its own).
+    typeAt(view, '/button', line + 6, slashTogether ? 10 : 5000)
+    const added = slashButton(view, line + 6, line + 13)
+    const placed = buttonAt(view.state)!
+    assert.equal(saveDocument(opened, view.state.doc).includes('{.button}'), true, name)
+    const record = newButtonOf(added, view.state, placed.pos)
+    assert.deepEqual(record.query, { from: line + 6, to: line + 13, text: '/button' }, name)
+    assert.ok(takeBackNewButton(view, record, true), name)
+    assert.equal(saveDocument(opened, view.state.doc), before, `${name}: as if never added, the /button words gone too`)
+    // The next ⌘Z takes back the words typed before: the person's last real change, never a step that does nothing.
+    const back = undo(view.state, tr => view.dispatch(tr))
+    assert.ok(back, name)
+    assert.ok(!saveDocument(opened, view.state.doc).includes('Words'), `${name}: ⌘Z took back "Words"`)
+  }
+  // An edit came in meanwhile (not exact): the button still goes, out of the history.
+  {
+    const view = viewOf(EditorState.create({ doc: opened.doc, plugins: [history()] }))
+    const tr = view.state.tr.insert(view.state.doc.content.size, view.state.schema.nodes.paragraph.create())
+    insertButton(tr, tr.doc.content.size - 1)
+    view.dispatch(tr)
+    const placed = buttonAt(view.state)!
+    const record = newButtonOf(tr, view.state, placed.pos)
+    assert.ok(takeBackNewButton(view, record, false))
+    assert.ok(!saveDocument(opened, view.state.doc).includes('{.button}'), 'no empty button left')
+  }
+}
+
+// The Experience lead (19 November): one ring for every chosen block. The chosen button on a slide has the indigo
+// `.deck-block-ring` the other blocks have (drawn in the frame); amber stays the words' focus only.
+{
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const slideCss = fs.readFileSync(path.join(here, '../../components/decks/slide/slide.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  assert.ok(!/\.blk-button\.is-chosen\s*\{[^}]*outline/.test(slideCss), 'no amber outline of the button\'s own')
+  const tools = fs.readFileSync(path.join(here, 'ButtonBlockTools.tsx'), 'utf8')
+  assert.ok(tools.includes('className="deck-block-ring"') && tools.includes(', frame)'), 'the shared ring, in the slide\'s frame')
+  const decksCss = fs.readFileSync(path.join(here, '../../components/decks/decks.css'), 'utf8')
+  assert.ok(/\.deck-block-ring \{[^}]*var\(--r-accent\)/.test(decksCss), 'the ring is the app\'s accent (indigo)')
+}
+
+// (B) The address sheet lines up with the card's left edge; where that would run past the editor's right edge (a
+// right-hand box), with its right edge; never out of the editor's visible area, so Done is in view.
+{
+  const bounds = { left: 8, right: 1432 }
+  assert.equal(sheetWidth(1440), 360)
+  assert.equal(sheetWidth(300), 284, 'never wider than the window less 8 a side')
+  assert.equal(sheetLeft({ left: 200, right: 700 }, 360, bounds), 200, 'room: the card\'s left edge')
+  assert.equal(sheetLeft({ left: 1150, right: 1400 }, 360, bounds), 1040, 'a right-hand box: the card\'s right edge')
+  assert.equal(sheetLeft({ left: 1300, right: 1500 }, 360, bounds), 1072, 'a card past the edge: inside the editor')
+  assert.equal(sheetLeft({ left: -40, right: 100 }, 360, bounds), 8, 'never past the left edge either')
+  for (const card of [{ left: 1150, right: 1400 }, { left: 1300, right: 1500 }, { left: 0, right: 1440 }]) {
+    const left = sheetLeft(card, 360, bounds)
+    assert.ok(left >= bounds.left && left + 360 <= bounds.right, `Done in view for ${JSON.stringify(card)}`)
+  }
 }
 
 // The keys: Enter in the button's words ends them; the block's two parts never join.

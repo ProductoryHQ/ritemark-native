@@ -196,4 +196,20 @@ const icons = { copy: '<svg data-i="copy"></svg>', check: '<svg data-i="check"><
   assert.ok(off.includes('class="cb-copy"') && !off.includes('class="cb-open"') && !off.includes('claude.ai'), 'open-in: none: no ↗ and no link anywhere')
 }
 
+// ---- The smoke run of 19 November (C): hovering Copy or the ↗ draws no edit ring. The code tools are
+// `contenteditable="false"`, which `[contenteditable]` matches too: every rule of the slide's for any edited part (the ring,
+// the focus ring, the text cursor, the faint words) leaves those parts out, at the rule's old weight.
+{
+  const here = path.dirname(fileURLToPath(import.meta.url))
+  const slideCss = fs.readFileSync(path.join(here, '../slide/slide.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  const generic = slideCss.split('}').map(rule => rule.split('{')[0].trim()).flatMap(selectors => selectors.split(',').map(one => one.trim()))
+    .filter(selector => / \[contenteditable\]/.test(selector))
+  assert.ok(generic.length >= 7, 'the ring, focus, cursor and faint-word rules, Evening and Borderless')
+  for (const selector of generic) assert.ok(selector.includes('[contenteditable]:where(:not([contenteditable="false"]))'), `"${selector}" leaves out the parts the editor keeps out`)
+  assert.ok(generic.some(selector => selector.endsWith(':hover')) && generic.some(selector => selector.includes('is-borderless') && selector.endsWith(':hover')), 'both hover rings')
+  // The stage's code tools are such a part.
+  const codeBlockSource = fs.readFileSync(path.join(here, '../../CodeBlockWithCopy.tsx'), 'utf8')
+  assert.ok(codeBlockSource.includes('<span className="cb-tools" contentEditable={false}>'), 'the stage\'s Copy and ↗ are kept out of the editing')
+}
+
 console.log('slideCodeBlock: passed')
