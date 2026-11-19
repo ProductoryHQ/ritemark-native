@@ -73,3 +73,7 @@ One line per PR, in plain words, written with the `release-notes` skill:
 
 ## Approval
 - [ ] The Development manager and the Experience lead approved this sprint plan (delegated by Jarmo; pending)
+
+## The Experience lead's answers (19 November, with the approval)
+
+Until PR 2 and PR 3 merge, the ▾ shows the kind that exists: "Save slides and handout as PDF…" in every view, naming truthfully what it saves; once all three kinds exist, the item follows the view. Never a menu that holds only Publish…, never a stub. If PR 0 finds the print path needs a patch, Sprint 170 stays in 2.3 (a shell release anyway). Shots for each PR before merge, synthetic decks only.
