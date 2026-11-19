@@ -1002,8 +1002,8 @@ export function DeckView({
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const delta = wheelPixels(event, stage.clientHeight)
       // A pane or a column that holds more than its room scrolls first; in Slide only so does the stage under the empty
-      // bands while it can (a short window), and beside the handout the bands are always the stage's; everything else
-      // moves the slide, one per gesture (#824, #855). What is under the pointer is asked only while the gesture is
+      // bands while it can (a short window); beside the handout the bands are always the stage's, and so is the slide
+      // while the stage, shorter than the slide, can scroll; everything else moves the slide, one per gesture (#824, #855). What is under the pointer is asked only while the gesture is
       // undecided, not through a flick's momentum.
       const takerOf = () => wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY, stageWheel)
       const route = wheelRoute(gesture, delta, event.timeStamp, takerOf)

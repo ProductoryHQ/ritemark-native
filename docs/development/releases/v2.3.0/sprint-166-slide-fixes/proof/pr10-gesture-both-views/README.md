@@ -41,6 +41,7 @@ Rows 1 to 8 start from slide 1, chosen on the strip; rows 9 to 11 from slide 2; 
 **What stays as it was:**
 - Over the handout's text (rows 12–19) the wheel scrolls the text, and the slide follows the part being read, one part per turn at most (the scroll rule, unchanged): the same in both columns.
 - A long column on the slide scrolls first and keeps the whole gesture (rows 9–10, as #849 made it in Slide only); at its end the next gesture moves the slide (row 11; on main the slide never moved).
+- A window too short for the slide (review of #871): beside the handout the slide keeps its width, so the stage can be shorter than the slide. Over the slide the stage then scrolls first, as a long column does, so the slide's foot can be reached, and at its end the next gesture moves the slide. In this run the stage fits (780 px for a 264 px slide), so nothing scrolls first; the rule is in `slideNav.test.ts`.
 - The band under the slide (rows 7–8): beside the handout it is the stage's own scroll and never steps. The design names only the slide for this view ("over the slide, a gesture means the same in every view"); in Slide only the space around the slide steps as before (below).
 
 ## Slide only, unchanged
@@ -71,4 +72,5 @@ The same launch, this branch, the window narrowed to 1000×900 so the slide sits
 
 - A real Mac trackpad and a real mouse: the gestures are protocol events of the same shape (pixel deltas, timing), not hardware.
 - The slide above the handout beyond the three notches above (no flick, no long column there).
+- A window too short for the slide beside the handout, live: the stage scrolling first over the slide is covered by the test only (the review fix came after the launch).
 - Windows.

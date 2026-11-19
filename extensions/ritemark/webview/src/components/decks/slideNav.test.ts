@@ -115,7 +115,14 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(beside(stage, stage, 100), 'stage')
   assert.equal(beside(tallGroup, tall, 100), 'stage', 'a row under the slide scrolls the stage')
   assert.equal(beside(box('group', tallAtEnd), tallAtEnd, 100), 'stage', "at the stage's end the band still never steps")
-  assert.equal(beside(tallBig, tall, 100), 'slide', 'over the slide on a tall stage: the slide moves')
+  // Beside the handout the slide keeps its width in a short window, so it can be taller than the stage (review of #871):
+  // over the slide the stage then scrolls first, as a long column does, so the slide's foot can be reached; at its end
+  // the slide moves. In Slide only the slide fits the stage, and over it the slide moves, as before.
+  assert.equal(beside(tallBig, tall, 100), 'stage', 'over the slide on a stage shorter than the slide: the stage scrolls first')
+  const tallAtEndBig = box('big', box('group', tallAtEnd), 'hidden', 479, 479, 0, ['deck-big'])
+  assert.equal(beside(tallAtEndBig, tallAtEnd, 100), 'slide', "at the stage's end the slide moves on")
+  assert.equal(beside(tallAtEndBig, tallAtEnd, -100), 'stage', 'and up scrolls the stage back first')
+  assert.equal(taker(tallBig, tall, 100), 'slide', 'Slide only: over the slide the slide moves, whatever the stage')
   assert.equal(wheelTaker(group, stage, 100, overflowOf, 'alone')?.name ?? 'slide', 'slide', "Slide only's bands are unchanged")
   // Which views route the stage's wheel: Slide only and Slide and handout, never Handout only (no slide on show).
   assert.equal(stageWheelOf(true, false), 'alone', 'Slide only')

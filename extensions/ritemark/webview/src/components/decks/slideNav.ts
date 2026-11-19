@@ -99,11 +99,13 @@ export function stageWheelOf(slideShown: boolean, handoutShown: boolean): StageW
 /**
  * The box that takes a wheel event over the stage, or null when nothing under the pointer scrolls that way and the
  * slide moves. A box is a pane or a column on the slide that holds more than its room (the design: it scrolls, in the
- * editor too), or, outside the slide, the stage itself. Over the slide the stage never counts, so the slide moves
- * there, in both views. Outside it, in Slide only, the stage takes the wheel while it is taller than its room and can
- * scroll that way, and at its end the next gesture moves the slide (before, the bands did nothing once the stage could
- * scroll); beside the handout the stage always takes it, as before #855, so the space around the slide and a row under
- * it never step: there only the slide does.
+ * editor too), or the stage itself. In Slide only the slide fits the stage, so over the slide the stage never counts
+ * and the slide moves; outside it the stage takes the wheel while it is taller than its room and can scroll that way,
+ * and at its end the next gesture moves the slide (before, the bands did nothing once the stage could scroll).
+ * Beside the handout the slide keeps its width however short the window, so the stage can be shorter than the slide:
+ * over the slide the stage then scrolls first, as a long column does, so the slide's foot can be reached, and at its
+ * end the next gesture moves the slide (review of #871). Outside the slide the stage always takes the gesture, as
+ * before #855, so the space around the slide and a row under it never step: there only the slide does.
  */
 export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string, view: StageWheel = 'alone'): T | null {
   let overSlide = false
@@ -112,9 +114,10 @@ export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta
     // The cheap reads first: only a box with room left that way is asked for its style.
     if (hasRoom(box, delta) && boxScrolls(box, overflowOf(box), delta)) return box
   }
-  if (overSlide) return null
+  const stageScrolls = hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta)
+  if (overSlide) return view === 'beside' && stageScrolls ? stage : null
   if (view === 'beside') return stage
-  return hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
+  return stageScrolls ? stage : null
 }
 
 /**
