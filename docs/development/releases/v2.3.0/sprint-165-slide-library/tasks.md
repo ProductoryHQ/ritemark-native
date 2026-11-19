@@ -14,9 +14,9 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] Tests, shots on synthetic decks, lead's look, release-notes line, Risk and How to revert
 
 ## PR 2: Sections and Take section (`sprint-165-slide-library-pr2`)
-- [ ] Section detection and heading, with tests
-- [ ] Take section as one insert and one undo step
-- [ ] Tests, shots, lead's look, release-notes line, Risk and How to revert
+- [x] Section detection and heading, with tests
+- [x] Take section as one insert and one undo step
+- [x] Tests, shots, lead's look, release-notes line, Risk and How to revert
 
 ## PR 3: Search once per slide (`sprint-165-slide-library-pr3`)
 - [ ] Grouping by the chosen lineage test; library first

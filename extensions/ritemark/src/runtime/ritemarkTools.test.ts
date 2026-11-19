@@ -563,30 +563,32 @@ async function main(): Promise<void> {
     const context = { runtimeId: 'claude-code' as const };
     const inserted = await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Practice.deck.md', slide_ids: ['e1', 'e2', 'e3'] }, context);
     assert.equal(inserted.isError, undefined, inserted.text);
-    // Sprint 161 (PR 2): the copies go in as block slides, each pill its Steps block's label (#752's rule kept).
-    const { blockStepsTagOf } = await import('../decks/blocks/slideRenderer');
+    // Sprint 161 (PR 2): the copies go in as block slides; Sprint 164 PR 3: each pill as a Label over its title, an
+    // emptied one as none, and the default word for none written.
+    const { blockStepsLabelOf } = await import('../decks/blocks/slideRenderer');
     const copies = slidesOfText(files['Clients/Harbour.deck.md']).slice(1);
-    assert.deepEqual(copies.map((slide) => blockStepsTagOf(slide.data.markdown ?? '')), ['Ülesanne: 1', '', 'Exercise'], 'insert_slides keeps the pill, an empty one, and no label');
-    assert.match(files['Clients/Harbour.deck.md'], /\n::: \{\.steps tag="Ülesanne: 1"\}\n/);
-    assert.match(files['Clients/Harbour.deck.md'], /\n::: \{\.steps tag=""\}\n/);
-    assert.match(files['Clients/Harbour.deck.md'], /# Plain\n\n::: steps\n:::/);
-    // read_deck shows each slide's Markdown as written: its pill in its Steps block's line.
+    assert.deepEqual(copies.map((slide) => blockStepsLabelOf(slide.data.markdown ?? '')), ['Ülesanne: 1', '', 'Exercise'], 'insert_slides keeps the pill, an empty one, and no label');
+    assert.match(files['Clients/Harbour.deck.md'], /\n\[Ülesanne: 1\]\{\.label\}\n\n# Proovi\n\n::: steps\n/);
+    assert.match(files['Clients/Harbour.deck.md'], /\n# Quiet\n\n::: steps\n/);
+    assert.match(files['Clients/Harbour.deck.md'], /\[Exercise\]\{\.label\}\n\n# Plain\n\n::: steps\n:::/);
+    assert.ok(!files['Clients/Harbour.deck.md'].includes('tag='), 'no pill on a Steps line');
+    // read_deck shows each slide's Markdown as written: its Label over its title.
     const read = (await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text;
-    assert.match(read, /block slide[^\n]*\n# Proovi\n\n::: \{\.steps tag="Ülesanne: 1"\}\n1\. Ava fail\n:::/);
-    assert.match(read, /block slide[^\n]*\n# Quiet\n\n::: \{\.steps tag=""\}\n1\. Read\n:::/);
-    // An edit to the copy's pill is a change to the slide: Update the library writes it back.
+    assert.match(read, /block slide[^\n]*\n\[Ülesanne: 1\]\{\.label\}\n\n# Proovi\n\n::: steps\n1\. Ava fail\n:::/);
+    assert.match(read, /block slide[^\n]*\n# Quiet\n\n::: steps\n1\. Read\n:::/);
+    // An edit to the copy's Label is a change to the slide: Update the library writes it back.
     const copyId = copies[2].data.id as string;
-    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('# Plain\n\n::: steps', '# Plain\n\n::: {.steps tag="Harjutus"}');
-    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /changed here[^\n]*\n# Plain\n\n::: \{\.steps tag="Harjutus"\}/);
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('[Exercise]{.label}\n\n# Plain', '[Harjutus]{.label}\n\n# Plain');
+    assert.match((await runTool(tool('read_deck'), { deck: 'Clients/Harbour.deck.md' }, context)).text, /changed here[^\n]*\n\[Harjutus\]\{\.label\}\n\n# Plain/);
     const updated = await runTool(tool('update_library_slide'), { deck: 'Clients/Harbour.deck.md', slide_id: copyId }, context);
     assert.equal(updated.isError, undefined, updated.text);
-    assert.equal(blockStepsTagOf(slidesOfText(files['Slide library/Practice.deck.md'])[2].data.markdown ?? ''), 'Harjutus');
+    assert.equal(blockStepsLabelOf(slidesOfText(files['Slide library/Practice.deck.md'])[2].data.markdown ?? ''), 'Harjutus');
     // The library's search finds a slide by its pill's words, an older slide's and a block slide's.
     const found = await runTool(tool('list_decks'), { where: 'library', query: 'Ülesanne' }, context);
     assert.match(found.text, /Practice\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 1 \(id e1, exercise\): Proovi/);
     assert.match((await runTool(tool('list_decks'), { where: 'library', query: 'harjutus' }, context)).text, /slide 3 \(id e3, block slide\): Plain/);
-    // Search finds a block slide by the pill it draws: with no label, the default.
-    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('::: {.steps tag="Harjutus"}', '::: steps');
+    // Search finds a block slide by its Label's words, and by an old pill's words written on its Steps line.
+    files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('[Harjutus]{.label}\n\n# Plain\n\n::: steps', '# Plain\n\n::: {.steps tag="Exercise"}');
     assert.match((await runTool(tool('list_decks'), { where: 'other', query: 'exercise' }, context)).text, /Harbour\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 4 \([^)]*block slide\): Plain/);
   }
 

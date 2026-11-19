@@ -15,6 +15,7 @@
  * is opened again, so the save checks what it wrote reads back as the same blocks, and if it doesn't, writes such lines
  * escaped (`\:::`, which CommonMark reads as `:::`). Only then: a stray `:::` written by someone else stays as written.
  * Comments on the slide (`<!-- … -->`, `<mark data-comment>`) load and save as the handout's do, with the comment flag.
+ * Sprint 164 PR 3: the Label (`[words]{.label}`, `slideLabel.ts`) loads and saves here only, never in a Text document.
  */
 import { Node, mergeAttributes } from '@tiptap/core'
 import { Marked } from 'marked'
@@ -29,6 +30,8 @@ import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMark
 import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
+import { LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
+import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
 function escapeAttribute(value: string): string {
@@ -83,6 +86,8 @@ slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMar
 slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Sprint 163 PR 3: the Button block, read as the Text editor reads it.
 slideEditorMarked.use(buttonMarkedExtension)
+// Sprint 164 PR 3: the Label, on a slide only.
+slideEditorMarked.use(labelMarkedExtension)
 
 let slideComments = false
 
@@ -121,8 +126,12 @@ export function withColumnPlaces(html: string): string {
   return html.replace(/(<div data-fdiv=""[^>]*\sdata-class="column"[^>]*>)(<\/div>)/g, '$1<h3></h3><p></p>$2')
 }
 
-/** The faint words an empty line on the stage shows: the title's, an empty column's heading and text, an empty pane's. */
-export function slidePlaceholderOf(node: PMNode, parent: PMNode | null, isTitle: boolean): string {
+/**
+ * The faint words an empty line on the stage shows: the title's, an empty column's heading and text, an empty pane's,
+ * and an empty Label's while the caret is in it (`hasCaret`; Sprint 164 PR 3).
+ */
+export function slidePlaceholderOf(node: PMNode, parent: PMNode | null, isTitle: boolean, hasCaret = false): string {
+  if (node.type.name === SLIDE_LABEL_NODE) return hasCaret ? LABEL_PLACEHOLDER : ''
   if (isTitle) return 'Title'
   // Sprint 163: an empty tab's pane says what goes in it (README "Adding it").
   if (parent?.type.name === 'tabPane') return node.type.name === 'paragraph' && parent.childCount === 1 ? PANE_PLACEHOLDER : ''
@@ -280,7 +289,24 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
 export function createSlideTurndownService(): TurndownService {
   const service = createEditorTurndownService()
   addSlideDivTurndownRule(service)
+  addLabelTurndownRules(service)
   return service
+}
+
+/**
+ * The stage's title place: a top-level heading with nothing before it but Labels (a Label may stand over the title,
+ * Sprint 164 PR 3), so an empty title under a Label still says "Title".
+ */
+export function isTitlePlace(doc: PMNode, node: PMNode, pos: number): boolean {
+  if (node.type.name !== 'heading') return false
+  let offset = 0
+  for (let index = 0; index < doc.childCount; index++) {
+    const child = doc.child(index)
+    if (offset === pos) return child === node
+    if (child.type.name !== SLIDE_LABEL_NODE) return false
+    offset += child.nodeSize
+  }
+  return false
 }
 
 let slideTurndown: TurndownService | null = null

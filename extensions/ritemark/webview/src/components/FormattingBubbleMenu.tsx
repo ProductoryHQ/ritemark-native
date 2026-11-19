@@ -71,6 +71,20 @@ export function FormattingBubbleMenu({
   // saved comment latched (#687). It stays hidden until the selection changes
   // or the editor gets the focus again.
   const hiddenFor = useRef<Selection | null>(null)
+  // #846: the Link dialog's state for `shouldShow`, which TipTap calls outside React's render.
+  const linkDialogOpenRef = useRef(false)
+
+  // #846: the toolbar goes while its Link dialog is open. The ref is cleared at once wherever the dialog closes, so
+  // TipTap's own re-check when the editor gets its focus back (onCloseAutoFocus below, or Apply's `focus()`) shows
+  // the toolbar again, at the selection's current place.
+  const closeLinkDialog = () => {
+    linkDialogOpenRef.current = false
+    setShowLinkDialog(false)
+  }
+  useEffect(() => {
+    linkDialogOpenRef.current = showLinkDialog
+    if (showLinkDialog) toolbarTippy.current?.hide()
+  }, [showLinkDialog])
 
   useEffect(() => {
     if (!editor) return
@@ -171,7 +185,8 @@ export function FormattingBubbleMenu({
         const { empty } = selection
 
         // Guard: Don't open dialog in code blocks (matches BubbleMenu shouldShow logic)
-        if (!empty && !editor.isActive('codeBlock')) {
+        // Only the editor with the focus: a deck mounts several slide editors, each keeping its last selection.
+        if (!empty && !editor.isActive('codeBlock') && editor.view.hasFocus()) {
           const previousUrl = editor.getAttributes('link').href
           const { from, to } = editor.state.selection
           clickedHrefRef.current = undefined
@@ -223,7 +238,7 @@ export function FormattingBubbleMenu({
       .run()
 
     if (success) {
-      setShowLinkDialog(false)
+      closeLinkDialog()
       setLinkUrl('')
       setLinkDisplayText('')
       setUrlError('')
@@ -242,7 +257,7 @@ export function FormattingBubbleMenu({
     const chain = editor.chain().focus()
     ;(range ? chain.setTextSelection({ from: range.from, to: range.to }) : chain).unsetLink().run()
     clickedHrefRef.current = undefined
-    setShowLinkDialog(false)
+    closeLinkDialog()
     setLinkUrl('')
     setLinkDisplayText('')
     setUrlError('')
@@ -327,6 +342,8 @@ export function FormattingBubbleMenu({
             // Sprint 143 (#513): only while the editor (or the toolbar) has the focus, never over a comment's box.
             editorHasFocus: view.hasFocus(),
             focusInToolbar: element.contains(element.ownerDocument.activeElement),
+            // #846: never over (or behind) its own Link dialog.
+            linkDialogOpen: linkDialogOpenRef.current,
           })
         }}
       >
@@ -542,7 +559,8 @@ export function FormattingBubbleMenu({
       <Dialog.Root
         open={showLinkDialog}
         onOpenChange={(open) => {
-          setShowLinkDialog(open)
+          if (open) setShowLinkDialog(true)
+          else closeLinkDialog()
           if (!open) {
             setLinkUrl('')
             setLinkDisplayText('')
@@ -552,7 +570,18 @@ export function FormattingBubbleMenu({
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96">
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96"
+            // #846: the focus goes back to the words, not to the page (on a slide Radix gave it to <body>), so the
+            // selection is still drawn and the bubble comes back over it.
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              // view.focus(), not commands.focus(): no animation frame, so it also runs in a window drawn in the
+              // background, and it puts the kept selection back. Its focus event makes TipTap show the toolbar again.
+              linkDialogOpenRef.current = false
+              if (!editor.isDestroyed) editor.view.focus()
+            }}
+          >
             <Dialog.Title className="text-lg font-semibold mb-4">
               {editingLink ? 'Edit Link' : 'Add Link'}
             </Dialog.Title>
@@ -601,7 +630,7 @@ export function FormattingBubbleMenu({
                             } else {
                               openInternalLink(target.href)
                             }
-                            setShowLinkDialog(false)
+                            closeLinkDialog()
                           }}
                           className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
                           aria-label={isExternal ? 'Open in browser' : 'Open file'}
@@ -683,7 +712,7 @@ export function FormattingBubbleMenu({
                   </Button>
                 )}
                 <Button
-                  onClick={() => setShowLinkDialog(false)}
+                  onClick={() => closeLinkDialog()}
                   variant="outline"
                 >
                   Cancel

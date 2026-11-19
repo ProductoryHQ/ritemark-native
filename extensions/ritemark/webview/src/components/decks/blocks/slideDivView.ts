@@ -1,7 +1,7 @@
 /**
  * Sprint 161 (PR 2): a `:::` block on the stage, drawn as the one renderer draws it (`slideRenderer.ts`), so the slide
  * being edited looks like its thumbnail, the wall and the page: `blk-columns` and `blk-column`, `blk-boxes` with its
- * look, `blk-box` with its icon, `blk-steps` with its pill. The block's words are the editor's own content.
+ * look, `blk-box` with its icon, `blk-steps`. The block's words are the editor's own content.
  *
  * PR 3 (README frame 4 and "The 'Exercise' pill is the person's own word"; the plan's "Added to PR 3"):
  *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). A box with none gets a place
@@ -9,27 +9,23 @@
  *    (`display: none`): it tells the block bar that the caret's box has room for an icon, and the bar draws the icon
  *    handle there (`SlideBlockBar`, the `smile-plus` handle over the box's top edge). `slideCaretBox` still marks the
  *    caret's box `is-caret`; no rule draws it now.
- *  - **The Steps pill** is edited in place, like every other word on the slide. Emptying it hides the pill; while the
- *    caret is in an empty pill, "Exercise" shows faint as its placeholder. Settings' Label row brings it back. Its words
- *    are the block's `tag` (the stage's field over the pill, `handlers.editPill`; #752's rule in `setStepsTag`).
+ *  - **Steps** has no pill of its own since Sprint 164 PR 3: its old pill is a Label before it (`slideLabel.ts`), and the
+ *    stage opens a slide with its pills as Labels already (`SlideEditor.stageMarkdownOf`).
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg, isPageIconName } from '../slide/pageIcons'
 import { slideIcon } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
 import { divAttributesOf, revealWrappedList } from './blockBar'
 
-/** What the stage does when a box's icon or the Steps pill is used (SlideEditor gives them; they read its latest state). */
+/** What the stage does when a box's icon is used (SlideEditor gives it; it reads its latest state). */
 export interface SlideDivHandlers {
   /** A box's icon (or its empty place) was clicked: choose one for the box at `pos`, under `anchor`. */
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
-  /** The Steps pill at `pos` was pressed: its words are typed in place, in the stage's field over `anchor`. */
-  editPill: (pos: number, anchor: HTMLElement) => void
 }
 
 /** The block's attributes, read from its opening line as written. */
@@ -67,8 +63,8 @@ function onlyColumns(node: PMNode): FenceAttributes[] | null {
   return other ? null : columns
 }
 
-/** A block drawn with something before its words: a box (its icon) and Steps (its pill). */
-const decorated = (kind: string | null) => kind === 'box' || kind === 'steps'
+/** A block drawn with something before its words: a box (its icon). */
+const decorated = (kind: string | null) => kind === 'box'
 
 /** The empty icon place's mark: a plus, drawn as the page's icons are (Phosphor's regular `plus`). */
 const PLUS_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></svg>'
@@ -76,11 +72,9 @@ const PLUS_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
 class SlideDivView implements NodeView {
   dom: HTMLElement
   contentDOM: HTMLElement
-  /** The icon or the pill, drawn before the words (a box and Steps only). */
+  /** The icon, drawn before the words (a box only). */
   private readonly deco: HTMLElement | null
   private readonly kind: string | null
-  /** The pill's own words, typed in place (Steps only). */
-  private readonly pill: HTMLElement | null = null
 
   constructor(
     private node: PMNode,
@@ -96,33 +90,12 @@ class SlideDivView implements NodeView {
       this.contentDOM = document.createElement('div')
       this.contentDOM.className = 'blk-inner'
       this.dom.append(this.deco, this.contentDOM)
-      if (this.kind === 'steps' && handlers) this.pill = this.makePill(handlers)
-      if (this.kind === 'box' && handlers) this.deco.addEventListener('click', this.onIconClick)
+      if (handlers) this.deco.addEventListener('click', this.onIconClick)
     } else {
       this.deco = null
       this.contentDOM = this.dom
     }
     this.render()
-  }
-
-  /**
-   * The pill's words, drawn in the (not editable) mark. A press on them opens the stage's field for them over the pill
-   * (`handlers.editPill`), at the pill's own place and size: an editable host nested in ProseMirror's DOM lost the focus
-   * at the editor's next redraw (the app run), so the typing happens in that field, written on every key.
-   */
-  private makePill(handlers: SlideDivHandlers): HTMLElement {
-    const pill = document.createElement('span')
-    pill.className = 'blk-pill-words'
-    this.deco!.setAttribute('role', 'button')
-    this.deco!.setAttribute('aria-label', 'Edit the label over the steps')
-    this.deco!.addEventListener('mousedown', event => {
-      if (event.button !== 0) return
-      event.preventDefault()
-      const pos = this.getPos()
-      if (pos !== undefined && this.deco) handlers.editPill(pos, this.deco)
-    })
-    this.deco!.append(pill)
-    return pill
   }
 
   private onIconClick = (event: MouseEvent) => {
@@ -155,22 +128,6 @@ class SlideDivView implements NodeView {
         : {})
     const deco = this.deco
     if (!deco) return
-    if (kind === 'steps') {
-      const tag = stepsTagOf(attrs)
-      const pill = this.pill
-      if (!pill) {
-        // Without the stage's handlers (a test's view): the pill drawn, as the renderer draws it.
-        deco.className = tag ? 'blk-pill' : ''
-        deco.textContent = tag
-        deco.hidden = !tag
-        return
-      }
-      if (pill.textContent !== tag) pill.textContent = tag
-      deco.className = 'blk-pill is-pickable'
-      // Emptied, the pill hides (the stage's field shows the default faint while the caret is in it).
-      deco.hidden = !tag
-      return
-    }
     // A box: its icon, an arrow under the Arrows look, nothing under Steps and Line (they draw their own mark).
     const look = lookAround(this.getPos, this.doc)
     const name = slideIcon(attrs.values.icon)?.phosphor
@@ -224,7 +181,7 @@ class SlideDivView implements NodeView {
   }
 
   stopEvent(event: Event): boolean {
-    // The pill's typing and the icon's click are the view's own, never the editor's.
+    // The icon's click is the view's own, never the editor's.
     return !!this.deco && this.deco.contains(event.target as Node)
   }
 
@@ -232,7 +189,7 @@ class SlideDivView implements NodeView {
     // The block's own attributes are drawn, never read back: its class (the caret's mark, `slideCaretBox`) changing is
     // no edit (else the editor would draw the block again, and the mark again, without end).
     if (mutation.type === 'attributes' && mutation.target === this.dom) return true
-    // Only what happens in the words is the editor's: the icon and the pill are drawn.
+    // Only what happens in the words is the editor's: the icon is drawn.
     if (mutation.type === 'selection') return !!this.deco && this.deco.contains(mutation.target as Node)
     return !!this.deco && this.deco.contains(mutation.target as Node)
   }
@@ -298,5 +255,5 @@ export function slideDivWithView(handlers: SlideDivHandlers | null) {
   })
 }
 
-/** The node with its drawing and no handlers (the icon and the pill drawn, not edited). */
+/** The node with its drawing and no handlers (the icon drawn, not chosen). */
 export const SlideDivWithView = slideDivWithView(null)
