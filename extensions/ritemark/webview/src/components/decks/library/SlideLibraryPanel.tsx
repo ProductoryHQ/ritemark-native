@@ -92,7 +92,7 @@ function DeckRow({ name, meta, expanded, onToggle }: { name: string; meta: strin
     return () => observer.disconnect()
   }, [name])
   return (
-    <Tooltip label={name} side="right" hoverOnly suppressed={!cut} className="flex w-full">
+    <Tooltip label={name} side="bottom" hoverOnly suppressed={!cut} className="flex w-full">
       <button type="button" className="deck-lib-row deck-lib-row-two" aria-expanded={expanded} aria-label={`${name}, ${meta}`} onClick={onToggle}>
         <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
         <Icon name="presentation" size={16} tone="inherit" />
