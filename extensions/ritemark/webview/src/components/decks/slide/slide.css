@@ -156,7 +156,7 @@
    don't collapse, padding never does). None at the start of the flow, a column, a box or a tab's pane (the renderer's
    pane starts with its hidden name), none under a Label (it keeps its 8 px), none in a box (its 4 px gap stays). The
    title's line, an H2 right under the title, keeps its close place and its room under it, as before. */
-.deck-sl.is-blocks :is(h2, h3, h4, h5, h6):first-child,
+.deck-sl.is-blocks :is(.blk-flow, .blk-column, .blk-tabpane) > :is(h2, h3, h4, h5, h6):first-child,
 .deck-sl.is-blocks .blk-tabname + :is(h2, h3, h4, h5, h6),
 .deck-sl.is-blocks .blk-label + :is(h2, h3, h4, h5, h6),
 .deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > :is(h2, h3, h4, h5, h6) { padding-top: 0; }

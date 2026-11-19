@@ -22,7 +22,7 @@ const sheet = (name: string) => readFileSync(new URL(name, import.meta.url), 'ut
 
 // ---- A small cascade -------------------------------------------------------------------------------------------------
 
-interface El { tag: string; classes: string[]; parent?: El; prev?: El; next?: El; kids: El[] }
+interface El { tag: string; classes: string[]; attrs?: Record<string, string>; parent?: El; prev?: El; next?: El; kids: El[] }
 function el(tag: string, classes: string[], parent?: El, prev?: El): El {
   const made: El = { tag, classes, parent, prev, kids: [] }
   if (prev) prev.next = made
@@ -91,6 +91,11 @@ function specificityOf(selector: string): Spec {
         if (inner[1] === 'where') continue
         const most = splitTop(inner[2], ',').map(specificityOf).sort((x, y) => weigh(y) - weigh(x))[0] ?? [0, 0, 0]
         spec[0] += most[0]; spec[1] += most[1]; spec[2] += most[2]
+      } else if (/^:nth-(last-)?child\(.* of /.test(simple)) {
+        // `:nth-child(An+B of S)`: a pseudo-class, plus the most specific selector of S.
+        const of = simple.slice(simple.indexOf(' of ') + 4, -1)
+        const most = splitTop(of, ',').map(specificityOf).sort((x, y) => weigh(y) - weigh(x))[0] ?? [0, 0, 0]
+        spec[0] += most[0]; spec[1] += most[1] + 1; spec[2] += most[2]
       } else if (simple.startsWith('::')) spec[2]++
       else if (simple.startsWith('.') || simple.startsWith('[') || simple.startsWith(':')) spec[1]++
       else if (simple !== '*') spec[2]++
@@ -101,6 +106,8 @@ function specificityOf(selector: string): Spec {
 
 /** The pseudo-classes this cascade evaluates; a heading's rule with any other is listed (`UNREAD`, under). */
 const READ_PSEUDO = /^:(is|where|not|has)\(|^:(first|last)-child$|^:nth-child\(1 of /
+/** The attribute selectors this cascade evaluates: a name with its value. */
+const ATTRIBUTE = /^\[([\w-]+)="([^"]*)"\]$/
 const UNREAD: string[] = []
 
 /** `:has()`'s relative selector (`+ h2`, `~ p`, `> h3`, `h3`) from `anchor`, forwards. */
@@ -131,13 +138,18 @@ function matchesCompound(element: El, compound: string): boolean {
       const any = splitTop(inner[2], ',').some(selector => matches(element, selector))
       if (inner[1] === 'not' ? any : !any) return false
     } else if (/^:nth-child\(1 of /.test(simple)) {
-      // The first of its siblings that match the selector (the stage's `1 of :not(ritemark-comment)`).
-      const of = simple.slice(':nth-child(1 of '.length, -1)
-      for (let at = element.prev; at; at = at.prev) if (matches(at, of)) return false
+      // One of the selector's, and the first of its siblings that are (the stage's `1 of :not(ritemark-comment)`).
+      const of = (at: El) => splitTop(simple.slice(':nth-child(1 of '.length, -1), ',').some(selector => matches(at, selector))
+      if (!of(element)) return false
+      for (let at = element.prev; at; at = at.prev) if (of(at)) return false
     } else if (simple === ':first-child') {
       if (element.prev) return false
     } else if (simple === ':last-child') {
       if (element.next) return false
+    } else if (ATTRIBUTE.test(simple)) {
+      // An attribute with its value (`[data-placeholder=""]`); a bare one is not read.
+      const [, name, value] = ATTRIBUTE.exec(simple) ?? []
+      if (element.attrs?.[name] !== value) return false
     } else if (simple.startsWith(':') || simple.startsWith('[')) return false
     else if (simple.startsWith('.')) {
       if (!element.classes.includes(simple.slice(1))) return false
@@ -262,7 +274,7 @@ const stage = cascade(rulesOf(slideCss, decksCss))
   const READS = new Set(['font-weight', 'font-size', 'line-height', 'color', 'margin-top', 'margin-bottom', 'padding-top'])
   const unreadable = (selector: string): boolean => parts(selector).compounds.some(compound => simples(compound).some(simple => {
     if (/^:(is|where|not|has)\(/.test(simple)) return splitTop(simple.slice(simple.indexOf('(') + 1, -1), ',').some(inner => unreadable(inner.replace(/^[+~>]\s*/, '')))
-    return (simple.startsWith(':') && !READ_PSEUDO.test(simple)) || simple.startsWith('[')
+    return (simple.startsWith(':') && !READ_PSEUDO.test(simple)) || (simple.startsWith('[') && !ATTRIBUTE.test(simple))
   }))
   const unreadHeadingRules = (...texts: string[]) => rulesOf(...texts)
     .filter(rule => rule.decls.some(([name]) => READS.has(name)))
@@ -387,7 +399,9 @@ const OLD_H2 = { size: 1.12, lineHeight: 1.3, marginBottom: 0.7 }
 /** The H2 as it was drawn: `old` before Sprint 168 PR 3 (1.12 em), `pr3` after it (1.3 em, .7 em under it and no room
  *  above it, before #901), `now` from slide.css as it stands. */
 type H2Mode = 'old' | 'pr3' | 'now'
-type Block = { tag: 'h1' | 'h2' | 'p' | 'ul'; lines: number[] }
+/** A mid-slide heading's room under it before #901, an em of its own type (`old` and `pr3`); none above it then. */
+const PRE_901_UNDER: Partial<Record<Block['tag'], number>> = { h2: 0.7, h3: 0.35 }
+type Block = { tag: 'h1' | 'h2' | 'h3' | 'p' | 'ul'; lines: number[] }
 const SLIDE: Block[] = [
   { tag: 'h1', lines: [1] },
   { tag: 'p', lines: [1] },
@@ -417,11 +431,13 @@ function layout(blocks: Block[], fit: number, mode: H2Mode): Array<{ top: number
     } else {
       const look = drawn.computed(element, fit)
       const h2 = block.tag === 'h2'
+      // Before #901 a mid-slide heading had no room above it and an em of its own type under it (H2 .7, H3 .35).
+      const oldUnder = PRE_901_UNDER[block.tag]
       const size = h2 && mode === 'old' ? 24 * fit * OLD_H2.size : look.size
       const lineHeight = h2 && mode === 'old' ? size * OLD_H2.lineHeight : look.lineHeight
       // A heading's own room above it is inside its box (`offsetHeight`), as the padding it is (#901).
-      height = block.lines[0] * lineHeight + (h2 && mode !== 'now' ? 0 : look.paddingTop)
-      marginBottom = h2 && mode !== 'now' ? size * OLD_H2.marginBottom : look.marginBottom
+      height = block.lines[0] * lineHeight + (oldUnder !== undefined && mode !== 'now' ? 0 : look.paddingTop)
+      marginBottom = oldUnder !== undefined && mode !== 'now' ? size * oldUnder : look.marginBottom
     }
     // The flow's last block has no margin under it (`.blk-flow > :last-child`).
     if (index === blocks.length - 1) marginBottom = 0
@@ -561,7 +577,7 @@ for (const fit of [1, BLOCK_FIT_STEPS[2]]) {
 {
   const [, , , h2] = children(flowOf(), ['h1'], ['p'], ['p', ['blk-label']], ['h2'], ['p'])
   sameRoom(room(drawn, h2), { above: 8, under: 6 }, 'a Label over an H2')
-  for (const notes of [1, 2]) {
+  for (const notes of [1, 2, 3]) {
     const specs: Array<[string, string[]?]> = [['p'], ['p', ['blk-label']], ...Array.from({ length: notes }, (): [string] => ['ritemark-comment']), ['h3'], ['p']]
     const elements = children(flowOf({ editing: true }), ...specs)
     sameRoom(room(stage, elements[elements.length - 2]), { above: 8, under: 6 }, `the stage, ${notes} note(s): a Label over an H3`)
@@ -580,6 +596,54 @@ for (const fit of [1, BLOCK_FIT_STEPS[2]]) {
   near(stage.computed(stageBoxH3).paddingTop, 0, "the stage: a box's heading adds nothing above it")
 }
 
+// Review of #906: an empty Label is never drawn (the renderer draws nothing for it), so on the stage the heading under it
+// keeps its room, as on the wall; at the start of the flow or a column it still adds none.
+{
+  const emptyLabel = (parent: El, prev?: El) => {
+    const made = el('p', ['blk-label', 'is-empty'], parent, prev)
+    made.attrs = { 'data-placeholder': '' }
+    return made
+  }
+  const flow = flowOf({ editing: true })
+  const [words] = children(flow, ['p'])
+  const label = emptyLabel(flow, words)
+  const h2 = el('h2', [], flow, label)
+  el('p', [], flow, h2)
+  // The empty Label is 0 tall with no margin, so the words' 12 and the H2's 12 meet over it.
+  near(stage.computed(label).marginBottom, 0, 'the empty Label takes no room')
+  near(stage.computed(words).marginBottom + stage.computed(label).marginBottom + stage.computed(h2).paddingTop, 24, 'the stage: an H2 under an empty Label keeps its 24')
+  const columns = children(flowOf({ editing: true }), ['div', ['blk-columns']])[0]
+  const [column] = children(columns, ['div', ['blk-column']])
+  const firstLabel = emptyLabel(column)
+  const h3 = el('h3', [], column, firstLabel)
+  el('p', [], column, h3)
+  near(stage.computed(h3).paddingTop, 0, "the stage: a column's first heading under an empty Label adds nothing")
+  // A Label with words keeps its 8 px over the heading.
+  const flow2 = flowOf({ editing: true })
+  const [, filled, h3b] = children(flow2, ['p'], ['p', ['blk-label']], ['h3'], ['p'])
+  void filled
+  sameRoom(room(stage, h3b), { above: 8, under: 6 }, 'the stage: a Label with words over an H3')
+}
+
+// A heading that starts some other group (a reveal's or an unknown fenced div's `.blk-group`) mid-slide keeps its room:
+// only the flow, a column, a box and a tab's pane start without it.
+{
+  const [, group] = children(flowOf(), ['p'], ['div', ['blk-group']], ['p'])
+  const [h2] = children(group, ['h2'], ['p'])
+  near(drawn.computed(h2).paddingTop, 12, "a group's first H2 keeps its 12 above it")
+  const [, stageGroup] = children(flowOf({ editing: true }), ['p'], ['div', ['blk-group']], ['p'])
+  const [stageH3] = children(stageGroup, ['h3'], ['p'])
+  near(stage.computed(stageH3).paddingTop, 6, "the stage: a group's first H3 keeps its 6 above it")
+}
+
+// The cascade's `:nth-child(1 of S)` needs the element to be one of S, as the browser does.
+{
+  const tiny = cascade(rulesOf('.x p:nth-child(1 of .lead) { color: red; }'))
+  const [plain, lead] = children(el('div', ['x']), ['p'], ['p', ['lead']])
+  assert.equal(tiny.computed(plain).color, '', 'not one of S: no match')
+  assert.equal(tiny.computed(lead).color, 'red', 'the first of S')
+}
+
 // The fit, on the same realistic slide: before #901 (Sprint 168 PR 3's record: 453 of 460 px at 100 % with the old H2,
 // then 440 at 92 % with the grown one) and now. Each mid-slide H2 trades .7 em (21.84 px) under it for 6 under and
 // 12 above, so the slide is shorter and its words never need a smaller step than before.
@@ -596,6 +660,31 @@ for (const fit of [1, BLOCK_FIT_STEPS[2]]) {
   assert.ok(nowFit.step <= pr3Fit.step, 'no smaller fit step than before #901')
   assert.equal(nowFit.full, false)
   assert.ok(nowFitted <= 460, 'nothing past the bottom')
+}
+
+// H3s do the opposite (review of #906): a mid-slide H3 after words had 12 above and .35 em (9.66 px) under, 21.66 in
+// all; it now has 18 above and 6 under, 24 in all, 2.34 px more each. A realistic slide of H3 sections: its step,
+// before and now, recorded; nothing past the bottom either way.
+{
+  const H3_SLIDE: Block[] = [
+    { tag: 'h1', lines: [1] },
+    { tag: 'p', lines: [1] },
+    { tag: 'h3', lines: [1] }, { tag: 'p', lines: [1] },
+    { tag: 'h3', lines: [1] }, { tag: 'p', lines: [1] },
+    { tag: 'h3', lines: [1] }, { tag: 'ul', lines: [1, 1] },
+    { tag: 'h3', lines: [1] }, { tag: 'p', lines: [1] },
+  ]
+  const pr3 = modelFlow(H3_SLIDE, 'pr3')
+  const now = modelFlow(H3_SLIDE, 'now')
+  pr3.style.setProperty('--fit', '1')
+  now.style.setProperty('--fit', '1')
+  const [pr3Full, nowFull] = [pr3.content(), now.content()]
+  near(nowFull - pr3Full, 4 * 2.34, 'four mid-slide H3s after words add 2.34 px each')
+  const pr3Fit = fitFlow(pr3 as unknown as HTMLElement)
+  const nowFit = fitFlow(now as unknown as HTMLElement)
+  console.log(`slideHeadings: H3 sections, before #901 ${pr3Full.toFixed(1)} of 460 at 1, fitted at ${BLOCK_FIT_STEPS[pr3Fit.step]} (${pr3.content().toFixed(1)}); now ${nowFull.toFixed(1)} at 1, fitted at ${BLOCK_FIT_STEPS[nowFit.step]} (${now.content().toFixed(1)})`)
+  assert.equal(nowFit.full, false)
+  assert.ok(now.content() <= 460, 'nothing past the bottom')
 }
 
 console.log('slideHeadings: passed')
