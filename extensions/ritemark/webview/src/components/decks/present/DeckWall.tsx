@@ -57,7 +57,7 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { themeVars, wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
-import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
+import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBarBottom, wallBleed, wallKeyOf, WALL_LINE_HEIGHT, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
 import { directionOf, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
 import { drawingOf, motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
 import { ROW_PLAYER, type RowTransition } from './rowArrival'
@@ -72,11 +72,10 @@ import './wall.css'
 /** The bar fades this long after the pointer last moved; the go-to box closes after this pause. */
 const BAR_MS = 2000
 const GOTO_MS = 3000
-/** The go-to box sits this far below the slide's top edge (51 of the drawing's 810), the bar this far above its bottom. */
+/** The go-to box sits this far below the slide's top edge (51 of the drawing's 810); the bar's place is wallBarBottom (#842). */
 const GOTO_FROM_TOP = 51
-const BAR_FROM_BOTTOM = 27
-/** The quiet line at the wall's foot (the published page's `.line`): 44 px high. */
-export const WALL_LINE_HEIGHT = 44
+/** The quiet line at the wall's foot: 44 px high (kept in wallKeys so the bar's test can read it). */
+export { WALL_LINE_HEIGHT }
 /** The grid's thumbnails: at most this wide, with this gap. */
 const GRID_THUMB_MAX = 300
 const GRID_GAP = 28
@@ -561,7 +560,7 @@ export function DeckWall() {
 
       <div
         className={`wall-bar dark${barVisible ? ' is-shown' : ''}`}
-        style={{ bottom: frameBottom + BAR_FROM_BOTTOM }}
+        style={{ bottom: wallBarBottom(frameBottom) }}
         onPointerEnter={() => setOverBar(true)}
         onPointerLeave={() => { setOverBar(false); showBar() }}
         aria-hidden={barVisible ? undefined : true}

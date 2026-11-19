@@ -241,6 +241,23 @@ export function wallBleed(frame: { width: number; left: number; top: number }, c
   return { x: side(frame.left), y: side(frame.top) }
 }
 
+/** The quiet line at the wall's foot (the published page's `.line`): 44 px high. */
+export const WALL_LINE_HEIGHT = 44
+/** The wall's floating bar is 48 px high; its bottom sits 12 px from the screen's edge (Sprint 166 Fix 6, #842). */
+export const WALL_BAR_HEIGHT = 48
+export const WALL_BAR_FROM_EDGE = 12
+/** The slide's own bottom margin, which the flow never draws in: 34 of 540. */
+export const SLIDE_BOTTOM_MARGIN = 34 / 540
+
+/**
+ * Sprint 166 Fix 6 (#842): where the bar's bottom sits, in px from the screen's bottom edge, for a frame `frameBottom`
+ * px above that edge. At the screen's foot, never over the slide's words: in the ground below the 16:9 content on a
+ * wider screen, in the slide's own bottom margin on a 16:9 one.
+ */
+export function wallBarBottom(_frameBottom: number): number {
+  return WALL_BAR_FROM_EDGE
+}
+
 /** The presenter view's clock: elapsed time as m:ss, or h:mm:ss past an hour. */
 export function clockText(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
