@@ -20,10 +20,10 @@ The fix: when a solo button is chosen, its card grows outward around the pill, a
 
 Where to look: the unchosen solo rule in `extensions/ritemark/webview/src/components/decks/slide/slide.css` (`.blk-button.is-solo:not(.is-chosen)`, about line 229) and its twin in `extensions/ritemark/webview/src/extensions/buttonBlock/buttonBlock.css` (line 28), which draws the same block in a Text document and must not change.
 
-- [ ] A test that measures the pill's position before and after choosing (and after un-choosing); it fails before the fix.
-- [ ] The card's edge shows as before; the blocks around the button do not move when it is chosen or not.
-- [ ] A button with words beside it is unchanged; the Text document's button is unchanged.
-- [ ] One before shot and one after shot, on a synthetic deck.
+- [x] A test that measures the pill's position before and after choosing (and after un-choosing); it fails before the fix.
+- [x] The card's edge shows as before; the blocks around the button do not move when it is chosen or not.
+- [x] A button with words beside it is unchanged. The Text document's solo button jumped too (the words' field opened on its left and pushed it about 520 px right, and 10 px down), so it gets the same fix (the Experience lead's correction).
+- [x] One before shot and one after shot, on a synthetic deck.
 
 ## For this PR
 
