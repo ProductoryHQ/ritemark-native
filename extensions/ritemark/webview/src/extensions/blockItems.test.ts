@@ -64,7 +64,13 @@ assert.deepEqual(titles(text, 'drawio'), ['Diagram'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'h1'), ['Title'])
 
 // Names that start with the query come first, then the other matches, each in the menu's own order.
-assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Code block', 'Tabs', 'Agenda', 'Picture', 'New slide below'])
+assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Code block', 'Tabs', 'Agenda', 'Label', 'Picture', 'New slide below'])
+
+// Sprint 164 PR 3 (the decks README): the Label, by its name and its hidden words, English and Estonian, without accents;
+// the slide's / menu only.
+for (const word of ['label', 'tag', 'badge', 'pill', 'eyebrow', 'silt', 'märgis', 'margis', 'MÄRG']) assert.ok(titles(SLIDE_ITEMS, word).includes('Label'), word)
+assert.deepEqual(titles(SLIDE_ITEMS, 'lab'), ['Label'])
+assert.ok(!titles(text, 'label').includes('Label') && !titles(text, 'pill').includes('Label'), 'never in the Text editor')
 assert.deepEqual(titles(text, 'ta'), ['Task list', 'Table', 'Tabs', 'Bullet list'])
 assert.deepEqual(titles(text, 'title'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'grid'), ['Boxes', 'Table'])

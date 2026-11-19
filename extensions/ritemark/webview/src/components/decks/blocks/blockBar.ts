@@ -320,8 +320,8 @@ function divChild(schema: Schema, kind: 'box' | 'column', content: PMNode[]): PM
   return div(schema, `::: ${kind}`, ':::', blocks)
 }
 
-/** The block of `kind` holding `parts`' items. `tag`: a new Steps block's label (the deck's last, as the / menu's). */
-function build(schema: Schema, kind: BarKind, parts: Parts, tag: string | null): PMNode {
+/** The block of `kind` holding `parts`' items. A Steps block has no Label (Sprint 164 PR 3, as the / menu's). */
+function build(schema: Schema, kind: BarKind, parts: Parts): PMNode {
   // README item 18: One by one goes with the items into the new kind, written as that kind writes it.
   const revealed = (open: string) => (parts.reveal ? withFenceValue(open, REVEAL_KEY, REVEAL_ONE)! : open)
   const wrapped = (list: PMNode) => (parts.reveal ? div(schema, REVEAL_LIST_OPEN, REVEAL_LIST_CLOSE, [list]) : list)
@@ -339,7 +339,7 @@ function build(schema: Schema, kind: BarKind, parts: Parts, tag: string | null):
   if (kind === 'list') return wrapped(schema.nodes.bulletList.createChecked(same('bulletList'), items))
   const list = schema.nodes.orderedList.createChecked(same('orderedList'), items)
   if (kind === 'numbered') return wrapped(list)
-  return div(schema, revealed(tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!), ':::', [list])
+  return div(schema, revealed('::: steps'), ':::', [list])
 }
 
 /** Which item the caret is in (its index), or 0. */
@@ -386,7 +386,7 @@ function itemStart(doc: PMNode, pos: number, kind: BarKind, index: number): Sele
  * Turn the block at `pos` into `kind` (frames 29 and 30): one transaction, every item's heading and line kept, the caret
  * in the same item. Null when it is that kind already, or when nothing can be built.
  */
-export function turnInto(state: EditorState, pos: number, kind: BarKind, tag: string | null = null): Transaction | null {
+export function turnInto(state: EditorState, pos: number, kind: BarKind): Transaction | null {
   const block = blockAt(state, pos)
   // The Agenda holds no items to carry, and no block turns into one.
   if (!block || block.kind === kind || block.kind === 'agenda' || kind === 'agenda') return null
@@ -397,7 +397,7 @@ export function turnInto(state: EditorState, pos: number, kind: BarKind, tag: st
   const parts = partsOf(block)
   let made: PMNode
   try {
-    made = build(state.schema, kind, parts, tag)
+    made = build(state.schema, kind, parts)
   } catch {
     return null
   }

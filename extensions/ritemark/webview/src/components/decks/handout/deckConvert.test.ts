@@ -148,7 +148,7 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   assert.equal(slides[3].node.attrs.notes, 'UNKNOWNNOTES', 'and keeps its notes')
   assert.ok(slides.slice(0, 3).every(slide => slide.node.attrs.notes === null), 'no notes block on a block slide')
   assert.equal(conversionStateOf(after).count, 1)
-  assert.deepEqual(conversionStateOf(after).last, { slides: 3, comments: 2, firstComment: 'NOTESWORD: say hello first. --› not the end\nHidden by the old layout: TITLEITEMWORD' })
+  assert.deepEqual(conversionStateOf(after).last, { slides: 3, comments: 2, labels: 0, firstComment: 'NOTESWORD: say hello first. --› not the end\nHidden by the old layout: TITLEITEMWORD' })
   // Their Markdown is what the stage drew before the edit (legacyToBlocks): "1. 1." numbers as a real list.
   assert.equal(slideDataOf('', slides[2].node.attrs.body).markdown, '# The steps\n\n1. Sisend\n2. Väljund')
   assert.equal(slideDataOf('', slides[0].node.attrs.body).id, 't1', 'the header keeps the id')
@@ -303,7 +303,7 @@ const apply = (state: EditorState, tr: Transaction) => state.apply(tr)
   const plain = stateOf('---\ndeck: 1\n---\n\n```slide points\nid: p1\ntitle: Plain\nitems:\n- heading: One\n```\n\nWords.\n', deckPlugins())
   const quiet = plain.state.apply(plain.state.tr.insertText('!', endOf(plain.state.doc, 'Words.')))
   assert.equal(conversionStateOf(quiet).count, 1)
-  assert.deepEqual(conversionStateOf(quiet).last, { slides: 1, comments: 0, firstComment: null })
+  assert.deepEqual(conversionStateOf(quiet).last, { slides: 1, comments: 0, labels: 0, firstComment: null })
   assert.equal(conversionNoticeFor(conversionStateOf(quiet).last, false), null, 'no notes, no line')
 }
 
@@ -437,6 +437,40 @@ const blockSlide = '```slide\n---\nid: b1\n---\n# Already blocks\n```\n\n## Alre
   }
   assert.ok(file.startsWith('---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\nhandout: text\n---\n'), file.slice(0, 120))
   assert.ok(!file.includes('```slide points'), 'the slides stay converted')
+}
+
+// ---- Sprint 164 PR 3 (the decks README, "Today's pills are kept"): a deck of block slides whose Steps blocks still have
+// their pills opens and saves byte for byte; its first real edit writes each pill as a Label in the same place (before
+// the heading over the steps, or before the steps), in the same transaction, with the person's words; an emptied pill
+// becomes nothing; one Undo gives the file back. A v1 Exercise slide converts with its pill as a Label too.
+{
+  const OLD = [
+    '---', 'deck: 2', 'handout: text', '---', '',
+    '```slide', '---', 'id: e1', '---', '# Try it', '', '::: {.steps tag="Harjutus · 1 / 2"}', '1. Open the file', ':::', '```', '',
+    '## Try it', '', 'Bring a report.', '',
+    '```slide', '---', 'id: e2', '---', '::: {.steps tag="Exercise · 2 / 2"}', '1. Ask', ':::', '', '::: {.steps tag=""}', '1. Emptied', ':::', '```', '',
+    '## Second', '', 'Words.', '',
+    '```slide exercise', 'id: e3', 'title: Old one', 'items:', '- heading: Go', '```', '',
+    '## Old one', '', 'Last.', '',
+  ].join('\n')
+  const { state, save } = stateOf(OLD, deckPlugins())
+  assert.equal(save(state.doc), OLD, 'opened and saved untouched: byte for byte')
+  assert.equal(needsConversion(state.doc), true, 'the pills wait for the first edit')
+  const tr = state.tr.insertText('!', endOf(state.doc, 'Words.'))
+  const edited = state.applyTransaction(tr).state
+  const file = save(edited.doc)
+  assert.ok(file.includes('```slide\n---\nid: e1\n---\n[Harjutus · 1 / 2]{.label}\n\n# Try it\n\n::: steps\n1. Open the file\n:::\n```'), file)
+  assert.ok(file.includes('```slide\n---\nid: e2\n---\n[Exercise · 2 / 2]{.label}\n\n::: steps\n1. Ask\n:::\n\n::: steps\n1. Emptied\n:::\n```'), file)
+  assert.ok(file.includes('[Exercise]{.label}\n\n# Old one\n\n::: steps\n1. Go\n:::'), 'a v1 Exercise slide: its default pill as a Label over its title')
+  assert.ok(!file.includes('tag='), 'no pill is left on a Steps line')
+  assert.ok(file.includes('Words.!'), 'with the edit')
+  assert.equal(conversionStateOf(edited).last?.labels, 2)
+  assert.equal(needsConversion(edited.doc), false)
+  let back = edited
+  undo(back, next => { back = back.apply(next) })
+  assert.equal(save(back.doc), OLD, 'one Undo: byte for byte')
+  // What the slides show before the edit is what it writes: the stage and the strip draw an old pill as its Label.
+  assert.equal(slideDataOf('', slidesOf(edited.doc)[0].node.attrs.body).markdown, '[Harjutus · 1 / 2]{.label}\n\n# Try it\n\n::: steps\n1. Open the file\n:::')
 }
 
 console.log('deckConvert: passed')

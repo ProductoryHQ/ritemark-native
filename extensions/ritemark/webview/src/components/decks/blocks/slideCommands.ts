@@ -3,15 +3,16 @@
  * slide editor's document. Pure ProseMirror, so the tests drive the same steps the stage takes.
  *
  *  - **The / menu** (frame 22) in four groups: Text (Title, Heading, Bullet list, Numbered list, Code block, with their
- *    Markdown shortcuts), Blocks (Columns, Boxes, Steps, Table, and the Agenda of small details 14), Media (Picture, Web page) and Slides (New slide below, Split
- *    slide here). Web page is a link to the page, in the picture's group; no live page is drawn.
+ *    Markdown shortcuts), Blocks (Columns, Boxes, Steps, Table, Tabs, Button, the Agenda of small details 14, and the
+ *    Label of Sprint 164 PR 3), Media (Picture, Web page) and Slides (New slide below, Split slide here). Web page is a
+ *    link to the page, in the picture's group; no live page is drawn.
  *  - **A block** goes where the / was typed: in place of the empty line, else after the block the caret is in. Its
  *    lines are the ones the conversion writes (`:::: columns`, `::: box`, `::: steps`), so a new block saves as an AI
  *    would write it, and its empty boxes and its first empty step are kept (`slideEditorMarkdown`'s blank rule).
  *  - **Split slide here** cuts the slide at the caret: the blocks before it stay, the rest go to a new slide below. A
  *    comment on a block goes with its block.
- *  - **A box's icon and the Steps pill** are one value each on the block's opening line (`withFenceValue`): changing one
- *    rewrites that line only.
+ *  - **A box's icon** is one value on the block's opening line (`withFenceValue`): changing it rewrites that line only.
+ *    (The Steps pill was one too, until Sprint 164 PR 3 made it a Label of its own: a new Steps block has none.)
  *  - **A table** in a slide: Enter moves to the cell below (a new row under the last), as Tab moves to the next cell.
  *    Its rows and columns are changed with the table's own handles (`extensions/tables/`), as in a Text document.
  *
@@ -24,10 +25,8 @@ import { canSplit } from '@tiptap/pm/transform'
 import { TableMap, addRow, cellAround } from '@tiptap/pm/tables'
 import { TABLE_COMMAND } from '../../../extensions/tables/tableOps'
 import { SLIDE_COMMAND, placeBlock } from '../../../extensions/blockPlacement'
-import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, TABS_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
+import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, LABEL_KEYWORDS, NUMBERED_LIST_KEYWORDS, PICTURE_KEYWORDS, TABLE_KEYWORDS, TABS_KEYWORDS, type BlockItemDef } from '../../../extensions/blockItems'
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
-import { EXERCISE_TAG } from '../../../../../src/decks/deckFormat'
-import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
 import { canHoldTabs } from '../../../extensions/tabs/tabsCommands'
 
@@ -57,6 +56,8 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
   { group: 'Blocks', title: 'Button', description: '', icon: 'cursor-click', nodeType: 'button', keywords: BUTTON_KEYWORDS },
   // Small details 14: the deck's section slides, listed and numbered by themselves.
   { group: 'Blocks', title: 'Agenda', description: '', icon: 'calendar', nodeType: 'agenda', keywords: ['contents', 'toc', 'sisukord', 'päevakava'] },
+  // Sprint 164 PR 3: a short line in the accent, anywhere on the slide (the decks README, "Label, a block of its own").
+  { group: 'Blocks', title: 'Label', description: '', icon: 'tag', nodeType: 'label', keywords: LABEL_KEYWORDS },
   { group: 'Media', title: 'Picture', description: '', icon: 'image', nodeType: 'picture', keywords: PICTURE_KEYWORDS },
   { group: 'Media', title: 'Web page', description: '', icon: 'globe', nodeType: 'webPage', keywords: ['link', 'url', 'website', 'embed', 'veebileht'] },
   { group: 'Slides', title: 'New slide below', description: '', icon: 'plus-square', nodeType: 'newSlideBelow', keywords: ['slide', 'new slide', 'page', 'uus slaid'] },
@@ -86,8 +87,11 @@ export type SlideBlockKind = 'columns' | 'boxes' | 'steps' | 'table'
 export const slideDivNode = (schema: Schema, open: string, close: string, content: PMNode[]) =>
   schema.nodes.slideDiv.create({ open, close, gapOpen: 'false', gapClose: 'false', class: parseFenceAttributes(OPEN_FENCE.exec(open)![2])!.classes.join(' ') }, content)
 
-/** A new block, empty, as the conversion writes one: two columns, three boxes, Steps with one step, a 3 × 3 table. */
-export function slideBlockNode(schema: Schema, kind: SlideBlockKind, tag: string | null = null): PMNode {
+/**
+ * A new block, empty, as the conversion writes one: two columns, three boxes, Steps with one step (and no Label: the
+ * decks README, "A new Steps block comes without a Label"), a 3 × 3 table.
+ */
+export function slideBlockNode(schema: Schema, kind: SlideBlockKind): PMNode {
   const paragraph = () => schema.nodes.paragraph.create()
   switch (kind) {
     case 'columns':
@@ -96,8 +100,7 @@ export function slideBlockNode(schema: Schema, kind: SlideBlockKind, tag: string
     case 'boxes':
       return slideDivNode(schema, ':::: boxes', '::::', [0, 1, 2].map(() => slideDivNode(schema, '::: box', ':::', [paragraph()])))
     case 'steps':
-      // A label carried from the deck's earlier pill is written as its own tag (the lead on #769).
-      return slideDivNode(schema, tag === null ? '::: steps' : withFenceValue('::: steps', 'tag', tag)!, ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
+      return slideDivNode(schema, '::: steps', ':::', [schema.nodes.orderedList.create(null, [schema.nodes.listItem.create(null, [paragraph()])])])
     case 'table': {
       const row = (header: boolean) => schema.nodes.tableRow.create(null, [0, 1, 2].map(() => (header ? schema.nodes.tableHeader : schema.nodes.tableCell).create(null, [paragraph()])))
       return schema.nodes.table.create(null, [row(true), row(false), row(false)])
@@ -207,7 +210,7 @@ export function withoutEmptyLineAt(state: EditorState, pos: number): { state: Ed
 }
 
 // ---------------------------------------------------------------------------
-// A box's icon and the Steps pill
+// A box's icon
 // ---------------------------------------------------------------------------
 
 /** The `:::` block at `pos` with one value of its opening line set (or taken out); null when nothing changes. */
@@ -219,56 +222,6 @@ export function setBlockValue(state: EditorState, pos: number, key: string, valu
   if (next === null || next === open) return null
   return state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, open: next }).setMeta(SLIDE_COMMAND, true)
 }
-
-/**
- * The Steps pill's words typed in place (#752's rule): words the pill already shows write nothing (so a Steps block
- * with no `tag` stays without one while its pill reads "Exercise"); any other words, an empty pill included, are its
- * `tag`. Null when nothing changes.
- */
-export function setStepsTag(state: EditorState, pos: number, words: string): Transaction | null {
-  const node = state.doc.nodeAt(pos)
-  if (!node || node.type.name !== 'slideDiv') return null
-  const open = OPEN_FENCE.exec(String(node.attrs.open ?? ''))
-  const attrs = open ? parseFenceAttributes(open[2]) : null
-  if (!attrs || !attrs.classes.includes('steps')) return null
-  const shown = stepsTagOf(attrs)
-  const typed = words.replace(/\s*\n\s*/g, ' ')
-  if (typed === shown || (!typed.trim() && !shown)) return null
-  // Typed like any other words on the slide: the pill's keys join one undo step as typing does.
-  return setBlockValue(state, pos, 'tag', typed.trim() ? typed : '')?.setMeta(SLIDE_COMMAND, false) ?? null
-}
-
-/**
- * The label a new Steps block takes (the Experience lead on #769): the deck's last pill label written in words of its
- * own, up to and including the slide being written on (a v1 Exercise slide's `tag:`, a block slide's Steps `tag`);
- * null when there is none, so the new pill shows "Exercise" by #752's rule. An emptied (hidden) pill and the default
- * word are no label to carry.
- */
-export function lastPillLabel(slides: Array<{ kind: string; markdown?: string; tag?: string }>): string | null {
-  let label: string | null = null
-  const take = (tag: string | undefined) => {
-    if (tag === undefined || !tag.trim() || tag.trim().toLowerCase() === EXERCISE_TAG.toLowerCase()) return
-    label = tag
-  }
-  for (const slide of slides) {
-    if (slide.kind === 'exercise') { take(slide.tag); continue }
-    if (slide.kind !== '' || !slide.markdown) continue
-    let code: string | null = null
-    for (const line of slide.markdown.split('\n')) {
-      // A `:::` line inside a code block is the code's words.
-      const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line)
-      if (code !== null) { if (fence && fence[1][0] === code[0] && fence[1].length >= code.length) code = null; continue }
-      if (fence) { code = fence[1]; continue }
-      const open = OPEN_FENCE.exec(line)
-      const attrs = open ? parseFenceAttributes(open[2]) : null
-      if (attrs?.classes.includes('steps')) take(attrs.values.tag)
-    }
-  }
-  return label
-}
-
-/** The pill's placeholder while it is empty and the caret is in it: the default word, faint. */
-export const PILL_PLACEHOLDER = EXERCISE_TAG
 
 // ---------------------------------------------------------------------------
 // Tables

@@ -11,12 +11,15 @@
  *    end of its handout part (Jarmo, 17 November: no private notes field). The page, the wall and Publish drop comments.
  *  - A copy whose `from:` stamp still matches the slide gets the block stamp; a changed copy keeps its old one.
  *  - A kind this build doesn't know stays as written, with its notes.
+ *  - Sprint 164 PR 3: a block slide whose Steps block still has its old pill (`tag`) gets it as a Label in the same
+ *    conversion (`labelledSlideBody`, `labelBlock.withStepsLabels`).
  *
  * Pure: no DOM, no `vscode`.
  */
-import { isSlideKind, parseDeck, parseFrom, slideDataOf, writeFrom, writeSlideBlock, writeSlideData, type SlideData } from '../deckFormat';
+import { isBlockSlide, isSlideKind, parseDeck, parseFrom, slideDataOf, withBlockMarkdown, writeFrom, writeSlideBlock, writeSlideData, type SlideData } from '../deckFormat';
 import { slideStamp, slideStamps } from '../deckLibraryFormat';
 import { legacyDataToBlocks } from './legacyToBlocks';
+import { withStepsLabels, writesPill } from './labelBlock';
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from './fencedDiv';
 
 /** Does a slide of this kind convert to a block slide: a v1 slide of one of the nine kinds. */
@@ -131,18 +134,55 @@ export function saysBlockDeck(version: string | null): boolean {
 }
 
 /**
+ * Sprint 164 PR 3: a block slide's body with its Steps blocks' old pills as Labels (`withStepsLabels`), as the deck
+ * view's first real edit writes it, its header as it was. A copy's `from:` stamp is renewed as `renewedFrom` renews a
+ * v1 slide's: when the stamp it holds still matches the slide as it was and the slide's stamp changed (an emptied
+ * pill's; every other pill stamps the same as its Label, `deckLibraryFormat.canonicalStepsLines`). `handout` is the
+ * part's text (trimmed) and `folder` the deck's, for the stamp. The body as it was when it has no pill.
+ */
+export function labelledSlideBody(body: string, handout = '', folder = ''): string {
+  const data = slideDataOf('', body);
+  const markdown = data.markdown;
+  if (markdown === undefined) return body;
+  const labelled = withStepsLabels(markdown);
+  if (labelled === markdown) return body;
+  const next = withBlockMarkdown(body, labelled);
+  const source = parseFrom(data.from);
+  if (!source || !source.stamp) return next;
+  const after = slideDataOf('', next);
+  const fresh = slideStamp('', after, handout, folder);
+  if (source.stamp === fresh || !slideStamps('', data, handout, folder).includes(source.stamp)) return next;
+  return writeSlideData('', next, { ...after, from: writeFrom({ ...source, stamp: fresh }) });
+}
+
+/** Does a block slide still have a Steps block's old pill, which the deck's first edit writes as a Label? */
+export function hasStepsPill(kind: string, body: string): boolean {
+  // Only a body that writes a `tag` value is read (`writesPill`: "tagasi" is a word).
+  if (!isBlockSlide(kind) || !writesPill(body)) return false;
+  const markdown = slideDataOf(kind, body).markdown;
+  return markdown !== undefined && withStepsLabels(markdown) !== markdown;
+}
+
+/**
  * The whole deck converted, as the deck view's first real edit writes it (with `withWrittenHandout`): every v1 slide of
- * the nine kinds as a block slide, its notes and hidden words as a comment at the end of its part, and `deck: 2`. Every
- * other byte stays. A deck with nothing to convert is returned as it is.
+ * the nine kinds as a block slide, its notes and hidden words as a comment at the end of its part, every block slide's
+ * old Steps pill as a Label (Sprint 164 PR 3), and `deck: 2`. Every other byte stays. A deck with nothing to convert is
+ * returned as it is.
  */
 export function convertDeckText(text: string, folder = ''): string {
   const deck = parseDeck(text);
-  if (!deck.slides.some(slide => convertsToBlocks(slide.kind))) return text;
+  if (!deck.slides.some(slide => convertsToBlocks(slide.kind) || hasStepsPill(slide.kind, slide.body))) return text;
   let out = text;
   for (const slide of [...deck.slides].reverse()) {
-    if (!convertsToBlocks(slide.kind)) continue;
     const handout = text.slice(slide.handoutStart, slide.handoutEnd);
     const trimmed = handout.replace(/^\n+/, '').replace(/\s+$/, '');
+    if (hasStepsPill(slide.kind, slide.body)) {
+      // Only the body between its fences changes: the fences, its notes and the handout stay as written.
+      const bodyStart = text.indexOf('\n', slide.start) + 1;
+      if (bodyStart > 0 && text.startsWith(slide.body, bodyStart)) out = out.slice(0, bodyStart) + labelledSlideBody(slide.body, trimmed, folder) + out.slice(bodyStart + slide.body.length);
+      continue;
+    }
+    if (!convertsToBlocks(slide.kind)) continue;
     const converted = convertSlide(slide.kind, slide.body, slide.notes, trimmed, folder);
     out = out.slice(0, slide.start) + writeSlideBlock('', converted.body) + withCommentAtEnd(handout, converted.comment) + out.slice(slide.handoutEnd);
   }
@@ -153,6 +193,10 @@ export function convertDeckText(text: string, folder = ''): string {
  * A block slide's Markdown with its first Steps block's pill set to `tag` (Settings' Label row, #752's rule kept for
  * block slides): `tag=""` for no pill. Only that opening line changes, its colons kept; the Markdown as it was when it
  * has no Steps block outside code, or when the line says that pill already.
+ *
+ * Sprint 164 PR 3: Settings' Label row is gone (Jarmo's yes by name, 19 November) and nothing in the slide editor calls
+ * this. It stays only while `DeckView.tsx` still imports it: that file is PR 1's (#819) until it merges, and its
+ * `stepsTagSetting` goes with this function and `blockStepsTagOf` in the follow-up.
  */
 export function withStepsTag(markdown: string, tag: string): string {
   const lines = markdown.split('\n');

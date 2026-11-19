@@ -10,7 +10,7 @@
  */
 import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, isBlockSlide, sidePictureOf, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
 import { legacyDataToBlocks } from './blocks/legacyToBlocks';
-import { OPEN_FENCE, parseFenceAttributes } from './blocks/fencedDiv';
+import { labelsAsPills } from './blocks/labelBlock';
 
 // ---------------------------------------------------------------------------
 // Paths (posix, project-relative)
@@ -347,21 +347,25 @@ function withoutComments(text: string): string {
 /**
  * A Steps block's opening line as its pill draws it (#752's rule): no label and `tag="Exercise"` (in any case) are the
  * same pill, and so are an empty label and one of spaces, so writing out what the slide already shows is no change.
+ * Sprint 164 PR 3: the pill is a Label now (`labelBlock.withStepsLabels`); the Label in the pill's place is read back
+ * onto the line (`labelsAsPills`), so a slide stamps the same before its pills became Labels and after, and every
+ * `from:` written before stands.
  */
-function canonicalStepsLines(markdown: string): string {
-  return markdown.split('\n').map(line => {
-    const open = OPEN_FENCE.exec(line);
-    const attrs = open ? parseFenceAttributes(open[2]) : null;
-    if (!attrs || !attrs.classes.includes('steps')) return line;
-    const tag = (attrs.values.tag ?? EXERCISE_TAG).replace(/\s+/g, ' ').trim();
+function canonicalStepsLines(markdown: string, emptied = false): string {
+  return labelsAsPills(markdown, (label, written) => {
+    // A Steps block written with an emptied pill (an Exercise slide's `tag: ""` too) keeps its stamp until it is
+    // written as nothing.
+    if (label === null) return emptied || (written !== undefined && !written.trim()) ? '::: {.steps tag=""}' : '::: steps';
+    const tag = label.replace(/\s+/g, ' ').trim();
     if (tag.toLowerCase() === EXERCISE_TAG.toLowerCase()) return '::: steps';
     return `::: {.steps tag="${tag}"}`;
-  }).join('\n');
+  });
 }
 
 function blockStampOf(kind: string, data: SlideData, handout: string, folder: string): string {
   const converted = isBlockSlide(kind) ? { markdown: data.markdown ?? '', header: data } : legacyDataToBlocks(kind, data);
-  const blocks = { ...converted, markdown: canonicalStepsLines(converted.markdown) };
+  const emptied = kind === 'exercise' && data.tag !== undefined && !exerciseTagOf(data);
+  const blocks = { ...converted, markdown: canonicalStepsLines(converted.markdown, emptied) };
   const side = sidePictureOf(blocks.header) ?? '';
   const image = side && blocks.header.image ? projectPath(blocks.header.image, folder) ?? blocks.header.image : '';
   const resolve = (markdown: string) => foldMarkdown(withoutComments(rewriteMarkdownTargets(markdown, target => projectPath(target, folder) ?? target)));
