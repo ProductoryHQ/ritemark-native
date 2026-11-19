@@ -28,7 +28,7 @@ Gate: no code until Jarmo approves the plan and each PR's branch is created from
 - [x] Empty Label behaviour; slides and page only
 - [x] Removals done: Settings Label row, last-label rule, padding-top pill rule (DeckView.tsx's three leftover lines follow once #819 merges)
 - [ ] Shots on the slide, strip, wall and page (taken: `proof/pr3-label/`); the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review (High: two rounds and the security review)
 
 ## Sprint end
 - [ ] Full test chain once per final head
