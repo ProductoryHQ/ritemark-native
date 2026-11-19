@@ -779,7 +779,7 @@ body {
   cursor: grabbing;
 }
 /* Sprint 167 PR 4: the bar's Focus brings the keyboard to the dot, and the arrow keys move it. */
-.deck-sl .photo-focus:focus-visible {
+:where(:root:not([data-input-mode="pointer"])) .deck-sl .photo-focus:focus-visible {
   outline: 3px solid #fff;
   outline-offset: 3px;
 }

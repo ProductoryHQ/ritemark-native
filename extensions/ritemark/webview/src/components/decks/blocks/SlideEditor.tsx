@@ -1254,7 +1254,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             ) : null}
             <EditorContent editor={editor} />
             {/* Sprint 162 PR 4: the theme's logo in its corner, over the words, as every other view draws it. */}
-            <SlideLogoImage logo={slideLogo} cover={cover} />
+            <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isCoverSlide(shownMarkdown)} />
           </div>
           {missingSpots.map(spot => (
             <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>
