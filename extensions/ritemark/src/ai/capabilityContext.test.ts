@@ -17,6 +17,7 @@ import {
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
 } from './capabilityContext';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -173,6 +174,21 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
     for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', '```` ```slide ```` (the word `slide` alone)', ':::: columns', '::: column', ':::: boxes', '::: steps', '`deck: 2`', 'a Ritemark comment, `<!-- … -->`', 'There is no speaker-notes field', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', "changing a slide\'s title never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`', 'never put a list number in front of a heading']) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
+  }
+});
+
+// ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
+test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
+  // The names the slide draws (iconSet.ts): every one, and every other name for one, must be in the line.
+  const names = [...SLIDE_ICON_NAMES];
+  const aliases = [...SLIDE_ICON_ALIASES];
+  assert.ok(names.length > 0 && aliases.length > 0);
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    const line = text.split('\n').find((entry) => entry.startsWith("- A box's `icon` is one of these names:"));
+    assert.ok(line, `${runtime}: the icon line`);
+    for (const name of [...names, ...aliases]) assert.ok(line.includes(`\`${name}\``), `${runtime}: ${name}`);
+    assert.ok(line.includes("a name Ritemark doesn't know draws a dashed circle"), `${runtime}: what an unknown name does`);
   }
 });
 

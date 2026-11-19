@@ -70,6 +70,17 @@ export function labelEnd(node: PMNode, pos: number): number {
 }
 
 /**
+ * A press on the button outside its words (#848: its icon, or the pill's edge): the caret goes to the end of the
+ * button's own words, from `inside`, a place in them. Null when `inside` isn't in a button's words.
+ */
+export function caretOnLabel(state: EditorState, inside: number): Transaction | null {
+  if (!Number.isInteger(inside) || inside < 0 || inside > state.doc.content.size) return null
+  const $inside = state.doc.resolve(inside)
+  const button = $inside.parent.type.name === BUTTON_LABEL_NODE ? buttonAround($inside) : null
+  return button ? state.tr.setSelection(TextSelection.create(state.doc, labelEnd(button.node, button.pos))) : null
+}
+
+/**
  * The address sheet's Done: the button at `pos` takes `typed` as its address (a full https one, else null: the sheet
  * says why), and the caret goes onto its words. Empty: the address stays as it was, and only the caret moves.
  */
@@ -168,7 +179,9 @@ export function newButtonOf(transaction: Transaction, after: EditorState, pos: n
  * A new button left before it has an address (the smoke run of 19 November; the Experience lead: no dead ⌘Z). When
  * nothing has changed since it was added, its own undo step is undone, and the `/` words that step had taken away go
  * again, out of the history: no step is left, and the next ⌘Z brings back the person's last change. Otherwise (an edit
- * came in meanwhile, or the editor keeps no history) it goes as `dropNewButton` takes it. False: it was not there.
+ * came in meanwhile, or the editor keeps no history) it goes as `dropNewButton` takes it; but when words were typed on
+ * it or beside it (#848: they can be while its sheet is open), it goes as a step of its own, so ⌘Z brings it back with
+ * them and nothing typed is lost. False: it was not there.
  */
 export function takeBackNewButton(view: { state: EditorState; dispatch: (tr: Transaction) => void }, added: NewButton, exact: boolean): boolean {
   const node = buttonAtPos(view.state, added.pos)
@@ -188,6 +201,14 @@ export function takeBackNewButton(view: { state: EditorState; dispatch: (tr: Tra
         view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(query.from))))
       }
     }
+    return true
+  }
+  if (node.textContent) {
+    const gone = deleteButton(view.state, added.pos)
+    if (!gone) return false
+    // Never joined to the typing just before it: ⌘Z brings the button back with its words.
+    closeHistory(gone)
+    view.dispatch(gone)
     return true
   }
   const drop = dropNewButton(view.state, added.pos)

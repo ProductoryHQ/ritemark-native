@@ -23,6 +23,17 @@
 import type { AgentId } from '../agent/types';
 import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
 import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+
+/**
+ * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with, so an AI never
+ * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Today's 24 and the other names drawn
+ * as them; every Phosphor name once the icon search lands (Sprint 169).
+ */
+function iconLine(): string {
+  const list = (names: readonly string[]) => names.map((name) => `\`${name}\``).join(', ');
+  return `- A box's \`icon\` is one of these names: ${list(SLIDE_ICON_NAMES)}; these are read as one of them too: ${list(SLIDE_ICON_ALIASES)}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+}
 
 /**
  * Sprint 162 PR 5: the DECKS lines on themes. The folder, the fonts and the ratios come from the theme reader's own
@@ -185,6 +196,8 @@ const SECTIONS: CapabilitySection[] = [
             // Sprint 161 (PR 2): block slides, written like text (the Pandoc and Quarto `:::` blocks for columns, boxes and steps)
             '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `) and a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: images/x.png`); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](images/x.png)`). Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
             '- A slide\'s blocks are Pandoc\'s fenced divs, each closed by a line of as many colons as opened it: `:::: columns` holding two or three `::: column` (each with a `### ` heading and its lines); `:::: boxes` (or `:::: {.boxes look="steps"}`, `"arrows"`, `"line"`) holding `::: box` or `::: {.box icon="lightbulb"}`; and `::: steps` around a numbered list.',
+            // Sprint 166 PR 9 (#850): the icon names a box may carry
+            iconLine(),
             // Sprint 164 PR 3 (the decks README, "Label, a block of its own")
             '- A Label is a short line drawn as a pill in the theme\'s accent: a line of its own, `[Exercise · 1 / 2]{.label}`, with a blank line after it. It may stand anywhere on a slide: over the title, in a column, in a box or in a tab\'s pane. Its words are only what the user wants it to say ("1 / 2" too: nothing counts for them), and no block brings one: a `::: steps` block has none unless you write it. An older slide may still have `tag="…"` on its Steps line: that is its pill, so write it as a Label over the heading above the steps (or over the steps when there is none) and take `tag` off the line.',
             // Sprint 163 PR 5 (the decks README: the workbook, Tabs in the editor, the Button block, an exercise's layout)
