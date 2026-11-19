@@ -94,9 +94,9 @@
    it are the 32 `fullSlideWidthFor` keeps, as above. */
 .deck-stage.is-alone { align-items: center; }
 .deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
-/* In Slide only a long column or pane takes the wheel first (slideNav.ts, #824); at its end the rest of a turn stays
-   with it and never scrolls the stage under the slide. */
-.deck-stage.is-alone .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }
+/* On the stage a long column or pane takes the wheel first (slideNav.ts, #824), in Slide only and beside the handout
+   (#855); at its end the rest of a turn stays with it and never scrolls the stage under the slide. */
+.deck-stage .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }
 .deck-divider.is-above { width: auto; right: 0; bottom: auto; height: 13px; margin-left: 0; margin-top: -6px; cursor: row-resize; }
 .deck-divider.is-above::before { left: 0; right: 0; top: 6px; bottom: auto; border-left: 0; border-top: 2px solid transparent; }
 .deck-divider.is-above:hover::before, .deck-divider.is-above.is-dragging::before { border-left: 0; border-top: 2px solid var(--r-accent); }
