@@ -69,6 +69,7 @@ export function Tooltip({
   className,
   hoverOnly = false,
   suppressed = false,
+  onOpenChange,
   children,
 }: {
   label: ReactNode;
@@ -78,11 +79,13 @@ export function Tooltip({
   hoverOnly?: boolean;
   /** Kept closed while true (a table's grip being pressed or dragged: the tooltip would cover where it lands). */
   suppressed?: boolean;
+  /** Told when the tooltip opens and closes (a slide's unknown icon: its trigger goes once the tooltip has closed, #850). */
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }) {
   return (
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
-      <TooltipPrimitive.Root open={suppressed ? false : undefined}>
+      <TooltipPrimitive.Root open={suppressed ? false : undefined} onOpenChange={onOpenChange}>
         <TooltipPrimitive.Trigger asChild onFocus={hoverOnly ? onTriggerFocusHoverOnly : onTriggerFocus}>
           <span className={cn('inline-flex', className)}>{children}</span>
         </TooltipPrimitive.Trigger>

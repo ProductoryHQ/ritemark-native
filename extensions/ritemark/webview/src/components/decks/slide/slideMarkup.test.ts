@@ -34,7 +34,7 @@ const { BUILT_IN_THEME } = await import('../../../../../src/decks/deckTheme')
 const { blockSlideMarkup } = await import('../../../../../src/decks/blocks/slideRenderer')
 const { publicSlide } = await import('../../../../../src/decks/page/publicDeck')
 const { PAGE_ICON_PATHS, iconSvg } = await import('./pageIcons')
-const { SLIDE_ICONS } = await import('./iconSet')
+const { SLIDE_ICONS, UNKNOWN_ICON } = await import('./iconSet')
 
 /** A node as a comparable tree: tag, attributes (style as a sorted map, `data-fit` left out), text, children. */
 function shape(node: HTMLNode): unknown {
@@ -142,7 +142,13 @@ for (const borderless of [false, true]) {
   const core = fileURLToPath(new URL('../../../../../node_modules/@phosphor-icons/core/assets/regular/', import.meta.url))
   const names = Object.keys(PAGE_ICON_PATHS)
   for (const icon of SLIDE_ICONS) assert.ok(names.includes(icon.phosphor), `${icon.phosphor} is in pageIcons.ts`)
+  // #850: the dashed circle an unknown icon name draws.
+  assert.ok(names.includes(UNKNOWN_ICON), `${UNKNOWN_ICON} is in pageIcons.ts`)
   for (const name of ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'folder', 'file-text']) assert.ok(names.includes(name), name)
+  // The generator writes the module as it is (every icon the page draws, the ones added by hand before too).
+  const generator = new URL('../../../../../scripts/generate-page-icons.mjs', import.meta.url).href
+  const { iconNames } = (await import(generator)) as { iconNames: () => string[] }
+  assert.deepEqual(iconNames(), [...names].sort(), 'node scripts/generate-page-icons.mjs writes these icons')
   for (const name of names) {
     const file = readFileSync(join(core, `${name}.svg`), 'utf8').trim()
     const inner = /^<svg\b[^>]*>([\s\S]*)<\/svg>$/.exec(file)![1]

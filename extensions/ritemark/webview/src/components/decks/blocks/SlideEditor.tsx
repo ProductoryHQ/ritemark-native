@@ -64,7 +64,7 @@ import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
-import { SlideIconPicker, WebPageDialog, type IconPick } from './SlideBlockTools'
+import { SlideIconPicker, UnknownIconHint, WebPageDialog, type IconHint, type IconPick } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
 import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
@@ -147,6 +147,7 @@ interface SlideTools {
   splitLine: () => boolean
   tab: (direction: 1 | -1) => boolean
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
+  hintIcon: (pos: number, anchor: HTMLElement, name: string) => void
 }
 
 /** A paragraph that holds only `***`, the caret at its end: Split slide here's shortcut (frame 22). */
@@ -324,6 +325,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const toolsRef = useRef<SlideTools | null>(null)
   const divHandlers = useMemo<SlideDivHandlers>(() => ({
     pickIcon: (pos, anchor, current) => toolsRef.current?.pickIcon(pos, anchor, current),
+    hintIcon: (pos, anchor, name) => toolsRef.current?.hintIcon(pos, anchor, name),
   }), [])
   // Small details 14: the Agenda reads the deck's sections from the handout's editor, and draws again as they change.
   const agendaSource = useMemo<AgendaSource>(() => ({
@@ -642,6 +644,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // ---- PR 3: the slide's / menu, its blocks' own tools, and the bar's and Settings' requests
 
   const [iconPick, setIconPick] = useState<IconPick | null>(null)
+  /** #850: the box's unknown icon being pointed at (its tooltip). */
+  const [iconHint, setIconHint] = useState<IconHint | null>(null)
+  const endIconHint = useCallback(() => setIconHint(null), [])
+  // Any change to the slide's words ends it (yours, an undo, or an AI's edit of the file): the box's place it holds may
+  // be another block's now.
+  useEffect(() => {
+    if (!editor || !iconHint) return
+    const changed = ({ transaction }: { transaction: Transaction }) => { if (transaction.docChanged) setIconHint(null) }
+    editor.on('transaction', changed)
+    return () => { editor.off('transaction', changed) }
+  }, [editor, iconHint])
   const [webPageAt, setWebPageAt] = useState<number | null>(null)
   /** Where the / menu's Picture goes once the host has saved it. */
   const pictureAt = useRef<number | null>(null)
@@ -837,6 +850,11 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     pickIcon: (pos, anchor, current) => {
       const rect = anchor.getBoundingClientRect()
       setIconPick({ pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current })
+      setIconHint(null)
+    },
+    // #850: never while the icon menu is open for it (the badge is under the menu's own place).
+    hintIcon: (pos, anchor, name) => {
+      if (!iconPick) setIconHint({ pos, anchor, name })
     },
   }
 
@@ -1265,6 +1283,16 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         editor.view.focus()
       }}
       onClose={() => setIconPick(null)}
+    />
+    <UnknownIconHint
+      frame={frame}
+      hint={iconHint}
+      onChoose={(hint, rect) => {
+        setIconHint(null)
+        // The menu as it is (its search, with the name in it, is Sprint 169's); No icon takes the name out of the file.
+        setIconPick({ pos: hint.pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current: hint.name })
+      }}
+      onDone={endIconHint}
     />
     <WebPageDialog
       open={webPageAt !== null}

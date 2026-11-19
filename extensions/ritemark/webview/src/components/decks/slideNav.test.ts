@@ -308,4 +308,43 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.ok(view.includes('const stop = wheelStop(state, delta, currentRef.current)'))
 }
 
+// A thumbnail is a picture of the slide (#856, the Experience lead): nothing inside it takes a click or a wheel, so a
+// click anywhere on it chooses the slide, and its columns and panes never show or catch a scrollbar. Before, a click on
+// the exact centre of a strip thumbnail with a long column hit that column's scaled-down scrollbar: no click reached
+// the thumbnail, and the slide wasn't chosen. The review of #875: the wall's grid and the presenter view's row and Next
+// draw the same pictures, and the copy a drag lifts too, so one rule covers them all.
+{
+  const flat = (css: string) => css.replace(/\/\*[^]*?\*\//g, '').replace(/\s+/g, ' ')
+  const decksCss = flat(readFileSync(new URL('./decks.css', import.meta.url), 'utf8'))
+  /** The declarations of the rule whose selector is exactly this. */
+  const rule = (css: string, selector: string) => new RegExp(`(^|\\}) ?${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`).exec(css)?.[2] ?? null
+  const thumbs = rule(decksCss, ':is(.deck-thumb, .deck-drag-ghost, .wall-grid, .pv-row, .pv-side) :is(.deck-sl, .deck-sl *)')
+  assert.ok(thumbs?.includes('pointer-events: none'), 'nothing in the picture takes the pointer')
+  // Every block's scrollbar, whatever its own rule sets (the stage's column sets one with five classes): its room and
+  // its fade stay, so the words wrap as on the stage, and it draws nothing.
+  assert.ok(thumbs?.includes('scrollbar-color: transparent transparent !important'), 'no scrollbar shows in a thumbnail')
+  // Nothing in a thumbnail takes the pointer back: no rule that gives it back names a slide's own parts or a thumbnail.
+  // (The stage's own layers, `.deck-block-layer > *` and `.deck-comment-spot`, are drawn over the stage, never in a
+  // thumbnail, and are one class each, below the thumbnails' two.)
+  const css = (name: string) => flat(readFileSync(new URL(name, import.meta.url), 'utf8'))
+  const giveBack = ['./decks.css', './slide/slide.css', './present/wall.css', './present/presenter.css']
+    .flatMap(name => Array.from(css(name).matchAll(/(?<=^|\})\s*([^{}]+?)\s*\{[^}]*pointer-events: auto[^}]*\}/g), m => m[1]))
+  const inPicture = /\.deck-sl\b|\.blk-|\.cb-|\.slide-|\.deck-thumb|\.deck-drag-ghost|\.wall-grid|\.pv-row|\.pv-side/
+  assert.ok(giveBack.includes('.deck-comment-spot') && inPicture.test('.deck-thumb .deck-sl .blk-column'), 'the guard sees the rules it reads')
+  assert.deepEqual(giveBack.filter(selector => inPicture.test(selector)), [], 'nothing in a thumbnail takes it back')
+  // The stage's columns and panes still scroll, with their scrollbar.
+  const slideCss = css('./slide/slide.css')
+  assert.ok(/overflow: hidden auto/.test(rule(slideCss, '.deck-sl.is-blocks .blk-flow > .blk-columns > .blk-column') ?? ''), "the stage's column scrolls")
+  assert.ok(/overflow: hidden auto/.test(rule(slideCss, '.deck-sl.is-blocks .blk-tabpane') ?? ''), "the stage's pane scrolls")
+  // Each thumbnail still chooses its slide on a click on itself: the strip's, the wall grid's and the presenter row's.
+  const stripSource = readFileSync(new URL('./SlideStrip.tsx', import.meta.url), 'utf8')
+  assert.ok(/data-thumb=\{index\}[^]*?onClick=\{\(\) => actions\.pick\(index\)\}[^]*?<div className="deck-thumb-slide">/.test(stripSource), "the strip thumbnail's own click picks it")
+  const wall = readFileSync(new URL('./present/DeckWall.tsx', import.meta.url), 'utf8')
+  assert.ok(/className=\{`wall-grid-item[^]*?onClick=\{\(\) => onGo\(slide\.number\)\}/.test(wall), "the wall grid's item takes the click")
+  const presenter = readFileSync(new URL('./present/DeckPresenterView.tsx', import.meta.url), 'utf8')
+  assert.ok(/className=\{`pv-thumb[^]*?onClick=\{\(\) => send\('present\/go'/.test(presenter), "the presenter row's thumbnail takes the click")
+  // The wall and the presenter view load this file, so the rule reaches them.
+  assert.ok(wall.includes("import '../decks.css'") && presenter.includes("import '../decks.css'"))
+}
+
 console.log('slideNav: passed')

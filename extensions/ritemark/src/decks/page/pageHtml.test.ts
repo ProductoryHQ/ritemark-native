@@ -18,6 +18,8 @@ import { PAGE_FONTS } from './pageFile';
 import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
+import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
+import { iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
@@ -515,6 +517,19 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.ok(/\.tw\.is-scrollable-left \{ --fade-l: transparent; \}/.test(html) && /\.tw\.is-scrollable-right \{ --fade-r: transparent; \}/.test(html), 'each side by its own class');
   assert.ok(!/\.tw[^{]*\{[^}]*(transition|animation)/.test(html), 'the fade appears and goes with no animation');
   assert.ok(/\.steps label > span \{ min-width: 0; flex: 1 1 auto; \}/.test(html), "a step's words take its width");
+}
+
+// #850: a box whose icon Ritemark doesn't know: on the page its badge stays, with the dashed circle in the placeholder
+// colour, inlined like every icon; a known icon is drawn as before; the name itself never reaches the page.
+{
+  const deckText = '---\ndeck: 2\n---\n\n```slide\n---\nid: i1\n---\n# Parts\n\n:::: boxes\n::: {.box icon="zebra-crossing"}\n### Unknown\n:::\n::: {.box icon="lightbulb"}\n### Known\n:::\n::::\n```\n\n## Parts\n';
+  const page = pageHtml(publicDeck(deckText, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest, pictureUrl });
+  const badges = parse(page).querySelectorAll('.blk-box > .blk-icon');
+  assert.deepEqual(badges.map(badge => badge.getAttribute('class')), ['blk-icon is-unknown', 'blk-icon'], 'both boxes keep their badge');
+  assert.ok(page.includes(`<span class="blk-icon is-unknown">${iconSvg(UNKNOWN_ICON as PageIconName, 28)}</span><h3>Unknown</h3>`), 'the dashed circle, inline');
+  assert.ok(page.includes(`<span class="blk-icon">${iconSvg('lightbulb', 28)}</span><h3>Known</h3>`), 'a known icon as before');
+  assert.ok(!page.includes('zebra-crossing'), 'the name stays in the deck, never on the page');
+  assert.ok(page.includes('.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph'), "the page's sheet draws it in the placeholder colour");
 }
 
 
