@@ -127,7 +127,10 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
   // rest; never native titles, and a pointer on its buttons (the global rule).
   const css = fs.readFileSync(path.join(here, '..', 'decks.css'), 'utf8')
   assert.match(css, /\.deck-slide > \.deck-behind-chip\.is-filled:where\(:not\(\.is-keep\):not\(:focus-within\)\) \{ opacity: 0; pointer-events: none; \}/)
-  assert.match(css, /\.deck-slide:hover > \.deck-behind-chip \.deck-behind-chip-full, \.deck-slide > \.deck-behind-chip:is\(\.is-keep, :focus-within\) \.deck-behind-chip-full \{ display: inline-flex; \}/)
+  assert.match(css, /\.deck-slide:hover > \.deck-behind-chip \.deck-behind-chip-full, \.deck-slide > \.deck-behind-chip:is\(\.is-keep, :focus-within\) \.deck-behind-chip-full \{ max-width: none; overflow: visible; opacity: 1; \}/)
+  // Folded, its buttons stay in the Tab order (never display: none), so the keyboard can reach and open it (Codex).
+  assert.match(css, /\.deck-behind-chip \.deck-behind-chip-full \{ display: inline-flex; [^}]*max-width: 0; overflow: hidden; opacity: 0; \}/)
+  assert.ok(!/deck-behind-chip-full \{[^}]*display: none/.test(css))
   assert.match(css, /\.deck-slide\.is-behind-chosen::after \{ content: ""; position: absolute; inset: 0; z-index: 6; border-radius: inherit; box-shadow: inset 0 0 0 3px var\(--r-accent\);/, "the ring round the whole slide")
   assert.ok(!/ title=/.test(renderToStaticMarkup(createElement(BehindChip, { place, filled: false, keep: false, onChoose: noop, onChatgpt: noop }))))
 }
