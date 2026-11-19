@@ -1032,6 +1032,82 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     chosenQuote.apply(wholeWords)
     assert.equal(markdownOf(chosenQuote), '# A prompt\n\n```\nYou are an analyst.\n\nWrite a summary of [the report].\n\nStop there.\n```')
   }
+
+  // The attribution stays with the quote's words (the Experience lead, 19 November), and one Undo gives it all back.
+  {
+    const SAID = ['# What the team said', '', '> It took ten minutes.', '>', '> Paste the report, then ask.', '>', '> — Team lead']
+    // The middle paragraph made code: "— Team lead" joins the words above it, not a quote of its own under the code.
+    const middle = bubbleCode(quoteDeck(SAID), 'Paste', null).stage
+    assert.equal(markdownOf(middle), '# What the team said\n\n> It took ten minutes.\n>\n> — Team lead\n\n```\nPaste the report, then ask.\n```')
+    middle.undo()
+    assert.equal(middle.save(), quoteDeck(SAID), 'one Undo, the quote as it was')
+    // With an empty line between the code and the attribution, the same.
+    const spaced = stageOn(openDeck(quoteDeck(SAID)), 0)
+    spaced.caretAfter('then ask.')
+    spaced.apply(spaced.inner.tr.split(spaced.inner.selection.from))
+    const spacedTr = spaced.inner.tr.setSelection(TextSelection.create(spaced.inner.doc, placeOf(spaced.inner.doc, 'Paste')))
+    assert.ok(run(SlideCodeBlock, 'toggleCodeBlock', spacedTr).done)
+    spaced.apply(spacedTr)
+    assert.equal(markdownOf(spaced), '# What the team said\n\n> It took ten minutes.\n>\n> — Team lead\n\n```\nPaste the report, then ask.\n```')
+    // Code from the start of the quote: the part after it keeps its words and its attribution.
+    const first = bubbleCode(quoteDeck(SAID), 'took', null).stage
+    assert.equal(markdownOf(first), '# What the team said\n\n```\nIt took ten minutes.\n```\n\n> Paste the report, then ask.\n>\n> — Team lead')
+    first.undo()
+    assert.equal(first.save(), quoteDeck(SAID))
+    // Everything but the attribution made code: "— Team lead" stays, a quote of one line; nothing goes by itself.
+    const allWords = bubbleCode(quoteDeck(SAID), 'It took', 'then ask.').stage
+    assert.equal(markdownOf(allWords), '# What the team said\n\n```\nIt took ten minutes.\n\nPaste the report, then ask.\n```\n\n> — Team lead')
+    allWords.undo()
+    assert.equal(allWords.save(), quoteDeck(SAID))
+    // An en dash is an attribution too; a hyphen is not.
+    const en = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '– '))), 'Paste', null).stage
+    assert.ok(markdownOf(en).includes('> It took ten minutes.\n>\n> – Team lead\n\n```'), markdownOf(en))
+    const hyphen = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '- '))), 'Paste', null).stage
+    assert.ok(markdownOf(hyphen).endsWith('```\n\n> \\- Team lead') || markdownOf(hyphen).endsWith('```\n\n> - Team lead'), markdownOf(hyphen))
+  }
+
+  // Round two of the review: a code block's language stays; a list whose last item is empty still counts as chosen
+  // whole; a quote of code with an empty line, chosen whole, toggles back; a selection made backwards stays backwards.
+  {
+    const TEXT_CODE = ['# A prompt', '', '> Context first.', '>', '> ```text', '> Summarise it.', '> ```']
+    const kept = stageOn(openDeck(quoteDeck(TEXT_CODE)), 0)
+    const keptTr = kept.inner.tr.setSelection(TextSelection.create(kept.inner.doc, placeOf(kept.inner.doc, 'Context'), placeOf(kept.inner.doc, 'Summarise it.', true)))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', keptTr).today, [])
+    kept.apply(keptTr)
+    assert.equal(markdownOf(kept), '# A prompt\n\n```text\nContext first.\n\nSummarise it.\n```', 'its language stays')
+    const two = ['# A prompt', '', '> ```text', '> One', '> ```', '>', '> ```python', '> two()', '> ```']
+    const twoStage = stageOn(openDeck(quoteDeck(two)), 0)
+    const twoTr = twoStage.inner.tr.setSelection(TextSelection.create(twoStage.inner.doc, placeOf(twoStage.inner.doc, 'One'), placeOf(twoStage.inner.doc, 'two()', true)))
+    // All code: toggled back, as before; and with a line of words among two languages, today's path too.
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', twoTr).today, ['toggleNode'])
+    const mixed = stageOn(openDeck(quoteDeck(['# A prompt', '', '> Both:', '>', ...two.slice(2)])), 0)
+    const mixedTr = mixed.inner.tr.setSelection(TextSelection.create(mixed.inner.doc, placeOf(mixed.inner.doc, 'Both'), placeOf(mixed.inner.doc, 'two()', true)))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', mixedTr).today, ['toggleNode'], 'two languages: never one of them for both')
+
+    const listed = stageOn(openDeck(quoteDeck(['# A prompt', '', '> Ask for:', '>', '> 1. risks', '> 2. costs'])), 0)
+    listed.caretAfter('costs')
+    listed.apply(listed.inner.tr.split(listed.inner.selection.from, 2))
+    assert.equal(markdownOf(listed).split('\n').length, 7, markdownOf(listed))
+    const listedTr = listed.inner.tr.setSelection(TextSelection.create(listed.inner.doc, placeOf(listed.inner.doc, 'Ask'), placeOf(listed.inner.doc, 'costs', true)))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', listedTr).today, [], 'an empty last item: the list still chosen whole')
+
+    const spacer = stageOn(openDeck(quoteDeck(['# A prompt', '', '> ```text', '> Summarise it.', '> ```'])), 0)
+    let codeEnd = -1
+    spacer.inner.doc.descendants((node, pos) => { if (node.type.name === 'codeBlock') codeEnd = pos + node.nodeSize; return true })
+    spacer.apply(spacer.inner.tr.insert(codeEnd, spacer.inner.schema.nodes.paragraph.create()))
+    let spacerAt = -1
+    spacer.inner.doc.forEach((node, offset) => { if (node.type.name === 'blockquote') spacerAt = offset })
+    const spacerTr = spacer.inner.tr.setSelection(NodeSelection.create(spacer.inner.doc, spacerAt))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', spacerTr).today, ['toggleNode'], 'code and an empty line: toggled back')
+
+    const back = stageOn(openDeck(QUOTE_DECK), 0)
+    const backTr = back.inner.tr.setSelection(TextSelection.create(back.inner.doc, placeOf(back.inner.doc, 'Write a', true), placeOf(back.inner.doc, 'You')))
+    assert.ok(run(SlideCodeBlock, 'toggleCodeBlock', backTr).done)
+    back.apply(backTr)
+    const { anchor, head } = back.inner.selection
+    assert.ok(head < anchor, 'still backwards')
+    assert.equal(back.inner.doc.textBetween(head, anchor), 'You are an analyst.\n\nWrite a')
+  }
 }
 
 console.log('slideCommands: passed')

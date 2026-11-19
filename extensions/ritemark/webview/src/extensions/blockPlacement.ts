@@ -1,7 +1,11 @@
 /**
- * Where a block chosen from a / menu goes, the one rule the slide editor (`slideCommands.insertSlideBlock`) and the Text
- * editor's Button (`buttonBlock/buttonCommands.insertButton`) both use (Sprint 163 PR 3: one placement, never two
- * copies). Pure ProseMirror, and no import of a menu's items, so both menus' modules can use it.
+ * Where a block goes. Pure ProseMirror, with no import of a menu's items or of deck code, so the Text editor's modules
+ * can use it too.
+ *  - `placeBlock`: where a block chosen from a / menu goes, the one rule the slide editor (`slideCommands.insertSlideBlock`)
+ *    and the Text editor's Button (`buttonBlock/buttonCommands.insertButton`) both use (Sprint 163 PR 3: one
+ *    placement, never two copies).
+ *  - `codeOutOfQuote` (Sprint 168 PR 2): on a slide, Code block on words in a quote puts them in a code block out of
+ *    it (`SlideCodeBlock`, whose module the Text editor's code block shares).
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, TextSelection, type Transaction } from '@tiptap/pm/state'
@@ -73,6 +77,7 @@ function joinedWords(node: PMNode, gap: string): string | null {
  */
 function codeWordsOf(node: PMNode): string | null {
   if (node.isTextblock) {
+    // A code block's words are its own; its language is carried by `codeOutOfQuote`.
     let words = ''
     let whole = true
     node.forEach(child => {
@@ -107,37 +112,44 @@ function emptyLines(node: PMNode, from: number, to: number): boolean {
   return true
 }
 
-/** The first line's start and the last line's end inside a block at `pos` (its own, for a line). */
+/**
+ * The first words' start and the last words' end inside a block at `pos` (a line's own): empty lines at its start and
+ * end aren't counted, so a selection that looks whole is whole. -1 when it has no line.
+ */
 function wordsSpan(node: PMNode, pos: number): { start: number; end: number } {
-  let start = -1
-  let end = -1
   if (node.isTextblock) return { start: pos + 1, end: pos + node.nodeSize - 1 }
+  const lines: Array<{ start: number; end: number; empty: boolean }> = []
   node.descendants((child, offset) => {
     if (!child.isTextblock) return true
     const at = pos + 1 + offset
-    if (start < 0) start = at + 1
-    end = at + child.nodeSize - 1
+    lines.push({ start: at + 1, end: at + child.nodeSize - 1, empty: child.content.size === 0 })
     return false
   })
-  return { start, end }
+  const worded = lines.filter(line => !line.empty)
+  const span = worded.length ? worded : lines
+  return span.length ? { start: span[0].start, end: span[span.length - 1].end } : { start: -1, end: -1 }
 }
+
+/** A quote's attribution line: a paragraph that starts with a dash, "— Name" or "– Name" (the spec's R1). */
+const isAttribution = (node: PMNode) => node.type.name === 'paragraph' && /^[\u2014\u2013] /.test(node.textContent)
 
 /**
  * Sprint 168 PR 2 (the decks README, "Quotes, prompts and heading levels on a slide", item 2; Jarmo's quote held a
  * prompt): on a slide, Code block on words inside a quote takes them out of it. The quote's blocks the selection is in
  * become one code block in their place, with Copy and ↗, a paragraph's words a blank line from the next one's; what is
  * left of the quote above and below stays a quote, split around it, and a part of it left with no words goes, so a quote
- * left empty goes. It leaves every quote around them (a quote in a quote) but never a box, a column, a list or a tab's
- * pane, and it is one transaction marked `SLIDE_COMMAND`, so one Undo gives the quote back as it was. The words keep
- * their letters and line breaks; their marks (bold, a link's address, a comment's highlight) go, as in any code block.
+ * left empty goes. An attribution stays with the quote's words (the Experience lead, 19 November): when the part after
+ * the code block holds only it ("— Name"), it joins the part before; with no words before, it stays a one-line quote.
+ * It leaves every quote around them (a quote in a quote) but never a box, a column, a list or a tab's pane, and it is
+ * one transaction marked `SLIDE_COMMAND`, so one Undo gives the quote back as it was. The words keep their letters and
+ * line breaks, and a chosen code block's language stays; their marks (bold, a link's address, a comment's highlight)
+ * go, as in any code block.
  *
  * Nothing changes, and false is returned, when the selection isn't inside one quote; when it is all in code blocks
  * already (Code block then toggles them back); when it takes only part of a list or of a quote in the quote (the rest
- * of it would go with it); or when a chosen block holds what a code block can't (a picture, math, a table). Code block
- * then does what it does everywhere. With `dispatch` false it only says whether it would (TipTap's `can()`).
- *
- * Here beside `placeBlock`, pure ProseMirror with no deck import, since the slide's code block (`SlideCodeBlock`)
- * shares its module with the Text editor's.
+ * of it would go with it); when the chosen code blocks have different languages; or when a chosen block holds what a
+ * code block can't (a picture, math, a table). Code block then does what it does everywhere. With `dispatch` false it
+ * only says whether it would (TipTap's `can()`).
  */
 export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unknown> | null, dispatch = true): boolean {
   const doc = tr.doc
@@ -154,12 +166,14 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
   // The innermost quote holding the whole selection, and its blocks the selection is in.
   const range = $from.blockRange($to, node => node.type === quote)
   if (!range) return false
+  // All code already (empty lines aside): Code block toggles it back, as it does everywhere.
   let lines = 0
   let codeLines = 0
   doc.nodesBetween(from, to, node => {
     if (!node.isTextblock) return true
-    lines++
     if (node.type === code) codeLines++
+    else if (node.content.size === 0) return false
+    lines++
     return false
   })
   if (lines > 0 && codeLines === lines) return false
@@ -179,10 +193,18 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
   const parts = chosen.map(codeWordsOf)
   if (parts.some(part => part === null)) return false
   const words = parts.join(PARAGRAPH_GAP)
+  // A chosen code block's language stays (a ```text prompt, a diagram); two different ones can't both.
+  const languages = new Set<string>()
+  for (const node of chosen) {
+    node.descendants(child => { if (child.type === code && child.attrs.language) languages.add(String(child.attrs.language)); return !child.isTextblock })
+    if (node.type === code && node.attrs.language) languages.add(String(node.attrs.language))
+  }
+  if (languages.size > 1) return false
+  const language = attributes?.language ?? [...languages][0] ?? null
 
   // On a scratch copy first: the steps are taken only when the code block got out of at least one quote.
   const step = new Transform(doc)
-  step.replaceWith(range.start, range.end, code.create(attributes ?? null, words ? schema.text(words) : null))
+  step.replaceWith(range.start, range.end, code.create({ ...attributes, language }, words ? schema.text(words) : null))
   let place = range.start
   let lifted = 0
   for (;;) {
@@ -199,6 +221,17 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
     if (index > 0 && emptyLines(holder, 0, index)) {
       step.delete($place.start(), place)
       place = $place.start()
+    }
+    // The attribution stays with the words above the code block: a part after it that holds only "— Name" (empty lines
+    // aside) joins the part before. With no words before, it stays where it is, a quote of one line.
+    const $now = step.doc.resolve(place)
+    const rest = $now.parent
+    const here = $now.index()
+    const last = rest.child(rest.childCount - 1)
+    if (here > 0 && here + 1 < rest.childCount && isAttribution(last) && emptyLines(rest, here + 1, rest.childCount - 1)) {
+      step.delete(place + size, $now.end())
+      step.insert(place, last)
+      place += last.nodeSize
     }
     const lift = step.doc.resolve(place).blockRange(step.doc.resolve(place + size))!
     const before = step.steps.length
@@ -224,8 +257,10 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
   }
   for (const each of step.steps) tr.step(each)
   const inside = place + 1
-  const anchor = inside + (empty ? wordAt(from, true) : wordAt(from, false))
-  const head = empty ? anchor : inside + wordAt(to, true)
-  tr.setSelection(TextSelection.create(tr.doc, anchor, head)).setMeta(SLIDE_COMMAND, true)
+  const start = inside + (empty ? wordAt(from, true) : wordAt(from, false))
+  const end = empty ? start : inside + wordAt(to, true)
+  // A selection made backwards stays backwards, so Shift and an arrow go on from the same end.
+  const backwards = selection.head < selection.anchor
+  tr.setSelection(TextSelection.create(tr.doc, backwards ? end : start, backwards ? start : end)).setMeta(SLIDE_COMMAND, true)
   return true
 }
