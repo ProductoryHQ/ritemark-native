@@ -30,14 +30,15 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-bl
 - [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 4: picture behind, D (High), branch `sprint-167-block-details-pr4`, after PR 1 and PR 3
-- [x] Issue created in milestone v2.3.0 (manager): #838: to be created
-- [ ] Corner chip replaces the centred prompt, at rest a round handle, opening on hover (R4)
-- [ ] Choosing Behind with no picture opens the chooser; paste or drop anywhere goes behind
-- [ ] Placed picture: click chooses, ring, picture bar without Size or Crop, hover chip, paste or drop replaces (R5)
-- [ ] Replace… and Remove under Behind in Slide settings
-- [ ] Tests: paste, drop, replace, remove; the chip never takes the words' clicks
-- [ ] Shots empty and placed, logo top right and not; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Issue created in milestone v2.3.0 (manager): #838
+- [x] Corner chip replaces the centred prompt, at rest a round handle, opening on hover (R4) (`blocks/BehindChip.tsx`, `blocks/behindChipPlace.ts`)
+- [x] Choosing Behind with no picture opens the chooser; paste or drop anywhere goes behind
+- [x] Placed picture: click chooses, ring, picture bar without Size or Crop (Focus first, its dot moved by the arrow keys too), hover chip, paste or drop replaces (R5)
+- [x] Replace… and Remove under Behind in Slide settings (Choose… while it is empty)
+- [x] Tests: paste, drop, replace, remove; the chip never takes the words' clicks (`blocks/behindChip.test.ts`, `handout/deckConvert.test.ts`)
+- [x] Shots empty and placed, logo in each corner (`proof/pr4-picture-behind/`)
+- [ ] The Experience lead's look (before the merge)
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 5: item handle, B (High), branch `sprint-167-block-details-pr5`, after Sprint 166 merges
 - [x] Issue created in milestone v2.3.0 (manager): #839: to be created
@@ -46,7 +47,7 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-bl
 - [ ] Backspace in an empty item still removes it; the handle covers no words
 - [ ] Tests: each menu action with undo; the drop line
 - [ ] Shots of the box, column and item handles; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## Sprint end
 - [ ] Full test chain once per final head

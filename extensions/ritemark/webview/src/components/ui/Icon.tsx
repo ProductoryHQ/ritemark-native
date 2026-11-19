@@ -31,6 +31,7 @@ import {
   TextAlignLeft,
   TextAlignRight,
   Crop,
+  Crosshair,
   Rectangle,
   SquareHalf,
   ArrowRight,
@@ -397,6 +398,8 @@ const iconMap = {
   'text-align-right': TextAlignRight,
   // Experience 49: the picture's bar (Crop; Place In text, and Left / Right as one half of a square, drawn mirrored).
   'crop': Crop,
+  // Sprint 167 PR 4: a side picture's Focus, what stays in view (decks README item D).
+  'crosshair': Crosshair,
   'rectangle': Rectangle,
   'square-half': SquareHalf,
   // Sprint 163: the Tabs block (the / menu, its bar) and a tab's Duplicate.

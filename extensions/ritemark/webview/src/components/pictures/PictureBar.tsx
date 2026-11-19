@@ -57,6 +57,11 @@ export interface PictureBarProps {
   onChatgpt?: (mode: 'new' | 'change') => void
   /** The picture is a file in the project, so ChatGPT can change it (a web address can't be sent). Default true. */
   chatgptCanChange?: boolean
+  /**
+   * Sprint 167 PR 4 (decks README item D): a side picture's Focus, first in its bar: the keyboard goes to the dot that
+   * says what stays in view (drag it, or move it with the arrow keys). Absent: no Focus.
+   */
+  onFocusPoint?: () => void
   onReplace: () => void
   onCopy: () => void
   onReveal: () => void
@@ -324,9 +329,15 @@ export function PictureBar(props: PictureBarProps) {
               </BarButton>
             </>
           ) : null}
+          {kind === 'side' && !empty && props.onFocusPoint ? (
+            <BarButton tip="What stays in view: drag the dot on the picture, or move it with the arrow keys" label="Focus" onClick={props.onFocusPoint}>
+              <Icon name="crosshair" size={14} tone="inherit" />
+              {fold >= 1 ? null : 'Focus'}
+            </BarButton>
+          ) : null}
           {context === 'slide' && props.onPlace ? (
             <>
-              {kind === 'flow' ? <Divider /> : null}
+              {kind === 'flow' || (kind === 'side' && !empty && props.onFocusPoint) ? <Divider /> : null}
               <Group label="Place">
                 {PLACES.map(option => (
                   <BarButton key={option.value} label={option.label} tip={option.tip} active={place === option.value} onClick={() => props.onPlace?.(option.value)}>
