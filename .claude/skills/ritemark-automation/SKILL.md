@@ -463,6 +463,22 @@ embed-partner source check) in minutes each.
   over Reload Window: reloads can restore a custom-editor webview with stale
   HTML and you'll be debugging the previous build.
 
+### Reloading: only Reload Window, never a raw CDP `Page.reload`
+
+- Reload a test window only with VS Code's own Reload Window
+  (`workbench.action.reloadWindow`: the command palette's
+  "Developer: Reload Window", as in the feature-flag recipe above).
+- **Never send a raw CDP `Page.reload`** to the workbench page. It leaves the
+  old IPC connection subscribed, so every file read comes back twice (once
+  more per raw reload), and auto-save in a plain text editor then writes the
+  doubled text to disk (#860, 19 November 2026).
+- A renderer crash followed by **Reopen** does not do this (checked on 20
+  November 2026: twice, with a plain `.md` file open in the text editor, its
+  text came back once and its bytes on disk stayed the same). To test a crash,
+  crash the window from the main process (`webContents.forcefullyCrashRenderer()`
+  over its inspector, `--inspect=<port>` after `--` on the launch) rather
+  than from the page.
+
 ## Cleanup — always do this
 
 Leaving Code-OSS running consumes 1–4 GB of RAM and holds the CDP port. After every automation run:
