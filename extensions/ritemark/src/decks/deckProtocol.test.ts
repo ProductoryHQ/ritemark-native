@@ -81,6 +81,15 @@ assert.deepEqual(decodeLibraryRequest({ type: 'library/insert', path: 'Slide lib
 assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1', extra: 1 }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: '../g1' }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/open', path: '../../etc/passwd' }), null, 'only a deck is opened');
+// Sprint 165 PR 2: Take section sends the section's slide ids, in order; each one a slide id, none twice, at least one.
+assert.deepEqual(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: ['s1', 'a2', 'b3'] }), { type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: ['s1', 'a2', 'b3'] });
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: [] }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: ['s1', 's1'] }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: ['s1', '../x'] }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: 's1' }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'notes.md', ids: ['s1'] }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: Array.from({ length: 201 }, (_, i) => `i${i}`) }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clients/Day 2.deck.md', ids: ['s1'], after: 3 }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/search', query: 'x'.repeat(201) }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/ready', more: true }), null);
 assert.equal(decodeLibraryRequest('library/ready'), null);

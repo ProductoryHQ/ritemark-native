@@ -241,6 +241,37 @@ export function wallBleed(frame: { width: number; left: number; top: number }, c
   return { x: side(frame.left), y: side(frame.top) }
 }
 
+/** The quiet line at the wall's foot (the published page's `.line`): 44 px high. */
+export const WALL_LINE_HEIGHT = 44
+/** The wall's floating bar is 48 px high; its bottom sits 12 px from the screen's edge (Sprint 166 Fix 6, #842). */
+export const WALL_BAR_HEIGHT = 48
+export const WALL_BAR_FROM_EDGE = 12
+/** The slide's own bottom margin, which the flow never draws in: 34 of 540. */
+export const SLIDE_BOTTOM_MARGIN = 34 / 540
+
+/**
+ * Sprint 166 Fix 6 (#842): where the bar's bottom sits, in px from the screen's bottom edge, for a frame `frameBottom`
+ * px above that edge. At the screen's foot, never over the slide's words: in the ground below the 16:9 content on a
+ * wider screen, in the slide's own bottom margin on a 16:9 one.
+ */
+export function wallBarBottom(_frameBottom: number): number {
+  return WALL_BAR_FROM_EDGE
+}
+
+/** The bar's classes: shown while the pointer moves (or rests on it), faded otherwise. */
+export function wallBarClass(barVisible: boolean): string {
+  return `wall-bar dark${barVisible ? ' is-shown' : ''}`
+}
+
+/**
+ * The quiet line's classes (Sprint 166 PR 6, the Experience lead): while the bar shows, the line fades out with the
+ * bar's own timing, and it comes back when the bar fades. The bar already says "n of N", so the line's "n / N" would
+ * only repeat it, and a long client name never runs under the bar.
+ */
+export function wallLineClass(barVisible: boolean): string {
+  return `wall-line${barVisible ? ' is-hidden' : ''}`
+}
+
 /** The presenter view's clock: elapsed time as m:ss, or h:mm:ss past an hour. */
 export function clockText(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))

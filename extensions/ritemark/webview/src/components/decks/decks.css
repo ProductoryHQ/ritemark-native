@@ -417,7 +417,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* The same when the column, box or pane ends with a comment note (never drawn), so the stage measures as the renderer draws. */
 .deck-sl.is-blocks.is-editing :is(.blk-column, .blk-box > .blk-inner, .blk-tabpane) > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
 .deck-sl.is-blocks.is-editing .blk-pill, .deck-sl.is-blocks.is-editing .blk-icon, .deck-sl.is-blocks.is-editing .blk-mark { user-select: none; }
-.deck-sl.is-blocks.is-editing blockquote { border-left: 0; }
 .deck-sl.is-blocks.is-editing table { width: auto; }
 .deck-sl.is-blocks.is-editing th { border: 0; }
 .deck-sl.is-blocks.is-editing td { border-left: 0; border-right: 0; border-bottom: 0; }
@@ -524,3 +523,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-spot .deck-sl .is-spot-dim { opacity: 0.3; }
 @media (prefers-reduced-motion: reduce) { .deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: none; } }
 .vscode-reduce-motion .deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: none; }
+/* Sprint 165 PR 2 (README "A section in one move"): an open deck's sections, each heading its number, title and Take section. */
+/* The number and Take section sit on the title's first line, as a deck row's caret sits on its name's (the lead on
+   #861). The first line is 12.5px x 1.25 = 15.6px tall from the 5px padding: the 18px number goes 1px up, the 24px
+   button 4px up from the padding (top: 1px), so all three share its middle. */
+.deck-lib-section-head { position: relative; display: flex; align-items: flex-start; gap: 8px; min-height: 28px; padding: 5px 0; margin: 6px 8px 0; }
+.deck-lib-section-number { display: inline-grid; place-items: center; flex: none; min-width: 18px; height: 18px; margin-top: -1px; padding: 0 4px; border-radius: 9px; background: var(--r-warning-surface, var(--r-surface-soft)); color: var(--r-warning-ink, var(--r-ink-body)); font: 700 11px/1 var(--ritemark-ui-font-family); }
+.deck-lib-section-title { flex: 1; min-width: 0; font: 600 12.5px/1.25 var(--ritemark-ui-font-family); color: var(--r-ink-strong); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.deck-lib-take { flex: none; white-space: nowrap; height: 24px; padding: 0 8px; gap: 4px; font-size: 12px; }
+/* #861 (the Experience lead): at rest the title has the heading's full width; Take section shows at its right, over
+   the title's end on the side bar's ground, only while the pointer is over the section or the heading holds focus. */
+.deck-lib-take-slot { position: absolute; right: 0; top: 1px; display: flex; padding-left: 16px; background: linear-gradient(to right, transparent, var(--vscode-sideBar-background) 14px); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+.deck-lib-section:hover .deck-lib-take-slot,
+.deck-lib-section-head:has(:focus-visible) .deck-lib-take-slot { opacity: 1; pointer-events: auto; }
+.deck-lib-take[aria-disabled="true"] { opacity: 0.5; cursor: default; }

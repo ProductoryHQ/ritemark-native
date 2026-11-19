@@ -51,4 +51,15 @@ for (const editorHasFocus of [true, false]) {
   assert.equal(bubbleHost({ getElementById: () => null, body }), body)
 }
 
+// #846: the bubble steps aside while its Link dialog is open, on a slide and in the Text editor alike.
+// Open: never shows, whatever the focus and selection (the dialog's input has the focus, the words stay selected).
+for (const editorHasFocus of [true, false]) {
+  for (const focusInToolbar of [true, false]) {
+    assert.equal(formattingToolbarShows({ ...base, editorHasFocus, focusInToolbar, linkDialogOpen: true }), false)
+  }
+}
+assert.equal(formattingToolbarShows({ ...base, linkDialogOpen: false }), true, 'closed: the rule as before')
+// Closed again: the editor has the focus back and the words are still selected, so it shows (Cancel or Esc).
+assert.equal(formattingToolbarShows({ ...base, editorHasFocus: true, linkDialogOpen: false }), true)
+
 console.log('formattingToolbar: all passed')

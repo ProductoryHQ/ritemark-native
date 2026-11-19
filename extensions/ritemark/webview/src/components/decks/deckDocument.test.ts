@@ -4,6 +4,7 @@
 import { strict as assert } from 'node:assert'
 import { getSchema } from '@tiptap/core'
 import { EditorState } from '@tiptap/pm/state'
+import { history, undo } from '@tiptap/pm/history'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { createEditorSchemaExtensions } from '../../utils/editorMarkdown'
 import { editorMarkdown, installTestDocument } from '../../utils/markdownFidelity'
@@ -170,5 +171,17 @@ assert.equal(partIndexAt(doc, slidesOf(doc)[1].pos + 3), 1)
   assert.equal(initialRatio(Number.NaN), 0.4)
 }
 
+
+// Sprint 165 PR 2: Take section's slides go in as one insert after the current slide, in their order, each with its
+// handout, and one undo takes them all out again.
+{
+  const withHistory = EditorState.create({ doc, plugins: [history()] })
+  const section = partContent(doc, 1)!.append(partContent(doc, 2)!)
+  const taken = withHistory.apply(restoreSlide(withHistory, 1, section))
+  assert.deepEqual(order(taken.doc), ['Preamble', '[A]', 'a text', '[B]', 'b text', 'b more', '[C]', 'c text', '[B]', 'b text', 'b more', '[C]', 'c text'])
+  let undone = taken
+  assert.equal(undo(taken, tr => { undone = taken.apply(tr) }), true)
+  assert.ok(undone.doc.eq(doc), 'one undo removes every slide of the section')
+}
 
 console.log('deckDocument: passed')

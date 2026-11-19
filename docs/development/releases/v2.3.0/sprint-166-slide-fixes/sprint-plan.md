@@ -58,31 +58,43 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 5: a Quote's leaked look (PR 5, issue #841)
 [#841](https://github.com/ProductoryHQ/ritemark-native/issues/841): in the editor, the strip, the wall and the presenter view a Quote on a dark slide is drawn as a near-white box, because VS Code's webview stylesheet gives blockquotes a fill of their own. `.deck-sl.is-blocks blockquote` sets `background: none`, `border: 0` and its own padding and colour, so nothing of VS Code's or `.ProseMirror`'s quote style reaches a slide. The quote's own look is designed separately with Jarmo.
-- [ ] A test that the slide's blockquote has no fill or border from outside; shots on a dark slide and on Paper, in the editor and on the wall, with the page for comparison.
+- [x] A test that the slide's blockquote has no fill or border from outside; shots on a dark slide and on Paper, in the editor and on the wall, with the page for comparison.
 
 ### Fix 6: the Present bar at the screen's foot (PR 6, issue #842)
 [#842](https://github.com/ProductoryHQ/ritemark-native/issues/842): the wall's floating bar sits at the screen's foot, centred, its bottom 12 px from the edge, never over the slide's words: in the ground below the 16:9 content on a wider screen (1440×900 leaves a 45 px band), in the slide's own bottom margin on a 16:9 screen. It still shows on pointer movement and fades after 2 s.
-- [ ] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right.
+- [x] The bar sits 12 px from the screen's foot, its box outside the content box at 16:10 and 16:9 sizes (`wallBar.test.ts`, PR 6).
+- [x] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right (`proof/pr6-present-bar/`).
+- [x] The Experience lead's rule: while the bar shows, the quiet line fades out with the bar's timing and comes back when the bar fades (`wallBar.test.ts`); one shot at 1440×900 with the bar showing and the line hidden (`proof/pr6-present-bar/present-bar-line-hidden-1440x900.png`).
 
 ### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
-- [ ] A test, and one shot with the Link dialog open.
+- [x] A test, and one shot with the Link dialog open.
 
 ## Added on 19 November, second time (Jarmo: "jah, lisa mõlemad sprinti 166")
 
 ### Fix 8: a Button's own words (PR 8, issue #848)
 [#848](https://github.com/ProductoryHQ/ritemark-native/issues/848): the button's words can't be typed into, or nothing shows they can. The design (decks README, Button, Editing) says a click chooses the block and then its words and the words beside it are typed in place. Likely cause, not proven: with no words the pill's editable span has no width (the placeholder is a CSS `::before` with `pointer-events: none` beside a `contenteditable=false` icon), so the caret can't get in; or the open Address sheet keeps the focus. A live check first; if it works and is only undiscoverable, it goes back to the Experience lead as UX.
-- [x] A test that fails before; shots of an empty and a filled button being typed into (`proof/pr8-button-words/`). The live check found the bug: a click on the button's icon put the caret at the start of the slide's title (or a document's first line), and the words typed went there; and with a new button's address sheet open, a click on the button took the new button away. Now a click anywhere on the button puts the caret in its words, the sheet stays open while you type them, and Enter in them goes on to the address while the sheet is open.
+- [x] A test that fails before; shots of an empty and a filled button being typed into (`proof/pr8-button-words/`). The live check found the bug: a click on the button's icon put the caret at the start of the slide's title (or a document's first line), and the words typed went there; and with a new button's address sheet open, a click on the button took the new button away. Now a click anywhere on the button puts the caret in its words, the sheet stays open while you type them, and while a new button's sheet asks for its address, Enter in them goes on to it. A new button left without an address after words were typed on it goes as an undo step, so ⌘Z brings it back.
 
 ### Fix 9: an unknown icon name (PR 9, issue #850)
 [#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
 - [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
 
+## Added on 19 November, third time (Jarmo: "jah kõigile kolmele")
+
+### Fix 10: a gesture over the slide in Slide and handout (PR 10, issue #855)
+[#855](https://github.com/ProductoryHQ/ritemark-native/issues/855): over the slide, a gesture means the same in every view. In Slide and handout a wheel or flick over the slide moves one slide, as in Slide only, and the handout scrolls to that slide's part (the strip click's path); over the handout's text the wheel scrolls the text as now and the slide follows the part being read; a long column or pane still scrolls first (#849).
+- [ ] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+
+### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
+[#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
+- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+
 ## For every PR
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848` and `#850`, one per PR.
+- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848`, `#850`, `#855` and `#856`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 
