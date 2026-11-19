@@ -141,7 +141,7 @@ const DECK = [
 // ---- The menu (frame 22): its groups and shortcuts; the Text editor's own menu is unchanged.
 {
   assert.deepEqual(SLIDE_ITEMS.map(item => `${item.group}: ${item.title}${item.shortcut ? ` ${item.shortcut}` : ''}`), [
-    'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.', 'Text: Code block ```',
+    'Text: Heading 1 #', 'Text: Heading 2 ##', 'Text: Heading 3 ###', 'Text: Bullet list -', 'Text: Numbered list 1.', 'Text: Code block ```',
     'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Tabs', 'Blocks: Button', 'Blocks: Agenda', 'Blocks: Label',
     'Media: Picture', 'Media: Web page',
     'Slides: New slide below', 'Slides: Split slide here ***',
@@ -199,13 +199,28 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   stage.apply(stage.inner.tr.split(stage.inner.selection.from))
   const from = stage.inner.selection.from
   stage.apply(stage.inner.tr.insertText('/ti'), true)
-  // Title (#): the line as an H1, as the menu's chain sets it.
+  // Heading 1 (#, the old Title): the line as an H1, as the menu's chain sets it.
   const tr = stage.inner.tr.delete(from, from + 3).insertText('Next', from).setBlockType(from, from, stage.inner.schema.nodes.heading, { level: 1 }).setMeta(SLIDE_COMMAND, true)
   stage.apply(tr)
   assert.ok(stage.save().includes('Three jobs every week or two\n\n# Next'), stage.save())
   assertStable(stage.save(), 'Title')
   stage.undo()
-  assert.equal(stage.save(), typed, 'one Undo takes the Title back and keeps the words typed before it')
+  assert.equal(stage.save(), typed, 'one Undo takes the Heading 1 back and keeps the words typed before it')
+}
+
+// Heading 3 (###, Sprint 168 PR 3): the menu's item makes the line an H3, written `###`, stable, and one Undo.
+{
+  const stage = stageOn(openDeck(DECK), 0)
+  stage.caretAfter('Three jobs every week')
+  stage.apply(stage.inner.tr.split(stage.inner.selection.from))
+  const before = stage.save()
+  const from = stage.inner.selection.from
+  const item = SLIDE_ITEMS.find(entry => entry.title === 'Heading 3')!
+  stage.apply(stage.inner.tr.insertText('Next', from).setBlockType(from, from, stage.inner.schema.nodes.heading, item.attrs).setMeta(SLIDE_COMMAND, true))
+  assert.ok(stage.save().includes('Three jobs every week\n\n### Next'), stage.save())
+  assertStable(stage.save(), 'Heading 3')
+  stage.undo()
+  assert.equal(stage.save(), before, 'one Undo takes the Heading 3 back')
 }
 
 // The Web page item: a link to the page on its own line; the address only http(s).
@@ -525,6 +540,19 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   let paneText = -1
   inPane.doc.descendants((node, pos) => { if (paneText < 0 && node.type.name === 'paragraph') paneText = pos + 1; return paneText < 0 })
   assert.ok(slideItemsAt(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))).some(item => item.nodeType === 'label'), 'offered in a tab\'s pane')
+  // Sprint 168 PR 3: a tab's pane never offers Heading 1 (the slide's title), nor the heading at the tabs' own level, which
+  // the pane keeps one level under them (under `##` tabs, Heading 2 would come out as Heading 3); the slide all three.
+  const headingsIn = (state: EditorState) => slideItemsAt(state).filter(item => item.nodeType === 'heading').map(item => item.title)
+  const caretInPane = (markdown: string) => {
+    const state = EditorState.create({ doc: loadSlide(markdown) })
+    let at = -1
+    state.doc.descendants((node, pos) => { if (at < 0 && node.type.name === 'paragraph') at = pos + 1; return at < 0 })
+    return state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)))
+  }
+  assert.deepEqual(headingsIn(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))), ['Heading 3'], 'under ## tabs')
+  assert.deepEqual(headingsIn(caretInPane('::: {.panel-tabset}\n# One\n\nWords\n:::')), ['Heading 2', 'Heading 3'], 'under # tabs')
+  assert.deepEqual(headingsIn(caretInPane('::: {.panel-tabset}\n### One\n\nWords\n:::')), ['Heading 2'], 'under ### tabs')
+  assert.deepEqual(headingsIn(EditorState.create({ doc: loadSlide('# A slide\n\nWords') })), ['Heading 1', 'Heading 2', 'Heading 3'])
 }
 
 // ---- Tables: the + bars (experience 48, in place of Settings' Add a row and Add a column) write valid Markdown

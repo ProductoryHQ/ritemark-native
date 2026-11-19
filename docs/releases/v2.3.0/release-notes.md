@@ -59,6 +59,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
 - **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides, with their handout and prompts, after the slide you're on, and one undo takes them out again.
 - **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it, and a tick marks the slides already in your deck.
+- **The library offers the slides you repeat.** When a few slides are in most of your decks, the Slide library offers them at its top. **Add all** puts them in a topic called Every training, **Choose…** lets you pick, and **Not now** hides them for good. Nothing is added until you choose.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
 - **The toolbar steps aside while you add a link.** On a slide, the toolbar hides while you type the link's address, so it covers nothing. It comes back when you're done.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
@@ -74,6 +75,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
 - **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
+- **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
 <!-- DECKS END -->
 
 ## Smaller changes

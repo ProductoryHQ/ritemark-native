@@ -179,3 +179,30 @@ export function hitsCount(shown: number, total: number): string {
 export function decksCount(shown: number, total: number): string {
   return countOf(shown, total, 'deck')
 }
+
+/**
+ * Sprint 165 PR 4 (README "The library offers what he repeats"): the offer's words. Its first line counts the slides
+ * ("These 4 slides are in most of your decks."), its second says what Add does.
+ */
+export function offerHeadline(count: number): string {
+  return count === 1 ? 'This slide is in most of your decks.' : `These ${count} slides are in most of your decks.`
+}
+
+export function offerHint(count: number): string {
+  return count === 1 ? 'Add it to the library to take it in one click next time.' : 'Add them to the library to take them in one click next time.'
+}
+
+/** The offer's first button: "Add all 4", or "Add" for one slide (beside Choose… and Not now, as ever). */
+export function addAllLabel(count: number): string {
+  return count === 1 ? 'Add' : `Add all ${count}`
+}
+
+/** Under an offered slide: how many decks have it ("in 7 decks"). */
+export function inDecksLine(decks: number): string {
+  return decks === 1 ? 'in 1 deck' : `in ${decks} decks`
+}
+
+/** Choose…'s Add button: "Add 3", or "Add" with nothing ticked (then its tooltip says why it can't). */
+export function addChosenLabel(count: number): string {
+  return count > 0 ? `Add ${count}` : 'Add'
+}
