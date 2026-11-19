@@ -1,7 +1,7 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { alsoLine, deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
+import { alsoLine, deckDate, deckExpanded, deckMeta, deckPlace, folderHeading, folderOfDeck, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -143,6 +143,12 @@ console.log('libraryGroups: ok')
   assert.equal(alsoLine(4, true), 'also in 4 decks', "a library slide's copies needn't be older")
   assert.equal(alsoLine(1, true), 'also in 1 deck')
   assert.equal(alsoLine(0, false), null)
+  // On the tile: the place may wrap and be cut, the date never is.
+  assert.equal(deckPlace('Harbour/day 2.deck.md', 'day 2', 'Trainings'), 'Harbour › day 2')
+  assert.equal(deckPlace('Kickoff.deck.md', 'Kickoff', 'Trainings'), 'Trainings › Kickoff')
+  assert.equal(hitMeta(at, 3, false, now), '12 Nov · also in 3 older decks')
+  assert.equal(hitMeta(at, 0, false, now), '12 Nov')
+  assert.equal(hitMeta(0, 2, true, now), 'also in 2 decks')
   assert.equal(hitsCount(4, 4), '4 slides')
   assert.equal(hitsCount(1, 1), '1 slide')
   assert.equal(hitsCount(60, 412), '60 of 412 slides')

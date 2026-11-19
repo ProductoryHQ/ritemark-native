@@ -137,9 +137,22 @@ export function takeSectionTip(label: string | null, ids: readonly string[] | nu
  * the same › as the folder headings (the project's name for a deck at its top level).
  */
 export function placeLine(path: string, name: string, modified: number, projectName: string, now: number = Date.now()): string {
-  const folder = folderHeading(folderOfDeck(path)) || projectName || 'This project'
   const date = deckDate(modified, now)
-  return `${folder}${PLACE_SEPARATOR}${name}${date ? ` · ${date}` : ''}`
+  return `${deckPlace(path, name, projectName)}${date ? ` · ${date}` : ''}`
+}
+
+/** A deck's place without its date, "Folder › Deck": a hit's first line, which may wrap and be cut. */
+export function deckPlace(path: string, name: string, projectName: string): string {
+  const folder = folderHeading(folderOfDeck(path)) || projectName || 'This project'
+  return `${folder}${PLACE_SEPARATOR}${name}`
+}
+
+/**
+ * A hit's second line, never cut: the copy's date and how many other decks have it ("12 Nov · also in 3 older
+ * decks"), so a long folder or deck name never hides the date (the Experience lead: AI topics age in months).
+ */
+export function hitMeta(modified: number, count: number, library: boolean, now: number = Date.now()): string {
+  return [deckDate(modified, now), alsoLine(count, library)].filter(Boolean).join(' · ')
 }
 
 /**

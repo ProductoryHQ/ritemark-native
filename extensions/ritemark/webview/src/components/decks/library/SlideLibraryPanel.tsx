@@ -18,7 +18,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { alsoLine, deckExpanded, deckMeta, groupByFolder, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
+import { alsoLine, deckExpanded, deckMeta, deckPlace, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -232,12 +232,13 @@ export function SlideLibraryPanel() {
    * A slide's tile: its thumbnail, title and menu. In a search (Sprint 165 PR 3) also its place and "also in N older
    * decks"; anywhere, the tick when its copy is already in the open deck.
    */
-  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; place?: string; also?: string | null }) => {
+  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; hit?: { place: string; where: string; meta: string; also: string | null } }) => {
     const key = `${deck.path}#${slide.id ?? slide.index}`
     const title = titleOf(slide)
     const number = options.numbered ? `${slide.index + 1}. ` : ''
     const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
-    const spoken = [options.place, options.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
+    const hit = options.hit
+    const spoken = [hit?.place, hit?.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
     const trigger = (
           <DropdownMenuTrigger asChild>
             <button
@@ -255,8 +256,9 @@ export function SlideLibraryPanel() {
                 ) : null}
               </span>
               <span className="deck-lib-title">{number}{title}</span>
-              {options.place ? <span className="deck-lib-place">{options.place}</span> : null}
-              {options.also ? <span className="deck-lib-also">{options.also}</span> : null}
+              {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks" never are. */}
+              {hit ? <span className="deck-lib-place">{hit.where}</span> : null}
+              {hit?.meta ? <span className="deck-lib-also">{hit.meta}</span> : null}
             </button>
           </DropdownMenuTrigger>
     )
@@ -270,7 +272,7 @@ export function SlideLibraryPanel() {
         ) : trigger}
         <DropdownMenuContent align="start" className="deck-lib-menu">
           <div className="deck-lib-menu-head">{title}</div>
-          {options.place ? <div className="deck-lib-menu-place">{options.place}</div> : null}
+          {hit ? <div className="deck-lib-menu-place">{[hit.place, hit.also].filter(Boolean).join(' · ')}</div> : null}
           {inOpenDeck ? (
             <div className="deck-lib-menu-here">
               <Icon name="check" size={12} tone="inherit" />
@@ -398,7 +400,15 @@ export function SlideLibraryPanel() {
         <div className="deck-lib-grid">
           {shown.map(({ hit, deck, slide }) => (
             <AgendaContext.Provider key={`${deck.path}#${slide.index}`} value={agendaOfDeck.get(deck.path) ?? null}>
-              {tile(deck, slide, { numbered: false, place: placeLine(deck.path, deck.name, deck.modified, state.projectName ?? ''), also: alsoLine(hit.also, hit.library) })}
+              {tile(deck, slide, {
+                numbered: false,
+                hit: {
+                  place: placeLine(deck.path, deck.name, deck.modified, state.projectName ?? ''),
+                  where: deckPlace(deck.path, deck.name, state.projectName ?? ''),
+                  meta: hitMeta(deck.modified, hit.also, hit.library),
+                  also: alsoLine(hit.also, hit.library),
+                },
+              })}
             </AgendaContext.Provider>
           ))}
         </div>
