@@ -36,7 +36,7 @@ import { markableBox } from './slideDivView'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, tabAcross, turnInto, type BarKind,
+  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind,
 } from './blockBar'
 
 installTestDocument()
@@ -480,6 +480,66 @@ stable(COLUMNS, 'three columns')
     // The drop line nearest the pointer is the gap under it.
     const lines = new Map([[1, 100 * scale], [3, 300 * scale], [4, 400 * scale]])
     assert.equal(nearestGap(310 * scale, [1, 3, 4], lines), 3)
+  }
+}
+
+// ---- #829: the split's guide stands in the middle of the gap the line will have, as the handle does once it lands.
+// The columns laid out as slide.css draws them: `column-gap: calc(32px * var(--fit))`, each column its share of the
+// room as an `fr` (`columnTemplateOf`), or an even share. A third of the two columns' span was drawn, which is a sixth
+// of the gap off the split at ⅓ and ⅔ (about 5 px at the 32 px gap).
+{
+  const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
+  const gapRule = /\.blk-columns \{[^}]*column-gap: calc\((\d+)px \* var\(--fit, 1\)\)/.exec(css)
+  assert.ok(gapRule, 'the columns\' gap, from slide.css')
+  const GAP = Number(gapRule[1])
+  assert.equal(GAP, 32)
+  /** The columns' edges on the screen: a block `width` slide px wide from `left`, at the stage's `scale`. */
+  const drawn = (shares: readonly number[] | null, count: number, fit: number, scale: number, left = 200, width = 832) => {
+    const gap = GAP * fit * scale
+    const tracks = shares ?? Array.from({ length: count }, () => 1)
+    const sum = tracks.reduce((a, b) => a + b, 0)
+    const room = width * scale - gap * (count - 1)
+    const columns: { left: number; right: number }[] = []
+    let x = left
+    for (const track of tracks) { columns.push({ left: x, right: x + (track / sum) * room }); x += (track / sum) * room + gap }
+    /** Line `index` as `measure` reads it: its handle's x, the two columns' outer edges and the gap between them. */
+    return (index: number) => {
+      const a = columns[index]
+      const b = columns[index + 1]
+      return { handle: (a.right + b.left) / 2, left: a.left, right: b.right, gap: b.left - a.right }
+    }
+  }
+  const SNAPS = [[1 / 3, '⅓'], [1 / 2, '½'], [2 / 3, '⅔']] as const
+  for (const fit of [1, 0.6]) {
+    for (const scale of [0.9, 0.5]) {
+      for (const [snap, name] of SNAPS) {
+        const where = `fit ${fit}, scale ${scale}, ${name}`
+        const written = splitShares([50, 50], 0, snap)
+        assert.deepEqual(written, snap === 1 / 2 ? null : snap < 1 / 2 ? [33, 67] : [67, 33], `${where}: the shares written`)
+        // Held at the split the columns have: the guide is on the handle, in the middle of the gap.
+        const line = drawn(written, 2, fit, scale)(0)
+        const shares = written ?? [50, 50]
+        assert.ok(Math.abs(splitGuideX(line, shares, 0, snap) - line.handle) < 1e-6, `${where}: the guide in the middle of the gap (${splitGuideX(line, shares, 0, snap).toFixed(2)} for ${line.handle.toFixed(2)})`)
+        // Dragged there from an even split: the guide stands where the handle will be once it lands.
+        const from = drawn(null, 2, fit, scale)(0)
+        assert.ok(Math.abs(splitGuideX(from, [50, 50], 0, snap) - line.handle) < 1e-6, `${where}: from an even split, where the line lands`)
+      }
+      // Three columns: the second line, its two columns' room as the drop writes it (the first column's 33 too).
+      for (const [snap, name] of SNAPS) {
+        const evenShares = [100 / 3, 100 / 3, 100 / 3]
+        const written = splitShares(evenShares, 1, snap)
+        const landed = drawn(written, 3, fit, scale)(1)
+        const guide = splitGuideX(drawn(null, 3, fit, scale)(1), evenShares, 1, snap)
+        assert.ok(Math.abs(guide - landed.handle) < 1e-6, `fit ${fit}, scale ${scale}, three columns, ${name}: ${guide.toFixed(2)} for ${landed.handle.toFixed(2)}`)
+      }
+    }
+  }
+  // The drop writes what the guide showed: the same shares through `setColumnSplit`.
+  const twoColumns = ['# Two', '', ':::: columns', '::: column', 'A', ':::', '', '::: column', 'B', ':::', '::::'].join('\n')
+  const state = stateWith(twoColumns, 'A')
+  for (const snap of [1 / 3, 2 / 3]) {
+    const dropped = state.apply(setColumnSplit(state, blockPos(state), 0, snap)!)
+    assert.deepEqual(columnShares(dropped.doc.nodeAt(blockPos(dropped))!), splitShares([50, 50], 0, snap))
   }
 }
 

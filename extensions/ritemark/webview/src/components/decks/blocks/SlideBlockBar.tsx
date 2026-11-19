@@ -26,8 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf, dropGaps,
+  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
@@ -53,8 +53,8 @@ interface Placed {
   block: Box
   /** The block on the screen, for the bar in `document.body`. */
   screen: DOMRect
-  /** Columns: the lines between them, each its x in the frame and the two columns' outer edges on the screen. */
-  lines: { x: number; left: number; right: number }[]
+  /** Columns: the lines between them, each its x in the frame, the two columns' outer edges and the gap between them on the screen. */
+  lines: { x: number; left: number; right: number; gap: number }[]
   /** A list's or Steps' numbers or bullets: their middle's x in the frame (the + goes under them). */
   markerX: number | null
   /** The slide's pane on the screen: the bar stays inside it. */
@@ -214,7 +214,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
         const a = columns[index].getBoundingClientRect()
         const b = columns[index + 1].getBoundingClientRect()
         // The split's handle sits in the middle of the gap between the two columns (README "Spacing on the slide").
-        lines.push({ x: (a.right + b.left) / 2 - origin.left, left: a.left, right: b.right })
+        lines.push({ x: (a.right + b.left) / 2 - origin.left, left: a.left, right: b.right, gap: b.left - a.right })
       }
     }
     // A list's or Steps' markers sit left of its first item's words: the + goes under their middle.
@@ -393,9 +393,11 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     // A drop on a document that changed meanwhile is no drop: the line's place was read from the one before.
     const startDoc = editor.state.doc
     const origin = frame.getBoundingClientRect()
+    const shares = columnShares(chosen.node)
     let fraction = splitPlace(event.clientX, edges.left, edges.right)
     const show = () => {
-      const x = edges.left + snapSplit(fraction) * (edges.right - edges.left) - origin.left
+      // In the middle of the gap the line will have (#829), as the handle is once it lands.
+      const x = splitGuideX(edges, shares, line, fraction) - origin.left
       setDrag({ kind: 'split', x, top: placed.block.top, height: placed.block.height })
     }
     show()

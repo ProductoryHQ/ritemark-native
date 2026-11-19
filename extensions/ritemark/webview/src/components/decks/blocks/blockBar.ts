@@ -601,20 +601,41 @@ export function setColumnSplit(state: EditorState, pos: number, line: number, fr
   if (!block || block.kind !== 'columns') return null
   const columns = columnsOf(block.node, pos)
   if (line < 0 || line >= columns.length - 1) return null
-  const shares = columnShares(block.node)
-  const pair = shares[line] + shares[line + 1]
-  const snapped = snapSplit(fraction)
-  shares[line] = pair * snapped
-  shares[line + 1] = pair * (1 - snapped)
-  const even = 100 / columns.length
-  const isEven = shares.every(share => Math.abs(share - even) < 0.5)
+  const written = splitShares(columnShares(block.node), line, fraction)
   const tr = state.tr
   columns.forEach((column, index) => {
     const open = String(column.node.attrs.open ?? '')
-    const next = withFenceValue(open, 'width', isEven ? null : `${Math.round(shares[index])}%`)
+    const next = withFenceValue(open, 'width', written ? `${written[index]}%` : null)
     if (next !== null && next !== open) tr.setNodeMarkup(column.pos, undefined, { ...column.node.attrs, open: next })
   })
   return tr.docChanged ? tr.setMeta(SLIDE_COMMAND, true) : null
+}
+
+/**
+ * The columns' shares once the line after column `line` lands at `fraction` (snapped), as `setColumnSplit` writes
+ * them: whole percents, or null back at an even split (no width is written).
+ */
+export function splitShares(shares: readonly number[], line: number, fraction: number): number[] | null {
+  const next = [...shares]
+  const pair = next[line] + next[line + 1]
+  const snapped = snapSplit(fraction)
+  next[line] = pair * snapped
+  next[line + 1] = pair * (1 - snapped)
+  const even = 100 / next.length
+  return next.every(share => Math.abs(share - even) < 0.5) ? null : next.map(share => Math.round(share))
+}
+
+/**
+ * Where the split's guide stands while it drags (#829), on the screen: in the middle of the gap the line will have
+ * once dropped at `fraction`, where the handle then sits. The grid shares the two columns' room, their span from
+ * `left` to `right` without the `gap` between them (the slide's 32 px times its fit and the stage's scale), so a third
+ * of the span is not a third of the room: the guide stood a sixth of the gap off the split at ⅓ and ⅔. `shares` are the
+ * columns' now (`columnShares`); the room is shared as the drop writes it (whole percents).
+ */
+export function splitGuideX(line: { left: number; right: number; gap: number }, shares: readonly number[], index: number, fraction: number): number {
+  const drawn = splitShares(shares, index, fraction) ?? shares.map(() => 1)
+  const room = Math.max(0, line.right - line.left - line.gap)
+  return line.left + (drawn[index] / (drawn[index] + drawn[index + 1])) * room + line.gap / 2
 }
 
 // ---------------------------------------------------------------------------
