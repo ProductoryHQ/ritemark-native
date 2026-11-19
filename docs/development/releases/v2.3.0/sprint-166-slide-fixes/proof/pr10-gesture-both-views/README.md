@@ -56,6 +56,8 @@ The second launch, Slide and handout, from slide 1. The stage was made taller th
 | 5 | Trackpad flick down | the band under the slide | 1 → **1** (the stage scrolls to 92 of 92) |
 | 6 | Trackpad flick down (the stage at its end) | the band under the slide | 1 → **2** (stage at 92 of 92) |
 
+After this run, the review of the rule's commit found that a step left the pane where it was, so going on showed each new slide from its foot and the next gesture stepped again without showing its top. Now a step shows the new slide from where the gesture goes on: the pane at its top going on, at its end going back. In rows 2 and 6 the pane would stand at 0 after the step. That fix is covered by `slideNav.test.ts`, not by a third launch.
+
 ## Slide only, unchanged
 
 The second launch, view switch on **Slide only**:
@@ -85,4 +87,5 @@ The first launch, this branch's first version (over the slide, the same code the
 - A real Mac trackpad and a real mouse: the gestures are protocol events of the same shape (pixel deltas, timing), not hardware.
 - The slide above the handout beyond the three notches above (no flick, no long column, no band there).
 - A real short window: the slide's pane taller than its room was a synthetic stand-in (the group's padding).
+- The pane's place after a step (top going on, end going back), live.
 - Windows.

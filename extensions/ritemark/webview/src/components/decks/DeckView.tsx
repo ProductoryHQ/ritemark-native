@@ -75,7 +75,7 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish } from './DeckPublish'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
-import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
+import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
 import { isMac } from '../../hooks/usePlatform'
 import './decks.css'
@@ -1009,7 +1009,12 @@ export function DeckView({
       const route = wheelRoute(gesture, delta, event.timeStamp, takerOf)
       gesture = route.gesture
       if (!route.scroll) event.preventDefault()
-      if (route.move !== 0) goTo(Math.min(currentRef.current, countRef.current - 1) + route.move)
+      if (route.move !== 0) {
+        const from = Math.min(currentRef.current, countRef.current - 1)
+        goTo(from + route.move)
+        // The new slide is seen from where the gesture goes on (a pane taller than its room); at the deck's ends nothing moves.
+        if (Math.min(currentRef.current, countRef.current - 1) !== from) stage.scrollTop = stageScrollAfter(route.move, stage)
+      }
     }
     stage.addEventListener('wheel', onWheel, { passive: false })
     return () => stage.removeEventListener('wheel', onWheel)

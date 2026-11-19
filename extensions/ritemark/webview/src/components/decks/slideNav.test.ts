@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { NO_GESTURE, WHEEL_QUIET_MS, WHEEL_STEP, boxScrolls, slideKeyOf, slideKeyTarget, stageWheelOf, wheelPixels, wheelRoute, wheelStep, wheelTaker, type WheelBox, type WheelGesture } from './slideNav'
+import { NO_GESTURE, WHEEL_QUIET_MS, WHEEL_STEP, boxScrolls, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelStep, wheelTaker, type WheelBox, type WheelGesture } from './slideNav'
 
 /** A run of wheel events, `[delta, ms]`, from no gesture: the moves they make. */
 function moves(events: Array<[number, number]>): number[] {
@@ -128,7 +128,7 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(wheelTaker(group, stage, 100, overflowOf, 'alone')?.name ?? 'slide', 'slide', "Slide only's bands are unchanged")
   // Which views route the stage's wheel: Slide only and Slide and handout, never Handout only (no slide on show).
   assert.equal(stageWheelOf(true, false), 'alone', 'Slide only')
-  assert.equal(stageWheelOf(true, true), 'beside', 'Slide and handout: the wheel over the slide moves it too')
+  assert.equal(stageWheelOf(true, true), 'beside', "Slide and handout: the wheel on the slide's side moves it too")
   assert.equal(stageWheelOf(false, true), null, 'Handout only: no stage')
   assert.equal(stageWheelOf(false, false), null)
 
@@ -203,7 +203,7 @@ function moves(events: Array<[number, number]>): number[] {
           const step = wheelRoute(gesture, delta, at, () => wheelTaker(box('group', stageBox), stageBox, delta, overflowOf, 'beside'))
           const latched = gesture.held
           gesture = step.gesture
-          out.moves += step.move
+          out.moves += Math.abs(step.move)
           if (step.scroll) {
             out.scrolled++
             const scroller = (gesture.held ?? latched) as Box
@@ -218,6 +218,12 @@ function moves(events: Array<[number, number]>): number[] {
     assert.deepEqual(run(short, 2), { moves: 1, scrolled: 7 }, 'a stage taller than its room: the first flick scrolls it to its end, the second steps')
     assert.equal(short.scrollTop, 115)
   }
+  // After a step the new slide is seen from where the gesture goes on (review of #871): the pane at its top going on,
+  // at its end going back. Kept where it was, going on showed each new slide from its foot, and the next gesture
+  // stepped again without showing its top.
+  assert.equal(stageScrollAfter(1, { scrollHeight: 895, clientHeight: 780 }), 0, 'on: from the top')
+  assert.equal(stageScrollAfter(-1, { scrollHeight: 895, clientHeight: 780 }), 115, 'back: from the end')
+  assert.equal(stageScrollAfter(-1, { scrollHeight: 780, clientHeight: 780 }), 0, 'a pane that fits stays put')
 }
 
 /** A fake element: its tag, whether it's editable, and the selectors it sits inside. */
@@ -292,6 +298,8 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.ok(/wheelTaker\(event\.target[^)]*, stage, delta, .*?, stageWheel\)/.test(wheel), 'what is under the pointer, up to the stage, by the view')
   assert.ok(/wheelRoute\(gesture, delta, event\.timeStamp, \w+\)/.test(wheel))
   assert.ok(/if \(!route\.scroll\) event\.preventDefault\(\)/.test(wheel) && !/^\s*event\.preventDefault\(\)/.test(wheel))
+  // A step shows the new slide from where the gesture goes on, and only when the slide moved (not at the deck's ends).
+  assert.ok(/const from = Math\.min\([^)]*\) goTo\(from \+ route\.move\) [^]*?if \(Math\.min\(currentRef\.current, countRef\.current - 1\) !== from\) stage\.scrollTop = stageScrollAfter\(route\.move, stage\)/.test(wheel), 'the pane after a step')
   // The slide's scrolling boxes keep a turn's rest to themselves in both views, so it never scrolls the stage.
   const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
   assert.ok(css.includes('.deck-stage .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }'))
