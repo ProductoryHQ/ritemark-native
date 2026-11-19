@@ -34,7 +34,7 @@ import { Marked, marked, type Tokens } from 'marked';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { columnFloors, floorCss } from '../../markdown/tableColumns';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
-import { agendaOf, blockRevealCount, blockSectionNumberOf, blockSlideMarkup, blockStepsTagOf } from '../blocks/slideRenderer';
+import { agendaOf, blockRevealCount, blockSectionNumberOf, blockSlideMarkup, blockStepsLabelOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
 import { mix, themeStyle, themeVars, wallGround } from '../../../webview/src/components/decks/theme/themeVars';
@@ -828,11 +828,11 @@ function fontFaces(fonts: PageFont[], themeFonts: readonly PageThemeFont[] = [])
 const titleOf = (slide: PublicSlide) => (slide.data.title ?? '').trim();
 
 /**
- * A block slide's Steps (Sprint 161): the pill of its first Steps block ('' for none), or null when it has no Steps
- * block. A slide with Steps is an exercise on the page, as an Exercise slide is.
+ * A block slide's Steps (Sprint 161): its Label's words ('' for none; Sprint 164 PR 3, the Label that was its pill), or
+ * null when it has no Steps block. A slide with Steps is an exercise on the page, as an Exercise slide is.
  */
 function blockStepsTag(slide: PublicSlide): string | null {
-  return isBlockSlide(slide.kind) ? blockStepsTagOf(slide.data.markdown ?? '') : null;
+  return isBlockSlide(slide.kind) ? blockStepsLabelOf(slide.data.markdown ?? '') : null;
 }
 
 /**
@@ -853,7 +853,7 @@ function isExercise(slide: PublicSlide): boolean {
   return slide.kind === 'exercise' || blockStepsTag(slide) !== null;
 }
 
-/** An exercise's pill beside its label and in Contents: the slide's own words (`tag:`), the default, or none. */
+/** An exercise's pill beside its label and in Contents: the slide's own words (`tag:`, a block slide's Label), the default, or none. */
 function pillHtml(slide: PublicSlide): string {
   const words = slide.kind === 'exercise' ? exerciseTagOf(slide.data) : blockStepsTag(slide) ?? '';
   return words ? `<span class="tag">${esc(words)}</span>` : '';

@@ -308,11 +308,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings input:checked ~ span .deck-lay-pic i { background: var(--r-accent); opacity: .55; }
 .deck-settings-sep { height: 1px; margin: 12px -12px 10px; background: var(--r-hairline); }
 .deck-settings-row { display: flex; align-items: center; justify-content: space-between; }
-/* An exercise slide's Label row: its pill's words (16 November) */
-.deck-settings-tag { gap: 12px; margin-top: 12px; }
-.deck-settings .deck-settings-tag .deck-settings-field { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--r-hairline-strong); background: var(--r-surface); font: 400 13px/28px var(--ritemark-ui-font-family); color: var(--r-ink-strong); outline: 0; }
-.deck-settings .deck-settings-tag .deck-settings-field:focus { box-shadow: inset 0 0 0 2px var(--r-accent); --tw-ring-shadow: 0 0 #0000; }
-.deck-settings .deck-settings-tag .deck-settings-field::placeholder { color: var(--r-ink-faint); }
 
 /* Sprint 157, PR 4: the Slide library place (README frame 3; prototype .lsearch, .row, .lgrid, .lit, .lhint). */
 .deck-lib { min-height: 100vh; padding: 4px 8px 16px; box-sizing: border-box; color: var(--r-ink-strong); }
@@ -403,7 +398,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-column > :last-child, .deck-sl.is-blocks.is-editing .blk-box > .blk-inner > :last-child { margin-bottom: 0; }
 /* The same when the column, box or pane ends with a comment note (never drawn), so the stage measures as the renderer draws. */
 .deck-sl.is-blocks.is-editing :is(.blk-column, .blk-box > .blk-inner, .blk-tabpane) > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
-.deck-sl.is-blocks.is-editing .blk-pill, .deck-sl.is-blocks.is-editing .blk-icon, .deck-sl.is-blocks.is-editing .blk-mark { user-select: none; }
+.deck-sl.is-blocks.is-editing .blk-icon, .deck-sl.is-blocks.is-editing .blk-mark { user-select: none; }
 .deck-sl.is-blocks.is-editing blockquote { border-left: 0; }
 .deck-sl.is-blocks.is-editing table { width: auto; }
 .deck-sl.is-blocks.is-editing th { border: 0; }
@@ -459,18 +454,23 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar .deck-comments { display: inline-flex; align-items: center; gap: 2px; }
 .deck-bar .deck-comments-count { min-width: 16px; height: 16px; margin-left: 4px; padding: 0 4px; border-radius: 8px; background: #F2B544; color: #1C1F4A; font: 700 10px/16px 'Sofia Sans', sans-serif; text-align: center; box-sizing: border-box; }
 
-/* Sprint 161 (PR 3; README frame 4 and "The 'Exercise' pill is the person's own word"). A box's icon is clicked to
-   choose another, and a box with none shows a faint place for one (on the stage only). The Steps pill's words are
-   typed in place, in a field drawn over the pill in its look (`PillField`): emptied, the pill hides once the field
-   closes, and while the field is open, empty, the default word shows faint as its placeholder. */
-.deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover, .deck-sl.is-blocks.is-editing .blk-pill.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
-.deck-sl.is-blocks.is-editing .blk-pill.is-pickable { cursor: text; }
+/* Sprint 161 (PR 3; README frame 4). A box's icon is clicked to choose another, and a box with none shows a faint place
+   for one (on the stage only). */
+.deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+/* Sprint 164 PR 3 (the decks README, "Label, a block of its own"): the Label typed in place, like every word on the
+   slide, its words never cut while the caret is in them. Empty, it shows "Label" faint while the caret is in it and
+   takes no room while it is elsewhere, as the renderer draws nothing for it. A comment note on the heading under it
+   is never drawn, so the Label keeps its 8 px over that heading here too. */
+.deck-sl.is-blocks.is-editing .blk-label { cursor: text; text-overflow: clip; }
+.deck-sl.is-blocks.is-editing .blk-label.is-empty[data-placeholder=""] { height: 0; margin: 0; padding: 0; background: none; }
+.deck-sl.is-blocks.is-editing .blk-label.is-empty:not([data-placeholder=""])::before { content: attr(data-placeholder); opacity: .55; pointer-events: none; }
+.deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + :is(h1, h2, h3, h4, h5, h6)),
+.deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + ritemark-comment + :is(h1, h2, h3, h4, h5, h6)) { margin-bottom: calc(8px * var(--fit, 1)); }
 /* The empty place is never drawn on the slide: the caret's box shows the icon handle instead, the ⋮'s and the +'s
    size, over its top edge at the right, in the handles' layer (`deck-block-icon`; the lead's follow-up to #773). It
    takes no room: the box, the slide's fit and the thumbnail stay as they are while the caret moves from box to box. */
 .deck-sl.is-blocks.is-editing .blk-box { position: relative; }
 .deck-sl.is-blocks.is-editing .blk-icon.is-place { display: none; }
-.deck-pill-field::placeholder { color: inherit; opacity: .45; }
 /* A table's empty cells keep a width on the stage, so a column just added (Settings' Add a column) can be typed in
    (the app run: an empty column had none, and was invisible). */
 .deck-sl.is-blocks.is-editing th, .deck-sl.is-blocks.is-editing td { min-width: 4em; }

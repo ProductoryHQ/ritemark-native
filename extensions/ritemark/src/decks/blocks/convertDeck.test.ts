@@ -8,8 +8,9 @@ import { slideStamp, slideStamps } from '../deckLibraryFormat';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { pageHtml } from '../page/pageHtml';
 import { deckDigest, publicDeck } from '../page/publicDeck';
-import { blockDataOf, blockSlideBody, convertDeckText, convertedPart, convertSlide, renewedFrom, withCommentAtEnd, withDeckVersion, withStepsTag } from './convertDeck';
-import { blockSectionNumberOf, blockStepsTagOf } from './slideRenderer';
+import { blockDataOf, blockSlideBody, convertDeckText, convertedPart, convertSlide, hasStepsPill, labelledSlideBody, renewedFrom, withCommentAtEnd, withDeckVersion, withStepsTag } from './convertDeck';
+import { blockSectionNumberOf, blockSlideHtml, blockStepsLabelOf, blockStepsTagOf } from './slideRenderer';
+import { labelsAsPills, withStepsLabels } from './labelBlock';
 
 // ---- deck: 2 in the front matter: replaced, added first, or a front matter made; every other byte stays.
 assert.equal(withDeckVersion('---\ndeck: 1\ntheme: T\n---\n\nText\n', 2), '---\ndeck: 2\ntheme: T\n---\n\nText\n');
@@ -55,7 +56,7 @@ assert.equal(converted, [
   '```slide', '---', 'id: s1', 'section: true', '---', '1', '', '# Why agents?', '```', '',
   '## Why agents?', '', 'Section text.', '',
   '<!-- NOTESWORD --› still notes', 'Hidden by the old layout: SECTIONSUBTITLE -->', '',
-  '```slide', '---', 'id: e2', '---', '# Try it', '', '::: {.steps tag="Harjutus"}', '1. Open', '2. Ask', ':::', '```', '',
+  '```slide', '---', 'id: e2', '---', '[Harjutus]{.label}', '', '# Try it', '', '::: steps', '1. Open', '2. Ask', ':::', '```', '',
   'Do it.', '',
   '<!-- Hidden by the old layout: step 1: STEPLINEWORD -->', '',
   '```slide gamma.v2', 'title: Elsewhere', '```', '',
@@ -155,7 +156,8 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(convertedPart(kept), kept, 'a kind this build doesn\'t know stays');
 }
 
-// ---- Settings' Label row on a block slide: the first Steps block's pill, its colons kept, nothing else touched.
+// ---- Settings' Label row on a block slide (gone since Sprint 164 PR 3; `withStepsTag` stays only while DeckView.tsx,
+// PR 1's until #819 merges, still imports it): the first Steps block's pill, its colons kept, nothing else touched.
 {
   const markdown = '# Try\n\n```\n::: steps\n```\n\n:::: {.steps look="x"}\n1. A\n::::\n\n::: steps\n1. B\n:::';
   const tagged = withStepsTag(markdown, 'Harjutus');
@@ -165,6 +167,87 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(withStepsTag(tagged, 'Harjutus'), tagged, 'the same words: the same text');
   assert.equal(withStepsTag('::: steps\n1. A\n:::', 'Say "hi"'), "::: {.steps tag='Say \"hi\"'}\n1. A\n:::");
   assert.equal(withStepsTag('# No steps', 'X'), '# No steps');
+}
+
+// ---- Sprint 164 PR 3 (the decks README, "Today's pills are kept"): a block slide's Steps pill becomes a Label in the
+// same place, before the heading over the steps, or before the steps when there is no heading; the person's words kept
+// exactly; an emptied pill becomes nothing; a Steps block with no tag has no Label; a deck with no pill is not touched.
+{
+  // Before the heading over the steps, its notes included; the other values on the line stay in their order.
+  assert.equal(withStepsLabels('# Try it\n\n::: {.steps tag="Harjutus · 1 / 2" reveal="one"}\n1. Open\n:::'), '[Harjutus · 1 / 2]{.label}\n\n# Try it\n\n::: {.steps reveal="one"}\n1. Open\n:::');
+  assert.equal(withStepsLabels('<!-- {id:a} on the title -->\n# Try\n\n::: {.steps tag="X"}\n1. A\n:::'), '[X]{.label}\n\n<!-- {id:a} on the title -->\n# Try\n\n::: steps\n1. A\n:::', 'a note on the heading stays with it');
+  // No heading over it: before the steps (a paragraph between is no heading over them), never joined to the words before.
+  assert.equal(withStepsLabels('::: {.steps tag="Harjutus"}\n1. Open\n:::'), '[Harjutus]{.label}\n\n::: steps\n1. Open\n:::');
+  assert.equal(withStepsLabels('# T\n\nIntro\n::: {.steps tag="X"}\n1. A\n:::'), '# T\n\nIntro\n\n[X]{.label}\n\n::: steps\n1. A\n:::');
+  // In a column, as an exercise's layout writes it: before the column's title, inside the column.
+  assert.equal(
+    withStepsLabels(':::: columns\n::: {.column width="35%"}\n# Report\n::: {.steps tag="Exercise · 1 / 2"}\n1. Read\n:::\n:::\n::: column\nTabs\n:::\n::::'),
+    ':::: columns\n::: {.column width="35%"}\n[Exercise · 1 / 2]{.label}\n\n# Report\n::: steps\n1. Read\n:::\n:::\n::: column\nTabs\n:::\n::::',
+  );
+  // Emptied: nothing. No tag: nothing. In code: words. Written again: the same text.
+  assert.equal(withStepsLabels('# T\n\n::: {.steps tag=""}\n1. A\n:::'), '# T\n\n::: steps\n1. A\n:::');
+  assert.equal(withStepsLabels('# T\n\n::: {.steps tag="  "}\n1. A\n:::'), '# T\n\n::: steps\n1. A\n:::');
+  const plain = '# T\n\n::: steps\n1. A\n:::';
+  assert.equal(withStepsLabels(plain), plain, 'a new Steps block has no Label');
+  const code = '```\n::: {.steps tag="X"}\n```';
+  assert.equal(withStepsLabels(code), code, 'a ::: line in code is words');
+  const once = withStepsLabels('# T\n\n::: {.steps tag="X"}\n1. A\n:::');
+  assert.equal(withStepsLabels(once), once, 'a slide written as Labels is never changed again');
+  // Brackets and emphasis marks in the words are escaped, so they read back as typed.
+  assert.equal(withStepsLabels('::: {.steps tag="A [b] *c*"}\n1. A\n:::'), '[A \\[b\\] \\*c\\*]{.label}\n\n::: steps\n1. A\n:::');
+  assert.equal(blockStepsLabelOf('::: {.steps tag="A [b] *c*"}\n1. A\n:::'), 'A [b] *c*');
+  // What is drawn before the first edit is what it writes.
+  const old = '# Try it\n\n::: {.steps tag="Harjutus"}\n1. Open\n:::';
+  assert.equal(blockSlideHtml(old), blockSlideHtml(withStepsLabels(old)));
+  assert.equal(blockStepsLabelOf(old), 'Harjutus');
+  assert.equal(blockStepsTagOf, blockStepsLabelOf, 'the old name, for DeckView.tsx until #819 merges');
+}
+
+// ---- The deck's first edit writes each block slide's pill as a Label (`convertDeckText` is the deck view's rule):
+// the fences, the notes and the handout stay byte for byte, and a deck with no pill comes back as it is.
+{
+  const deck = [
+    '---', 'deck: 2', '---', '',
+    '```slide', '---', 'id: e1', '---', '# Try it', '', '::: {.steps tag="Harjutus · 1 / 2"}', '1. Open', ':::', '```', '',
+    '```notes', 'Kept notes.', '```', '',
+    '## Try it', '', 'Handout words.', '',
+    '````slide', '::: {.steps tag=""}', '1. Read', '', '```', 'code', '```', ':::', '````', '',
+    '```slide', '# Plain', '', '::: steps', '1. Go', ':::', '```', '',
+  ].join('\n');
+  const bodies = parseDeck(deck).slides.map(slide => slide.body);
+  assert.ok(hasStepsPill('', bodies[0]) && hasStepsPill('', bodies[1]) && !hasStepsPill('', bodies[2]));
+  const after = convertDeckText(deck);
+  assert.equal(after, deck
+    .replace('# Try it\n\n::: {.steps tag="Harjutus · 1 / 2"}', '[Harjutus · 1 / 2]{.label}\n\n# Try it\n\n::: steps')
+    .replace('::: {.steps tag=""}', '::: steps'));
+  assert.equal(convertDeckText(after), after, 'converting again changes nothing');
+  const untouched = '---\ndeck: 2\n---\n\n```slide\n# Plain\n\n::: steps\n1. Go\n:::\n```\n\n## Plain\n';
+  assert.equal(convertDeckText(untouched), untouched, 'no pill: the deck as it is');
+}
+
+// ---- A copy's stamp through the pill's move: a pill and its Label stamp alike, so a copy and its source still match
+// whichever was written first; an emptied pill's stamp changes, and its copy's `from:` is renewed with the edit.
+{
+  const handout = 'Words.';
+  const withPill = '---\nid: c1\n---\n# Try\n\n::: {.steps tag="Harjutus"}\n1. A\n:::';
+  const asLabel = labelledSlideBody(withPill);
+  assert.equal(asLabel, '---\nid: c1\n---\n[Harjutus]{.label}\n\n# Try\n\n::: steps\n1. A\n:::');
+  assert.equal(slideStamp('', slideDataOf('', withPill), handout, ''), slideStamp('', slideDataOf('', asLabel), handout, ''), 'a pill and its Label stamp alike');
+  const bare = '---\nid: c1\n---\n# Try\n\n::: steps\n1. A\n:::';
+  const exercise = '---\nid: c1\n---\n[Exercise]{.label}\n\n# Try\n\n::: steps\n1. A\n:::';
+  assert.equal(slideStamp('', slideDataOf('', bare), handout, ''), slideStamp('', slideDataOf('', exercise), handout, ''), 'the old bare pill was "Exercise": stamps written before still stand');
+  assert.notEqual(slideStamp('', slideDataOf('', asLabel), handout, ''), slideStamp('', slideDataOf('', asLabel.replace('Harjutus', 'Other')), handout, ''), "a Label's words count");
+  assert.equal(labelsAsPills('[Free]{.label}\n\n# T\n\nWords', () => 'x'), '[Free]{.label}\n\n# T\n\nWords', 'a free Label stays words');
+  // An emptied pill: its stamp changes when it is written as nothing, so a copy that matched is renewed.
+  const emptied = '---\nid: c1\n---\n# Try\n\n::: {.steps tag=""}\n1. A\n:::';
+  const stamp = slideStamp('', slideDataOf('', emptied), handout, '');
+  const copy = writeSlideData('', emptied, { ...slideDataOf('', emptied), from: writeFrom({ path: 'Slide library/A.deck.md', id: 'a1', stamp }) });
+  const written = labelledSlideBody(copy, handout, '');
+  const fresh = slideStamp('', slideDataOf('', written), handout, '');
+  assert.notEqual(fresh, stamp, 'precondition: the emptied pill stamps otherwise once written as nothing');
+  assert.equal(parseFrom(slideDataOf('', written).from)?.stamp, fresh, 'renewed');
+  const changed = writeSlideData('', emptied, { ...slideDataOf('', emptied), from: writeFrom({ path: 'Slide library/A.deck.md', id: 'a1', stamp: 'zzzzzz' }) });
+  assert.equal(parseFrom(slideDataOf('', labelledSlideBody(changed, handout, '')).from)?.stamp, 'zzzzzz', 'a changed copy keeps its stamp');
 }
 
 // ---- parseDeck still reads every part of the converted deck.

@@ -1,7 +1,10 @@
 /**
  * 16 November: an exercise slide's pill is the slide's own words, in an optional `tag:` line. Missing: the default
- * ("Exercise"), and the deck stays byte for byte; edited on the slide or in Settings' Label row: written through
- * `writeScalar`; emptied: `tag: ""`, no pill, on the stage, the wall and the page; Undo puts back the line that was there.
+ * ("Exercise"), and the deck stays byte for byte; written through `writeScalar`; emptied: `tag: ""`, no pill, on the
+ * stage, the wall and the page; Undo puts back the line that was there.
+ *
+ * Sprint 164 PR 3 (the decks README, "Label, a block of its own"): the pill is drawn as a Label over the slide's title,
+ * as the slide converts (`legacyToBlocks`), and Settings' Label row is gone (Jarmo's yes by name, 19 November).
  *
  * Run: npx tsx webview/src/components/decks/slide/exerciseTag.test.ts
  */
@@ -105,33 +108,32 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   // The stage's empty pill is hidden by its own rule once the caret leaves; the placeholder is faint, on the pill.
   const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:empty:not\(:focus\) \{ display: none; \}/)
-  // Sprint 161 (PR 2, decision 8): the stage draws an Exercise slide as the Steps block its conversion writes, the pill
-  // by #752's rule: none for `tag: ""`, the words for any other (its editing on the slide comes with PR 3's blocks;
-  // Settings' Label row sets it meanwhile).
+  // Sprint 161 (PR 2, decision 8): the stage draws an Exercise slide as the blocks its conversion writes; Sprint 164 PR 3:
+  // its pill as a Label over its title, by #752's rule: none for `tag: ""`, the words for any other, the default without.
   const drawn = (tag: string | undefined) => parse(renderToStaticMarkup(createElement(SlideCanvas, {
     kind: 'exercise', data: { ...data, tag }, width: 960, theme: BUILT_IN_THEME, borderless: false, assets: {},
     editing: { onText: () => {}, onKey: () => false, onSetIcon: () => {}, focusPath: null, onFocused: () => {} },
   })))
-  assert.equal(drawn('').querySelector('.blk-pill'), null, 'no pill')
-  assert.equal(drawn('Harjutus').querySelector('.blk-pill')!.text, 'Harjutus')
-  assert.equal(drawn(undefined).querySelector('.blk-pill')!.text, 'Exercise', 'no line: the default')
+  assert.equal(drawn('').querySelector('.blk-label'), null, 'no Label')
+  assert.equal(drawn('Harjutus').querySelector('.blk-label')!.text, 'Harjutus')
+  assert.equal(drawn(undefined).querySelector('.blk-label')!.text, 'Exercise', 'no line: the default')
+  assert.equal(drawn('Harjutus').querySelector('.blk-pill'), null, 'no pill of the Steps block\'s own')
 }
 
-// ---- Settings' Label row: only on an exercise, the pill's words, the default as its placeholder.
+// ---- Sprint 164 PR 3 (Jarmo's yes by name, 19 November): Settings has no Label row, on an exercise or anywhere else.
 {
   const render = (kind: string, tag?: string) => parse(renderToStaticMarkup(createElement(SlideSettings, {
-    number: 2, kind, data: { title: 'Try it', ...(tag === undefined ? {} : { tag }) }, onKind: () => {}, onChange: () => {}, onClose: () => {}, onUndo: () => {},
+    number: 2, kind, data: { title: 'Try it', ...(tag === undefined ? {} : { tag }) }, onKind: () => {}, onChange: () => {}, onClose: () => {},
   })))
-  const field = (tag?: string) => render('exercise', tag).querySelector('#deck-tag-2')!
-  assert.equal(render('exercise').querySelector('label[for="deck-tag-2"]')!.text, 'Label')
-  assert.equal(field().getAttribute('placeholder'), 'Exercise')
-  assert.equal(field().getAttribute('value'), 'Exercise', 'no line: the default, as the slide shows it')
-  assert.equal(field('Harjutus').getAttribute('value'), 'Harjutus')
-  assert.equal(field('').getAttribute('value'), '', 'no pill: empty, the default as its placeholder')
-  for (const kind of ['points', 'boxes', 'title', 'section', 'table']) assert.equal(render(kind).querySelector('#deck-tag-2'), null, kind)
+  for (const kind of ['exercise', '', 'points', 'boxes', 'title', 'section', 'table']) {
+    const root = render(kind, 'Harjutus')
+    assert.equal(root.querySelector('#deck-tag-2'), null, kind)
+    assert.equal(root.querySelector('label[for="deck-tag-2"]'), null, kind)
+  }
 }
 
-// ---- The Label row sets the line, as the deck view writes it (one transaction), and Undo puts back the line that was there.
+// ---- A `tag:` change through the deck view's one write of a slide's data (`updateSlide`, one transaction) sets the line,
+// and Undo puts back the line that was there.
 {
   installTestDocument()
   const schema = getSchema(createEditorSchemaExtensions({ deck: [DeckSlide] }))
@@ -158,8 +160,8 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   assert.equal(cleared.undone, written, 'Undo puts back the words that were there')
 }
 
-// ---- The page and the wall show the same pill, or none. Sprint 161 (PR 2): both draw the slide as the Steps block its
-// conversion writes (`.blk-pill`), the pill's words in its `tag` only when the line is written.
+// ---- The page and the wall show the same pill, or none. Sprint 161 (PR 2): both draw the slide as the blocks its
+// conversion writes; Sprint 164 PR 3: the pill as its Label (`.blk-label`), written only when it has words.
 {
   const deckText = (tagLine: string) => DECK.replace('title: Try it\n', `title: Try it\n${tagLine}`)
   const page = (text: string) => {
@@ -173,19 +175,20 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   }
   for (const [line, words] of [['', 'Exercise'], ['tag: Harjutus\n', 'Harjutus'], ['tag: "Teema: <1> & 2"\n', 'Teema: <1> & 2'], ['tag: ""\n', null]] as const) {
     const { deck, root } = page(deckText(line))
-    const slide = root.querySelector('.deck-sl .blk-pill')
+    const slide = root.querySelector('.deck-sl .blk-label')
     const contents = root.querySelector('.toc .tag')
-    const onWall = wall(deckText(line)).querySelector('.deck-sl .blk-pill')
+    const onWall = wall(deckText(line)).querySelector('.deck-sl .blk-label')
     if (words === null) {
       assert.equal(slide, null, 'the page draws no pill on the slide')
       assert.equal(contents, null, 'nor in Contents')
       assert.equal(onWall, null, 'the wall draws none')
-      assert.match(deck.slides[0].data.markdown ?? '', /::: \{\.steps tag=""\}/)
+      assert.ok(!(deck.slides[0].data.markdown ?? '').includes('{.label}'), 'no Label in the page\'s slide')
     } else {
       for (const [where, node] of [['slide', slide], ['contents', contents], ['wall', onWall]] as const) {
         assert.equal(node?.text, words, `${where}: ${words}`)
       }
-      assert.equal(/tag=/.test(deck.slides[0].data.markdown ?? ''), !!line, 'the page holds the line only when it is written')
+      assert.ok((deck.slides[0].data.markdown ?? '').includes(']{.label}\n\n# Try it'), 'the page holds it as a Label over the title')
+      assert.ok(!/tag=/.test(deck.slides[0].data.markdown ?? ''), 'never on the Steps line')
     }
     // Contents still knows it is an exercise, pill or none, so it ticks it once its steps are done.
     assert.equal(root.querySelector('#frame > .layer')!.hasAttribute('data-exercise'), true)
@@ -257,8 +260,8 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   assert.match(css, /\.deck-sl \.tag\[contenteditable\]:focus \{ text-overflow: clip; \}/)
 }
 
-// ---- The Experience lead's guard (16 November): focusing the Label row or the pill and leaving it without typing
-// writes nothing. The DOM writes only on `input` (the pill) and `change` (the row), never on focus or blur; and a write
+// ---- The Experience lead's guard (16 November): focusing the pill and leaving it without typing writes nothing (the
+// Label row, which shared the rule, is gone since Sprint 164 PR 3). The DOM writes only on `input` (the pill) and `change` (the row), never on focus or blur; and a write
 // of the words as they were is no write at all, through the one rule both use (`setPath`).
 {
   installTestDocument()

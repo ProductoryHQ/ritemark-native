@@ -10,7 +10,7 @@
  * | points             | `# title`, an ordered list; an item's text is a second line                    |
  * | boxes              | `# title`, `:::: {.boxes look="…"}` of `::: {.box icon="…"}` with `### heading` |
  * | columns            | `# title`, `:::: columns` of two `::: column` with `### heading` and its lines  |
- * | exercise           | `# title`, `::: {.steps tag="…"}` (only when `tag:` is written) and its list    |
+ * | exercise           | its pill as a Label (`[Exercise]{.label}`, none for `tag: ""`), `# title`, `::: steps` |
  * | picture            | `# title`, `![](image)`, its caption                                           |
  * | table              | `# title`, a GFM table, the first row its header                               |
  * | picture beside or behind | the header's `picture:` and `image:`                                     |
@@ -21,8 +21,9 @@
  *
  * Pure and dependency-free but for the deck format: the host and the webview use this one converter.
  */
-import { HEADER_KEYS, isSlideKind, parseSlideBody, sidePictureOf, type SlideData, type SlideItem } from '../deckFormat';
+import { HEADER_KEYS, exerciseTagOf, isSlideKind, parseSlideBody, sidePictureOf, type SlideData, type SlideItem } from '../deckFormat';
 import { OWN_MARK_LOOKS, fenceAttributeValue } from './fencedDiv';
+import { isEmptyLabel, labelLine } from './labelBlock';
 
 /** A v1 slide as blocks: the header's data, the Markdown, and the comment its hidden words and notes make. */
 export interface LegacyBlocks {
@@ -179,9 +180,11 @@ function markdownOf(kind: string, data: SlideData): string {
       blocks.push(titleLine(data), orderedList(items, true));
       break;
     case 'exercise': {
-      const open = data.tag === undefined ? '::: steps' : `::: {.steps tag=${attributeValue(data.tag)}}`;
-      const list = orderedList(items, false);
-      blocks.push(titleLine(data), [open, ...list, ':::']);
+      // Sprint 164 PR 3: the pill is a Label of its own over the title, with its words ("Exercise" when the slide has
+      // no `tag:`); an emptied pill (`tag: ""`) is nothing. The Steps block has no pill.
+      const pill = exerciseTagOf(data).replace(/\s*\n\s*/g, ' ');
+      if (!isEmptyLabel(pill)) blocks.push([labelLine(pill)]);
+      blocks.push(titleLine(data), ['::: steps', ...orderedList(items, false), ':::']);
       break;
     }
     case 'boxes': {

@@ -10,6 +10,8 @@
  *    handout's drawn headings are written with it (`withWrittenHandout`'s rule), and the deck view puts `deck: 2` and
  *    `handout: text` in the front matter in the same change.
  *  - A kind this build doesn't know stays as it is, with its notes.
+ *  - Sprint 164 PR 3: a block slide whose Steps block still has its old pill (`tag`) gets it as a Label in the same
+ *    place, in the same transaction (`labelledSlideBody`); every view drew it so before (`withStepsLabels`).
  *  - Without the comment node (the comment-callouts kill switch), a slide's private words stay in its notes block,
  *    which never goes out either: nothing is lost and nothing turns public.
  *
@@ -19,7 +21,7 @@
 import { Extension } from '@tiptap/core'
 import { DOMParser as PMDOMParser, DOMSerializer, type Node as PMNode, type Schema } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { convertSlide, convertsToBlocks, drawsAsBlocks, saysBlockDeck } from '../../../../../src/decks/blocks/convertDeck'
+import { convertSlide, convertsToBlocks, drawsAsBlocks, hasStepsPill, labelledSlideBody, saysBlockDeck } from '../../../../../src/decks/blocks/convertDeck'
 import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, isBlockSlide, slideDataOf as readSlideData, withBlockMarkdown, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, isSlideNode, slidesOf } from '../deckDocument'
@@ -31,10 +33,14 @@ export const deckConvertKey = new PluginKey('deckConvert')
 /** Meta on the transaction that converts a deck, with what it did (`DeckConversion`). */
 export const DECK_CONVERTED = 'deckConverted'
 
-/** What a conversion did: how many slides became block slides, and how many got a comment for their private words. */
+/**
+ * What a conversion did: how many slides became block slides, how many got a comment for their private words, and how
+ * many block slides had their Steps pill written as a Label (Sprint 164 PR 3).
+ */
 export interface DeckConversion {
   slides: number
   comments: number
+  labels: number
   /** The note of the first comment it made, in the deck's order (the notice's Show opens it); null without one. */
   firstComment: string | null
 }
@@ -141,10 +147,13 @@ export class DeckFrontMatterSteps {
   }
 }
 
-/** Does the document hold a slide the conversion would change: a v1 slide of one of the nine kinds? */
+/**
+ * Does the document hold a slide the conversion would change: a v1 slide of one of the nine kinds, or a block slide
+ * whose Steps block still has its old pill (Sprint 164 PR 3)?
+ */
 export function needsConversion(doc: PMNode): boolean {
   let found = false
-  doc.forEach(node => { if (!found && isSlideNode(node) && convertsToBlocks(node.attrs.kind)) found = true })
+  doc.forEach(node => { if (!found && isSlideNode(node) && (convertsToBlocks(node.attrs.kind) || hasStepsPill(node.attrs.kind, node.attrs.body))) found = true })
   return found
 }
 
@@ -184,14 +193,21 @@ function notesOf(comment: string): string {
 export function convertDeckInto(tr: Transaction): DeckConversion | null {
   if (!needsConversion(tr.doc)) return null
   const schema = tr.doc.type.schema
-  const result: DeckConversion = { slides: 0, comments: 0, firstComment: null }
+  const result: DeckConversion = { slides: 0, comments: 0, labels: 0, firstComment: null }
   const slides = slidesOf(tr.doc)
   // From the last part to the first, so the positions before each one still hold.
   for (let index = slides.length - 1; index >= 0; index--) {
     const slide = slides[index]
-    if (!convertsToBlocks(slide.kind)) continue
     const next = slides[index + 1]
     const partEnd = next ? next.pos : tr.doc.content.size
+    if (hasStepsPill(slide.kind, slide.node.attrs.body)) {
+      // Its pill as a Label; a copy's stamp renewed when the move changes it (an emptied pill's), as below.
+      const handout = slide.data.from ? handoutMarkdownOf(tr.doc, slide.pos + slide.node.nodeSize, partEnd) : ''
+      tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: labelledSlideBody(slide.node.attrs.body, handout, '') })
+      result.labels++
+      continue
+    }
+    if (!convertsToBlocks(slide.kind)) continue
     // A library copy's stamp counts its handout: the part's words go with it, so a copy still as copied gets the block
     // stamp. The deck's folder isn't known here: a stamp that depends on its paths stays as it was (`renewedFrom`).
     const handout = slide.data.from ? handoutMarkdownOf(tr.doc, slide.pos + slide.node.nodeSize, partEnd) : ''
