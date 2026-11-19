@@ -78,7 +78,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 9: an unknown icon name (PR 9, issue #850)
 [#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
-- [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+- [x] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+- Done (PR 9): the Experience lead's look (issue #850, decks README c6f8477): the badge keeps its place, size and soft accent ground with Phosphor's `circle-dashed` in the placeholder colour, drawn by one helper for the renderer and the stage (`boxIconBadge`). The hint is a tooltip, No icon named “xyz”, with Choose an icon, which opens the icon menu as it is (the search with the name in it waits for Sprint 169). The DECKS rules list the 24 names and the aliases; the name stays in the file as written. Tests: `blocks.test.ts`, `pageHtml.test.ts`, `slideRenderer.parity.test.ts`, `capabilityContext.test.ts`, `layoutSlide.test.ts`, `slideMarkup.test.ts`, `slideBlocks.roundtrip.test.ts`. Shots: `proof/pr9-unknown-icon/`.
 
 ## Added on 19 November, third time (Jarmo: "jah kõigile kolmele")
 

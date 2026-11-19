@@ -104,12 +104,14 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
     <div className="deck-block-at" style={{ left: badge.left - origin.left, top: badge.top - origin.top, width: badge.width, height: badge.height, zIndex: 5 }}>
       <Tooltip
         className="size-full"
+        // Beside the badge, where a box has nothing (under it is the box's heading).
+        side="right"
         onOpenChange={next => {
           open.current = next
           if (!next && !over.current) onDone()
         }}
         label={(
-          <span className="inline-flex flex-wrap items-baseline gap-x-2">
+          <span className="flex flex-col items-start gap-0.5 py-0.5">
             {words}
             <Button variant="link" className="h-auto p-0 text-[12px]" onMouseDown={event => event.preventDefault()} onClick={choose}>Choose an icon</Button>
           </span>
