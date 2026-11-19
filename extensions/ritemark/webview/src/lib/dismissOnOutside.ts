@@ -7,7 +7,8 @@
  * - a press outside the popup closes it, and the focus goes where the press put it;
  * - Esc closes it, and the focus goes back to where it came from (the trigger that opened it) when it was in the popup;
  *   focus elsewhere (typing in the handout with Settings open) stays where it is;
- * - a press on the trigger is not "outside": the trigger toggles the popup by itself, so it doesn't close and reopen.
+ * - a press on the trigger is not "outside": the trigger toggles the popup by itself, so it doesn't close and reopen;
+ *   nor is a press on what the popup belongs to (`alsoInside`: a Button's address sheet and its button).
  *
  * A press or Esc inside a Radix layer (a Select's list, a tooltip, a menu opened from inside the popup) is the layer's
  * own: it portals out of the popup, so without this check choosing from a Select inside a popup would close the popup.
@@ -31,6 +32,9 @@ export interface DismissOptions {
   /** Where Esc or Close puts the focus when no trigger opened the popup (a sheet opened from a menu item): unlike a
    *  trigger, a press on it is outside. */
   returnFocus?: ElementSource
+  /** What else the popup belongs to (a Button's address sheet: its button, #848): a press on it is not outside, and
+   *  the focus goes where the press puts it. */
+  alsoInside?: ElementSource
   /** false: the popup is closed, nothing is listened to. */
   enabled?: boolean
 }
@@ -82,11 +86,12 @@ export function attachDismissOnOutside(
   getTrigger: () => NodeLike | null | undefined,
   onClose: () => void,
   getReturnFocus: () => NodeLike | null | undefined = getTrigger,
+  getAlsoInside: () => NodeLike | null | undefined = () => null,
 ): () => void {
   const onPointerDown = (event: Event) => {
     const target = event.target
     const panel = getPanel()
-    if (!panel || within(panel, target) || within(getTrigger(), target) || inRadixLayer(target)) return
+    if (!panel || within(panel, target) || within(getTrigger(), target) || within(getAlsoInside(), target) || inRadixLayer(target)) return
     if (doc.querySelector?.(OPEN_RADIX_LIST)) return
     onClose()
   }
@@ -113,9 +118,9 @@ export function attachDismissOnOutside(
  * for the popup's own Close button: it gives the focus back to the trigger, as Esc does.
  */
 export function useDismissOnOutside(ref: RefObject<HTMLElement | null>, onClose: () => void, options: DismissOptions = {}): () => void {
-  const { trigger, returnFocus, enabled = true } = options
-  const latest = useRef({ onClose, trigger, returnFocus })
-  latest.current = { onClose, trigger, returnFocus }
+  const { trigger, returnFocus, alsoInside, enabled = true } = options
+  const latest = useRef({ onClose, trigger, returnFocus, alsoInside })
+  latest.current = { onClose, trigger, returnFocus, alsoInside }
   const focusBack = () => resolve(latest.current.returnFocus ?? latest.current.trigger)
 
   useEffect(() => {
@@ -126,6 +131,7 @@ export function useDismissOnOutside(ref: RefObject<HTMLElement | null>, onClose:
       () => resolve(latest.current.trigger),
       () => latest.current.onClose(),
       focusBack,
+      () => resolve(latest.current.alsoInside),
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps -- focusBack reads the latest options through the ref
   }, [enabled, ref])
