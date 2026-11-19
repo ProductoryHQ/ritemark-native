@@ -10,22 +10,27 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { QUOTE_BY_CLASS, isQuoteByWords } from '../../../../../src/decks/blocks/slideRenderer'
+import { isEmptyLabel } from '../../../../../src/decks/blocks/labelBlock'
 
 const key = new PluginKey<DecorationSet>('slideQuoteBy')
 
-/** What a quote holds that draws nothing (the renderer draws none of it): an empty line, an empty Label, a comment. */
+/**
+ * What a quote holds that the renderer draws as nothing (`quoteHtml` counts only what draws): an empty line, an empty
+ * Label (words of only spaces too, `isEmptyLabel`), a comment note. The parity test holds the two sides together.
+ */
 function drawsNothing(node: PMNode): boolean {
   if (node.type.name === 'commentNode') return true
-  return (node.type.name === 'paragraph' || node.type.name === 'slideLabel') && node.childCount === 0
+  if (node.type.name === 'slideLabel') return isEmptyLabel(node.textContent)
+  return node.type.name === 'paragraph' && node.childCount === 0
 }
 
-/** The offset of a quote's attribution inside it, or null when it has none. */
-export function quoteByOffset(quote: PMNode): number | null {
+/** A quote's attribution, its paragraph and its offset inside the quote, or null when it has none. */
+export function quoteBy(quote: PMNode): { node: PMNode; offset: number } | null {
   const drawn: Array<{ node: PMNode; offset: number }> = []
   quote.forEach((node, offset) => { if (!drawsNothing(node)) drawn.push({ node, offset }) })
   const last = drawn[drawn.length - 1]
   if (drawn.length < 2 || last.node.type.name !== 'paragraph' || !isQuoteByWords(last.node.textContent)) return null
-  return last.offset
+  return last
 }
 
 /** The attribution of every quote on the slide, in a column, a box or a tab's pane too. */
@@ -33,9 +38,8 @@ export function quoteByDecorations(doc: PMNode): DecorationSet {
   const found: Decoration[] = []
   doc.descendants((node, pos) => {
     if (node.type.name !== 'blockquote') return node.isBlock && !node.isTextblock
-    const offset = quoteByOffset(node)
-    const by = offset === null ? null : node.nodeAt(offset)
-    if (offset !== null && by) found.push(Decoration.node(pos + 1 + offset, pos + 1 + offset + by.nodeSize, { class: QUOTE_BY_CLASS }))
+    const by = quoteBy(node)
+    if (by) found.push(Decoration.node(pos + 1 + by.offset, pos + 1 + by.offset + by.node.nodeSize, { class: QUOTE_BY_CLASS }))
     return true
   })
   return DecorationSet.create(doc, found)

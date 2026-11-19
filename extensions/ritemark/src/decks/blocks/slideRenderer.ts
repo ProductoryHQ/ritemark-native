@@ -352,9 +352,69 @@ export function isQuoteByWords(words: string): boolean {
   return /^[—–] /.test(words);
 }
 
-/** A paragraph's words from its drawn HTML: no tags, and a dash written as an entity read as the dash it draws. */
+/**
+ * A paragraph's words from its drawn HTML: no tags, and a first character written as an entity read as the character it
+ * draws (`&mdash;`, `&#8212;`, `&#x02014;`…), as the stage's words have it.
+ */
 function drawnWordsOf(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/^&(?:mdash|#8212|#[xX]2014);/, '—').replace(/^&(?:ndash|#8211|#[xX]2013);/, '–');
+  return html.replace(/<[^>]*>/g, '').replace(/^&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(mdash|ndash));/, (_entity, decimal?: string, hex?: string, name?: string) => {
+    if (name) return name === 'mdash' ? '—' : '–';
+    const code = decimal ? Number(decimal) : parseInt(hex as string, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+  });
+}
+
+/**
+ * A block a quote holds that is drawn as nothing: a blank line, a comment note (the slide editor's own reader makes it a
+ * `ritemarkComment` token), an empty Label.
+ */
+function drawsNoBlock(token: Token): boolean {
+  if (token.type === 'space' || token.type === 'ritemarkComment' || isCommentBlock(token)) return true;
+  const label = token.type === 'paragraph' ? labelParagraphOf(token as Tokens.Paragraph) : null;
+  return !!label && isEmptyLabel(label.words);
+}
+
+/** The words a run of inline tokens draws, as text: no tags, no picture, no line break. */
+function inlineWordsOf(tokens: readonly Token[]): string {
+  return tokens.map(token => {
+    if (token.type === 'html' || token.type === 'image' || token.type === 'br') return '';
+    const inner = (token as { tokens?: Token[] }).tokens;
+    if (inner) return inlineWordsOf(inner);
+    return 'text' in token ? String(token.text) : '';
+  }).join('');
+}
+
+/**
+ * Sprint 168 PR 1, the Experience lead (19 November): a quote's last line after a line break in its last paragraph is
+ * its attribution too, when it opens with "— " or "– " ("> Words" then "> — X", as people and Claude often write it).
+ * That paragraph is split at the break into its words and the attribution, two paragraphs, before the renderer or the
+ * slide editor draws it: both register this as `walkTokens`, so the stage opens the attribution as a paragraph of its
+ * own and the stage, the wall and the page agree. The file is read, never changed: an untouched slide writes back as it
+ * was written (`SlideSync`), and the first real edit writes the blank `>` line between them, as other normalisations do.
+ * A break inside bold or a link, a Button's or a Label's line and a picture's are left as they are.
+ */
+export function splitQuoteByLine(token: Token): void {
+  if (token.type !== 'blockquote') return;
+  const blocks = (token as Tokens.Blockquote).tokens;
+  let at = blocks.length - 1;
+  while (at >= 0 && drawsNoBlock(blocks[at])) at--;
+  if (at < 0 || blocks[at].type !== 'paragraph') return;
+  const paragraph = blocks[at] as Tokens.Paragraph;
+  const inline = paragraph.tokens ?? [];
+  if (labelParagraphOf(paragraph) || buttonParagraphOf(inline) || isPictureParagraph(paragraph) || isAlonePicture(paragraph)) return;
+  // A last paragraph that opens with the dash under words of its own is the attribution already, whole.
+  if (blocks.slice(0, at).some(block => !drawsNoBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
+  const br = inline.map(child => child.type).lastIndexOf('br');
+  if (br <= 0) return;
+  const words = inline.slice(0, br);
+  const by = inline.slice(br + 1);
+  // Something drawn before the break: words, or a picture (the slide editor opens a picture on its own line as a block).
+  if ((!inlineWordsOf(words).trim() && !words.some(child => child.type === 'image')) || !isQuoteByWords(drawnWordsOf(inlineWordsOf(by)))) return;
+  const raw = (tokens: Token[]) => tokens.map(child => child.raw).join('');
+  // The words keep the paragraph's own marks (as-written's `rmTight`); the attribution has a blank line before it.
+  blocks.splice(at, 1,
+    { ...paragraph, raw: raw(words), text: raw(words), tokens: words } as Tokens.Paragraph,
+    { type: 'paragraph', raw: raw(by), text: raw(by), tokens: by } as Tokens.Paragraph);
 }
 
 /**
@@ -506,6 +566,8 @@ function createSlideMarked(): Marked {
       },
     },
   });
+  // Sprint 168 PR 1: a quote's last line after a line break, as its attribution (`splitQuoteByLine`).
+  instance.use({ walkTokens: splitQuoteByLine });
   return instance;
 }
 

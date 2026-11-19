@@ -18,6 +18,9 @@ import { EditorState } from '@tiptap/pm/state'
 import { QUOTE_BY_CLASS, blockSlideHtml, isQuoteByWords } from '../../../../../src/decks/blocks/slideRenderer'
 import { loadSlideWithComments, saveSlide as saveSlideWithComments } from '../blocks/slideEditorHarness'
 import { quoteByDecorations } from '../blocks/slideQuote'
+import { SlideSync } from '../blocks/slideSync'
+import { saveSlideMarkdown } from '../blocks/slideEditorMarkdown'
+import { editorHTML } from '../../../utils/markdownFidelity'
 
 const sheet = (rel: string) =>
   readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ')
@@ -110,6 +113,12 @@ const hdOnWhite = slideRules.find((r) => r.sel.split(',').map((s) => s.trim()).i
 assert.ok(hdOnWhite && decls(hdOnWhite.body).color === 'var(--s-hd, #1C1F4A)', 'a quote on white in the heading colour')
 const subOnWhite = slideRules.find((r) => r.sel.split(',').map((s) => s.trim()).includes('.deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by'))
 assert.ok(subOnWhite && decls(subOnWhite.body).color === 'var(--s-sub, #5B5F86)', 'its attribution on white in the sub colour')
+// Review: a bold name in the attribution keeps its quiet colour (the slide's `strong` is the heading colour), on white too.
+const boldBy = slideRules.find((r) => r.sel.split(',').map((s) => s.trim()).includes(`${sel} > p.blk-by strong`))
+assert.ok(boldBy && decls(boldBy.body).color === 'inherit', 'bold words in the attribution in its colour')
+assert.ok(boldBy && boldBy.sel.includes('.deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by strong'), 'and on white')
+// Review: on the stage, a note after a quote's last paragraph (never drawn) doesn't give it its 6 px back.
+assert.ok(editorRules.some((r) => r.sel === '.deck-sl.is-blocks.is-editing blockquote > :nth-last-child(1 of :not(ritemark-comment))' && decls(r.body)['margin-bottom'] === '0'), 'the stage skips a note after the last paragraph')
 assert.equal(QUOTE_BY_CLASS, 'blk-by', 'the class slide.css draws is the one the renderer and the stage write')
 
 // The selector outranks VS Code's `blockquote` and `.ProseMirror blockquote`, whatever the sheets' order.
@@ -131,39 +140,70 @@ assert.equal(decls(code[0].body).color, 'inherit')
 // #863: the attribution, marked alike by the renderer (the strip, the wall, the presenter view, the page) and by the
 // stage's decoration, on the same paragraph; never on a quote of that one line; the file as written, byte for byte.
 const drawnBy = (markdown: string) =>
-  [...blockSlideHtml(markdown).matchAll(/<p class="blk-by">([\s\S]*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').replace(/^&mdash;/, '—'))
+  [...blockSlideHtml(markdown).matchAll(/<p class="blk-by">([\s\S]*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').replace(/^&(?:mdash|#x02014);/, '—'))
 const stageBy = (markdown: string) => {
   const doc = loadSlideWithComments(markdown)
   return quoteByDecorations(doc).find().map((d) => doc.nodeAt(d.from)?.textContent ?? '')
 }
-const QUOTES: Array<[string, string, string[]]> = [
+/** Each quote: what it is, its Markdown, the attribution drawn, and what the stage's first real edit writes when that
+ * differs from the file (a soft-break attribution gets its blank `>` line then, and only then). */
+const QUOTES: Array<[string, string, string[], string?]> = [
   ['an em dash under the words', '# What the team said\n\n> We used to spend Monday morning sorting the inbox.\n>\n> — Team lead, Harbour Logistics', ['— Team lead, Harbour Logistics']],
   ['an en dash', '> The replies sound like us.\n>\n> – Customer service', ['– Customer service']],
   ['two paragraphs of words, then the attribution', '> One.\n>\n> Two.\n>\n> — A. Writer', ['— A. Writer']],
   ['bold words in the attribution', '> Words\n>\n> **— A.** Writer', ['— A. Writer']],
   ['a dash written as an entity', '> Words\n>\n> &mdash; A. Writer', ['— A. Writer']],
+  ['a dash written as a padded number', '> Words\n>\n> &#x02014; A. Writer', ['— A. Writer']],
   ['a list above it', '> - one\n> - two\n>\n> — A. Writer', ['— A. Writer']],
   ['a comment note after it', '> Words\n>\n> — A. Writer\n>\n> <!-- a note -->', ['— A. Writer']],
   ['in a column', ':::: columns\n::: column\n> Words\n>\n> — A\n:::\n::: column\n> Plain words\n:::\n::::', ['— A']],
   ['in a box', ':::: boxes\n::: box\n> Words\n>\n> — A\n:::\n::::', ['— A']],
   ['two quotes, one with', '> First\n>\n> — A\n\n> Second', ['— A']],
+  // The Experience lead, 19 November: the last line after a line break is the attribution too ("> Words" / "> — X").
+  ['a dash line after a line break', '# What the team said\n\n> We read what matters.\n> — Customer service', ['— Customer service'], '# What the team said\n\n> We read what matters.\n>\n> — Customer service'],
+  ['an en dash after a hard break', '> Words  \n> – A. Writer', ['– A. Writer'], '> Words\n>\n> – A. Writer'],
+  ['two lines of words, then the dash line', '> One\n> two\n> — A. Writer', ['— A. Writer'], '> One\n> two\n>\n> — A. Writer'],
+  ['a dash line after a break, a note after it', '> Words\n> — A. Writer\n>\n> <!-- a note -->', ['— A. Writer'], '> Words\n>\n> — A. Writer\n>\n> <!-- a note -->'],
+  ['a dash line after a break, under a paragraph', '> First.\n>\n> Words\n> — A. Writer', ['— A. Writer'], '> First.\n>\n> Words\n>\n> — A. Writer'],
+  ['a dash line after a break, in a column', ':::: columns\n::: column\n> Words\n> — A\n:::\n::: column\nB\n:::\n::::', ['— A'], ':::: columns\n::: column\n> Words\n>\n> — A\n:::\n::: column\nB\n:::\n::::'],
+  ['a dash line after a break under a picture (the stage opens the picture as a block)', '> ![](images/x.png)\n> — A. Writer', ['— A. Writer'], '> ![](images/x.png)\n>\n> — A. Writer'],
+  ['a two-line attribution stays whole', '> Words\n>\n> — A. Writer\n> Harbour Logistics', ['— A. WriterHarbour Logistics']],
   // Never an attribution: a quote of that one line is its words (the Experience lead, 19 November).
   ['a quote of one dash line', '> — A. Writer', []],
   ['a dash line under a comment only', '> <!-- a note -->\n>\n> — A. Writer', []],
+  ['a dash line under a Label of only spaces', '> [ ]{.label}\n>\n> — A. Writer', []],
   ['a hyphen', '> Words\n>\n> -- A. Writer', []],
   ['no space after the dash', '> Words\n>\n> —A. Writer', []],
   ['the dash line not last', '> — A. Writer\n>\n> Words', []],
   ['no dash', '> Words\n>\n> A. Writer', []],
-  ['a dash line after a line break in the same paragraph (one paragraph)', '> Words\n> — A. Writer', []],
   ['a dash inside the words', '> Words — and more\n>\n> words — too', []],
+  ['a line break with no dash after it', '> Words\n> more words', []],
+  ['a dash line after a break inside bold', '> **Words\n> — A. Writer**', []],
   ['no quote at all', '# Title\n\nWords\n\n— A line of its own', []],
 ]
-for (const [what, markdown, expected] of QUOTES) {
+for (const [what, markdown, expected, written] of QUOTES) {
   assert.deepEqual(drawnBy(markdown), expected, `the renderer: ${what}`)
   assert.deepEqual(stageBy(markdown), expected, `the stage: ${what}`)
   // The file is never touched by the look: the slide editor writes it back as written (an entity is written as the
-  // dash it draws, as before #863).
-  if (!markdown.includes('&mdash;')) assert.equal(saveSlideWithComments(loadSlideWithComments(markdown)), markdown, `byte for byte: ${what}`)
+  // character it draws, and a Label of only spaces as `[]{.label}`, as before #863).
+  if (!markdown.includes('&') && !markdown.includes('[ ]{.label}')) assert.equal(saveSlideWithComments(loadSlideWithComments(markdown)), written ?? markdown, `as the stage writes it: ${what}`)
+  // An untouched slide writes back byte for byte, whatever the stage opened it as (`SlideSync`: its first content).
+  const load = (text: string) => loadSlideWithComments(text)
+  const sync = new SlideSync(load, (doc) => saveSlideMarkdown(doc, editorHTML(doc), load), markdown, load(markdown))
+  assert.equal(sync.markdownOf(load(markdown)), markdown, `untouched, byte for byte: ${what}`)
+  if (written) {
+    // The first real edit writes the blank `>` line, and the slide reads back the same.
+    const doc = load(markdown)
+    let end = -1
+    doc.descendants((node, pos) => { if (end < 0 && node.isTextblock && node.textContent) end = pos + node.nodeSize - 1 })
+    const edited = EditorState.create({ doc }).apply(EditorState.create({ doc }).tr.insertText('!', end)).doc
+    const saved = sync.markdownOf(edited)
+    assert.notEqual(saved, markdown, `an edit writes: ${what}`)
+    // (The edit may land in the attribution itself: compare the lines' count and the two sides.)
+    assert.equal(stageBy(saved).length, expected.length, `and reads back with its attribution: ${what}`)
+    assert.deepEqual(drawnBy(saved), stageBy(saved), `and draws so: ${what}`)
+    assert.ok(/\n>\n> [—–] /.test(saved), `with the blank line before the attribution: ${what}`)
+  }
 }
 // A quote with no attribution, and a slide with no quote, draw exactly as marked draws them.
 assert.equal(blockSlideHtml('> One\n>\n> Two'), '<blockquote>\n<p>One</p>\n<p>Two</p>\n</blockquote>\n')

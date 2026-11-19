@@ -20,7 +20,7 @@ import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
 import { loadSlide } from './slideEditorHarness'
 import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
-import { quoteByOffset } from './slideQuote'
+import { quoteBy } from './slideQuote'
 
 type Outline = string[]
 
@@ -64,7 +64,7 @@ function outlineOfDoc(doc: PMNode): Outline {
   const text = (node: PMNode) => node.textContent.replace(/\s+/g, ' ').trim()
   const walk = (node: PMNode, depth: number) => {
     // Sprint 168 PR 1: a quote's attribution, as the stage's decoration marks it.
-    const by = node.type.name === 'blockquote' ? quoteByOffset(node) : null
+    const by = node.type.name === 'blockquote' ? quoteBy(node)?.offset ?? null : null
     node.forEach((child, offset) => {
       switch (child.type.name) {
         case 'slideDiv': {
@@ -127,8 +127,8 @@ const SPIKE = [
   '[Workshop · day 1]{.label}\n\n# Agents at work\n\n:::: columns\n::: column\n[Before]{.label}\n\n### Copilot\nText\n:::\n::: column\n[]{.label}\n\nAfter\n:::\n::::',
   ':::: boxes\n::: box\n[Tip]{.label}\n\nOne line\n:::\n::::\n\nWords\n[not a label]{.label}\n\n[a link](https://example.com){.label}',
   '# Steps with an old pill\n\n::: {.steps tag="Harjutus · 1 / 2"}\n1. Open the file\n:::\n\n::: {.steps tag=""}\n1. Emptied\n:::',
-  // Sprint 168 PR 1: quotes with their attribution (an em and an en dash), in a column, and two that have none: a quote
-  // of one dash line, and a dash line after a line break in the same paragraph.
+  // Sprint 168 PR 1: quotes with their attribution (an em and an en dash), in a column, after a line break (both sides
+  // split it off as a paragraph of its own), and one that has none: a quote of one dash line.
   '# What the team said\n\n:::: columns\n::: column\nAfter four weeks with the shared inbox:\n:::\n::: column\n> We used to spend Monday morning sorting the inbox.\n>\n> — Team lead, Harbour Logistics\n\n> The replies sound like us.\n>\n> – Customer service\n:::\n::::',
   '> — A quote of one dash line\n\n> Words\n> — after a line break\n\n> **Bold** words\n>\n> **— A.** Writer',
 ]

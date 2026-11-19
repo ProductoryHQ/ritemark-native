@@ -172,7 +172,7 @@ Text`],
 :::
 ::: column
 > Words
-> — after a line break
+> on a second line, no dash
 :::
 ::::`],
 ]

@@ -258,6 +258,8 @@
 .deck-sl.is-blocks blockquote > p { margin: 0 0 calc(6px * var(--fit, 1)); }
 .deck-sl.is-blocks blockquote > :last-child { margin-bottom: 0; }
 .deck-sl.is-blocks blockquote > p.blk-by { margin-top: calc(10px * var(--fit, 1)); font-size: .74em; font-weight: 600; color: var(--s-sub, #C7CAEB); }
+/* A bold name in the attribution stays in its quiet colour (the slide's `strong` is the heading colour). */
+.deck-sl.is-blocks blockquote > p.blk-by strong, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by strong { color: inherit; }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
