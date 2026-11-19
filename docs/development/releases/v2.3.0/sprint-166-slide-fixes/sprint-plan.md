@@ -6,7 +6,7 @@ Track: Lightweight (small bug fixes, one PR each, no new dependency). Decks stay
 
 Branch: `sprint-166-slide-fixes` (this plan); the fixes on `sprint-166-slide-fixes-pr1` to `-pr4`.
 
-Status: plan waiting for Jarmo's approval.
+Status: **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167). Phase 3 (DEVELOP).
 
 ## Goal
 
@@ -71,4 +71,4 @@ None.
 
 ## Approval
 
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026)
