@@ -14,7 +14,7 @@ import { scanFencedDiv } from './fencedDiv';
 import { TABSET_CLOSE, TABSET_OPEN, newTabsetMarkdown, renamedTabLine, tabHeadingLine, tabsetMarkdown, tabsetOf, tabsetOfInner, tabsetStart, type TabsetLines } from './tabset';
 import { agendaOf, blockCanvasMarkup, blockPicturePaths, blockRevealCount, blockSlideHtml, isCoverSlide } from './slideRenderer';
 import { blockTitleOf, fenceFor, parseDeck, partHeadingOf, slideDataOf } from '../deckFormat';
-import { PRINT_CSS, handoutHtml } from '../page/pageHtml';
+import { PAGE_CSS, PRINT_CSS, handoutHtml } from '../page/pageHtml';
 import { lexHandout, publicMarkdown } from '../page/publicDeck';
 import { decodeWallRequest } from '../present/presentProtocol';
 import { tabsOf, withTab } from '../present/wallTabs';
@@ -256,6 +256,81 @@ test('a place to fill in looks the same in a pane as on the slide: no pane rule 
   assert.ok(/\.deck-sl\.is-blocks :is\(pre, code\) \.cb-fill[^{]*\{[^}]*color: var\(--s-acct/.test(css), 'the place mark keeps its own colour inside code');
   const html = blockSlideHtml(`${TABSET_OPEN}\n## A\n\n\`\`\`\nAdd [the report].\n\`\`\`\n:::`);
   assert.ok(html.includes('class="cb-fill"'), 'a place in a pane\'s prompt is marked as on the slide');
+});
+
+/** The declarations of every rule whose selector list holds `selector` exactly, the later ones winning (comments dropped). */
+function declarations(css: string, selector: string): Map<string, string> {
+  const found = new Map<string, string>();
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const rule of plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!rule[1].split(',').map(part => part.trim()).includes(selector)) continue;
+    for (const declaration of rule[2].split(';')) {
+      const colon = declaration.indexOf(':');
+      if (colon > 0) found.set(declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim());
+    }
+  }
+  return found;
+}
+
+/** A length in px from a shorthand's `at`th value (`padding: 5px 5px 10px`, `inset: 0 0 -10px`). */
+function pxAt(value: string | undefined, at: number): number {
+  const part = (value ?? '').split(/\s+/)[at] ?? '';
+  return part === '0' ? 0 : Number(/^(-?[\d.]+)px$/.exec(part)?.[1] ?? NaN);
+}
+
+/**
+ * The chosen tab joins its pane with no line between them (Jarmo, 19 November: a hairline under "Tab 2"). On a scaled
+ * slide the join falls inside a pixel, where two grounds that each cover part of it let the band show through. So the
+ * chosen tab has no ground of its own that meets the pane's: one shape, the pane's colour, runs from its top on past its
+ * foot into the pane, in room the band keeps for it, by at least a whole pixel at the smallest drawing (the strip).
+ */
+function checkJoin(css: string, look: { tab: string; band: string; panes: string; smallestScale: number }): void {
+  const tab = declarations(css, look.tab);
+  const active = declarations(css, `${look.tab}.is-active`);
+  const ground = declarations(css, `${look.tab}::before`);
+  const activeGround = declarations(css, `${look.tab}.is-active::before`);
+  const band = declarations(css, look.band);
+  const panes = declarations(css, look.panes);
+  assert.ok(!active.has('background') && !active.has('background-color'), 'the chosen tab draws no ground of its own at the join');
+  assert.equal(activeGround.get('background'), panes.get('background'), 'its one ground is the pane\'s colour');
+  assert.equal(ground.get('content'), "''");
+  assert.equal(ground.get('position'), 'absolute');
+  assert.equal(ground.get('z-index'), '-1', 'under the tab\'s name');
+  assert.equal(tab.get('z-index'), '0', 'inside the tab (each tab its own layer)');
+  assert.equal(ground.get('pointer-events'), 'none');
+  const run = -pxAt(ground.get('inset'), 2);
+  const room = pxAt(band.get('padding'), 2);
+  assert.ok(run > 0, `the ground runs on past the tab's foot (${ground.get('inset')})`);
+  assert.ok(room >= run, `the band keeps room for it, so it is not cut at the join (${room} for ${run})`);
+  assert.equal(pxAt(band.get('margin-bottom'), 0), -room, 'laid over the pane\'s top, so nothing moves');
+  assert.ok(run * look.smallestScale >= 1, `a whole pixel past the join even at the smallest drawing (${run} × ${look.smallestScale})`);
+}
+
+test('the chosen tab joins its pane with no hairline: one ground across the join, on every scaled slide (19 November)', () => {
+  const webview = path.join(__dirname, '..', '..', '..', 'webview', 'src');
+  const css = fs.readFileSync(path.join(webview, 'components', 'decks', 'slide', 'slide.css'), 'utf8');
+  const strip = fs.readFileSync(path.join(webview, 'components', 'decks', 'SlideStrip.tsx'), 'utf8');
+  const thumb = Number(/const THUMB_WIDTH = (\d+)/.exec(strip)?.[1]);
+  assert.ok(thumb > 0, 'the strip\'s thumbnail width is found');
+  // The stage, the strip, the wall and the page all draw with slide.css; a 1× screen is the smallest pixel.
+  checkJoin(css, { tab: '.deck-sl.is-blocks .blk-tab', band: '.deck-sl.is-blocks .blk-tabbar', panes: '.deck-sl.is-blocks .blk-tabpanes', smallestScale: thumb / 960 });
+  // The open pane lies above the band's room, so a click there still lands in it (README "Tabs in the editor").
+  assert.ok(/\.blk-tabpane:nth-child\(24\) \{ visibility: visible; z-index: 1; \}/.test(css), 'the open pane is above the band');
+  // Nothing on the page, in a Borderless deck or for the keyboard gives the chosen tab a ground (or a line) of its own.
+  for (const sheet of [PAGE_CSS, css]) {
+    assert.ok(!/\.blk-tab\.is-active(?!::before)[^{,]*\{[^}]*\b(?:background|border-bottom|box-shadow)\b/.test(sheet), 'no other rule draws at the chosen tab\'s foot');
+  }
+  const pageRing = declarations(PAGE_CSS, '.layer .deck-sl.is-blocks .blk-tab:focus-visible');
+  assert.ok(pageRing.has('outline') && !pageRing.has('box-shadow'), 'the page\'s keyboard ring is an outline, drawn over the ground');
+});
+
+test('in the editors the keyboard\'s ring stays visible over the chosen tab\'s ground, and a Text document joins the same way', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'webview', 'src', 'index.css'), 'utf8');
+  const ring = declarations(css, ':where(:root:not([data-input-mode="pointer"])) .blk-tabbar .blk-tab:focus-visible');
+  assert.ok(ring.has('outline') && !ring.has('box-shadow'), 'an outline: a shadow on the tab would go under its ground');
+  // A Text document is drawn unscaled, but a zoomed window puts its join inside a pixel too.
+  checkJoin(css, { tab: '.blk-tabs.is-text .blk-tab', band: '.blk-tabs.is-text .blk-tabbar', panes: '.blk-tabs.is-text .blk-tabpanes', smallestScale: 1 });
+  assert.equal(declarations(css, '.blk-tabs.is-text .blk-tabpanes').get('z-index'), '1', 'the panes lie above the band\'s room, so a click there goes into the pane');
 });
 
 console.log(`tabset: ${passed} passed`);
