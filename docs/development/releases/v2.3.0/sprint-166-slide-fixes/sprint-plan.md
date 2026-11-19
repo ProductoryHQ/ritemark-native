@@ -89,7 +89,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
 [#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
-- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- [x] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- Built (PR 11): nothing in a thumbnail's slide takes the pointer (`decks.css`), so every click and wheel there is the thumbnail's own, and no block in it draws a scrollbar (each keeps its room and fade). One rule for every thumbnail: the strip and a drag's lifted copy, the wall's grid, and the presenter view's row and Next (widened in review). Proof: `proof/pr11-thumbnail-clicks/`.
 
 ## For every PR
 
