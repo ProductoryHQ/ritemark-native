@@ -80,54 +80,86 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(boxScrolls(stage, 'auto', 10), false, 'the stage that fits has nothing to scroll')
   assert.equal(boxScrolls(column, 'auto', 0), false)
 
-  // Who takes the wheel: the column under the pointer while it can scroll that way, else the slide.
-  assert.equal(wheelTaker(words, stage, 100, overflowOf), 'slide', 'over the words: the slide moves')
-  assert.equal(wheelTaker(big, stage, 100, overflowOf), 'slide')
-  assert.equal(wheelTaker(group, stage, 100, overflowOf), 'slide', 'over the empty band: the slide moves')
-  assert.equal(wheelTaker(stage, stage, -100, overflowOf), 'slide', 'over the stage itself')
-  assert.equal(wheelTaker(inColumn, stage, 100, overflowOf), 'box', 'a long column scrolls first')
-  assert.equal(wheelTaker(inColumn, stage, -100, overflowOf), 'slide', 'at its top, up moves the slide back')
-  assert.equal(wheelTaker(inColumnAtEnd, stage, 100, overflowOf), 'slide', 'at its end, down moves the slide on')
-  assert.equal(wheelTaker(null, stage, 100, overflowOf), 'slide')
+  // Who takes the wheel: the column under the pointer while it can scroll that way, else nothing and the slide moves.
+  const taker = (target: Box | null, on: Box, delta: number) => wheelTaker(target, on, delta, overflowOf)?.name ?? 'slide'
+  assert.equal(taker(words, stage, 100), 'slide', 'over the words: the slide moves')
+  assert.equal(taker(big, stage, 100), 'slide')
+  assert.equal(taker(group, stage, 100), 'slide', 'over the empty band: the slide moves')
+  assert.equal(taker(stage, stage, -100), 'slide', 'over the stage itself')
+  assert.equal(taker(inColumn, stage, 100), 'column', 'a long column scrolls first')
+  assert.equal(taker(inColumn, stage, -100), 'slide', 'at its top, up moves the slide back')
+  assert.equal(taker(inColumnAtEnd, stage, 100), 'slide', 'at its end, down moves the slide on')
+  assert.equal(taker(null, stage, 100), 'slide')
   // A stage taller than its room (a short window, a row under the slide): it scrolls first under the bands, to its end,
   // and then the bands move the slide; over the slide itself the slide moves, as before.
   const tall = box('stage', null, 'auto', 895, 780, 0)
   const tallGroup = box('group', tall)
   const tallBig = box('big', tallGroup, 'hidden', 479, 479, 0, ['deck-big'])
-  assert.equal(wheelTaker(tallGroup, tall, 100, overflowOf), 'box', 'the band: the stage scrolls first')
-  assert.equal(wheelTaker(tallBig, tall, 100, overflowOf), 'slide', 'the slide: it moves')
+  assert.equal(taker(tallGroup, tall, 100), 'stage', 'the band: the stage scrolls first')
+  assert.equal(taker(tallBig, tall, 100), 'slide', 'the slide: it moves')
   const tallAtEnd = box('stage', null, 'auto', 895, 780, 115)
-  assert.equal(wheelTaker(box('group', tallAtEnd), tallAtEnd, 100, overflowOf), 'slide', 'the band at the stage\'s end moves the slide (it did nothing)')
-  assert.equal(wheelTaker(box('group', tallAtEnd), tallAtEnd, -100, overflowOf), 'box', 'and up scrolls the stage back')
+  assert.equal(taker(box('group', tallAtEnd), tallAtEnd, 100), 'slide', "the band at the stage's end moves the slide (it did nothing)")
+  assert.equal(taker(box('group', tallAtEnd), tallAtEnd, -100), 'stage', 'and up scrolls the stage back')
 
-  /** A run of wheel events, `[delta, ms, taker]`: the moves they make and how many the browser scrolls. */
-  const route = (events: Array<[number, number, 'box' | 'slide']>) => {
+  /**
+   * A run of wheel events, `[delta, ms, over]`, on a long column (882 in 382) and a tall stage, each scrolled as the
+   * browser would when the route lets it (the latched box takes the delta, up to its end). The moves, how many events
+   * the browser scrolled, where the column ended, and how often what's under the pointer was asked.
+   */
+  const route = (events: Array<[number, number, 'column' | 'slide' | 'band']>, columnTop = 0) => {
+    const col = box('column', big, 'auto', 882, 382, columnTop)
+    const tallStage = box('stage', null, 'auto', 895, 780, 0)
     let gesture: WheelGesture = NO_GESTURE
-    const out = { moves: [] as number[], scrolled: 0 }
-    for (const [delta, at, taker] of events) {
-      const step = wheelRoute(gesture, delta, at, taker)
+    const out = { moves: [] as number[], scrolled: 0, column: 0, asked: 0 }
+    for (const [delta, at, over] of events) {
+      const step = wheelRoute(gesture, delta, at, () => {
+        out.asked++
+        return over === 'column' && boxScrolls(col, 'auto', delta) ? col : over === 'band' && boxScrolls(tallStage, 'auto', delta) ? tallStage : null
+      })
+      const latched = gesture.held
       gesture = step.gesture
       if (step.move !== 0) out.moves.push(step.move)
-      if (step.scroll) out.scrolled++
+      if (step.scroll) {
+        out.scrolled++
+        const scroller = (gesture.held ?? latched) as Box
+        scroller.scrollTop = Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, scroller.scrollTop + delta))
+      }
     }
+    out.column = col.scrollTop
     return out
   }
+  type Ev = [number, number, 'column' | 'slide' | 'band']
+  const flick = (over: Ev[2], from = 0, scale = 1): Ev[] => Array.from({ length: 40 }, (_, i): Ev => [Math.max(1, Math.round(24 * scale * 0.9 ** i)), from + i * 16, over])
   // With nothing to scroll, the route is the slide's gesture, unchanged: one slide per gesture.
-  const flick = (taker: 'box' | 'slide', from = 0): Array<[number, number, 'box' | 'slide']> =>
-    Array.from({ length: 40 }, (_, i) => [Math.max(1, Math.round(24 * 0.9 ** i)), from + i * 16, taker])
-  assert.deepEqual(route(flick('slide')), { moves: [1], scrolled: 0 }, 'a flick over the slide: one slide, nothing scrolls')
+  assert.deepEqual(route(flick('slide')).moves, [1], 'a flick over the slide: one slide')
+  assert.equal(route(flick('slide')).scrolled, 0, 'and nothing scrolls')
   assert.deepEqual(route([[100, 0, 'slide'], [100, 150, 'slide'], [-100, 300, 'slide']]).moves, [1, 1, -1], 'notches: a slide each')
-  // A flick over a long column scrolls the column, and never the slide, even once the column reaches its end mid-flick.
-  const intoEnd = flick('box').map(([d, t], i): [number, number, 'box' | 'slide'] => [d, t, i < 12 ? 'box' : 'slide'])
-  assert.deepEqual(route(intoEnd), { moves: [], scrolled: 12 }, 'the column scrolls; its momentum never moves the slide')
+  // A flick over a long column scrolls the column, and never the slide.
+  const one = route(flick('column'))
+  assert.deepEqual([one.moves, one.column], [[], 238], 'the column scrolls; the slide stays')
+  // A big flick takes the column to its end; the rest of its momentum is ignored, never the next slide.
+  const big3 = route(flick('column', 0, 3))
+  assert.deepEqual([big3.moves, big3.column], [[], 500], 'at its end mid-flick: the slide still stays')
   // The next flick, with the column at its end, moves the slide.
-  assert.deepEqual(route([...intoEnd, ...flick('slide', 40 * 16 + WHEEL_QUIET_MS)]).moves, [1])
+  assert.deepEqual(route([...flick('column', 0, 3), ...flick('column', 40 * 16 + WHEEL_QUIET_MS)]).moves, [1])
   // Mouse notches over a long column: each scrolls it while it can, and the notch at its end moves the slide.
-  assert.deepEqual(route([[100, 0, 'box'], [100, 150, 'box'], [100, 300, 'box'], [100, 450, 'slide']]), { moves: [1], scrolled: 3 })
+  const notches = route([[100, 0, 'column'], [100, 150, 'column'], [100, 300, 'column'], [100, 450, 'column'], [100, 600, 'column'], [100, 750, 'column']])
+  assert.deepEqual([notches.moves, notches.column], [[1], 500], 'five notches to its end, the sixth moves the slide')
+  // A few pixels the other way first (a trackpad's jitter at the column's top) don't give the gesture to the slide.
+  const jitter = route([[-2, 0, 'column'], ...flick('column', 16)])
+  assert.deepEqual([jitter.moves, jitter.column], [[], 238], 'jitter, then the flick: the column takes it')
+  // The pointer drifting off the column in a gesture: the column keeps it (the browser stays latched to it), and the
+  // stage under the band isn't scrolled in that gesture.
+  const drift = route(flick('column').map(([d, t], i): Ev => [d, t, i < 10 ? 'column' : 'band']))
+  assert.deepEqual([drift.moves, drift.column], [[], 238], 'the column keeps the gesture')
   // A gesture that moved the slide keeps the rest of it, even when the new slide brings a column under the pointer.
-  assert.deepEqual(route([[30, 0, 'slide'], [30, 16, 'slide'], [20, 32, 'box'], [10, 48, 'box']]), { moves: [1], scrolled: 0 })
+  assert.deepEqual(route([[30, 0, 'slide'], [30, 16, 'slide'], [20, 32, 'column'], [10, 48, 'column']]).scrolled, 0)
+  // What's under the pointer is asked only while the gesture is undecided: once, for a flick a box takes; until the
+  // step, for a flick that moves the slide.
+  assert.equal(route(flick('column')).asked, 1)
+  assert.equal(route(flick('slide')).asked, 2)
   // A first event with no delta decides nothing.
-  assert.deepEqual(route([[0, 0, 'slide'], [30, 16, 'box']]), { moves: [], scrolled: 1 })
+  assert.equal(route([[0, 0, 'slide'], [30, 16, 'column']]).column, 30)
 }
 
 /** A fake element: its tag, whether it's editable, and the selectors it sits inside. */
@@ -193,8 +225,15 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.ok(/const goTo = useCallback\([^]*?pick\(next\)/.test(view), "the strip's own pick moves the slide")
   assert.ok(view.includes("stage.addEventListener('wheel', onWheel, { passive: false })"), 'the wheel over the stage')
   // #824: what scrolls first decides, and the bands are no longer left out once the stage can scroll.
-  assert.ok(view.includes('const taker = wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY)'))
-  assert.ok(view.includes('const route = wheelRoute(gesture, delta, event.timeStamp, taker)') && view.includes('if (!route.scroll) event.preventDefault()'))
+  // The wiring only (the rules are tested above): the stage's wheel asks wheelTaker through wheelRoute, and prevents the
+  // default only when the route doesn't scroll a box.
+  const wheel = /const onWheel = \(event: WheelEvent\) => \{([^]*?)\n?\s*\} stage\.addEventListener\('wheel'/.exec(view)?.[1] ?? ''
+  assert.ok(/wheelTaker\(event\.target[^)]*, stage, delta,/.test(wheel), 'what is under the pointer, up to the stage')
+  assert.ok(/wheelRoute\(gesture, delta, event\.timeStamp, \w+\)/.test(wheel))
+  assert.ok(/if \(!route\.scroll\) event\.preventDefault\(\)/.test(wheel) && !/^\s*event\.preventDefault\(\)/.test(wheel))
+  // The slide's scrolling boxes keep a turn's rest to themselves in Slide only, so it never scrolls the stage.
+  const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
+  assert.ok(css.includes('.deck-stage.is-alone .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }'))
   assert.ok(!view.includes("!target?.closest?.('.deck-big')) return"), 'the early return for the bands is gone')
   // The handout's wheel rule is still there for the handout.
   assert.ok(view.includes('const stop = wheelStop(state, delta, currentRef.current)'))

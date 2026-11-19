@@ -76,6 +76,10 @@ The stage scrolls when it is taller than its room (a short window, a row under t
 - [1-before-flick-over-long-column-1440x900.png](1-before-flick-over-long-column-1440x900.png): main. Slide 2 chosen in the strip, then one trackpad flick over its long column: the deck went to slide 3.
 - [2-after-flick-over-long-column-1440x900.png](2-after-flick-over-long-column-1440x900.png): this branch. The same flick scrolls the column (Six to Fourteen in view, the fade at its foot); the deck stays on slide 2.
 
+## Which code ran
+
+The After column ran this branch's first commit, `54d34645`. The review round then changed the route without changing these outcomes: a box can still take a gesture after a few pixels of jitter the other way, the gesture stays with the box it began on (as the browser's own scroll does) even if the pointer drifts, what is under the pointer is read only while a gesture is undecided, and a column or pane at its end keeps the rest of a turn from the stage (`overscroll-behavior-y: contain`). Those are covered by `slideNav.test.ts`, not by a second launch.
+
 ## Not verified
 
 - A real Mac trackpad and a real mouse: the gestures here are protocol events of the same shape (pixel deltas, timing), not hardware. Real trackpad momentum can run longer than the 40 events used here; a second flick during the first one's momentum still counts as the same gesture (one slide per gesture, as designed).
