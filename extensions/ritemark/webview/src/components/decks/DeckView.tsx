@@ -493,18 +493,8 @@ export function DeckView({
     return onDocChanged(editor, refresh)
   }, [editor])
 
-  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only borrows the handout, beside the
-  // slide, so the bar and its matches show. Closing Find (Esc or its ×) gives it back: the view returns to Slide only,
-  // unless the person chose a view while Find was open (`chooseView` ends the borrowing), which then holds.
-  const findOpen = Boolean(findBar)
-  const foldRef = useRef(fold)
-  foldRef.current = fold
+  // The Find loan (`foldForFind`, after `chooseView`) can end while Find is open.
   const findBorrowedHandout = useRef(false)
-  useEffect(() => {
-    const next = foldForFind(findOpen, foldRef.current, findBorrowedHandout.current)
-    findBorrowedHandout.current = next.borrowed
-    if (next.fold !== foldRef.current) setFold(next.fold)
-  }, [findOpen])
 
   const count = slides.length
   // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
@@ -961,6 +951,23 @@ export function DeckView({
     setFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [pick])
+
+  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only borrows the handout, beside the
+  // slide, so the bar and its matches show (not on a desk with no room for the handout). Closing Find (Esc or its ×)
+  // gives it back: the view returns to Slide only, unless the person chose a view while Find was open (`chooseView`
+  // ends the loan), which then holds, or the deck has no slide left to show. As after any fold, the part being read
+  // stays at the top. The rest is read when Find opens or closes, never as a reason to decide again.
+  const findOpen = Boolean(findBar)
+  const findSees = useRef({ fold, handoutRoom: true, hasSlides: true, pick })
+  findSees.current = { fold, handoutRoom: !(deskWidth > 0 && deskWidth < NARROWEST_DESK), hasSlides: count > 0, pick }
+  useEffect(() => {
+    const seen = findSees.current
+    const next = foldForFind(findOpen, seen.fold, findBorrowedHandout.current, seen.handoutRoom, seen.hasSlides)
+    findBorrowedHandout.current = next.borrowed
+    if (next.fold === seen.fold) return
+    setFold(next.fold)
+    requestAnimationFrame(() => seen.pick(currentRef.current))
+  }, [findOpen])
 
   // When the slide moves beside or above, the part being read stays at the top, as after a drag or a fold. Not at the
   // first decision, as the deck opens.

@@ -110,6 +110,9 @@ const draw = (view: DeckViewMode, above = false) =>
     assert.deepEqual(opened, { fold, borrowed: false }, `${String(fold)}: nothing to borrow`)
     assert.deepEqual(foldForFind(false, opened.fold, opened.borrowed), { fold, borrowed: false }, `${String(fold)}: as it was`)
   }
+  // No room for the handout (under 600 px): nothing to borrow. A deck with no slide left when Find closes keeps the handout.
+  assert.deepEqual(foldForFind(true, 'handout', false, false), { fold: 'handout', borrowed: false }, 'no room: nothing borrowed')
+  assert.deepEqual(foldForFind(false, null, true, true, false), { fold: null, borrowed: false }, 'no slide left: the handout stays')
   // The person picks Handout only while Find is open: chooseView clears the loan, and closing Find keeps that view.
   assert.deepEqual(foldForFind(false, 'slide', false), { fold: 'slide', borrowed: false }, 'the chosen view holds')
   // And picks Slide only while Find is open: the handout folds, and closing Find keeps Slide only.
@@ -153,7 +156,9 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the view')
   assert.ok(view.includes('useState<DeckFold>(OPENING_FOLD)'), 'Slide only at mount, every deck')
   assert.ok(/if \(slidesOf\(editor\.state\.doc\)\.length === 0\) setFold\(current => \(current === 'handout' \? null : current\)\)/.test(view), 'a deck with no slide opens with the handout')
-  assert.ok(view.includes('const next = foldForFind(findOpen, foldRef.current, findBorrowedHandout.current)') && view.includes('}, [findOpen])'), 'Find borrows the handout as it opens and closes')
+  const findEffect = block('const next = foldForFind(')
+  assert.ok(view.includes('const next = foldForFind(findOpen, seen.fold, findBorrowedHandout.current, seen.handoutRoom, seen.hasSlides)') && /pick\(currentRef\.current\)\) \}, \[findOpen\]\)/.test(view.slice(view.indexOf('const next = foldForFind('))), 'Find borrows the handout as it opens and closes, and only then')
+  assert.ok(findEffect.length > 0)
   assert.ok(block('const chooseView = useCallback(').includes('findBorrowedHandout.current = false'), 'a view chosen while Find is open ends the loan')
   // The choice holds while the deck is open because its webview keeps its context when hidden.
   const provider = readFileSync(new URL('../../../../src/ritemarkEditor.ts', import.meta.url), 'utf8').replace(/\s+/g, ' ')

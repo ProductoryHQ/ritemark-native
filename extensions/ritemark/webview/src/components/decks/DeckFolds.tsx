@@ -53,10 +53,11 @@ export const OPENING_FOLD: DeckFold = 'handout'
  * Find borrows the handout (Experience lead, 19 November): its bar and matches are the handout's, so opening Find in
  * Slide only shows the handout beside the slide, and closing it returns to Slide only. `borrowed` says the handout is on
  * loan; a view the person chooses while Find is open ends the loan (the caller clears it), and that view then holds.
+ * With no room for the handout (under 600 px) nothing is borrowed; a deck with no slide left keeps the handout.
  */
-export function foldForFind(findOpen: boolean, fold: DeckFold, borrowed: boolean): { fold: DeckFold; borrowed: boolean } {
-  if (findOpen) return fold === 'handout' ? { fold: null, borrowed: true } : { fold, borrowed }
-  return borrowed ? { fold: 'handout', borrowed: false } : { fold, borrowed: false }
+export function foldForFind(findOpen: boolean, fold: DeckFold, borrowed: boolean, handoutRoom = true, hasSlides = true): { fold: DeckFold; borrowed: boolean } {
+  if (findOpen) return fold === 'handout' && handoutRoom ? { fold: null, borrowed: true } : { fold, borrowed }
+  return { fold: borrowed && hasSlides ? 'handout' : fold, borrowed: false }
 }
 
 /** What each side shows, from the fold and whether the desk has room for the handout at all. */
