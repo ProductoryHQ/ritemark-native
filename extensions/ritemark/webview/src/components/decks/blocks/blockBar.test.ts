@@ -541,6 +541,11 @@ stable(COLUMNS, 'three columns')
     const dropped = state.apply(setColumnSplit(state, blockPos(state), 0, snap)!)
     assert.deepEqual(columnShares(dropped.doc.nodeAt(blockPos(dropped))!), splitShares([50, 50], 0, snap))
   }
+  // Pointed at, the split shows its line only: the ghost Button's hover fill (a light 12 px bar on the slide) is undone
+  // by a rule that outranks Tailwind's `hover:` class (three classes or pseudo-classes against its two).
+  const decksCss = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  assert.match(decksCss, /\.deck-slide \.deck-block-split:is\(:hover, :active, :focus-visible\) \{ background: transparent; \}/)
+  assert.match(readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8'), /variant="ghost"\s+className="deck-block-split"/, 'the split is the ghost Button the rule answers')
 }
 
 // ---- Review of #773: the fixes, each failing before.
