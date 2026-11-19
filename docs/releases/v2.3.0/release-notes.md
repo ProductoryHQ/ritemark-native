@@ -44,6 +44,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Make a deck of slides.** Choose **New → Deck**, or the Deck card on Home. Start empty or from a copy of an earlier deck.
 - **Write on the slide as in a document.** Type a title, text and lists, with no layout to choose. Type / for columns, boxes, steps, tabs, a button, a picture or a table.
 - **Write the handout beside the slides.** Participants read it. A comment stays with you and never goes out.
+- **A deck opens on its slides.** Every deck opens showing only the slide. The switch on the deck's bar shows the handout beside it, or the handout alone.
 - **Give the deck a look, yourself or with AI.** **Theme** on the deck's bar picks a theme and changes its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
 - **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
 - **Present from Ritemark.** **Present** shows only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.

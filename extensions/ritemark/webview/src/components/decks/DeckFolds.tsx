@@ -6,9 +6,12 @@
  * line between the panes, because chevrons beside a slide read as previous and next ("kasutaja arvab, et saab
  * navigeerida slaidide vahel"). The line between the panes only drags.
  *
- * The view is one value (the fold: which side is folded away), so the two sides can never both be hidden. Each deck
- * keeps it in its own view state, as it keeps the divider's share, never in the file: opening a deck writes nothing,
- * and a deck opened again shows both.
+ * The view is one value (the fold: which side is folded away), so the two sides can never both be hidden. Since
+ * 19 November every deck opens in Slide only, a new deck too (Jarmo: "slide only should be default view"): the view
+ * lives only while the deck is open (its webview keeps its context when hidden), and nothing is stored in the file or
+ * remembered, so a deck opened again starts in Slide only. A fold an older build kept in the view state is never read.
+ * Two exceptions show the handout, where the words are: a deck that opens with no slide, and Find, which borrows it
+ * while open (`foldForFind`).
  */
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -18,14 +21,9 @@ import { getState, saveState } from '../../bridge'
 /** Which side is folded away: the slide, the handout, or neither. */
 export type DeckFold = 'slide' | 'handout' | null
 
-/** The fold as the view kept it; anything else is no fold. */
-export function foldFrom(stored: unknown): DeckFold {
-  return stored === 'slide' || stored === 'handout' ? stored : null
-}
-
-/** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`), its share of the
- *  height above it (`deckAboveRatio`), and the fold. Never the file. */
-export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckFold?: unknown; deckConversionNoticed?: unknown }
+/** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`) and its share of the
+ *  height above it (`deckAboveRatio`). Never the file, and never the view: a `deckFold` an older build kept is not read. */
+export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckConversionNoticed?: unknown }
 
 /** This deck's kept view state, or nothing when the view has none. */
 export function deckViewState(): DeckViewState {
@@ -47,11 +45,20 @@ export function keepDeckViewState(change: DeckViewState) {
   }
 }
 
-/** The fold this deck's view kept, if any. */
-export const storedFold = (): DeckFold => foldFrom(deckViewState().deckFold)
+/** The fold every deck opens with: the handout folded away, Slide only. A constant, never read from anything kept, so
+ *  nothing an older build kept (its `deckFold`) can bring back a different start. */
+export const OPENING_FOLD: DeckFold = 'handout'
 
-/** Keeps the fold in this deck's view state; both sides shown is no entry at all. */
-export const keepFold = (fold: DeckFold) => keepDeckViewState({ deckFold: fold ?? undefined })
+/**
+ * Find borrows the handout (Experience lead, 19 November): its bar and matches are the handout's, so opening Find in
+ * Slide only shows the handout beside the slide, and closing it returns to Slide only. `borrowed` says the handout is on
+ * loan; a view the person chooses while Find is open ends the loan (the caller clears it), and that view then holds.
+ * With no room for the handout (under 600 px) nothing is borrowed; a deck with no slide left keeps the handout.
+ */
+export function foldForFind(findOpen: boolean, fold: DeckFold, borrowed: boolean, handoutRoom = true, hasSlides = true): { fold: DeckFold; borrowed: boolean } {
+  if (findOpen) return fold === 'handout' && handoutRoom ? { fold: null, borrowed: true } : { fold, borrowed }
+  return { fold: borrowed && hasSlides ? 'handout' : fold, borrowed: false }
+}
 
 /** What each side shows, from the fold and whether the desk has room for the handout at all. */
 export function foldedSides(fold: DeckFold, handoutRoom: boolean): { slideShown: boolean; handoutShown: boolean } {
