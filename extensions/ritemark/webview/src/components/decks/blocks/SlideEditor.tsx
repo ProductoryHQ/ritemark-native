@@ -77,6 +77,7 @@ import { TableHandlesLayer, useAltHeld } from '../../tables/TableHandlesLayer'
 import { TableMenuItems, runClipboardEdit, type MenuKit, type TableMenuTarget } from '../../tables/TableMenuItems'
 import { PictureTools, stageBounds } from '../../pictures/PictureTools'
 import { PictureMakerView, usePictureMaker, type PictureAwayOptions, type PicturePlaceRef } from '../../pictures/ChatgptPicture'
+import { slidePictureKey } from '../../pictures/picturesAway'
 import { chosenPicture, chosenPictureUnder, leavePicture, replacePictureKeepingCaret } from '../../../extensions/pictures/pictureCommands'
 import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
@@ -968,7 +969,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // Jarmo's test of #800: a slide left while ChatGPT makes its picture. The request goes on; the picture lands on this
   // slide in the deck (`putSlidePicture`, the stage's own load and save of the words), and the strip is back with the
   // slide. The place is the slide's id and, in the words, which picture with that path it is.
-  const slideKey = slide.data.id ? `id:${slide.data.id}` : `index:${slide.index}`
+  const slideKey = slidePictureKey({ id: slide.data.id, index: slide.index })
   const pictureAway: PictureAwayOptions = {
     key: slideKey,
     leave: place => {

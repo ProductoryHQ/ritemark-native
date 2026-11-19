@@ -8,6 +8,7 @@
  * Run: npx tsx webview/src/components/pictures/picturesAway.test.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { getSchema } from '@tiptap/core'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
@@ -18,7 +19,7 @@ import { slidesOf } from '../decks/deckDocument'
 import { loadSlide, saveSlide } from '../decks/blocks/slideEditorHarness'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, type SlideDocKit, type SlidePictureTarget } from '../decks/blocks/slidePictureSwap'
 import { madeDescription, phaseAfterStatus, placeOfMade, type MakerPhase, type PictureAsk, type PicturePlaceRef } from './chatgptPictureState'
-import { PicturesAway, type AwayLanding } from './picturesAway'
+import { PicturesAway, PicturesMaking, slidePictureKey, type AwayLanding } from './picturesAway'
 
 installTestDocument()
 
@@ -221,6 +222,68 @@ check('review of #803: answers for slides never shown again are not kept forever
   }
   assert.equal(away.heldFor('id:k0'), 0, 'the oldest answer went')
   assert.equal(away.heldFor(`id:k${PicturesAway.KEPT + 4}`), 1, 'the newest stays')
+})
+
+// The strip's spinner on a thumbnail (the Experience lead on #803): it follows the request, shown or left.
+check('the spinner: a request starts it, the picture landing ends it', () => {
+  const making = new PicturesMaking()
+  let changes = 0
+  making.subscribe(() => { changes += 1 })
+  const empty = making.keys()
+  assert.equal(empty.size, 0)
+  making.begin('m1', slidePictureKey({ id: 's2', index: 1 }))
+  assert.deepEqual([...making.keys()], ['id:s2'])
+  assert.equal(changes, 1)
+  const shown = making.keys()
+  assert.equal(making.keys(), shown, 'the same set until something changes (useSyncExternalStore)')
+  making.status({ requestId: 'other', state: 'made', path: 'images/x.png', url: 'u' })
+  assert.equal(making.keys(), shown, "another request's answer changes nothing")
+  making.status({ requestId: 'm1', state: 'ready' })
+  assert.ok(making.keys().has('id:s2'), "a check's 'ready' is no answer to a make")
+  making.status({ requestId: 'm1', state: 'made', path: 'images/x.png', url: 'u' })
+  assert.equal(making.keys().size, 0, 'the picture landed: the spinner goes')
+  assert.equal(changes, 2)
+})
+
+check('the spinner: Cancel, a failure, sign-in and the host cancelling each end it', () => {
+  const making = new PicturesMaking()
+  making.begin('c', 'id:a')
+  making.end('c')
+  assert.equal(making.keys().size, 0, 'Cancel')
+  making.begin('f', 'id:a')
+  making.status({ requestId: 'f', state: 'failed', problem: 'No' })
+  assert.equal(making.keys().size, 0, 'failed')
+  making.begin('s', 'id:a')
+  making.status({ requestId: 's', state: 'sign-in' })
+  assert.equal(making.keys().size, 0, 'sign-in')
+  making.begin('x', 'id:a')
+  making.status({ requestId: 'x', state: 'cancelled' })
+  assert.equal(making.keys().size, 0, 'the host cancelled it')
+})
+
+check('the spinner: one per slide, while any of its requests is being made; a slide without an id by its place', () => {
+  const making = new PicturesMaking()
+  making.begin('a1', 'id:a')
+  making.begin('b1', slidePictureKey({ index: 3 }))
+  making.begin('a2', 'id:a')
+  assert.deepEqual([...making.keys()].sort(), ['id:a', 'index:3'])
+  making.end('a1')
+  assert.ok(making.keys().has('id:a'), 'its other request is still made')
+  making.end('a2')
+  making.end('a2')
+  assert.deepEqual([...making.keys()], ['index:3'])
+})
+
+// The spinner's drawing (the Experience lead on #809): a 16 px white disc, a 10 px ring with a quarter arc in Ritemark's
+// indigo, still under Reduce motion with the arc kept (a full ring would read as done).
+check('the spinner is drawn as the Experience lead drew it', () => {
+  const css = readFileSync(new URL('../decks/decks.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(css.includes('.deck-thumb .deck-thumb-making { position: absolute; left: 36px; top: 9px;'), 'top-left corner, 6 px in')
+  assert.ok(/\.deck-thumb-making > span \{[^}]*width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba\(28, 31, 74, \.10\);/.test(css), 'the disc')
+  assert.ok(/\.deck-thumb-making > span::before \{[^}]*width: 10px; height: 10px;[^}]*border: 2px solid #E3E4EE; border-top-color: #4F46E5; animation: deck-thumb-making 900ms linear infinite;/.test(css), 'the ring and its quarter arc')
+  const still = css.match(/prefers-reduced-motion: reduce\) \{ \.deck-thumb \.deck-thumb-making > span::before \{([^}]*)\}/)?.[1] ?? ''
+  assert.equal(still.trim(), 'animation: none;', 'still under Reduce motion, the quarter arc kept')
+  assert.ok(!/var\(--r-accent/.test(css.match(/\.deck-thumb-making[^}]*\}/g)?.join('') ?? ''), "Ritemark's indigo, not a theme token")
 })
 
 if (failures) {

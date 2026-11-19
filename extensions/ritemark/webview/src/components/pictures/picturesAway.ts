@@ -107,3 +107,54 @@ export class PicturesAway {
     this.entries = this.entries.filter(item => item !== entry)
   }
 }
+
+/** A deck slide's key for its pictures: its id, or its place in the deck when it has none (`PictureAwayOptions.key`). */
+export function slidePictureKey(slide: { id?: string; index: number }): string {
+  return slide.id ? `id:${slide.id}` : `index:${slide.index}`
+}
+
+/**
+ * The slides ChatGPT is making a picture for, whether their editor is shown or was left: the strip's spinner on the
+ * thumbnail (the Experience lead on #803). A request counts from its `picture/make` until the host answers it (made,
+ * failed, sign-in, cancelled) or the webview cancels it; handing it to `PicturesAway` changes nothing, since the request
+ * goes on. Pure: the maker reports, the strip reads `keys()` (one set per change, for `useSyncExternalStore`).
+ */
+export class PicturesMaking {
+  private byRequest = new Map<string, string>()
+  private shown: ReadonlySet<string> = new Set()
+  private listeners = new Set<() => void>()
+
+  /** A request was sent for a slide. */
+  begin(requestId: string, key: string): void {
+    this.byRequest.set(requestId, key)
+    this.changed()
+  }
+
+  /** The request is over without the host's answer here (Cancel, or its editor closed). */
+  end(requestId: string): void {
+    if (this.byRequest.delete(requestId)) this.changed()
+  }
+
+  /** The host's `picture/status`: any answer to a request being made ends it ('ready' answers a check, never a make). */
+  status(message: { requestId?: unknown; state?: unknown; [field: string]: unknown }): void {
+    if (typeof message.requestId !== 'string' || message.state === 'ready') return
+    this.end(message.requestId)
+  }
+
+  /** The keys of the slides with a picture being made: the same set until one starts or ends. */
+  keys(): ReadonlySet<string> {
+    return this.shown
+  }
+
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
+  private changed(): void {
+    const next = new Set(this.byRequest.values())
+    if (next.size === this.shown.size && [...next].every(key => this.shown.has(key))) return
+    this.shown = next
+    for (const listener of [...this.listeners]) listener()
+  }
+}

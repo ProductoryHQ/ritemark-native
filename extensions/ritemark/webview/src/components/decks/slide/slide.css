@@ -125,6 +125,11 @@
 .deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
 .deck-sl.is-blocks .blk-flow > :first-child { margin-top: 0; }
 .deck-sl.is-blocks .blk-flow > :last-child { margin-bottom: 0; }
+/* Every heading on a slide is balanced (the Experience lead, 19 November): "A long report, in steps" breaks as "A long
+   report, / in steps", never leaving "steps" alone on its line. The slide, the strip, the wall, the presenter view and
+   the page draw with this file, so one rule holds everywhere; the old kinds' titles (.st, .stc) and box heads (.bh)
+   too. Balance keeps the line count greedy wrapping gives, so the fit's measures (heights, overflow) don't change. */
+.deck-sl :is(h1, h2, h3, h4, h5, h6, .st, .stc, .bh) { text-wrap: balance; }
 .deck-sl.is-blocks h1 { margin: 0 0 .5em; font: 700 2em/1.12 var(--s-fh, 'Sofia Sans'), sans-serif; letter-spacing: -.3px; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks h2 { margin: 0 0 .7em; font: 600 1.12em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks h3 { margin: 0 0 .35em; font: 700 1.25em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }

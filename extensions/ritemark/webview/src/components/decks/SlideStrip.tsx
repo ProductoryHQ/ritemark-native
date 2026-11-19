@@ -31,6 +31,8 @@ import { Tooltip } from '../ui/tooltip'
 import { isMac } from '../../hooks/usePlatform'
 import type { DeckSlideEntry } from './deckDocument'
 import { SlideCanvas } from './slide/SlideCanvas'
+import { useSlidesMakingPictures } from '../pictures/ChatgptPicture'
+import { slidePictureKey } from '../pictures/picturesAway'
 import { keyOrigin, stripKeyOf } from './stripKeys'
 import { slideMenuItems, type SlideMenuActions } from './slideMenuItems'
 import { STRIP_PICTURES_MIN, draggedPictureCount, droppedPictures } from './stripPictures'
@@ -196,10 +198,12 @@ interface ThumbnailProps {
   joining: boolean
   /** Undo just changed this slide: a serial (0: none), so each undo flashes it once more. */
   flash: number
+  /** ChatGPT is making a picture for this slide (shown or left): a quiet spinner in its corner until it lands or stops. */
+  makingPicture: boolean
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash, makingPicture }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -207,7 +211,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}${joining ? ' is-join' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -224,6 +228,13 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         {/* Keyed by the serial: a second undo of the same slide plays it again. None under reduced motion (decks.css). */}
         {flash ? <span key={flash} className="deck-thumb-flash" aria-hidden="true" /> : null}
       </div>
+      {makingPicture ? (
+        // The Experience lead on #803: a quiet circle in the accent, still under Reduce motion (decks.css). No toast; a
+        // screen reader hears it in the slide's own name.
+        <Tooltip label="ChatGPT is making a picture" className="deck-thumb-making">
+          <span aria-hidden="true" />
+        </Tooltip>
+      ) : null}
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       {comments > 0 ? (
         // Sprint 161: the slide's comments, counted on the strip only (the thumbnails people see draw none).
@@ -291,6 +302,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
+  const makingPictures = useSlidesMakingPictures()
   const suppressClick = useRef(false)
 
   /** The gap nearest the pointer: before the thumbnail whose middle is below it. */
@@ -498,6 +510,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
             badgeAmber={!!(entry.data.id && libraryBadge(marks[entry.data.id])?.amber)}
             comments={commentCounts ? stripCommentCount(entry) : 0}
             joining={joinAt === entry.index}
+            makingPicture={makingPictures.has(slidePictureKey({ id: entry.data.id, index: entry.index }))}
             flash={flash?.index === entry.index ? flash.serial : 0}
           />
         </div>
