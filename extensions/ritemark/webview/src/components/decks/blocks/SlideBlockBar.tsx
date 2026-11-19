@@ -2,7 +2,7 @@
  * The block's bar on the stage (experience 46, 17 November; frames 23, 29 and 30; `blockBar.ts` does the work).
  *
  *  - **The bar** sits under the chosen block (the caret's Boxes, Steps, Columns or list): the type as a menu
- *    ("Boxes ▾"), the block's own group (Boxes: Style, Width, alignment; Columns: the count, the vertical alignment and
+ *    ("Boxes ▾"), the block's own group (Boxes: Style, Mark, Width, alignment; Columns: the count, the vertical alignment and
  *    frame 23's ⋯ with Add a column, Remove a column and Delete block), then Add and Delete. It is the page's own size at
  *    any stage size, so it goes in `document.body` (the slide's frame clips, and frame 29's bar runs past the slide), and
  *    follows its block as the stage moves and scales. A press outside it or Esc closes it; a press in the block opens it.
@@ -17,7 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { Transaction } from '@tiptap/pm/state'
-import { BOX_WIDTH_PX, boxesLookOf, columnsAlignOf, type BoxWidth } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, BOX_WIDTH_PX, boxesLookOf, boxesMarkOf, columnsAlignOf, type BoxWidth, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
@@ -26,8 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
+  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
@@ -35,6 +35,8 @@ import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar', tabs: 'tabs' }
+/** Sprint 167 PR 2: the Mark menu's icons (README item C, `block-details.html`). */
+const MARK_ICON: Record<BoxesMark, PhosphorIconName> = { icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' }
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '', tabs: 'Add a tab' }
 
 export interface SlideBlockBarProps {
@@ -110,18 +112,20 @@ interface Option {
 
 /**
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
- * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773).
+ * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
+ * trigger says the value to a screen reader too ("Width: Auto"). `bare` shows the value as its icon only, the word in the
+ * tooltip ("Mark: Number"); `tip` is the tooltip otherwise (else the group's name).
  */
-function Group({ label, options, folded }: { label: string; options: Option[]; folded: boolean }) {
+function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={label}>
+      <Tooltip label={bare ? `${label}: ${current.label ?? current.tip}` : tip ?? label}>
         <DropdownMenuTrigger asChild>
-          <Button variant="toolbar" size="compact" aria-label={label} onMouseDown={event => event.preventDefault()}>
+          <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
             {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
-            {current.label}
+            {bare && current.icon ? null : current.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
         </DropdownMenuTrigger>
@@ -301,6 +305,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const attrs = divAttributesOf(chosen.node)
   const look = chosen.kind === 'boxes' ? boxesLookOf(attrs) : null
   const fill = look?.fill ?? theme.boxes
+  const mark = chosen.kind === 'boxes' ? boxesMarkOf(attrs) : null
   const columns = chosen.kind === 'columns' ? columnCount(chosen.node) : 0
   const reveal = revealsOneBlock(chosen)
   /**
@@ -547,6 +552,17 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                     { key: 'filled', on: fill === 'filled', label: 'Filled', tip: "Boxes filled with the theme's colour", pick: () => setValue('fill', theme.boxes === 'filled' ? null : 'filled') },
                     { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
                   ]} />
+                  <Sep />
+                  {/* Sprint 167 PR 2 (README item C): Mark, a menu that shows its value; Icon, the default, writes nothing. On
+                      the narrowest pane it folds last, to its value's icon (the word stays in its tooltip). */}
+                  <Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(choice => ({
+                    key: choice,
+                    on: mark === choice,
+                    icon: MARK_ICON[choice],
+                    label: MARK_LABEL[choice],
+                    tip: MARK_TIP[choice],
+                    pick: () => run(act(pos => setBoxesMark(editor.state, pos, choice))),
+                  }))} />
                   <Sep />
                   <Group label="Width" folded={fold >= FOLD_AT.size} options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },

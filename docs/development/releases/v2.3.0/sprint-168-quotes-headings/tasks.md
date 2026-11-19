@@ -4,12 +4,12 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-168-qu
 
 ## PR 1: the quote's look, R1 (High), branch `sprint-168-quotes-headings-pr1`, after Sprint 166 PR 5 (#841) merges
 - [x] Issue created in milestone v2.3.0 (manager): #863: to be created
-- [ ] Audit: how the attribution line is told apart on every surface
-- [ ] The quote's look per the README, with the attribution line
-- [ ] Same on the editor, wall, presenter view, strip and page, on dark and on Paper
-- [ ] Tests: parity across the renderers; a quote with no attribution; a deck with no quote unchanged
-- [ ] Shots: a quote with attribution on dark and on Paper, in the editor and on the wall; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Audit: how the attribution line is told apart on every surface (the renderer writes `blk-by` on it, the stage's decoration the same; the file is untouched)
+- [x] The quote's look per the README, with the attribution line
+- [x] Same on the editor, wall, presenter view, strip and page, on dark and on Paper (one renderer and one sheet; seen on the stage, the wall and the page; the strip and the presenter view by tests)
+- [x] Tests: parity across the renderers; a quote with no attribution; a deck with no quote unchanged
+- [x] Shots: a quote with attribution on dark and on Paper, in the editor and on the wall (`proof/pr1-quote-look/`); the Experience lead's look
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 2: a prompt out of a quote, R2 (High), branch `sprint-168-quotes-headings-pr2`, can start now
 - [x] Issue created in milestone v2.3.0 (manager): #864: to be created
