@@ -93,6 +93,22 @@ assert.equal(decodeLibraryRequest({ type: 'library/insert-section', path: 'Clien
 assert.equal(decodeLibraryRequest({ type: 'library/search', query: 'x'.repeat(201) }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/ready', more: true }), null);
 assert.equal(decodeLibraryRequest('library/ready'), null);
+// Sprint 165 PR 4: the offer's Add all / Choose…, Not now and the notice's Undo, with exact fields.
+const offered = [{ path: 'Clients/Day 2.deck.md', id: 'p1aa' }, { path: 'Trainings/Talk.deck.md', id: 'q2bb' }];
+assert.deepEqual(decodeLibraryRequest({ type: 'library/offer-add', slides: offered }), { type: 'library/offer-add', slides: offered });
+assert.deepEqual(decodeLibraryRequest({ type: 'library/offer-not-now', slides: offered }), { type: 'library/offer-not-now', slides: offered });
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: [] }), null, 'nothing to add');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: [offered[0], offered[0]] }), null, 'a slide twice');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: Array.from({ length: 7 }, (_, i) => ({ path: 'A.deck.md', id: `a${i}` })) }), null, 'at most six');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: [{ path: 'notes.md', id: 'p1aa' }] }), null, 'only a deck');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: [{ path: 'A.deck.md', id: '../x' }] }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: [{ path: 'A.deck.md', id: 'p1aa', topic: 'Other' }] }), null, 'no extra field in a slide');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-add', slides: offered, topic: 'Other' }), null, 'the topic is the host\'s');
+assert.equal(decodeLibraryRequest({ type: 'library/offer-not-now', slides: 'p1aa' }), null);
+assert.deepEqual(decodeLibraryRequest({ type: 'library/undo', token: 'w1a2b3' }), { type: 'library/undo', token: 'w1a2b3' });
+assert.equal(decodeLibraryRequest({ type: 'library/undo', token: '' }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/undo', token: 'w1', extra: 1 }), null);
+assert.equal(decodeLibraryRequest({ type: 'library/undo', token: 'x'.repeat(65) }), null);
 assert.throws(() => decodeDeckRequest(null), DeckProtocolError);
 assert.throws(() => decodeDeckRequest([]), DeckProtocolError);
 

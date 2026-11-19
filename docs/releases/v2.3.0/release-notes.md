@@ -58,6 +58,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
 - **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides, with their handout and prompts, after the slide you're on, and one undo takes them out again.
 - **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it, and a tick marks the slides already in your deck.
+- **The library offers the slides you repeat.** When a few slides are in most of your decks, the Slide library offers them at its top. **Add all** puts them in a topic called Every training, **Choose…** lets you pick, and **Not now** hides them for good. Nothing is added until you choose.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 - **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.

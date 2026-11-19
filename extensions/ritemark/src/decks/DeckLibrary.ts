@@ -7,7 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
-import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
+import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withTextHandoutMark, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
   slidesOfText, type DeckSlideText,
@@ -27,6 +27,14 @@ export interface DeckFiles {
   read(path: string): Promise<string | null>;
   /** Write a file's text; `create` only when it doesn't exist yet. */
   write(path: string, text: string, options?: { create?: boolean }): Promise<void>;
+  /**
+   * Sprint 165 PR 4: take away a file a library write made, for its Undo (to the Trash on disk). Without it, a topic a
+   * write made has no Undo.
+   */
+  remove?(path: string): Promise<void>;
+  /** Sprint 165 PR 4: is there a folder here; and take away a folder a write made, only while it is empty. */
+  folderExists?(path: string): Promise<boolean>;
+  removeEmptyFolder?(path: string): Promise<void>;
 }
 
 /** A topic is a deck directly in the Slide library folder. */
@@ -92,6 +100,22 @@ export interface LibraryWrite {
   path: string;
   previous: string | null;
   written: string;
+}
+
+/**
+ * Sprint 165 PR 4: slides copied into a topic in one write (the offer's Add all and Choose…), and what it changed, so one
+ * Undo takes it all back: the topic's text before it (null when the write made the topic), and the files it made.
+ */
+export interface TopicWrite {
+  path: string;
+  previous: string | null;
+  written: string;
+  /** How many slides went in. */
+  count: number;
+  /** Files the write made besides the topic (the built-in theme's, when the project had none), with their text. */
+  made: Array<{ path: string; text: string }>;
+  /** Folders the write made (`Slide library/Themes`, `Slide library`), the deepest first. */
+  madeFolders: string[];
 }
 
 /**
@@ -176,7 +200,8 @@ function asBlockDeck(text: string, kinds: string[]): string {
 }
 
 export class DeckLibrary {
-  constructor(private readonly files: DeckFiles) {}
+  /** The project's files (Sprint 165 PR 4: the offer reads the decks and keeps its Not now beside the library). */
+  constructor(readonly files: DeckFiles) {}
 
   /** The project's decks: the library's topics first, then the other decks, newest first; filtered by `query`. */
   async listDecks(options: { where?: 'library' | 'other' | 'all'; query?: string; agenda?: boolean } = {}): Promise<DeckSummary[]> {
@@ -368,17 +393,103 @@ export class DeckLibrary {
     const id = newId(taken);
     const { body, handout } = this.asSourcePart(copy, id, deckPath, path);
     const part = partText(copy.kind, body, handout);
-    if ((await this.files.read(BUILT_IN_THEME_PATH)) === null) {
-      try {
-        await this.files.write(BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, { create: true });
-      } catch {
-        // Made meanwhile: it is there, which is all that is needed.
-      }
-    }
+    await this.builtInTheme();
     const written = previous === null ? newTopicText(BUILT_IN_THEME_PATH, part, isBlockSlide(copy.kind)) : appendPart(asBlockDeck(previous, [copy.kind]), part);
     await this.files.write(path, written, { create: previous === null });
     const stamp = slideStamp(copy.kind, slideDataOf(copy.kind, body), handout, folderOf(path));
     return { from: writeFrom({ path, id, stamp }), path, previous, written };
+  }
+
+  /**
+   * Sprint 165 PR 4 (the offer's Add all and Choose…): copies of `slides` (each a deck's slide, by id) at the end of the
+   * topic named `topic`, made when it isn't there, in one write. Each is a copy the way the library's insert makes one
+   * (`copies`: a new id, its `from:` line, its handout and prompts, paths rebased, as a block slide), and its part opens
+   * with its heading, as a part the library writes into a closed deck does. The decks are never written.
+   */
+  async addCopiesToTopic(slides: ReadonlyArray<{ path: string; id: string }>, topic: string): Promise<TopicWrite> {
+    if (!slides.length) throw new Error('No slide to add.');
+    const path = `${LIBRARY_FOLDER}/${topic.replace(/[\\/:*?"<>|]+/g, ' ').trim()}.deck.md`;
+    if (!isTopicPath(path)) throw new Error('A topic needs a name.');
+    const previous = await this.files.read(path);
+    if (previous !== null) writableDeckText(path, previous);
+    const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
+    const parts: CopiedPart[] = [];
+    // A slide named twice goes in once, and one the topic already has a copy of (its `from:` names it: a second press
+    // that crossed the first) not again.
+    const named = new Set<string>(previous ? slidesOfText(previous).flatMap(slide => {
+      const source = parseFrom(slide.data.from);
+      return source ? [`${source.path}#${source.id}`] : [];
+    }) : []);
+    for (const slide of slides) {
+      if (named.has(`${slide.path}#${slide.id}`)) continue;
+      named.add(`${slide.path}#${slide.id}`);
+      const source = normalizePath(slide.path);
+      if (!source || source !== slide.path || !/\.deck\.md$/i.test(source)) throw new Error(`${slide.path} is no deck in this project.`);
+      if (isTopicPath(source)) throw new Error(`${deckName(source)} is already in the library.`);
+      const [part] = await this.copies(source, [slide.id], path, taken);
+      const id = slideDataOf(part.kind, part.body).id;
+      if (id) taken.push(id);
+      parts.push(part);
+    }
+    if (!parts.length) throw new Error(`${deckName(path)} already has ${slides.length === 1 ? 'this slide' : 'these slides'}.`);
+    const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, slideDataOf(part.kind, part.body), part.handout)));
+    const kinds = parts.map(part => part.kind);
+    // A topic made here names the built-in theme, whose file is made with it when the project has none; it says
+    // `handout: text`, as every deck the library writes a heading into. The folders made for them are noted for Undo.
+    const folders = previous === null ? [BUILT_IN_THEME_PATH.slice(0, BUILT_IN_THEME_PATH.lastIndexOf('/')), LIBRARY_FOLDER] : [];
+    const missing = this.files.folderExists ? (await Promise.all(folders.map(async folder => ((await this.files.folderExists!(folder)) ? null : folder)))).filter((folder): folder is string => !!folder) : [];
+    const made = previous === null ? await this.builtInTheme() : [];
+    const text = previous === null
+      ? withTextHandoutMark(newTopicText(BUILT_IN_THEME_PATH, written.join('\n\n'), kinds.some(isBlockSlide)))
+      : insertPartsText(asBlockDeck(withWrittenHandout(previous), kinds), Number.MAX_SAFE_INTEGER, written);
+    try {
+      await this.files.write(path, text, { create: previous === null });
+    } catch (error) {
+      // Nothing went in: the theme file made for it goes again.
+      await this.removeMade(made, missing);
+      throw error;
+    }
+    return { path, previous, written: text, count: parts.length, made, madeFolders: missing };
+  }
+
+  /**
+   * Undo of `addCopiesToTopic`, while nothing changed the topic since: its text before, or no topic when the write made
+   * it; a file the write made goes too while it is as written. False when it can't, and then nothing is changed.
+   */
+  async undoTopicWrite(write: TopicWrite): Promise<boolean> {
+    // An open topic holds the text in its own line endings (a Windows file's CRLF): the same text either way.
+    const lines = (text: string | null) => text?.replace(/\r\n/g, '\n');
+    if (lines(await this.files.read(write.path)) !== lines(write.written)) return false;
+    if (write.previous !== null) await this.files.write(write.path, write.previous);
+    else if (this.files.remove) await this.files.remove(write.path);
+    else return false;
+    await this.removeMade(write.made, write.madeFolders);
+    return true;
+  }
+
+  /** The built-in theme's file, written when the project has none; what was made, for an Undo. */
+  private async builtInTheme(): Promise<Array<{ path: string; text: string }>> {
+    if ((await this.files.read(BUILT_IN_THEME_PATH)) !== null) return [];
+    try {
+      await this.files.write(BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, { create: true });
+      return [{ path: BUILT_IN_THEME_PATH, text: BUILT_IN_THEME_TEXT }];
+    } catch {
+      // Made meanwhile: it is there, which is all that is needed (and it isn't this write's to take away).
+      return [];
+    }
+  }
+
+  /**
+   * Files a write made, taken away again while each is as it was written and no deck names it in its `theme:` line (a
+   * topic made meanwhile may), then the folders it made, while they are empty.
+   */
+  private async removeMade(made: ReadonlyArray<{ path: string; text: string }>, folders: readonly string[] = []): Promise<void> {
+    const named = made.length ? new Set((await this.deckThemeList()).map(deck => deck.theme?.trim()).filter(Boolean)) : new Set<string | undefined>();
+    for (const file of made) {
+      if (!this.files.remove || named.has(file.path)) continue;
+      if ((await this.files.read(file.path)) === file.text) await this.files.remove(file.path).catch(() => undefined);
+    }
+    for (const folder of folders) await this.files.removeEmptyFolder?.(folder).catch(() => undefined);
   }
 
   /** The deck's slide `id` as written, for the AI's library tools (they name a slide, the buttons send its text). */
