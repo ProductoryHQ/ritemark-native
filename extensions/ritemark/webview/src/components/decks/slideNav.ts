@@ -124,10 +124,13 @@ export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta
  * Where the slide's pane stands after the wheel moved the slide: at its top going on, at its end going back, so the
  * new slide is seen from where the gesture goes on and a pane taller than its room scrolls through each slide before
  * the next step (review of #871: kept where it was, going on showed every new slide from its foot and the next gesture
- * skipped it).
+ * skipped it). A slide chosen any other way (0: a thumbnail's click, the strip's keys, Home and End, a comment's
+ * Previous and Next, the handout's rail) is seen from its top: the Experience lead's rule (#902; kept where it was, a
+ * slide chosen with the pane scrolled down showed from its foot). One rule for every way: the deck view asks it once
+ * the new slide is drawn, with the wheel's direction or 0.
  */
-export function stageScrollAfter(move: -1 | 1, pane: Pick<WheelBox, 'scrollHeight' | 'clientHeight'>): number {
-  return move > 0 ? 0 : Math.max(0, pane.scrollHeight - pane.clientHeight)
+export function stageScrollAfter(move: -1 | 0 | 1, pane: Pick<WheelBox, 'scrollHeight' | 'clientHeight'>): number {
+  return move < 0 ? Math.max(0, pane.scrollHeight - pane.clientHeight) : 0
 }
 
 /**

@@ -652,6 +652,18 @@ export function DeckView({
     }
   }, [editor, shown, count])
 
+  // Where the slide's pane stands once another slide is shown (#902, #871): beside the handout the pane can be taller
+  // than its room. A slide chosen any way (the strip's click and keys, Home and End, a comment, the rail, the handout
+  // read on into the next part) is seen from its top; the wheel's step says its direction first (`paneMove`), so going
+  // back shows the slide from its end. Set after the new slide is drawn, so its end is measured on it, and only when the
+  // slide changes, so a split drag or a view switch on the same slide keeps the reader's place.
+  const paneMove = useRef<-1 | 0 | 1>(0)
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (stage) stage.scrollTop = stageScrollAfter(paneMove.current, stage)
+    paneMove.current = 0
+  }, [shown])
+
   // The room below the text, so the last part can be scrolled to the top; and the start card's place under the text.
   const measureBar = useCallback(() => {
     const tops = partTops()
@@ -1010,9 +1022,11 @@ export function DeckView({
       if (!route.scroll) event.preventDefault()
       if (route.move !== 0) {
         const from = Math.min(currentRef.current, countRef.current - 1)
+        // The new slide is seen from where the gesture goes on (a pane taller than its room): the pane's effect reads
+        // the direction once the slide is drawn. At the deck's ends nothing moves, and nothing is left waiting.
+        paneMove.current = route.move
         goTo(from + route.move)
-        // The new slide is seen from where the gesture goes on (a pane taller than its room); at the deck's ends nothing moves.
-        if (Math.min(currentRef.current, countRef.current - 1) !== from) stage.scrollTop = stageScrollAfter(route.move, stage)
+        if (Math.min(currentRef.current, countRef.current - 1) === from) paneMove.current = 0
       }
     }
     stage.addEventListener('wheel', onWheel, { passive: false })
