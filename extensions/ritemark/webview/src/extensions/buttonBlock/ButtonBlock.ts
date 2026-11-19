@@ -176,6 +176,7 @@ function addsButton(tr: Transaction): boolean {
 /** What `pressOnPill` needs of the editor's view: enough for a test to stand in for it. */
 export interface PillView {
   state: EditorState
+  editable: boolean
   dom: { contains(node: unknown): boolean }
   dispatch(tr: Transaction): void
   focus(): void
@@ -187,10 +188,11 @@ export interface PillView {
  * words, its icon (not editable) or the pill's edge, puts the caret at the end of its words and chooses the button.
  * Left to the browser, a press on the icon put the caret at the start of the document's first line (a slide's title),
  * and the words typed next went there. A press on the words themselves stays the browser's: the caret goes where it
- * was pressed. Only the editor's own button (`data-button-label`, the node view's); a drawn slide's is never one.
+ * was pressed. Only the editor's own button (`data-button-label`, the node view's) while the editor takes edits; a
+ * drawn slide's is never one.
  */
 export function pressOnPill(view: PillView, event: MouseEvent): boolean {
-  if (event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return false
+  if (!view.editable || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return false
   const target = event.target as Element | null
   if (!target || typeof target.closest !== 'function') return false
   const pill = target.closest('[data-button-label]')

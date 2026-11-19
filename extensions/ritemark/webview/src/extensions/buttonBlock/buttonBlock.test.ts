@@ -345,6 +345,21 @@ for (const form of FORMS) {
     assert.ok(takeBackNewButton(view, record, false))
     assert.ok(!saveDocument(opened, view.state.doc).includes('{.button}'), 'no empty button left')
   }
+  // #848: words typed on a new button while its sheet is open (so not exact). Left with no address, it still goes, but
+  // as a step of its own: ⌘Z brings it back with its words, and nothing typed is lost.
+  {
+    const view = viewOf(EditorState.create({ doc: opened.doc, plugins: [history()] }))
+    const tr = view.state.tr.insert(view.state.doc.content.size, view.state.schema.nodes.paragraph.create())
+    insertButton(tr, tr.doc.content.size - 1)
+    view.dispatch(tr)
+    const placed = buttonAt(view.state)!
+    const record = newButtonOf(tr, view.state, placed.pos)
+    view.dispatch(view.state.tr.insertText('Open the report', labelEnd(placed.node, placed.pos)))
+    assert.ok(takeBackNewButton(view, record, false))
+    assert.ok(!saveDocument(opened, view.state.doc).includes('{.button}'), 'the button with no address goes')
+    assert.ok(undo(view.state, tr => view.dispatch(tr)), '⌘Z brings it back')
+    assert.match(saveDocument(opened, view.state.doc), /\[Open the report\]\(\)\{\.button\}/, 'with the words typed on it')
+  }
 }
 
 // The Experience lead (19 November): one ring for every chosen block. The chosen button on a slide has the indigo
@@ -563,6 +578,7 @@ assert.equal(decodeWallRequest({ type: 'present/open-link', url: 42 }), null)
     let focused = 0
     const view = {
       state: EditorState.create({ doc, plugins: [plugin] }),
+      editable: true,
       dom: drawn.root,
       dispatch(tr: Transaction) { view.state = view.state.apply(tr) },
       focus() { focused++ },
@@ -612,6 +628,10 @@ assert.equal(decodeWallRequest({ type: 'present/open-link', url: 42 }), null)
     shown.appendChild(shownIcon)
     drawn.root.appendChild(shown)
     assert.equal(handler!(view, press(shownIcon)), false, `${where}: a drawn button isn't the editor's`)
+    // An editor that takes no edits (read-only) leaves the press to ProseMirror, as any other.
+    const still = press(drawn.glyph)
+    assert.equal(handler!({ ...view, editable: false }, still), false, `${where}: a read-only editor isn't changed`)
+    assert.ok(!still.prevented)
   }
 
   // `caretOnLabel` only acts from a place in a button's words.
