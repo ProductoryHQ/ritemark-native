@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: three kinds of output with numbered requirements, a new export path, files the person keeps, and a webview to host to filesystem flow). Override with: "use plain full track".
 Branch: sprint-170-save-as-pdf
 Release tier: extension (provisional: shell if PR 0 finds the print path needs a patch; see the Tier section)
-Status: **Waiting for approval.** Overnight, Jarmo delegated small plan approvals to the Development manager together with the Experience lead; neither approval has happened yet. No code until both are recorded here. Phase 2 (PLAN).
+Status: **Approved** by Jarmo on 19 November 2026: "1 jah", "kinnitatud" (Jarmo) and "jah sa tee ise otsuseid" (Jarmo to the Experience lead): the Development manager and the Experience lead approve small plans tonight. Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Save as PDF, from Publish (19 November)"). It comes from Jarmo's rule that "save sõltub kas kasutaja sel hetkel Slides (only) või Slides+Handouts või Handout" (the save depends on the view the person is in).
 
@@ -24,8 +24,8 @@ From a deck, Save as PDF writes the kind of PDF that matches the view the person
 One GitHub issue per PR in milestone v2.3.0.
 - PR 0 (spike): to be created
 - PR 1: [#881](https://github.com/ProductoryHQ/ritemark-native/issues/881)
-- PR 2: to be created
-- PR 3: to be created
+- PR 2: [#884](https://github.com/ProductoryHQ/ritemark-native/issues/884)
+- PR 3: [#881](https://github.com/ProductoryHQ/ritemark-native/issues/881)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
