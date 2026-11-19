@@ -6,8 +6,8 @@
  * icon by its own name (`icon: truck`). A Phosphor name always means Phosphor's icon (the Experience lead, 19 November);
  * the grid's own names and its aliases only fill names Phosphor doesn't have (`mail`, `puzzle`, `search`). The 24 stay
  * as the menu's first view. The one import is `pageIcons.ts`, every regular icon's drawing, which has none: the host's
- * type check and the published page read this file too. SlideCanvas's `<Icon name>` checks that every `phosphor` in the
- * grid is one of Ritemark's chrome icons.
+ * type check and the published page read this file too. Sprint 169 PR 2 (#867): every surface draws the icon this file
+ * resolves from that drawing (`SlideIconGlyph`, `iconSvg`), never through the chrome's `ui/Icon.tsx`.
  */
 import { isPageIconName, type PageIconName } from './pageIcons'
 
@@ -90,16 +90,6 @@ export function slideIcon(name: string | undefined): SlideIcon | null {
   const key = iconKey(name)
   if (isPageIconName(key)) return BY_DRAWING.get(key) ?? { name: key, phosphor: key, label: labelOf(key) }
   return BY_NAME.get(key) ?? BY_NAME.get(ALIAS_OF.get(key) ?? '') ?? null
-}
-
-/**
- * The grid's icon for a name: `slideIcon`'s, when it is one of the 24's drawings; null for any other. The old layout
- * (`SlideCanvas`, `slideMarkup`) draws only these, through the chrome's `Icon`, until Sprint 169 PR 2 draws it from the
- * full set.
- */
-export function gridIcon(name: string | undefined): GridIcon | null {
-  const icon = slideIcon(name)
-  return icon ? BY_DRAWING.get(icon.phosphor) ?? null : null
 }
 
 /**
