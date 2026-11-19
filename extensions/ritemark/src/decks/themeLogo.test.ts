@@ -20,11 +20,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from '../publish/gather';
-import { BUILT_IN_THEME_TEXT, drawsSecondLogo, groundOf, isLogoPath, offersSecondLogo, parseTheme, secondLogoGround, themeWithLogoAddresses } from './deckTheme';
+import { BUILT_IN_THEME_TEXT, drawsSecondLogo, groundOf, isLogoPath, LOGO_PLACES, logoEdgeOf, logoPlaceOf, logoSideOf, offersSecondLogo, parseTheme, secondLogoGround, themeWithLogoAddresses } from './deckTheme';
 import { isThemeChanges, themeTextWith } from './themeFile';
 import { logoAspectOf, logoKindOfName, logoNames, logoProblem, MAX_LOGO_BYTES, svgProblem, themeStem } from './themeLogo';
 import { decodeThemeRequest, ThemeProtocolError } from './themeProtocol';
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, FLOW_BOTTOM, FLOW_TOP, LOGO_CLEARANCE, LOGO_GAP, LOGO_HEIGHT, LOGO_MAX_WIDTH, blockCanvasMarkup, logoDrop, blockSlideMarkup, drawsLogo, logoTitleMargin, slideLogoHtml, themeSlideLogo } from './blocks/slideRenderer';
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, FLOW_BOTTOM, FLOW_TOP, LOGO_CLEARANCE, LOGO_GAP, LOGO_HEIGHT, LOGO_MAX_WIDTH, blockCanvasMarkup, logoCanvasMarks, logoDrop, blockSlideMarkup, drawsLogo, logoTitleMargin, slideLogoHtml, themeSlideLogo } from './blocks/slideRenderer';
 import { slideMarkup } from '../../webview/src/components/decks/slide/slideMarkup';
 import { LOGO_PLACE, PAGE_FONTS, buildDeckPage, foreignLogoLine, nodeFontFs, nodePageFs, pageLogoFile, pageLogoOf, removePageFonts, writeDeckPage, writePageFonts } from './page/pageFile';
 import type { PageAssets } from './page/pageHtml';
@@ -247,6 +247,46 @@ async function main(): Promise<void> {
     for (const place of ['top-left', 'bottom-right'] as const) {
       assert.doesNotMatch(blockCanvasMarkup(twoLines, { logo: { ...base, place, on: 'title-slides' } }), /logo-tl|logo-br|--logo-drop/);
     }
+  });
+
+  // ---- Sprint 167 PR 1 (R6): any of the four corners
+  await test('every corner round-trips; an old top-right theme is byte for byte; Top | Bottom and Left | Right make four', () => {
+    const added = themeTextWith(FERN, { logo: 'L.svg' });
+    assert.equal(themeTextWith(added, { logoAt: 'top-right' }), added, 'top right writes nothing new');
+    const oldTopRight = `${added.replace('logo: L.svg', 'logo: L.svg\nlogo-place: top-right')}`;
+    assert.equal(parseTheme(oldTopRight).logo?.place, 'top-right');
+    assert.equal(themeTextWith(oldTopRight, { logoOn: 'every-slide' }), oldTopRight, 'an old top-right file is kept byte for byte');
+    for (const place of ['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const) {
+      const text = themeTextWith(added, { logoAt: place });
+      assert.equal(parseTheme(text).logo?.place, place, place);
+      assert.equal(themeTextWith(text, { logoAt: place }), text, `${place}: written again, the same text`);
+      assert.equal(logoPlaceOf(logoEdgeOf(place), logoSideOf(place)), place);
+      if (place !== 'top-right') assert.ok(text.includes(`logo-place: ${place}`));
+    }
+    assert.deepEqual(LOGO_PLACES, ['top-left', 'top-right', 'bottom-left', 'bottom-right']);
+    const row = fs.readFileSync(path.join(extension, 'webview/src/components/decks/theme/LogoRow.tsx'), 'utf8');
+    assert.match(row, /options=\{LOGO_EDGE_OPTIONS\}/);
+    assert.match(row, /options=\{LOGO_SIDE_OPTIONS\}/);
+  });
+
+  await test('a bottom-left logo keeps its room on every slide, a title slide most of all', () => {
+    const base = { url: 'L.svg', on: 'every-slide' as const, width: 139.75 };
+    const css = fs.readFileSync(path.join(extension, 'webview/src/components/decks/slide/slide.css'), 'utf8');
+    const page = fs.readFileSync(path.join(extension, 'src/decks/page/pageHtml.ts'), 'utf8');
+    const cover = { markdown: '# Harbour title\n\nA line under it' };
+    const body = { markdown: '# Four parts\n\n- Instructions\n- Knowledge' };
+    const titleSlide = blockCanvasMarkup(cover, { logo: { ...base, place: 'bottom-left' } });
+    assert.match(titleSlide, /class="deck-sl is-blocks is-cover logo-bl" style="--logo-drop:38px"/);
+    assert.match(titleSlide, /<img class="slide-logo is-bottom-left"/);
+    assert.match(blockCanvasMarkup(body, { logo: { ...base, place: 'bottom-left' } }), /class="deck-sl is-blocks logo-bl" style="--logo-drop:38px"/);
+    assert.match(css, /\.deck-sl\.is-blocks\.logo-bl \.blk-flow \{ bottom: calc\(34px \+ var\(--logo-drop, 0px\)\); \}/);
+    assert.match(css, /\.slide-logo\.is-bottom-left \{ bottom: 18px; left: 30px;/);
+    assert.match(page, /logo-bl \.blk-flow/, 'the page\'s reading flow undoes it too');
+    // The room each corner makes, the same function every view calls.
+    const marks = (place: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right', isCover: boolean) => logoCanvasMarks({ ...base, place }, isCover).cls;
+    assert.deepEqual(['top-left', 'top-right', 'bottom-left', 'bottom-right'].map(place => marks(place as 'top-left', false)), ['logo-tl', 'logo-tr', 'logo-bl', 'logo-br']);
+    assert.deepEqual(['top-left', 'top-right', 'bottom-left', 'bottom-right'].map(place => marks(place as 'top-left', true)), ['logo-tl', '', 'logo-bl', 'logo-br']);
+    assert.doesNotMatch(blockCanvasMarkup(body, { logo: { ...base, place: 'bottom-left', on: 'title-slides' } }), /logo-bl|--logo-drop/);
   });
 
   // ---- The place and title-only rules, and a missing file
