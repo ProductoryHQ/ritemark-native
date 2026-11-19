@@ -73,12 +73,6 @@ interface SlideSettingsProps {
   onClose: () => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
-  /**
-   * Sprint 164 PR 3: Settings' Label row is gone (Jarmo's yes by name, 19 November), so these two are never read. They
-   * stay only while `DeckView.tsx` (PR 1's, #819, until it merges) still passes them, and go in the follow-up.
-   */
-  onUndo?: (redo: boolean) => void
-  stepsTag?: { value: string; onChange: (tag: string) => void }
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */

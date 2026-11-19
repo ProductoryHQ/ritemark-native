@@ -8,8 +8,8 @@ import { slideStamp, slideStamps } from '../deckLibraryFormat';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { pageHtml } from '../page/pageHtml';
 import { deckDigest, publicDeck } from '../page/publicDeck';
-import { blockDataOf, blockSlideBody, convertDeckText, convertedPart, convertSlide, hasStepsPill, labelledSlideBody, renewedFrom, withCommentAtEnd, withDeckVersion, withStepsTag } from './convertDeck';
-import { blockSectionNumberOf, blockSlideHtml, blockStepsLabelOf, blockStepsTagOf } from './slideRenderer';
+import { blockDataOf, blockSlideBody, convertDeckText, convertedPart, convertSlide, hasStepsPill, labelledSlideBody, renewedFrom, withCommentAtEnd, withDeckVersion } from './convertDeck';
+import { blockSectionNumberOf, blockSlideHtml, blockStepsLabelOf } from './slideRenderer';
 import { labelLine, labelsAsPills, withStepsLabels } from './labelBlock';
 
 // ---- deck: 2 in the front matter: replaced, added first, or a front matter made; every other byte stays.
@@ -156,19 +156,6 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(convertedPart(kept), kept, 'a kind this build doesn\'t know stays');
 }
 
-// ---- Settings' Label row on a block slide (gone since Sprint 164 PR 3; `withStepsTag` stays only while DeckView.tsx,
-// PR 1's until #819 merges, still imports it): the first Steps block's pill, its colons kept, nothing else touched.
-{
-  const markdown = '# Try\n\n```\n::: steps\n```\n\n:::: {.steps look="x"}\n1. A\n::::\n\n::: steps\n1. B\n:::';
-  const tagged = withStepsTag(markdown, 'Harjutus');
-  assert.equal(tagged, markdown.replace(':::: {.steps look="x"}', ':::: {.steps look="x" tag="Harjutus"}'), 'a ::: line in code is no block; the other values keep their order (withFenceValue)');
-  assert.equal(blockStepsTagOf(tagged), 'Harjutus');
-  assert.equal(blockStepsTagOf(withStepsTag(tagged, '')), '', 'emptied: no pill');
-  assert.equal(withStepsTag(tagged, 'Harjutus'), tagged, 'the same words: the same text');
-  assert.equal(withStepsTag('::: steps\n1. A\n:::', 'Say "hi"'), "::: {.steps tag='Say \"hi\"'}\n1. A\n:::");
-  assert.equal(withStepsTag('# No steps', 'X'), '# No steps');
-}
-
 // ---- Sprint 164 PR 3 (the decks README, "Today's pills are kept"): a block slide's Steps pill becomes a Label in the
 // same place, before the heading over the steps, or before the steps when there is no heading; the person's words kept
 // exactly; an emptied pill becomes nothing; a Steps block with no tag has no Label; a deck with no pill is not touched.
@@ -200,7 +187,6 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   const old = '# Try it\n\n::: {.steps tag="Harjutus"}\n1. Open\n:::';
   assert.equal(blockSlideHtml(old), blockSlideHtml(withStepsLabels(old)));
   assert.equal(blockStepsLabelOf(old), 'Harjutus');
-  assert.equal(blockStepsTagOf, blockStepsLabelOf, 'the old name, for DeckView.tsx until #819 merges');
   // Review of #858: a Steps block in a tab's pane keeps its Label in that pane; the tab's name is no heading over it.
   const inPane = '::: {.panel-tabset}\n## Prompt 1\n::: {.steps tag="Harjutus"}\n1. x\n:::\n\n## Prompt 2\n\nWords\n:::';
   assert.equal(withStepsLabels(inPane), '::: {.panel-tabset}\n## Prompt 1\n\n[Harjutus]{.label}\n\n::: steps\n1. x\n:::\n\n## Prompt 2\n\nWords\n:::');

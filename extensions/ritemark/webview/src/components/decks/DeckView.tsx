@@ -27,7 +27,7 @@ import { DeckOpenInContext } from './slide/codeToolsClick'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
-import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, updateSlideMarkdown, type DeckSlideEntry } from './deckDocument'
+import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
@@ -39,7 +39,7 @@ import { getUniqueImageFilename, readFileAsBase64 } from '../../lib/pastedImage'
 import { dropPlaceNow, insertPictureSlides, newSlideIds, pictureTitleOf, type SavedPicture } from './stripPictures'
 import { COPY_FAILED_NOTE, copiedNote, copySlidePicture } from './slidePicture'
 import { convertKind, hiddenNote } from './slide/convertKind'
-import { setPath, undoKeyOf } from './slide/slideEdits'
+import { undoKeyOf } from './slide/slideEdits'
 import { SlideAbout, SlideSettings } from './SlideSettings'
 import { ThemeMenu, themePickedNotice } from './ThemeMenu'
 import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from './TransitionPreview'
@@ -50,7 +50,7 @@ import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValu
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
 import { DropdownMenu, DropdownMenuContent, MoreActionsTrigger } from '../ui/dropdown-menu'
-import { OPEN_IN_KEY, OPEN_IN_NONE, TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, exerciseTagOf, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
+import { OPEN_IN_KEY, OPEN_IN_NONE, TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, isBlockSlide, newId, slideDataOf as readSlideData, withPartHeading, writeSlideBlock, writeSlideData } from '../../../../src/decks/deckFormat'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { isHistoryTransaction, undoDepth } from '@tiptap/pm/history'
 import { useDeckAssets, useDeckTheme } from './deckBridge'
@@ -59,8 +59,7 @@ import { CURRENT_SLIDE_SETTLE_MS, currentSlideMessage } from './currentSlideMess
 import { DeckGuard } from './handout/deckGuard'
 import { CONVERSION_NOTICE, DeckConvert, DeckFrontMatterSteps, commentNodeAt, conversionNoticeFor, conversionStateOf, pictureIntoSlide } from './handout/deckConvert'
 import { commentBoxStorage } from '../../extensions/comment/CommentNode'
-import { blockDataOf, drawsAsBlocks, withStepsTag } from '../../../../src/decks/blocks/convertDeck'
-import { blockStepsTagOf } from '../../../../src/decks/blocks/slideRenderer'
+import { blockDataOf, drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import { splitSlide } from './blocks/slideSplit'
 import { hiddenWords } from '../../../../src/decks/blocks/legacyToBlocks'
 import { DeckCurrent, deckCurrentKey, deckFocusKey, setCurrentSlide } from './handout/deckCurrent'
@@ -1429,26 +1428,6 @@ export function DeckView({
     })
   }, [addSheet, deskWidth, deskHeight, stageWidth, bigWidth, aboveLine, shown, slideShown, dividerLeft])
 
-  /**
-   * Settings' Label row for a slide drawn as blocks with a Steps block (PR 2): a v1 Exercise slide's `tag:` (converted
-   * with the deck's first edit), or a block slide's first Steps block's pill (`withStepsTag`).
-   */
-  const stepsTagSetting = (entry: DeckSlideEntry): { value: string; onChange: (tag: string) => void } | undefined => {
-    if (!editor) return undefined
-    if (entry.kind === 'exercise') return { value: exerciseTagOf(entry.data), onChange: tag => changeSlide(data => setPath(data, 'tag', tag)) }
-    const markdown = entry.data.markdown
-    if (!isBlockSlide(entry.kind) || markdown === undefined) return undefined
-    const tag = blockStepsTagOf(markdown)
-    if (tag === null) return undefined
-    return {
-      value: tag,
-      onChange: next => {
-        const fresh = slidesOf(editor.state.doc)[entry.index]
-        if (fresh?.data.markdown !== undefined) dispatch(updateSlideMarkdown(editor.state, entry.index, withStepsTag(fresh.data.markdown, next)))
-      },
-    }
-  }
-
   /** Settings' change, made to the slide as the document has it now. */
   const changeSlide = useCallback((change: (data: SlideData) => SlideData, kind?: string) => {
     if (!editor) return
@@ -2094,7 +2073,6 @@ export function DeckView({
               // A slide drawn as blocks (a v1 slide too, PR 2) has no layout: its blocks are its layout (frame 26).
               kind={drawsAsBlocks(slide.kind) ? '' : slide.kind}
               data={drawsAsBlocks(slide.kind) ? { ...slide.data, ...blockDataOf(slide.kind, slide.data), skip: slide.data.skip } : slide.data}
-              stepsTag={stepsTagSetting(slide)}
               about={(
                 <SlideAbout
                   data={slide.data}
@@ -2115,7 +2093,6 @@ export function DeckView({
               onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
               onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
               onClose={() => setSettingsFor(null)}
-              onUndo={redo => { if (redo) editor?.commands.redo(); else editor?.commands.undo() }}
             />
           ) : null}
         </PopoverContent>

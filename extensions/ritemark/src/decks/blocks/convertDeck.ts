@@ -20,7 +20,6 @@ import { isBlockSlide, isSlideKind, parseDeck, parseFrom, slideDataOf, withBlock
 import { slideStamp, slideStamps } from '../deckLibraryFormat';
 import { legacyDataToBlocks } from './legacyToBlocks';
 import { withStepsLabels, writesPill } from './labelBlock';
-import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from './fencedDiv';
 
 /** Does a slide of this kind convert to a block slide: a v1 slide of one of the nine kinds. */
 export function convertsToBlocks(kind: string): boolean {
@@ -187,38 +186,6 @@ export function convertDeckText(text: string, folder = ''): string {
     out = out.slice(0, slide.start) + writeSlideBlock('', converted.body) + withCommentAtEnd(handout, converted.comment) + out.slice(slide.handoutEnd);
   }
   return withDeckVersion(out, 2);
-}
-
-/**
- * A block slide's Markdown with its first Steps block's pill set to `tag` (Settings' Label row, #752's rule kept for
- * block slides): `tag=""` for no pill. Only that opening line changes, its colons kept; the Markdown as it was when it
- * has no Steps block outside code, or when the line says that pill already.
- *
- * Sprint 164 PR 3: Settings' Label row is gone (Jarmo's yes by name, 19 November) and nothing in the slide editor calls
- * this. It stays only while `DeckView.tsx` still imports it: that file is PR 1's (#819) until it merges, and its
- * `stepsTagSetting` goes with this function and `blockStepsTagOf` in the follow-up.
- */
-export function withStepsTag(markdown: string, tag: string): string {
-  const lines = markdown.split('\n');
-  let fence: { char: string; size: number } | null = null;
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const code = /^ {0,3}(`{3,}|~{3,})/.exec(line);
-    if (fence) {
-      if (code && code[1][0] === fence.char && code[1].length >= fence.size && /^ {0,3}(`{3,}|~{3,})[ \t]*$/.test(line)) fence = null;
-      continue;
-    }
-    if (code) { fence = { char: code[1][0], size: code[1].length }; continue; }
-    const open = OPEN_FENCE.exec(line);
-    const attrs = open ? parseFenceAttributes(open[2]) : null;
-    if (!open || !attrs || !attrs.classes.includes('steps')) continue;
-    // The one writer of an opening line's value, as the stage's pill field uses it (review of #769).
-    const next = withFenceValue(line, 'tag', tag);
-    if (next === null || next === line) return markdown;
-    lines[index] = next;
-    return lines.join('\n');
-  }
-  return markdown;
 }
 
 // ---------------------------------------------------------------------------
