@@ -10,8 +10,8 @@
  * 19 November every deck opens in Slide only, a new deck too (Jarmo: "slide only should be default view"): the view
  * lives only while the deck is open (its webview keeps its context when hidden), and nothing is stored in the file or
  * remembered, so a deck opened again starts in Slide only. A fold an older build kept in the view state is never read.
- * Two exceptions show the handout, where the words are: a deck that opens with no slide, and Find (its bar and its
- * matches are the handout's).
+ * Two exceptions show the handout, where the words are: a deck that opens with no slide, and Find, which borrows it
+ * while open (`foldForFind`).
  */
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -48,6 +48,16 @@ export function keepDeckViewState(change: DeckViewState) {
 /** The fold every deck opens with: the handout folded away, Slide only. A constant, never read from anything kept, so
  *  nothing an older build kept (its `deckFold`) can bring back a different start. */
 export const OPENING_FOLD: DeckFold = 'handout'
+
+/**
+ * Find borrows the handout (Experience lead, 19 November): its bar and matches are the handout's, so opening Find in
+ * Slide only shows the handout beside the slide, and closing it returns to Slide only. `borrowed` says the handout is on
+ * loan; a view the person chooses while Find is open ends the loan (the caller clears it), and that view then holds.
+ */
+export function foldForFind(findOpen: boolean, fold: DeckFold, borrowed: boolean): { fold: DeckFold; borrowed: boolean } {
+  if (findOpen) return fold === 'handout' ? { fold: null, borrowed: true } : { fold, borrowed }
+  return borrowed ? { fold: 'handout', borrowed: false } : { fold, borrowed: false }
+}
 
 /** What each side shows, from the fold and whether the desk has room for the handout at all. */
 export function foldedSides(fold: DeckFold, handoutRoom: boolean): { slideShown: boolean; handoutShown: boolean } {

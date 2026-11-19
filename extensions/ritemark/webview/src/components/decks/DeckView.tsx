@@ -73,7 +73,7 @@ import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
+import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
@@ -493,11 +493,17 @@ export function DeckView({
     return onDocChanged(editor, refresh)
   }, [editor])
 
-  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only brings the handout beside, so the
-  // bar and its matches show. Closing it leaves the view as it is.
+  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only borrows the handout, beside the
+  // slide, so the bar and its matches show. Closing Find (Esc or its ×) gives it back: the view returns to Slide only,
+  // unless the person chose a view while Find was open (`chooseView` ends the borrowing), which then holds.
   const findOpen = Boolean(findBar)
+  const foldRef = useRef(fold)
+  foldRef.current = fold
+  const findBorrowedHandout = useRef(false)
   useEffect(() => {
-    if (findOpen) setFold(current => (current === 'handout' ? null : current))
+    const next = foldForFind(findOpen, foldRef.current, findBorrowedHandout.current)
+    findBorrowedHandout.current = next.borrowed
+    if (next.fold !== foldRef.current) setFold(next.fold)
   }, [findOpen])
 
   const count = slides.length
@@ -951,6 +957,7 @@ export function DeckView({
    *  still rings. */
   const chooseView = useCallback((view: DeckViewMode) => {
     const next = foldOfView(view)
+    findBorrowedHandout.current = false
     setFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [pick])

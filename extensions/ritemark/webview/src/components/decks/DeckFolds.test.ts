@@ -28,7 +28,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckViewSwitch, OPENING_FOLD, foldOfView, foldedSides, viewOfFold, viewParts } = await import('./DeckFolds')
+const { DeckViewSwitch, OPENING_FOLD, foldForFind, foldOfView, foldedSides, viewOfFold, viewParts } = await import('./DeckFolds')
 type DeckViewMode = 'slide' | 'both' | 'handout'
 
 const draw = (view: DeckViewMode, above = false) =>
@@ -99,6 +99,23 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.deepEqual(posted, [], 'the view never reaches the host')
 }
 
+// Find borrows the handout: opened in Slide only it shows the handout beside, closed it goes back to Slide only; opened
+// in another view it changes nothing; a view chosen while it is open (the loan cleared) holds when it closes.
+{
+  const open = foldForFind(true, 'handout', false)
+  assert.deepEqual(open, { fold: null, borrowed: true }, 'Slide only: the handout comes in, on loan')
+  assert.deepEqual(foldForFind(false, open.fold, open.borrowed), { fold: 'handout', borrowed: false }, 'closed: Slide only again')
+  for (const fold of [null, 'slide'] as const) {
+    const opened = foldForFind(true, fold, false)
+    assert.deepEqual(opened, { fold, borrowed: false }, `${String(fold)}: nothing to borrow`)
+    assert.deepEqual(foldForFind(false, opened.fold, opened.borrowed), { fold, borrowed: false }, `${String(fold)}: as it was`)
+  }
+  // The person picks Handout only while Find is open: chooseView clears the loan, and closing Find keeps that view.
+  assert.deepEqual(foldForFind(false, 'slide', false), { fold: 'slide', borrowed: false }, 'the chosen view holds')
+  // And picks Slide only while Find is open: the handout folds, and closing Find keeps Slide only.
+  assert.deepEqual(foldForFind(false, 'handout', false), { fold: 'handout', borrowed: false })
+}
+
 // The deck view (its editor can't be drawn here, so its source is read): the switch on the bar right after the strip's
 // button and before "Slide N of M", only where the handout has room; the line between the panes is a separator with
 // nothing on it; with the slide hidden, the stage goes and the strip stays.
@@ -136,7 +153,8 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the view')
   assert.ok(view.includes('useState<DeckFold>(OPENING_FOLD)'), 'Slide only at mount, every deck')
   assert.ok(/if \(slidesOf\(editor\.state\.doc\)\.length === 0\) setFold\(current => \(current === 'handout' \? null : current\)\)/.test(view), 'a deck with no slide opens with the handout')
-  assert.ok(view.includes("if (findOpen) setFold(current => (current === 'handout' ? null : current)) }, [findOpen])"), 'Find shows the handout, where its bar is')
+  assert.ok(view.includes('const next = foldForFind(findOpen, foldRef.current, findBorrowedHandout.current)') && view.includes('}, [findOpen])'), 'Find borrows the handout as it opens and closes')
+  assert.ok(block('const chooseView = useCallback(').includes('findBorrowedHandout.current = false'), 'a view chosen while Find is open ends the loan')
   // The choice holds while the deck is open because its webview keeps its context when hidden.
   const provider = readFileSync(new URL('../../../../src/ritemarkEditor.ts', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(provider.includes('webviewOptions: { retainContextWhenHidden: true }'), 'the deck keeps its view while hidden')
