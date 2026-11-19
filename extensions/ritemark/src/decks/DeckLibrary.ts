@@ -104,10 +104,54 @@ function sourceOf(from: string | undefined): { path: string; id: string; stamp: 
   return source;
 }
 
-const words = (slide: DeckSlideText) => [
+/** What search looks through on a slide: its words and its handout, lower case (the place's search and the AI's). */
+export const slideSearchText = (slide: DeckSlideText) => [
   slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? exerciseTagOf(slide.data) : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
   ...(slide.data.rows ?? []).flat(), slide.data.markdown, slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
+
+/** The words typed, each of which a slide must have, in any order (the place's search and the AI's `list_decks`). */
+export function searchTerms(query: string): string[] {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+/**
+ * A deck's summary from its text: its look, the slides `shown` (all when left out) and, when asked, its Agenda from all
+ * its slides. The listing and the place's index (Sprint 165 PR 3, `librarySearch.ts`) share it.
+ */
+export function deckSummaryOf(
+  file: { path: string; modified: number },
+  text: string,
+  slides: readonly DeckSlideText[],
+  options: { shown?: readonly DeckSlideText[]; agenda?: boolean } = {},
+): DeckSummary {
+  const frontMatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
+  // Read as the deck view and the Theme menu read it (Sprint 162): its quotes taken off, so the path is the file's.
+  const theme = frontMatterField(text.replace(/^\uFEFF/, ''), 'theme')?.trim() || null;
+  const borderless = /^look:\s*borderless\s*$/m.test(frontMatter);
+  return {
+    path: file.path,
+    name: deckName(file.path),
+    topic: isTopicPath(file.path),
+    theme,
+    borderless,
+    modified: file.modified,
+    slides: (options.shown ?? slides).map(slide => ({
+      index: slide.index,
+      id: slide.data.id,
+      kind: slide.kind,
+      data: slide.data,
+      handout: slide.handout.slice(0, 400),
+      hasNotes: slide.notes !== null,
+    })),
+    ...(options.agenda ? { agenda: agendaOf(slides.map(slide => ({ kind: slide.kind, data: slide.data, number: slide.index + 1 }))) } : {}),
+  };
+}
+
+/** The listing's order: the library's topics first, by name, then the other decks, newest first. */
+export function compareDecks(a: { topic: boolean; name: string; modified: number }, b: { topic: boolean; name: string; modified: number }): number {
+  return a.topic === b.topic ? (a.topic ? a.name.localeCompare(b.name) : b.modified - a.modified) : a.topic ? -1 : 1;
+}
 
 /**
  * Sprint 159 (PR 2): a deck file this build may change. A deck whose front matter names a later `deck:` version (a
@@ -138,6 +182,7 @@ export class DeckLibrary {
   async listDecks(options: { where?: 'library' | 'other' | 'all'; query?: string; agenda?: boolean } = {}): Promise<DeckSummary[]> {
     const where = options.where ?? 'all';
     const query = (options.query ?? '').trim().toLowerCase();
+    const terms = searchTerms(query);
     const found: DeckSummary[] = [];
     for (const file of await this.files.list()) {
       const topic = isTopicPath(file.path);
@@ -146,31 +191,13 @@ export class DeckLibrary {
       const text = await this.files.read(file.path);
       if (text === null) continue;
       const slides = slidesOfText(text);
-      const hits = query ? slides.filter(slide => words(slide).includes(query) || deckName(file.path).toLowerCase().includes(query)) : slides;
+      // Each word typed, as the place's search (Sprint 165 PR 3); the AI's listing also finds a deck by its name.
+      const named = query !== '' && deckName(file.path).toLowerCase().includes(query);
+      const hits = query && !named ? slides.filter(slide => { const text = slideSearchText(slide); return terms.every(term => text.includes(term)); }) : slides;
       if (query && hits.length === 0) continue;
-      const frontMatter = /^---\n([\s\S]*?)\n---/.exec(text)?.[1] ?? '';
-      // Read as the deck view and the Theme menu read it (Sprint 162): its quotes taken off, so the path is the file's.
-      const theme = frontMatterField(text.replace(/^\uFEFF/, ''), 'theme')?.trim() || null;
-      const borderless = /^look:\s*borderless\s*$/m.test(frontMatter);
-      found.push({
-        path: file.path,
-        name: deckName(file.path),
-        topic,
-        theme,
-        borderless,
-        modified: file.modified,
-        slides: hits.map(slide => ({
-          index: slide.index,
-          id: slide.data.id,
-          kind: slide.kind,
-          data: slide.data,
-          handout: slide.handout.slice(0, 400),
-          hasNotes: slide.notes !== null,
-        })),
-        ...(options.agenda ? { agenda: agendaOf(slides.map(slide => ({ kind: slide.kind, data: slide.data, number: slide.index + 1 }))) } : {}),
-      });
+      found.push(deckSummaryOf(file, text, slides, { shown: hits, agenda: options.agenda }));
     }
-    return found.sort((a, b) => (a.topic === b.topic ? (a.topic ? a.name.localeCompare(b.name) : b.modified - a.modified) : a.topic ? -1 : 1));
+    return found.sort(compareDecks);
   }
 
   /**

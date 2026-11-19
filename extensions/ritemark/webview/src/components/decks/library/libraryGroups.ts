@@ -131,3 +131,51 @@ export function takeSectionTip(label: string | null, ids: readonly string[] | nu
   if (!ids) return "This section's slides need ids of their own. Open its deck once to give them."
   return `Take section · ${slideCount(slides)}`
 }
+
+/**
+ * Sprint 165 PR 3 (README "Search shows each slide once"): where a search hit's copy is, "Folder › Deck · 12 Nov", with
+ * the same › as the folder headings (the project's name for a deck at its top level).
+ */
+export function placeLine(path: string, name: string, modified: number, projectName: string, now: number = Date.now()): string {
+  const date = deckDate(modified, now)
+  return `${deckPlace(path, name, projectName)}${date ? ` · ${date}` : ''}`
+}
+
+/** A deck's place without its date, "Folder › Deck": a hit's first line, which may wrap and be cut. */
+export function deckPlace(path: string, name: string, projectName: string): string {
+  const folder = folderHeading(folderOfDeck(path)) || projectName || 'This project'
+  return `${folder}${PLACE_SEPARATOR}${name}`
+}
+
+/**
+ * A hit's second line, never cut: the copy's date and how many other decks have it ("12 Nov · also in 3 older
+ * decks"), so a long folder or deck name never hides the date (the Experience lead: AI topics age in months).
+ */
+export function hitMeta(modified: number, count: number, library: boolean, now: number = Date.now()): string {
+  return [deckDate(modified, now), alsoLine(count, library)].filter(Boolean).join(' · ')
+}
+
+/**
+ * The line under a hit: "also in 3 older decks", the other decks that have the same slide (the open deck left out: it
+ * has the tick). A library slide's copies can be newer than its topic, so it says "also in 3 decks". Null for none.
+ */
+export function alsoLine(count: number, library: boolean): string | null {
+  if (!Number.isFinite(count) || count <= 0) return null
+  return `also in ${count} ${library ? '' : 'older '}${count === 1 ? 'deck' : 'decks'}`
+}
+
+/** A search group's count: "4 slides" or "1 deck", or "60 of 412 slides" when the list stops short. */
+function countOf(shown: number, total: number, noun: 'slide' | 'deck'): string {
+  if (total > shown) return `${shown} of ${total} ${noun}s`
+  return shown === 1 ? `1 ${noun}` : `${shown} ${noun}s`
+}
+
+/** The search heading's count: "4 slides", or "60 of 412 slides" when the list stops short. */
+export function hitsCount(shown: number, total: number): string {
+  return countOf(shown, total, 'slide')
+}
+
+/** The Decks group's count (#877): "2 decks", or "8 of 20 decks" when the list stops short. */
+export function decksCount(shown: number, total: number): string {
+  return countOf(shown, total, 'deck')
+}
