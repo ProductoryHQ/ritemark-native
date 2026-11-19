@@ -11,12 +11,13 @@ import { copiedDeckText } from './newDeck';
 /** An in-memory project whose files' times the test sets, counting the reads. */
 function project(files: Record<string, string>, times: Record<string, number>) {
   const reads: string[] = [];
+  const lists = { count: 0 };
   const deckFiles: DeckFiles = {
-    async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map(path => ({ path, modified: times[path] ?? 1 })); },
+    async list() { lists.count++; return Object.keys(files).filter(path => path.endsWith('.deck.md')).map(path => ({ path, modified: times[path] ?? 1 })); },
     async read(path) { reads.push(path); return files[path] ?? null; },
     async write(path, text) { files[path] = text; },
   };
-  return { files: deckFiles, reads };
+  return { files: deckFiles, reads, lists };
 }
 
 const slide = (id: string, markdown: string, handout = '') => ['```slide', '---', `id: ${id}`, '---', markdown, '```', '', handout, ''].join('\n');
@@ -154,6 +155,22 @@ async function run() {
     assert.ok(Array.isArray(shown[1].agenda));
   }
 
+  // ---- The AI's list_decks matches each word typed too, and still finds a deck by its name.
+  {
+    const listed = await library.listDecks({ query: 'context what' });
+    assert.ok(listed.some(entry => entry.path === C4 && entry.slides.some(item => item.id === 'c2aa')), 'each word, in any order');
+    const named = await library.listDecks({ query: 'context 3' });
+    assert.ok(named.some(entry => entry.path === C3 && entry.slides.length === slidesOfText(files[C3]).length), 'a deck named so: all its slides');
+  }
+
+  // ---- A grouping out of step with the decks given never throws: what is gone is left out.
+  {
+    const without = decks.filter(entry => entry.summary.path !== C4);
+    const { hits } = searchLibrary(without, same, 'budget', { active: OPEN });
+    assert.deepEqual(hits.map(hit => hit.path), [C3]);
+    assert.deepEqual(searchLibrary(decks.filter(entry => entry.summary.topic), same, 'what is context', { active: OPEN }).hits, []);
+  }
+
   // ---- At most `limit` hits; the total counts them all.
   for (let n = 0; n < 5; n++) files[`Many/Deck ${n}.deck.md`] = deck(slide(`m${n}aa`, `# Many words ${n}\n\nDistinct ${n} thing ${n * 7}`));
   {
@@ -188,13 +205,24 @@ async function run() {
     assert.ok(!after.some(entry => entry.summary.path === 'Talks/Talk A.deck.md'), 'a deleted deck leaves the index');
     assert.equal(watched.reads.length, count + 2);
     assert.equal(searchLibrary(after, own.same(), 'questions', { active: OPEN }).hits[0].also, 0, 'and its copy no longer counts');
+    // A search typed lists no file again while no change was named; any other refresh does.
+    const listings = watched.lists.count;
+    await own.decks({ listAgain: false });
+    await own.decks({ listAgain: false });
+    assert.equal(watched.lists.count, listings, 'typing in the search lists no file');
+    await own.decks();
+    assert.equal(watched.lists.count, listings + 1);
+    own.invalidate(C1);
+    await own.decks({ listAgain: false });
+    assert.equal(watched.lists.count, listings + 2, 'after a change, a search lists the files again');
     own.invalidate();
     await own.decks();
-    assert.equal(watched.reads.length, count + 2 + count - 1, 'invalidate() with no path reads every deck again');
+    assert.equal(watched.reads.length, count + 3 + count - 1, 'invalidate() with no path reads every deck again');
     // Two updates at once read once.
     own.invalidate(C4);
     await Promise.all([own.decks(), own.decks()]);
     assert.equal(watched.reads.filter(path => path === C4).length, 3);
+    assert.equal(watched.reads.filter(path => path === C1).length, 3, 'C1: the first read, its change and every deck again');
   }
 
   // ---- A big project stays quick: 400 decks of 25 slides, copied from each other; search reads nothing again.

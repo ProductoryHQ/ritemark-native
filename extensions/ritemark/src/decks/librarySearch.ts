@@ -11,7 +11,9 @@
  *
  * Pure and without `vscode`: the files come in through `DeckFiles`, as `DeckLibrary`'s do.
  */
-import { compareDecks, deckSummaryOf, slideSearchText, type DeckFiles, type DeckSummary } from './DeckLibrary';
+import { compareDecks, deckSummaryOf, searchTerms, slideSearchText, type DeckFiles, type DeckSummary } from './DeckLibrary';
+
+export { searchTerms };
 import { slidesOfText } from './deckLibraryFormat';
 import { sameSlides, slideWords, type SameSlides } from './sameSlide';
 
@@ -62,6 +64,8 @@ export class DeckIndex {
   private version = 0;
   private grouped: { version: number; same: SameSlides } | null = null;
   private running: Promise<IndexedDeck[]> | null = null;
+  /** The last listing of the project's deck files, reused by a search while no change was named since. */
+  private listed: Array<{ path: string; modified: number }> | null = null;
 
   constructor(private readonly files: Pick<DeckFiles, 'list' | 'read'>) {}
 
@@ -69,12 +73,17 @@ export class DeckIndex {
   invalidate(path?: string): void {
     if (path === undefined) this.everything = true;
     else this.stale.add(path);
+    this.listed = null;
   }
 
-  /** The project's decks in the listing's order, brought up to date. One update runs at a time. */
-  async decks(): Promise<IndexedDeck[]> {
+  /**
+   * The project's decks in the listing's order, brought up to date. One update runs at a time. `listAgain: false` (a
+   * search typed) lists the files again only when a change was named since the last listing: the watcher names every
+   * change, so typing touches no file at all.
+   */
+  async decks(options: { listAgain?: boolean } = {}): Promise<IndexedDeck[]> {
     while (this.running) await this.running.catch(() => undefined);
-    const running = this.update();
+    const running = this.update(options.listAgain ?? true);
     this.running = running;
     try {
       return await running;
@@ -94,14 +103,15 @@ export class DeckIndex {
     return this.grouped.same;
   }
 
-  private async update(): Promise<IndexedDeck[]> {
+  private async update(listAgain: boolean): Promise<IndexedDeck[]> {
     // Taken at the start: a change named while this update reads is read at the next one.
     const stale = this.stale;
     const everything = this.everything;
     this.stale = new Set();
     this.everything = false;
     try {
-      const listed = await this.files.list();
+      const listed = !listAgain && this.listed && !everything && !stale.size ? this.listed : await this.files.list();
+      this.listed = listed;
       let changed = false;
       const present = new Set(listed.map(file => file.path));
       for (const path of [...this.entries.keys()]) {
@@ -149,11 +159,6 @@ export interface LibraryHit {
   library: boolean;
 }
 
-/** The words typed, each of which a slide must have. */
-export function searchTerms(query: string): string[] {
-  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-}
-
 /**
  * Search: every slide whose words and handout hold each word typed, once per same slide. The open deck (`active`) is no
  * source. Order: library slides first, then slides whose title has the words, then the newest. `total` counts them
@@ -182,9 +187,11 @@ export function searchLibrary(
       found.set(group, (found.get(group) ?? false) || inTitle);
     });
   }
-  const ranked = [...found].map(([group, inTitle]) => {
+  const ranked = [...found].flatMap(([group, inTitle]) => {
     const members = (same.membersOf(group).length ? same.membersOf(group) : [group]).map(keyParts);
     const sources = members.filter(member => member.path !== active && byPath.has(member.path));
+    // A grouping out of step with the decks given (a deck gone since): only what is still there.
+    if (!sources.length) return [];
     const library = sources.filter(member => byPath.get(member.path)!.summary.topic);
     const newest = (list: typeof sources) => list.reduce((best, next) => {
       const a = byPath.get(best.path)!.summary.modified;
@@ -195,11 +202,11 @@ export function searchLibrary(
     const others = new Set(members.map(member => member.path));
     others.delete(shown.path);
     if (active) others.delete(active);
-    return {
+    return [{
       hit: { path: shown.path, index: shown.index, also: others.size, library: library.length > 0 },
       inTitle,
       modified: byPath.get(shown.path)!.summary.modified,
-    };
+    }];
   });
   ranked.sort((a, b) =>
     Number(b.hit.library) - Number(a.hit.library)

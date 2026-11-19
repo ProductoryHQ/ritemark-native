@@ -112,6 +112,11 @@ export const slideSearchText = (slide: DeckSlideText) => [
   ...(slide.data.rows ?? []).flat(), slide.data.markdown, slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
 
+/** The words typed, each of which a slide must have, in any order (the place's search and the AI's `list_decks`). */
+export function searchTerms(query: string): string[] {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
 /**
  * A deck's summary from its text: its look, the slides `shown` (all when left out) and, when asked, its Agenda from all
  * its slides. The listing and the place's index (Sprint 165 PR 3, `librarySearch.ts`) share it.
@@ -179,6 +184,7 @@ export class DeckLibrary {
   async listDecks(options: { where?: 'library' | 'other' | 'all'; query?: string; agenda?: boolean } = {}): Promise<DeckSummary[]> {
     const where = options.where ?? 'all';
     const query = (options.query ?? '').trim().toLowerCase();
+    const terms = searchTerms(query);
     const found: DeckSummary[] = [];
     for (const file of await this.files.list()) {
       const topic = isTopicPath(file.path);
@@ -187,7 +193,9 @@ export class DeckLibrary {
       const text = await this.files.read(file.path);
       if (text === null) continue;
       const slides = slidesOfText(text);
-      const hits = query ? slides.filter(slide => slideSearchText(slide).includes(query) || deckName(file.path).toLowerCase().includes(query)) : slides;
+      // Each word typed, as the place's search (Sprint 165 PR 3); the AI's listing also finds a deck by its name.
+      const named = query !== '' && deckName(file.path).toLowerCase().includes(query);
+      const hits = query && !named ? slides.filter(slide => { const text = slideSearchText(slide); return terms.every(term => text.includes(term)); }) : slides;
       if (query && hits.length === 0) continue;
       found.push(deckSummaryOf(file, text, slides, { shown: hits, agenda: options.agenda }));
     }

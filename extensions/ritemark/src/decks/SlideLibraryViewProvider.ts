@@ -157,7 +157,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       }
       case 'library/search':
         this.query = request.query;
-        await this.refresh();
+        // Only the words changed: the index lists no file again unless a deck changed meanwhile.
+        await this.refresh({ listAgain: false });
         return;
       case 'library/insert':
         await this.insert(request.path, [request.id]);
@@ -211,7 +212,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     }, REFRESH_MS);
   }
 
-  private async refresh(): Promise<void> {
+  private async refresh(options: { listAgain?: boolean } = {}): Promise<void> {
     if (!this.view) return;
     if (!isEnabled('decks')) {
       await this.post({ type: 'library/state', enabled: false, decks: [], active: null, query: this.query, project: false });
@@ -224,7 +225,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const active = this.pages.activeDeck();
     let indexed: IndexedDeck[] = [];
     try {
-      indexed = index ? await index.decks() : [];
+      indexed = index ? await index.decks(options) : [];
     } catch {
       // The project's files couldn't be listed this time: the place keeps what it shows, and the next change tries again.
       return;

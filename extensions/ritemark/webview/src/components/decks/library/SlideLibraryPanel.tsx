@@ -238,9 +238,7 @@ export function SlideLibraryPanel() {
     const number = options.numbered ? `${slide.index + 1}. ` : ''
     const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
     const spoken = [options.place, options.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
-    return (
-      <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
-        <Tooltip label="Already in the open deck" side="bottom" hoverOnly suppressed={!inOpenDeck} className="flex min-w-0">
+    const trigger = (
           <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -261,7 +259,15 @@ export function SlideLibraryPanel() {
               {options.also ? <span className="deck-lib-also">{options.also}</span> : null}
             </button>
           </DropdownMenuTrigger>
-        </Tooltip>
+    )
+    return (
+      <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
+        {/* The tick's tooltip, on the tiles that have one: hundreds of tiles mount no tooltip they never show. */}
+        {inOpenDeck ? (
+          <Tooltip label="Already in the open deck" side="bottom" hoverOnly className="flex min-w-0">
+            {trigger}
+          </Tooltip>
+        ) : trigger}
         <DropdownMenuContent align="start" className="deck-lib-menu">
           <div className="deck-lib-menu-head">{title}</div>
           {options.place ? <div className="deck-lib-menu-place">{options.place}</div> : null}
@@ -424,7 +430,8 @@ export function SlideLibraryPanel() {
         />
       </label>
       ) : null}
-      {searching ? searchResults() : (
+      {/* Just cleared: until the host answers, its decks hold only the hits, so nothing is drawn as the library. */}
+      {searching ? searchResults() : state.search ? null : (
         <>
           <div className="deck-lib-group">Library</div>
           {topics.map((deck) => deckRows(deck, false))}
