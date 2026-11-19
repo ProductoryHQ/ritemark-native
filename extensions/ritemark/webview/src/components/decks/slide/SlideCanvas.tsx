@@ -11,8 +11,8 @@
  */
 import { fitTabBands } from '../../../../../src/decks/blocks/tabsFit'
 import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, blockHasAgenda, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { isBlockSlide, sidePictureOf, type SlideData } from '../../../../../src/decks/deckFormat'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, blockHasAgenda, contentPlaceFitKey, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import { AgendaContext } from './agendaContext'
 import { DeckOpenInContext } from './codeToolsClick'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
@@ -325,7 +325,7 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   const deckOpenIn = useContext(DeckOpenInContext)
   const openInShown = openIn ?? deckOpenIn
   // The fit belongs to these words in this look: a theme or Card | Borderless change measures again from the top.
-  const key = fitKeyOf(markdown, data.image, data.picture, fitLookOf(borderless, theme))
+  const key = fitKeyOf(markdown, data.image, data.picture, fitLookOf(borderless, theme), contentPlaceFitKey(markdown, data.valign, sidePictureOf(data)))
   // 17 November: the slide on the stage is drawn here at the stage's own step, so a thumbnail is its scaled copy.
   const stageStep = useSyncExternalStore(subscribeStageFit, () => stageFitFor(key), () => stageFitFor(key))
   const [fit, setFit] = useState<{ key: string; step: number }>({ key, step: 0 })

@@ -277,7 +277,9 @@ const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
 /** Only the words and settings a slide's layout draws, copied one by one. */
 export function wallDataOf(data: SlideData): SlideData {
   const out: SlideData = {};
-  for (const key of ['title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image'] as const) {
+  // Sprint 167 PR 3: `valign` (where the content sits, one of three words by `publicSlide`), and the side picture's
+  // `focus`, which the page drew and the wall dropped until then.
+  for (const key of ['title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'focus', 'valign'] as const) {
     if (typeof data[key] === 'string') out[key] = data[key];
   }
   if (Array.isArray(data.items)) {

@@ -17,7 +17,7 @@
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
-import { isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
+import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
@@ -716,6 +716,40 @@ export function lonePictureClass(markdown: string, side: string | null): string 
   return lone === 'alone' ? 'is-lone-pic' : lone === 'titled' ? 'is-titled-pic' : '';
 }
 
+/**
+ * Sprint 167 PR 3 (decks README item A): where a slide's content sits when its header says nothing, which is where it
+ * is drawn today. A title or section slide (`isCoverSlide`) sits at the bottom, drawn big and low with its own foot room;
+ * a picture alone on the slide in the middle (`lonePictureOf`, experience 49); every other slide at the top. Slide
+ * settings shows this value chosen, and choosing it again takes the `valign:` line out. The theme holds no positions.
+ */
+export function contentPlaceDefault(markdown: string, side: string | null): ContentPlace {
+  if (isCoverSlide(markdown)) return 'bottom';
+  return !side && lonePictureOf(markdown) === 'alone' ? 'middle' : 'top';
+}
+
+/** Where the slide's content sits: its `valign:` line when it names a place, else the slide's own default. */
+export function contentPlaceOf(markdown: string, valign: string | undefined, side: string | null): ContentPlace {
+  return contentPlaceValue(valign) ?? contentPlaceDefault(markdown, side);
+}
+
+/**
+ * The canvas class for a slide's content place (`va-top`, `va-middle`, `va-bottom`, slide.css), or '' when it sits at
+ * its default: an untouched slide's canvas is drawn exactly as before, in every view.
+ */
+export function contentPlaceClass(markdown: string, valign: string | undefined, side: string | null): string {
+  const written = contentPlaceValue(valign);
+  return written && written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
+}
+
+/**
+ * The content place's part of a slide's fit key (`slideFit.fitKeyOf`): only a title slide's, whose place decides a
+ * top-right logo's room (`logoCanvasMarks`). Every other slide's room is the same in all three places, so its key, and
+ * the step the stage tells the strip, stay as they are when the place changes.
+ */
+export function contentPlaceFitKey(markdown: string, valign: string | undefined, side: string | null): string {
+  return isCoverSlide(markdown) ? contentPlaceClass(markdown, valign, side) : '';
+}
+
 const sectionCache = new Map<string, string | null>();
 
 /**
@@ -991,14 +1025,16 @@ const LOGO_ROOM_CLASS: Record<Exclude<LogoPlace, 'top-right'>, string> = { 'top-
  * The canvas's class and style for the room the logo keeps on this slide ("never touch", the Experience lead, step-3-themes.md,
  * 18 November), only on a slide that shows it; the fit then makes the room:
  *  - top right (`.logo-tr`): the first block ends the logo's width and 16 px short of it, on every slide but a title
- *    slide (its words sit low);
+ *    slide whose words sit low (its default, Bottom; `place` is the slide's content place, Sprint 167 PR 3);
  *  - top left (`.logo-tl`): the words start lower by the logo's height and 12 px (38 px), so every line keeps its left edge;
  *  - bottom right (`.logo-br`) or bottom left (`.logo-bl`, Sprint 167 PR 1): the words end higher by the same, so a
  *    title slide's low words never run under it.
  */
-export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
+export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean, place?: ContentPlace): { cls: string; style: Record<string, string> } {
   if (!drawsLogo(logo, cover)) return { cls: '', style: {} };
-  if (logo.place === 'top-right') return cover ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
+  // Sprint 167 PR 3: a title slide moved up (Top or Middle) has its title near the logo's corner, so it keeps the room.
+  const low = cover && (place ?? 'bottom') === 'bottom';
+  if (logo.place === 'top-right') return low ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
   return { cls: LOGO_ROOM_CLASS[logo.place], style: { '--logo-drop': `${logoDrop()}px` } };
 }
 
@@ -1059,9 +1095,9 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
   const cover = isCoverSlide(markdown);
-  const marks = logoCanvasMarks(options.logo, cover);
+  const marks = logoCanvasMarks(options.logo, cover, contentPlaceOf(markdown, data.valign, side));
   Object.assign(inner, marks.style);
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), contentPlaceClass(markdown, data.valign, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   // A picture of the slide everywhere but the published page, where the slide is what a reader reads (and ticks).
   const hidden = options.readable ? '' : ' aria-hidden="true"';
