@@ -5,14 +5,18 @@
  *    the icon the person clicked. The menu sits in `document.body`, outside the scaled slide, at its own size.
  *  - `WebPageDialog`: the / menu's Web page asks for the page's address and puts it on the slide as a link (no live
  *    page is drawn: the sprint plan's "same place as a Picture with a link").
+ *  - `UnknownIconHint` (#850): pointing at a box's unknown icon shows No icon named “xyz” with Choose an icon.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Button } from '../../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { Dialog, DialogBody, DialogButton, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../ui/dialog'
 import { Icon } from '../../ui/Icon'
 import { Input } from '../../ui/input'
+import { Tooltip } from '../../ui/tooltip'
 import { IconGridItems } from '../slide/IconGrid'
+import { unknownIconWords } from './slideDivView'
 
 /** Where the picker opens, and for which box. */
 export interface IconPick {
@@ -37,6 +41,95 @@ export function SlideIconPicker({ pick, onPick, onClose }: { pick: IconPick | nu
       </DropdownMenuContent>
     </DropdownMenu>,
     document.body,
+  )
+}
+
+/** #850: a box's unknown icon being pointed at on the stage: which box, its badge, and the name as written. */
+export interface IconHint {
+  pos: number
+  anchor: HTMLElement
+  name: string
+}
+
+/**
+ * #850 (the Experience lead, 19 November; decks README, "Every Phosphor icon"): pointing at a box's unknown icon (the
+ * dashed circle) shows a tooltip, No icon named “xyz”, with Choose an icon, which opens the box's icon menu, as a click
+ * on the badge does. The menu has no search yet, so the name isn't in one: that waits for Sprint 169's icon search. No
+ * banner, no toast.
+ *
+ * The tooltip's trigger is a round place over the badge, in a layer of the slide's frame (so a wheel over it still
+ * reaches the stage, and it moves with the slide as the stage scrolls), put there when the pointer comes onto the badge
+ * (`SlideDivHandlers.hintIcon`) and gone once the pointer has left it and the tooltip has closed.
+ */
+export function UnknownIconHint({ frame, hint, onChoose, onDone }: {
+  frame: HTMLElement | null
+  hint: IconHint | null
+  onChoose: (hint: IconHint, rect: DOMRect) => void
+  onDone: () => void
+}) {
+  // The layer, the frame's last child while the frame is there (SlideBlockBar's way: React inserting beside the frame's
+  // other children failed).
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!frame) return
+    const element = document.createElement('div')
+    element.className = 'deck-block-layer'
+    frame.append(element)
+    setLayer(element)
+    return () => { element.remove(); setLayer(null) }
+  }, [frame])
+  if (!frame || !layer || !hint || !hint.anchor.isConnected) return null
+  return createPortal(<UnknownIconPlace key={`${hint.pos}:${hint.name}`} frame={frame} hint={hint} onChoose={onChoose} onDone={onDone} />, layer)
+}
+
+function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElement; hint: IconHint; onChoose: (hint: IconHint, rect: DOMRect) => void; onDone: () => void }) {
+  const open = useRef(false)
+  const over = useRef(true)
+  // A new size of the stage scales the slide: the place would stay where the badge was. A key ends it too (an edit
+  // may move the box).
+  useEffect(() => {
+    const end = () => onDone()
+    window.addEventListener('resize', end)
+    window.addEventListener('keydown', end, true)
+    return () => {
+      window.removeEventListener('resize', end)
+      window.removeEventListener('keydown', end, true)
+    }
+  }, [onDone])
+  const badge = hint.anchor.getBoundingClientRect()
+  const origin = frame.getBoundingClientRect()
+  const words = unknownIconWords(hint.name)
+  const choose = () => onChoose(hint, hint.anchor.getBoundingClientRect())
+  return (
+    <div className="deck-block-at" style={{ left: badge.left - origin.left, top: badge.top - origin.top, width: badge.width, height: badge.height, zIndex: 5 }}>
+      <Tooltip
+        className="size-full"
+        onOpenChange={next => {
+          open.current = next
+          if (!next && !over.current) onDone()
+        }}
+        label={(
+          <span className="inline-flex flex-wrap items-baseline gap-x-2">
+            {words}
+            <Button variant="link" className="h-auto p-0 text-[12px]" onMouseDown={event => event.preventDefault()} onClick={choose}>Choose an icon</Button>
+          </span>
+        )}
+      >
+        <span
+          role="button"
+          aria-label={`${words}: choose an icon`}
+          className="deck-icon-hint"
+          // A press keeps the caret where it is, as on every handle over the slide.
+          onMouseDown={event => event.preventDefault()}
+          onClick={choose}
+          onPointerEnter={() => { over.current = true }}
+          onPointerLeave={() => {
+            over.current = false
+            if (!open.current) onDone()
+          }}
+        />
+      </Tooltip>
+    </div>
   )
 }
 

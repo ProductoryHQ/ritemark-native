@@ -481,6 +481,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    closes, and while the field is open, empty, the default word shows faint as its placeholder. */
 .deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover, .deck-sl.is-blocks.is-editing .blk-pill.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
 .deck-sl.is-blocks.is-editing .blk-pill.is-pickable { cursor: text; }
+/* #850: the place over a box's unknown icon while it is pointed at, its tooltip's trigger (`UnknownIconHint`), ringed
+   as the icon itself is. */
+.deck-icon-hint { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.deck-icon-hint:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
 /* The empty place is never drawn on the slide: the caret's box shows the icon handle instead, the ⋮'s and the +'s
    size, over its top edge at the right, in the handles' layer (`deck-block-icon`; the lead's follow-up to #773). It
    takes no room: the box, the slide's fit and the thumbnail stay as they are while the caret moves from box to box. */

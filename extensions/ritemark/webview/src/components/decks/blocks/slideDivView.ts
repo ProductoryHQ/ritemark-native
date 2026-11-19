@@ -12,15 +12,19 @@
  *  - **The Steps pill** is edited in place, like every other word on the slide. Emptying it hides the pill; while the
  *    caret is in an empty pill, "Exercise" shows faint as its placeholder. Settings' Label row brings it back. Its words
  *    are the block's `tag` (the stage's field over the pill, `handlers.editPill`; #752's rule in `setStepsTag`).
+ *
+ * #850 (Sprint 166 PR 9): a box whose `icon` names one Ritemark doesn't know draws the renderer's badge for it, the
+ * dashed circle (`boxIconBadge`), and pointing at it tells the stage (`handlers.hintIcon`), which shows the tooltip
+ * No icon named “xyz” with Choose an icon. The name stays in the file as written until another icon is chosen.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { iconSvg, isPageIconName } from '../slide/pageIcons'
-import { slideIcon } from '../slide/iconSet'
+import { boxIconBadge, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { iconSvg } from '../slide/pageIcons'
+import { boxIconOf } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
 import { divAttributesOf, revealWrappedList } from './blockBar'
 
@@ -30,6 +34,13 @@ export interface SlideDivHandlers {
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
   /** The Steps pill at `pos` was pressed: its words are typed in place, in the stage's field over `anchor`. */
   editPill: (pos: number, anchor: HTMLElement) => void
+  /** #850: the pointer came onto the badge of a box at `pos` whose icon `name` Ritemark doesn't know (its tooltip). */
+  hintIcon?: (pos: number, anchor: HTMLElement, name: string) => void
+}
+
+/** #850: the words a box's unknown icon says, in the stage's tooltip and to a screen reader. */
+export function unknownIconWords(name: string): string {
+  return `No icon named “${name}”`
 }
 
 /** The block's attributes, read from its opening line as written. */
@@ -97,7 +108,10 @@ class SlideDivView implements NodeView {
       this.contentDOM.className = 'blk-inner'
       this.dom.append(this.deco, this.contentDOM)
       if (this.kind === 'steps' && handlers) this.pill = this.makePill(handlers)
-      if (this.kind === 'box' && handlers) this.deco.addEventListener('click', this.onIconClick)
+      if (this.kind === 'box' && handlers) {
+        this.deco.addEventListener('click', this.onIconClick)
+        this.deco.addEventListener('mouseenter', this.onIconEnter)
+      }
     } else {
       this.deco = null
       this.contentDOM = this.dom
@@ -130,7 +144,16 @@ class SlideDivView implements NodeView {
     const pos = this.getPos()
     // Only an icon or its place: the Arrows look's arrow is drawn, never chosen (review of #769).
     if (pos === undefined || !this.handlers || !this.deco || this.deco.hidden || !this.deco.classList.contains('is-pickable')) return
-    this.handlers.pickIcon(pos, this.deco, slideIcon(attributesOf(this.node).values.icon)?.name ?? null)
+    // A name Ritemark doesn't know is the box's icon as written: No icon removes it (#850).
+    this.handlers.pickIcon(pos, this.deco, boxIconOf(attributesOf(this.node).values.icon)?.name ?? null)
+  }
+
+  /** #850: the pointer on an unknown icon's badge: the stage's tooltip says so, with Choose an icon. */
+  private onIconEnter = () => {
+    const pos = this.getPos()
+    const name = this.deco?.classList.contains('is-unknown') ? this.deco.getAttribute('data-icon') : null
+    if (pos === undefined || !this.deco || this.deco.hidden || !name) return
+    this.handlers?.hintIcon?.(pos, this.deco, name)
   }
 
   private render() {
@@ -173,17 +196,21 @@ class SlideDivView implements NodeView {
     }
     // A box: its icon, an arrow under the Arrows look, nothing under Steps and Line (they draw their own mark).
     const look = lookAround(this.getPos, this.doc)
-    const name = slideIcon(attrs.values.icon)?.phosphor
+    // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
+    const badge = boxIconBadge(attrs.values.icon)
+    deco.removeAttribute('data-icon')
     if (look === 'arrows') {
       deco.className = 'blk-mark'
       deco.innerHTML = iconSvg('arrow-right', 20)
       deco.hidden = false
       deco.removeAttribute('role')
-    } else if (!OWN_MARK_LOOKS.has(look) && name && isPageIconName(name)) {
-      deco.className = `blk-icon${this.handlers ? ' is-pickable' : ''}`
-      deco.innerHTML = iconSvg(name, 28)
+    } else if (!OWN_MARK_LOOKS.has(look) && badge) {
+      deco.className = `${badge.className}${this.handlers ? ' is-pickable' : ''}`
+      deco.innerHTML = badge.svg
       deco.hidden = false
-      this.pickable(deco, 'Change the icon')
+      // The unknown name, as written, for the stage's tooltip (`onIconEnter`).
+      if (badge.unknown !== null) deco.setAttribute('data-icon', badge.unknown)
+      this.pickable(deco, badge.unknown === null ? 'Change the icon' : `${unknownIconWords(badge.unknown)}: choose an icon`)
     } else if (!OWN_MARK_LOOKS.has(look) && this.handlers) {
       // A box with no icon shows a place for one, on the stage only (README frame 4).
       deco.className = 'blk-icon is-pickable is-place'

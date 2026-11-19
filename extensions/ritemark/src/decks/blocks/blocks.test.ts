@@ -28,6 +28,8 @@ import { PresentSession } from '../present/presentSession';
 import { presenterStateOf, wallPicturePaths, wallStateOf } from '../present/presentProtocol';
 import { partComments } from '../present/partComments';
 import { rebaseSlide, slideStamp, slideStamps, slidesOfText } from '../deckLibraryFormat';
+import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
+import { PAGE_ICON_PATHS, iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 
 let passed = 0;
 function test(name: string, run: () => void) {
@@ -189,6 +191,41 @@ test('the renderer draws no raw HTML, no comment, no link and no web picture', (
   const picture = blockSlideHtml('![A chart](images/a%20b.png)', { pictureUrl: path => `u/${path}` });
   assert.equal(picture, '<img class="blk-pic" src="u/images/a b.png" alt="A chart">\n');
   assert.deepEqual(blockPicturePaths('![](images/a%20b.png) ![](<images/c d.png>) ![](https://x/y.png) ![](/etc/z.png)'), ['images/a b.png', 'images/c d.png']);
+});
+
+test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the dashed circle (red on main: an empty place)', () => {
+  const dashed = PAGE_ICON_PATHS[UNKNOWN_ICON as keyof typeof PAGE_ICON_PATHS];
+  assert.ok(dashed, 'the page carries the dashed circle');
+  const boxes = (icon: string) => blockSlideHtml(`:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`);
+  // A name Ritemark doesn't know: the badge, in its usual place before the words, with the dashed circle.
+  for (const name of ['xyz', 'rocket-launch', 'Lightbulbs']) {
+    const html = boxes(name);
+    assert.ok(html.includes(`<div class="blk-box"><span class="blk-icon is-unknown">${iconSvg(UNKNOWN_ICON as PageIconName, 28)}</span><h3>Idea</h3>`), `${name}: ${html}`);
+    assert.ok(!html.includes(name), `${name}: the unknown name itself is never drawn`);
+  }
+  // A known name, and another name for it, are drawn as before.
+  assert.ok(boxes('lightbulb').includes(`<span class="blk-icon">${iconSvg('lightbulb', 28)}</span>`));
+  assert.ok(boxes(' Chat ').includes(`<span class="blk-icon">${iconSvg('chat-text', 28)}</span>`));
+  for (const name of ['lightbulb', 'chat']) assert.ok(!boxes(name).includes('is-unknown') && !boxes(name).includes(dashed), name);
+  // No icon, or an empty one: no badge at all.
+  assert.ok(!blockSlideHtml(':::: boxes\n::: box\n### Idea\n:::\n::::').includes('blk-icon'));
+  assert.ok(!boxes('').includes('blk-icon') && !boxes('  ').includes('blk-icon'));
+  // Looks that draw their own mark draw no icon, known or not; Arrows draws its arrow.
+  for (const look of ['steps', 'line']) assert.ok(!blockSlideHtml(`:::: {.boxes look="${look}"}\n::: {.box icon="xyz"}\nA\n:::\n::::`).includes('blk-icon'), look);
+  assert.ok(!blockSlideHtml(':::: {.boxes look="arrows"}\n::: {.box icon="xyz"}\nA\n:::\n::::').includes('is-unknown'));
+  // The look: the badge's place, size and soft accent ground as every icon's; the dashed circle in the placeholder colour, on a card and borderless.
+  const css = fs.readFileSync(path.join(__dirname, '../../../webview/src/components/decks/slide/slide.css'), 'utf8').replace(/\s+/g, ' ');
+  assert.ok(css.includes('.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }'), 'the placeholder colour');
+  assert.ok(css.includes('.deck-slide.is-borderless .deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }'), 'borderless too');
+  assert.ok(!/\.blk-icon\.is-unknown \{[^}]*(background|width|height|margin)/.test(css), 'its ground, size and place are the badge\'s own');
+  // The wall and the presenter view get the slide as written (the name too) and draw it with the same renderer.
+  const deck = '---\ndeck: 2\n---\n\n```slide\n---\nid: u1\n---\n# Parts\n\n:::: boxes\n::: {.box icon="xyz"}\n### Idea\n:::\n::::\n```\n';
+  const view = new PresentSession(deck, { from: 'start' }).view();
+  const [slide] = wallStateOf(view, { borderless: false, theme: BUILT_IN_THEME }, {}).slides;
+  assert.ok(slide.data.markdown?.includes('::: {.box icon="xyz"}'), 'the name as written');
+  for (const borderless of [false, true]) {
+    assert.ok(blockSlideMarkup(slide.data, { theme: BUILT_IN_THEME, borderless }).includes('<span class="blk-icon is-unknown">'), `the wall, borderless ${borderless}`);
+  }
 });
 
 test('the cover look and the fit', () => {

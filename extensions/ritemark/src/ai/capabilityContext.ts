@@ -23,6 +23,17 @@
 import type { AgentId } from '../agent/types';
 import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
 import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+
+/**
+ * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with, so an AI never
+ * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Today's 24 and the other names drawn
+ * as them; every Phosphor name once the icon search lands (Sprint 169).
+ */
+function iconLine(): string {
+  const list = (names: readonly string[]) => names.map((name) => `\`${name}\``).join(', ');
+  return `- A box's \`icon\` is one of these names: ${list(SLIDE_ICON_NAMES)}; these are read as one of them too: ${list(SLIDE_ICON_ALIASES)}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+}
 
 /**
  * Sprint 162 PR 5: the DECKS lines on themes. The folder, the fonts and the ratios come from the theme reader's own
@@ -185,6 +196,7 @@ const SECTIONS: CapabilitySection[] = [
             // Sprint 161 (PR 2): block slides, written like text (the Pandoc and Quarto `:::` blocks for columns, boxes and steps)
             '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `) and a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: images/x.png`); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](images/x.png)`). Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
             '- A slide\'s blocks are Pandoc\'s fenced divs, each closed by a line of as many colons as opened it: `:::: columns` holding two or three `::: column` (each with a `### ` heading and its lines); `:::: boxes` (or `:::: {.boxes look="steps"}`, `"arrows"`, `"line"`) holding `::: box` or `::: {.box icon="lightbulb"}`; and `::: steps` around a numbered list, the pill above it saying "Exercise" (`::: {.steps tag="Harjutus"}` for other words, `tag=""` for none). Write `tag` only when the user wants other words or none.',
+            iconLine(),
             // Sprint 163 PR 5 (the decks README: the workbook, Tabs in the editor, the Button block, an exercise's layout)
             '- A prompt to copy goes in a code block with no language (```` ``` ```` alone), so it gets Copy and ↗ Open in; write each place to fill in in square brackets, `[the client\'s name]`. A slide holding a code block opens and closes with four backticks, ```` ````slide ````, so the code block\'s own ```` ``` ```` never ends the slide. Prompts done in order go in Tabs: `::: {.panel-tabset}` with a `## ` heading per tab and its pane under it; "put these four prompts in tabs" means one Tabs block, a tab per prompt. Never put Tabs inside Tabs, a box, a step or a table cell.',
             '- Material (a sample, a form, the emails) is a Button: a paragraph `[Open the sample](https://…){.button}`, any words beside it before the link. Only a full https address where the file already is (SharePoint, Drive); never copy a file into the project for it.',

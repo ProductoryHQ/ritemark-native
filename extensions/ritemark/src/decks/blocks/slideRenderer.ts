@@ -18,7 +18,7 @@ import { EXERCISE_TAG, isBlockSlide, sidePictureOf, type SlideData } from '../de
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
-import { slideIcon } from '../../../webview/src/components/decks/slide/iconSet';
+import { boxIconOf } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
@@ -60,6 +60,17 @@ export function picturePathOf(href: string): string {
   }
 }
 
+/**
+ * A box's icon badge, as every view draws it (the strip, the wall, the presenter view, the page and, through
+ * `slideDivView`, the stage): its icon, or for a name Ritemark doesn't know (#850) the dashed circle, `is-unknown`, which
+ * slide.css draws in the theme's placeholder colour on the badge's usual ground. `unknown` is that name as written; null
+ * when the box names no icon.
+ */
+export function boxIconBadge(name: string | undefined): { className: string; svg: string; unknown: string | null } | null {
+  const icon = boxIconOf(name);
+  if (!icon || !isPageIconName(icon.phosphor)) return null;
+  return { className: icon.known ? 'blk-icon' : 'blk-icon is-unknown', svg: iconSvg(icon.phosphor, 28), unknown: icon.known ? null : icon.name };
+}
 
 interface SlideDivToken {
   type: 'slideDiv';
@@ -269,8 +280,8 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       let mark = '';
       if (look === 'arrows') mark = `<span class="blk-mark">${iconSvg('arrow-right', 20)}</span>`;
       else if (!OWN_MARK_LOOKS.has(look)) {
-        const name = slideIcon(token.attrs.values.icon)?.phosphor;
-        if (name && isPageIconName(name)) mark = `<span class="blk-icon">${iconSvg(name, 28)}</span>`;
+        const badge = boxIconBadge(token.attrs.values.icon);
+        if (badge) mark = `<span class="${badge.className}">${badge.svg}</span>`;
       }
       return `<div class="blk-box"${item}>${mark}${within()}</div>\n`;
     }
