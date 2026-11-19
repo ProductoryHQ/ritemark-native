@@ -8,7 +8,7 @@
  * and "also in N older decks"; a tick on a thumbnail says its copy is already in the open deck (the host works out
  * both, `librarySearch.ts`).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
@@ -120,6 +120,15 @@ function DeckRow({ name, meta, expanded, onToggle }: { name: string; meta: strin
       </button>
     </Tooltip>
   )
+}
+
+/** The tick's tooltip, only on a tile that has the tick: hundreds of tiles mount no tooltip they never show. */
+function TickTip({ on, children }: { on: boolean; children: ReactElement }) {
+  return on ? (
+    <Tooltip label="Already in the open deck" side="bottom" hoverOnly className="flex min-w-0">
+      {children}
+    </Tooltip>
+  ) : children
 }
 
 export function SlideLibraryPanel() {
@@ -239,7 +248,9 @@ export function SlideLibraryPanel() {
     const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
     const hit = options.hit
     const spoken = [hit?.place, hit?.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
-    const trigger = (
+    return (
+      <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
+        <TickTip on={inOpenDeck}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
@@ -261,15 +272,7 @@ export function SlideLibraryPanel() {
               {hit?.meta ? <span className="deck-lib-also">{hit.meta}</span> : null}
             </button>
           </DropdownMenuTrigger>
-    )
-    return (
-      <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
-        {/* The tick's tooltip, on the tiles that have one: hundreds of tiles mount no tooltip they never show. */}
-        {inOpenDeck ? (
-          <Tooltip label="Already in the open deck" side="bottom" hoverOnly className="flex min-w-0">
-            {trigger}
-          </Tooltip>
-        ) : trigger}
+        </TickTip>
         <DropdownMenuContent align="start" className="deck-lib-menu">
           <div className="deck-lib-menu-head">{title}</div>
           {hit ? <div className="deck-lib-menu-place">{[hit.place, hit.also].filter(Boolean).join(' · ')}</div> : null}
