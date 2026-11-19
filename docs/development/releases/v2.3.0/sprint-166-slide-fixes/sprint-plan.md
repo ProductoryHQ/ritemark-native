@@ -1,16 +1,16 @@
-# Sprint 166: Two slide editor fixes from Jarmo's 19 November test
+# Sprint 166: Slide fixes from Jarmo's 19 November test and the spacing review
 
 Release tier: extension
 
-Track: Lightweight (two bug fixes, one PR each, no new dependency). Decks stays behind `ritemark.features.decks`, so no new flag.
+Track: Lightweight (small bug fixes, one PR each, no new dependency). Decks stays behind `ritemark.features.decks`, so no new flag.
 
-Branch: `sprint-166-slide-fixes` (this plan); the fixes on `sprint-166-slide-fixes-pr1` and `sprint-166-slide-fixes-pr2`.
+Branch: `sprint-166-slide-fixes` (this plan); the fixes on `sprint-166-slide-fixes-pr1` to `-pr4`.
 
 Status: plan waiting for Jarmo's approval.
 
 ## Goal
 
-On a block slide, the formatting bubble's buttons change the selected text; and in Slide only, the wheel, the trackpad and the keys move between slides, as designed on 16 November.
+On a block slide, the formatting bubble's buttons change the selected text; in Slide only, the wheel, the trackpad and the keys move between slides, as designed on 16 November; a table looks the same in the editor as on the wall and its frame hugs it on the page; and the column split's guide sits in the middle of the gap.
 
 ## Fix 1: the formatting bubble (PR 1, issue #822)
 
@@ -36,13 +36,28 @@ Seen on main: the full-slide wheel effect in `extensions/ritemark/webview/src/co
 - [ ] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
 - [ ] Typing, selecting and scrolling inside the words still behave as before.
 
-**Order:** PR 2 starts after Sprint 164 PR 1 (#819) merges, because both change `DeckView.tsx`. PR 1 can start at once.
+**Order:** PR 1, PR 3 and PR 4 can start at once; PR 4 changes `SlideBlockBar.tsx`, so it waits if Sprint 164 PR 3 (the Label block) is changing the same lines. PR 2 starts after Sprint 164 PR 1 (#819) merges, because both change `DeckView.tsx`.
+
+## Fix 3: tables look the same everywhere (PR 3, issues #827 and #828)
+
+Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 November.
+
+- [#827](https://github.com/ProductoryHQ/ritemark-native/issues/827): for the same content the editor draws a table's rows about 56–58 slide px tall and the wall about 42 (the wall is right), so an editor column holds more and scrolls. The design says the slide being edited looks as its thumbnail does. Likely the cells' paragraphs or the editor's td borders.
+- [#828](https://github.com/ProductoryHQ/ritemark-native/issues/828): on the published page at 720 px the table's bordered frame takes the full width while the table stops at about a quarter of it. The frame hugs the table: its own width up to the column's, and only then does it scroll inside, with the fade. Check whether it predates #821 (the wrapper likely comes from #780).
+- [ ] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
+- [ ] Shots of the same table in the editor, on the wall and on the 720 px page.
+
+## Fix 4: the split's drag guide (PR 4, issue #829)
+
+[#829](https://github.com/ProductoryHQ/ritemark-native/issues/829): with the 32 px gap, the drag guide at the ⅓ and ⅔ snap points sits about 5 px off the middle of the gap. It goes to the middle, as the handle already is.
+- [ ] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
+
 
 ## For both PRs
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822` and `Closes #824`.
+- `Closes #822`, `#824`, `#827` with `#828`, and `#829`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 
