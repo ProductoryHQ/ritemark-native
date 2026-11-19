@@ -29,6 +29,7 @@ import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, LABEL_KEYWO
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
 import { canHoldTabs } from '../../../extensions/tabs/tabsCommands'
+import { tabsLevelOf } from '../../../extensions/tabs/tabsMarkdown'
 
 /** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own (`blockPlacement`). */
 export { SLIDE_COMMAND }
@@ -41,10 +42,11 @@ export function isOwnStep(tr: Transaction): boolean {
 /** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows and its hidden search words (18 November). */
 export const SLIDE_ITEMS: BlockItemDef[] = [
   // Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide"): the Text editor's names and
-  // order, H1 > H2 > H3; the old Title and Heading are Heading 1 and Heading 2, found by their old words too.
+  // order, H1 > H2 > H3; the old Title and Heading are Heading 1 and Heading 2, found by their old words too. "heading"
+  // is Heading 3's word: typed whole, it puts Heading 3 first, so /heading never makes a second title.
   { group: 'Text', title: 'Heading 1', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['title', 'h1', 'pealkiri'] },
   { group: 'Text', title: 'Heading 2', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['subtitle', 'subheading', 'h2', 'alapealkiri'] },
-  { group: 'Text', title: 'Heading 3', description: '', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, shortcut: '###', keywords: ['heading', 'h3'] },
+  { group: 'Text', title: 'Heading 3', description: '', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, shortcut: '###', keywords: ['heading', 'h3'], firstFor: ['heading'] },
   { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: BULLET_LIST_KEYWORDS },
   { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: NUMBERED_LIST_KEYWORDS },
   // Sprint 163 PR 1: prompts live on the slide, each in a code block with its own Copy (the decks README).
@@ -72,15 +74,19 @@ const NOT_IN_A_PANE = new Set(['agenda', 'newSlideBelow', 'splitSlide', 'tabs'])
 
 /**
  * Sprint 163: the slide's / menu where the caret is. In a tab's pane, never Tabs, Heading 1 (the title) or the slide's
- * own items; in a box, Steps or a table cell, never Tabs (`canHoldTabs`).
+ * own items; in a box, Steps or a table cell, never Tabs (`canHoldTabs`). Sprint 168 PR 3: nor, in a pane, the heading
+ * at the tabs' own level, which the pane keeps one level under them (`tabsMarkdown`'s pane headings): under `##` tabs,
+ * Heading 2 would come out as Heading 3, the item after it.
  */
 export function slideItemsAt(state: EditorState): BlockItemDef[] {
-  const inPane = (() => {
+  const tabsLevel = (() => {
     const $from = state.selection.$from
-    for (let depth = $from.depth; depth > 0; depth--) if ($from.node(depth).type.name === 'tabPane') return true
-    return false
+    for (let depth = $from.depth; depth > 1; depth--) if ($from.node(depth).type.name === 'tabPane') return tabsLevelOf($from.node(depth - 1))
+    return null
   })()
-  if (inPane) return SLIDE_ITEMS.filter(item => !NOT_IN_A_PANE.has(item.nodeType) && !(item.nodeType === 'heading' && item.attrs?.level === 1))
+  if (tabsLevel !== null) {
+    return SLIDE_ITEMS.filter(item => !NOT_IN_A_PANE.has(item.nodeType) && !(item.nodeType === 'heading' && (item.attrs?.level === 1 || item.attrs?.level === tabsLevel)))
+  }
   return canHoldTabs(state) ? SLIDE_ITEMS : SLIDE_ITEMS.filter(item => item.nodeType !== 'tabs')
 }
 

@@ -540,9 +540,18 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   let paneText = -1
   inPane.doc.descendants((node, pos) => { if (paneText < 0 && node.type.name === 'paragraph') paneText = pos + 1; return paneText < 0 })
   assert.ok(slideItemsAt(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))).some(item => item.nodeType === 'label'), 'offered in a tab\'s pane')
-  // Sprint 168 PR 3: a tab's pane offers Heading 2 and Heading 3, never Heading 1 (the slide's title); the slide all three.
+  // Sprint 168 PR 3: a tab's pane never offers Heading 1 (the slide's title), nor the heading at the tabs' own level, which
+  // the pane keeps one level under them (under `##` tabs, Heading 2 would come out as Heading 3); the slide all three.
   const headingsIn = (state: EditorState) => slideItemsAt(state).filter(item => item.nodeType === 'heading').map(item => item.title)
-  assert.deepEqual(headingsIn(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))), ['Heading 2', 'Heading 3'])
+  const caretInPane = (markdown: string) => {
+    const state = EditorState.create({ doc: loadSlide(markdown) })
+    let at = -1
+    state.doc.descendants((node, pos) => { if (at < 0 && node.type.name === 'paragraph') at = pos + 1; return at < 0 })
+    return state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)))
+  }
+  assert.deepEqual(headingsIn(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))), ['Heading 3'], 'under ## tabs')
+  assert.deepEqual(headingsIn(caretInPane('::: {.panel-tabset}\n# One\n\nWords\n:::')), ['Heading 2', 'Heading 3'], 'under # tabs')
+  assert.deepEqual(headingsIn(caretInPane('::: {.panel-tabset}\n### One\n\nWords\n:::')), ['Heading 2'], 'under ### tabs')
   assert.deepEqual(headingsIn(EditorState.create({ doc: loadSlide('# A slide\n\nWords') })), ['Heading 1', 'Heading 2', 'Heading 3'])
 }
 

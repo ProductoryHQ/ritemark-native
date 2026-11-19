@@ -6,7 +6,7 @@
  * The sizes are computed, not read off one rule: a small cascade takes every rule of slide.css (the one sheet the stage,
  * the strip, the wall, the presenter view and the page draw with) and decks.css (the stage's own), matches them against
  * a slide's elements by selector, specificity and order, and inherits and resolves the em sizes from the flow's 24 px
- * times the fit. Then a realistic slide with two H2s in its middle goes through the fit (`fitFlow`, the one measure of
+ * times the fit. Then a realistic slide with three H2s in its middle goes through the fit (`fitFlow`, the one measure of
  * every view), laid out by a model whose heights come from those computed sizes. Run with `npx tsx`.
  */
 import { strict as assert } from 'node:assert'
@@ -22,8 +22,13 @@ const sheet = (name: string) => readFileSync(new URL(name, import.meta.url), 'ut
 
 // ---- A small cascade -------------------------------------------------------------------------------------------------
 
-interface El { tag: string; classes: string[]; parent?: El; prev?: El }
-const el = (tag: string, classes: string[], parent?: El, prev?: El): El => ({ tag, classes, parent, prev })
+interface El { tag: string; classes: string[]; parent?: El; prev?: El; next?: El; kids: El[] }
+function el(tag: string, classes: string[], parent?: El, prev?: El): El {
+  const made: El = { tag, classes, parent, prev, kids: [] }
+  if (prev) prev.next = made
+  parent?.kids.push(made)
+  return made
+}
 
 interface Decl { property: string; value: string; specificity: number; order: number }
 type Spec = [number, number, number]
@@ -94,15 +99,41 @@ function specificityOf(selector: string): Spec {
   return spec
 }
 
-/** Does one compound match the element? Unknown pseudo-classes (`:has`, `:hover`) and pseudo-elements never do. */
+/** The pseudo-classes this cascade evaluates; a heading's rule with any other is listed (`UNREAD`, under). */
+const READ_PSEUDO = /^:(is|where|not|has)\(|^:(first|last)-child$/
+const UNREAD: string[] = []
+
+/** `:has()`'s relative selector (`+ h2`, `~ p`, `> h3`, `h3`) from `anchor`, forwards. */
+function hasRelative(anchor: El, relative: string): boolean {
+  const lead = /^([+~>])\s*(.*)$/.exec(relative.trim())
+  const { compounds, combinators } = parts(lead ? lead[2] : relative)
+  const after = (from: El, combinator: string): El[] => {
+    if (combinator === '+') return from.next ? [from.next] : []
+    if (combinator === '~') { const out: El[] = []; for (let at = from.next; at; at = at.next) out.push(at); return out }
+    if (combinator === '>') return from.kids
+    const out: El[] = []
+    const walk = (node: El) => node.kids.forEach(kid => { out.push(kid); walk(kid) })
+    walk(from)
+    return out
+  }
+  const on = (from: El, combinator: string, index: number): boolean =>
+    after(from, combinator).some(next => matchesCompound(next, compounds[index]) && (index === compounds.length - 1 || on(next, combinators[index], index + 1)))
+  return on(anchor, lead ? lead[1] : ' ', 0)
+}
+
+/** Does one compound match the element? Pseudo-elements and the pseudo-classes it doesn't evaluate never do. */
 function matchesCompound(element: El, compound: string): boolean {
   for (const simple of simples(compound)) {
-    const inner = /^:(is|where|not)\((.*)\)$/.exec(simple)
-    if (inner) {
+    const inner = /^:(is|where|not|has)\((.*)\)$/.exec(simple)
+    if (inner && inner[1] === 'has') {
+      if (!splitTop(inner[2], ',').some(relative => hasRelative(element, relative))) return false
+    } else if (inner) {
       const any = splitTop(inner[2], ',').some(selector => matches(element, selector))
       if (inner[1] === 'not' ? any : !any) return false
     } else if (simple === ':first-child') {
       if (element.prev) return false
+    } else if (simple === ':last-child') {
+      if (element.next) return false
     } else if (simple.startsWith(':') || simple.startsWith('[')) return false
     else if (simple.startsWith('.')) {
       if (!element.classes.includes(simple.slice(1))) return false
@@ -214,6 +245,31 @@ const decksCss = sheet('../decks.css')
 const drawn = cascade(rulesOf(slideCss))
 const stage = cascade(rulesOf(slideCss, decksCss))
 
+// The heading rules this cascade can't evaluate: a heading as the subject (not its ::before), setting what this test
+// reads, with a pseudo-class it doesn't read (`:hover`, `nth-child(… of …)`) or an attribute. Each such rule must be
+// listed in `UNREAD` by name (there are none today), so a new one fails here until it is looked at, never skipped unseen.
+{
+  const READS = new Set(['font-weight', 'font-size', 'line-height', 'color', 'margin-top', 'margin-bottom'])
+  const unreadable = (selector: string): boolean => parts(selector).compounds.some(compound => simples(compound).some(simple => {
+    if (/^:(is|where|not|has)\(/.test(simple)) return splitTop(simple.slice(simple.indexOf('(') + 1, -1), ',').some(inner => unreadable(inner.replace(/^[+~>]\s*/, '')))
+    return (simple.startsWith(':') && !READ_PSEUDO.test(simple)) || simple.startsWith('[')
+  }))
+  const unreadHeadingRules = (...texts: string[]) => rulesOf(...texts)
+    .filter(rule => rule.decls.some(([name]) => READS.has(name)))
+    .flatMap(rule => rule.selectors)
+    .filter(selector => {
+      // The subject: the last compound, without what :has() and :not() only look at.
+      const subject = (parts(selector).compounds.pop() ?? '').replace(/:(has|not)\((?:[^()]|\([^()]*\))*\)/g, '')
+      return !selector.includes('::') && /(^|[\s>+~(,])h[1-3]\b/.test(subject) && unreadable(selector)
+    })
+  assert.deepEqual(unreadHeadingRules(slideCss, decksCss), UNREAD, 'a heading rule this test cannot evaluate: look at it, then list it here')
+  // It would see one: a state, an attribute, nth-child's `of`; not a ::before, nor a rule on another element.
+  assert.deepEqual(
+    unreadHeadingRules('.deck-sl.is-blocks h2:hover { color: red; } .deck-sl.is-blocks :is(h1, h3)[data-x] { font-size: 3em; } .x h2:nth-child(1 of p) { margin-bottom: 0; } .x h2::before { color: red; } .x p:hover:has(+ h2) { color: red; }'),
+    ['.deck-sl.is-blocks h2:hover', '.deck-sl.is-blocks :is(h1, h3)[data-x]', '.x h2:nth-child(1 of p)'],
+  )
+}
+
 /** A block slide's flow, as the renderer (or, `editing`, the stage) draws it, Card or Borderless. */
 function flowOf(options: { borderless?: boolean; editing?: boolean } = {}): El {
   const frame = el('div', options.borderless ? ['deck-slide', 'is-borderless'] : ['deck-slide'])
@@ -254,6 +310,7 @@ for (const borderless of [false, true]) {
   // The H2's lines and room: 1.3 of its size, and .7 of it under it; the title's line keeps the title close (.12 em).
   near(two.lineHeight, 31.2 * 1.3, `${look}: the H2's line height`)
   near(two.marginBottom, 31.2 * 0.7, `${look}: the H2's room under it`)
+  near(one.marginBottom, 48 * 0.12, `${look}: the title keeps its line close (h1:has(+ h2))`)
 }
 
 // The title's line only right under the title: after words, or with a Label between, an H2 is a heading.
@@ -273,6 +330,7 @@ for (const borderless of [false, true]) {
     const elements = children(flowOf({ borderless, editing: true }), ...specs)
     const line = elements[elements.length - 1]
     const look = stage.computed(line)
+    near(stage.computed(elements[0]).marginBottom, 48 * 0.12, `${notes} note(s): the title keeps its line close`)
     assert.equal(look.weight, 500, `${notes} note(s): weight 500`)
     assert.equal(look.color, borderless ? 'var(--s-sub, #5B5F86)' : 'var(--s-sub, #C7CAEB)', `${notes} note(s): the sub colour`)
     near(look.size, 31.2, `${notes} note(s): the H2's size`)
@@ -386,9 +444,9 @@ function modelFlow(blocks: Block[], oldH2: boolean) {
   assert.ok(step > 0, 'the fit steps the words down')
   assert.equal(full, false, 'and the slide is not full')
   assert.ok(after.content() <= 460, `nothing past the bottom at ${BLOCK_FIT_STEPS[step]} (${after.content().toFixed(1)} px)`)
-  // The step found is the biggest that fits: one up would run past the bottom again.
+  // The step found is the biggest that fits: one up runs past the bottom.
   after.style.setProperty('--fit', String(BLOCK_FIT_STEPS[step - 1]))
-  assert.ok(after.content() > 460 * 0.97, 'the step above does not fit')
+  assert.ok(after.content() > 460, `the step above does not fit (${after.content().toFixed(1)} px)`)
 }
 
 console.log('slideHeadings: passed')
