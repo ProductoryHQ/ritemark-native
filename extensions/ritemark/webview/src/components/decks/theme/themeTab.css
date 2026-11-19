@@ -105,6 +105,8 @@ body.vscode-dark .theme-tab .theme-bar .theme-not-saved, body.vscode-high-contra
 
 .theme-seg { display: inline-flex; }
 .theme-seg-control { min-width: 0; }
+/* Sprint 167 PR 1: the logo's Where as two segments side by side, Top | Bottom and Left | Right. */
+.theme-seg-pair { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 
 /* Sprint 162 PR 3: a font row's choice, as wide as the Corners row's control (both end at the column's edge); each font named in its own face. */
 .theme-font-select { width: 158px; flex: none; }

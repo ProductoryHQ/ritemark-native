@@ -826,18 +826,21 @@ export function logoDrop(): number {
   return LOGO_HEIGHT + LOGO_GAP;
 }
 
+const LOGO_ROOM_CLASS: Record<Exclude<LogoPlace, 'top-right'>, string> = { 'top-left': 'logo-tl', 'bottom-left': 'logo-bl', 'bottom-right': 'logo-br' };
+
 /**
  * The canvas's class and style for the room the logo keeps on this slide ("never touch", the Experience lead, step-3-themes.md,
  * 18 November), only on a slide that shows it; the fit then makes the room:
  *  - top right (`.logo-tr`): the first block ends the logo's width and 16 px short of it, on every slide but a title
  *    slide (its words sit low);
  *  - top left (`.logo-tl`): the words start lower by the logo's height and 12 px (38 px), so every line keeps its left edge;
- *  - bottom right (`.logo-br`): the words end higher by the same.
+ *  - bottom right (`.logo-br`) or bottom left (`.logo-bl`, Sprint 167 PR 1): the words end higher by the same, so a
+ *    title slide's low words never run under it.
  */
 export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
   if (!drawsLogo(logo, cover)) return { cls: '', style: {} };
   if (logo.place === 'top-right') return cover ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
-  return { cls: logo.place === 'top-left' ? 'logo-tl' : 'logo-br', style: { '--logo-drop': `${logoDrop()}px` } };
+  return { cls: LOGO_ROOM_CLASS[logo.place], style: { '--logo-drop': `${logoDrop()}px` } };
 }
 
 /**

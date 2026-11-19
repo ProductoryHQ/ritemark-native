@@ -55,8 +55,11 @@ export interface DeckTheme {
 /** A slide's ground, for its logo: dark or light. */
 export type LogoGround = 'dark' | 'light';
 
-/** Sprint 162 PR 4 (step-3-themes.md, "Logo"): top left, top right or bottom right, of the slide's 16:9 area. */
-export type LogoPlace = 'top-left' | 'top-right' | 'bottom-right';
+/**
+ * Sprint 162 PR 4 (step-3-themes.md, "Logo"): a corner of the slide's 16:9 area. Sprint 167 PR 1 adds bottom left, so
+ * all four corners can be chosen; a theme file written before keeps its value and reads as it did.
+ */
+export type LogoPlace = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 /** On every slide, or on the title slides only (a slide drawn big and low: its title alone, `isCoverSlide`). */
 export type LogoOn = 'every-slide' | 'title-slides';
 
@@ -150,7 +153,13 @@ export function themeWithLogoAddresses(theme: DeckTheme, logo: unknown, aspect?:
   return out;
 }
 
-export const LOGO_PLACES: readonly LogoPlace[] = ['top-left', 'top-right', 'bottom-right'];
+export const LOGO_PLACES: readonly LogoPlace[] = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+/** A corner as its two halves, for the theme editor's Top | Bottom and Left | Right (Sprint 167 PR 1). */
+export type LogoEdge = 'top' | 'bottom';
+export type LogoSide = 'left' | 'right';
+export function logoEdgeOf(place: LogoPlace): LogoEdge { return place.startsWith('bottom') ? 'bottom' : 'top'; }
+export function logoSideOf(place: LogoPlace): LogoSide { return place.endsWith('left') ? 'left' : 'right'; }
+export function logoPlaceOf(edge: LogoEdge, side: LogoSide): LogoPlace { return `${edge}-${side}`; }
 export const LOGO_ONS: readonly LogoOn[] = ['every-slide', 'title-slides'];
 /** The prototype's defaults: top right, on every slide. */
 export const DEFAULT_LOGO_PLACE: LogoPlace = 'top-right';

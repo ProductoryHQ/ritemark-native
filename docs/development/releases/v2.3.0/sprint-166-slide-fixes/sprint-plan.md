@@ -67,11 +67,21 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
 - [ ] A test, and one shot with the Link dialog open.
 
+## Added on 19 November, second time (Jarmo: "jah, lisa mõlemad sprinti 166")
+
+### Fix 8: a Button's own words (PR 8, issue #848)
+[#848](https://github.com/ProductoryHQ/ritemark-native/issues/848): the button's words can't be typed into, or nothing shows they can. The design (decks README, Button, Editing) says a click chooses the block and then its words and the words beside it are typed in place. Likely cause, not proven: with no words the pill's editable span has no width (the placeholder is a CSS `::before` with `pointer-events: none` beside a `contenteditable=false` icon), so the caret can't get in; or the open Address sheet keeps the focus. A live check first; if it works and is only undiscoverable, it goes back to the Experience lead as UX.
+- [ ] A test that fails before; shots of an empty and a filled button being typed into.
+
+### Fix 9: an unknown icon name (PR 9, issue #850)
+[#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
+- [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+
 ## For every PR
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842` and `#846`, one per PR.
+- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848` and `#850`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 

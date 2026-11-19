@@ -56,6 +56,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
+- **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
 <!-- DECKS END -->
 
 ## Smaller changes
