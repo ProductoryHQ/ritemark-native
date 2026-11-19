@@ -44,8 +44,6 @@ export interface SlideBlockBarProps {
   theme: DeckTheme
   /** Run a change on the slide's editor (written to the deck as an undo step of its own). */
   apply: (tr: Transaction | null) => boolean
-  /** A new Steps block's label: the deck's last (as the / menu's Steps). */
-  stepsLabel: () => string | null
   /** The icon handle was pressed: open the grid of icons for the box at `pos`, under `anchor` (as a click on an icon). */
   pickIcon?: (pos: number, anchor: HTMLElement, current: string | null) => void
 }
@@ -173,7 +171,7 @@ function SmilePlusGlyph() {
   )
 }
 
-export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIcon }: SlideBlockBarProps) {
+export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
@@ -531,7 +529,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
                     <DropdownMenuItem
                       key={kind}
                       className="gap-2"
-                      onSelect={() => { if (kind !== chosen.kind) apply(act(pos => turnInto(editor.state, pos, kind, kind === 'steps' ? stepsLabel() : null))) }}
+                      onSelect={() => { if (kind !== chosen.kind) apply(act(pos => turnInto(editor.state, pos, kind))) }}
                     >
                       <Icon name={KIND_ICON[kind]} size={16} tone="inherit" />
                       <span className="flex-1">{BAR_KIND_LABEL[kind]}</span>

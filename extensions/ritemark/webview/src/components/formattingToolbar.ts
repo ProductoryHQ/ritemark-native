@@ -22,7 +22,14 @@ export function formattingToolbarShows(input: {
   editorHasFocus: boolean
   /** The focus is inside the toolbar itself. */
   focusInToolbar: boolean
+  /**
+   * #846: the toolbar's Link dialog is open. On a slide the toolbar lives in the app's root (`bubbleHost`), above the
+   * dialog's overlay, and drew over the dialog; in the Text editor it stayed up behind the overlay. It steps aside
+   * until the dialog closes, when the editor's focus comes back and TipTap checks again.
+   */
+  linkDialogOpen?: boolean
 }): boolean {
+  if (input.linkDialogOpen) return false
   if (!input.editorHasFocus && !input.focusInToolbar) return false
   if (input.empty) return false
   if (input.inCodeBlock) return false

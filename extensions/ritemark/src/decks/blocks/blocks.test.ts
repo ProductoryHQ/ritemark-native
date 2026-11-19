@@ -1,7 +1,7 @@
 /**
  * Sprint 161, PR 1: block slides read and drawn, nothing written.
  *  - format v2: a bare `slide` fence, its optional header, `deck: 2`, the header-only writer;
- *  - `legacyToBlocks`: every v1 kind as blocks, "1. 1." numbers, `tag:` into Steps, hidden words and old notes as one
+ *  - `legacyToBlocks`: every v1 kind as blocks, "1. 1." numbers, `tag:` as a Label (Sprint 164), hidden words and old notes as one
  *    comment with `-->` made harmless;
  *  - the one renderer: its escaping, raw HTML and comments never drawn, no link or web picture, a picture alone a block;
  *  - privacy: a test word in every private place of a block deck and a mixed deck reaches neither the page, its digest,
@@ -18,7 +18,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { isBlockSlide, parseDeck, slideDataOf, splitBlockSlide, writeSlideData, isReadableDeckVersion, blockTitleOf, withWrittenHandout } from '../deckFormat';
 import { DeckLibrary } from '../DeckLibrary';
 import { conversionComment, legacyToBlocks, withoutItemNumber } from './legacyToBlocks';
-import { blockPicturePaths, blockSlideHtml, blockSlideMarkup, isCoverSlide, stepsTagOf } from './slideRenderer';
+import { blockPicturePaths, blockSlideHtml, blockSlideMarkup, isCoverSlide } from './slideRenderer';
 import { parseFenceAttributes, scanFencedDiv } from './fencedDiv';
 import { deckDigest, publicDeck } from '../page/publicDeck';
 import { pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from '../page/pageHtml';
@@ -141,17 +141,19 @@ test('"1. 1.": the number that repeats the item\'s place goes; any other is esca
   assert.equal(withoutItemNumber('1. Sisend', 1), 'Sisend');
   assert.equal(withoutItemNumber('3. Sisend', 1), '3. Sisend');
   assert.equal(legacyToBlocks('points', 'title: T\nitems:\n- heading: "1. Sisend"\n- heading: "2. Väljund"\n- heading: "7. Seven"').markdown, '# T\n\n1. Sisend\n2. Väljund\n3. 7\\. Seven');
-  assert.equal(legacyToBlocks('exercise', 'title: T\nitems:\n- heading: "1. Open"').markdown, '# T\n\n::: steps\n1. Open\n:::');
+  assert.equal(legacyToBlocks('exercise', 'title: T\nitems:\n- heading: "1. Open"').markdown, '[Exercise]{.label}\n\n# T\n\n::: steps\n1. Open\n:::');
 });
 
-test('tag: carries into Steps; tag: "" is an empty pill; no tag: the default', () => {
-  assert.equal(legacyToBlocks('exercise', 'title: T\ntag: Harjutus\nitems:\n- heading: Open').markdown, '# T\n\n::: {.steps tag="Harjutus"}\n1. Open\n:::');
-  assert.equal(legacyToBlocks('exercise', 'title: T\ntag: ""\nitems:\n- heading: Open').markdown, '# T\n\n::: {.steps tag=""}\n1. Open\n:::');
-  assert.equal(stepsTagOf(parseFenceAttributes('{.steps tag="Harjutus"}')!), 'Harjutus');
-  assert.equal(stepsTagOf(parseFenceAttributes('{.steps tag=""}')!), '');
-  assert.equal(stepsTagOf(parseFenceAttributes('steps')!), 'Exercise');
-  assert.ok(blockSlideHtml('::: {.steps tag="Harjutus"}\n1. Open\n:::').includes('<span class="blk-pill">Harjutus</span>'));
-  assert.ok(!blockSlideHtml('::: {.steps tag=""}\n1. Open\n:::').includes('blk-pill'));
+test('Sprint 164 PR 3: tag: is a Label over the title; tag: "" is none; no tag: the default word', () => {
+  assert.equal(legacyToBlocks('exercise', 'title: T\ntag: Harjutus\nitems:\n- heading: Open').markdown, '[Harjutus]{.label}\n\n# T\n\n::: steps\n1. Open\n:::');
+  assert.equal(legacyToBlocks('exercise', 'title: T\ntag: ""\nitems:\n- heading: Open').markdown, '# T\n\n::: steps\n1. Open\n:::');
+  assert.equal(legacyToBlocks('exercise', 'title: T\ntag: "  "\nitems:\n- heading: Open').markdown, '# T\n\n::: steps\n1. Open\n:::');
+  // A block slide's old pill is drawn as the Label it becomes; an emptied one, and a Steps block without a tag, as none.
+  assert.ok(blockSlideHtml('::: {.steps tag="Harjutus"}\n1. Open\n:::').startsWith('<div class="blk-label">Harjutus</div>\n<div class="blk-steps">'));
+  assert.ok(!blockSlideHtml('::: {.steps tag=""}\n1. Open\n:::').includes('blk-label'));
+  assert.ok(!blockSlideHtml('::: steps\n1. Open\n:::').includes('blk-label'));
+  assert.ok(!blockSlideHtml('::: steps\n1. Open\n:::').includes('blk-pill'));
+  assert.ok(parseFenceAttributes('{.steps tag="x"}'), 'the reader still reads the old line');
 });
 
 test('words a layout hides and old notes: one comment, -> made harmless, never on the slide', () => {
@@ -482,9 +484,45 @@ test('R2-5: a line of dashes in converted words stays words', () => {
   assert.ok(html.includes('Pros<br>--<br>Cons<br>---'), html);
 });
 
-test('R2-6: a pill with a quote keeps its words', () => {
-  const markdown = legacyToBlocks('exercise', 'title: T\ntag: \'Say "hi"\'\nitems:\n- heading: One').markdown;
-  assert.ok(blockSlideHtml(markdown).includes('<span class="blk-pill">Say &quot;hi&quot;</span>'), markdown);
+test('R2-6: a pill with a quote keeps its words (a Label since Sprint 164)', () => {
+  const markdown = legacyToBlocks('exercise', 'title: T\ntag: \'Say "hi" [now]\'\nitems:\n- heading: One').markdown;
+  assert.ok(markdown.startsWith('[Say "hi" \\[now\\]]{.label}\n\n# T'), markdown);
+  assert.ok(blockSlideHtml(markdown).includes('<div class="blk-label">Say &quot;hi&quot; [now]</div>'), markdown);
+});
+
+// ---------------------------------------------------------------------------
+// Sprint 164 PR 3 (the decks README, "Label, a block of its own")
+// ---------------------------------------------------------------------------
+
+test('Label: one `[words]{.label}` line is drawn as its pill, anywhere on the slide; nothing else is', () => {
+  const html = blockSlideHtml('[Exercise · 1 / 2]{.label}\n\n# Try it\n\n:::: columns\n::: column\n[In a column]{.label}\n:::\n::::\n\n:::: boxes\n::: box\n[In a box]{.label}\n\nWords\n:::\n::::\n\n::: {.panel-tabset}\n## One\n\n[In a pane]{.label}\n:::');
+  for (const words of ['Exercise · 1 / 2', 'In a column', 'In a box', 'In a pane']) assert.ok(html.includes(`<div class="blk-label">${words}</div>`), `${words}: ${html}`);
+  assert.ok(html.startsWith('<div class="blk-label">Exercise · 1 / 2</div>\n<h1'), 'over the title');
+  // Its words are text: escaped for the page, its own escapes read; other attributes beside the class stay unread.
+  assert.ok(blockSlideHtml('[<img src=x onerror=alert(1)> & \\[x\\]]{.label #id data-x="y"}').includes('<div class="blk-label">&lt;img src=x onerror=alert(1)&gt; &amp; [x]</div>'));
+  // Only a paragraph that is that one line: a span inside words, a link, another class, a space before the braces.
+  for (const markdown of ['Words\n[x]{.label}', '[x](https://example.com){.label}', '[x]{.tag}', '[x] {.label}', '`[x]{.label}`', '```\n[x]{.label}\n```']) {
+    assert.ok(!blockSlideHtml(markdown).includes('blk-label'), markdown);
+  }
+  // A title slide with a Label over its title is still a title slide (a Label is free).
+  assert.equal(isCoverSlide('[Workshop]{.label}\n\n# Agents at work\n\nThree hours'), true);
+});
+
+test('Label: an empty one is never drawn, on the strip, the wall or the page', () => {
+  for (const markdown of ['[]{.label}\n\n# T', '[   ]{.label}\n\n# T']) {
+    assert.ok(!blockSlideHtml(markdown).includes('blk-label'), markdown);
+    const deck = publicDeck(`---\ndeck: 2\n---\n\n\`\`\`slide\n${markdown}\n\`\`\`\n`, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME });
+    assert.ok(!pageHtml(deck, { slideCss: '', fonts: [] }, { digest: deckDigest(deck), pictureUrl: () => null }).includes('blk-label'), `the page: ${markdown}`);
+  }
+});
+
+test('Label: slides only. In the handout it is the words it is, on the page too', () => {
+  const text = '---\ndeck: 2\n---\n\n```slide\n[On the slide]{.label}\n\n# T\n```\n\n## T\n\n[In the handout]{.label}\n';
+  const deck = publicDeck(text, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME });
+  const html = pageHtml(deck, { slideCss: '', fonts: [] }, { digest: deckDigest(deck), pictureUrl: () => null });
+  assert.ok(html.includes('<div class="blk-label">On the slide</div>'), 'the page draws the slide\'s Label as the slide does');
+  assert.ok(html.includes('[In the handout]{.label}'), 'the handout shows its words as written');
+  assert.ok(!html.includes('<div class="blk-label">In the handout</div>'));
 });
 
 test('R2-7: a setext H2 names a slide that has no H1', () => {

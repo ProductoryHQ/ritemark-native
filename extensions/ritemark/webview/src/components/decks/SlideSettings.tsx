@@ -3,15 +3,15 @@
  * the slide's own menu opens, "Slide settings…" (Jarmo, 17 November: "slaidi settings peaks olema siin: mitte kuskil
  * ülal tööriistaribas"): the thumbnail's ⋯ or right-click, the handout part number's ⋯ and the end of the slide's own
  * right-click menu, anchored beside where it came from. The gear in the bar is gone. Its order (README, "Nothing around
- * the slide"): the library section, Picture, then a Steps label. A table's rows and columns are
+ * the slide"): the library section, then Picture. A table's rows and columns are
  * added with the table's own + bars and grips (experience 48), so Settings no longer has Add a row and Add a column.
  * Skip slide is only in the menu, so it isn't in two places.
  * Layout (nine kinds as small pictures), the look of a row of boxes, Picture (None, Left, Right, Behind) and Skip
  * slide. A change of kind keeps the words (`convertKind`). Built from the shared controls: the segmented control (its
  * picture variant for the layouts and the picture places) and the switch.
  *
- * An exercise slide also has Label (16 November): its pill's words, as on the slide, with the default as the
- * placeholder. Emptied, the slide has no pill (`tag: ""`); words typed here bring it back.
+ * Sprint 164 PR 3 (Jarmo's yes by name, 19 November, "kinnitan sprindi 164 koos eemaldustega"): the Label row (16
+ * November, a Steps pill's words) is gone. The pill is a Label block of its own on the slide, added from the / menu.
  *
  * The popover (DeckView) closes on a press outside and on Esc and gives the focus back to where the menu was opened.
  * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
@@ -22,14 +22,11 @@
  * bar (`ThemeMenu.tsx`, step-3-themes.md), with the deck's theme, and writes the deck's front matter the same way.
  */
 import type { ReactNode } from 'react'
-import { EXERCISE_TAG, exerciseTagOf, isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
-import { Input } from '../ui/input'
-import { Label } from '../ui/label'
 import { SegmentedControl } from '../ui/segmented-control'
 import { Tooltip } from '../ui/tooltip'
-import { oneLine, setPath, undoKeyOf } from './slide/slideEdits'
 
 /** A small picture of a layout: a few bars, as the prototype's `.lay .pic`. */
 function Bars({ bars }: { bars: Array<[number, number, number, number]> }) {
@@ -74,14 +71,13 @@ interface SlideSettingsProps {
   /** The settings changed, as a patch on the slide's data (an undefined value takes the line out). */
   onChange: (patch: Partial<SlideData>) => void
   onClose: () => void
-  /** Cmd+Z (redo: Cmd+Shift+Z, Cmd+Y) in a field: the deck's undo, as on the stage, not the field's own. */
-  onUndo: (redo: boolean) => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
   /**
-   * Sprint 161 (PR 2): a slide drawn as blocks with a Steps block: its pill's words (#752's Label row, which brings an
-   * emptied pill back), and their change.
+   * Sprint 164 PR 3: Settings' Label row is gone (Jarmo's yes by name, 19 November), so these two are never read. They
+   * stay only while `DeckView.tsx` (PR 1's, #819, until it merges) still passes them, and go in the follow-up.
    */
+  onUndo?: (redo: boolean) => void
   stepsTag?: { value: string; onChange: (tag: string) => void }
 }
 
@@ -123,36 +119,7 @@ export function SlideAbout({ data, sourceLines, hidden }: SlideAboutProps) {
   )
 }
 
-/**
- * The pill's Label row (16 November): its words, the default as the placeholder; emptied, no pill. Cmd+Z in it is the
- * deck's undo. One row for an Exercise slide's `tag:` and a block slide's Steps (PR 2).
- */
-function LabelRow({ id, value, onWords, onUndo }: { id: string; value: string; onWords: (words: string) => void; onUndo: (redo: boolean) => void }) {
-  return (
-    <div className="deck-settings-row deck-settings-tag">
-      <Label htmlFor={id}>Label</Label>
-      <Input
-        id={id}
-        className="deck-settings-field"
-        placeholder={EXERCISE_TAG}
-        value={value}
-        onChange={event => {
-          const words = oneLine(event.target.value)
-          if (words !== value) onWords(words)
-        }}
-        onKeyDown={event => {
-          const step = undoKeyOf({ key: event.key, metaKey: event.metaKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing })
-          if (!step) return
-          event.preventDefault()
-          onUndo(step === 'redo')
-        }}
-      />
-    </div>
-  )
-}
-
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, onUndo, about, stepsTag }: SlideSettingsProps) {
-  const tagId = `deck-tag-${number}`
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, about }: SlideSettingsProps) {
   return (
     <section aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
@@ -207,19 +174,6 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, o
             options={PICTURES}
           />
         </>
-      ) : null}
-      {stepsTag ? <LabelRow id={tagId} value={stepsTag.value} onWords={stepsTag.onChange} onUndo={onUndo} /> : null}
-      {kind === 'exercise' ? (
-        <LabelRow
-          id={tagId}
-          value={exerciseTagOf(data)}
-          // Through the pill's own rule (`setPath`): words as they were write nothing.
-          onWords={words => {
-            const next = setPath(data, 'tag', words)
-            if (next !== data) onChange({ tag: next.tag })
-          }}
-          onUndo={onUndo}
-        />
       ) : null}
     </section>
   )

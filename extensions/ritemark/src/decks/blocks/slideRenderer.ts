@@ -10,11 +10,14 @@
  *  - Pictures: a relative path is drawn through `pictureUrl` (the deck view's webview URI, the page's file beside
  *    it), or as an empty place; a web address is never loaded. A picture alone in a paragraph is a block of its own,
  *    as the editor's image node is (`preprocessImageHTML`), so the parity test sees the same outline.
+ *  - Sprint 164 PR 3: a Label (`[words]{.label}` alone in its paragraph, `labelBlock.ts`) is drawn as its pill, and an
+ *    empty one not at all. A Steps block's old pill (`tag`) is drawn as the Label it becomes (`withStepsLabels`), so a
+ *    deck looks the same before its first edit writes it so and after.
  *
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
-import { EXERCISE_TAG, isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
+import { isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
@@ -27,6 +30,7 @@ import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } fro
 import { tabsetOf, type Tabset } from './tabset';
 import { codeBlockHtml } from './codeTools';
 import { buttonHtml, buttonParagraphOf, isButtonAddress } from './buttonBlock';
+import { isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
 
 export { sidePictureOf };
 
@@ -138,12 +142,6 @@ export function missingHtml(path: string): string {
   return `<span class="blk-missing"><span class="blk-missing-head">Picture not found</span><span class="blk-missing-name">${esc(pictureFileName(path))}</span></span>`;
 }
 
-
-/** The pill over a Steps block: its `tag`, "Exercise" when it has none, and no pill for an empty one (#752's rule). */
-export function stepsTagOf(attrs: FenceAttributes): string {
-  const tag = attrs.values.tag ?? EXERCISE_TAG;
-  return tag.trim() ? tag : '';
-}
 
 /** Drawn attributes as HTML, escaped. */
 function drawnAttributes(attributes: Record<string, string>): string {
@@ -286,11 +284,11 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       return `<div class="blk-box"${item}>${mark}${within()}</div>\n`;
     }
     case 'steps': {
-      const tag = stepsTagOf(token.attrs);
+      // Sprint 164 PR 3: no pill of its own. An old one is a Label before it (`withStepsLabels`, before the slide is read).
       const block = state.steps++;
       const body = within();
       const items = reveals ? markListItems(body, 'ol') : body;
-      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${state.ticks ? tickListItems(items, block) : items}</div>\n`;
+      return `<div class="blk-steps"${revealMark}>${state.ticks ? tickListItems(items, block) : items}</div>\n`;
     }
     default: {
       const body = within();
@@ -396,6 +394,10 @@ function createSlideMarked(): Marked {
       name: 'paragraph',
       renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
         const paragraph = token as Tokens.Paragraph;
+        // Sprint 164 PR 3: a paragraph that is one `[words]{.label}` line is a Label, drawn as its pill; an empty one is
+        // never drawn (the wall, the page, the strip).
+        const label = labelParagraphOf(paragraph);
+        if (label) return isEmptyLabel(label.words) ? '' : `<div class="blk-label">${esc(label.words)}</div>\n`;
         // Sprint 163 PR 3: a paragraph that ends with a `{.button}` link is a Button block, its words beside it.
         const button = buttonParagraphOf(paragraph.tokens);
         if (button) {
@@ -470,9 +472,17 @@ function createSlideMarked(): Marked {
 
 const slideMarked = createSlideMarked();
 
-/** A block slide's Markdown as tokens, read the one way the renderer reads it. */
+/**
+ * A block slide's Markdown as tokens, read the one way the renderer reads it: its Steps blocks' old pills as the Labels
+ * they become (Sprint 164 PR 3, `withStepsLabels`).
+ */
 export function lexBlockSlide(markdown: string): Token[] {
-  return slideMarked.lexer(markdown);
+  return slideMarked.lexer(withStepsLabels(markdown));
+}
+
+/** Is this token a Label (`[words]{.label}`, Sprint 164 PR 3), with words or empty? */
+export function isLabelToken(token: Token): boolean {
+  return token.type === 'paragraph' && labelParagraphOf(token as Tokens.Paragraph) !== null;
 }
 
 /**
@@ -485,10 +495,11 @@ export function isCommentBlock(token: Token): boolean {
 
 /**
  * The blocks a slide draws, at its top level: no blank space, and no comment note, so a comment never changes how a
- * slide is drawn (a title-only slide with a comment is still drawn big and low).
+ * slide is drawn (a title-only slide with a comment is still drawn big and low). Nor a Label (Sprint 164 PR 3): it is
+ * free, and a title slide with one over its title is still a title slide.
  */
 function drawnBlocksOf(markdown: string): Token[] {
-  return lexBlockSlide(markdown).filter(token => token.type !== 'space' && !isCommentBlock(token));
+  return lexBlockSlide(markdown).filter(token => token.type !== 'space' && !isCommentBlock(token) && !isLabelToken(token));
 }
 
 const picturePathsCache = new Map<string, string[]>();
@@ -627,27 +638,60 @@ function sectionNumberOfBlocks(markdown: string): string | null {
 
 const stepsCache = new Map<string, string | null>();
 
+/** Blank space and comment notes stand between blocks without being one. */
+const isBetween = (token: Token) => token.type === 'space' || isCommentBlock(token);
+
 /**
- * The pill of a block slide's first Steps block ('' for none), or null when it has no Steps block: a slide with Steps
- * is an exercise on the page, as an Exercise slide is. Read once per Markdown.
+ * The Label in the place a block's Label goes (`labelBlock.withStepsLabels`): the block before it, or the block before
+ * the heading right over it, past blank space and notes. `found` with its words ('' for an emptied one), or not found.
  */
-export function blockStepsTagOf(markdown: string): string | null {
+function labelInPlace(tokens: Token[], index: number): { found: boolean; words: string } {
+  let at = index - 1;
+  while (at >= 0 && isBetween(tokens[at])) at--;
+  if (at >= 0 && tokens[at].type === 'heading') {
+    at--;
+    while (at >= 0 && isBetween(tokens[at])) at--;
+  }
+  const label = at >= 0 && tokens[at].type === 'paragraph' ? labelParagraphOf(tokens[at] as Tokens.Paragraph) : null;
+  return label ? { found: true, words: isEmptyLabel(label.words) ? '' : label.words } : { found: false, words: '' };
+}
+
+/**
+ * The first Steps block in the slide's own blocks (a tab's pane and an Agenda block are never read, as before), and the
+ * Label in its place, else in the place of the nearest block that holds it (a Columns block over a column's steps).
+ */
+function exerciseLabelIn(tokens: Token[]): { steps: boolean; label: { found: boolean; words: string } } {
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (token.type !== 'slideDiv') continue;
+    const div = token as unknown as SlideDivToken;
+    if (div.attrs.classes.includes('steps')) return { steps: true, label: labelInPlace(tokens, index) };
+    const inner = exerciseLabelIn(div.tokens);
+    if (inner.steps) return inner.label.found ? inner : { steps: true, label: labelInPlace(tokens, index) };
+  }
+  return { steps: false, label: { found: false, words: '' } };
+}
+
+/**
+ * A block slide with a Steps block: the words of its exercise Label ('' for none), or null when it has no Steps block.
+ * A slide with Steps is an exercise on the page, as an Exercise slide is, and the page's Contents and Present's timer
+ * read its Label (Sprint 164 PR 3: the Label is the old pill): the one in the place of its first Steps block, or of the
+ * nearest block holding that block. Read from the tokens the slide is drawn with, once per Markdown.
+ */
+export function blockStepsLabelOf(markdown: string): string | null {
   if (stepsCache.has(markdown)) return stepsCache.get(markdown) ?? null;
   if (stepsCache.size > 500) stepsCache.clear();
-  let found: string | null = null;
-  const visit = (tokens: Token[]) => {
-    for (const token of tokens) {
-      if (found !== null) return;
-      if (token.type !== 'slideDiv') continue;
-      const div = token as unknown as SlideDivToken;
-      if (div.attrs.classes.includes('steps')) { found = stepsTagOf(div.attrs); return; }
-      visit(div.tokens);
-    }
-  };
-  visit(lexBlockSlide(markdown));
+  const exercise = exerciseLabelIn(lexBlockSlide(markdown));
+  const found = exercise.steps ? exercise.label.words : null;
   stepsCache.set(markdown, found);
   return found;
 }
+
+/**
+ * Sprint 164 PR 3: the old name of `blockStepsLabelOf`, kept only while `DeckView.tsx` (PR 1's, #819, until it merges)
+ * still imports it for Settings' Label row, which no longer draws (`SlideSettings`). It goes in the follow-up.
+ */
+export const blockStepsTagOf = blockStepsLabelOf;
 
 const agendaCache = new Map<string, boolean>();
 
@@ -731,7 +775,7 @@ export function blockSlideHtml(markdown: string, options: BlockDrawingContext = 
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
   state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, ticks: options.ticks === true, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
   try {
-    return slideMarked.parse(markdown, { async: false }) as string;
+    return slideMarked.parse(withStepsLabels(markdown), { async: false }) as string;
   } finally {
     state = previous;
   }
@@ -752,7 +796,7 @@ export function blockRevealCount(markdown: string): number {
   state = freshState();
   let count = 0;
   try {
-    slideMarked.parse(markdown, { async: false });
+    slideMarked.parse(withStepsLabels(markdown), { async: false });
     count = state.reveal.next;
   } finally {
     state = previous;
