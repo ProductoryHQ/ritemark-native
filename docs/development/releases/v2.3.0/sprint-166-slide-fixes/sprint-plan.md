@@ -62,7 +62,9 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 6: the Present bar at the screen's foot (PR 6, issue #842)
 [#842](https://github.com/ProductoryHQ/ritemark-native/issues/842): the wall's floating bar sits at the screen's foot, centred, its bottom 12 px from the edge, never over the slide's words: in the ground below the 16:9 content on a wider screen (1440×900 leaves a 45 px band), in the slide's own bottom margin on a 16:9 screen. It still shows on pointer movement and fades after 2 s.
-- [ ] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right.
+- [x] The bar sits 12 px from the screen's foot, its box outside the content box at 16:10 and 16:9 sizes (`wallBar.test.ts`, PR 6).
+- [x] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right (`proof/pr6-present-bar/`).
+- [x] The Experience lead's rule: while the bar shows, the quiet line fades out with the bar's timing and comes back when the bar fades (`wallBar.test.ts`); one shot at 1440×900 with the bar showing and the line hidden (`proof/pr6-present-bar/present-bar-line-hidden-1440x900.png`).
 
 ### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
@@ -78,11 +80,21 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 [#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
 - [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
 
+## Added on 19 November, third time (Jarmo: "jah kõigile kolmele")
+
+### Fix 10: a gesture over the slide in Slide and handout (PR 10, issue #855)
+[#855](https://github.com/ProductoryHQ/ritemark-native/issues/855): over the slide, a gesture means the same in every view. In Slide and handout a wheel or flick over the slide moves one slide, as in Slide only, and the handout scrolls to that slide's part (the strip click's path); over the handout's text the wheel scrolls the text as now and the slide follows the part being read; a long column or pane still scrolls first (#849).
+- [ ] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+
+### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
+[#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
+- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+
 ## For every PR
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848` and `#850`, one per PR.
+- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848`, `#850`, `#855` and `#856`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 

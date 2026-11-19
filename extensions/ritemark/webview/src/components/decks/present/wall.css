@@ -93,6 +93,12 @@
    (DeckWall's WALL_LINE_HEIGHT); the blank, the QR code and a filled wall cover it as they cover the slide. */
 .wall-line { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; padding: 0 20px; display: flex; align-items: center; gap: 16px; pointer-events: none;
   font: 500 13.5px/1 'Sofia Sans', var(--ritemark-ui-font-family), sans-serif; color: color-mix(in srgb, var(--wall-line-ink, #fff) 60%, transparent); }
+/* Sprint 166 PR 6: while the bar shows, the line fades out with the bar's own timing (the bar's "n of N" says the
+   same), and it comes back when the bar fades. */
+.wall-line { transition: opacity 0.2s ease; }
+.wall-line.is-hidden { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .wall-line { transition: none; } }
+.vscode-reduce-motion .wall-line { transition: none; }
 .wall-line-who { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wall-line-who b { font-weight: 700; color: var(--wall-line-ink, #fff); }
 .wall-line-pos { font-weight: 600; color: color-mix(in srgb, var(--wall-line-ink, #fff) 78%, transparent); font-variant-numeric: tabular-nums; white-space: nowrap; }
