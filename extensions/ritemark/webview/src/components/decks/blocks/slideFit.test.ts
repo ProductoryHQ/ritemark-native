@@ -206,9 +206,12 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
 {
   const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(css.includes('.deck-sl :is(h1, h2, h3, h4, h5, h6, .st, .stc, .bh) { text-wrap: balance; }'), 'headings balanced on every slide')
-  assert.equal((css.match(/text-wrap:/g) ?? []).length, 1, 'no other text-wrap on a slide')
+  // No other rule that names a heading sets its wrapping, on a slide or on the stage.
+  const unbalances = (sheet: string) => (sheet.replace(/\s+/g, ' ').match(/[^{}]*\{[^}]*text-wrap:[^}]*\}/g) ?? []).filter(rule => !rule.includes('text-wrap: balance') && /(?:^|[\s,(>+~])(?:h[1-6]|\.st|\.stc|\.bh)\b/.test(rule.split('{')[0]))
+  assert.deepEqual(unbalances(css), [], 'no other heading wrapping on a slide')
   const decks = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
-  assert.ok(!/text-wrap:/.test(decks), 'the stage sets none of its own')
+  assert.deepEqual(unbalances(decks), [], 'nor on the stage')
+  assert.deepEqual(unbalances('.deck-sl h1 { text-wrap: wrap; } .deck-sl p { text-wrap: pretty; }'), ['.deck-sl h1 { text-wrap: wrap; }'], 'the check sees a heading unbalanced, and lets body text be')
   const page = readFileSync(new URL('../../../../../src/decks/page/pageAssets.ts', import.meta.url), 'utf8')
   assert.ok(page.includes("import slideCss from '../../../webview/src/components/decks/slide/slide.css'"), 'the page draws its slides with the same sheet')
 }

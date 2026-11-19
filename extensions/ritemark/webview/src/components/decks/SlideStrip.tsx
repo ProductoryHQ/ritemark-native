@@ -211,7 +211,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}${joining ? ' is-join' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -229,9 +229,10 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
         {flash ? <span key={flash} className="deck-thumb-flash" aria-hidden="true" /> : null}
       </div>
       {makingPicture ? (
-        // The Experience lead on #803: a quiet circle in the accent, still under Reduce motion (decks.css). No toast.
+        // The Experience lead on #803: a quiet circle in the accent, still under Reduce motion (decks.css). No toast; a
+        // screen reader hears it in the slide's own name.
         <Tooltip label="ChatGPT is making a picture" className="deck-thumb-making">
-          <span role="status" aria-label="ChatGPT is making a picture" />
+          <span aria-hidden="true" />
         </Tooltip>
       ) : null}
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}

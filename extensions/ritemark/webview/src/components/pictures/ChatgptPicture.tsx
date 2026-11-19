@@ -79,27 +79,24 @@ function describing(asked: string): Describe {
   return (currentAlt, currentPath) => madeDescription(currentAlt, asked, currentPath ? madeWith.get(pictureKey(currentPath)) : undefined)
 }
 
-// Requests let go by their editors: answered here until their editor is back (`picturesAway.ts`).
-let awayRequests: PicturesAway | null = null
-function picturesAway(): PicturesAway {
-  if (!awayRequests) {
-    const away = new PicturesAway()
-    onMessage(message => { if (message.type === 'picture/status') away.status(message as Record<string, unknown>) })
-    awayRequests = away
+// The webview's picture requests, one listener for the host's answers (`picturesAway.ts`): `away`, the requests let go
+// by their editors, answered here until their editor is back; `making`, the slides a picture is being made for, shown
+// or left (the strip's spinner on their thumbnails).
+let requests: { away: PicturesAway; making: PicturesMaking } | null = null
+function pictureRequests(): { away: PicturesAway; making: PicturesMaking } {
+  if (!requests) {
+    const held = { away: new PicturesAway(), making: new PicturesMaking() }
+    onMessage(message => {
+      if (message.type !== 'picture/status') return
+      held.away.status(message as Record<string, unknown>)
+      held.making.status(message as Record<string, unknown>)
+    })
+    requests = held
   }
-  return awayRequests
+  return requests
 }
-
-// The slides a picture is being made for, shown or left: the strip's spinner on their thumbnails (`PicturesMaking`).
-let makingSlides: PicturesMaking | null = null
-function picturesMaking(): PicturesMaking {
-  if (!makingSlides) {
-    const making = new PicturesMaking()
-    onMessage(message => { if (message.type === 'picture/status') making.status(message as Record<string, unknown>) })
-    makingSlides = making
-  }
-  return makingSlides
-}
+const picturesAway = () => pictureRequests().away
+const picturesMaking = () => pictureRequests().making
 
 /** The keys (`slidePictureKey`) of the deck's slides ChatGPT is making a picture for now. */
 export function useSlidesMakingPictures(): ReadonlySet<string> {
@@ -142,8 +139,12 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos, path ? attrs => sameRelativeImagePath(imagePathOf(attrs) ?? '', path) : undefined)
       if (pos === null) {
         // The picture went: nothing stays anchored on nothing. A request still running goes on, and its picture, never
-        // placed, stays in images/ (the person's words aren't lost because a place was).
-        if (current.phase === 'making') latest.current.onSettled?.(current.ask)
+        // placed, stays in images/ (the person's words aren't lost because a place was); nothing is coming for the
+        // slide, so its thumbnail's spinner goes.
+        if (current.phase === 'making') {
+          picturesMaking().end(current.requestId)
+          latest.current.onSettled?.(current.ask)
+        }
         setState({ phase: 'idle' })
         return
       }
