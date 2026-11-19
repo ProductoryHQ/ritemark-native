@@ -41,7 +41,8 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
-import { EVERY_TRAINING, MAX_OFFER, OFFER_MIN_FAMILIES, projectOffer } from '../decks/libraryOffer';
+import { EVERY_TRAINING, MAX_OFFER, NOT_NOW_UNREADABLE, OFFER_MIN_FAMILIES, projectOffer } from '../decks/libraryOffer';
+import { SENDABLE_SLIDE_ID } from '../decks/deckProtocol';
 import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from '../decks/deckFormat';
 import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
 import { DECK_FONT_LIST } from '../decks/deckTheme';
@@ -629,13 +630,14 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
           `The slides that are in most of the project's decks, as the Slide library offers them at its top: at most ${MAX_OFFER}, the ones in the most families of decks first (decks copied from each other count as one family), each at its newest copy, with how many decks and families have it. Worked out from the decks themselves; slides the library already has, and ones the user hid with Not now, are left out. Use it when the user asks which slides they repeat, or wants the library to have them.`,
         input: {},
         run: async () => {
-          const { offer } = await projectOffer(library().library);
+          const { offer, unreadable } = await projectOffer(library().library);
+          if (unreadable) return { text: NOT_NOW_UNREADABLE };
           if (!offer.slides.length) {
             return {
               text: offer.families < OFFER_MIN_FAMILIES
                 ? `No slide is offered: the project's decks make ${offer.families} famil${offer.families === 1 ? 'y' : 'ies'} (decks copied from each other count as one), and it takes at least ${OFFER_MIN_FAMILIES}.`
                 : offer.withheld > 0
-                  ? 'No slide is offered: the library already has the slides in most decks, or the user hid them with Not now.'
+                  ? 'No slide is offered: the library already has the slides in most decks, the user hid them with Not now, or their ids were written by hand (letters and digits only can be added).'
                   : `No slide is offered: none is in a third of the project's ${offer.families} families of decks (and in at least ${OFFER_MIN_FAMILIES}).`,
             };
           }
@@ -659,13 +661,15 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
         },
         run: async (args) => {
           const { library: project } = library();
-          const offered = (await projectOffer(project)).offer.slides.map(slide => ({ path: slide.path, id: slide.id }));
+          const found = await projectOffer(project);
+          if (found.unreadable) return { text: NOT_NOW_UNREADABLE, isError: true };
+          const offered = found.offer.slides.map(slide => ({ path: slide.path, id: slide.id }));
           const isOffered = new Set(offered.map(slide => `${slide.path}#${slide.id}`));
           const chosen = args.slides
             ? [...new Set(args.slides as string[])].map(entry => {
               const cut = entry.lastIndexOf('#');
               const id = entry.slice(cut + 1).trim();
-              if (cut < 0 || !/^[0-9a-z]{1,16}$/i.test(id)) throw new Error(`${entry} names no slide. Use list_repeated_slides to see them.`);
+              if (cut < 0 || !SENDABLE_SLIDE_ID.test(id)) throw new Error(`${entry} names no slide. Use list_repeated_slides to see them.`);
               const slide = { path: deckPathOf(entry.slice(0, cut)), id };
               // Only what the library offers now: never a slide it has already, nor one the user hid with Not now.
               if (!isOffered.has(`${slide.path}#${slide.id}`)) throw new Error(`${entry} isn't offered now. Use list_repeated_slides to see the slides that are.`);

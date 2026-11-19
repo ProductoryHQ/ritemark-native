@@ -381,8 +381,10 @@ export type LibraryRequest =
 
 /** The most slides one Take section sends. */
 export const MAX_SECTION_SLIDES = 200;
-/** The most slides one offer sends (it shows at most six). */
+/** The most slides one offer shows and sends (Sprint 165 PR 4; `libraryOffer.ts` takes it from here). */
 export const MAX_OFFER_SLIDES = 6;
+/** A slide id the library's messages and tools carry: the decoder, the offer and the AI's tools share it. */
+export const SENDABLE_SLIDE_ID = /^[0-9a-z]{1,16}$/i;
 
 /** Decode one message from the Slide library place with exact fields, or null. */
 export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
@@ -433,7 +435,7 @@ function offerSlidesOf(value: unknown, deckPath: (field: unknown) => boolean): A
     const record = entry as Record<string, unknown>;
     const keys = Object.keys(record);
     if (keys.length !== 2 || !keys.includes('path') || !keys.includes('id')) return null;
-    if (!deckPath(record.path) || typeof record.id !== 'string' || !/^[0-9a-z]{1,16}$/i.test(record.id)) return null;
+    if (!deckPath(record.path) || typeof record.id !== 'string' || !SENDABLE_SLIDE_ID.test(record.id)) return null;
     slides.push({ path: record.path as string, id: record.id });
   }
   return new Set(slides.map(slide => `${slide.path}#${slide.id}`)).size === slides.length ? slides : null;

@@ -11,7 +11,7 @@ import { BUILT_IN_THEME_PATH } from './deckTheme';
 import { DeckLibrary, LIBRARY_FOLDER, type DeckFiles } from './DeckLibrary';
 import { DeckIndex } from './librarySearch';
 import {
-  EVERY_TRAINING, MAX_OFFER, NOT_NOW_PATH, hideFromOffer, notNowSlides, notNowText, offerOf, parseNotNow, projectOffer, readNotNow,
+  EVERY_TRAINING, MAX_OFFER, NO_NOT_NOW, NOT_NOW_PATH, hideFromOffer, notNowSlides, notNowText, offerOf, parseNotNow, projectOffer, readNotNow,
   type LibraryOffer,
 } from './libraryOffer';
 import { copiedDeckText } from './newDeck';
@@ -74,7 +74,7 @@ function withOwn(text: string, course: string, n: number): string {
 async function offerNow(files: DeckFiles, active?: string): Promise<{ offer: LibraryOffer; titles: string[] }> {
   const index = new DeckIndex(files);
   const decks = await index.decks();
-  const offer = offerOf(decks, index.same(), await readNotNow(files), { active });
+  const offer = offerOf(decks, index.same(), (await readNotNow(files)) ?? NO_NOT_NOW, { active });
   return { offer, titles: offer.slides.map(entry => entry.title) };
 }
 
@@ -383,17 +383,34 @@ async function run() {
     }
     const { offer, titles } = await offerNow(deckFiles);
     assert.deepEqual(titles, ["Today's plan"], 'the hand-written ids\' slide is not offered');
-    assert.equal(offer.withheld, 0);
+    assert.equal(offer.withheld, 1, 'counted, so Claude says why');
     await library.addCopiesToTopic([offer.slides[0], offer.slides[0]].map(entry => ({ path: entry.path, id: entry.id })), EVERY_TRAINING);
     assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`]).length, 1, 'named twice, added once');
     const after = (await offerNow(deckFiles)).offer;
-    assert.deepEqual([after.slides.length, after.withheld], [0, 1], 'withheld: the library has it');
+    assert.deepEqual([after.slides.length, after.withheld], [0, 2], 'withheld: the library has it (and the hand-written ids)');
+    // Round two: a second press that crossed the first adds nothing again.
+    await assert.rejects(library.addCopiesToTopic([{ path: offer.slides[0].path, id: offer.slides[0].id }], EVERY_TRAINING), /already has this slide/);
+    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`]).length, 1);
 
     // Not now over a file that isn't JSON (edited by hand): refused, the file as it was, nothing it hid comes back.
     const broken = '{ "slides": [ { "places": ["A.deck.md#ab12"] }, ] }';
     files[NOT_NOW_PATH] = broken;
     await assert.rejects(hideFromOffer(deckFiles, [{ places: ['Talks/Alpha.deck.md#p0aa'], words: [] }]), /can't be read, so nothing was hidden/);
     assert.equal(files[NOT_NOW_PATH], broken);
+    // Round two: JSON of another shape is never written over either, and while the file can't be read nothing is
+    // offered (it may have hidden any of them); the tools say why.
+    for (const other of ['[{ "places": ["A.deck.md#ab12"] }]', '{ "slides": { "places": [] } }']) {
+      files[NOT_NOW_PATH] = other;
+      await assert.rejects(hideFromOffer(deckFiles, [{ places: ['Talks/Alpha.deck.md#p0aa'], words: [] }]), /can't be read/);
+      assert.equal(files[NOT_NOW_PATH], other);
+      assert.equal(await readNotNow(deckFiles), null);
+    }
+    delete files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`];
+    const unreadable = await projectOffer(library);
+    assert.deepEqual([unreadable.unreadable, unreadable.offer.slides.length], [true, 0]);
+    delete files[NOT_NOW_PATH];
+    const readable = await projectOffer(library);
+    assert.deepEqual([readable.unreadable, readable.offer.slides.length], [false, 1], 'deleted: offered again');
   }
   {
     // A Slide library folder the person made and left empty stays after Undo; only Themes, which the add made, goes.
@@ -410,6 +427,13 @@ async function run() {
     assert.equal(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`], undefined);
     assert.ok(files[BUILT_IN_THEME_PATH], 'the theme file a topic names stays');
     assert.ok(await deckFiles.folderExists!('Slide library'), 'the person\'s own folder stays');
+
+    // Round two: an open topic holds its text in its own line endings (CRLF on Windows): Undo still takes it back.
+    const again = await library.addCopiesToTopic([{ path: 'A/One.deck.md', id: 'ap01' }], EVERY_TRAINING);
+    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`;
+    files[topic] = files[topic].replace(/\n/g, '\r\n');
+    assert.equal(await library.undoTopicWrite(again), true);
+    assert.equal(files[topic], undefined);
   }
   {
     // A folder deleted at once (the watcher reports the folder alone): the index says whether it held decks.

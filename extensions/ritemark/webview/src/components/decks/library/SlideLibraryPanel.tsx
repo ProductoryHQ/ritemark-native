@@ -186,17 +186,14 @@ export function SlideLibraryPanel() {
 
   useEffect(() => {
     const stop = onMessage((message) => {
-      if (message.type === 'library/state') {
-        setState(message as unknown as LibraryState)
-        setOfferBusy(false)
-      }
+      if (message.type === 'library/state') setState(message as unknown as LibraryState)
       else if (message.type === 'library/active') setState((value) => (value ? { ...value, active: (message.active as ActiveDeck | null) ?? null } : value))
       else if (message.type === 'library/focus-search') {
         setSearchOpen(true)
         setFocusSearch((count) => count + 1)
       } else if (message.type === 'library/notice' && typeof message.text === 'string') {
         setNotice({ text: message.text, ...(typeof message.undo === 'string' ? { undo: message.undo } : {}) })
-        // The host's answer to an offer press, whatever it was: the buttons work again.
+        // The host's answer to an offer press, whatever it was (every press gets one): the buttons work again.
         setOfferBusy(false)
       }
       else if (message.type === 'library/show' && (message.section === 'topics' || message.section === 'other')) {

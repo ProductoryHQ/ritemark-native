@@ -192,9 +192,9 @@ export function offerHint(count: number): string {
   return count === 1 ? 'Add it to the library to take it in one click next time.' : 'Add them to the library to take them in one click next time.'
 }
 
-/** The offer's first button: "Add all 4", or "Add it" for one slide. */
+/** The offer's first button: "Add all 4", or "Add" for one slide (beside Choose… and Not now, as ever). */
 export function addAllLabel(count: number): string {
-  return count === 1 ? 'Add it' : `Add all ${count}`
+  return count === 1 ? 'Add' : `Add all ${count}`
 }
 
 /** Under an offered slide: how many decks have it ("in 7 decks"). */

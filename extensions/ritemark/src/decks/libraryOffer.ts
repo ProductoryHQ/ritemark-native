@@ -23,6 +23,7 @@ import { createHash } from 'crypto';
 import type { DeckFiles, DeckLibrary, DeckSummary } from './DeckLibrary';
 import { jaccard, type SameSlides } from './sameSlide';
 import { DeckIndex } from './librarySearch';
+import { MAX_OFFER_SLIDES, SENDABLE_SLIDE_ID } from './deckProtocol';
 
 /** Decks at least this much the same (Jaccard over their slides' groups) are one family. */
 export const FAMILY_SHARE = 0.5;
@@ -30,8 +31,8 @@ export const FAMILY_SHARE = 0.5;
 export const OFFER_SHARE = 1 / 3;
 /** …and in at least this many of them. */
 export const OFFER_MIN_FAMILIES = 3;
-/** The offer shows at most this many slides. */
-export const MAX_OFFER = 6;
+/** The offer shows at most this many slides (the messages carry as many). */
+export const MAX_OFFER = MAX_OFFER_SLIDES;
 /** The topic the offer's slides go into, made when it isn't there. */
 export const EVERY_TRAINING = 'Every training';
 /** Where Not now is kept: beside the library's topics, never in a deck. */
@@ -62,15 +63,12 @@ export interface LibraryOffer {
   slides: OfferedSlide[];
   /** How many families the project's decks make. */
   families: number;
-  /** Slides in enough families but left out: the library has them, or Not now hid them. */
+  /**
+   * Slides in enough families but left out: the library has them, Not now hid them, or no copy has an id the place and
+   * the tools can send (written by hand otherwise, "intro-1", so it could be neither added nor hidden).
+   */
   withheld: number;
 }
-
-/**
- * A slide id the place and the tools can send (`deckProtocol.ts`): a slide whose id was written by hand otherwise
- * ("intro-1") is never offered, as it could be neither added nor hidden.
- */
-const SENDABLE_ID = /^[0-9a-z]{1,16}$/i;
 
 /** One slide Not now hid: its title (for a person reading the file), its copies' places and its words' hashes. */
 export interface NotNowSlide {
@@ -91,16 +89,25 @@ export function wordsHash(words: readonly string[]): string | null {
   return text ? createHash('sha256').update(text).digest('hex').slice(0, 16) : null;
 }
 
-/** Not now as read from its file; an unreadable or missing file hides nothing. */
-export function parseNotNow(text: string | null): NotNow {
-  if (!text) return NO_NOT_NOW;
+/**
+ * Not now's file as written, or null when it is there but isn't Not now's shape (JSON with a `slides` list): edited
+ * by hand and broken. A missing or empty file is no Not now yet.
+ */
+function notNowValue(text: string | null): { slides: unknown[] } | null {
+  if (text === null || !text.trim()) return { slides: [] };
   let value: unknown;
   try {
     value = JSON.parse(text);
   } catch {
-    return NO_NOT_NOW;
+    return null;
   }
-  const list = typeof value === 'object' && value !== null && Array.isArray((value as { slides?: unknown }).slides) ? (value as { slides: unknown[] }).slides : [];
+  const slides = typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as { slides?: unknown }).slides : undefined;
+  return Array.isArray(slides) ? { slides } : null;
+}
+
+/** Not now as read from its file; a missing or unreadable one hides nothing (`readNotNow` tells the two apart). */
+export function parseNotNow(text: string | null): NotNow {
+  const list = notNowValue(text)?.slides ?? [];
   const strings = (field: unknown) => (Array.isArray(field) ? field.filter((item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 1100) : []);
   const slides = list.flatMap((entry): NotNowSlide[] => {
     if (typeof entry !== 'object' || entry === null) return [];
@@ -228,7 +235,7 @@ export function offerOf(decks: readonly OfferDeck[], same: SameSlides, notNow: N
     const isOpen = (member: Member) => decks[member.deck].summary.path === options.active;
     for (const member of members) {
       const slide = decks[member.deck].summary.slides[member.at];
-      if (!slide.id || !SENDABLE_ID.test(slide.id)) continue;
+      if (!slide.id || !SENDABLE_SLIDE_ID.test(slide.id)) continue;
       if (!newest || (isOpen(newest) && !isOpen(member))) {
         newest = member;
         continue;
@@ -238,7 +245,10 @@ export function offerOf(decks: readonly OfferDeck[], same: SameSlides, notNow: N
       const b = decks[member.deck].summary;
       if (b.modified > a.modified || (b.modified === a.modified && (b.path < a.path || (b.path === a.path && member.at < newest.at)))) newest = member;
     }
-    if (!newest) continue;
+    if (!newest) {
+      withheld++;
+      continue;
+    }
     const deck = decks[newest.deck].summary;
     const slide = deck.slides[newest.at];
     offered.push({
@@ -291,10 +301,17 @@ export function notNowSlides(decks: readonly OfferDeck[], same: SameSlides, slid
   });
 }
 
-/** Not now, as the project keeps it. */
-export async function readNotNow(files: Pick<DeckFiles, 'read'>): Promise<NotNow> {
-  return parseNotNow(await files.read(NOT_NOW_PATH));
+/**
+ * Not now, as the project keeps it; null when its file can't be read (edited by hand and broken). Then nothing is
+ * offered: offering what it may have hidden would be the wrong side to err on.
+ */
+export async function readNotNow(files: Pick<DeckFiles, 'read'>): Promise<NotNow | null> {
+  const text = await files.read(NOT_NOW_PATH);
+  return notNowValue(text) ? parseNotNow(text) : null;
 }
+
+/** What the place and the tools say when Not now's file can't be read. */
+export const NOT_NOW_UNREADABLE = `${NOT_NOW_PATH} can't be read, so nothing is offered. Fix it or delete it.`;
 
 /**
  * Not now for these slides, added to what the project keeps: they aren't offered again. A file that is there but isn't
@@ -303,13 +320,8 @@ export async function readNotNow(files: Pick<DeckFiles, 'read'>): Promise<NotNow
 export async function hideFromOffer(files: Pick<DeckFiles, 'read' | 'write'>, slides: readonly NotNowSlide[]): Promise<void> {
   if (!slides.length) return;
   const text = await files.read(NOT_NOW_PATH);
-  if (text !== null && text.trim()) {
-    try {
-      JSON.parse(text);
-    } catch {
-      throw new Error(`${NOT_NOW_PATH} can't be read, so nothing was hidden. Fix it or delete it, then try again.`);
-    }
-  }
+  // Not JSON, or JSON of another shape: never written over.
+  if (!notNowValue(text)) throw new Error(`${NOT_NOW_PATH} can't be read, so nothing was hidden. Fix it or delete it, then try again.`);
   await files.write(NOT_NOW_PATH, notNowText({ slides: [...parseNotNow(text).slides, ...slides] }));
 }
 
@@ -317,9 +329,11 @@ export async function hideFromOffer(files: Pick<DeckFiles, 'read' | 'write'>, sl
  * The project's offer read afresh (Claude's tools; the place keeps an index of its own): every deck once, grouped, and
  * Not now read from its file.
  */
-export async function projectOffer(library: DeckLibrary): Promise<{ offer: LibraryOffer; decks: OfferDeck[]; same: SameSlides }> {
+export async function projectOffer(library: DeckLibrary): Promise<{ offer: LibraryOffer; decks: OfferDeck[]; same: SameSlides; unreadable: boolean }> {
   const index = new DeckIndex(library.files);
   const decks = await index.decks();
   const same = index.same();
-  return { offer: offerOf(decks, same, await readNotNow(library.files)), decks, same };
+  const notNow = await readNotNow(library.files);
+  const offer = offerOf(decks, same, notNow ?? NO_NOT_NOW);
+  return { offer: notNow ? offer : { ...offer, slides: [] }, decks, same, unreadable: !notNow };
 }

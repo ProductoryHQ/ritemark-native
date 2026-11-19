@@ -22,7 +22,8 @@ import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
 import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks, searchLibrary, type IndexedDeck } from './librarySearch';
-import { EVERY_TRAINING, NO_NOT_NOW, hideFromOffer, notNowSlides, offerOf, readNotNow, type OfferedSlide } from './libraryOffer';
+import { EVERY_TRAINING, NOT_NOW_PATH, NOT_NOW_UNREADABLE, hideFromOffer, notNowSlides, offerOf, readNotNow, type NotNow, type OfferedSlide } from './libraryOffer';
+import type { SameSlides } from './sameSlide';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -56,6 +57,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private stateActive: string | null = null;
   /** Sprint 165 PR 4: the offer's Add all and Choose… writes, by the token their notice's Undo sends. */
   private readonly writes = new Map<string, TopicWrite>();
+  /**
+   * The offer last worked out, and what it was worked out from: the grouping (the index's, the same object until a
+   * deck changes), the open deck and Not now's text. Typing in a deck changes the grouping; a search changes none.
+   */
+  private offerMemo: { same: SameSlides; active: string | null; notNow: string | null; offer: OfferedSlide[] } | null = null;
+  /** Not now's file can't be read: the place says so once, until it can again. */
+  private notNowBroken = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -96,13 +104,21 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       const current = this.index;
       const relative = current && !isDeck(uri) ? projectRelative(current.root, uri.fsPath) : null;
       if (!current || !relative || !current.index.holdsUnder(relative)) return;
-      current.index.invalidate();
+      // A stale path lists the files again, and the next update drops the decks no longer listed; the rest stay read.
+      current.index.invalidate(relative);
       this.refreshSoon();
     };
+    // Not now's file deleted (as it says to, to have the slides offered again) or edited: the offer follows.
+    const notNow = vscode.workspace.createFileSystemWatcher(`**/${NOT_NOW_PATH}`);
+    const notNowChanged = () => this.refreshSoon();
     this.watching = [
       watcher,
       deletes,
       deletes.onDidDelete(listedAgain),
+      notNow,
+      notNow.onDidCreate(notNowChanged),
+      notNow.onDidChange(notNowChanged),
+      notNow.onDidDelete(notNowChanged),
       watcher.onDidCreate(uri => this.deckChanged(uri)),
       watcher.onDidDelete(uri => this.deckChanged(uri)),
       watcher.onDidChange(uri => this.deckChanged(uri)),
@@ -273,7 +289,11 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const library = this.library();
     const write = this.writes.get(token);
     this.writes.delete(token);
-    if (!library || !write) return;
+    if (!library || !write) {
+      // A window reloaded since, or older than the last five adds: the press still gets an answer.
+      await this.post({ type: 'library/notice', text: `This Undo is no longer here. Open ${EVERY_TRAINING} to take the slides out.` });
+      return;
+    }
     let text: string;
     try {
       text = (await library.undoTopicWrite(write))
@@ -357,10 +377,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const here = same ? inOpenDeck(indexed, same, active?.path) : [];
     // Sprint 165 PR 4: the offer, only while browsing (a search shows none).
     let offer: OfferedSlide[] = [];
-    if (same && library && !query.trim()) {
-      const notNow = await readNotNow(library.files).catch(() => NO_NOT_NOW);
-      offer = offerOf(indexed, same, notNow, { active: active?.path }).slides;
-    }
+    if (same && library && !query.trim()) offer = await this.offerFor(library, indexed, same, active?.path ?? null);
     // Each deck's pictures once: a named deck can be a hit deck too.
     const drawn = named ? [...new Map([...decks, ...named.decks].map(deck => [deck.path, deck] as const)).values()] : decks;
     const { assets, themes } = this.view ? await looksOf(this.view.webview, drawn) : { assets: {}, themes: {} };
@@ -370,6 +387,25 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       type: 'library/state', enabled: true, decks, assets, themes, active, query, project: !!library, projectName: projectName(), here, offer,
       ...(found ? { search: { ...found, decks: named?.decks ?? [], deckTotal: named?.total ?? 0 } } : {}),
     });
+  }
+
+  /**
+   * Sprint 165 PR 4: the offer for this state, worked out again only when the grouping, the open deck or Not now's text
+   * changed. Not now's file broken: no offer, and a notice once.
+   */
+  private async offerFor(library: DeckLibrary, indexed: IndexedDeck[], same: SameSlides, active: string | null): Promise<OfferedSlide[]> {
+    const text = await library.files.read(NOT_NOW_PATH).catch(() => null);
+    const memo = this.offerMemo;
+    if (memo && memo.same === same && memo.active === active && memo.notNow === text) return memo.offer;
+    // The text just read, as `readNotNow` reads it (one read for the memo and the offer).
+    const notNow: NotNow | null = await readNotNow({ read: async () => text });
+    if (!notNow !== this.notNowBroken) {
+      this.notNowBroken = !notNow;
+      if (!notNow) void this.post({ type: 'library/notice', text: NOT_NOW_UNREADABLE });
+    }
+    const offer = notNow ? offerOf(indexed, same, notNow, { active }).slides : [];
+    this.offerMemo = { same, active, notNow: text, offer };
+    return offer;
   }
 
   private async post(message: Record<string, unknown>): Promise<void> {

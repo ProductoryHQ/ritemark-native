@@ -414,8 +414,12 @@ export class DeckLibrary {
     if (previous !== null) writableDeckText(path, previous);
     const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
     const parts: CopiedPart[] = [];
-    // A slide named twice goes in once.
-    const named = new Set<string>();
+    // A slide named twice goes in once, and one the topic already has a copy of (its `from:` names it: a second press
+    // that crossed the first) not again.
+    const named = new Set<string>(previous ? slidesOfText(previous).flatMap(slide => {
+      const source = parseFrom(slide.data.from);
+      return source ? [`${source.path}#${source.id}`] : [];
+    }) : []);
     for (const slide of slides) {
       if (named.has(`${slide.path}#${slide.id}`)) continue;
       named.add(`${slide.path}#${slide.id}`);
@@ -427,6 +431,7 @@ export class DeckLibrary {
       if (id) taken.push(id);
       parts.push(part);
     }
+    if (!parts.length) throw new Error(`${deckName(path)} already has ${slides.length === 1 ? 'this slide' : 'these slides'}.`);
     const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, slideDataOf(part.kind, part.body), part.handout)));
     const kinds = parts.map(part => part.kind);
     // A topic made here names the built-in theme, whose file is made with it when the project has none; it says
@@ -452,7 +457,9 @@ export class DeckLibrary {
    * it; a file the write made goes too while it is as written. False when it can't, and then nothing is changed.
    */
   async undoTopicWrite(write: TopicWrite): Promise<boolean> {
-    if ((await this.files.read(write.path)) !== write.written) return false;
+    // An open topic holds the text in its own line endings (a Windows file's CRLF): the same text either way.
+    const lines = (text: string | null) => text?.replace(/\r\n/g, '\n');
+    if (lines(await this.files.read(write.path)) !== lines(write.written)) return false;
     if (write.previous !== null) await this.files.write(write.path, write.previous);
     else if (this.files.remove) await this.files.remove(write.path);
     else return false;
