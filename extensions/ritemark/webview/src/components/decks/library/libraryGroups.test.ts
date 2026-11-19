@@ -121,6 +121,6 @@ console.log('libraryGroups: ok')
   assert.match(rule('.deck-lib-take-slot'), /position: absolute/, 'at rest the button takes no room from the title')
   assert.match(rule('.deck-lib-take-slot'), /opacity: 0/)
   assert.match(css, /\.deck-lib-section:hover \.deck-lib-take-slot/, 'shown while the pointer is over the section')
-  assert.match(css, /\.deck-lib-section-head:focus-within \.deck-lib-take-slot/, 'shown while the heading holds the keyboard')
+  assert.match(css, /\.deck-lib-section-head:has\(:focus-visible\) \.deck-lib-take-slot/, 'shown while the heading holds the keyboard, not after a click')
   assert.match(rule('.deck-lib-section-title'), /-webkit-line-clamp: 2/, 'two lines before an ellipsis')
 }

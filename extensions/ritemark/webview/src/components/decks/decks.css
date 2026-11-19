@@ -533,4 +533,5 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    the title's end on the side bar's ground, only while the pointer is over the section or the heading holds focus. */
 .deck-lib-take-slot { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; padding-left: 16px; background: linear-gradient(to right, transparent, var(--vscode-sideBar-background) 14px); opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .deck-lib-section:hover .deck-lib-take-slot,
-.deck-lib-section-head:focus-within .deck-lib-take-slot { opacity: 1; pointer-events: auto; }
+.deck-lib-section-head:has(:focus-visible) .deck-lib-take-slot { opacity: 1; pointer-events: auto; }
+.deck-lib-take[aria-disabled="true"] { opacity: 0.5; cursor: default; }

@@ -278,19 +278,20 @@ export function SlideLibraryPanel() {
             <span className="deck-lib-section-title">{section.title}</span>
             {/* #861: shown only while the pointer is over the section or the heading holds the keyboard (CSS). */}
             <span className="deck-lib-take-slot">
-            <Tooltip label={tip} side="bottom">
-              <Button
-                variant="secondary"
-                size="compact"
-                className="deck-lib-take"
-                disabled={!ready}
-                aria-label={`Take section ${section.title}`}
-                onClick={() => sendToExtension('library/insert-section', { path: shown.path, ids })}
-              >
-                <Icon name="plus" size={12} tone="inherit" />
-                Take section
-              </Button>
-            </Tooltip>
+              <Tooltip label={tip} side="bottom">
+                {/* Not `disabled` when it can't be taken: it stays in the Tab order, so the keyboard shows it and its reason. */}
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  className="deck-lib-take"
+                  aria-disabled={!ready}
+                  aria-label={`Take section ${section.title}`}
+                  onClick={() => { if (ready) sendToExtension('library/insert-section', { path: shown.path, ids }) }}
+                >
+                  <Icon name="plus" size={12} tone="inherit" />
+                  Take section
+                </Button>
+              </Tooltip>
             </span>
           </div>
           {grid(section.slides)}
