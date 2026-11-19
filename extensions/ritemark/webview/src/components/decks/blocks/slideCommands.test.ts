@@ -1,6 +1,6 @@
 /**
  * Sprint 161 (PR 3): the blocks on the slide. The / menu's blocks, New slide below and Split slide here, a box's icon,
- * the Steps pill, a table's rows and columns, empty boxes, a converted Section slide and "This slide is full", driven
+ * the Label (Sprint 164 PR 3; the Steps pill it replaces), a table's rows and columns, empty boxes, a converted Section slide and "This slide is full", driven
  * the way the stage drives them: the slide editor's document on its own schema and pipeline (`slideEditorHarness`), the
  * slide's sync (`SlideSync`), and the deck as the deck view's editor holds it, with its history, guard, drawn headings
  * and conversion, saved through the editor's own Markdown pipeline.
@@ -16,16 +16,16 @@ import { closeHistory, history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
 import { partHeadingLevel, slideDataOf, withBlockMarkdown, withPartHeading, withWrittenHandout } from '../../../../../src/decks/deckFormat'
-import { convertDeckText, withStepsTag } from '../../../../../src/decks/blocks/convertDeck'
-import { withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
-import { blockSlideHtml, isCoverSlide, lexBlockSlide, stepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { parseFenceAttributes, OPEN_FENCE } from '../../../../../src/decks/blocks/fencedDiv'
+import { convertDeckText } from '../../../../../src/decks/blocks/convertDeck'
+import { OPEN_FENCE, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
+import { blockSlideHtml, isCoverSlide, lexBlockSlide } from '../../../../../src/decks/blocks/slideRenderer'
+import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { deckDigest, publicDeck } from '../../../../../src/decks/page/publicDeck'
 import { pageHtml } from '../../../../../src/decks/page/pageHtml'
 import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
 import { editorHTML, editorMarkdown, installTestDocument } from '../../../utils/markdownFidelity'
-import { blockItems } from '../../../extensions/blockItems'
+import { blockItems, filterSlashItems } from '../../../extensions/blockItems'
 import { DeckSlide } from '../handout/deckSchema'
 import { DeckDrawnHeadings, drawnHeadingsFollow } from '../handout/drawnHeadings'
 import { deckGuardPlugin } from '../handout/deckGuard'
@@ -33,9 +33,10 @@ import { deckLinesPlugin } from '../handout/deckLines'
 import { convertDeckInto, deckConvertPlugin } from '../handout/deckConvert'
 import { derivedHeadings, insertSlide, slidesOf, starterMarkdown } from '../deckDocument'
 import { loadSlide, loadSlideWithComments, saveSlide, slideSchema } from './slideEditorHarness'
-import { saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { isTitlePlace, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { labelBackspace, labelNode } from './slideLabel'
 import { SlideSync } from './slideSync'
-import { SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SLIDE_COMMAND, SLIDE_ITEMS, agendaNode, isOwnStep, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, slideBlockNode, slideItemsAt, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
 import { splitSlide } from './slideSplit'
 import { webPageAddress } from './SlideBlockTools'
 import { isFullAt, nextFitStep } from './slideFit'
@@ -87,7 +88,8 @@ const slideSave = (doc: PMNode) => saveSlideMarkdown(doc, editorHTML(doc), loadS
 function stageOn(deck: ReturnType<typeof openDeck>, index: number) {
   let outer = deck.state
   const entry = slidesOf(outer.doc)[index]
-  const markdown = slideDataOf(entry.kind, entry.node.attrs.body).markdown ?? ''
+  // As the stage opens it (`stageMarkdownOf`): a Steps block's old pill as its Label (Sprint 164 PR 3).
+  const markdown = withStepsLabels(slideDataOf(entry.kind, entry.node.attrs.body).markdown ?? '')
   let inner = EditorState.create({ doc: loadSlide(markdown) })
   const sync = new SlideSync(loadSlide, slideSave, markdown, inner.doc)
   const write = (ownStep: boolean) => {
@@ -140,7 +142,7 @@ const DECK = [
 {
   assert.deepEqual(SLIDE_ITEMS.map(item => `${item.group}: ${item.title}${item.shortcut ? ` ${item.shortcut}` : ''}`), [
     'Text: Title #', 'Text: Heading ##', 'Text: Bullet list -', 'Text: Numbered list 1.', 'Text: Code block ```',
-    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Tabs', 'Blocks: Button', 'Blocks: Agenda',
+    'Blocks: Columns', 'Blocks: Boxes', 'Blocks: Steps', 'Blocks: Table', 'Blocks: Tabs', 'Blocks: Button', 'Blocks: Agenda', 'Blocks: Label',
     'Media: Picture', 'Media: Web page',
     'Slides: New slide below', 'Slides: Split slide here ***',
   ])
@@ -326,25 +328,17 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(shape(loadSlide(':::: columns\n::: column\nWords\n:::\n::::')), 'slideDiv:Words slideDiv:Words paragraph:Words text:Words', 'no empty heading added')
 }
 
-// ---- The lead on #769: a new Steps block carries the deck's last pill label, written as its own tag; with none it shows
-// "Exercise" (#752's rule) and writes no tag.
+// ---- Sprint 164 PR 3 (Jarmo's yes by name, 19 November): a new Steps block comes without a Label, whatever the deck's
+// earlier pills said; the rule that it took the deck's last label is gone.
 {
-  const deck = [
-    { kind: 'exercise', tag: 'Harjutus' },
-    { kind: '', markdown: '# Two\n\n::: steps\n1. A\n:::' },
-    { kind: '', markdown: '# Three\n\n```\n::: {.steps tag="In code"}\n```' },
-  ]
-  assert.equal(lastPillLabel(deck), 'Harjutus', 'the last label written in words of its own')
-  assert.equal(lastPillLabel([...deck, { kind: '', markdown: '::: {.steps tag="Ülesanne"}\n1. B\n:::' }]), 'Ülesanne')
-  assert.equal(lastPillLabel([{ kind: '', markdown: '::: {.steps tag=""}\n1. B\n:::' }]), null, 'a hidden pill is no label')
-  assert.equal(lastPillLabel([{ kind: 'exercise' }, { kind: '', markdown: '# No steps' }]), null)
   const schema = slideSchema
-  const carried = slideSave(schema.nodes.doc.create(null, [slideBlockNode(schema, 'steps', 'Harjutus')]))
-  assert.equal(carried, '::: {.steps tag="Harjutus"}\n1.\n:::')
-  assert.equal(/<span class="blk-pill">([^<]*)</.exec(blockSlideHtml(carried))?.[1], 'Harjutus')
-  const plain = slideSave(schema.nodes.doc.create(null, [slideBlockNode(schema, 'steps', null)]))
-  assert.equal(plain, '::: steps\n1.\n:::', 'no label: no tag, the pill shows "Exercise"')
-  assert.equal(/<span class="blk-pill">([^<]*)</.exec(blockSlideHtml(plain))?.[1], 'Exercise')
+  const plain = slideSave(schema.nodes.doc.create(null, [slideBlockNode(schema, 'steps')]))
+  assert.equal(plain, '::: steps\n1.\n:::', 'no tag on its line')
+  assert.ok(!blockSlideHtml(plain).includes('blk-label') && !blockSlideHtml(plain).includes('blk-pill'), 'and nothing over its steps')
+  // Turned into Steps from the block's bar: no Label either.
+  const list = EditorState.create({ doc: loadSlide('- One\n- Two') })
+  const turned = turnInto(list, 0, 'steps')!
+  assert.equal(slideSave(list.apply(turned).doc), '::: steps\n1. One\n2. Two\n:::')
 }
 
 // ---- Empty boxes survive save and reopen (PR 2's gap: a new Boxes slide's boxes dropped out at its first write).
@@ -390,39 +384,147 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.equal(withFenceValue('   ::: box', 'icon', 'a"b'), `   ::: {.box icon='a"b'}`, 'the indent kept; a quote in the value')
 }
 
-// ---- The Steps pill (#752's rule): a missing tag shows "Exercise", an empty one none, a written one is kept; the words
-// typed in place are its tag, and words it shows already write nothing. Emptied, Settings' Label row brings it back.
+// ---- Sprint 164 PR 3 (the decks README, "Label, a block of its own"): the Label on the stage. Its file form,
+// `[words]{.label}` on a line of its own, reads and writes byte for byte, in a column, a box and a tab's pane too; its
+// words are plain text; an empty one shows "Label" faint only while the caret is in it, and Backspace takes it away.
 {
-  const pill = (markdown: string) => /<span class="blk-pill">([^<]*)<\/span>/.exec(blockSlideHtml(markdown))?.[1] ?? null
-  const missing = '# Try it\n\n::: steps\n1. Open\n:::'
-  const written = '# Try it\n\n::: {.steps tag="Harjutus"}\n1. Open\n:::'
-  const empty = '# Try it\n\n::: {.steps tag=""}\n1. Open\n:::'
-  assert.equal(pill(missing), 'Exercise')
-  assert.equal(pill(written), 'Harjutus')
-  assert.equal(pill(empty), null, 'an empty tag: no pill')
-  for (const markdown of [missing, written, empty]) assert.equal(slideSave(loadSlide(markdown)), markdown, 'each reads back as written')
-
-  const stepsAt = (state: EditorState) => {
-    let at = -1
-    state.doc.descendants((node, pos) => { if (at < 0 && node.type.name === 'slideDiv') at = pos; return at < 0 })
-    return at
+  const label = (doc: PMNode) => {
+    const found: string[] = []
+    doc.descendants(node => { if (node.type.name === 'slideLabel') found.push(node.textContent); return true })
+    return found
   }
-  let state = EditorState.create({ doc: loadSlide(missing) })
-  assert.equal(setStepsTag(state, stepsAt(state), 'Exercise'), null, 'the default as typed writes no tag')
-  // Typed in place: other words.
-  state = state.apply(setStepsTag(state, stepsAt(state), 'Harjutus 1')!)
-  assert.equal(slideSave(state.doc), '# Try it\n\n::: {.steps tag="Harjutus 1"}\n1. Open\n:::')
-  // Emptied: tag="" and the pill hides.
-  const emptied = setStepsTag(state, stepsAt(state), '')!
-  assert.notEqual(emptied.getMeta(SLIDE_COMMAND), true, 'typed in the pill: it joins the typing, not an undo step of its own')
-  state = state.apply(emptied)
-  const saved = slideSave(state.doc)
-  assert.equal(saved, empty)
-  assert.equal(pill(saved), null, 'emptying it hides the pill')
-  assert.equal(stepsTagOf(parseFenceAttributes(OPEN_FENCE.exec('::: {.steps tag=""}')![2])!), '')
-  // Settings' Label row brings it back.
-  assert.equal(pill(withStepsTag(saved, 'Exercise')), 'Exercise')
-  assert.equal(pill(withStepsTag(saved, 'Harjutus')), 'Harjutus')
+  for (const markdown of [
+    '[Exercise · 1 / 2]{.label}\n\n# Try it\n\n::: steps\n1. Open\n:::',
+    ':::: columns\n::: column\n[Before]{.label}\n\n### Copilot\n:::\n\n::: column\n[After · 2]{.label}\n:::\n::::',
+    ':::: boxes\n::: box\n[Tip]{.label}\n\nOne line\n:::\n::::',
+    '# Tabs\n\n::: {.panel-tabset}\n## One\n\n[In a pane]{.label}\n\nWords\n:::',
+    '[A \\[b\\] \\*c\\*]{.label}\n\n# Escaped',
+    '[Kept #id]{.label #intro}\n\n# Attributes',
+    '[]{.label}\n\n# Empty',
+    '[Tight]{.label}\n# Under it',
+  ]) {
+    const doc = loadSlide(markdown)
+    assert.ok(label(doc).length > 0, `a Label on the stage: ${markdown}`)
+    assert.equal(slideSave(doc), markdown, `byte for byte: ${markdown}`)
+    assert.equal(slideSave(loadSlide(slideSave(doc))), markdown, `stable: ${markdown}`)
+  }
+  assert.deepEqual(label(loadSlide('[A \\[b\\] \\*c\\*]{.label}')), ['A [b] *c*'], 'its words, escapes read')
+  // Not a Label: a span inside a paragraph, a link, another class: words, as Pandoc reads them.
+  for (const markdown of ['Words\n[x]{.label}', '[x](https://example.com){.label}', '[x]{.tag}', '[x] {.label}']) {
+    assert.deepEqual(label(loadSlide(markdown)), [], markdown)
+    assert.ok(!blockSlideHtml(markdown).includes('blk-label'), markdown)
+  }
+  // Typed: its words written as `[words]{.label}`, brackets and marks escaped; the attribute block as it was read.
+  let state = EditorState.create({ doc: loadSlide('[Kept]{.label #intro}\n\n# T') })
+  state = state.apply(state.tr.insertText(' [now] *', 5))
+  assert.equal(slideSave(state.doc), '[Kept \\[now\\] \\*]{.label #intro}\n\n# T')
+  assert.ok(blockSlideHtml(slideSave(state.doc)).includes('<div class="blk-label">Kept [now] *</div>'))
+  // Typed back to the words it was read with: the line as written.
+  state = EditorState.create({ doc: loadSlide('[Odd\\·spacing]{.label}') })
+  state = state.apply(state.tr.insertText('x', 2))
+  assert.equal(slideSave(state.doc), '[Oxdd\\\\·spacing]{.label}', 'new words: written fresh, a backslash before a non-ASCII mark is a backslash')
+  state = state.apply(state.tr.delete(2, 3))
+  assert.equal(slideSave(state.doc), '[Odd\\·spacing]{.label}', 'its own words again: its own line again')
+  // Text only: no marks, no line break.
+  assert.equal(slideSchema.nodes.slideLabel.spec.marks, '')
+  assert.equal(slideSchema.nodes.slideLabel.spec.content, 'text*')
+
+  // The / menu's Label: where the / was, empty, the caret in it, an undo step of its own; it shows "Label" faint only
+  // while the caret is in it; its words typed are written; one Undo takes the block back.
+  const deck = openDeck(DECK)
+  const stage = stageOn(deck, 0)
+  stage.caretAfter('Three jobs every week')
+  stage.apply(stage.inner.tr.split(stage.inner.selection.from))
+  const from = stage.inner.selection.from
+  stage.apply(stage.inner.tr.insertText('/pill'), true)
+  const tr = stage.inner.tr.delete(from, from + 5)
+  insertSlideBlock(tr, from, labelNode(stage.inner.schema))
+  assert.equal(isOwnStep(tr), true)
+  stage.apply(tr)
+  assert.equal(stage.inner.selection.$from.parent.type.name, 'slideLabel', 'the caret in the new Label')
+  const empty = stage.inner.selection.$from.parent
+  assert.equal(slidePlaceholderOf(empty, null, false, true), 'Label', '"Label" faint while the caret is in it')
+  assert.equal(slidePlaceholderOf(empty, null, false, false), '', 'nothing while it is elsewhere')
+  const added = stage.save()
+  assert.ok(added.includes('Three jobs every week\n\n[]{.label}\n```'), added)
+  stage.apply(stage.inner.tr.insertText('Workshop'))
+  const typed = stage.save()
+  assert.ok(typed.includes('Three jobs every week\n\n[Workshop]{.label}\n```'), typed)
+  assertStable(typed, 'Label')
+  assert.ok(pageHtml(publicDeck(typed, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }), { slideCss: '', fonts: [] }, { digest: 'x', pictureUrl: () => null }).includes('<div class="blk-label">Workshop</div>'), 'the published page draws it on the slide')
+  stage.undo()
+  stage.undo()
+  assert.equal(stage.save(), DECK, 'Undo takes the words, then the Label, back')
+
+  // Backspace in an empty Label removes it: the caret to the end of the line before it, or to the next line when it was
+  // first; the only block of a box leaves its empty line. Anywhere else, the editor's own Backspace.
+  const caretIn = (markdown: string, nth = 0) => {
+    const doc = loadSlide(markdown)
+    let at = -1
+    let seen = 0
+    doc.descendants((node, pos) => { if (at < 0 && node.type.name === 'slideLabel' && seen++ === nth) at = pos + 1; return at < 0 })
+    return EditorState.create({ doc, selection: TextSelection.create(doc, at) })
+  }
+  let gone = caretIn('# Title\n\n[]{.label}\n\nWords')
+  gone = gone.apply(labelBackspace(gone)!)
+  assert.equal(slideSave(gone.doc), '# Title\n\nWords')
+  assert.equal(gone.selection.$from.parent.textContent, 'Title', 'the caret at the end of the line before it')
+  assert.equal(gone.selection.$from.parentOffset, 5)
+  let first = caretIn('[]{.label}\n\n# Title')
+  first = first.apply(labelBackspace(first)!)
+  assert.equal(slideSave(first.doc), '# Title')
+  assert.equal(first.selection.$from.parent.textContent, 'Title', 'first: the caret at the start of the line after it')
+  let only = caretIn(':::: boxes\n::: box\n[]{.label}\n:::\n::::')
+  only = only.apply(labelBackspace(only)!)
+  assert.equal(slideSave(only.doc), ':::: boxes\n::: box\n:::\n::::', 'the box keeps its empty line')
+  assert.equal(labelBackspace(caretIn('[Words]{.label}')), null, 'a Label with words: the editor\'s own Backspace')
+
+  // The title's place under a Label still says "Title".
+  const titled = loadSlide('[Day 1]{.label}\n\n#\n\nWords')
+  let titlePos = -1
+  titled.forEach((node, offset) => { if (titlePos < 0 && node.type.name === 'heading') titlePos = offset })
+  assert.ok(isTitlePlace(titled, titled.nodeAt(titlePos)!, titlePos), 'a heading with only Labels before it is the title')
+  assert.ok(!isTitlePlace(loadSlide('Words\n\n# Second'), loadSlide('Words\n\n# Second').child(1), loadSlide('Words\n\n# Second').child(0).nodeSize))
+
+  // An old Steps pill on the stage: it opens as its Label, nothing is written until the person types; the first word
+  // typed writes the slide with its Label (and every other slide's pill), as one step; one Undo gives the file back.
+  const OLD_PILLS = DECK
+    .replace('# Where assistants help\n\nThree jobs every week', '# Where assistants help\n\n::: {.steps tag="Harjutus · 1 / 2"}\n1. Three jobs every week\n:::')
+    .replace('# What the pilot taught us\n\nOne', '::: {.steps tag=""}\n1. One\n:::')
+  assert.notEqual(OLD_PILLS, DECK)
+  const old = openDeck(OLD_PILLS)
+  const onStage = stageOn(old, 0)
+  assert.deepEqual(label(onStage.inner.doc), ['Harjutus · 1 / 2'], 'the stage shows the pill as its Label')
+  assert.equal(onStage.save(), OLD_PILLS, 'opened and left: byte for byte')
+  onStage.caretAfter('Three jobs every week')
+  onStage.apply(onStage.inner.tr.insertText('!'))
+  const migrated = onStage.save()
+  assert.ok(migrated.includes('[Harjutus · 1 / 2]{.label}\n\n# Where assistants help\n\n::: steps\n1. Three jobs every week!\n:::'), migrated)
+  assert.ok(migrated.includes('---\nid: b2\n---\n::: steps\n1. One\n:::'), 'the emptied pill on the other slide: nothing')
+  assert.ok(!migrated.includes('tag='))
+  assertStable(migrated, 'migrated pills')
+  onStage.undo()
+  assert.equal(onStage.save(), OLD_PILLS, 'one Undo: byte for byte')
+
+  // Slides only: a Text document and the deck's handout read the line as the words it is, and write it back as written.
+  assert.ok(!deckSchema.nodes.slideLabel, 'the Text editor has no Label node')
+  assert.equal(markdownToEditorHTML('[Exercise]{.label}').trim(), '<p>[Exercise]{.label}</p>')
+  const handoutDeck = DECK.replace('Ask who has done one.', '[In the handout]{.label}')
+  const opened = openDeck(handoutDeck)
+  assert.equal(opened.save(opened.state.doc), handoutDeck, 'the handout keeps the line byte for byte')
+  let literal = false
+  opened.state.doc.descendants(node => { if (node.type.name === 'paragraph' && node.textContent === '[In the handout]{.label}') literal = true; return !literal })
+  assert.ok(literal, 'its words, brackets and braces included, are a paragraph of the handout')
+
+  // The / menu finds it by its hidden words, in a column, a box and a tab's pane too; the Text editor has none.
+  for (const word of ['label', 'tag', 'badge', 'pill', 'eyebrow', 'silt', 'märgis', 'margis']) {
+    assert.ok(filterSlashItems(SLIDE_ITEMS, word).some(item => item.title === 'Label'), `/${word} finds Label`)
+  }
+  assert.ok(!blockItems.some(item => item.title === 'Label' || item.nodeType === 'label'), 'the Text editor has no Label')
+  const inPane = EditorState.create({ doc: loadSlide('::: {.panel-tabset}\n## One\n\nWords\n:::') })
+  let paneText = -1
+  inPane.doc.descendants((node, pos) => { if (paneText < 0 && node.type.name === 'paragraph') paneText = pos + 1; return paneText < 0 })
+  assert.ok(slideItemsAt(inPane.apply(inPane.tr.setSelection(TextSelection.create(inPane.doc, paneText)))).some(item => item.nodeType === 'label'), 'offered in a tab\'s pane')
 }
 
 // ---- Tables: the + bars (experience 48, in place of Settings' Add a row and Add a column) write valid Markdown
