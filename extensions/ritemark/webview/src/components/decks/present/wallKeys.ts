@@ -258,6 +258,20 @@ export function wallBarBottom(_frameBottom: number): number {
   return WALL_BAR_FROM_EDGE
 }
 
+/** The bar's classes: shown while the pointer moves (or rests on it), faded otherwise. */
+export function wallBarClass(barVisible: boolean): string {
+  return `wall-bar dark${barVisible ? ' is-shown' : ''}`
+}
+
+/**
+ * The quiet line's classes (Sprint 166 PR 6, the Experience lead): while the bar shows, the line fades out with the
+ * bar's own timing, and it comes back when the bar fades. The bar already says "n of N", so the line's "n / N" would
+ * only repeat it, and a long client name never runs under the bar.
+ */
+export function wallLineClass(barVisible: boolean): string {
+  return `wall-line${barVisible ? ' is-hidden' : ''}`
+}
+
 /** The presenter view's clock: elapsed time as m:ss, or h:mm:ss past an hour. */
 export function clockText(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))

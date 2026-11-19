@@ -57,7 +57,7 @@ import { SlideCanvas } from '../slide/SlideCanvas'
 import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { themeVars, wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
-import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBarBottom, wallBleed, wallKeyOf, WALL_LINE_HEIGHT, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
+import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBarBottom, wallBarClass, wallBleed, wallLineClass, wallKeyOf, WALL_LINE_HEIGHT, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
 import { directionOf, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
 import { drawingOf, motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
 import { ROW_PLAYER, type RowTransition } from './rowArrival'
@@ -548,7 +548,7 @@ export function DeckWall() {
 
       {/* Sprint 163 PR 4: the quiet line, the page's own without its buttons: the client, the session and "7 / 12", with
           the accent's line for how far along it is (the decks README, "The page and Present are one player"). */}
-      <WallQuietLine line={state.line} position={state.position} count={state.count} ink={lineInk} />
+      <WallQuietLine line={state.line} position={state.position} count={state.count} ink={lineInk} barVisible={barVisible} />
 
       {digits !== null ? (
         <div className="wall-goto dark" style={{ top: frame.top + GOTO_FROM_TOP }} role="status">
@@ -559,7 +559,7 @@ export function DeckWall() {
       ) : null}
 
       <div
-        className={`wall-bar dark${barVisible ? ' is-shown' : ''}`}
+        className={wallBarClass(barVisible)}
         style={{ bottom: wallBarBottom(frameBottom) }}
         onPointerEnter={() => setOverBar(true)}
         onPointerLeave={() => { setOverBar(false); showBar() }}
@@ -686,12 +686,12 @@ function WallGrid({ state, width, picked, onPick, onGo }: {
  * Sprint 163 PR 4: the quiet line on the wall, the published page's line without its buttons (Jarmo: yes). A participant
  * sees 7 on the wall and goes to 7 on the page. Under the blank, the QR code and a filled wall, as the slide is.
  */
-function WallQuietLine({ line, position, count, ink }: { line: WallLine | undefined; position: number | null; count: number; ink: string }) {
+function WallQuietLine({ line, position, count, ink, barVisible }: { line: WallLine | undefined; position: number | null; count: number; ink: string; barVisible: boolean }) {
   const client = line?.client ?? ''
   const session = line?.session ?? ''
   const progress = position !== null && count > 0 ? Math.min(100, (position / count) * 100) : 0
   return (
-    <div className="wall-line" style={{ '--wall-line-ink': ink } as CSSProperties} aria-hidden="true">
+    <div className={wallLineClass(barVisible)} style={{ '--wall-line-ink': ink } as CSSProperties} aria-hidden="true">
       <span className="wall-line-who">
         {client ? <b>{client}</b> : null}
         {client && session ? <span className="wall-line-dot"> · </span> : null}
