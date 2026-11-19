@@ -282,15 +282,23 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
     '```slide', '---', 'id: v2', '---', '# Bare steps', '', '::: steps', '1. Read', ':::', '```', '',
     '## Bare steps', '',
   ].join('\n');
+  const before = parseDeck(deck).slides;
   const after = convertDeckText(deck);
-  const [v1, v2] = parseDeck(after).slides.map(slide => slideDataOf(slide.kind, slide.body).markdown ?? '');
+  // The whole text: only the v1 slide's block changes (and `deck:` stays 2); the bare v2 slide and both parts stay.
+  assert.equal(after, deck.replace('```slide exercise\nid: v1\ntitle: Old exercise\nitems:\n- heading: Open\n```', '```slide\n---\nid: v1\n---\n[Exercise]{.label}\n\n# Old exercise\n\n::: steps\n1. Open\n:::\n```'));
+  assert.equal(convertDeckText(after), after, 'converting again changes nothing');
+  const slides = parseDeck(after).slides;
+  assert.equal(slides.length, 2);
+  const [v1, v2] = slides.map(slide => slideDataOf(slide.kind, slide.body).markdown ?? '');
   assert.equal(v1, '[Exercise]{.label}\n\n# Old exercise\n\n::: steps\n1. Open\n:::', 'the v1 Exercise slide: an "Exercise" Label');
   assert.equal(v2, '# Bare steps\n\n::: steps\n1. Read\n:::', 'the bare v2 Steps block: no Label');
   assert.equal(blockStepsLabelOf(v1), 'Exercise');
   assert.equal(blockStepsLabelOf(v2), '');
-  // Before the edit the views draw the same: the v1 slide as its conversion, the v2 slide as written.
-  assert.ok(blockSlideHtml(blockDataOf('exercise', slideDataOf('exercise', 'id: v1\ntitle: Old exercise\nitems:\n- heading: Open')).markdown ?? '').startsWith('<div class="blk-label">Exercise</div>'));
-  assert.ok(!blockSlideHtml('# Bare steps\n\n::: steps\n1. Read\n:::').includes('blk-label'));
+  // Before the edit the views draw what it writes: the v1 slide as its conversion, the v2 slide as written, no Label.
+  assert.equal(blockSlideHtml(blockDataOf(before[0].kind, slideDataOf(before[0].kind, before[0].body)).markdown ?? ''), blockSlideHtml(v1));
+  assert.ok(blockSlideHtml(v1).startsWith('<div class="blk-label">Exercise</div>\n<h1'));
+  assert.equal(blockSlideHtml(slideDataOf(before[1].kind, before[1].body).markdown ?? ''), blockSlideHtml(v2));
+  assert.ok(blockSlideHtml(v2).startsWith('<h1>Bare steps</h1>\n<div class="blk-steps"><ol>'), blockSlideHtml(v2));
 }
 
 // ---- A copy's stamp through the pill's move: a pill and its Label stamp alike, so a copy and its source still match
