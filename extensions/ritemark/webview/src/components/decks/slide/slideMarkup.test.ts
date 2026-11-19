@@ -215,12 +215,13 @@ for (const size of [16, 28]) assert.equal(renderToStaticMarkup(createElement(Sli
   assert.ok(css.includes('.deck-slide.is-borderless .deck-sl .ic.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }'), 'borderless too')
 }
 
-// The icon menu draws its choices as the slide does; the chrome's Icon draws only its No icon cross (the menu can't be
+// The icon menu draws its choices as the slide does; the chrome's Icon draws only the menu's own marks, the search
+// field's glass (Sprint 169 PR 3) and No icon's cross (the menu can't be
 // rendered outside an open Radix menu, so its source is read). SlideCanvas draws no chrome icon at all.
 {
   const menuSource = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
   assert.ok(/<SlideIconGlyph name=\{\w+\.phosphor\}/.test(menuSource), 'the menu draws the slide glyph')
-  assert.deepEqual(menuSource.match(/<Icon\b[^>]*>/g), ['<Icon name="x" size={14} tone="inherit" />'], 'the chrome icon only for No icon')
+  assert.deepEqual(menuSource.match(/<Icon\b[^>]*>/g), ['<Icon name="magnifying-glass" size={14} tone="inherit" />', '<Icon name="x" size={14} tone="inherit" />'], 'the chrome icon only for the search field and No icon')
   const canvas = readFileSync(fileURLToPath(new URL('./SlideCanvas.tsx', import.meta.url)), 'utf8')
   assert.equal(/<Icon\b|ui\/Icon'/.test(canvas), false, 'SlideCanvas draws no chrome icon')
 }
