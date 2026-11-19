@@ -46,14 +46,31 @@ One GitHub issue per PR in milestone v2.3.0, to be created by the manager when t
 - If a PR's author finds something else that really goes, it is listed here and waits for Jarmo's yes by name before any code is deleted.
 
 ## Success Criteria
-- [ ] A quote has no fill, a 3 px accent bar, and the words in the heading colour; a last line that starts with "— " or "– " is drawn as the attribution; it looks the same on the editor, wall, presenter view, strip and page, on dark and on Paper.
-- [ ] Code block on words inside a quote takes them out as one code block with Copy and ↗, removes a quote left empty, and is one undo step.
-- [ ] H1, H2 and H3 are ordered by size and weight on the slide; an h2 directly after the h1 keeps the title's line; a box's h3 is unchanged.
-- [ ] The / menu offers Heading 1, 2 and 3 with the hidden words from the README; the bubble keeps H1/H2/H3.
-- [ ] One realistic synthetic deck with an h2 mid-slide is checked through the fit.
-- [ ] The Experience lead has seen each PR's shots before it merges.
-- [ ] The full test chain ran once on each final head.
-- [ ] `qa-validator` has signed off at the sprint's end.
+- [x] A quote has no fill, a 3 px accent bar, and the words in the heading colour; a last line that starts with "— " or "– " is drawn as the attribution; it looks the same on the editor, wall, presenter view, strip and page, on dark and on Paper. (#880: the stage and the wall on dark and on Paper, the page at 720×860 and 390×844 in `proof/pr1-quote-look/`; the strip and the presenter view through the same renderer, by tests; the close-out's Paper shot shows it again on the stage and the wall.)
+- [x] Code block on words inside a quote takes them out as one code block with Copy and ↗, removes a quote left empty, and is one undo step. (#872; one ⌘Z gave the deck file back byte for byte.)
+- [x] H1, H2 and H3 are ordered by size and weight on the slide; an h2 directly after the h1 keeps the title's line; a box's h3 is unchanged. (#889; on Paper in the close-out's shot, with one spacing note below.)
+- [x] The / menu offers Heading 1, 2 and 3 with the hidden words from the README; the bubble keeps H1/H2/H3. (#889)
+- [x] One realistic synthetic deck with an h2 mid-slide is checked through the fit. (#889: 453 of 460 px at 100 % before; 440 of 460 px at 92 % after, nothing past the bottom.)
+- [x] The Experience lead has seen each PR's shots before it merges. (He approved #880, #872 and #889 before they merged.)
+- [x] The full test chain ran once on each final head. (EXIT 0 on `8310e024`, `ad14293f` and `b92b8c31`, in each PR's Review record.)
+- [ ] `qa-validator` has signed off at the sprint's end. Not yet: on 20 November it passed every PR check and blocked only on these records and the Paper shot; its sign-off on the close-out PR is still to come.
+
+## Close-out
+The three PRs merged on the evening of 19 November (#889 just after midnight, Tallinn time), each after the Experience lead's look and with a full-chain EXIT 0 on its final head:
+- PR 1, the quote's look: [#880](https://github.com/ProductoryHQ/ritemark-native/pull/880) (`c656d9c5`), closes [#863](https://github.com/ProductoryHQ/ritemark-native/issues/863).
+- PR 2, Code block takes a prompt out of a quote: [#872](https://github.com/ProductoryHQ/ritemark-native/pull/872) (`4a135b4c`), closes [#864](https://github.com/ProductoryHQ/ritemark-native/issues/864).
+- PR 3, heading levels: [#889](https://github.com/ProductoryHQ/ritemark-native/pull/889) (`795adcfd`), closes [#865](https://github.com/ProductoryHQ/ritemark-native/issues/865).
+
+**The Paper shot** (asked for by the Experience lead; #889 had measured Paper but not shot it). One isolated launch of `main` at `795adcfd` on 20 November, a synthetic two-slide deck in the Paper theme, at 1440×900, in `proof/pr3-headings/`:
+- `paper-1-editor-h1-h2-h3-body-1440x900.png`: the slide editor, one slide with Heading 1, a line of text, Heading 2, Heading 3 and a line of text.
+- `paper-2-editor-headings-crop-2x.png`: the three headings and the body text, cropped at 2×.
+- `paper-3-wall-h1-h2-h3-body-1440x900.png`: the same slide on the wall.
+- `paper-4-wall-quote-attribution-1440x900.png`: the second slide on the wall, a quote with its attribution line.
+- `paper-5-editor-quote-attribution-1440x900.png`: the same quote in the slide editor.
+
+What they show: H1 > H2 > H3 > body reads at a glance, all in Source Serif 4 bold in the Paper heading colour over Sofia Sans body (measured: 48, 31.2 and 27.6 px, body 24 px). Nothing is clipped. The quote has its 3 px accent bar, the words in the heading colour and the attribution in a quieter colour under them. One spacing note, not fixed here: the space above a Heading 2 that follows body text is the paragraph's 12 px, while the space under it is its own 21.84 px, so "What helped" sits nearer the line above it than the Heading 3 it heads. The H3 has 9.66 px under it. The crop shows it.
+
+Not run: Windows; the presenter view (it needs a second display); the published page and the strip on Paper (they draw with the same `slide.css` and renderer). The deck file was byte for byte the same after the run.
 
 ## Release notes
 One line per PR, in plain words for people, written with the `release-notes` skill:
