@@ -17,7 +17,7 @@ import { themePathOf } from './deckTheme';
 import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
-import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, searchLibrary, type IndexedDeck } from './librarySearch';
+import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks, searchLibrary, type IndexedDeck } from './librarySearch';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -235,13 +235,15 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     // the slides whose copy is already in the open deck, in the search and in the decks alike.
     const found = same && query.trim() ? searchLibrary(indexed, same, query, { active: active?.path, limit: MAX_HITS }) : null;
     const decks = found ? hitDecks(indexed, found.hits) : indexed.map(entry => entry.summary);
+    // #877 (the Experience lead): the decks whose folder or name has the words, as closed rows above the slides.
+    const named = found ? namedDecks(indexed, query, { active: active?.path, limit: MAX_NAMED_DECKS }) : null;
     const here = same ? inOpenDeck(indexed, same, active?.path) : [];
-    const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
+    const { assets, themes } = this.view ? await looksOf(this.view.webview, named ? [...decks, ...named.decks] : decks) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
     this.stateActive = active?.path ?? null;
     await this.post({
       type: 'library/state', enabled: true, decks, assets, themes, active, query, project: !!library, projectName: projectName(), here,
-      ...(found ? { search: found } : {}),
+      ...(found ? { search: { ...found, decks: named?.decks ?? [], deckTotal: named?.total ?? 0 } } : {}),
     });
   }
 

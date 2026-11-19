@@ -168,3 +168,9 @@ export function alsoLine(count: number, library: boolean): string | null {
 export function hitsCount(shown: number, total: number): string {
   return total > shown ? `${shown} of ${total} slides` : slideCount(shown)
 }
+
+/** The Decks group's count (#877): "2 decks", or "8 of 20 decks" when the list stops short. */
+export function decksCount(shown: number, total: number): string {
+  if (total > shown) return `${shown} of ${total} decks`
+  return shown === 1 ? '1 deck' : `${shown} decks`
+}

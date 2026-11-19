@@ -217,6 +217,24 @@ export function searchLibrary(
   return { hits: ranked.slice(0, options.limit ?? MAX_HITS).map(entry => entry.hit), total: ranked.length };
 }
 
+/** Search's Decks group shows at most this many decks; the count says how many more there are. */
+export const MAX_NAMED_DECKS = 8;
+
+/**
+ * Search's Decks group (the Experience lead on #877): the decks whose folder or name holds each word typed ("Harbour"
+ * finds the decks in Harbour Logistics), whole, in the listing's order, the open deck left out. A deck's name matching
+ * never lists its slides as hits: its row shows instead, closed.
+ */
+export function namedDecks(decks: readonly IndexedDeck[], query: string, options: { active?: string | null; limit?: number } = {}): { decks: DeckSummary[]; total: number } {
+  const terms = searchTerms(query);
+  if (!terms.length) return { decks: [], total: 0 };
+  const found = decks.filter(deck => {
+    const place = deck.summary.path.replace(/\.deck\.md$/i, '').toLowerCase();
+    return deck.summary.path !== options.active && terms.every(term => place.includes(term));
+  });
+  return { decks: found.slice(0, options.limit ?? MAX_NAMED_DECKS).map(deck => deck.summary), total: found.length };
+}
+
 /** The decks search shows, each with only the slides it shows (in their deck's order) and its Agenda. */
 export function hitDecks(decks: readonly IndexedDeck[], hits: readonly LibraryHit[]): DeckSummary[] {
   const wanted = new Map<string, Set<number>>();

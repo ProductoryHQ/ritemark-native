@@ -1,7 +1,7 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { alsoLine, deckDate, deckExpanded, deckMeta, deckPlace, folderHeading, folderOfDeck, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
+import { alsoLine, deckDate, deckExpanded, deckMeta, deckPlace, decksCount, folderHeading, folderOfDeck, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -152,6 +152,10 @@ console.log('libraryGroups: ok')
   assert.equal(hitsCount(4, 4), '4 slides')
   assert.equal(hitsCount(1, 1), '1 slide')
   assert.equal(hitsCount(60, 412), '60 of 412 slides')
+  // #877: the Decks group's count.
+  assert.equal(decksCount(2, 2), '2 decks')
+  assert.equal(decksCount(1, 1), '1 deck')
+  assert.equal(decksCount(8, 20), '8 of 20 decks')
   const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
   const rule = (selector: string) => {
     const found = css.indexOf(`${selector} {`)
@@ -160,4 +164,7 @@ console.log('libraryGroups: ok')
   assert.match(rule('.deck-lib-here'), /position: absolute/, 'the tick sits on the thumbnail')
   assert.match(rule('.deck-lib-here'), /color: var\(--r-ink-strong\)/, 'in ink: green is only the ready dot (greenIsTheReadyDot.test.ts)')
   assert.match(rule('.deck-lib-place'), /-webkit-line-clamp: 2/, 'a long place takes two lines before an ellipsis')
+  // #877: the foot note has room under it at the end of the scroll.
+  const foot = /padding: 4px 8px (\d+)px/.exec(rule('.deck-lib'))
+  assert.ok(foot && Number(foot[1]) >= 32, 'the list ends 32 px under its foot note')
 }

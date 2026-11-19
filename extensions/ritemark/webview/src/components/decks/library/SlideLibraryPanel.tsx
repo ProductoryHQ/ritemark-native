@@ -18,7 +18,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { alsoLine, deckExpanded, deckMeta, deckPlace, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
+import { alsoLine, deckExpanded, deckMeta, deckPlace, decksCount, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -70,8 +70,11 @@ interface LibraryState {
   projectName?: string
   /** Sprint 165 PR 3: the slides (`<path>#<index>`) whose copy is already in the open deck. */
   here?: string[]
-  /** Sprint 165 PR 3: a search's slides in their order (the decks hold only them), and how many it found. */
-  search?: { hits: LibraryHit[]; total: number }
+  /**
+   * Sprint 165 PR 3: a search's slides in their order (the decks hold only them), and how many it found; and (#877) the
+   * decks whose folder or name has the words, whole, for the Decks group, and how many there are.
+   */
+  search?: { hits: LibraryHit[]; total: number; decks?: LibraryDeck[]; deckTotal?: number }
 }
 
 const NO_ASSETS: Record<string, string> = {}
@@ -209,7 +212,7 @@ export function SlideLibraryPanel() {
   // Small details 14: each deck's Agenda list, as its tiles draw it (no hint: the editor's only), once per state.
   const agendaOfDeck = useMemo(() => {
     const drawings = new Map<string, AgendaDrawing>()
-    for (const deck of state?.decks ?? []) drawings.set(deck.path, { entries: agendaEntriesFrom(deck.agenda), hint: false })
+    for (const deck of [...(state?.decks ?? []), ...(state?.search?.decks ?? [])]) drawings.set(deck.path, { entries: agendaEntriesFrom(deck.agenda), hint: false })
     return drawings
   }, [state])
 
@@ -299,9 +302,13 @@ export function SlideLibraryPanel() {
     )
   }
 
-  const deckRows = (deck: LibraryDeck, numbered: boolean) => {
+  /**
+   * A deck's row and, open, its slides. `named` (#877): a row of search's Decks group, which starts closed whatever the
+   * search, is drawn on two lines for a topic too, and opens to the whole deck by section.
+   */
+  const deckRows = (deck: LibraryDeck, numbered: boolean, named = false) => {
     // "From another deck…" opens the newest other deck; the others stay one click away.
-    const expanded = deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
+    const expanded = named ? open[deck.path] === true : deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
     const grid = (slides: LibrarySlide[]) => (
       <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
         <div className="deck-lib-grid">{slides.map((slide) => tile(deck, slide, { numbered }))}</div>
@@ -310,8 +317,9 @@ export function SlideLibraryPanel() {
     // Sprint 165 PR 2: an open deck shows its sections, each with Take section; a search's hits stay one grid (a
     // section would be only the slides found).
     const sectioned = (shown: LibraryDeck) => {
-      // The host's own query too: until it answers a cleared search, its decks hold only the hits.
-      if (searching || state.query.trim()) return grid(shown.slides)
+      // The host's own query too: until it answers a cleared search, its decks hold only the hits. A Decks group's
+      // deck is whole.
+      if (!named && (searching || state.query.trim())) return grid(shown.slides)
       const { before, sections } = sectionsOf(shown.slides)
       if (sections.length === 0) return grid(before)
       return (
@@ -354,7 +362,7 @@ export function SlideLibraryPanel() {
     }
     return (
       <div key={deck.path}>
-        {deck.topic ? (
+        {deck.topic && !named ? (
         <button
           type="button"
           className="deck-lib-row"
@@ -393,12 +401,32 @@ export function SlideLibraryPanel() {
       const slide = deck?.slides.find((entry) => entry.index === hit.index)
       return deck && slide ? [{ hit, deck, slide }] : []
     })
-    if (!shown.length) return <p className="deck-lib-none">No slide matches.</p>
+    const decks = search.decks ?? []
+    if (!shown.length && !decks.length) return <p className="deck-lib-none">No slide matches.</p>
+    return (
+      <>
+        {/* #877 (the Experience lead): decks whose folder or name has the words, closed, above the slides. */}
+        {decks.length ? (
+          <>
+            <div className="deck-lib-group deck-lib-group-hits">
+              Decks
+              <span className="deck-lib-group-count">{decksCount(decks.length, search.deckTotal ?? decks.length)}</span>
+            </div>
+            {decks.map((deck) => deckRows(deck, true, true))}
+          </>
+        ) : null}
+        {shown.length ? slideHits(shown, search.total) : null}
+      </>
+    )
+  }
+
+  /** Search's slides, each once, under "Best match first". */
+  const slideHits = (shown: Array<{ hit: LibraryHit; deck: LibraryDeck; slide: LibrarySlide }>, total: number) => {
     return (
       <>
         <div className="deck-lib-group deck-lib-group-hits">
           Best match first
-          <span className="deck-lib-group-count">{hitsCount(shown.length, search.total)}</span>
+          <span className="deck-lib-group-count">{hitsCount(shown.length, total)}</span>
         </div>
         <div className="deck-lib-grid">
           {shown.map(({ hit, deck, slide }) => (
@@ -415,7 +443,7 @@ export function SlideLibraryPanel() {
             </AgendaContext.Provider>
           ))}
         </div>
-        {search.total > shown.length ? <p className="deck-lib-none">More words find fewer slides.</p> : null}
+        {total > shown.length ? <p className="deck-lib-none">More words find fewer slides.</p> : null}
         <p className="deck-lib-hint">A slide that is in several decks shows once, at its newest. A tick says it's already in the open deck.</p>
       </>
     )

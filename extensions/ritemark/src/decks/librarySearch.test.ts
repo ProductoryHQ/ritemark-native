@@ -5,7 +5,7 @@
 import { strict as assert } from 'node:assert';
 import { slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, type DeckFiles } from './DeckLibrary';
-import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, searchLibrary, searchTerms, slideKey } from './librarySearch';
+import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks, searchLibrary, searchTerms, slideKey } from './librarySearch';
 import { copiedDeckText } from './newDeck';
 
 /** An in-memory project whose files' times the test sets, counting the reads. */
@@ -169,6 +169,24 @@ async function run() {
     const { hits } = searchLibrary(without, same, 'budget', { active: OPEN });
     assert.deepEqual(hits.map(hit => hit.path), [C3]);
     assert.deepEqual(searchLibrary(decks.filter(entry => entry.summary.topic), same, 'what is context', { active: OPEN }).hits, []);
+  }
+
+  // ---- #877: the Decks group: decks whose folder or name has each word, whole, in the listing's order; never the
+  // open deck; their slides are not hits for the name.
+  {
+    assert.deepEqual(namedDecks(decks, 'northwind', { active: OPEN }).decks.map(entry => entry.path), [C2, C1], 'the folder\'s decks, newest first');
+    assert.equal(search('northwind').total, 0, 'a folder\'s name lists no slide');
+    assert.deepEqual(namedDecks(decks, 'context 3').decks.map(entry => entry.path), [C3], 'each word, in the folder or the name');
+    const whole = namedDecks(decks, 'contoso').decks[0];
+    assert.equal(whole.slides.length, slidesOfText(files[C3]).length, 'a named deck comes whole');
+    assert.ok(Array.isArray(whole.agenda), 'with its Agenda');
+    assert.deepEqual(namedDecks(decks, 'every training').decks.map(entry => entry.path), [TOPIC], 'a topic by its name');
+    assert.deepEqual(namedDecks(decks, 'new client', { active: OPEN }).decks, [], 'never the open deck');
+    assert.deepEqual(namedDecks(decks, 'new client', { active: null }).decks.map(entry => entry.path), [OPEN]);
+    assert.deepEqual(namedDecks(decks, '   '), { decks: [], total: 0 });
+    const capped = namedDecks(decks, 'context', { limit: 2 });
+    assert.deepEqual([capped.decks.length, capped.total], [2, 4], 'at most `limit`, the total counts them all');
+    assert.equal(MAX_NAMED_DECKS, 8);
   }
 
   // ---- At most `limit` hits; the total counts them all.
