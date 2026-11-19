@@ -62,6 +62,8 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
 - **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
+- **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
+- **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 <!-- DECKS END -->
 

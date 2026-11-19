@@ -11,6 +11,9 @@
  *    the card's left edge, or its right edge where it would run past the editor's (`sheetLeft`): Done is always in view.
  *  - A new button (`BUTTON_ASK`) opens its sheet at once. Left with Esc or a press outside before it has an address, it
  *    goes, as if it had never been added (`dropNewButton`; the smoke run of 19 November).
+ *  - #848: a press on the sheet's own button (the pill, or the words beside it) is not outside: the sheet stays, and the
+ *    caret goes there (`pressOnPill` for its icon). While a new button's sheet asks for its first address, Enter in the
+ *    button's words goes on to the address; otherwise Enter ends them as before.
  *
  * Every button has a tooltip and one line of words; a press on the bar never takes the caret out of the editor. ⌘Z is
  * the editor's (a slide's: the deck's): each change is an undo step of its own.
@@ -25,7 +28,7 @@ import { Button } from '../../components/ui/button'
 import { Tooltip } from '../../components/ui/tooltip'
 import { Icon } from '../../components/ui/Icon'
 import { useDismissOnOutside } from '../../lib/dismissOnOutside'
-import { BUTTON_ASK, BUTTON_DROP, buttonAt, deleteButton, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton, type NewButton } from './buttonCommands'
+import { BUTTON_ASK, BUTTON_DROP, BUTTON_LABEL_NODE, buttonAt, deleteButton, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton, type NewButton } from './buttonCommands'
 import { unchooseButton } from './ButtonBlock'
 import './buttonBlock.css'
 
@@ -47,6 +50,16 @@ export interface ButtonBlockToolsProps {
   takeBackNew?: () => boolean
 }
 
+/** An open address sheet: its button; for a new one, how it was added and whether nothing else has changed since
+ *  (`exact`: its adding can be undone as it was); and which opening it is (`id`: its field takes the keys once, as it
+ *  opens, never again at each change while it is open). */
+interface Sheet {
+  pos: number
+  added: NewButton | null
+  exact: boolean
+  id: number
+}
+
 interface Placed {
   pos: number
   href: string
@@ -66,11 +79,8 @@ export function openButtonAddress(href: string): boolean {
 export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBlockToolsProps) {
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [focused, setFocused] = useState(false)
-  /**
-   * The open sheet; for a new button (just added, no address yet), how it was added, and whether nothing else has
-   * changed since (`exact`: its adding can be undone as it was).
-   */
-  const [sheet, setSheet] = useState<{ pos: number; added: NewButton | null; exact: boolean } | null>(null)
+  const [sheet, setSheet] = useState<Sheet | null>(null)
+  const sheetIds = useRef(0)
   const [draft, setDraft] = useState('')
   const [refused, setRefused] = useState(false)
   const [barAt, setBarAt] = useState<{ left: number; top: number; above: boolean } | null>(null)
@@ -104,7 +114,7 @@ export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBl
         // Measured now, with the sheet: a sheet whose button isn't placed yet would close at once.
         measure()
         if (found) {
-          setSheet({ pos: found.pos, added: newButtonOf(transaction, editor.state, found.pos), exact: true })
+          setSheet({ pos: found.pos, added: newButtonOf(transaction, editor.state, found.pos), exact: true, id: ++sheetIds.current })
           setDraft(String(found.node.attrs.href ?? ''))
           setRefused(false)
         }
@@ -113,7 +123,7 @@ export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBl
         setSheet(current => {
           if (!current) return current
           const pos = transaction.mapping.map(current.pos)
-          return { pos, added: current.added ? { ...current.added, pos } : null, exact: false }
+          return { ...current, pos, added: current.added ? { ...current.added, pos } : null, exact: false }
         })
       }
       later()
@@ -156,15 +166,39 @@ export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBl
     setBarAt(current => (current && current.left === left && current.top === top && current.above === above ? current : { left, top, above }))
   }, [showing, placed, frame, sheet])
 
-  // The sheet's field takes the keys as it opens, its words chosen.
+  // The sheet's field takes the keys as it opens, its words chosen; only then: the words typed on the button while it
+  // is open (#848) are changes too, and the field must not take the keys back at each one.
+  const sheetId = sheet?.id ?? 0
   useEffect(() => {
-    if (!sheet) return
+    if (!sheetId) return
     const id = requestAnimationFrame(() => { inputRef.current?.focus(); inputRef.current?.select() })
     return () => cancelAnimationFrame(id)
-  }, [sheet])
+  }, [sheetId])
+
+  // #848: while a new button's sheet asks for its first address, Enter in the button's own words ends them by going on
+  // to the address, the next thing the button needs. Ending them as elsewhere (the caret to the line after) would leave
+  // the button, close the sheet and take the new button away. Any other sheet: Enter ends the words as always. Before
+  // the editor's own keys hear it, for this one key only.
+  const sheetPos = sheet?.pos ?? -1
+  const sheetAsksFirst = !!sheet?.added
+  useEffect(() => {
+    if (!editor || editor.isDestroyed || !sheetId || !sheetAsksFirst) return
+    const dom = editor.view.dom
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return
+      const { $from, empty } = editor.state.selection
+      if (!empty || $from.parent.type.name !== BUTTON_LABEL_NODE || buttonAt(editor.state)?.pos !== sheetPos) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+    dom.addEventListener('keydown', onKey, true)
+    return () => dom.removeEventListener('keydown', onKey, true)
+  }, [editor, sheetId, sheetPos, sheetAsksFirst])
 
   /** A new button left before it has an address goes, leaving no undo step (one that has an address keeps it). */
-  const takeBack = useCallback((was: { pos: number; added: NewButton | null; exact: boolean } | null): boolean => {
+  const takeBack = useCallback((was: Sheet | null): boolean => {
     if (!editor || editor.isDestroyed || !was?.added) return false
     const node = editor.state.doc.nodeAt(was.pos)
     if (!node || node.type.name !== 'buttonBlock' || String(node.attrs.href ?? '')) return false
@@ -195,7 +229,16 @@ export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBl
     else if (!editor.view.hasFocus()) unchooseButton(editor.view)
   }, [editor, sheet, takeBack])
 
-  useDismissOnOutside(sheetRef, () => closeSheet(false), { trigger: () => addressRef.current, enabled: !!sheet })
+  // A press on the sheet's own button (#848), the pill or the words beside it, is not outside: the caret goes there and
+  // the sheet stays. The chosen button as it is now (the sheet's: it closes when the caret leaves its button), never a
+  // place read at the last render, which a change since may have moved.
+  const sheetButton = useCallback((): HTMLElement | null => {
+    if (!sheet || !editor || editor.isDestroyed) return null
+    const found = buttonAt(editor.state)
+    const dom = found ? editor.view.nodeDOM(found.pos) : null
+    return dom instanceof HTMLElement ? dom : null
+  }, [editor, sheet])
+  useDismissOnOutside(sheetRef, () => closeSheet(false), { trigger: () => addressRef.current, alsoInside: sheetButton, enabled: !!sheet })
 
   if (!editor || !placed || !showing) return null
 
@@ -256,7 +299,7 @@ export function ButtonBlockTools({ editor, frame = null, takeBackNew }: ButtonBl
                 if (sheet) { closeSheet(true); return }
                 setDraft(placed.href)
                 setRefused(false)
-                setSheet({ pos: placed.pos, added: null, exact: false })
+                setSheet({ pos: placed.pos, added: null, exact: false, id: ++sheetIds.current })
               }}
             >
               <Icon name="link" size={16} tone="inherit" />

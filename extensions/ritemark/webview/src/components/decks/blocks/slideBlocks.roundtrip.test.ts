@@ -72,6 +72,15 @@ One line
 Another line
 :::
 ::::`],
+  // #850: a name Ritemark doesn't know draws the dashed circle, and stays in the file exactly as written.
+  ['boxes with icons Ritemark does not know', `:::: boxes
+::: {.box icon="Rocket-Launch"}
+### Launch
+:::
+::: {.box icon=" zebra "}
+### Crossing
+:::
+::::`],
   ['an agenda (small details 14)', `# Today
 
 ::: agenda

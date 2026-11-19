@@ -299,6 +299,8 @@
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
 .deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks .blk-mark { border-radius: 8px; width: 34px; height: 34px; }
+/* #850: a box whose icon Ritemark doesn't know keeps its badge, with a dashed circle in the theme's placeholder colour. */
+.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-sl.is-blocks .blk-boxes[data-look="steps"] > .blk-box::before { content: counter(blk-box); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
 .deck-sl.is-blocks .blk-boxes[data-look="line"] > .blk-box::before { content: ''; display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
 /* Sprint 164 PR 3 (the decks README, "Label, a block of its own"): a short line in the theme's accent, as a pill, in
@@ -387,6 +389,7 @@
 .deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }
 .deck-slide.is-borderless .deck-sl.is-blocks table { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
 .deck-slide.is-borderless .deck-sl.is-blocks th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
 .deck-slide.is-borderless .deck-sl.is-blocks td { border-top-color: var(--s-row, #ECEDF5); }
