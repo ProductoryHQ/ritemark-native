@@ -11,8 +11,8 @@
  */
 import { fitTabBands } from '../../../../../src/decks/blocks/tabsFit'
 import { memo, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react'
-import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, blockHasAgenda, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { isBlockSlide, sidePictureOf, type SlideData } from '../../../../../src/decks/deckFormat'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, blockCanvasMarkup, blockHasAgenda, contentPlaceFitKey, drawsLogo, themeSlideLogo, type SlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import { AgendaContext } from './agendaContext'
 import { DeckOpenInContext } from './codeToolsClick'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
@@ -20,7 +20,7 @@ import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
-import { slideIcon } from './iconSet'
+import { gridIcon } from './iconSet'
 import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
 import { isLayoutTitleSlide } from './slideMarkup'
@@ -204,7 +204,8 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
     case 'text':
       return <SlideText box={box} editing={editing} />
     case 'mark': {
-      const icon = box.icon ? (box.icon === 'plus' ? 'plus' : box.icon === 'arrow-right' ? 'arrow-right' : slideIcon(box.icon)?.phosphor) : undefined
+      // The old layout draws the grid's 24 through the chrome's Icon (`gridIcon`), as before Sprint 169.
+      const icon = box.icon ? (box.icon === 'plus' ? 'plus' : box.icon === 'arrow-right' ? 'arrow-right' : gridIcon(box.icon)?.phosphor) : undefined
       const glyph = icon ? <Icon name={icon} size={20} tone="inherit" /> : box.text
       if (editing && box.iconIndex !== undefined) {
         return <IconPicker box={box} glyph={glyph} editing={editing} />
@@ -266,7 +267,7 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
 /** A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. */
 function IconPicker({ box, glyph, editing }: { box: MarkBox; glyph: ReactNode; editing: SlideEditing }) {
   const index = box.iconIndex ?? 0
-  const current = box.icon === 'plus' ? null : slideIcon(box.icon)?.name ?? null
+  const current = box.icon === 'plus' ? null : gridIcon(box.icon)?.name ?? null
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -324,7 +325,7 @@ const BlockSlideCanvas = memo(function BlockSlideCanvas({ data, width, theme, bo
   const deckOpenIn = useContext(DeckOpenInContext)
   const openInShown = openIn ?? deckOpenIn
   // The fit belongs to these words in this look: a theme or Card | Borderless change measures again from the top.
-  const key = fitKeyOf(markdown, data.image, data.picture, fitLookOf(borderless, theme))
+  const key = fitKeyOf(markdown, data.image, data.picture, fitLookOf(borderless, theme), contentPlaceFitKey(markdown, data.valign, sidePictureOf(data)))
   // 17 November: the slide on the stage is drawn here at the stage's own step, so a thumbnail is its scaled copy.
   const stageStep = useSyncExternalStore(subscribeStageFit, () => stageFitFor(key), () => stageFitFor(key))
   const [fit, setFit] = useState<{ key: string; step: number }>({ key, step: 0 })

@@ -160,9 +160,12 @@ const stageFitListeners = new Set<() => void>()
 /**
  * What a fit belongs to: the slide's Markdown, its picture and place, and the look. The Markdown as it is drawn: a Steps
  * block's old pill as its Label (Sprint 164 PR 3), so the stage, which opens the slide so, and the strip agree.
+ * Sprint 167 PR 3: a title slide's content place when it isn't its default (`contentPlaceFitKey`): a title slide moved
+ * up keeps a top-right logo's room, so each of its places has its own step. The place moves every other slide's words
+ * in the same room, so its key stays as it was.
  */
-export function fitKeyOf(markdown: string, image: string | undefined, picture: string | undefined, look: string): string {
-  return [withStepsLabels(markdown), image ?? '', picture ?? '', look].join('\u0000')
+export function fitKeyOf(markdown: string, image: string | undefined, picture: string | undefined, look: string, place = ''): string {
+  return [withStepsLabels(markdown), image ?? '', picture ?? '', look, ...(place ? [place] : [])].join('\u0000')
 }
 
 /** The look part of a fit's key: Card or Borderless, and the theme. */

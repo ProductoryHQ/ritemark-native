@@ -6,7 +6,7 @@
 import type { Fragment, Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, type Transaction } from '@tiptap/pm/state'
 import { closeHistory } from '@tiptap/pm/history'
-import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, splitBlockSlide, withBlockMarkdown, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
+import { derivedHeading, isBlockSlide, newId, slideDataOf as readSlideData, partHeadingLevel, writeSlideBody, writeSlideData, type SlideData } from '../../../../src/decks/deckFormat'
 import { blockSlideBody, drawsAsBlocks } from '../../../../src/decks/blocks/convertDeck'
 import { legacyDataToBlocks } from '../../../../src/decks/blocks/legacyToBlocks'
 
@@ -367,18 +367,6 @@ export function updateSlide(state: EditorState, index: number, data: SlideData, 
   const nextKind = kind ?? slide.kind
   if (body === slide.node.attrs.body && nextKind === slide.kind) return null
   return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body, kind: nextKind })
-}
-
-/**
- * Change part `index`'s block slide's Markdown (Settings' Label row, a picture put in), its header kept. Null for a
- * slide that isn't a block slide, or when the Markdown is the same.
- */
-export function updateSlideMarkdown(state: EditorState, index: number, markdown: string): Transaction | null {
-  const slide = slidesOf(state.doc)[index]
-  if (!slide || !isBlockSlide(slide.kind)) return null
-  const parts = splitBlockSlide(slide.node.attrs.body)
-  if (parts.markdown === markdown) return null
-  return state.tr.setNodeMarkup(slide.pos, undefined, { ...slide.node.attrs, body: withBlockMarkdown(slide.node.attrs.body, markdown) })
 }
 
 /** Put `content` in place of part `index` (the library's version of a copy, or the copy back again), as one step. */

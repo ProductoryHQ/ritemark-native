@@ -30,7 +30,7 @@
 import { createHash } from 'node:crypto';
 import { pictureBlockTokenizer } from '../../markdown/pictureLook';
 import { Marked, marked, Tokenizer, type Token } from 'marked';
-import { blockTitleOf, frontMatterField, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
+import { blockTitleOf, contentPlaceValue, frontMatterField, frontMatterLook, isBlockSlide, isOpenInOff, isSlideKind, isTextHandout, parseDeck, slideDataOf, type SlideData, type SlideItem } from '../deckFormat';
 import { BLOCK_MAX_STEP, isCoverSlide, sidePictureOf } from '../blocks/slideRenderer';
 import { legacyDataToBlocks } from '../blocks/legacyToBlocks';
 import { scanFencedDiv } from '../blocks/fencedDiv';
@@ -124,6 +124,9 @@ export function drawnData(kind: string, data: SlideData): SlideData {
   const out: SlideData = {};
   if (data.title !== undefined) out.title = data.title;
   if (!isSlideKind(kind)) return out;
+  // Sprint 167 PR 3: where the content sits, as one of its three words (a v1 slide's Settings may have written it).
+  const place = contentPlaceValue(data.valign);
+  if (place) out.valign = place;
   // A picture beside or behind the words, in every kind but Picture, which draws its own.
   if (kind === 'picture') {
     if (data.image !== undefined) out.image = data.image;
@@ -196,6 +199,9 @@ export function publicSlide(kind: string, data: SlideData): { kind: string; data
     }
     // A section (PR 3: the header's mark, no words): the page keeps its band, with or without a number.
     if (data.section === true) out.section = true;
+    // Sprint 167 PR 3: where the content sits, only as one of its three words (`contentPlaceValue`), never as written.
+    const place = contentPlaceValue(data.valign);
+    if (place) out.valign = place;
     return { kind: '', data: out };
   }
   // A kind this build doesn't know (the nine kinds went out as blocks above): its title alone.

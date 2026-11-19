@@ -21,12 +21,13 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-bl
 
 ## PR 3: content position, A (High), branch `sprint-167-block-details-pr3`, after Sprint 164 PR 2 and PR 3 merge
 - [x] Issue created in milestone v2.3.0 (manager): #837: to be created
-- [ ] A new slide setting, written only when not the default; old decks unchanged (R1)
-- [ ] Content row in Slide settings; title and section slides read as Bottom
-- [ ] Drawn alike on the editor, strip, wall, page and presenter view; with a picture left, right or behind; a full slide unchanged
-- [ ] Tests: round-trip, no setting for the default, fit unchanged
-- [ ] Shots at Top, Middle, Bottom on each surface; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] A new slide setting, written only when not the default; old decks unchanged (R1): `valign:` in the block slide's header
+- [x] Content row in Slide settings; title and section slides read as Bottom
+- [x] Drawn alike on the editor, strip, wall, page and presenter view; with a picture left, right or behind; a full slide unchanged
+- [x] Tests: round-trip, no setting for the default, fit unchanged (`contentPlace.test.ts`, `slideContentPlace.test.ts`)
+- [x] Shots at Top, Middle, Bottom on each surface (`proof/pr3-content-position/`)
+- [ ] The Experience lead's look (before the merge)
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 4: picture behind, D (High), branch `sprint-167-block-details-pr4`, after PR 1 and PR 3
 - [x] Issue created in milestone v2.3.0 (manager): #838: to be created

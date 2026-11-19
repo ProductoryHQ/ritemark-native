@@ -8,7 +8,7 @@
  *    were rebased does not show as changed, and an edit that only moves line breaks in the handout doesn't either.
  *  - Update the library writes one slide by id (`replaceSlideBlock`), and every other byte of the topic stays.
  */
-import { EXERCISE_TAG, exerciseTagOf, handoutWithoutHeading, isBlockSlide, sidePictureOf, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
+import { EXERCISE_TAG, contentPlaceValue, exerciseTagOf, handoutWithoutHeading, isBlockSlide, sidePictureOf, isDefaultExerciseTag, isSlideKind, parseDeck, slideDataOf, splitBlockSlide, writeSlideBlock, writeSlideData, type SlideData } from './deckFormat';
 import { legacyDataToBlocks } from './blocks/legacyToBlocks';
 import { labelsAsPills } from './blocks/labelBlock';
 
@@ -369,7 +369,10 @@ function blockStampOf(kind: string, data: SlideData, handout: string, folder: st
   const side = sidePictureOf(blocks.header) ?? '';
   const image = side && blocks.header.image ? projectPath(blocks.header.image, folder) ?? blocks.header.image : '';
   const resolve = (markdown: string) => foldMarkdown(withoutComments(rewriteMarkdownTargets(markdown, target => projectPath(target, folder) ?? target)));
-  return fnv1a(['blocks', resolve(blocks.markdown), side, image, '#handout', resolve(handout)].join('\u0001'));
+  // Sprint 167 PR 3: where the content sits counts, as the picture's place does, only when a slide names one, so every
+  // stamp made before it stands.
+  const place = contentPlaceValue(blocks.header.valign);
+  return fnv1a(['blocks', resolve(blocks.markdown), side, image, ...(place ? ['#valign', place] : []), '#handout', resolve(handout)].join('\u0001'));
 }
 
 /**

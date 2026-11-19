@@ -19,8 +19,10 @@ import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, handoutHtml, isSl
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
-import { iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
+import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
+// The page's own icons, from the one list the generator keeps (plain JavaScript; tests aren't type-checked).
+import { PAGE_ONLY } from '../../../scripts/generate-page-icons.mjs';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
 const assets: PageAssets = {
@@ -530,6 +532,23 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.ok(page.includes(`<span class="blk-icon">${iconSvg('lightbulb', 28)}</span><h3>Known</h3>`), 'a known icon as before');
   assert.ok(!page.includes('zebra-crossing'), 'the name stays in the deck, never on the page');
   assert.ok(page.includes('.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph'), "the page's sheet draws it in the placeholder colour");
+}
+
+// Sprint 169 (#866): an icon outside the grid of 24 is drawn on the page, inline, and the page carries the drawings of
+// exactly the icons its deck uses (and its own few), never the whole set.
+{
+  const deckText = '---\ndeck: 2\n---\n\n```slide\n---\nid: e1\n---\n# Parts\n\n:::: boxes\n::: {.box icon="truck"}\n### Delivery\n:::\n::: {.box icon="Users-Three"}\n### Team\n:::\n::: {.box icon="truck"}\n### Again\n:::\n::::\n```\n\n## Parts\n';
+  const page = pageHtml(publicDeck(deckText, { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest, pictureUrl });
+  assert.ok(page.includes(`<span class="blk-icon">${iconSvg('truck', 28)}</span><h3>Delivery</h3>`), 'truck, inline');
+  assert.ok(page.includes(`<span class="blk-icon">${iconSvg('users-three', 28)}</span><h3>Team</h3>`), 'users-three, by its name in any case');
+  assert.ok(!page.includes('class="blk-icon is-unknown"'), 'both are known');
+  const drawn = PAGE_ICON_NAMES.filter(name => page.includes(PAGE_ICON_PATHS[name]));
+  // The page's own icons (Copy, the tick, More, the arrows, Contents, the close ×), as the generator lists them.
+  const own = PAGE_ONLY as PageIconName[];
+  assert.ok(own.includes('copy') && own.includes('x'));
+  const extra = drawn.filter(name => !own.includes(name) && name !== 'truck' && name !== 'users-three');
+  assert.deepEqual(extra, [], 'no drawing the deck does not use');
+  assert.equal(page.split(PAGE_ICON_PATHS.truck).length - 1, 2, "truck's drawing once for each of its two boxes");
 }
 
 
