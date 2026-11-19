@@ -23,12 +23,12 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-168-qu
 
 ## PR 3: heading levels, R3 (High), branch `sprint-168-quotes-headings-pr3`, after Sprint 164 PR 3 merges
 - [x] Issue created in milestone v2.3.0 (manager): #865: to be created
-- [ ] h2 and h3 values in `slide.css`; the title's line keeps its look
-- [ ] / menu: Heading 1, 2, 3 with the hidden words; "Title" and "Heading" renamed (no real removal); the bubble unchanged
-- [ ] One realistic synthetic deck with an h2 mid-slide checked through the fit
-- [ ] Tests: menu entries and keywords; the fit with the larger h2
-- [ ] Shots: a slide with h1, h2 and h3 together; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] h2 and h3 values in `slide.css`; the title's line keeps its look
+- [x] / menu: Heading 1, 2, 3 with the hidden words; "Title" and "Heading" renamed (no real removal); the bubble unchanged
+- [x] One realistic synthetic deck with an h2 mid-slide checked through the fit (three h2s: 453 of 460 px at 100 % before; after, 440 of 460 at 92 %, nothing past the bottom)
+- [x] Tests: menu entries and keywords; the fit with the larger h2 (`blocks/slideHeadings.test.ts`: computed sizes through slide.css and decks.css, the box's h3, the fit)
+- [x] Shots: a slide with h1, h2 and h3 together, the title's line, the / menu, the realistic deck before and after (`proof/pr3-headings/`); the Experience lead's look follows
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review (High, two rounds; #889)
 
 ## Sprint end
 - [ ] Full test chain once per final head

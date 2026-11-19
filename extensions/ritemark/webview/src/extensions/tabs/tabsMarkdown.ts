@@ -174,7 +174,7 @@ function noTabsDroppedInside(): Plugin {
 
 /**
  * A heading at the tabs' own level as a pane's own block would read back as a new tab (a higher one is the pane's, as
- * the reader reads it): it is kept one level under the tabs' (a slide's "Heading" in a `##` block is an H3). Only a pane's own
+ * the reader reads it): it is kept one level under the tabs' (a slide's Heading 2 in a `##` block is an H3). Only a pane's own
  * blocks: a heading in a column or a list inside it is written inside its own lines.
  */
 function tabPaneHeadings(): Plugin {
