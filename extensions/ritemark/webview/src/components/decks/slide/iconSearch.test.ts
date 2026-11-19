@@ -9,8 +9,8 @@ import { readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
-import { PAGE_ICON_NAMES, PAGE_ICON_PATHS } from './pageIcons'
-import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, gridIcon, ownIconNames, slideIcon } from './iconSet'
+import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
+import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, gridIcon, slideIcon } from './iconSet'
 import { searchIcons } from './iconSearch'
 
 let passed = 0
@@ -25,7 +25,11 @@ const core = fileURLToPath(new URL('../../../../../node_modules/@phosphor-icons/
 const generator = new URL('../../../../../scripts/generate-page-icons.mjs', import.meta.url).href
 const { iconTags } = (await import(generator)) as { iconTags: (name: string) => string[] }
 
-/** What each grid name and alias drew before Sprint 169 (iconSet.ts on main): an old deck must draw the same. */
+/**
+ * What each grid name and alias drew before Sprint 169 (iconSet.ts on main). An old deck draws the same, but for the
+ * five Phosphor has icons of its own by (`NOW_PHOSPHOR`): a Phosphor name always means Phosphor's icon (the Experience
+ * lead, 19 November; 2.3 isn't out, so no released deck changes).
+ */
 const BEFORE: Record<string, [name: string, phosphor: string]> = {
   'list-checks': ['list-checks', 'list-checks'], 'book-open': ['book-open', 'book-open'], 'puzzle': ['puzzle', 'puzzle-piece'],
   'wrench': ['wrench', 'wrench'], 'folder-open': ['folder-open', 'folder-open'], 'mail': ['mail', 'envelope-simple'],
@@ -40,6 +44,7 @@ const BEFORE: Record<string, [name: string, phosphor: string]> = {
   'robot': ['bot', 'robot'], 'sparkle': ['sparkles', 'sparkle'], 'help': ['circle-help', 'question'], 'warning': ['triangle-alert', 'warning'],
   'check': ['circle-check', 'check-circle'], 'book': ['book-open', 'book-open'], 'folder': ['folder-open', 'folder-open'],
 }
+const NOW_PHOSPHOR = ['check', 'envelope', 'chat', 'book', 'folder']
 
 test('the generated modules are @phosphor-icons/core 2.1.1: every regular drawing, and its tags', () => {
   const files = readdirSync(core).filter(file => file.endsWith('.svg')).map(file => file.slice(0, -4)).sort()
@@ -64,15 +69,20 @@ test('the generated modules are @phosphor-icons/core 2.1.1: every regular drawin
   assert.ok(!Object.values(ICON_TAGS).some(tags => tags.includes('*new*') || tags.includes('*updated*')), 'no catalog marks')
 })
 
-test('every name in the set resolves, in any case and spacing', () => {
+test('every name in the set resolves to its own icon, in any case and spacing; no alias shadows one', () => {
   for (const name of PAGE_ICON_NAMES) {
     const icon = slideIcon(name)
     assert.ok(icon, name)
+    // The rule (the Experience lead on #879): a Phosphor name always means Phosphor's icon.
+    assert.equal(icon.phosphor, name, `${name} draws its own icon`)
     assert.deepEqual(boxIconOf(` ${name.toUpperCase()} `), { known: true, name: icon.name, phosphor: icon.phosphor }, name)
     assert.ok(Object.prototype.hasOwnProperty.call(PAGE_ICON_PATHS, icon.phosphor), `${name} draws a drawing the module has`)
-    // Its own drawing, but where an old deck's name reads it as one of the grid's (S8).
-    if (icon.phosphor !== name) assert.ok(Object.prototype.hasOwnProperty.call(BEFORE, name), `${name} draws ${icon.phosphor}`)
+    // Written as Phosphor's name, or as the grid's for one of the 24's drawings.
+    assert.ok(icon.name === name || SLIDE_ICONS.some(grid => grid.name === icon.name && grid.phosphor === name), `${name} is written ${icon.name}`)
   }
+  // Ritemark's own names fill only names Phosphor doesn't have.
+  for (const name of SLIDE_ICON_ALIASES) assert.ok(!isPageIconName(name), `the alias ${name} is no Phosphor name`)
+  for (const icon of SLIDE_ICONS) assert.ok(!isPageIconName(icon.name) || icon.name === icon.phosphor, `the grid's ${icon.name} is no other Phosphor icon`)
   assert.deepEqual(slideIcon('truck'), { name: 'truck', phosphor: 'truck', label: 'Truck' })
   assert.deepEqual(slideIcon('User-Circle'), { name: 'user-circle', phosphor: 'user-circle', label: 'User circle' })
   assert.deepEqual(boxIconOf(' Rocket-Launch '), { known: true, name: 'rocket-launch', phosphor: 'rocket-launch' })
@@ -86,10 +96,15 @@ test('every name in the set resolves, in any case and spacing', () => {
   assert.deepEqual(boxIconOf(UNKNOWN_ICON), { known: true, name: 'circle-dashed', phosphor: 'circle-dashed' })
 })
 
-test('the 24 and their aliases resolve as before, so an old deck reads and draws the same', () => {
+test('the 24 and their old aliases draw as before, but for the five Phosphor names', () => {
   assert.equal(SLIDE_ICON_NAMES.length, 24)
-  assert.deepEqual([...SLIDE_ICON_NAMES, ...SLIDE_ICON_ALIASES].sort(), Object.keys(BEFORE).sort())
+  for (const name of [...SLIDE_ICON_NAMES, ...SLIDE_ICON_ALIASES]) assert.ok(Object.prototype.hasOwnProperty.call(BEFORE, name), name)
   for (const [name, [written, phosphor]] of Object.entries(BEFORE)) {
+    if (NOW_PHOSPHOR.includes(name)) {
+      assert.deepEqual(slideIcon(name), { name, phosphor: name, label: name.charAt(0).toUpperCase() + name.slice(1) }, `${name}: Phosphor's own`)
+      assert.equal(gridIcon(name), null, `${name}: no grid icon on the old layout`)
+      continue
+    }
     for (const lookup of [slideIcon, gridIcon]) {
       const icon = lookup(name)
       assert.equal(icon?.name, written, `${lookup.name}(${name})`)
@@ -97,10 +112,10 @@ test('the 24 and their aliases resolve as before, so an old deck reads and draws
     }
     assert.equal(slideIcon(` ${name.toUpperCase()} `)?.phosphor, phosphor, name)
   }
-  // The old layout's picker and drawing keep to the 24 (Sprint 169 PR 2 widens them), reading names as slideIcon does.
+  // The old layout's picker and drawing keep to the 24's drawings (Sprint 169 PR 2 widens them), read as slideIcon reads.
   assert.equal(gridIcon(' Puzzle Piece ')?.name, 'puzzle')
+  assert.equal(gridIcon('envelope-simple')?.name, 'mail')
   assert.equal(gridIcon('truck'), null)
-  assert.equal(gridIcon('envelope-simple'), null)
 })
 
 test('an unknown name still falls back to the dashed circle, as written', () => {
@@ -135,10 +150,11 @@ test('the search finds nothing for nonsense or nothing, and offers only names th
   assert.deepEqual(searchIcons('zzzq'), [])
   assert.deepEqual(searchIcons(''), [])
   assert.deepEqual(searchIcons('   '), [])
-  // `check` is the grid's circled check in an old deck, so Phosphor's own tick (no name reaches it) isn't offered.
+  // `check` is Phosphor's tick, offered first; the grid's circled check comes after it.
   const check = searchIcons('check')
-  assert.equal(check[0].phosphor, 'check-circle')
-  assert.ok(!check.some(icon => icon.phosphor === 'check'))
+  assert.deepEqual(check[0], { name: 'check', phosphor: 'check', label: 'Check' })
+  assert.ok(check.some(icon => icon.name === 'circle-check' && icon.phosphor === 'check-circle'))
+  for (const name of NOW_PHOSPHOR) assert.equal(searchIcons(name)[0].phosphor, name, name)
   // Whatever it offers, writing its name draws that same icon; each icon once.
   const seen = new Set<string>()
   for (const letter of 'abcdefghijklmnopqrstuvwxyz0123456789') {
@@ -149,10 +165,8 @@ test('the search finds nothing for nonsense or nothing, and offers only names th
       seen.add(icon.phosphor)
     }
   }
-  // Every drawing a name reaches can be found: all but the five an old deck's alias reads as the grid's.
-  assert.equal(seen.size, PAGE_ICON_NAMES.length - 5)
-  assert.deepEqual([...seen].sort(), [...ownIconNames()].sort(), 'the same names the DECKS rules list')
-  assert.deepEqual(PAGE_ICON_NAMES.filter(name => !ownIconNames().includes(name)), ['book', 'chat', 'check', 'envelope', 'folder'])
+  // Every regular icon can be found.
+  assert.equal(seen.size, PAGE_ICON_NAMES.length)
   // A query is text, never a pattern.
   for (const query of ['.*', '(', '[', '\\', '?', '+']) assert.doesNotThrow(() => searchIcons(query), query)
 })

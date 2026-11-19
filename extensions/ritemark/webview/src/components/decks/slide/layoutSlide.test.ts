@@ -127,11 +127,11 @@ for (const kind of SLIDE_KINDS) {
 
 // Icons by their Ritemark names, and the names other tools write.
 assert.equal(slideIcon('list-checks')?.phosphor, 'list-checks')
-assert.equal(slideIcon('chat')?.name, 'message-square')
+assert.equal(slideIcon('message')?.name, 'message-square')
 assert.equal(slideIcon('nope'), null)
 // #850: a box's icon, the dashed circle for a name Ritemark doesn't know (kept as written), nothing for no name.
 assert.deepEqual(boxIconOf('list-checks'), { known: true, name: 'list-checks', phosphor: 'list-checks' })
-assert.deepEqual(boxIconOf(' Chat '), { known: true, name: 'message-square', phosphor: 'chat-text' })
+assert.deepEqual(boxIconOf(' Message '), { known: true, name: 'message-square', phosphor: 'chat-text' })
 assert.deepEqual(boxIconOf(' Rocket-Launchpad '), { known: false, name: 'Rocket-Launchpad', phosphor: UNKNOWN_ICON })
 assert.equal(UNKNOWN_ICON, 'circle-dashed')
 for (const none of [undefined, '', '   ']) assert.equal(boxIconOf(none), null)

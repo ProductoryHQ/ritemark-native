@@ -207,8 +207,8 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
   }
   // A known name, and another name for it, are drawn as before.
   assert.ok(boxes('lightbulb').includes(`<span class="blk-icon">${iconSvg('lightbulb', 28)}</span>`));
-  assert.ok(boxes(' Chat ').includes(`<span class="blk-icon">${iconSvg('chat-text', 28)}</span>`));
-  for (const name of ['lightbulb', 'chat']) assert.ok(!boxes(name).includes('is-unknown') && !boxes(name).includes(dashed), name);
+  assert.ok(boxes(' Message ').includes(`<span class="blk-icon">${iconSvg('chat-text', 28)}</span>`));
+  for (const name of ['lightbulb', 'message']) assert.ok(!boxes(name).includes('is-unknown') && !boxes(name).includes(dashed), name);
   // No icon, or an empty one: no badge at all.
   assert.ok(!blockSlideHtml(':::: boxes\n::: box\n### Idea\n:::\n::::').includes('blk-icon'));
   assert.ok(!boxes('').includes('blk-icon') && !boxes('  ').includes('blk-icon'));
@@ -233,7 +233,8 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
 test('Sprint 169 (#866): a box draws any Phosphor regular icon by its name (red on main: the dashed circle)', () => {
   const boxes = (icon: string) => blockSlideHtml(`:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`);
   // Names outside the grid of 24, as written by hand or by an AI, any case and spacing.
-  for (const [written, drawn] of [['truck', 'truck'], [' Rocket-Launch ', 'rocket-launch'], ['USERS-THREE', 'users-three'], ['circle-dashed', 'circle-dashed']] as const) {
+  // A Phosphor name is always Phosphor's icon, old aliases' words too (the Experience lead on #879): `check` is the tick.
+  for (const [written, drawn] of [['truck', 'truck'], [' Rocket-Launch ', 'rocket-launch'], ['USERS-THREE', 'users-three'], ['circle-dashed', 'circle-dashed'], ['check', 'check'], ['Envelope', 'envelope']] as const) {
     const html = boxes(written);
     assert.ok(html.includes(`<div class="blk-box"><span class="blk-icon">${iconSvg(drawn, 28)}</span><h3>Idea</h3>`), `${written}: ${html}`);
     assert.ok(!html.includes('is-unknown'), `${written} is known`);

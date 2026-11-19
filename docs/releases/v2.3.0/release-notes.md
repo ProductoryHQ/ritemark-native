@@ -64,6 +64,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
 - **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
+- **Give a box any of 1,500 icons.** Ask the AI for one, or write an icon's name from the Phosphor set, such as truck. It looks the same while you edit, present and share.
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
