@@ -758,10 +758,16 @@ export function DeckView({
     }
   }, [editor, makeCurrent])
 
-  /** A thumbnail: its slide becomes current and the handout scrolls to its part. */
+  /** A thumbnail: its slide becomes current, the slide's pane shows it from its top, and the handout scrolls to its
+   *  part. Every way of choosing a slide comes here (the strip's click and keys, Home and End, a comment, the rail, an
+   *  undo); so does the wheel's step, which then sets the pane by its direction (#871). */
   const pick = useCallback((index: number) => {
     lockUntil.current = Date.now() + PICK_LOCK_MS
     makeCurrent(index)
+    // The chosen slide from its top (#902): beside the handout the slide's pane can be taller than its room, and left
+    // where it was, a slide chosen with it scrolled down showed from its foot.
+    const stage = stageRef.current
+    if (stage) stage.scrollTop = stageScrollAfter(0, stage)
     // Told even when this slide was already current: a + menu's "From the library…" may have moved the host's insert
     // point to a gap, and picking a slide brings it back to the slide.
     sendToExtension('deck/current', { index, count: countRef.current })

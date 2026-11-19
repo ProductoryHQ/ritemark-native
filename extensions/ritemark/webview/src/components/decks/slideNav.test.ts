@@ -224,6 +224,10 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(stageScrollAfter(1, { scrollHeight: 895, clientHeight: 780 }), 0, 'on: from the top')
   assert.equal(stageScrollAfter(-1, { scrollHeight: 895, clientHeight: 780 }), 115, 'back: from the end')
   assert.equal(stageScrollAfter(-1, { scrollHeight: 780, clientHeight: 780 }), 0, 'a pane that fits stays put')
+  // A slide chosen any other way (a thumbnail, the strip's keys, Home and End) is seen from its top (#902, the
+  // Experience lead's rule): before, the pane was left where it was, so with it scrolled down the slide showed from its foot.
+  assert.equal(stageScrollAfter(0, { scrollHeight: 895, clientHeight: 780 }), 0, 'chosen: from the top')
+  assert.equal(stageScrollAfter(0, { scrollHeight: 780, clientHeight: 780 }), 0, 'chosen, a pane that fits: at its top')
 }
 
 /** A fake element: its tag, whether it's editable, and the selectors it sits inside. */
@@ -300,6 +304,14 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.ok(/if \(!route\.scroll\) event\.preventDefault\(\)/.test(wheel) && !/^\s*event\.preventDefault\(\)/.test(wheel))
   // A step shows the new slide from where the gesture goes on, and only when the slide moved (not at the deck's ends).
   assert.ok(/const from = Math\.min\([^)]*\) goTo\(from \+ route\.move\) [^]*?if \(Math\.min\(currentRef\.current, countRef\.current - 1\) !== from\) stage\.scrollTop = stageScrollAfter\(route\.move, stage\)/.test(wheel), 'the pane after a step')
+  // #902: every other way of choosing a slide comes through pick, and pick starts the pane at the slide's top, through
+  // the same rule; the wheel's step goes through pick (goTo) first and sets the pane by its direction after it.
+  const pickBody = /const pick = useCallback\(\(index: number\) => \{([^]*?)\}, \[makeCurrent/.exec(view)?.[1] ?? ''
+  assert.ok(/const stage = stageRef\.current if \(stage\) stage\.scrollTop = stageScrollAfter\(0, stage\)/.test(pickBody), 'a chosen slide from its top')
+  assert.ok(/goTo\(from \+ route\.move\)[^]*?stageScrollAfter\(route\.move, stage\)/.test(wheel), 'the wheel sets the pane after pick')
+  const strip = readFileSync(new URL('./SlideStrip.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(/onClick=\{\(\) => actions\.pick\(index\)\}/.test(strip) && /if \(key\.type === 'pick'\) actions\.pick\(key\.index\)/.test(strip), "the strip's click and keys choose through pick")
+  assert.equal((view.match(/stage\.scrollTop = /g) ?? []).length, 2, 'the pane is set in two places only: pick and the wheel')
   // The slide's scrolling boxes keep a turn's rest to themselves in both views, so it never scrolls the stage.
   const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
   assert.ok(css.includes('.deck-stage .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }'))
