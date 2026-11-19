@@ -40,3 +40,7 @@ None.
 ## Approval
 
 - [ ] The Development manager and the Experience lead approved this sprint plan (delegated by Jarmo; pending)
+
+## The Experience lead's correction (19 November, with the approval)
+
+The README's rule is that a lone button never moves under the pointer that chooses it, in a Text document too. Check the Text document's solo button: if it jumps as well, fix it the same way; if not, leave `buttonBlock.css` alone. Before and after shots for both surfaces.
