@@ -637,6 +637,15 @@ export function contentPlaceClass(markdown: string, valign: string | undefined, 
   return written && written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
 }
 
+/**
+ * The content place's part of a slide's fit key (`slideFit.fitKeyOf`): only a title slide's, whose place decides a
+ * top-right logo's room (`logoCanvasMarks`). Every other slide's room is the same in all three places, so its key, and
+ * the step the stage tells the strip, stay as they are when the place changes.
+ */
+export function contentPlaceFitKey(markdown: string, valign: string | undefined, side: string | null): string {
+  return isCoverSlide(markdown) ? contentPlaceClass(markdown, valign, side) : '';
+}
+
 const sectionCache = new Map<string, string | null>();
 
 /**

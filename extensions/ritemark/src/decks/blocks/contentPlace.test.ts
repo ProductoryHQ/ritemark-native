@@ -14,7 +14,7 @@ import * as path from 'node:path';
 import { parse } from 'node-html-parser';
 import { contentPlaceValue, parseDeck, slideDataOf, splitBlockSlide, writeSlideData, writeSlideBlock } from '../deckFormat';
 import { BUILT_IN_THEME } from '../deckTheme';
-import { blockCanvasMarkup, contentPlaceClass, contentPlaceDefault, contentPlaceOf, logoCanvasMarks } from './slideRenderer';
+import { blockCanvasMarkup, contentPlaceClass, contentPlaceDefault, contentPlaceFitKey, contentPlaceOf, logoCanvasMarks } from './slideRenderer';
 import { legacyDataToBlocks } from './legacyToBlocks';
 import { slideStamp } from '../deckLibraryFormat';
 import { deckDigest, publicDeck, publicSlide } from '../page/publicDeck';
@@ -62,7 +62,13 @@ const SECTION = '2\n\n# The afternoon';
   // A word that names no place makes no header: `---`, `valign: sideways`, `---` stays the slide's words.
   assert.equal(splitBlockSlide('---\nvalign: sideways\n---\n# T').header, null);
   assert.equal(contentPlaceValue(' Middle '), 'middle', 'read as written, in any case');
-  assert.equal(contentPlaceValue('centre'), null);
+  // `center` and `centre` read as middle, as the Columns block's own `valign` reads them; a header of only that is one.
+  assert.equal(contentPlaceValue('center'), 'middle');
+  assert.equal(contentPlaceValue('centre'), 'middle');
+  assert.equal(slideDataOf('', `---\nvalign: center\n---\n${CONTENT}`).valign, 'center');
+  assert.equal(slideDataOf('', `---\nvalign: center\n---\n${CONTENT}`).markdown, CONTENT);
+  assert.deepEqual(vaClasses(canvas(CONTENT, { valign: 'center' })), ['va-middle']);
+  assert.equal(contentPlaceValue('sideways'), null);
   // A v1 slide (Settings may write it before the deck converts): its body takes the line, and its blocks carry it.
   assert.equal(writeSlideData('points', 'title: A\nid: x', { title: 'A', id: 'x', valign: 'middle' }), 'title: A\nid: x\nvalign: middle');
   assert.equal(legacyDataToBlocks('points', { title: 'A', valign: 'middle' }).header.valign, 'middle');
@@ -128,11 +134,12 @@ const SECTION = '2\n\n# The afternoon';
       assert.match(selector, /:is\(\.is-lone-pic, \.is-titled-pic\):is\(\.va-top, \.va-middle, \.va-bottom\)/, 'only a lone picture');
       continue;
     }
-    if (/\.blk-flow > :last-child >/.test(selector)) {
+    if (/\.blk-flow > :nth-last-child/.test(selector)) {
       // The last block's trailing margin (its last list item's, a Steps list's) only, at Middle and Bottom: the words end
       // at the flow's foot. Nothing inside a block moves (only the last item of the last block's own list).
       assert.deepEqual(props, ['margin-bottom'], selector);
-      const end = '.deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :last-child >';
+      // The last block drawn: on the stage a comment after it is never drawn.
+      const end = '.deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) >';
       assert.equal(selector.trim(), `${end} :is(li, ol, ul):last-child, ${end} :is(ol, ul):last-child > li:last-child`);
       continue;
     }
@@ -142,9 +149,14 @@ const SECTION = '2\n\n# The afternoon';
   assert.match(flatCss, /\.va-bottom \.blk-flow \{ align-content: end; align-content: safe end; justify-content: flex-end; justify-content: safe flex-end; \}/);
   // Their rules follow the cover's, so a title slide's place wins over its own low drawing.
   assert.ok(flatCss.indexOf('.va-top .blk-flow') > flatCss.indexOf('.is-cover .blk-flow { display: flex'));
-  // The fit's key is the old one for a slide at its default; the stage and the strip share each place's own step.
+  // The fit's key: the place counts only on a title slide (a top-right logo's room); every other slide keeps its key
+  // in all three places, and every slide at its default keeps the key it had.
   const fit = fs.readFileSync(path.join(extension, 'webview', 'src', 'components', 'decks', 'blocks', 'slideFit.ts'), 'utf8');
   assert.match(fit, /\.\.\.\(place \? \[place\] : \[\]\)/);
+  assert.equal(contentPlaceFitKey(CONTENT, 'middle', null), '');
+  assert.equal(contentPlaceFitKey(CONTENT, 'bottom', 'left'), '');
+  assert.equal(contentPlaceFitKey(TITLE, undefined, null), '');
+  assert.equal(contentPlaceFitKey(TITLE, 'top', null), 'va-top');
 }
 
 // ---- 5. With a picture on the Left or Right the content aligns in its column; with Behind it moves over the picture;
@@ -186,11 +198,14 @@ const SECTION = '2\n\n# The afternoon';
   assert.equal(page.querySelectorAll('.layer .deck-sl.va-middle').length, 1, 'the page: Middle');
   assert.equal(page.querySelectorAll('.layer .deck-sl.is-cover.va-top').length, 1, 'the page: a title slide at Top');
   assert.equal(page.querySelectorAll('.layer .deck-sl[class*="va-"]').length, 2, 'the slide at its default draws none');
-  // In one column (half a laptop, a phone) a title slide at Top starts at the top, without the low start.
-  assert.match(pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl: () => 'pic.png' }), /\.layer\.flow \.deck-sl\.is-blocks\.is-cover\.va-top \.blk-flow \{ padding-top: 0; \}/);
+  // In one column (half a laptop, a phone) a title slide at Top starts at the top, without the low start; at Middle, half.
+  const html = pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl: () => 'pic.png' });
+  assert.match(html, /\.layer\.flow \.deck-sl\.is-blocks\.is-cover\.va-top \.blk-flow \{ padding-top: 0; \}/);
+  assert.match(html, /\.layer\.flow \.deck-sl\.is-blocks\.is-cover\.va-middle \.blk-flow \{ padding-top: 9vh; \}/);
   // The stage's editor marks its canvas by the same rule.
   const editor = fs.readFileSync(path.join(extension, 'webview', 'src', 'components', 'decks', 'blocks', 'SlideEditor.tsx'), 'utf8');
-  assert.match(editor, /'is-editing'[^\n]*contentPlaceClass\(shownMarkdown, header\.valign, side\)/, 'the stage marks its canvas');
+  assert.match(editor, /const placeClass = contentPlaceClass\(shownMarkdown, header\.valign, sidePictureOf\(header\)\)/, 'the stage works out its place');
+  assert.match(editor, /'is-editing'[^\n]*lonePictureClass\(shownMarkdown, side\), placeClass,/, 'and marks its canvas with it');
 }
 
 // ---- 7. A library copy moved to another place is a change of the copy; every stamp made before it stands.

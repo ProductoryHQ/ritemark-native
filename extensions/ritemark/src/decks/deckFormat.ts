@@ -718,9 +718,13 @@ export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'alt', 'fo
 export const CONTENT_PLACES = ['top', 'middle', 'bottom'] as const;
 export type ContentPlace = (typeof CONTENT_PLACES)[number];
 
-/** A `valign:` value as one of the three places, or null for none (or a value this build doesn't know). */
+/**
+ * A `valign:` value as one of the three places, or null for none (or a value this build doesn't know). `center` and
+ * `centre` read as middle, as the Columns block's own `valign` reads them (`fencedDiv.columnsAlignOf`).
+ */
 export function contentPlaceValue(value: string | undefined): ContentPlace | null {
   const place = value?.trim().toLowerCase();
+  if (place === 'center' || place === 'centre') return 'middle';
   return (CONTENT_PLACES as readonly string[]).includes(place ?? '') ? place as ContentPlace : null;
 }
 
