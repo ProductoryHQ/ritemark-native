@@ -3,8 +3,12 @@
  * `Slide library` folder, opening to their slides as thumbnails with titles; below, Other decks, every other deck in
  * the project, each opening the same way. A slide is clicked for "Insert after slide N", which the host copies into
  * the deck that is open (`library/insert`); the copy keeps a `from:` line when it came from a topic.
+ *
+ * Sprint 165 PR 3: the search lists each slide once, at its newest copy, library slides first, each with its place
+ * and "also in N older decks"; a tick on a thumbnail says its copy is already in the open deck (the host works out
+ * both, `librarySearch.ts`).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
@@ -14,7 +18,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { deckExpanded, deckMeta, groupByFolder, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
+import { alsoLine, deckExpanded, deckMeta, deckPlace, decksCount, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -38,6 +42,14 @@ interface LibraryDeck {
   agenda?: unknown
 }
 
+/** Sprint 165 PR 3: one slide search shows, at its copy in `path`, with how many other decks have it. */
+interface LibraryHit {
+  path: string
+  index: number
+  also: number
+  library: boolean
+}
+
 interface ActiveDeck {
   path: string
   name: string
@@ -56,6 +68,13 @@ interface LibraryState {
   query: string
   /** The project folder's name: the heading of the decks at its top level (Sprint 165 PR 1). */
   projectName?: string
+  /** Sprint 165 PR 3: the slides (`<path>#<index>`) whose copy is already in the open deck. */
+  here?: string[]
+  /**
+   * Sprint 165 PR 3: a search's slides in their order (the decks hold only them), and how many it found; and (#877) the
+   * decks whose folder or name has the words, whole, for the Decks group, and how many there are.
+   */
+  search?: { hits: LibraryHit[]; total: number; decks?: LibraryDeck[]; deckTotal?: number }
 }
 
 const NO_ASSETS: Record<string, string> = {}
@@ -106,6 +125,15 @@ function DeckRow({ name, meta, expanded, onToggle }: { name: string; meta: strin
   )
 }
 
+/** The tick's tooltip, only on a tile that has the tick: hundreds of tiles mount no tooltip they never show. */
+function TickTip({ on, children }: { on: boolean; children: ReactElement }) {
+  return on ? (
+    <Tooltip label="Already in the open deck" side="bottom" hoverOnly className="flex min-w-0">
+      {children}
+    </Tooltip>
+  ) : children
+}
+
 export function SlideLibraryPanel() {
   const [state, setState] = useState<LibraryState | null>(null)
   const [query, setQuery] = useState('')
@@ -113,6 +141,8 @@ export function SlideLibraryPanel() {
   const [selected, setSelected] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [openOthers, setOpenOthers] = useState(false)
+  // #877: the Decks group's rows open on their own, apart from browsing's, and start closed at each search.
+  const [openNamed, setOpenNamed] = useState<Record<string, boolean>>({})
   const field = useRef<HTMLInputElement>(null)
   // The field shows once the place's Search is pressed (as Tasks' does), and stays while it holds words.
   const [searchOpen, setSearchOpen] = useState(false)
@@ -146,11 +176,15 @@ export function SlideLibraryPanel() {
     return stop
   }, [])
 
-  // The search goes to the host (it reads every deck), a moment after the typing stops.
+  // The search goes to the host (it reads every deck), a moment after the typing stops; an emptied one at once, so the
+  // decks come back without a wait.
   useEffect(() => {
-    const timer = setTimeout(() => sendToExtension('library/search', { query }), 150)
+    const timer = setTimeout(() => sendToExtension('library/search', { query }), query.trim() ? 150 : 0)
     return () => clearTimeout(timer)
   }, [query])
+
+  // A new search's Decks group starts closed.
+  useEffect(() => setOpenNamed({}), [state?.query])
 
   useEffect(() => {
     if (!focusSearch) return
@@ -177,11 +211,13 @@ export function SlideLibraryPanel() {
     [state],
   )
   const newestOther = folders[0]?.decks[0]?.path
+  const here = useMemo(() => new Set(state?.here ?? []), [state])
+  const deckOf = useMemo(() => new Map((state?.decks ?? []).map((deck) => [deck.path, deck])), [state])
 
   // Small details 14: each deck's Agenda list, as its tiles draw it (no hint: the editor's only), once per state.
   const agendaOfDeck = useMemo(() => {
     const drawings = new Map<string, AgendaDrawing>()
-    for (const deck of state?.decks ?? []) drawings.set(deck.path, { entries: agendaEntriesFrom(deck.agenda), hint: false })
+    for (const deck of [...(state?.decks ?? []), ...(state?.search?.decks ?? [])]) drawings.set(deck.path, { entries: agendaEntriesFrom(deck.agenda), hint: false })
     return drawings
   }, [state])
 
@@ -209,55 +245,88 @@ export function SlideLibraryPanel() {
   const searching = query.trim().length > 0
   const label = insertLabel(state.active)
 
-  const deckRows = (deck: LibraryDeck, numbered: boolean) => {
+  /**
+   * A slide's tile: its thumbnail, title and menu. In a search (Sprint 165 PR 3) also its place and "also in N older
+   * decks"; anywhere, the tick when its copy is already in the open deck.
+   */
+  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string; also: string | null } }) => {
+    // A Decks group's tile (#877) is keyed apart: the same slide can be among the hits under it.
+    const key = `${options.named ? 'decks:' : ''}${deck.path}#${slide.id ?? slide.index}`
+    const title = titleOf(slide)
+    const number = options.numbered ? `${slide.index + 1}. ` : ''
+    const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
+    const hit = options.hit
+    const spoken = [hit?.place, hit?.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
+    return (
+      <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
+        <TickTip on={inOpenDeck}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={`deck-lib-tile${selected === key ? ' sel' : ''}`}
+              data-library-slide={key}
+              aria-label={`${number}${title}${spoken ? `, ${spoken}` : ''}: insert into the open deck`}
+            >
+              <span className="deck-lib-thumb" aria-hidden>
+                <SlideCanvas kind={slide.kind} data={slide.data} width={TILE_WIDTH} theme={themeOf(deck.theme)} borderless={deck.borderless} assets={state.assets?.[deck.path] ?? NO_ASSETS} />
+                {inOpenDeck ? (
+                  <span className="deck-lib-here">
+                    <Icon name="check" size={12} tone="inherit" />
+                  </span>
+                ) : null}
+              </span>
+              <span className="deck-lib-title">{number}{title}</span>
+              {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks" never are. */}
+              {hit ? <span className="deck-lib-place">{hit.where}</span> : null}
+              {hit?.meta ? <span className="deck-lib-also">{hit.meta}</span> : null}
+            </button>
+          </DropdownMenuTrigger>
+        </TickTip>
+        <DropdownMenuContent align="start" className="deck-lib-menu">
+          <div className="deck-lib-menu-head">{title}</div>
+          {hit ? <div className="deck-lib-menu-place">{[hit.place, hit.also].filter(Boolean).join(' · ')}</div> : null}
+          {inOpenDeck ? (
+            <div className="deck-lib-menu-here">
+              <Icon name="check" size={12} tone="inherit" />
+              Already in the open deck
+            </div>
+          ) : null}
+          {label && slide.id ? (
+            <DropdownMenuItem onSelect={() => sendToExtension('library/insert', { path: deck.path, id: slide.id })}>
+              <Icon name="arrow-right" size={14} tone="inherit" />
+              {label}
+            </DropdownMenuItem>
+          ) : (
+            <div className="deck-lib-menu-note">{slide.id ? 'Open a deck to insert this slide into it.' : 'This slide has no id yet. Open its deck once to give it one.'}</div>
+          )}
+          <DropdownMenuItem onSelect={() => sendToExtension('library/open', { path: deck.path })}>
+            <Icon name="arrow-square-out" size={14} tone="inherit" />
+            Open {deck.topic ? 'the topic' : 'the deck'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  /**
+   * A deck's row and, open, its slides. `named` (#877): a row of search's Decks group, which starts closed whatever the
+   * search, is drawn on two lines for a topic too, and opens to the whole deck by section.
+   */
+  const deckRows = (deck: LibraryDeck, numbered: boolean, named = false) => {
     // "From another deck…" opens the newest other deck; the others stay one click away.
-    const expanded = deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
-    const tile = (slide: LibrarySlide) => {
-              const key = `${deck.path}#${slide.id ?? slide.index}`
-              const title = titleOf(slide)
-              return (
-                <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className={`deck-lib-tile${selected === key ? ' sel' : ''}`}
-                      data-library-slide={key}
-                      aria-label={`${numbered ? `${slide.index + 1}. ` : ''}${title}: insert into the open deck`}
-                    >
-                      <span className="deck-lib-thumb" aria-hidden>
-                        <SlideCanvas kind={slide.kind} data={slide.data} width={TILE_WIDTH} theme={themeOf(deck.theme)} borderless={deck.borderless} assets={state.assets?.[deck.path] ?? NO_ASSETS} />
-                      </span>
-                      <span className="deck-lib-title">{numbered ? `${slide.index + 1}. ` : ''}{title}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="deck-lib-menu">
-                    <div className="deck-lib-menu-head">{title}</div>
-                    {label && slide.id ? (
-                      <DropdownMenuItem onSelect={() => sendToExtension('library/insert', { path: deck.path, id: slide.id })}>
-                        <Icon name="arrow-right" size={14} tone="inherit" />
-                        {label}
-                      </DropdownMenuItem>
-                    ) : (
-                      <div className="deck-lib-menu-note">{slide.id ? 'Open a deck to insert this slide into it.' : 'This slide has no id yet. Open its deck once to give it one.'}</div>
-                    )}
-                    <DropdownMenuItem onSelect={() => sendToExtension('library/open', { path: deck.path })}>
-                      <Icon name="arrow-square-out" size={14} tone="inherit" />
-                      Open {deck.topic ? 'the topic' : 'the deck'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )
-    }
+    const expanded = named ? openNamed[deck.path] === true : deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
+    const toggle = () => (named ? setOpenNamed : setOpen)((value) => ({ ...value, [deck.path]: !expanded }))
     const grid = (slides: LibrarySlide[]) => (
       <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
-        <div className="deck-lib-grid">{slides.map((slide) => tile(slide))}</div>
+        <div className="deck-lib-grid">{slides.map((slide) => tile(deck, slide, { numbered, named }))}</div>
       </AgendaContext.Provider>
     )
     // Sprint 165 PR 2: an open deck shows its sections, each with Take section; a search's hits stay one grid (a
     // section would be only the slides found).
     const sectioned = (shown: LibraryDeck) => {
-      // The host's own query too: until it answers a cleared search, its decks hold only the hits.
-      if (searching || state.query.trim()) return grid(shown.slides)
+      // The host's own query too: until it answers a cleared search, its decks hold only the hits. A Decks group's
+      // deck is whole.
+      if (!named && (searching || state.query.trim())) return grid(shown.slides)
       const { before, sections } = sectionsOf(shown.slides)
       if (sections.length === 0) return grid(before)
       return (
@@ -300,12 +369,12 @@ export function SlideLibraryPanel() {
     }
     return (
       <div key={deck.path}>
-        {deck.topic ? (
+        {deck.topic && !named ? (
         <button
           type="button"
           className="deck-lib-row"
           aria-expanded={expanded}
-          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+          onClick={toggle}
         >
           <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
           <Icon name="presentation" size={16} tone="inherit" />
@@ -317,13 +386,73 @@ export function SlideLibraryPanel() {
             name={deck.name}
             meta={deckMeta(deck.modified, deck.slides.length)}
             expanded={expanded}
-            onToggle={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+            onToggle={toggle}
           />
         )}
         {expanded ? (
           sectioned(deck)
         ) : null}
       </div>
+    )
+  }
+
+  /**
+   * Sprint 165 PR 3 (README "Search shows each slide once"): one grid of the slides found, each once, library slides
+   * first, under "Best match first". Until the host has answered the first words, nothing shows (no flash of every deck).
+   */
+  const searchResults = () => {
+    const search = state.search
+    if (!search || !state.query.trim()) return null
+    const shown = search.hits.flatMap((hit) => {
+      const deck = deckOf.get(hit.path)
+      const slide = deck?.slides.find((entry) => entry.index === hit.index)
+      return deck && slide ? [{ hit, deck, slide }] : []
+    })
+    const decks = search.decks ?? []
+    if (!shown.length && !decks.length) return <p className="deck-lib-none">No slide matches.</p>
+    return (
+      <>
+        {/* #877 (the Experience lead): decks whose folder or name has the words, closed, above the slides. */}
+        {decks.length ? (
+          <>
+            <div className="deck-lib-group deck-lib-group-hits">
+              Decks
+              <span className="deck-lib-group-count">{decksCount(decks.length, search.deckTotal ?? decks.length)}</span>
+            </div>
+            {decks.map((deck) => deckRows(deck, true, true))}
+          </>
+        ) : null}
+        {shown.length ? slideHits(shown, search.total) : <p className="deck-lib-none">No slide has these words.</p>}
+      </>
+    )
+  }
+
+  /** Search's slides, each once, under "Best match first". */
+  const slideHits = (shown: Array<{ hit: LibraryHit; deck: LibraryDeck; slide: LibrarySlide }>, total: number) => {
+    return (
+      <>
+        <div className="deck-lib-group deck-lib-group-hits">
+          Best match first
+          <span className="deck-lib-group-count">{hitsCount(shown.length, total)}</span>
+        </div>
+        <div className="deck-lib-grid">
+          {shown.map(({ hit, deck, slide }) => (
+            <AgendaContext.Provider key={`${deck.path}#${slide.index}`} value={agendaOfDeck.get(deck.path) ?? null}>
+              {tile(deck, slide, {
+                numbered: false,
+                hit: {
+                  place: placeLine(deck.path, deck.name, deck.modified, state.projectName ?? ''),
+                  where: deckPlace(deck.path, deck.name, state.projectName ?? ''),
+                  meta: hitMeta(deck.modified, hit.also, hit.library),
+                  also: alsoLine(hit.also, hit.library),
+                },
+              })}
+            </AgendaContext.Provider>
+          ))}
+        </div>
+        {total > shown.length ? <p className="deck-lib-none">More words find fewer slides.</p> : null}
+        <p className="deck-lib-hint">A slide that is in several decks shows once, at its newest. A tick says it's already in the open deck.</p>
+      </>
     )
   }
 
@@ -349,23 +478,27 @@ export function SlideLibraryPanel() {
         />
       </label>
       ) : null}
-      {topics.length || !searching ? <div className="deck-lib-group">Library</div> : null}
-      {topics.map((deck) => deckRows(deck, false))}
-      {topics.length === 0 && !searching ? (
-        <p className="deck-lib-none">No topics yet. Add a slide to the library from a deck's slide menu.</p>
-      ) : null}
-      {folders.length ? <div className="deck-lib-group deck-lib-group-other">Other decks</div> : null}
-      {folders.map((group) => (
-        <div key={group.folder || '.'} className="deck-lib-folder-group">
-          <div className="deck-lib-folder">
-            <Icon name="folder-simple" size={14} tone="inherit" />
-            <span className="deck-lib-name">{group.name}</span>
-          </div>
-          {group.decks.map((deck) => deckRows(deck, true))}
-        </div>
-      ))}
-      {searching && topics.length === 0 && folders.length === 0 ? <p className="deck-lib-none">No slide matches.</p> : null}
-      <p className="deck-lib-hint">Each topic is a deck in the Slide library folder. A slide you take is a copy: the library's slide stays as it is.</p>
+      {/* Just cleared: until the host answers, its decks hold only the hits, so nothing is drawn as the library. */}
+      {searching ? searchResults() : state.search ? null : (
+        <>
+          <div className="deck-lib-group">Library</div>
+          {topics.map((deck) => deckRows(deck, false))}
+          {topics.length === 0 ? (
+            <p className="deck-lib-none">No topics yet. Add a slide to the library from a deck's slide menu.</p>
+          ) : null}
+          {folders.length ? <div className="deck-lib-group deck-lib-group-other">Other decks</div> : null}
+          {folders.map((group) => (
+            <div key={group.folder || '.'} className="deck-lib-folder-group">
+              <div className="deck-lib-folder">
+                <Icon name="folder-simple" size={14} tone="inherit" />
+                <span className="deck-lib-name">{group.name}</span>
+              </div>
+              {group.decks.map((deck) => deckRows(deck, true))}
+            </div>
+          ))}
+          <p className="deck-lib-hint">Each topic is a deck in the Slide library folder. A slide you take is a copy: the library's slide stays as it is.</p>
+        </>
+      )}
       {notice ? <div className="deck-lib-notice" role="status">{notice}</div> : null}
     </div>
   )

@@ -18,7 +18,9 @@ All with synthetic decks (invented names and words). They become the manual and 
 - Given a slide copied across four decks, when I search a word in it, then it shows once at its newest copy, with "also in 3 older decks" and "Folder › Deck · date".
 - Given a hit in the library and in a deck, then the library hit comes first.
 - Given the open deck already has a copy, then the thumbnail has a tick.
-- Given two slides with the same words but no shared lineage, then both show.
+- Given two slides with the same words but no shared lineage, then they show once: the Experience lead's rule G (19 November, after PR 0) counts the same title and words as the same slide, so a slide typed again by hand is found.
+- Given a slide rewritten into another under its old id (under 30% of its words left), then both show.
+- Given a deck copied into another client's folder, then its slides still show once, with the copy counted.
 
 ## R6: The offer
 - Given synthetic decks where four slides recur and the rest differ, then the top shows "These 4 slides are in most of your decks."
