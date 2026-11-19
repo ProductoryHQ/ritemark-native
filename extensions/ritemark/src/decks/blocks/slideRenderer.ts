@@ -30,7 +30,7 @@ import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } fro
 import { tabsetOf, type Tabset } from './tabset';
 import { codeBlockHtml } from './codeTools';
 import { buttonHtml, buttonParagraphOf, isButtonAddress } from './buttonBlock';
-import { isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
+import { exerciseLabelOf, isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
 
 export { sidePictureOf };
 
@@ -628,22 +628,15 @@ function sectionNumberOfBlocks(markdown: string): string | null {
 const stepsCache = new Map<string, string | null>();
 
 /**
- * A block slide with a Steps block: the words of its first Label with words ('' for none), or null when it has no
- * Steps block. A slide with Steps is an exercise on the page, as an Exercise slide is, and the page's Contents and
- * Present's timer read its Label (Sprint 164 PR 3: the Label is the old pill, `withStepsLabels`). Read once per Markdown.
+ * A block slide with a Steps block: the words of its exercise Label ('' for none), or null when it has no Steps block
+ * (outside a tab's pane). A slide with Steps is an exercise on the page, as an Exercise slide is, and the page's
+ * Contents and Present's timer read its Label: the one in its Steps block's place, else the last one before it
+ * (Sprint 164 PR 3, `labelBlock.exerciseLabelOf`; the Label is the old pill). Read once per Markdown.
  */
 export function blockStepsLabelOf(markdown: string): string | null {
   if (stepsCache.has(markdown)) return stepsCache.get(markdown) ?? null;
   if (stepsCache.size > 500) stepsCache.clear();
-  let steps = false;
-  let label = '';
-  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
-    if (token.type === 'slideDiv' && (token as unknown as SlideDivToken).attrs.classes.includes('steps')) steps = true;
-    if (label || token.type !== 'paragraph') return;
-    const words = labelParagraphOf(token as Tokens.Paragraph)?.words ?? '';
-    if (!isEmptyLabel(words)) label = words;
-  });
-  const found = steps ? label : null;
+  const found = exerciseLabelOf(markdown);
   stepsCache.set(markdown, found);
   return found;
 }

@@ -20,6 +20,7 @@
  * Pure and dependency-free but for the fenced-div reader: the host and the webview import this one file.
  */
 import { CLOSE_FENCE, OPEN_FENCE, parseFenceAttributes, withFenceValue } from './fencedDiv';
+import { isAgendaClasses } from './agenda';
 
 /** The class that makes a bracketed span a Label (Pandoc's and Quarto's attribute: `{.label}`). */
 export const LABEL_CLASS = 'label';
@@ -32,6 +33,12 @@ export const LABEL_PLACEHOLDER = 'Label';
 
 /** The Steps block's old pill value, read only to carry it into a Label. */
 const PILL_KEY = 'tag';
+
+/** A `tag` value written on some line: the only Markdown the migration has to read line by line. */
+const PILL_WRITTEN = /\btag\s*=/;
+
+/** The class of a Tabs block (Quarto's tabset): a heading right inside it is a tab's name, never a heading over steps. */
+const TABSET_CLASS = 'panel-tabset';
 
 /** `[words]{…}` alone on its line: the words may hold escapes (`\]`), never a bare bracket. */
 const LABEL_LINE = /^ {0,3}\[((?:\\[^\n]|[^\\[\]\n])*)\](\{[^{}\n]*\})[ \t]*$/;
@@ -81,7 +88,10 @@ export function labelWordsMarkdown(words: string): string {
 
 /** A Label's line: `[words]{.label}`, or its own attribute block as read. */
 export function labelLine(words: string, attrs: string = LABEL_ATTRIBUTES): string {
-  return `[${labelWordsMarkdown(words)}]${isLabelAttributes(attrs) ? attrs.trim() : LABEL_ATTRIBUTES}`;
+  // Only an attribute block of one line, as the reader reads one (the security review of #858: a value with a line
+  // break would carry a second line into the file).
+  const kept = attrs.trim();
+  return `[${labelWordsMarkdown(words)}]${/^\{[^{}\n]*\}$/.test(kept) && isLabelAttributes(kept) ? kept : LABEL_ATTRIBUTES}`;
 }
 
 /** Are these a Label's words that draw nothing (empty, or only spaces)? */
@@ -103,35 +113,46 @@ interface LineInfo {
   code: boolean;
   /** The opening line of the `:::` block this line is in (-1 at the slide's top level). */
   container: number;
+  /** That block is a Tabs block: a heading here is a tab's name. */
+  inTabset: boolean;
+  /** Inside a Tabs block at any depth (a tab's pane). */
+  inTabs: boolean;
+  /** Inside an Agenda block: what someone wrote there is kept and never read (`slideRenderer`). */
+  inAgenda: boolean;
 }
 
 /** Where each line stands: in code or not, and in which `:::` block (the innermost open one closes first). */
 function lineInfos(lines: string[]): LineInfo[] {
   const out: LineInfo[] = [];
-  const stack: number[] = [];
+  const stack: Array<{ at: number; tabs: boolean; agenda: boolean }> = [];
   let code: { char: string; size: number } | null = null;
+  const here = (isCode: boolean): LineInfo => {
+    const top = stack[stack.length - 1];
+    return { code: isCode, container: top?.at ?? -1, inTabset: !!top?.tabs, inTabs: stack.some(entry => entry.tabs), inAgenda: stack.some(entry => entry.agenda) };
+  };
   lines.forEach((raw, index) => {
     const line = raw.replace(/\r$/, '');
     if (code) {
-      out.push({ code: true, container: stack[stack.length - 1] ?? -1 });
+      out.push(here(true));
       const close = CODE_CLOSE.exec(line);
       if (close && close[1][0] === code.char && close[1].length >= code.size) code = null;
       return;
     }
     const fence = CODE_OPEN.exec(line);
     if (fence) {
-      out.push({ code: true, container: stack[stack.length - 1] ?? -1 });
+      out.push(here(true));
       code = { char: fence[1][0], size: fence[1].length };
       return;
     }
     const open = OPEN_FENCE.exec(line);
-    if (open && parseFenceAttributes(open[2])) {
-      out.push({ code: false, container: stack[stack.length - 1] ?? -1 });
-      stack.push(index);
+    const attrs = open ? parseFenceAttributes(open[2]) : null;
+    if (attrs) {
+      out.push(here(false));
+      stack.push({ at: index, tabs: attrs.classes.includes(TABSET_CLASS), agenda: isAgendaClasses(attrs.classes) });
       return;
     }
     if (CLOSE_FENCE.test(line) && stack.length) stack.pop();
-    out.push({ code: false, container: stack[stack.length - 1] ?? -1 });
+    out.push(here(false));
   });
   return out;
 }
@@ -171,11 +192,47 @@ function blockBefore(lines: string[], infos: LineInfo[], at: number): number {
   return -1;
 }
 
+/**
+ * The heading right over a Steps block (past blank lines and notes, in its own `:::` block), or -1. Never a tab's name:
+ * a heading right inside a Tabs block names its tab, and the Steps block stands in that tab's pane.
+ */
+function headingOver(lines: string[], infos: LineInfo[], steps: number): number {
+  const before = blockBefore(lines, infos, steps);
+  if (before < 0 || infos[before].code || infos[before].inTabset || !HEADING.test(lines[before])) return -1;
+  return before;
+}
+
 /** Where a Steps block's Label goes: before the heading right over it (and that heading's notes), else before it. */
 function labelPlace(lines: string[], infos: LineInfo[], steps: number): number {
-  const before = blockBefore(lines, infos, steps);
-  if (before >= 0 && !infos[before].code && HEADING.test(lines[before])) return notesStart(lines, infos, before);
-  return notesStart(lines, infos, steps);
+  const heading = headingOver(lines, infos, steps);
+  return notesStart(lines, infos, heading >= 0 ? heading : steps);
+}
+
+/**
+ * Does line `at` start a block of its own: the slide's or its `:::` block's first line, or after a blank line, a
+ * heading, a closing fence or the end of a note? A Label line that continues a paragraph is that paragraph's words.
+ */
+function startsBlock(lines: string[], infos: LineInfo[], at: number): boolean {
+  const previous = at - 1;
+  if (previous < 0 || previous === infos[at].container || isBlank(lines[previous])) return true;
+  const line = lines[previous].replace(/\r$/, '');
+  return infos[previous].code || HEADING.test(line) || CLOSE_FENCE.test(line) || /-->\s*$/.test(line);
+}
+
+/** The Label line in a Steps block's place (before the heading over it, or before it), or -1. */
+function labelOf(lines: string[], infos: LineInfo[], steps: number): number {
+  const heading = headingOver(lines, infos, steps);
+  const before = blockBefore(lines, infos, heading >= 0 ? heading : steps);
+  if (before < 0 || infos[before].code || !startsBlock(lines, infos, before)) return -1;
+  return labelLineOf(lines[before]) ? before : -1;
+}
+
+/** Is line `at` a Steps block's opening line (outside code)? */
+function isStepsLine(lines: string[], infos: LineInfo[], at: number): boolean {
+  if (infos[at].code) return false;
+  const open = OPEN_FENCE.exec(lines[at].replace(/\r$/, ''));
+  const attrs = open ? parseFenceAttributes(open[2]) : null;
+  return !!attrs && attrs.classes.includes('steps');
 }
 
 /**
@@ -186,12 +243,25 @@ function labelPlace(lines: string[], infos: LineInfo[], steps: number): number {
  * `tag`, so a slide written as Labels is never changed again.
  */
 export function withStepsLabels(markdown: string): string {
-  if (!markdown.includes(PILL_KEY) || !markdown.includes(':::')) return markdown;
+  if (!PILL_WRITTEN.test(markdown) || !markdown.includes(':::')) return markdown;
+  const cached = labelledCache.get(markdown);
+  if (cached !== undefined) return cached;
+  if (labelledCache.size > 500) labelledCache.clear();
+  const out = labelled(markdown);
+  labelledCache.set(markdown, out);
+  return out;
+}
+
+/** Every reader draws a slide through `withStepsLabels`: a slide with a pill is read once per Markdown. */
+const labelledCache = new Map<string, string>();
+
+function labelled(markdown: string): string {
   const lines = markdown.split('\n');
   const infos = lineInfos(lines);
   const pills: Array<{ at: number; words: string }> = [];
   lines.forEach((line, at) => {
-    if (infos[at].code) return;
+    // What an Agenda block holds is kept as written and never read.
+    if (infos[at].code || infos[at].inAgenda) return;
     const open = OPEN_FENCE.exec(line.replace(/\r$/, ''));
     const attrs = open ? parseFenceAttributes(open[2]) : null;
     if (!attrs || !attrs.classes.includes('steps') || attrs.values[PILL_KEY] === undefined) return;
@@ -239,21 +309,41 @@ export function labelsAsPills(markdown: string, canonicalSteps: (tag: string | n
   });
   const drop = new Set<number>();
   let block = 0;
-  lines.forEach((line, at) => {
-    if (infos[at].code) return;
-    const open = OPEN_FENCE.exec(line.replace(/\r$/, ''));
-    const attrs = open ? parseFenceAttributes(open[2]) : null;
-    if (!attrs || !attrs.classes.includes('steps')) return;
-    let tag: string | null = null;
-    let before = blockBefore(lines, infos, at);
-    if (before >= 0 && !infos[before].code && HEADING.test(lines[before])) before = blockBefore(lines, infos, before);
-    const label = before >= 0 && !infos[before].code ? labelLineOf(lines[before]) : null;
-    if (label) {
-      tag = label.words;
-      drop.add(before);
+  // Each Steps line read first, then written: a written line is no longer one this reader can read.
+  const steps = lines.map((_line, at) => at).filter(at => isStepsLine(lines, infos, at));
+  for (const at of steps) {
+    // In an Agenda block the line stays as written (`withStepsLabels` never reads it): its pill is its own tag.
+    if (infos[at].inAgenda) {
+      lines[at] = canonicalSteps(written[block] ?? null, written[block]);
+      block++;
+      continue;
     }
-    lines[at] = canonicalSteps(tag, written[block]);
+    const own = labelOf(lines, infos, at);
+    if (own >= 0) drop.add(own);
+    lines[at] = canonicalSteps(own >= 0 ? labelLineOf(lines[own])!.words : null, written[block]);
     block++;
-  });
+  }
   return lines.filter((_line, at) => !drop.has(at)).join('\n');
+}
+
+/**
+ * The words of a slide's exercise Label (the page's Contents and Present's timer read it): the Label in its first
+ * Steps block's place (`labelOf`), else the last Label with words before that block; '' for none. Null when the slide
+ * has no Steps block outside code, a tab's pane and an Agenda block (such a slide is no exercise, as before Sprint 164). Read on
+ * the Markdown as it is drawn (`withStepsLabels`).
+ */
+export function exerciseLabelOf(markdown: string): string | null {
+  if (!markdown.includes(':::')) return null;
+  const lines = withStepsLabels(markdown).split('\n');
+  const infos = lineInfos(lines);
+  const steps = lines.findIndex((_line, at) => !infos[at].inTabs && !infos[at].inAgenda && isStepsLine(lines, infos, at));
+  if (steps < 0) return null;
+  const own = labelOf(lines, infos, steps);
+  if (own >= 0 && !isEmptyLabel(labelLineOf(lines[own])!.words)) return labelLineOf(lines[own])!.words;
+  for (let at = steps - 1; at >= 0; at--) {
+    if (infos[at].code || infos[at].inTabs || infos[at].inAgenda || !startsBlock(lines, infos, at)) continue;
+    const label = labelLineOf(lines[at]);
+    if (label && !isEmptyLabel(label.words)) return label.words;
+  }
+  return '';
 }

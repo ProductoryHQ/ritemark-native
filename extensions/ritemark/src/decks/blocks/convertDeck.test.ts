@@ -10,7 +10,7 @@ import { pageHtml } from '../page/pageHtml';
 import { deckDigest, publicDeck } from '../page/publicDeck';
 import { blockDataOf, blockSlideBody, convertDeckText, convertedPart, convertSlide, hasStepsPill, labelledSlideBody, renewedFrom, withCommentAtEnd, withDeckVersion, withStepsTag } from './convertDeck';
 import { blockSectionNumberOf, blockSlideHtml, blockStepsLabelOf, blockStepsTagOf } from './slideRenderer';
-import { labelsAsPills, withStepsLabels } from './labelBlock';
+import { labelLine, labelsAsPills, withStepsLabels } from './labelBlock';
 
 // ---- deck: 2 in the front matter: replaced, added first, or a front matter made; every other byte stays.
 assert.equal(withDeckVersion('---\ndeck: 1\ntheme: T\n---\n\nText\n', 2), '---\ndeck: 2\ntheme: T\n---\n\nText\n');
@@ -201,6 +201,35 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(blockSlideHtml(old), blockSlideHtml(withStepsLabels(old)));
   assert.equal(blockStepsLabelOf(old), 'Harjutus');
   assert.equal(blockStepsTagOf, blockStepsLabelOf, 'the old name, for DeckView.tsx until #819 merges');
+  // Review of #858: a Steps block in a tab's pane keeps its Label in that pane; the tab's name is no heading over it.
+  const inPane = '::: {.panel-tabset}\n## Prompt 1\n::: {.steps tag="Harjutus"}\n1. x\n:::\n\n## Prompt 2\n\nWords\n:::';
+  assert.equal(withStepsLabels(inPane), '::: {.panel-tabset}\n## Prompt 1\n\n[Harjutus]{.label}\n\n::: steps\n1. x\n:::\n\n## Prompt 2\n\nWords\n:::');
+  const paneHtml = blockSlideHtml(inPane);
+  assert.ok(paneHtml.includes('class="blk-tabs"') && /data-tab-name="Prompt 1"><div class="blk-tabname">Prompt 1<\/div><div class="blk-label">Harjutus<\/div>/.test(paneHtml), paneHtml);
+  // What an Agenda block holds is kept as written and never read: its lines aren't moved either.
+  const inAgenda = '# Today\n\n::: agenda\n::: {.steps tag="Kept"}\n1. One\n:::\n:::';
+  assert.equal(withStepsLabels(inAgenda), inAgenda);
+  assert.equal(labelsAsPills(inAgenda, tag => `STEPS(${tag})`), '# Today\n\n::: agenda\nSTEPS(Kept)\n1. One\n:::\n:::', 'its stamp as before');
+  // Security review of #858: a Label's attribute block is written back only as one line.
+  assert.equal(labelLine('x', '{.label note="a\nb"}'), '[x]{.label}');
+  assert.equal(labelLine('x', '{.label #intro}'), '[x]{.label #intro}');
+  // Review of #858: "Tagasiside" and "tagasi" are words, not a pill to read.
+  const words = '# Tagasiside\n\n::: steps\n1. Tule tagasi\n:::';
+  assert.equal(withStepsLabels(words), words);
+}
+
+// ---- Review of #858: the exercise's Label for the page's Contents and Present's timer is the Steps block's own (in its
+// place), else the last one before it; never one after it; none for a slide whose only Steps block is in a tab's pane.
+{
+  assert.equal(blockStepsLabelOf('[Exercise · 2 / 3]{.label}\n\n# Try\n\n::: steps\n1. A\n:::\n\n:::: boxes\n::: box\n[Tip]{.label}\n\nOne\n:::\n::::'), 'Exercise · 2 / 3');
+  assert.equal(blockStepsLabelOf('# Try\n\n::: steps\n1. A\n:::\n\n:::: boxes\n::: box\n[Tip]{.label}\n:::\n::::'), '', 'a Label after the steps is not theirs');
+  assert.equal(blockStepsLabelOf('[Day 1]{.label}\n\n# Try\n\n:::: columns\n::: column\n::: steps\n1. A\n:::\n:::\n::::'), 'Day 1', 'the last one before the steps');
+  assert.equal(blockStepsLabelOf('# Try\n\n::: {.panel-tabset}\n## One\n\n::: steps\n1. A\n:::\n:::'), null, 'Steps only in a pane: no exercise, as before');
+  assert.equal(blockStepsLabelOf('# Try\n\nWords\n[Not a label]{.label}\n\n::: steps\n1. A\n:::'), '', 'a line that goes on a paragraph is words');
+  // The stamp reads only a Label that is a block of its own back as the pill.
+  const continued = 'Intro words\n[Note]{.label}\n\n# Title\n\n::: steps\n1. A\n:::';
+  assert.ok(labelsAsPills(continued, tag => `STEPS(${tag})`).includes('Intro words\n[Note]{.label}'), 'the paragraph keeps its words');
+  assert.ok(labelsAsPills(continued, tag => `STEPS(${tag})`).includes('STEPS(null)'));
 }
 
 // ---- The deck's first edit writes each block slide's pill as a Label (`convertDeckText` is the deck view's rule):

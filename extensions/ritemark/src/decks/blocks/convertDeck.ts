@@ -157,7 +157,8 @@ export function labelledSlideBody(body: string, handout = '', folder = ''): stri
 
 /** Does a block slide still have a Steps block's old pill, which the deck's first edit writes as a Label? */
 export function hasStepsPill(kind: string, body: string): boolean {
-  if (!isBlockSlide(kind) || !body.includes('tag')) return false;
+  // Only a body that writes a `tag` value is read (Estonian words such as "tagasi" hold the letters too).
+  if (!isBlockSlide(kind) || !/\btag\s*=/.test(body)) return false;
   const markdown = slideDataOf(kind, body).markdown;
   return markdown !== undefined && withStepsLabels(markdown) !== markdown;
 }
