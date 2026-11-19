@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: five user-facing requirements, and a flow from the file through the host, the editor, the strip, the wall, the presenter view and the published page). Override with: "use plain full track".
 Branch: sprint-169-every-icon
 Release tier: extension (the recommended delivery below is all `out/**/*.js` and `media/webview.js`, so no full release is needed)
-Status: Phase 2 (PLAN), waiting for Jarmo's approval
+Status: **Approved** by Jarmo on 19 November 2026: "jah kõigile kolmele" (yes to all three). Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Every Phosphor icon, found by searching", ritemark-dev commits 286af7c and c6f8477). Jarmo agreed it with the Experience lead on 19 November ("1. jah 2. ei, saada arendusse": yes to the full set with a search, no to icons of one's own). That sent it to planning. It is not his approval of this sprint.
 
@@ -22,10 +22,10 @@ A box can carry any of Phosphor's 1,512 regular icons, found by typing in the ic
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0, to be created at the sprint's start.
-- PR 1: to be created
-- PR 2: to be created
-- PR 3: to be created
-- PR 4: to be created
+- PR 1: [#866](https://github.com/ProductoryHQ/ritemark-native/issues/866)
+- PR 2: [#867](https://github.com/ProductoryHQ/ritemark-native/issues/867)
+- PR 3: [#868](https://github.com/ProductoryHQ/ritemark-native/issues/868)
+- PR 4: [#869](https://github.com/ProductoryHQ/ritemark-native/issues/869)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
@@ -83,4 +83,4 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - Development manager: does #850 land before PR 1 can start, as the plan assumes?
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026)
