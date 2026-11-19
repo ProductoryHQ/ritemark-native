@@ -271,6 +271,28 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(convertDeckText(untouched), untouched, 'no pill: the deck as it is');
 }
 
+// ---- The Experience lead on #858: a v1 Exercise slide with no `tag:` line showed "Exercise", and it is still told apart
+// by its kind, so its conversion gives it an "Exercise" Label; only a bare v2 `::: steps`, which can't be told from a new
+// Steps block, has none (its default pill goes). One deck with both, through the first edit's conversion, and drawn.
+{
+  const deck = [
+    '---', 'deck: 2', '---', '',
+    '```slide exercise', 'id: v1', 'title: Old exercise', 'items:', '- heading: Open', '```', '',
+    '## Old exercise', '',
+    '```slide', '---', 'id: v2', '---', '# Bare steps', '', '::: steps', '1. Read', ':::', '```', '',
+    '## Bare steps', '',
+  ].join('\n');
+  const after = convertDeckText(deck);
+  const [v1, v2] = parseDeck(after).slides.map(slide => slideDataOf(slide.kind, slide.body).markdown ?? '');
+  assert.equal(v1, '[Exercise]{.label}\n\n# Old exercise\n\n::: steps\n1. Open\n:::', 'the v1 Exercise slide: an "Exercise" Label');
+  assert.equal(v2, '# Bare steps\n\n::: steps\n1. Read\n:::', 'the bare v2 Steps block: no Label');
+  assert.equal(blockStepsLabelOf(v1), 'Exercise');
+  assert.equal(blockStepsLabelOf(v2), '');
+  // Before the edit the views draw the same: the v1 slide as its conversion, the v2 slide as written.
+  assert.ok(blockSlideHtml(blockDataOf('exercise', slideDataOf('exercise', 'id: v1\ntitle: Old exercise\nitems:\n- heading: Open')).markdown ?? '').startsWith('<div class="blk-label">Exercise</div>'));
+  assert.ok(!blockSlideHtml('# Bare steps\n\n::: steps\n1. Read\n:::').includes('blk-label'));
+}
+
 // ---- A copy's stamp through the pill's move: a pill and its Label stamp alike, so a copy and its source still match
 // whichever was written first; an emptied pill's stamp changes, and its copy's `from:` is renewed with the edit.
 {
