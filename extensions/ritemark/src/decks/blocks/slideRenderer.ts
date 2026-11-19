@@ -30,7 +30,7 @@ import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } fro
 import { tabsetOf, type Tabset } from './tabset';
 import { codeBlockHtml } from './codeTools';
 import { buttonHtml, buttonParagraphOf, isButtonAddress } from './buttonBlock';
-import { exerciseLabelOf, isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
+import { isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
 
 export { sidePictureOf };
 
@@ -627,16 +627,51 @@ function sectionNumberOfBlocks(markdown: string): string | null {
 
 const stepsCache = new Map<string, string | null>();
 
+/** Blank space and comment notes stand between blocks without being one. */
+const isBetween = (token: Token) => token.type === 'space' || isCommentBlock(token);
+
 /**
- * A block slide with a Steps block: the words of its exercise Label ('' for none), or null when it has no Steps block
- * (outside a tab's pane). A slide with Steps is an exercise on the page, as an Exercise slide is, and the page's
- * Contents and Present's timer read its Label: the one in its Steps block's place, else the last one before it
- * (Sprint 164 PR 3, `labelBlock.exerciseLabelOf`; the Label is the old pill). Read once per Markdown.
+ * The Label in the place a block's Label goes (`labelBlock.withStepsLabels`): the block before it, or the block before
+ * the heading right over it, past blank space and notes. `found` with its words ('' for an emptied one), or not found.
+ */
+function labelInPlace(tokens: Token[], index: number): { found: boolean; words: string } {
+  let at = index - 1;
+  while (at >= 0 && isBetween(tokens[at])) at--;
+  if (at >= 0 && tokens[at].type === 'heading') {
+    at--;
+    while (at >= 0 && isBetween(tokens[at])) at--;
+  }
+  const label = at >= 0 && tokens[at].type === 'paragraph' ? labelParagraphOf(tokens[at] as Tokens.Paragraph) : null;
+  return label ? { found: true, words: isEmptyLabel(label.words) ? '' : label.words } : { found: false, words: '' };
+}
+
+/**
+ * The first Steps block in the slide's own blocks (a tab's pane and an Agenda block are never read, as before), and the
+ * Label in its place, else in the place of the nearest block that holds it (a Columns block over a column's steps).
+ */
+function exerciseLabelIn(tokens: Token[]): { steps: boolean; label: { found: boolean; words: string } } {
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (token.type !== 'slideDiv') continue;
+    const div = token as unknown as SlideDivToken;
+    if (div.attrs.classes.includes('steps')) return { steps: true, label: labelInPlace(tokens, index) };
+    const inner = exerciseLabelIn(div.tokens);
+    if (inner.steps) return inner.label.found ? inner : { steps: true, label: labelInPlace(tokens, index) };
+  }
+  return { steps: false, label: { found: false, words: '' } };
+}
+
+/**
+ * A block slide with a Steps block: the words of its exercise Label ('' for none), or null when it has no Steps block.
+ * A slide with Steps is an exercise on the page, as an Exercise slide is, and the page's Contents and Present's timer
+ * read its Label (Sprint 164 PR 3: the Label is the old pill): the one in the place of its first Steps block, or of the
+ * nearest block holding that block. Read from the tokens the slide is drawn with, once per Markdown.
  */
 export function blockStepsLabelOf(markdown: string): string | null {
   if (stepsCache.has(markdown)) return stepsCache.get(markdown) ?? null;
   if (stepsCache.size > 500) stepsCache.clear();
-  const found = exerciseLabelOf(markdown);
+  const exercise = exerciseLabelIn(lexBlockSlide(markdown));
+  const found = exercise.steps ? exercise.label.words : null;
   stepsCache.set(markdown, found);
   return found;
 }

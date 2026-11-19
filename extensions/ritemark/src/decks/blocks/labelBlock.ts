@@ -17,7 +17,7 @@
  *    and every view draws a slide not yet written so (`slideRenderer`), so what is seen before the edit is what is
  *    written. A Steps block with no `tag` has no Label: a new Steps block comes without one.
  *
- * Pure and dependency-free but for the fenced-div reader: the host and the webview import this one file.
+ * Pure and dependency-free but for the fenced-div and Agenda readers: the host and the webview import this one file.
  */
 import { CLOSE_FENCE, OPEN_FENCE, parseFenceAttributes, withFenceValue } from './fencedDiv';
 import { isAgendaClasses } from './agenda';
@@ -34,14 +34,14 @@ export const LABEL_PLACEHOLDER = 'Label';
 /** The Steps block's old pill value, read only to carry it into a Label. */
 const PILL_KEY = 'tag';
 
-/** A `tag` value written on some line: the only Markdown the migration has to read line by line. */
+/** A `tag` value written on some line: the only Markdown the migration has to read line by line ("tagasi" is a word). */
 const PILL_WRITTEN = /\btag\s*=/;
 
-/** The class of a Tabs block (Quarto's tabset): a heading right inside it is a tab's name, never a heading over steps. */
+/** The class of a Tabs block (Quarto's tabset): a heading right inside it at its tabs' level is a tab's name. */
 const TABSET_CLASS = 'panel-tabset';
 
 /** `[words]{…}` alone on its line: the words may hold escapes (`\]`), never a bare bracket. */
-const LABEL_LINE = /^ {0,3}\[((?:\\[^\n]|[^\\[\]\n])*)\](\{[^{}\n]*\})[ \t]*$/;
+const LABEL_LINE = /^ {0,3}\[((?:\\[^\r\n]|[^\\[\]\r\n])*)\](\{[^{}\r\n]*\})[ \t]*$/;
 
 /** A Label as written: its words (escapes read) and its attribute block as written. */
 export interface LabelLine {
@@ -89,9 +89,9 @@ export function labelWordsMarkdown(words: string): string {
 /** A Label's line: `[words]{.label}`, or its own attribute block as read. */
 export function labelLine(words: string, attrs: string = LABEL_ATTRIBUTES): string {
   // Only an attribute block of one line, as the reader reads one (the security review of #858: a value with a line
-  // break would carry a second line into the file).
+  // break, a lone carriage return included, would carry a second line into the file).
   const kept = attrs.trim();
-  return `[${labelWordsMarkdown(words)}]${/^\{[^{}\n]*\}$/.test(kept) && isLabelAttributes(kept) ? kept : LABEL_ATTRIBUTES}`;
+  return `[${labelWordsMarkdown(words)}]${/^\{[^{}\r\n]*\}$/.test(kept) && isLabelAttributes(kept) ? kept : LABEL_ATTRIBUTES}`;
 }
 
 /** Are these a Label's words that draw nothing (empty, or only spaces)? */
@@ -105,30 +105,31 @@ export function isEmptyLabel(words: string): boolean {
 
 const CODE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 const CODE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/;
+const HEADING = /^ {0,3}(#{1,6})(?:[ \t]|$)/;
 
 /** One line of a slide's Markdown as the migration reads it. */
 interface LineInfo {
   /** Inside a code block (its fences included): never read. */
   code: boolean;
+  /** Inside a comment that runs over several lines (its first and last line included): never read either. */
+  comment: boolean;
   /** The opening line of the `:::` block this line is in (-1 at the slide's top level). */
   container: number;
-  /** That block is a Tabs block: a heading here is a tab's name. */
+  /** That block is a Tabs block: a heading right inside it at its tabs' level is a tab's name. */
   inTabset: boolean;
-  /** Inside a Tabs block at any depth (a tab's pane). */
-  inTabs: boolean;
   /** Inside an Agenda block: what someone wrote there is kept and never read (`slideRenderer`). */
   inAgenda: boolean;
 }
 
-/** Where each line stands: in code or not, and in which `:::` block (the innermost open one closes first). */
+/** Where each line stands: in code or a comment, or not, and in which `:::` block (the innermost open one closes first). */
 function lineInfos(lines: string[]): LineInfo[] {
   const out: LineInfo[] = [];
   const stack: Array<{ at: number; tabs: boolean; agenda: boolean }> = [];
   let code: { char: string; size: number } | null = null;
-  const here = (isCode: boolean): LineInfo => {
+  let comment = false;
+  const here = (isCode: boolean, inComment = false): LineInfo => {
     const top = stack[stack.length - 1];
-    return { code: isCode, container: top?.at ?? -1, inTabset: !!top?.tabs, inTabs: stack.some(entry => entry.tabs), inAgenda: stack.some(entry => entry.agenda) };
+    return { code: isCode, comment: inComment, container: top?.at ?? -1, inTabset: !!top?.tabs, inAgenda: stack.some(entry => entry.agenda) };
   };
   lines.forEach((raw, index) => {
     const line = raw.replace(/\r$/, '');
@@ -136,6 +137,17 @@ function lineInfos(lines: string[]): LineInfo[] {
       out.push(here(true));
       const close = CODE_CLOSE.exec(line);
       if (close && close[1][0] === code.char && close[1].length >= code.size) code = null;
+      return;
+    }
+    if (comment) {
+      out.push(here(false, true));
+      if (line.includes('-->')) comment = false;
+      return;
+    }
+    // A comment block (an HTML block that opens with `<!--`) runs to the line that holds `-->`.
+    if (/^ {0,3}<!--/.test(line) && !line.slice(line.indexOf('<!--') + 4).includes('-->')) {
+      out.push(here(false, true));
+      comment = true;
       return;
     }
     const fence = CODE_OPEN.exec(line);
@@ -158,6 +170,9 @@ function lineInfos(lines: string[]): LineInfo[] {
 }
 
 const isBlank = (line: string) => line.trim() === '';
+
+/** A line the migration may read: not code, not inside a comment, not in an Agenda block. */
+const readable = (infos: LineInfo[], at: number) => !infos[at].code && !infos[at].comment && !infos[at].inAgenda;
 
 /**
  * The first line of the comment notes right before line `at` (blank lines between them allowed), or `at` when it has
@@ -192,13 +207,30 @@ function blockBefore(lines: string[], infos: LineInfo[], at: number): number {
   return -1;
 }
 
+/** An ATX heading's level, or 0 for any other line. */
+function headingLevel(line: string): number {
+  return HEADING.exec(line.replace(/\r$/, ''))?.[1].length ?? 0;
+}
+
 /**
- * The heading right over a Steps block (past blank lines and notes, in its own `:::` block), or -1. Never a tab's name:
- * a heading right inside a Tabs block names its tab, and the Steps block stands in that tab's pane.
+ * Is the heading at line `at` a tab's name: right inside a Tabs block, at the level of that block's first heading (as
+ * `tabset.tabsetOf` reads its tabs)? A deeper heading in a pane is the pane's own.
  */
+function isTabName(lines: string[], infos: LineInfo[], at: number): boolean {
+  if (!infos[at].inTabset) return false;
+  const container = infos[at].container;
+  for (let index = container + 1; index < lines.length; index++) {
+    if (infos[index].container !== container || !readable(infos, index)) continue;
+    const level = headingLevel(lines[index]);
+    if (level) return level === headingLevel(lines[at]);
+  }
+  return false;
+}
+
+/** The heading right over a Steps block (past blank lines and notes, in its own `:::` block), or -1; never a tab's name. */
 function headingOver(lines: string[], infos: LineInfo[], steps: number): number {
   const before = blockBefore(lines, infos, steps);
-  if (before < 0 || infos[before].code || infos[before].inTabset || !HEADING.test(lines[before])) return -1;
+  if (before < 0 || !readable(infos, before) || !headingLevel(lines[before]) || isTabName(lines, infos, before)) return -1;
   return before;
 }
 
@@ -209,41 +241,57 @@ function labelPlace(lines: string[], infos: LineInfo[], steps: number): number {
 }
 
 /**
- * Does line `at` start a block of its own: the slide's or its `:::` block's first line, or after a blank line, a
- * heading, a closing fence or the end of a note? A Label line that continues a paragraph is that paragraph's words.
+ * Is line `at` a paragraph of its own: the slide's or its `:::` block's first line, or after a blank line, a heading,
+ * a closing fence or the end of a note; and before the end, a blank line, or a line that starts a block (a heading, a
+ * fence, a note). A Label line that goes on with words, or that a setext underline makes a heading, is words.
  */
-function startsBlock(lines: string[], infos: LineInfo[], at: number): boolean {
+function isOwnParagraph(lines: string[], infos: LineInfo[], at: number): boolean {
   const previous = at - 1;
-  if (previous < 0 || previous === infos[at].container || isBlank(lines[previous])) return true;
-  const line = lines[previous].replace(/\r$/, '');
-  return infos[previous].code || HEADING.test(line) || CLOSE_FENCE.test(line) || /-->\s*$/.test(line);
+  const opens = previous < 0 || previous === infos[at].container || isBlank(lines[previous])
+    || infos[previous].code || headingLevel(lines[previous]) > 0 || CLOSE_FENCE.test(lines[previous].replace(/\r$/, '')) || /-->\s*$/.test(lines[previous]);
+  if (!opens) return false;
+  const next = lines[at + 1];
+  if (next === undefined || isBlank(next)) return true;
+  const line = next.replace(/\r$/, '');
+  return headingLevel(line) > 0 || OPEN_FENCE.test(line) || CLOSE_FENCE.test(line) || CODE_OPEN.test(line) || /^ {0,3}<!--/.test(line);
 }
 
 /** The Label line in a Steps block's place (before the heading over it, or before it), or -1. */
 function labelOf(lines: string[], infos: LineInfo[], steps: number): number {
   const heading = headingOver(lines, infos, steps);
   const before = blockBefore(lines, infos, heading >= 0 ? heading : steps);
-  if (before < 0 || infos[before].code || !startsBlock(lines, infos, before)) return -1;
+  if (before < 0 || !readable(infos, before) || !isOwnParagraph(lines, infos, before)) return -1;
   return labelLineOf(lines[before]) ? before : -1;
 }
 
-/** Is line `at` a Steps block's opening line (outside code)? */
-function isStepsLine(lines: string[], infos: LineInfo[], at: number): boolean {
-  if (infos[at].code) return false;
+/** A Steps block's opening line's attributes (outside code and comments; in an Agenda block too), or null. */
+function stepsLineAttributes(lines: string[], infos: LineInfo[], at: number): ReturnType<typeof parseFenceAttributes> {
+  if (infos[at].code || infos[at].comment) return null;
   const open = OPEN_FENCE.exec(lines[at].replace(/\r$/, ''));
   const attrs = open ? parseFenceAttributes(open[2]) : null;
-  return !!attrs && attrs.classes.includes('steps');
+  return attrs && attrs.classes.includes('steps') ? attrs : null;
+}
+
+/** The same for a Steps block the migration may change: never one in an Agenda block. */
+function stepsAttributes(lines: string[], infos: LineInfo[], at: number): ReturnType<typeof parseFenceAttributes> {
+  return infos[at].inAgenda ? null : stepsLineAttributes(lines, infos, at);
+}
+
+/** Does this Markdown write a Steps block's old pill somewhere (a quick look; `withStepsLabels` reads it line by line)? */
+export function writesPill(markdown: string): boolean {
+  return PILL_WRITTEN.test(markdown) && markdown.includes(':::');
 }
 
 /**
  * A slide's Markdown with every Steps block's pill as a Label (the README, "Today's pills are kept"): the block's `tag`
  * taken off its opening line (only that value: its colons, classes and other values stay), and its words, when it has
  * any, as `[words]{.label}` in the same place, before the heading over the steps, or before the steps when there is no
- * heading. An emptied pill (`tag=""`) becomes nothing. The Markdown as it was when no Steps block outside code has a
- * `tag`, so a slide written as Labels is never changed again.
+ * heading (a tab's name is no heading over them: the Label stays in the pane). An emptied pill (`tag=""`) becomes
+ * nothing. Code, comments and an Agenda block are never read. The Markdown as it was when no Steps block has a `tag`, so
+ * a slide written as Labels is never changed again.
  */
 export function withStepsLabels(markdown: string): string {
-  if (!PILL_WRITTEN.test(markdown) || !markdown.includes(':::')) return markdown;
+  if (!writesPill(markdown)) return markdown;
   const cached = labelledCache.get(markdown);
   if (cached !== undefined) return cached;
   if (labelledCache.size > 500) labelledCache.clear();
@@ -259,13 +307,9 @@ function labelled(markdown: string): string {
   const lines = markdown.split('\n');
   const infos = lineInfos(lines);
   const pills: Array<{ at: number; words: string }> = [];
-  lines.forEach((line, at) => {
-    // What an Agenda block holds is kept as written and never read.
-    if (infos[at].code || infos[at].inAgenda) return;
-    const open = OPEN_FENCE.exec(line.replace(/\r$/, ''));
-    const attrs = open ? parseFenceAttributes(open[2]) : null;
-    if (!attrs || !attrs.classes.includes('steps') || attrs.values[PILL_KEY] === undefined) return;
-    pills.push({ at, words: attrs.values[PILL_KEY] });
+  lines.forEach((_line, at) => {
+    const words = stepsAttributes(lines, infos, at)?.values[PILL_KEY];
+    if (words !== undefined) pills.push({ at, words });
   });
   if (!pills.length) return markdown;
   // From the last to the first, so the lines before each one keep their places.
@@ -290,27 +334,20 @@ function labelled(markdown: string): string {
  * were, so a slide reads as the same slide before its pills became Labels and after, and every stamp written before
  * Sprint 164 still stands. A Label in the place a Steps block's pill goes (`withStepsLabels`) is taken back onto the
  * block's opening line, in `canonicalSteps`'s form; the default word ("Exercise") and no Label are the old bare pill.
- * Any other Label stays a line of words.
+ * Any other Label stays a line of words. A Steps block in an Agenda block keeps its own `tag`, as it is never migrated.
  */
 export function labelsAsPills(markdown: string, canonicalSteps: (tag: string | null, written: string | undefined) => string): string {
   if (!markdown.includes(':::')) return markdown;
-  const migrated = withStepsLabels(markdown);
-  const lines = migrated.split('\n');
-  const infos = lineInfos(lines);
-  // The `tag` each Steps block was written with, in order (`tag=""` keeps its old stamp until it is written as nothing).
-  const written: Array<string | undefined> = [];
   const original = markdown.split('\n');
   const originalInfos = lineInfos(original);
-  original.forEach((line, at) => {
-    if (originalInfos[at].code) return;
-    const open = OPEN_FENCE.exec(line.replace(/\r$/, ''));
-    const attrs = open ? parseFenceAttributes(open[2]) : null;
-    if (attrs?.classes.includes('steps')) written.push(attrs.values[PILL_KEY]);
-  });
+  // The `tag` each Steps block was written with, in order (`tag=""` keeps its old stamp until it is written as nothing).
+  const written = original.map((_line, at) => stepsLineAttributes(original, originalInfos, at)).filter(attrs => attrs !== null).map(attrs => attrs!.values[PILL_KEY]);
+  const lines = withStepsLabels(markdown).split('\n');
+  const infos = lineInfos(lines);
   const drop = new Set<number>();
   let block = 0;
   // Each Steps line read first, then written: a written line is no longer one this reader can read.
-  const steps = lines.map((_line, at) => at).filter(at => isStepsLine(lines, infos, at));
+  const steps = lines.map((_line, at) => at).filter(at => stepsLineAttributes(lines, infos, at) !== null);
   for (const at of steps) {
     // In an Agenda block the line stays as written (`withStepsLabels` never reads it): its pill is its own tag.
     if (infos[at].inAgenda) {
@@ -324,26 +361,4 @@ export function labelsAsPills(markdown: string, canonicalSteps: (tag: string | n
     block++;
   }
   return lines.filter((_line, at) => !drop.has(at)).join('\n');
-}
-
-/**
- * The words of a slide's exercise Label (the page's Contents and Present's timer read it): the Label in its first
- * Steps block's place (`labelOf`), else the last Label with words before that block; '' for none. Null when the slide
- * has no Steps block outside code, a tab's pane and an Agenda block (such a slide is no exercise, as before Sprint 164). Read on
- * the Markdown as it is drawn (`withStepsLabels`).
- */
-export function exerciseLabelOf(markdown: string): string | null {
-  if (!markdown.includes(':::')) return null;
-  const lines = withStepsLabels(markdown).split('\n');
-  const infos = lineInfos(lines);
-  const steps = lines.findIndex((_line, at) => !infos[at].inTabs && !infos[at].inAgenda && isStepsLine(lines, infos, at));
-  if (steps < 0) return null;
-  const own = labelOf(lines, infos, steps);
-  if (own >= 0 && !isEmptyLabel(labelLineOf(lines[own])!.words)) return labelLineOf(lines[own])!.words;
-  for (let at = steps - 1; at >= 0; at--) {
-    if (infos[at].code || infos[at].inTabs || infos[at].inAgenda || !startsBlock(lines, infos, at)) continue;
-    const label = labelLineOf(lines[at]);
-    if (label && !isEmptyLabel(label.words)) return label.words;
-  }
-  return '';
 }

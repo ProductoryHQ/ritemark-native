@@ -226,6 +226,23 @@ assert.equal(convertDeckText(converted), converted, 'converting again changes no
   assert.equal(blockStepsLabelOf('[Day 1]{.label}\n\n# Try\n\n:::: columns\n::: column\n::: steps\n1. A\n:::\n:::\n::::'), 'Day 1', 'the last one before the steps');
   assert.equal(blockStepsLabelOf('# Try\n\n::: {.panel-tabset}\n## One\n\n::: steps\n1. A\n:::\n:::'), null, 'Steps only in a pane: no exercise, as before');
   assert.equal(blockStepsLabelOf('# Try\n\nWords\n[Not a label]{.label}\n\n::: steps\n1. A\n:::'), '', 'a line that goes on a paragraph is words');
+  // Round two of #858's review: read as the slide is drawn. A Label line that goes on with words, or that a setext line
+  // makes a heading, is no Label; an emptied Label in the steps' place is none (never an earlier one); a box's Label
+  // before the title is not the exercise's; what a comment holds is never read; a Tabs block with no tabs is a block.
+  assert.equal(blockStepsLabelOf('[Day 1]{.label}\nSome words\n\n# Try\n\n::: steps\n1. A\n:::'), '');
+  assert.equal(blockStepsLabelOf('[Day]{.label}\n---\n\n::: steps\n1. A\n:::'), '');
+  assert.equal(blockStepsLabelOf('[Part 2]{.label}\n\n# Intro\n\nWords\n\n[]{.label}\n\n# Try\n\n::: steps\n1. A\n:::'), '');
+  assert.equal(blockStepsLabelOf(':::: boxes\n::: box\n[Tip]{.label}\n\nOne\n:::\n::::\n\n# Try\n\n::: steps\n1. A\n:::'), '');
+  assert.equal(blockStepsLabelOf('# Try\n\n<!-- draft\n::: steps\n1. A\n:::\n-->\n\nWords'), null, 'Steps in a comment: no exercise');
+  assert.equal(blockStepsLabelOf('<!--\n\n[Old]{.label}\n\n-->\n\n# Try\n\n::: steps\n1. A\n:::'), '', 'a Label in a comment is never read');
+  const commented = '# Try\n\n<!-- draft\n::: {.steps tag="X"}\n1. A\n:::\n-->';
+  assert.equal(withStepsLabels(commented), commented, 'nor migrated');
+  const deeper = '::: {.panel-tabset}\n## Tab\n\n### Do this\n\n::: {.steps tag="X"}\n1. a\n:::\n:::';
+  assert.equal(withStepsLabels(deeper), '::: {.panel-tabset}\n## Tab\n\n[X]{.label}\n\n### Do this\n\n::: steps\n1. a\n:::\n:::', 'a deeper heading in a pane is the pane\'s');
+  const noTabs = '# Try\n\n::: {.panel-tabset}\n::: {.steps tag="X"}\n1. a\n:::\n:::';
+  assert.equal(blockStepsLabelOf(noTabs), 'X', 'a tabset with no tabs is a plain block, as it is drawn');
+  assert.equal(labelLine('x', '{.label note="a\rb"}'), '[x]{.label}', 'a lone carriage return is a line break too');
+  assert.ok(!labelsAsPills('[Day]{.label}\n---\n\n::: steps\n1. A\n:::', tag => `STEPS(${tag})`).includes('STEPS(Day)'));
   // The stamp reads only a Label that is a block of its own back as the pill.
   const continued = 'Intro words\n[Note]{.label}\n\n# Title\n\n::: steps\n1. A\n:::';
   assert.ok(labelsAsPills(continued, tag => `STEPS(${tag})`).includes('Intro words\n[Note]{.label}'), 'the paragraph keeps its words');
