@@ -16,8 +16,10 @@ import { closeHistory, history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
 import { slideDataOf, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
-import { BOXES_MARKS, BOX_AUTO_MIN, BOX_GAP, MARK_LOOK, OPEN_FENCE, OWN_MARK_LOOKS, boxesLookOf, boxesMarkOf, columnWidthOf, columnsAlignOf, parseFenceAttributes, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, BOX_AUTO_MIN, BOX_GAP, MARK_LOOK, OPEN_FENCE, OWN_MARK_LOOKS, boxesLookOf, boxesMarkOf, columnTemplateOf, columnWidthOf, columnsAlignOf, parseFenceAttributes, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
+import { buttonVariants } from '../../ui/button'
+import { cn } from '../../../lib/utils'
 import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
 import { contrast, themeVars } from '../theme/themeVars'
 import { createEditorSchemaExtensions, ensureCommentMarkedPipeline, markdownToEditorHTML } from '../../../utils/editorMarkdown'
@@ -486,31 +488,40 @@ stable(COLUMNS, 'three columns')
 
 // ---- #829: the split's guide stands in the middle of the gap the line will have, as the handle does once it lands.
 // The columns laid out as slide.css draws them: `column-gap: calc(32px * var(--fit))`, each column its share of the
-// room as an `fr` (`columnTemplateOf`), or an even share. A third of the two columns' span was drawn, which is a sixth
-// of the gap off the split at ⅓ and ⅔ (about 5 px at the 32 px gap).
+// room as the `fr` `columnTemplateOf` writes, or an even share. A third of the two columns' span was drawn, which is a
+// sixth of the gap off the split at ⅓ and ⅔ (about 5 px at the 32 px gap).
 {
   const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
   const gapRule = /\.blk-columns \{[^}]*column-gap: calc\((\d+)px \* var\(--fit, 1\)\)/.exec(css)
   assert.ok(gapRule, 'the columns\' gap, from slide.css')
   const GAP = Number(gapRule[1])
   assert.equal(GAP, 32)
-  /** The columns' edges on the screen: a block `width` slide px wide from `left`, at the stage's `scale`. */
-  const drawn = (shares: readonly number[] | null, count: number, fit: number, scale: number, left = 200, width = 832) => {
+  /** The renderer's tracks for these widths: its own `fr` numbers, or even ones (no template). */
+  const tracksOf = (widths: ReadonlyArray<number | null>) => {
+    const template = columnTemplateOf(widths)
+    return template ? [...template.matchAll(/minmax\(0, ([\d.]+)fr\)/g)].map(match => Number(match[1])) : widths.map(() => 1)
+  }
+  /** The columns as `measure` reads them: a block `width` slide px wide from `left`, at the stage's `scale`. */
+  const drawn = (widths: ReadonlyArray<number | null>, fit: number, scale: number, left = 200, width = 832) => {
     const gap = GAP * fit * scale
-    const tracks = shares ?? Array.from({ length: count }, () => 1)
+    const tracks = tracksOf(widths)
     const sum = tracks.reduce((a, b) => a + b, 0)
-    const room = width * scale - gap * (count - 1)
+    const room = width * scale - gap * (tracks.length - 1)
     const columns: { left: number; right: number }[] = []
     let x = left
     for (const track of tracks) { columns.push({ left: x, right: x + (track / sum) * room }); x += (track / sum) * room + gap }
-    /** Line `index` as `measure` reads it: its handle's x, the two columns' outer edges and the gap between them. */
+    const grid = { left: columns[0].left, right: columns[columns.length - 1].right }
+    /** Line `index`: its handle's x, its two columns' outer edges, the gap between them and the grid's edges. */
     return (index: number) => {
       const a = columns[index]
       const b = columns[index + 1]
-      return { handle: (a.right + b.left) / 2, left: a.left, right: b.right, gap: b.left - a.right }
+      return { handle: (a.right + b.left) / 2, left: a.left, right: b.right, gap: b.left - a.right, grid }
     }
   }
+  const guideOf = (line: ReturnType<ReturnType<typeof drawn>>, shares: readonly number[], index: number, snap: number) => splitGuideX(line.grid, line.gap, shares, index, snap)
   const SNAPS = [[1 / 3, '⅓'], [1 / 2, '½'], [2 / 3, '⅔']] as const
+  const EVEN2 = [null, null]
+  const EVEN3 = [null, null, null]
   for (const fit of [1, 0.6]) {
     for (const scale of [0.9, 0.5]) {
       for (const [snap, name] of SNAPS) {
@@ -518,23 +529,35 @@ stable(COLUMNS, 'three columns')
         const written = splitShares([50, 50], 0, snap)
         assert.deepEqual(written, snap === 1 / 2 ? null : snap < 1 / 2 ? [33, 67] : [67, 33], `${where}: the shares written`)
         // Held at the split the columns have: the guide is on the handle, in the middle of the gap.
-        const line = drawn(written, 2, fit, scale)(0)
+        const line = drawn(written ?? EVEN2, fit, scale)(0)
         const shares = written ?? [50, 50]
-        assert.ok(Math.abs(splitGuideX(line, shares, 0, snap) - line.handle) < 1e-6, `${where}: the guide in the middle of the gap (${splitGuideX(line, shares, 0, snap).toFixed(2)} for ${line.handle.toFixed(2)})`)
+        assert.ok(Math.abs(guideOf(line, shares, 0, snap) - line.handle) < 1e-6, `${where}: the guide in the middle of the gap (${guideOf(line, shares, 0, snap).toFixed(2)} for ${line.handle.toFixed(2)})`)
         // Dragged there from an even split: the guide stands where the handle will be once it lands.
-        const from = drawn(null, 2, fit, scale)(0)
-        assert.ok(Math.abs(splitGuideX(from, [50, 50], 0, snap) - line.handle) < 1e-6, `${where}: from an even split, where the line lands`)
+        const from = drawn(EVEN2, fit, scale)(0)
+        assert.ok(Math.abs(guideOf(from, [50, 50], 0, snap) - line.handle) < 1e-6, `${where}: from an even split, where the line lands`)
+        // A pointer on the guide reads its own snap.
+        assert.equal(snapSplit(splitPlace(guideOf(from, [50, 50], 0, snap), from.left, from.right, from.gap)), snap, `${where}: the pointer on the guide`)
       }
-      // Three columns: the second line, its two columns' room as the drop writes it (the first column's 33 too).
+      // Three columns, the second line: every column as the drop writes it (the first one's 33 too).
       for (const [snap, name] of SNAPS) {
         const evenShares = [100 / 3, 100 / 3, 100 / 3]
-        const written = splitShares(evenShares, 1, snap)
-        const landed = drawn(written, 3, fit, scale)(1)
-        const guide = splitGuideX(drawn(null, 3, fit, scale)(1), evenShares, 1, snap)
+        const landed = drawn(splitShares(evenShares, 1, snap) ?? EVEN3, fit, scale)(1)
+        const guide = guideOf(drawn(EVEN3, fit, scale)(1), evenShares, 1, snap)
         assert.ok(Math.abs(guide - landed.handle) < 1e-6, `fit ${fit}, scale ${scale}, three columns, ${name}: ${guide.toFixed(2)} for ${landed.handle.toFixed(2)}`)
+      }
+      // Hand-written shares that the drop rounds outside the pair too (review of #893): 20.4 % becomes 20 %, which moves
+      // the pair, and the guide stands where it lands.
+      for (const [snap, name] of SNAPS) {
+        const handWritten = [20.4, 40.3, 39.3]
+        const landed = drawn(splitShares(handWritten, 1, snap) ?? EVEN3, fit, scale)(1)
+        const guide = guideOf(drawn(handWritten, fit, scale)(1), handWritten, 1, snap)
+        assert.ok(Math.abs(guide - landed.handle) < 1e-6, `fit ${fit}, scale ${scale}, 20.4/40.3/39.3, ${name}: ${guide.toFixed(2)} for ${landed.handle.toFixed(2)}`)
       }
     }
   }
+  // Shares that round to nothing still give a place on the slide, never NaN (review of #893).
+  const tiny = drawn([0.4, 0.4, 99.2], 1, 0.9)(0)
+  assert.ok(Number.isFinite(guideOf(tiny, [0.4, 0.4, 99.2], 0, 1 / 2)), 'a guide for shares that round to 0')
   // The drop writes what the guide showed: the same shares through `setColumnSplit`.
   const twoColumns = ['# Two', '', ':::: columns', '::: column', 'A', ':::', '', '::: column', 'B', ':::', '::::'].join('\n')
   const state = stateWith(twoColumns, 'A')
@@ -542,11 +565,13 @@ stable(COLUMNS, 'three columns')
     const dropped = state.apply(setColumnSplit(state, blockPos(state), 0, snap)!)
     assert.deepEqual(columnShares(dropped.doc.nodeAt(blockPos(dropped))!), splitShares([50, 50], 0, snap))
   }
-  // Pointed at, the split shows its line only: the ghost Button's hover fill (a light 12 px bar on the slide) is undone
-  // by a rule that outranks Tailwind's `hover:` class (three classes or pseudo-classes against its two).
-  const decksCss = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
-  assert.match(decksCss, /\.deck-slide \.deck-block-split:is\(:hover, :active, :focus-visible\) \{ background: transparent; \}/)
-  assert.match(readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8'), /variant="ghost"\s+className="deck-block-split"/, 'the split is the ghost Button the rule answers')
+  // Pointed at, the split shows its line only: its class takes the ghost Button's hover fill (a light 12 px bar on the
+  // slide) away at the source, through the Button's own class merge.
+  const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  const splitClass = /variant="ghost"\s+(?:\/\/[^\n]*\s+)?className="(deck-block-split[^"]*)"/.exec(barSource)
+  assert.ok(splitClass, 'the split is a ghost Button')
+  const classes = cn(buttonVariants({ variant: 'ghost', className: splitClass[1] })).split(/\s+/)
+  assert.ok(classes.includes('hover:bg-transparent') && !classes.some(name => /^hover:bg-(?!transparent$)/.test(name)), classes.join(' '))
 }
 
 // ---- Review of #773: the fixes, each failing before.

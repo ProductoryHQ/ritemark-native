@@ -649,16 +649,22 @@ export function splitShares(shares: readonly number[], line: number, fraction: n
 }
 
 /**
- * Where the split's guide stands while it drags (#829), on the screen: in the middle of the gap the line will have
- * once dropped at `fraction`, where the handle then sits. The grid shares the two columns' room, their span from
- * `left` to `right` without the `gap` between them (the slide's 32 px times its fit and the stage's scale), so a third
- * of the span is not a third of the room: the guide stood a sixth of the gap off the split at ⅓ and ⅔. `shares` are the
- * columns' now (`columnShares`); the room is shared as the drop writes it (whole percents).
+ * Where the split's guide stands while it drags (#829), on the screen: in the middle of the gap the line after column
+ * `index` will have once dropped at `fraction`, where its handle then sits. The grid shares its room, the columns' span
+ * from `grid.left` (the first column's left edge) to `grid.right` (the last one's right) without the gaps between them
+ * (`gap`: the slide's 32 px times its fit and the stage's scale), so a third of the two columns' span is not a third of
+ * their room: the guide stood a sixth of the gap off the split at ⅓ and ⅔. Every column's share is taken as the drop
+ * writes it (whole percents, `splitShares`), since rounding one outside the pair moves the pair too. `shares` are the
+ * columns' now (`columnShares`).
  */
-export function splitGuideX(line: { left: number; right: number; gap: number }, shares: readonly number[], index: number, fraction: number): number {
+export function splitGuideX(grid: { left: number; right: number }, gap: number, shares: readonly number[], index: number, fraction: number): number {
   const drawn = splitShares(shares, index, fraction) ?? shares.map(() => 1)
-  const room = Math.max(0, line.right - line.left - line.gap)
-  return line.left + (drawn[index] / (drawn[index] + drawn[index + 1])) * room + line.gap / 2
+  const total = drawn.reduce((sum, share) => sum + share, 0)
+  const room = Math.max(0, grid.right - grid.left - gap * (drawn.length - 1))
+  // Shares that round to nothing (a hand-written 0.4 %) still give a place, never NaN.
+  const before = drawn.slice(0, index + 1).reduce((sum, share) => sum + share, 0)
+  const share = total > 0 ? before / total : (index + 1) / drawn.length
+  return grid.left + share * room + gap * index + gap / 2
 }
 
 // ---------------------------------------------------------------------------
@@ -816,12 +822,13 @@ export function barLeft(blockLeft: number, width: number, pane: { left: number; 
 
 /**
  * Where a pointer at `x` (screen) lies along two columns from `left` to `right` (screen), 0 to 1. Screen pixels are the
- * slide's times its scale on both sides of the division, so the place is the same at any stage size.
+ * slide's times its scale on both sides of the division, so the place is the same at any stage size. Read in the two
+ * columns' room, without the `gap` between them (#829), as the guide is drawn: a pointer on the guide reads its snap.
  */
-export function splitPlace(x: number, left: number, right: number): number {
-  const width = right - left
+export function splitPlace(x: number, left: number, right: number, gap = 0): number {
+  const width = right - left - gap
   if (!(width > 0)) return 0.5
-  return Math.max(0, Math.min(1, (x - left) / width))
+  return Math.max(0, Math.min(1, (x - left - gap / 2) / width))
 }
 
 /** The gap a pointer at `y` drops a block into: the allowed gap whose line is nearest. `lines` maps a gap to its y. */
