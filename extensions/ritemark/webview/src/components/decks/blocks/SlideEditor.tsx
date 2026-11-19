@@ -1183,7 +1183,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           // mousedown is cancelled on the way down: the browser puts no caret and moves no focus, and ProseMirror leaves
           // a cancelled event alone, so the keys stay the picture's (Backspace removes it, never a letter; review).
           onPointerDownCapture={event => {
-            if (pressOnEmptyWords(event)) chooseSide()
+            if (!pressOnEmptyWords(event)) return
+            // Cancelled, never stopped: the block's bar opens nothing for it, and an open popover still closes.
+            event.preventDefault()
+            chooseSide()
           }}
           onMouseDownCapture={event => {
             if (pressOnEmptyWords(event)) event.preventDefault()

@@ -172,7 +172,10 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
 {
   const editor = fs.readFileSync(path.join(here, 'SlideEditor.tsx'), 'utf8')
   // Caught on the way down (capture), so the words' editor never takes the caret or the focus; only on the box itself.
-  assert.match(editor, /onPointerDownCapture=\{event => \{\s+if \(pressOnEmptyWords\(event\)\) chooseSide\(\)\s+\}\}/)
+  assert.match(editor, /onPointerDownCapture=\{event => \{\s+if \(!pressOnEmptyWords\(event\)\) return\s+(\/\/[^\n]*\s+)*event\.preventDefault\(\)\s+chooseSide\(\)\s+\}\}/)
+  // The block's bar opens nothing for a press the stage took (cancelled on its way down).
+  const blockBar = fs.readFileSync(path.join(here, 'SlideBlockBar.tsx'), 'utf8')
+  assert.ok(blockBar.includes('const press = (event: PointerEvent) => { if (event.defaultPrevented) return; setOpen(true); later() }'))
   assert.match(editor, /onMouseDownCapture=\{event => \{\s+if \(pressOnEmptyWords\(event\)\) event\.preventDefault\(\)\s+\}\}/)
   assert.match(editor, /const pressOnEmptyWords = [^\n]*\n[^\n]*!event\.shiftKey && !event\.ctrlKey && !event\.metaKey && !event\.altKey\n[^\n]*event\.target === editor\.view\.dom/)
   // Never stops the press: an open popover still closes on it.
