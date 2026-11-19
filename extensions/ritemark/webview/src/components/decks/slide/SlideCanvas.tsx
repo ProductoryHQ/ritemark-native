@@ -20,7 +20,7 @@ import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
-import { slideIcon } from './iconSet'
+import { gridIcon } from './iconSet'
 import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
 import { isLayoutTitleSlide } from './slideMarkup'
@@ -204,7 +204,8 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
     case 'text':
       return <SlideText box={box} editing={editing} />
     case 'mark': {
-      const icon = box.icon ? (box.icon === 'plus' ? 'plus' : box.icon === 'arrow-right' ? 'arrow-right' : slideIcon(box.icon)?.phosphor) : undefined
+      // The old layout draws the grid's 24 through the chrome's Icon (`gridIcon`), as before Sprint 169.
+      const icon = box.icon ? (box.icon === 'plus' ? 'plus' : box.icon === 'arrow-right' ? 'arrow-right' : gridIcon(box.icon)?.phosphor) : undefined
       const glyph = icon ? <Icon name={icon} size={20} tone="inherit" /> : box.text
       if (editing && box.iconIndex !== undefined) {
         return <IconPicker box={box} glyph={glyph} editing={editing} />
@@ -266,7 +267,7 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
 /** A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. */
 function IconPicker({ box, glyph, editing }: { box: MarkBox; glyph: ReactNode; editing: SlideEditing }) {
   const index = box.iconIndex ?? 0
-  const current = box.icon === 'plus' ? null : slideIcon(box.icon)?.name ?? null
+  const current = box.icon === 'plus' ? null : gridIcon(box.icon)?.name ?? null
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
