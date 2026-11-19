@@ -335,6 +335,16 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 :where(:root:not([data-input-mode="pointer"])) .deck-lib-tile:focus-visible { outline: none; }
 .deck-lib-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .deck-lib-group { margin: 14px 8px 4px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: .6px; text-transform: uppercase; color: var(--r-ink-muted); }
+/* Sprint 165 PR 1: an other deck's row on two lines, the caret and icon on the name's first line. */
+.deck-lib-row.deck-lib-row-two { height: auto; min-height: 30px; align-items: flex-start; padding: 5px 8px; white-space: normal; }
+.deck-lib-row.deck-lib-row-two > svg { margin-top: 2px; }
+.deck-lib-row.deck-lib-row-two > svg.deck-lib-caret { margin-top: 4px; }
+.deck-lib-deck-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.deck-lib-deck-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font: 400 13.5px/20px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
+.deck-lib-deck-meta { font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+/* Sprint 165 PR 1: a folder of Other decks, a plain heading (never opened or closed), as library-panel.html's .fold. */
+.deck-lib-folder { display: flex; align-items: center; gap: 6px; height: 24px; margin: 8px 8px 0; font: 600 12.5px/24px var(--ritemark-ui-font-family); color: var(--r-ink-body); white-space: nowrap; overflow: hidden; }
+.deck-lib-folder > svg { flex-shrink: 0; color: var(--r-ink-muted); }
 .deck-lib-hint, .deck-lib-none { margin: 6px 8px 0; font: 400 12px/17px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
 .deck-lib-empty { padding: 24px 16px; text-align: center; font: 400 12px/1.5 var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
 .deck-lib-menu-head { padding: 6px 8px 4px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
