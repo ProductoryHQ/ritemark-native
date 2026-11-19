@@ -167,14 +167,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-thumb .deck-thumb-flash { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; background: var(--r-accent); box-shadow: inset 0 0 0 2px var(--r-accent); animation: deck-thumb-flash 700ms ease-out 1 both; }
 @keyframes deck-thumb-flash { 0% { opacity: 0; } 22% { opacity: 0.45; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .deck-thumb .deck-thumb-flash { display: none; } }
-/* The Experience lead on #803: while ChatGPT makes a picture for a slide, shown or left, a quiet circle about 14 px
-   across in the accent, in the thumbnail's top-left corner (the ⋯ is top right, the badges at the foot); still, a full ring, under
-   Reduce motion. It goes when the picture lands, is cancelled or fails. */
-.deck-thumb .deck-thumb-making { position: absolute; left: 34px; top: 7px; z-index: 1; display: flex; }
-.deck-thumb .deck-thumb-making > span { box-sizing: border-box; width: 14px; height: 14px; border-radius: 50%; background: rgba(255, 255, 255, .92); border: 2px solid var(--r-accent-soft); border-top-color: var(--r-accent); animation: deck-thumb-making 900ms linear infinite; }
+/* The Experience lead on #803 and #809: while ChatGPT makes a picture for a slide, shown or left, a 16 px white disc
+   with a hairline edge in the thumbnail's top-left corner, 6 px in (the ⋯ is top right, the badges at the foot). Inside
+   it, a 10 px ring: a quiet track and a quarter arc in Ritemark's indigo (the strip is Ritemark's frame, not the
+   theme's), turning once every 0.9 s. Under Reduce motion the quarter arc stands still (a full ring would read as
+   done). It goes when the picture lands, is cancelled or fails. */
+.deck-thumb .deck-thumb-making { position: absolute; left: 36px; top: 9px; z-index: 1; display: flex; }
+.deck-thumb .deck-thumb-making > span { position: relative; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(28, 31, 74, .10); }
+.deck-thumb .deck-thumb-making > span::before { content: ''; position: absolute; left: 3px; top: 3px; box-sizing: border-box; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #E3E4EE; border-top-color: #4F46E5; animation: deck-thumb-making 900ms linear infinite; }
 @keyframes deck-thumb-making { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .deck-thumb .deck-thumb-making > span { animation: none; border-color: var(--r-accent); } }
-.vscode-reduce-motion .deck-thumb .deck-thumb-making > span { animation: none; border-color: var(--r-accent); }
+@media (prefers-reduced-motion: reduce) { .deck-thumb .deck-thumb-making > span::before { animation: none; } }
+.vscode-reduce-motion .deck-thumb .deck-thumb-making > span::before { animation: none; }
 .deck-thumb.is-join .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 /* A slide with no handout (Jarmo, 17 November: "mitte iga slaid ei pea näitama handouti"): a part with no heading and
    no text, while it isn't the current one, folds to one thin row, about 28 px with 22 px above it: the number on its
