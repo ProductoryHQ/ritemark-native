@@ -6,7 +6,7 @@ Track: Lightweight (one domain, a CSS fix well under 200 LOC, no dependency, no 
 
 Branch: `sprint-171-solo-button` (this plan and the one PR).
 
-Status: **Waiting for approval.** Overnight, Jarmo delegated small plan approvals to the Development manager together with the Experience lead; neither approval has happened yet. No code until both are recorded here. Phase 2 (PLAN).
+Status: **Approved** by Jarmo on 19 November 2026: "1 jah", "kinnitatud" (Jarmo) and "jah sa tee ise otsuseid" (Jarmo to the Experience lead): the Development manager and the Experience lead approve small plans tonight. Phase 3 (DEVELOP).
 
 ## Goal
 
