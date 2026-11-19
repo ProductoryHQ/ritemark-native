@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
-import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, gridIcon, slideIcon } from './iconSet'
+import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
 import { searchIcons } from './iconSearch'
 
 let passed = 0
@@ -102,20 +102,17 @@ test('the 24 and their old aliases draw as before, but for the five Phosphor nam
   for (const [name, [written, phosphor]] of Object.entries(BEFORE)) {
     if (NOW_PHOSPHOR.includes(name)) {
       assert.deepEqual(slideIcon(name), { name, phosphor: name, label: name.charAt(0).toUpperCase() + name.slice(1) }, `${name}: Phosphor's own`)
-      assert.equal(gridIcon(name), null, `${name}: no grid icon on the old layout`)
       continue
     }
-    for (const lookup of [slideIcon, gridIcon]) {
-      const icon = lookup(name)
-      assert.equal(icon?.name, written, `${lookup.name}(${name})`)
-      assert.equal(icon?.phosphor, phosphor, `${lookup.name}(${name})`)
-    }
+    const icon = slideIcon(name)
+    assert.equal(icon?.name, written, `slideIcon(${name})`)
+    assert.equal(icon?.phosphor, phosphor, `slideIcon(${name})`)
     assert.equal(slideIcon(` ${name.toUpperCase()} `)?.phosphor, phosphor, name)
   }
-  // The old layout's picker and drawing keep to the 24's drawings (Sprint 169 PR 2 widens them), read as slideIcon reads.
-  assert.equal(gridIcon(' Puzzle Piece ')?.name, 'puzzle')
-  assert.equal(gridIcon('envelope-simple')?.name, 'mail')
-  assert.equal(gridIcon('truck'), null)
+  // Sprint 169 PR 2 (#867): the old layout reads a name as a block slide's box does (`boxIconOf`), the full set too.
+  assert.equal(boxIconOf(' Puzzle Piece ')?.name, 'puzzle')
+  assert.equal(boxIconOf('envelope-simple')?.name, 'mail')
+  assert.deepEqual(boxIconOf('truck'), { known: true, name: 'truck', phosphor: 'truck' })
 })
 
 test('an unknown name still falls back to the dashed circle, as written', () => {

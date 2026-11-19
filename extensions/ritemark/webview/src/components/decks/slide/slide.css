@@ -29,6 +29,8 @@
 .deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
 .deck-sl .ic svg { width: 28px; height: 28px; }
 .deck-sl .ic.sm svg { width: 18px; height: 18px; }
+/* Sprint 169 PR 2 (#867): the old layout's unknown icon name, #850's dashed circle in the placeholder colour, as a block slide's. */
+.deck-sl .ic.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-sl .pickic:hover, :where(:root:not([data-input-mode="pointer"])) .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
 .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
 .deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }
@@ -91,6 +93,7 @@
 .deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl .bx.alt { background: var(--s-box2, #F6F6FB); }
 .deck-slide.is-borderless .deck-sl .ic { background: var(--s-accs, rgba(242,181,68,.2)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .ic.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }
 .deck-slide.is-borderless .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(224,162,31,.4)); color: var(--s-acct, rgba(176,122,18,.7)); }
 .deck-slide.is-borderless .deck-sl .cl .ch { color: var(--s-acct, #B07A12); }
 .deck-slide.is-borderless .deck-sl .ln { background: var(--s-accl, rgba(224,162,31,.5)); }
@@ -139,9 +142,9 @@
    the document's order, H1 the largest (the title, 2 em), then H2 (1.3 em, bold, the heading colour), then H3 (1.15 em).
    A box's H3 keeps its own size (`.blk-box h3`, under). */
 .deck-sl.is-blocks h1 { margin: 0 0 .5em; font: 700 2em/1.12 var(--s-fh, 'Sofia Sans'), sans-serif; letter-spacing: -.3px; color: var(--s-hd, #fff); }
-.deck-sl.is-blocks h2 { margin: 0 0 .7em; font: 700 1.3em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
-.deck-sl.is-blocks h3 { margin: 0 0 .35em; font: 700 1.15em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
-.deck-sl.is-blocks h4, .deck-sl.is-blocks h5, .deck-sl.is-blocks h6 { margin: 0 0 .45em; font: 600 .95em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h2 { margin: 0 0 calc(6px * var(--fit, 1)); padding-top: calc(12px * var(--fit, 1)); font: 700 1.3em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h3 { margin: 0 0 calc(6px * var(--fit, 1)); padding-top: calc(6px * var(--fit, 1)); font: 700 1.15em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h4, .deck-sl.is-blocks h5, .deck-sl.is-blocks h6 { margin: 0 0 calc(6px * var(--fit, 1)); padding-top: calc(6px * var(--fit, 1)); font: 600 .95em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
 /* The title's room (the Experience lead, #760): half its own size before whatever follows it, set on the title alone
    (the next block adds none), so it is the same on the stage, the strip, the wall, the presenter view and the page; a
    line under it (an H2) stays close, as frame 21 draws it. Inside the flow, so the fit measures it. That H2 is the
@@ -149,6 +152,18 @@
 .deck-sl.is-blocks h1 + * { margin-top: 0; }
 .deck-sl.is-blocks h1:has(+ h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks h1 + h2 { font-weight: 500; color: var(--s-sub, #C7CAEB); }
+/* #901 (the decks README, "Spacing on the slide", 20 November): a heading sits nearer to what it introduces. An H2 to H6
+   has 6 px under it (set above, slide px times the fit), and room of its own above it: the block before gives its 12,
+   and the heading adds 12 (an H2, 24 in all) or 6 (an H3 to H6, 18 in all) as padding, never margin, so the space is
+   the same in the flow and in the column a slide with Tabs, Columns or a picture lays its blocks out in (flex margins
+   don't collapse, padding never does). None at the start of the flow, a column, a box or a tab's pane (the renderer's
+   pane starts with its hidden name), none under a Label (it keeps its 8 px), none in a box (its 4 px gap stays). The
+   title's line, an H2 right under the title, keeps its close place and its room under it, as before. */
+.deck-sl.is-blocks :is(.blk-flow, .blk-column, .blk-tabpane) > :is(h2, h3, h4, h5, h6):first-child,
+.deck-sl.is-blocks .blk-tabname + :is(h2, h3, h4, h5, h6),
+.deck-sl.is-blocks .blk-label + :is(h2, h3, h4, h5, h6),
+.deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > :is(h2, h3, h4, h5, h6) { padding-top: 0; }
+.deck-sl.is-blocks h1 + h2 { padding-top: 0; margin-bottom: .7em; }
 .deck-sl.is-blocks p { margin: 0 0 calc(12px * var(--fit, 1)); }
 .deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: 1.25em; }
 /* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
