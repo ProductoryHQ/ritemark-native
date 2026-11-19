@@ -11,8 +11,8 @@ Phase 3 starts only after Jarmo's approval, #850 merged, and the sprint branch e
 - [x] Tests: generated names match `@phosphor-icons/core`, old decks read the same
 
 ## PR 2: every surface draws from the full set (High, after Sprint 167 PR 2)
-- [ ] `SlideIconGlyph` used by the editor, strip, wall and presenter view
-- [ ] Shots of `icon: truck` on all four, and the page offline, for the Experience lead
+- [x] `SlideIconGlyph` used by the editor, strip, wall and presenter view
+- [x] Shots of `icon: truck` on all four, and the page offline, for the Experience lead (the presenter view's own window not shot: see PR 2's Not verified)
 
 ## PR 3: Search icons (Standard)
 - [ ] Field, in-use first, then the 24, then results by name, tag and alias
