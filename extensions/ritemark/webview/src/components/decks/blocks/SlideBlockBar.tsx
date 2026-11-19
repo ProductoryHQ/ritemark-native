@@ -112,18 +112,20 @@ interface Option {
 
 /**
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
- * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773).
+ * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
+ * trigger says the value to a screen reader too ("Width: Auto"). `bare` shows the value as its icon only, the word in the
+ * tooltip ("Mark: Number"); `tip` is the tooltip otherwise (else the group's name).
  */
-function Group({ label, options, folded, tip }: { label: string; options: Option[]; folded: boolean; tip?: string }) {
+function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={tip ?? label}>
+      <Tooltip label={bare ? `${label}: ${current.label ?? current.tip}` : tip ?? label}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
             {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
-            {current.label}
+            {bare && current.icon ? null : current.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
         </DropdownMenuTrigger>
@@ -551,8 +553,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                     { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
                   ]} />
                   <Sep />
-                  {/* Sprint 167 PR 2 (README item C): Mark, a menu that shows its value; Icon, the default, writes nothing. */}
-                  <Group label="Mark" tip={MARK_MENU_TIP} folded options={BOXES_MARKS.map(choice => ({
+                  {/* Sprint 167 PR 2 (README item C): Mark, a menu that shows its value; Icon, the default, writes nothing. On
+                      the narrowest pane it folds last, to its value's icon (the word stays in its tooltip). */}
+                  <Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(choice => ({
                     key: choice,
                     on: mark === choice,
                     icon: MARK_ICON[choice],

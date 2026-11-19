@@ -655,7 +655,10 @@ stable(COLUMNS, 'three columns')
   assert.ok(/Present/.test(REVEAL_TIP) && /one by one/.test(REVEAL_TIP), REVEAL_TIP)
   assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Width or count, Style')
   assert.equal(FOLD_AT.reveal, FOLD_AT.alignment + 1, 'Reveal folds right after the alignment')
-  assert.equal(MAX_FOLD, FOLD_AT.style, 'every group can fold')
+  // Sprint 167 PR 2: Boxes' Mark, a menu already, folds last, to its value's icon (review of #878: else the Boxes bar at
+  // its last fold was a menu wider than before, and ran past a narrow pane).
+  assert.ok(FOLD_AT.style < FOLD_AT.mark, 'Style, then Mark')
+  assert.equal(MAX_FOLD, FOLD_AT.mark, 'every group can fold')
   {
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
     assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
@@ -876,13 +879,16 @@ stable(COLUMNS, 'three columns')
   // word and icon; it is a menu already, so it never folds.
   const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
   const style = barSource.indexOf('<Group label="Style"')
-  const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded options={BOXES_MARKS.map(')
+  const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(')
   const width = barSource.indexOf('<Group label="Width"')
   assert.ok(style > 0 && markAt > style && width > markAt, 'Style, then Mark, then Width')
   assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
-  // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it.
+  // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
+  // tooltip says it.
   assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
+  assert.match(barSource, /\{bare && current\.icon \? null : current\.label\}/)
+  assert.match(barSource, /<Tooltip label=\{bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : tip \?\? label\}>/)
 }
 
 console.log('blockBar: Turn into, Width, Style, Mark, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')
