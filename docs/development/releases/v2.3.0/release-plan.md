@@ -176,7 +176,7 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 - **The milestone:** it gained its first issues from the v2.2.0 sweep on 19 November (see the header). From Sprint 164 on, each PR gets an issue on it.
 - **The test checklist,** `docs/releases/v2.3.0/TEST-CHECKLIST.md`, started on 16 November, has rows from Sprints 159, 160 and 162 and from some of the work outside sprints (filed under 159). Sprint 158's Not run rows are added with the candidate, as its header says. Sprints 161 and 163 and most of the work of 17 to 19 November have no rows yet. The candidate's table, the Gate 1 and Gate 2 rows and the sign-off come when the candidate is built.
 - **`qa-validator` on Sprint 163** ran on 19 November as part of the repair: **PASS**, with one documentation gap (the code block's row in `architecture.md`), added in the same PR as this plan. Sprints 158–162 got no `qa-validator` run either; from Sprint 164 on it runs at every sprint's end.
-- **Sprint 164** approved on 19 November; it is being built.
+- **Sprint 164** approved on 19 November and done the same day: PRs #819, #821 and #858 merged, the leftovers' removal is #892, and `qa-validator` signed off (see the Sprints table).
 - **The release candidate's date** is not set.
 
 ## Risks
