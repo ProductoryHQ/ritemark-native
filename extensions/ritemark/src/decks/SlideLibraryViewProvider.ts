@@ -18,6 +18,12 @@ import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
 import { projectRoot } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
 
+/** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
+function projectName(): string {
+  const root = projectRoot();
+  return root ? path.basename(root) : '';
+}
+
 /** Library state is sent at most this often while decks change. */
 const REFRESH_MS = 300;
 /** Messages held for the page until it has loaded (Show in the library, Search, a notice), at most this many. */
@@ -169,7 +175,7 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const decks = library ? await library.listDecks({ query, agenda: true }) : [];
     const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
-    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query, project: !!library });
+    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query, project: !!library, projectName: projectName() });
   }
 
   private async post(message: Record<string, unknown>): Promise<void> {
