@@ -3,12 +3,12 @@
 Phase 3 starts only after Jarmo's approval, #850 merged, and the sprint branch exists.
 
 ## PR 1: the full set as data (High)
-- [ ] Generator emits the path module and the search index
-- [ ] `slideIcon` accepts any regular name or alias; the 24 and the aliases stay
-- [ ] The page inlines exactly the used icons
-- [ ] The DECKS rules list every name plus the aliases
-- [ ] Bundle growth measured against the 1 MB budget and written in the PR
-- [ ] Tests: generated names match `@phosphor-icons/core`, old decks read the same
+- [x] Generator emits the path module and the search index
+- [x] `slideIcon` accepts any regular name or alias; the 24 and the aliases stay
+- [x] The page inlines exactly the used icons
+- [x] The DECKS rules list every name plus the aliases
+- [x] Bundle growth measured against the 1 MB budget and written in the PR
+- [x] Tests: generated names match `@phosphor-icons/core`, old decks read the same
 
 ## PR 2: every surface draws from the full set (High, after Sprint 167 PR 2)
 - [ ] `SlideIconGlyph` used by the editor, strip, wall and presenter view

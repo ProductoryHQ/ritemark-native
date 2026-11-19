@@ -17,12 +17,18 @@
  * The lines that sat under the slide come first here (`about`, `SlideAbout`): where a library copy came from with its
  * actions, and the words a layout keeps for others; then a line, then the slide's own settings.
  *
+ * Sprint 167 PR 3 (decks README item A, `block-details.html`): a Content row, Top · Middle · Bottom, as tiles like
+ * Picture's, after it: where the slide's whole content sits, title included. It shows the slide's own default chosen
+ * when its header says nothing (a title or section slide Bottom, a picture alone Middle, the rest Top:
+ * `contentPlaceDefault`); choosing another writes `valign:`, and choosing the default again takes the line out.
+ *
  * The popover holds only the slide's own settings. From 16 to 17 November its last section was the deck's own choice,
  * Card or Borderless ("This deck · all 15 slides"); since Sprint 162 that choice lives in the Theme menu on the deck's
  * bar (`ThemeMenu.tsx`, step-3-themes.md), with the deck's theme, and writes the deck's front matter the same way.
  */
 import type { ReactNode } from 'react'
-import { isBlockSlide, parseFrom, type SlideData } from '../../../../src/decks/deckFormat'
+import { isBlockSlide, parseFrom, sidePictureOf, type ContentPlace, type SlideData } from '../../../../src/decks/deckFormat'
+import { contentPlaceDefault, contentPlaceOf } from '../../../../src/decks/blocks/slideRenderer'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/segmented-control'
@@ -62,6 +68,30 @@ const PICTURES: Array<{ value: string; label: string; picture: ReactNode }> = [
   { value: 'right', label: 'Right', picture: <span className="deck-pic-pic" aria-hidden="true"><i style={{ right: 0, top: 0, bottom: 0, width: '40%' }} /></span> },
   { value: 'behind', label: 'Behind', picture: <span className="deck-pic-pic" aria-hidden="true"><i style={{ inset: 0 }} /></span> },
 ]
+
+/** Two lines, a title and a shorter one under it, `top` px down a Picture-sized tile (30 px high). */
+function Lines({ top }: { top: number }) {
+  return (
+    <span className="deck-pic-pic" aria-hidden="true">
+      <i style={{ left: '22%', right: '22%', top, height: 4, borderRadius: 2 }} />
+      <i style={{ left: '22%', right: '40%', top: top + 7, height: 3, borderRadius: 2 }} />
+    </span>
+  )
+}
+
+const CONTENT_PLACE_TILES: Array<{ value: ContentPlace; label: string; picture: ReactNode }> = [
+  { value: 'top', label: 'Top', picture: <Lines top={5} /> },
+  { value: 'middle', label: 'Middle', picture: <Lines top={10} /> },
+  { value: 'bottom', label: 'Bottom', picture: <Lines top={15} /> },
+]
+
+/**
+ * What choosing a place writes: nothing (the line taken out) for the slide's own default, else the place. So a title
+ * slide's Bottom, chosen again after Top, leaves its header as it was before.
+ */
+export function contentPlaceChange(data: SlideData, place: ContentPlace): Pick<SlideData, 'valign'> {
+  return { valign: place === contentPlaceDefault(data.markdown ?? '', sidePictureOf(data)) ? undefined : place }
+}
 
 interface SlideSettingsProps {
   number: number
@@ -166,6 +196,19 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, a
             value={data.picture || 'none'}
             onValueChange={picture => onChange({ picture: picture === 'none' ? undefined : picture })}
             options={PICTURES}
+          />
+        </>
+      ) : null}
+      {isBlockSlide(kind) ? (
+        <>
+          <div className="deck-settings-k">Content</div>
+          <SegmentedControl
+            aria-label="Where the content sits"
+            variant="picture"
+            className="deck-settings-pics deck-settings-places"
+            value={contentPlaceOf(data.markdown ?? '', data.valign, sidePictureOf(data))}
+            onValueChange={place => onChange(contentPlaceChange(data, place as ContentPlace))}
+            options={CONTENT_PLACE_TILES}
           />
         </>
       ) : null}
