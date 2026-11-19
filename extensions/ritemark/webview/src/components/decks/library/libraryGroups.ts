@@ -5,6 +5,9 @@
  * file was last changed ("12 Nov", with the year when it isn't this one). Pure, so the panel and its tests share it.
  */
 
+import { blockSectionNumberOf, isSectionSlide } from '../../../../../src/decks/blocks/slideRenderer'
+import { isBlockSlide, type SlideData } from '../../../../../src/decks/deckFormat'
+
 export interface GroupedDeck {
   path: string
   modified: number
@@ -78,4 +81,31 @@ export function deckExpanded(path: string, options: { searching: boolean; open: 
 export function deckMeta(modified: number, count: number, now: number = Date.now()): string {
   const date = deckDate(modified, now)
   return date ? `${date} · ${slideCount(count)}` : slideCount(count)
+}
+
+/** Sprint 165 PR 2: one section of an open deck, from its section slide (included) up to the next one. */
+export interface DeckSection<T> {
+  /** The section's number as written ("1", "A"), '' for none. */
+  number: string
+  title: string
+  slides: T[]
+}
+
+/**
+ * Sprint 165 PR 2 (README "A section in one move"): a deck's slides by section. A section starts at a section slide (a
+ * title-only slide with its number, as the Agenda reads it) and runs to the next one; the slides before the first
+ * stand without a heading (`before`). A deck without sections has every slide in `before` and no sections.
+ */
+export function sectionsOf<T extends { kind: string; data: SlideData }>(slides: readonly T[]): { before: T[]; sections: DeckSection<T>[] } {
+  const before: T[] = []
+  const sections: DeckSection<T>[] = []
+  for (const slide of slides) {
+    if (isSectionSlide(slide.kind, slide.data)) {
+      const number = isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') ?? '' : String(slide.data.number ?? '').trim()
+      const title = typeof slide.data.title === 'string' ? slide.data.title.trim() : ''
+      sections.push({ number, title: title || (number ? `Section ${number}` : 'Section'), slides: [slide] })
+    } else if (sections.length) sections[sections.length - 1].slides.push(slide)
+    else before.push(slide)
+  }
+  return { before, sections }
 }

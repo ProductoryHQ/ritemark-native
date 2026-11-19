@@ -162,6 +162,25 @@ async function run() {
     assert.equal(newer.files['Slide library/Newer.deck.md'], LATER.replace('id: n1', 'id: a1'));
   }
 
+  // Sprint 165 PR 2: Take section copies a section's slides, the section slide first, in their order, each with its
+  // handout and its prompts, through the same copy path as one slide (the host sends them to the view as one insert).
+  {
+    const DAY = [
+      '---', 'deck: 2', '---', '',
+      '```slide', '---', 'id: w1', '---', '# Welcome', '```', '', 'Welcome words.', '',
+      '```slide', '---', 'id: s1', '---', '1', '', '# Agents at work', '```', '', '# Agents at work', '', 'Why agents now.', '',
+      '```slide', '---', 'id: p1', '---', '# Ask well', '```', '', '## Ask well', '', 'Try this prompt:', '', '```prompt', 'Summarise the meeting in five lines.', '```', '',
+      '```slide', '---', 'id: s2', '---', '2', '', '# Prompts', '```', '',
+    ].join('\n');
+    const day = project({ 'Clients/Day 2.deck.md': DAY, 'Clients/Harbour/Harbour.deck.md': DECK });
+    const parts = await new DeckLibrary(day).copies('Clients/Day 2.deck.md', ['s1', 'p1'], 'Clients/Harbour/Harbour.deck.md', ['t1']);
+    assert.deepEqual(parts.map(part => parseFrom(slideDataOf(part.kind, part.body).from)?.id), ['s1', 'p1'], 'in the section\'s order');
+    assert.match(parts[0].handout, /Why agents now\./);
+    assert.match(parts[1].handout, /```prompt\nSummarise the meeting in five lines\.\n```/, 'the prompt comes with its slide');
+    const ids = parts.map(part => slideDataOf(part.kind, part.body).id);
+    assert.equal(new Set([...ids, 't1']).size, 3, 'each copy gets an id of its own');
+  }
+
   console.log('DeckLibrary: passed');
 }
 

@@ -121,7 +121,10 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         await this.refresh();
         return;
       case 'library/insert':
-        await this.insert(request.path, request.id);
+        await this.insert(request.path, [request.id]);
+        return;
+      case 'library/insert-section':
+        await this.insert(request.path, request.ids);
         return;
       case 'library/open': {
         const library = this.library();
@@ -136,8 +139,11 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     }
   }
 
-  /** "Insert after slide N": a copy into the active deck, after its current slide, as one undo step there. */
-  private async insert(path: string, id: string): Promise<void> {
+  /**
+   * "Insert after slide N": copies into the active deck, after its current slide, as one undo step there. One slide, or
+   * (Sprint 165 PR 2, Take section) a section's slides in their order: the same copies, one edit.
+   */
+  private async insert(path: string, ids: string[]): Promise<void> {
     const library = this.library();
     const active = this.pages.activeDeck();
     const document = this.pages.activeDocument();
@@ -147,8 +153,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     }
     try {
       const taken = slidesOfText(document.getText()).map(slide => slide.data.id).filter((value): value is string => !!value);
-      const parts = await library.copies(path, [id], active.path, taken);
-      if (!(await this.pages.insertIntoActive(parts))) await this.post({ type: 'library/notice', text: 'The deck could not take the slide.' });
+      const parts = await library.copies(path, ids, active.path, taken);
+      if (!(await this.pages.insertIntoActive(parts))) await this.post({ type: 'library/notice', text: ids.length > 1 ? 'The deck could not take the section.' : 'The deck could not take the slide.' });
     } catch (error) {
       await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The slide could not be inserted.' });
     }

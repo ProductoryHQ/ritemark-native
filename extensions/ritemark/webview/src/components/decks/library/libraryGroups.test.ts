@@ -1,6 +1,7 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
-import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, slideCount } from './libraryGroups'
+import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionsOf, slideCount } from './libraryGroups'
+import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
 const decks = [
@@ -60,3 +61,35 @@ assert.equal(deckExpanded('Notes.deck.md', { ...closed, open: { 'Notes.deck.md':
 assert.equal(deckExpanded('Notes.deck.md', { ...closed, searching: true }), true)
 
 console.log('libraryGroups: ok')
+
+// Sprint 165 PR 2: an open deck's sections. A section slide (a short number over its title) starts one, up to the next;
+// the slides before the first have no heading; a deck without sections has none.
+{
+  const block = (markdown: string) => ['```slide', markdown, '```', ''].join('\n')
+  const deck = (...parts: string[]) => parseDeck(['---', 'deck: 2', '---', '', ...parts].join('\n')).slides.map((entry, index) => ({ index, kind: entry.kind, data: slideDataOf(entry.kind, entry.body) }))
+  const places = (slides: Array<{ index: number }>) => slides.map(slide => slide.index)
+  const withSections = deck(
+    block('# Welcome'),
+    block('# Today'),
+    block('1\n\n# Agents at work'),
+    block('# What an agent is'),
+    block('# Exercise'),
+    block('2\n\n# Prompts'),
+    block('# A good prompt'),
+  )
+  const grouped = sectionsOf(withSections)
+  assert.deepEqual(places(grouped.before), [0, 1], 'the slides before the first section stand alone')
+  assert.deepEqual(grouped.sections.map(section => [section.number, section.title, places(section.slides)]), [
+    ['1', 'Agents at work', [2, 3, 4]],
+    ['2', 'Prompts', [5, 6]],
+  ])
+  // A section first: nothing before it.
+  assert.deepEqual(sectionsOf(withSections.slice(2)).before, [])
+  // An old Section slide counts, its number from its header; one with no title is named by its number.
+  const old = sectionsOf([{ kind: 'section', data: { number: '3' } }, { kind: 'points', data: { title: 'x' } }])
+  assert.deepEqual(old.sections.map(section => [section.number, section.title, section.slides.length]), [['3', 'Section 3', 2]])
+  // No sections: every slide as before.
+  const none = deck(block('# One'), block('# Two'), block('# Just a title'))
+  assert.deepEqual(sectionsOf(none), { before: none, sections: [] })
+  assert.deepEqual(sectionsOf([]), { before: [], sections: [] })
+}

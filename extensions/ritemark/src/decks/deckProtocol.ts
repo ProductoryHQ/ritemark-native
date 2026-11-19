@@ -367,7 +367,12 @@ export type LibraryRequest =
   | { type: 'library/ready' }
   | { type: 'library/search'; query: string }
   | { type: 'library/insert'; path: string; id: string }
+  /** Sprint 165 PR 2: Take section, the section's slides in their order, inserted as one step. */
+  | { type: 'library/insert-section'; path: string; ids: string[] }
   | { type: 'library/open'; path: string };
+
+/** The most slides one Take section sends. */
+export const MAX_SECTION_SLIDES = 200;
 
 /** Decode one message from the Slide library place with exact fields, or null. */
 export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
@@ -386,6 +391,14 @@ export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
       return only('type', 'path', 'id') && deckPath(input.path) && typeof input.id === 'string' && /^[0-9a-z]{1,16}$/i.test(input.id)
         ? { type: 'library/insert', path: input.path as string, id: input.id }
         : null;
+    case 'library/insert-section': {
+      const ids = input.ids;
+      const valid = Array.isArray(ids) && ids.length > 0 && ids.length <= MAX_SECTION_SLIDES
+        && ids.every(id => typeof id === 'string' && /^[0-9a-z]{1,16}$/i.test(id)) && new Set(ids).size === ids.length;
+      return only('type', 'path', 'ids') && deckPath(input.path) && valid
+        ? { type: 'library/insert-section', path: input.path as string, ids: [...(ids as string[])] }
+        : null;
+    }
     case 'library/open':
       return only('type', 'path') && deckPath(input.path) ? { type: 'library/open', path: input.path as string } : null;
     default:
