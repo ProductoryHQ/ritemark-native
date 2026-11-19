@@ -1,0 +1,67 @@
+/**
+ * Sprint 165 PR 1 (README "The library place, from first principles"): Other decks grouped by the folder each deck is
+ * in. A folder is a plain heading, never opened or closed; a deck at the project's top level goes under the project's
+ * name. Folders come in the order of their newest deck, and a folder's decks newest first. A row's date is the day the
+ * file was last changed ("12 Nov", with the year when it isn't this one). Pure, so the panel and its tests share it.
+ */
+
+export interface GroupedDeck {
+  path: string
+  modified: number
+}
+
+export interface DeckFolder<T extends GroupedDeck> {
+  /** The folder's project-relative path ('' for the project's top level). */
+  folder: string
+  /** The heading: the folder's path as written, or the project's name for the top level. */
+  name: string
+  decks: T[]
+}
+
+/** The folder a deck is in, project-relative ('' at the top level). */
+export function folderOfDeck(path: string): string {
+  const cut = path.lastIndexOf('/')
+  return cut < 0 ? '' : path.slice(0, cut)
+}
+
+/** The decks by folder: folders by their newest deck, each folder's decks newest first (ties by path). */
+export function groupByFolder<T extends GroupedDeck>(decks: readonly T[], projectName: string): DeckFolder<T>[] {
+  const newestFirst = [...decks].sort((a, b) => b.modified - a.modified || a.path.localeCompare(b.path))
+  const folders = new Map<string, DeckFolder<T>>()
+  for (const deck of newestFirst) {
+    const folder = folderOfDeck(deck.path)
+    let group = folders.get(folder)
+    if (!group) {
+      group = { folder, name: folder || projectName || 'This project', decks: [] }
+      folders.set(folder, group)
+    }
+    group.decks.push(deck)
+  }
+  // A Map keeps insertion order, and each folder was first met at its newest deck.
+  return [...folders.values()]
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A deck's date as its row shows it: "12 Nov", or "12 Nov 2025" when it isn't this year. Empty for no date. */
+export function deckDate(modified: number, now: number = Date.now()): string {
+  if (!Number.isFinite(modified) || modified <= 0) return ''
+  const day = new Date(modified)
+  const text = `${day.getDate()} ${MONTHS[day.getMonth()]}`
+  return day.getFullYear() === new Date(now).getFullYear() ? text : `${text} ${day.getFullYear()}`
+}
+
+/** A deck's count of slides as its row's tooltip says it. */
+export function slideCount(count: number): string {
+  return count === 1 ? '1 slide' : `${count} slides`
+}
+
+/**
+ * Whether a deck shows its slides. Every deck starts closed; a search opens every deck it found; "From another deck…"
+ * (`openNewest`) opens the newest other deck until it is closed by hand.
+ */
+export function deckExpanded(path: string, options: { searching: boolean; open: Record<string, boolean>; openNewest: boolean; newest: string | undefined }): boolean {
+  if (options.searching) return true
+  if (options.open[path] !== undefined) return options.open[path]
+  return options.openNewest && path === options.newest
+}
