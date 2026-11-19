@@ -434,7 +434,7 @@ async function main(): Promise<void> {
     assert.equal(tools.deckToolsAvailable(), true);
     assert.deepEqual(toolGroupsFor({ browser: false }).map((group) => group.id), ['deck']);
     assert.equal(toolGroupById('deck'), deckGroup);
-    assert.deepEqual(deckGroup.tools.map((tool) => tool.name), ['list_decks', 'read_deck', 'insert_slides', 'update_library_slide', 'add_to_library', 'read_pptx_theme', 'set_deck_theme', 'check_theme_colours', 'set_theme_draft_colours']);
+    assert.deepEqual(deckGroup.tools.map((tool) => tool.name), ['list_decks', 'read_deck', 'insert_slides', 'update_library_slide', 'add_to_library', 'list_repeated_slides', 'add_repeated_slides', 'read_pptx_theme', 'set_deck_theme', 'check_theme_colours', 'set_theme_draft_colours']);
     assert.equal(claudeAllowName(deckGroup, deckGroup.tools[0]), 'mcp__ritemark_decks__list_decks');
     const tool = (name: string) => deckGroup.tools.find((item) => item.name === name)!;
     const context = { runtimeId: 'claude-code' as const };
@@ -543,6 +543,43 @@ async function main(): Promise<void> {
     assert.equal((await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['../x'] }, context)).isError, true);
     tools.setDeckToolHost(() => null);
     assert.equal(tools.deckToolsAvailable(), false);
+  }
+
+  // ── Sprint 165 PR 4 (#834): Claude reads and takes the library's offer with the same function as the place ──
+  {
+    const { DeckLibrary } = await import('../decks/DeckLibrary');
+    const { slidesOfText } = await import('../decks/deckLibraryFormat');
+    const block = (id: string, markdown: string) => ['```slide', '---', `id: ${id}`, '---', markdown, '```', ''].join('\n');
+    const own = (course: string) => Array.from({ length: 6 }, (_, n) => block(`${course.slice(0, 2).toLowerCase()}${n}q`, `# ${course} part ${n}\n\n${course} words ${n}`));
+    const files: Record<string, string> = {
+      'Clients/Alpha.deck.md': ['---\ndeck: 2\n---\n', ...own('Alpha'), block('ap01', "# Today's plan\n\nMorning and afternoon")].join('\n'),
+      'Clients/Beta.deck.md': ['---\ndeck: 2\n---\n', ...own('Beta')].join('\n'),
+    };
+    const library = new DeckLibrary({
+      async list() { return Object.keys(files).filter((path) => path.endsWith('.deck.md')).map((path, index) => ({ path, modified: index + 1 })); },
+      async read(path) { return files[path] ?? null; },
+      async write(path, text) { files[path] = text; },
+    });
+    const group = tools.createDeckToolGroup(() => ({ library: () => library, viewInsert: () => undefined }));
+    const tool = (name: string) => group.tools.find((item) => item.name === name)!;
+    const context = { runtimeId: 'codex' as const };
+    await library.insertCopies('Clients/Alpha.deck.md', ['ap01'], 'Clients/Beta.deck.md', undefined);
+    // Two families: no offer, and Claude is told why.
+    assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /make 2 families .* at least 3/);
+    files['Talks/Gamma.deck.md'] = ['---\ndeck: 2\n---\n', ...own('Gamma'), block('gp01', "# Today's plan\n\nMorning and afternoon")].join('\n');
+    const listed = (await runTool(tool('list_repeated_slides'), {}, context)).text;
+    assert.match(listed, /^This slide is in most of the project's decks \(they make 3 families\):\n- "Today's plan" · Talks\/Gamma\.deck\.md#gp01 · in 3 decks, 3 families/);
+    assert.equal(Object.keys(files).some((path) => path.startsWith('Slide library/')), false, 'listing writes nothing');
+    // Add: by the slide named, into Every training; then nothing is left to offer.
+    const added = await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md#gp01'] }, context);
+    assert.equal(added.text, 'Added 1 slide to the library under Every training (a new topic).');
+    const topic = slidesOfText(files['Slide library/Every training.deck.md']);
+    assert.equal(topic.length, 1);
+    assert.match(topic[0].data.from ?? '', /^Talks\/Gamma\.deck\.md#gp01 @/);
+    assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /library already has/);
+    assert.equal((await runTool(tool('add_repeated_slides'), {}, context)).text, 'No slide is offered now, so nothing was added.');
+    assert.equal((await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md'] }, context)).isError, true, 'a slide needs its id');
+    assert.equal((await runTool(tool('add_repeated_slides'), { slides: ['../x.deck.md#ab12'] }, context)).isError, true);
   }
 
   // ── 16 November: an exercise slide's pill (`tag:`) goes through the deck tools as written ──

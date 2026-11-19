@@ -174,6 +174,8 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
     for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', '```` ```slide ```` (the word `slide` alone)', ':::: columns', '::: column', ':::: boxes', '::: steps', '`deck: 2`', 'a Ritemark comment, `<!-- … -->`', 'There is no speaker-notes field', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', "changing a slide\'s title never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`', 'never put a list number in front of a heading']) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
+    // Sprint 165 PR 4 (#834): the library's offer, added only when the user asks.
+    assert.ok(withDecks.includes('list_repeated_slides') && withDecks.includes('Only when the user asks, add_repeated_slides'), `${runtime}: the offer's tools`);
   }
 });
 

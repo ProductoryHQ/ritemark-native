@@ -41,6 +41,7 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
+import { EVERY_TRAINING, MAX_OFFER, OFFER_MIN_FAMILIES, projectOffer } from '../decks/libraryOffer';
 import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from '../decks/deckFormat';
 import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
 import { DECK_FONT_LIST } from '../decks/deckTheme';
@@ -619,6 +620,54 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
             throw new Error(`${error instanceof Error ? error.message : String(error)} ${undone ? 'The library is back as it was; nothing changed.' : 'The library could not be put back: it was changed meanwhile.'}`);
           }
           return { text: `Added the slide to the library under ${deckName(write.path)}${write.previous === null ? ' (a new topic)' : ''}.` };
+        },
+      },
+      // Sprint 165 PR 4 (#834): the library's offer, the same function the Slide library place shows it with
+      {
+        name: 'list_repeated_slides',
+        description:
+          `The slides that are in most of the project's decks, as the Slide library offers them at its top: at most ${MAX_OFFER}, the ones in the most families of decks first (decks copied from each other count as one family), each at its newest copy, with how many decks and families have it. Worked out from the decks themselves; slides the library already has, and ones the user hid with Not now, are left out. Use it when the user asks which slides they repeat, or wants the library to have them.`,
+        input: {},
+        run: async () => {
+          const { offer } = await projectOffer(library().library);
+          if (!offer.slides.length) {
+            return {
+              text: offer.families < OFFER_MIN_FAMILIES
+                ? `No slide is offered: the project's decks make ${offer.families} famil${offer.families === 1 ? 'y' : 'ies'} (decks copied from each other count as one), and it takes at least ${OFFER_MIN_FAMILIES}.`
+                : 'No slide is offered: the library already has the slides in most decks, or the user hid them with Not now.',
+            };
+          }
+          const lines = offer.slides.map(slide => `- "${slide.title || 'Untitled slide'}" · ${slide.path}#${slide.id} · in ${slide.decks} decks, ${slide.families} families`);
+          return {
+            text: [
+              `${offer.slides.length === 1 ? 'This slide is' : `These ${offer.slides.length} slides are`} in most of the project's decks (they make ${offer.families} families):`,
+              ...lines,
+              `add_repeated_slides copies them into the library's topic "${EVERY_TRAINING}", only when the user asks for it.`,
+            ].join('\n'),
+          };
+        },
+      },
+      {
+        name: 'add_repeated_slides',
+        description:
+          `Copy slides that list_repeated_slides gave into the Slide library's topic "${EVERY_TRAINING}" (made when it isn't there), as the library's Add all does: each a copy with its \`from:\` line, its handout and its prompts, in one write; the decks are never changed. Only when the user asks for it.`,
+        input: {
+          slides: z.array(z.string().min(3).max(1100)).min(1).max(MAX_OFFER).optional()
+            .describe('The slides to add, each as `<deck path>#<slide id>` the way list_repeated_slides gives them. Left out: every slide offered now.'),
+        },
+        run: async (args) => {
+          const { library: project } = library();
+          const chosen = args.slides
+            ? (args.slides as string[]).map(entry => {
+              const cut = entry.lastIndexOf('#');
+              const id = entry.slice(cut + 1).trim();
+              if (cut < 0 || !/^[0-9a-z]{1,16}$/i.test(id)) throw new Error(`${entry} names no slide. Use list_repeated_slides to see them.`);
+              return { path: deckPathOf(entry.slice(0, cut)), id };
+            })
+            : (await projectOffer(project)).offer.slides.map(slide => ({ path: slide.path, id: slide.id }));
+          if (!chosen.length) return { text: 'No slide is offered now, so nothing was added.' };
+          const write = await project.addCopiesToTopic(chosen, EVERY_TRAINING);
+          return { text: `Added ${write.count === 1 ? '1 slide' : `${write.count} slides`} to the library under ${EVERY_TRAINING}${write.previous === null ? ' (a new topic)' : ''}.` };
         },
       },
       // Sprint 162 PR 5 (step-3-themes.md): themes, the same four tools for every runtime

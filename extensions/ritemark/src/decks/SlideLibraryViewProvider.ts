@@ -6,18 +6,23 @@
  *
  * The webview is the shared React bundle (`data-editor-type="slide-library"`); the library's work is `DeckLibrary`'s,
  * the same operations the deck view and the AI's tools use.
+ *
+ * Sprint 165 PR 4 (#834): at its top, the offer of the slides in most of the project's decks (`libraryOffer.ts`), with
+ * Add all and Choose… (copies into the topic Every training, one Undo on the place's notice) and Not now (kept beside
+ * the library). It is worked out from the decks alone, and only a press writes anything.
  */
 import { slidePicturePaths } from './blocks/slideRenderer';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
-import type { DeckLibrary, DeckSummary } from './DeckLibrary';
+import type { DeckLibrary, DeckSummary, TopicWrite } from './DeckLibrary';
 import { readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
 import { themePathOf } from './deckTheme';
 import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
 import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks, searchLibrary, type IndexedDeck } from './librarySearch';
+import { EVERY_TRAINING, NO_NOT_NOW, hideFromOffer, notNowSlides, offerOf, readNotNow, type OfferedSlide } from './libraryOffer';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -29,6 +34,8 @@ function projectName(): string {
 const REFRESH_MS = 300;
 /** Messages held for the page until it has loaded (Show in the library, Search, a notice), at most this many. */
 const MAX_HELD = 8;
+/** The offer's writes kept for their Undo, at most this many (the notice shows only the last). */
+const KEPT_WRITES = 5;
 
 export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   private view: vscode.WebviewView | null = null;
@@ -47,6 +54,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private index: { root: string; index: DeckIndex } | null = null;
   /** The open deck the last state was worked out for: another one changes the ticks and what search may show. */
   private stateActive: string | null = null;
+  /** Sprint 165 PR 4: the offer's Add all and Choose… writes, by the token their notice's Undo sends. */
+  private readonly writes = new Map<string, TopicWrite>();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -176,7 +185,82 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         await vscode.commands.executeCommand('vscode.openWith', vscode.Uri.joinPath(root.uri, ...relative.split('/')), 'ritemark.editor');
         return;
       }
+      case 'library/offer-add':
+        await this.addOffered(request.slides);
+        return;
+      case 'library/offer-not-now':
+        await this.notNow(request.slides);
+        return;
+      case 'library/undo':
+        await this.undo(request.token);
+        return;
     }
+  }
+
+  /**
+   * Sprint 165 PR 4, Add all and Choose…: copies of the slides into Every training (made if it isn't there), one write;
+   * the place opens the topic, and its notice has the Undo.
+   */
+  private async addOffered(slides: Array<{ path: string; id: string }>): Promise<void> {
+    const library = isEnabled('decks') ? this.library() : null;
+    if (!library) return;
+    try {
+      const write = await library.addCopiesToTopic(slides, EVERY_TRAINING);
+      const token = this.keep(write);
+      this.index?.index.invalidate(write.path);
+      await this.post({ type: 'library/reveal', path: write.path });
+      await this.post({
+        type: 'library/notice',
+        text: `${write.count === 1 ? '1 slide' : `${write.count} slides`} added to the library, in ${EVERY_TRAINING}.`,
+        undo: token,
+      });
+    } catch (error) {
+      await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The slides could not be added.' });
+    }
+    await this.refresh();
+  }
+
+  /** Not now: the slides (every copy of each) are kept beside the library and never offered again. */
+  private async notNow(slides: Array<{ path: string; id: string }>): Promise<void> {
+    const library = isEnabled('decks') ? this.library() : null;
+    const index = library ? this.indexOf() : null;
+    if (!library || !index) return;
+    try {
+      const decks = await index.decks();
+      await hideFromOffer(library.files, notNowSlides(decks, index.same(), slides));
+      await this.post({ type: 'library/notice', text: slides.length === 1 ? 'Hidden. This slide won’t be offered again.' : 'Hidden. These slides won’t be offered again.' });
+    } catch (error) {
+      await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The offer could not be hidden.' });
+    }
+    await this.refresh();
+  }
+
+  /** The notice's Undo: the write taken back while nothing changed the topic since. */
+  private async undo(token: string): Promise<void> {
+    const library = this.library();
+    const write = this.writes.get(token);
+    this.writes.delete(token);
+    if (!library || !write) return;
+    let undone = false;
+    try {
+      undone = await library.undoTopicWrite(write);
+    } catch {
+      undone = false;
+    }
+    this.index?.index.invalidate(write.path);
+    await this.post({
+      type: 'library/notice',
+      text: undone ? 'Undone. The slides are out of the library again.' : `${EVERY_TRAINING} was changed since, so it is left as it is.`,
+    });
+    await this.refresh();
+  }
+
+  /** Keep a write for its Undo; the token the notice sends back. */
+  private keep(write: TopicWrite): string {
+    const token = `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    this.writes.set(token, write);
+    while (this.writes.size > KEPT_WRITES) this.writes.delete(this.writes.keys().next().value as string);
+    return token;
   }
 
   /**
@@ -238,13 +322,19 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     // #877 (the Experience lead): the decks whose folder or name has the words, as closed rows above the slides.
     const named = found ? namedDecks(indexed, query, { active: active?.path, limit: MAX_NAMED_DECKS }) : null;
     const here = same ? inOpenDeck(indexed, same, active?.path) : [];
+    // Sprint 165 PR 4: the offer, only while browsing (a search shows none).
+    let offer: OfferedSlide[] = [];
+    if (same && library && !query.trim()) {
+      const notNow = await readNotNow(library.files).catch(() => NO_NOT_NOW);
+      offer = offerOf(indexed, same, notNow, { active: active?.path }).slides;
+    }
     // Each deck's pictures once: a named deck can be a hit deck too.
     const drawn = named ? [...new Map([...decks, ...named.decks].map(deck => [deck.path, deck] as const)).values()] : decks;
     const { assets, themes } = this.view ? await looksOf(this.view.webview, drawn) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
     this.stateActive = active?.path ?? null;
     await this.post({
-      type: 'library/state', enabled: true, decks, assets, themes, active, query, project: !!library, projectName: projectName(), here,
+      type: 'library/state', enabled: true, decks, assets, themes, active, query, project: !!library, projectName: projectName(), here, offer,
       ...(found ? { search: { ...found, decks: named?.decks ?? [], deckTotal: named?.total ?? 0 } } : {}),
     });
   }

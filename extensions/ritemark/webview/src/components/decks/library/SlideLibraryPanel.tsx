@@ -7,6 +7,9 @@
  * Sprint 165 PR 3: the search lists each slide once, at its newest copy, library slides first, each with its place
  * and "also in N older decks"; a tick on a thumbnail says its copy is already in the open deck (the host works out
  * both, `librarySearch.ts`).
+ *
+ * Sprint 165 PR 4: at the library's top, the offer of the slides in most of the decks (`libraryOffer.ts`), with Add
+ * all, Choose… (the slides ticked) and Not now. Only a press writes, and Add's notice has the Undo.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactElement } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
@@ -18,7 +21,10 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { alsoLine, deckExpanded, deckMeta, deckPlace, decksCount, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
+import {
+  addAllLabel, addChosenLabel, alsoLine, deckExpanded, deckMeta, deckPlace, decksCount, groupByFolder, hitMeta, hitsCount, inDecksLine, offerHeadline, offerHint, placeLine,
+  sectionIds, sectionsOf, takeSectionTip, type DeckSection,
+} from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -50,6 +56,16 @@ interface LibraryHit {
   library: boolean
 }
 
+/** Sprint 165 PR 4: one slide the offer shows, at its newest copy (`libraryOffer.ts`'s `OfferedSlide`). */
+interface OfferedSlide {
+  path: string
+  index: number
+  id: string
+  title: string
+  families: number
+  decks: number
+}
+
 interface ActiveDeck {
   path: string
   name: string
@@ -75,7 +91,22 @@ interface LibraryState {
    * decks whose folder or name has the words, whole, for the Decks group, and how many there are.
    */
   search?: { hits: LibraryHit[]; total: number; decks?: LibraryDeck[]; deckTotal?: number }
+  /** Sprint 165 PR 4: the slides in most of the decks, offered at the library's top (none while searching). */
+  offer?: OfferedSlide[]
 }
+
+/** The place's notice, with the Undo of the write it tells of (Sprint 165 PR 4, Add all and Choose…). */
+interface Notice {
+  text: string
+  undo?: string
+}
+
+/** A notice stays this long; one with an Undo longer, so there is time to press it. */
+const NOTICE_MS = 5000
+const UNDO_NOTICE_MS = 10000
+
+/** An offered slide's key in Choose…'s ticks. */
+const offerKey = (slide: { path: string; id: string }) => `${slide.path}#${slide.id}`
 
 const NO_ASSETS: Record<string, string> = {}
 
@@ -139,7 +170,12 @@ export function SlideLibraryPanel() {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [selected, setSelected] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [notice, setNotice] = useState<Notice | null>(null)
+  // Sprint 165 PR 4: Choose…'s ticks (null when not choosing), and a press on the offer waiting for the host's answer.
+  const [choosing, setChoosing] = useState<Set<string> | null>(null)
+  const [offerBusy, setOfferBusy] = useState(false)
+  const chooseButton = useRef<HTMLButtonElement>(null)
+  const firstChoice = useRef<HTMLButtonElement>(null)
   const [openOthers, setOpenOthers] = useState(false)
   // #877: the Decks group's rows open on their own, apart from browsing's, and start closed at each search.
   const [openNamed, setOpenNamed] = useState<Record<string, boolean>>({})
@@ -150,12 +186,17 @@ export function SlideLibraryPanel() {
 
   useEffect(() => {
     const stop = onMessage((message) => {
-      if (message.type === 'library/state') setState(message as unknown as LibraryState)
+      if (message.type === 'library/state') {
+        setState(message as unknown as LibraryState)
+        setOfferBusy(false)
+      }
       else if (message.type === 'library/active') setState((value) => (value ? { ...value, active: (message.active as ActiveDeck | null) ?? null } : value))
       else if (message.type === 'library/focus-search') {
         setSearchOpen(true)
         setFocusSearch((count) => count + 1)
-      } else if (message.type === 'library/notice' && typeof message.text === 'string') setNotice(message.text)
+      } else if (message.type === 'library/notice' && typeof message.text === 'string') {
+        setNotice({ text: message.text, ...(typeof message.undo === 'string' ? { undo: message.undo } : {}) })
+      }
       else if (message.type === 'library/show' && (message.section === 'topics' || message.section === 'other')) {
         const section = message.section
         setQuery('')
@@ -194,9 +235,15 @@ export function SlideLibraryPanel() {
 
   useEffect(() => {
     if (!notice) return
-    const timer = setTimeout(() => setNotice(null), 5000)
+    const timer = setTimeout(() => setNotice(null), notice.undo ? UNDO_NOTICE_MS : NOTICE_MS)
     return () => clearTimeout(timer)
   }, [notice])
+
+  // Choose… puts the keyboard on the first slide; Cancel gives it back to Choose….
+  const isChoosing = choosing !== null
+  useEffect(() => {
+    if (isChoosing) firstChoice.current?.focus()
+  }, [isChoosing])
 
   // A revealed slide scrolls into view once its topic has opened.
   useEffect(() => {
@@ -213,6 +260,16 @@ export function SlideLibraryPanel() {
   const newestOther = folders[0]?.decks[0]?.path
   const here = useMemo(() => new Set(state?.here ?? []), [state])
   const deckOf = useMemo(() => new Map((state?.decks ?? []).map((deck) => [deck.path, deck])), [state])
+  // Sprint 165 PR 4: the offered slides with their decks, to draw them as the library's tiles.
+  const offered = useMemo(() => (state?.offer ?? []).flatMap((entry) => {
+    const deck = deckOf.get(entry.path)
+    const slide = deck?.slides.find((item) => item.index === entry.index && item.id === entry.id)
+    return deck && slide ? [{ entry, deck, slide }] : []
+  }), [state, deckOf])
+  // An offer that went (all added, hidden, or the decks changed) ends Choose….
+  useEffect(() => {
+    if (!offered.length) setChoosing(null)
+  }, [offered.length])
 
   // Small details 14: each deck's Agenda list, as its tiles draw it (no hint: the editor's only), once per state.
   const agendaOfDeck = useMemo(() => {
@@ -249,14 +306,14 @@ export function SlideLibraryPanel() {
    * A slide's tile: its thumbnail, title and menu. In a search (Sprint 165 PR 3) also its place and "also in N older
    * decks"; anywhere, the tick when its copy is already in the open deck.
    */
-  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string; also: string | null } }) => {
-    // A Decks group's tile (#877) is keyed apart: the same slide can be among the hits under it.
-    const key = `${options.named ? 'decks:' : ''}${deck.path}#${slide.id ?? slide.index}`
+  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string; also: string | null }; note?: string }) => {
+    // A Decks group's tile (#877) and an offered one (PR 4) are keyed apart: the same slide can be under its deck too.
+    const key = `${options.named ? 'decks:' : options.note ? 'offer:' : ''}${deck.path}#${slide.id ?? slide.index}`
     const title = titleOf(slide)
     const number = options.numbered ? `${slide.index + 1}. ` : ''
     const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
     const hit = options.hit
-    const spoken = [hit?.place, hit?.also, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
+    const spoken = [hit?.place, hit?.also, options.note, inOpenDeck ? 'already in the open deck' : null].filter(Boolean).join(', ')
     return (
       <DropdownMenu key={key} onOpenChange={(isOpen) => setSelected(isOpen ? key : null)}>
         <TickTip on={inOpenDeck}>
@@ -279,6 +336,7 @@ export function SlideLibraryPanel() {
               {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks" never are. */}
               {hit ? <span className="deck-lib-place">{hit.where}</span> : null}
               {hit?.meta ? <span className="deck-lib-also">{hit.meta}</span> : null}
+              {options.note ? <span className="deck-lib-also">{options.note}</span> : null}
             </button>
           </DropdownMenuTrigger>
         </TickTip>
@@ -456,6 +514,112 @@ export function SlideLibraryPanel() {
     )
   }
 
+  /**
+   * Sprint 165 PR 4 (README "The library offers what he repeats"): the offer at the library's top. At rest its slides
+   * are the library's tiles (a click inserts one, as anywhere); Choose… turns them into ticks, all ticked to start.
+   * Nothing is added without a press, and a press waits for the host's answer (no second add from a double click).
+   */
+  const offerBlock = () => {
+    if (!offered.length) return null
+    const count = offered.length
+    const keys = offered.map(({ entry }) => offerKey(entry))
+    const ticked = choosing ? offered.filter(({ entry }) => choosing.has(offerKey(entry))) : []
+    const send = (type: 'library/offer-add' | 'library/offer-not-now', list: typeof offered) => {
+      if (offerBusy || !list.length) return
+      setOfferBusy(true)
+      setChoosing(null)
+      sendToExtension(type, { slides: list.map(({ entry }) => ({ path: entry.path, id: entry.id })) })
+    }
+    const cancel = () => {
+      setChoosing(null)
+      requestAnimationFrame(() => chooseButton.current?.focus())
+    }
+    const toggle = (key: string) => setChoosing((value) => {
+      const next = new Set(value ?? [])
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+    return (
+      <section
+        className="deck-lib-offer"
+        aria-label="Slides in most of your decks"
+        aria-busy={offerBusy || undefined}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape' || !choosing) return
+          event.preventDefault()
+          cancel()
+        }}
+      >
+        <p className="deck-lib-offer-text">
+          <b>{offerHeadline(count)}</b> {choosing ? 'Tick the ones to add to Every training.' : offerHint(count)}
+        </p>
+        <div className="deck-lib-grid deck-lib-offer-grid">
+          {offered.map(({ entry, deck, slide }, at) => {
+            const note = inDecksLine(entry.decks)
+            if (!choosing) {
+              return (
+                <AgendaContext.Provider key={`offer:${offerKey(entry)}`} value={agendaOfDeck.get(deck.path) ?? null}>
+                  {tile(deck, slide, { numbered: false, note })}
+                </AgendaContext.Provider>
+              )
+            }
+            const key = offerKey(entry)
+            const on = choosing.has(key)
+            return (
+              <AgendaContext.Provider key={`choose:${key}`} value={agendaOfDeck.get(deck.path) ?? null}>
+                <Tooltip label={on ? 'Leave this slide out' : 'Add this slide too'} side="bottom" hoverOnly className="flex min-w-0">
+                  <button
+                    ref={at === 0 ? firstChoice : undefined}
+                    type="button"
+                    role="checkbox"
+                    aria-checked={on}
+                    className={`deck-lib-tile deck-lib-choice${on ? ' on' : ''}`}
+                    aria-label={`${titleOf(slide)}, ${note}`}
+                    onClick={() => toggle(key)}
+                  >
+                    <span className="deck-lib-thumb" aria-hidden>
+                      <SlideCanvas kind={slide.kind} data={slide.data} width={TILE_WIDTH} theme={themeOf(deck.theme)} borderless={deck.borderless} assets={state.assets?.[deck.path] ?? NO_ASSETS} />
+                      <span className="deck-lib-tickbox">{on ? <Icon name="check" size={12} tone="inherit" /> : null}</span>
+                    </span>
+                    <span className="deck-lib-title">{titleOf(slide)}</span>
+                    <span className="deck-lib-also">{note}</span>
+                  </button>
+                </Tooltip>
+              </AgendaContext.Provider>
+            )
+          })}
+        </div>
+        <div className="deck-lib-offer-actions">
+          {choosing ? (
+            <>
+              <Tooltip label={ticked.length ? `Copy the ${ticked.length === 1 ? 'ticked slide' : `${ticked.length} ticked slides`} into the library's topic Every training` : 'Tick at least one slide to add it'}>
+                <Button size="compact" aria-disabled={!ticked.length || offerBusy} onClick={() => send('library/offer-add', ticked)}>
+                  {addChosenLabel(ticked.length)}
+                </Button>
+              </Tooltip>
+              <Tooltip label="Back to the offer, nothing added">
+                <Button variant="outline" size="compact" onClick={cancel}>Cancel</Button>
+              </Tooltip>
+            </>
+          ) : (
+            <>
+              <Tooltip label={`Copy ${count === 1 ? 'this slide' : `these ${count} slides`} into the library's topic Every training`}>
+                <Button size="compact" aria-disabled={offerBusy} onClick={() => send('library/offer-add', offered)}>{addAllLabel(count)}</Button>
+              </Tooltip>
+              <Tooltip label="Pick which of these slides to add">
+                <Button ref={chooseButton} variant="outline" size="compact" aria-disabled={offerBusy} onClick={() => { if (!offerBusy) setChoosing(new Set(keys)) }}>Choose…</Button>
+              </Tooltip>
+              <Tooltip label={count === 1 ? 'Hide this slide: it won’t be offered again' : 'Hide these slides: they won’t be offered again'}>
+                <Button variant="outline" size="compact" aria-disabled={offerBusy} onClick={() => send('library/offer-not-now', offered)}>Not now</Button>
+              </Tooltip>
+            </>
+          )}
+        </div>
+      </section>
+    )
+  }
+
   return (
     <div className="deck-lib font-ui">
       {searchOpen || query ? (
@@ -482,8 +646,9 @@ export function SlideLibraryPanel() {
       {searching ? searchResults() : state.search ? null : (
         <>
           <div className="deck-lib-group">Library</div>
+          {offerBlock()}
           {topics.map((deck) => deckRows(deck, false))}
-          {topics.length === 0 ? (
+          {topics.length === 0 && !offered.length ? (
             <p className="deck-lib-none">No topics yet. Add a slide to the library from a deck's slide menu.</p>
           ) : null}
           {folders.length ? <div className="deck-lib-group deck-lib-group-other">Other decks</div> : null}
@@ -499,7 +664,26 @@ export function SlideLibraryPanel() {
           <p className="deck-lib-hint">Each topic is a deck in the Slide library folder. A slide you take is a copy: the library's slide stays as it is.</p>
         </>
       )}
-      {notice ? <div className="deck-lib-notice" role="status">{notice}</div> : null}
+      {notice ? (
+        <div className="deck-lib-notice" role="status">
+          <span className="deck-lib-notice-text">{notice.text}</span>
+          {notice.undo ? (
+            <Tooltip label="Take these slides out of the library again">
+              <Button
+                variant="link"
+                size="compact"
+                className="deck-lib-notice-undo"
+                onClick={() => {
+                  sendToExtension('library/undo', { token: notice.undo })
+                  setNotice(null)
+                }}
+              >
+                Undo
+              </Button>
+            </Tooltip>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

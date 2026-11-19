@@ -362,17 +362,27 @@ function slideIdOf(value: unknown): string {
   return id;
 }
 
-/** The Slide library place's requests (`SlideLibraryViewProvider`): search, insert a slide, open a deck. */
+/** The Slide library place's requests (`SlideLibraryViewProvider`): search, insert a slide, open a deck, the offer. */
 export type LibraryRequest =
   | { type: 'library/ready' }
   | { type: 'library/search'; query: string }
   | { type: 'library/insert'; path: string; id: string }
   /** Sprint 165 PR 2: Take section, the section's slides in their order, inserted as one step. */
   | { type: 'library/insert-section'; path: string; ids: string[] }
-  | { type: 'library/open'; path: string };
+  | { type: 'library/open'; path: string }
+  /**
+   * Sprint 165 PR 4: the offer's Add all and Choose… (the slides to copy into Every training), and Not now (the slides
+   * not to offer again); each slide is a deck's by id, as the offer showed it.
+   */
+  | { type: 'library/offer-add'; slides: Array<{ path: string; id: string }> }
+  | { type: 'library/offer-not-now'; slides: Array<{ path: string; id: string }> }
+  /** The Undo on the place's notice after Add all: the write with this token is taken back. */
+  | { type: 'library/undo'; token: string };
 
 /** The most slides one Take section sends. */
 export const MAX_SECTION_SLIDES = 200;
+/** The most slides one offer sends (it shows at most six). */
+export const MAX_OFFER_SLIDES = 6;
 
 /** Decode one message from the Slide library place with exact fields, or null. */
 export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
@@ -401,7 +411,30 @@ export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
     }
     case 'library/open':
       return only('type', 'path') && deckPath(input.path) ? { type: 'library/open', path: input.path as string } : null;
+    case 'library/offer-add':
+    case 'library/offer-not-now': {
+      const slides = offerSlidesOf(input.slides, deckPath);
+      if (!only('type', 'slides') || !slides) return null;
+      return input.type === 'library/offer-add' ? { type: 'library/offer-add', slides } : { type: 'library/offer-not-now', slides };
+    }
+    case 'library/undo':
+      return only('type', 'token') && typeof input.token === 'string' && /^[0-9a-z]{1,64}$/i.test(input.token) ? { type: 'library/undo', token: input.token } : null;
     default:
       return null;
   }
+}
+
+/** The offer's slides as sent: one to six, each exactly `{ path, id }`, none twice; else null. */
+function offerSlidesOf(value: unknown, deckPath: (field: unknown) => boolean): Array<{ path: string; id: string }> | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_OFFER_SLIDES) return null;
+  const slides: Array<{ path: string; id: string }> = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return null;
+    const record = entry as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (keys.length !== 2 || !keys.includes('path') || !keys.includes('id')) return null;
+    if (!deckPath(record.path) || typeof record.id !== 'string' || !/^[0-9a-z]{1,16}$/i.test(record.id)) return null;
+    slides.push({ path: record.path as string, id: record.id });
+  }
+  return new Set(slides.map(slide => `${slide.path}#${slide.id}`)).size === slides.length ? slides : null;
 }

@@ -24,10 +24,11 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] Tests, shots, lead's look, release-notes line, Risk and How to revert
 
 ## PR 4: The offer (`sprint-165-slide-library-pr4`)
-- [ ] The offer function (no AI call) with the chosen rule
-- [ ] Add all, Choose…, Not now; the topic "Every training"; the hidden set
-- [ ] Claude's library tool returns the same offer
-- [ ] Tests, shots, lead's look, release-notes line, Risk and How to revert
+- [x] The offer function (no AI call) with the chosen rule
+- [x] Add all, Choose…, Not now; the topic "Every training"; the hidden set
+- [x] Claude's library tool returns the same offer
+- [x] Tests, shots, release-notes line, Risk and How to revert
+- [ ] Lead's look
 
 ## Sprint end
 - [ ] Full test chain once on each final head
