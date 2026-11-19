@@ -53,11 +53,25 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 - [ ] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
 
 
-## For both PRs
+## Added on 19 November (scope change, Jarmo: "jah, lisa need kolm sprinti 166")
+
+### Fix 5: a Quote's leaked look (PR 5, issue #841)
+[#841](https://github.com/ProductoryHQ/ritemark-native/issues/841): in the editor, the strip, the wall and the presenter view a Quote on a dark slide is drawn as a near-white box, because VS Code's webview stylesheet gives blockquotes a fill of their own. `.deck-sl.is-blocks blockquote` sets `background: none`, `border: 0` and its own padding and colour, so nothing of VS Code's or `.ProseMirror`'s quote style reaches a slide. The quote's own look is designed separately with Jarmo.
+- [ ] A test that the slide's blockquote has no fill or border from outside; shots on a dark slide and on Paper, in the editor and on the wall, with the page for comparison.
+
+### Fix 6: the Present bar at the screen's foot (PR 6, issue #842)
+[#842](https://github.com/ProductoryHQ/ritemark-native/issues/842): the wall's floating bar sits at the screen's foot, centred, its bottom 12 px from the edge, never over the slide's words: in the ground below the 16:9 content on a wider screen (1440×900 leaves a 45 px band), in the slide's own bottom margin on a 16:9 screen. It still shows on pointer movement and fades after 2 s.
+- [ ] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right.
+
+### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
+[#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
+- [ ] A test, and one shot with the Link dialog open.
+
+## For every PR
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822`, `#824`, `#827` with `#828`, and `#829`, one per PR.
+- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842` and `#846`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 
