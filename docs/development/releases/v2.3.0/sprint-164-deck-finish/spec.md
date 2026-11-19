@@ -1,0 +1,8 @@
+# Sprint 164 spec
+
+The README is the spec. It lives in the governance repo at `product/design/experience/experiences/decks/README.md`, agreed with Jarmo on 19 November (ritemark-dev commits 3eb72b7, 5bc0f70, 7382bee). The variants for spacing are drawn in `spacing-gap.html` beside it. This file only numbers the requirements so the scenarios and tasks can point at them.
+
+- **R1 (README "The view switch", the line starting "A deck opens in Slide only").** Every deck opens in Slide only, new decks included. While a deck is open it keeps the view the person chose. A reopened deck starts in Slide only again, and nothing is stored in the file or remembered. Under 600 px nothing changes. The published page keeps Slide and text as the reader's default.
+- **R2 (README "Spacing on the slide", variant D).** 12 px under every block, none above and none under the last; headings keep their own space. 18 px inside every surface (box, tab pane, code block); table cells 18 px at the sides and 9 px above and under. 32 px between columns, 16 px between boxes, and a column has no padding of its own. All values in slide px times fit, never em.
+- **R3 (README "Label, a block of its own").** A Label block, from the / menu's Blocks group, text only, anywhere on a slide, shown on slides and the published page only. An empty Label shows a faint "Label" while the cursor is in it, Backspace removes it, and it is never drawn. File form `[Exercise · 1 / 2]{.label}` on its own line. A Steps block's pill becomes a Label in the same place, and a new Steps block comes without one.
+- **R4 (HARD RULE #1).** The removals listed in the sprint plan happen only with Jarmo's yes by name.
