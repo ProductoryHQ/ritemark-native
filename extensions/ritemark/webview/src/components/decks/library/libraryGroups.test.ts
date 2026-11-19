@@ -1,7 +1,10 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { alsoLine, deckDate, deckExpanded, deckMeta, deckPlace, decksCount, folderHeading, folderOfDeck, groupByFolder, hitMeta, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
+import {
+  addAllLabel, addChosenLabel, alsoLine, deckDate, deckExpanded, deckMeta, deckPlace, decksCount, folderHeading, folderOfDeck, groupByFolder, hitMeta, hitsCount, inDecksLine,
+  offerHeadline, offerHint, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip,
+} from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -156,6 +159,17 @@ console.log('libraryGroups: ok')
   assert.equal(decksCount(2, 2), '2 decks')
   assert.equal(decksCount(1, 1), '1 deck')
   assert.equal(decksCount(8, 20), '8 of 20 decks')
+  // Sprint 165 PR 4: the offer's words.
+  assert.equal(offerHeadline(4), 'These 4 slides are in most of your decks.')
+  assert.equal(offerHeadline(1), 'This slide is in most of your decks.')
+  assert.equal(offerHint(4), 'Add them to the library to take them in one click next time.')
+  assert.equal(offerHint(1), 'Add it to the library to take it in one click next time.')
+  assert.equal(addAllLabel(4), 'Add all 4')
+  assert.equal(addAllLabel(1), 'Add', 'one slide left: Add, beside Choose… and Not now')
+  assert.equal(inDecksLine(7), 'in 7 decks')
+  assert.equal(inDecksLine(1), 'in 1 deck')
+  assert.equal(addChosenLabel(3), 'Add 3')
+  assert.equal(addChosenLabel(0), 'Add')
   const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
   const rule = (selector: string) => {
     const found = css.indexOf(`${selector} {`)

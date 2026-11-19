@@ -107,5 +107,23 @@ export function workspaceDeckFiles(root: string): DeckFiles {
       await fs.promises.writeFile(temporary, text, 'utf8');
       await fs.promises.rename(temporary, target);
     },
+    // Sprint 165 PR 4: the Undo of a topic a library write made. To the Trash, never deleted outright.
+    async remove(relative) {
+      const target = await absolute(relative);
+      await vscode.workspace.fs.delete(vscode.Uri.file(target), { useTrash: true });
+    },
+    async folderExists(relative) {
+      try {
+        return (await fs.promises.stat(await absolute(relative))).isDirectory();
+      } catch {
+        return false;
+      }
+    },
+    // A folder the write made (`Slide library`, `Themes`), taken away only while it is empty: rmdir refuses otherwise.
+    async removeEmptyFolder(relative) {
+      const target = await absolute(relative);
+      if (projectRelative(root, target) === null) return;
+      await fs.promises.rmdir(target);
+    },
   };
 }
