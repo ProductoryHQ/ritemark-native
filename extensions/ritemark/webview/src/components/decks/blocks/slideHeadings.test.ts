@@ -100,7 +100,7 @@ function specificityOf(selector: string): Spec {
 }
 
 /** The pseudo-classes this cascade evaluates; a heading's rule with any other is listed (`UNREAD`, under). */
-const READ_PSEUDO = /^:(is|where|not|has)\(|^:(first|last)-child$/
+const READ_PSEUDO = /^:(is|where|not|has)\(|^:(first|last)-child$|^:nth-child\(1 of /
 const UNREAD: string[] = []
 
 /** `:has()`'s relative selector (`+ h2`, `~ p`, `> h3`, `h3`) from `anchor`, forwards. */
@@ -130,6 +130,10 @@ function matchesCompound(element: El, compound: string): boolean {
     } else if (inner) {
       const any = splitTop(inner[2], ',').some(selector => matches(element, selector))
       if (inner[1] === 'not' ? any : !any) return false
+    } else if (/^:nth-child\(1 of /.test(simple)) {
+      // The first of its siblings that match the selector (the stage's `1 of :not(ritemark-comment)`).
+      const of = simple.slice(':nth-child(1 of '.length, -1)
+      for (let at = element.prev; at; at = at.prev) if (matches(at, of)) return false
     } else if (simple === ':first-child') {
       if (element.prev) return false
     } else if (simple === ':last-child') {
@@ -240,6 +244,7 @@ function cascade(rules: ReturnType<typeof rulesOf>) {
         weight: Number(inherited(element, 'font-weight', '400')),
         color: inherited(element, 'color', ''),
         marginBottom: length(declared(element, 'margin-bottom') ?? '0', size, fit),
+        paddingTop: length(declared(element, 'padding-top') ?? '0', size, fit),
       }
     },
   }
@@ -254,7 +259,7 @@ const stage = cascade(rulesOf(slideCss, decksCss))
 // reads, with a pseudo-class it doesn't read (`:hover`, `nth-child(… of …)`) or an attribute. Each such rule must be
 // listed in `UNREAD` by name (there are none today), so a new one fails here until it is looked at, never skipped unseen.
 {
-  const READS = new Set(['font-weight', 'font-size', 'line-height', 'color', 'margin-top', 'margin-bottom'])
+  const READS = new Set(['font-weight', 'font-size', 'line-height', 'color', 'margin-top', 'margin-bottom', 'padding-top'])
   const unreadable = (selector: string): boolean => parts(selector).compounds.some(compound => simples(compound).some(simple => {
     if (/^:(is|where|not|has)\(/.test(simple)) return splitTop(simple.slice(simple.indexOf('(') + 1, -1), ',').some(inner => unreadable(inner.replace(/^[+~>]\s*/, '')))
     return (simple.startsWith(':') && !READ_PSEUDO.test(simple)) || simple.startsWith('[')
@@ -270,8 +275,8 @@ const stage = cascade(rulesOf(slideCss, decksCss))
   assert.deepEqual(unreadHeadingRules(slideCss, decksCss), UNREAD, 'a heading rule this test cannot evaluate: look at it, then list it here')
   // It would see one: a state, an attribute, nth-child's `of`; not a ::before, nor a rule on another element.
   assert.deepEqual(
-    unreadHeadingRules('.deck-sl.is-blocks h2:hover { color: red; } .deck-sl.is-blocks :is(h1, h3)[data-x] { font-size: 3em; } .x h2:nth-child(1 of p) { margin-bottom: 0; } .x h2::before { color: red; } .x p:hover:has(+ h2) { color: red; }'),
-    ['.deck-sl.is-blocks h2:hover', '.deck-sl.is-blocks :is(h1, h3)[data-x]', '.x h2:nth-child(1 of p)'],
+    unreadHeadingRules('.deck-sl.is-blocks h2:hover { color: red; } .deck-sl.is-blocks :is(h1, h3)[data-x] { font-size: 3em; } .x h2:nth-last-child(1 of p) { margin-bottom: 0; } .x h2::before { color: red; } .x p:hover:has(+ h2) { color: red; }'),
+    ['.deck-sl.is-blocks h2:hover', '.deck-sl.is-blocks :is(h1, h3)[data-x]', '.x h2:nth-last-child(1 of p)'],
   )
 }
 
@@ -321,9 +326,9 @@ for (const borderless of [false, true]) {
   const [one, two, three, title] = [h1, h2, h3, line].map(element => drawn.computed(element))
   assert.deepEqual([one.weight, two.weight, three.weight, title.weight], [700, 700, 700, 500], `${look}: the weights`)
   assert.deepEqual([one.color, two.color, three.color, title.color], [hd, hd, hd, sub], `${look}: the H2 in the heading colour, the title's line quiet`)
-  // The H2's lines and room: 1.3 of its size, and .7 of it under it; the title's line keeps the title close (.12 em).
+  // The H2's lines and room: 1.3 of its size, and 6 px under it (#901); the title's line keeps the title close (.12 em).
   near(two.lineHeight, 31.2 * 1.3, `${look}: the H2's line height`)
-  near(two.marginBottom, 31.2 * 0.7, `${look}: the H2's room under it`)
+  near(two.marginBottom, 6, `${look}: the H2's room under it`)
   near(one.marginBottom, 48 * 0.12, `${look}: the title keeps its line close (h1:has(+ h2))`)
 }
 
@@ -379,6 +384,9 @@ for (const borderless of [false, true]) {
 // the bottom. Each block's height at a fit comes from its computed type here; its line count stays as at 100 %.
 
 const OLD_H2 = { size: 1.12, lineHeight: 1.3, marginBottom: 0.7 }
+/** The H2 as it was drawn: `old` before Sprint 168 PR 3 (1.12 em), `pr3` after it (1.3 em, .7 em under it and no room
+ *  above it, before #901), `now` from slide.css as it stands. */
+type H2Mode = 'old' | 'pr3' | 'now'
 type Block = { tag: 'h1' | 'h2' | 'p' | 'ul'; lines: number[] }
 const SLIDE: Block[] = [
   { tag: 'h1', lines: [1] },
@@ -392,7 +400,7 @@ const SLIDE: Block[] = [
 ]
 
 /** The flow's blocks laid out at a fit, top to bottom, with the type from slide.css (or the old H2's). */
-function layout(blocks: Block[], fit: number, oldH2: boolean): Array<{ top: number; height: number; marginBottom: number }> {
+function layout(blocks: Block[], fit: number, mode: H2Mode): Array<{ top: number; height: number; marginBottom: number }> {
   const flow = flowOf()
   const elements = children(flow, ...blocks.map((block): [string] => [block.tag]))
   const out: Array<{ top: number; height: number; marginBottom: number }> = []
@@ -408,10 +416,12 @@ function layout(blocks: Block[], fit: number, oldH2: boolean): Array<{ top: numb
       marginBottom = Math.max(drawn.computed(element, fit).marginBottom, li.marginBottom)
     } else {
       const look = drawn.computed(element, fit)
-      const size = block.tag === 'h2' && oldH2 ? 24 * fit * OLD_H2.size : look.size
-      const lineHeight = block.tag === 'h2' && oldH2 ? size * OLD_H2.lineHeight : look.lineHeight
-      height = block.lines[0] * lineHeight
-      marginBottom = block.tag === 'h2' && oldH2 ? size * OLD_H2.marginBottom : look.marginBottom
+      const h2 = block.tag === 'h2'
+      const size = h2 && mode === 'old' ? 24 * fit * OLD_H2.size : look.size
+      const lineHeight = h2 && mode === 'old' ? size * OLD_H2.lineHeight : look.lineHeight
+      // A heading's own room above it is inside its box (`offsetHeight`), as the padding it is (#901).
+      height = block.lines[0] * lineHeight + (h2 && mode !== 'now' ? 0 : look.paddingTop)
+      marginBottom = h2 && mode !== 'now' ? size * OLD_H2.marginBottom : look.marginBottom
     }
     // The flow's last block has no margin under it (`.blk-flow > :last-child`).
     if (index === blocks.length - 1) marginBottom = 0
@@ -422,13 +432,13 @@ function layout(blocks: Block[], fit: number, oldH2: boolean): Array<{ top: numb
 }
 
 /** A flow the fit can measure: the room of a 960 × 540 slide's flow (540 − 46 − 34), its blocks from `layout`. */
-function modelFlow(blocks: Block[], oldH2: boolean) {
+function modelFlow(blocks: Block[], mode: H2Mode) {
   let fit = 1
   const room = 460
   // Laid out once per fit, as the browser lays out once per `--fit`; the getters read that layout.
   let laid: { fit: number; blocks: ReturnType<typeof layout> } | null = null
   const at = () => {
-    if (laid?.fit !== fit) laid = { fit, blocks: layout(blocks, fit, oldH2) }
+    if (laid?.fit !== fit) laid = { fit, blocks: layout(blocks, fit, mode) }
     return laid.blocks
   }
   const kids = blocks.map((_, index) => ({
@@ -453,10 +463,10 @@ function modelFlow(blocks: Block[], oldH2: boolean) {
 ;(globalThis as unknown as { getComputedStyle: (element: { style: object }) => object }).getComputedStyle = element => element.style
 
 {
-  const before = modelFlow(SLIDE, true)
+  const before = modelFlow(SLIDE, 'old')
   const old = fitFlow(before as unknown as HTMLElement)
   assert.deepEqual(old, { step: 0, full: false }, 'with the old H2 the slide fits at 100 %')
-  const after = modelFlow(SLIDE, false)
+  const after = modelFlow(SLIDE, 'pr3')
   after.style.setProperty('--fit', '1')
   assert.ok(after.content() > 460, `with the grown H2 it no longer fits at 100 % (${after.content().toFixed(1)} px of 460)`)
   const { step, full } = fitFlow(after as unknown as HTMLElement)
@@ -466,6 +476,126 @@ function modelFlow(blocks: Block[], oldH2: boolean) {
   // The step found is the biggest that fits: one up runs past the bottom.
   after.style.setProperty('--fit', String(BLOCK_FIT_STEPS[step - 1]))
   assert.ok(after.content() > 460, `the step above does not fit (${after.content().toFixed(1)} px)`)
+}
+
+// ---- #901: a heading sits nearer to what it introduces ------------------------------------------------------------
+// The decks README, "Spacing on the slide" (20 November): an H2 to H6 has 6 px under it, and 24 px in all above an H2,
+// 18 above an H3 to H6: the block before gives its 12, the heading adds 12 or 6 as padding (so a flex column, whose
+// margins don't collapse, draws the same). Slide px times the fit, never an em of the heading's own type.
+
+/** The space above `heading` (the block before's margin under it and the heading's own padding) and under it, in px. */
+function room(look: ReturnType<typeof cascade>, heading: El, fit = 1): { above: number; under: number } {
+  let before = heading.prev
+  while (before && before.tag === 'ritemark-comment') before = before.prev
+  const above = (before ? look.computed(before, fit).marginBottom : 0) + look.computed(heading, fit).paddingTop
+  return { above, under: look.computed(heading, fit).marginBottom }
+}
+const sameRoom = (actual: { above: number; under: number }, expected: { above: number; under: number }, what: string) => {
+  near(actual.above, expected.above, `${what} (above)`)
+  near(actual.under, expected.under, `${what} (under)`)
+}
+
+for (const fit of [1, BLOCK_FIT_STEPS[2]]) {
+  // In the flow: a title, words, an H2, words, an H3, words, an H4.
+  const [, , h2, , h3, , h4] = children(flowOf(), ['h1'], ['p'], ['h2'], ['p'], ['h3'], ['p'], ['h4'], ['p'])
+  sameRoom(room(drawn, h2, fit), { above: 24 * fit, under: 6 * fit }, `the flow: an H2 at ${fit}`)
+  sameRoom(room(drawn, h3, fit), { above: 18 * fit, under: 6 * fit }, `the flow: an H3 at ${fit}`)
+  sameRoom(room(drawn, h4, fit), { above: 18 * fit, under: 6 * fit }, `the flow: an H4 at ${fit}`)
+  // After a list too: the list's own 12 under it.
+  const [, listH2] = children(flowOf(), ['ul'], ['h2'], ['p'])
+  near(room(drawn, listH2, fit).above, 24 * fit, 'an H2 after a list')
+
+  // In a column of a Columns block (the slide's flow is a flex column then): the same, and none at the column's top.
+  const [, columns] = children(flowOf(), ['h1'], ['div', ['blk-columns']])
+  const [column] = children(columns, ['div', ['blk-column']])
+  const [first, , colH3, , colH2] = children(column, ['h2'], ['p'], ['h3'], ['p'], ['h2'], ['p'])
+  near(drawn.computed(first, fit).paddingTop, 0, "a column's first heading adds nothing above it")
+  near(drawn.computed(first, fit).marginBottom, 6 * fit, "a column's first heading: 6 under it")
+  sameRoom(room(drawn, colH3, fit), { above: 18 * fit, under: 6 * fit }, 'a column: an H3')
+  sameRoom(room(drawn, colH2, fit), { above: 24 * fit, under: 6 * fit }, 'a column: an H2')
+
+  // In a tab's pane, as the renderer draws it (its hidden name first) and as the stage does (a note, never drawn, first).
+  const [tabs] = children(flowOf(), ['div', ['blk-tabs']])
+  const [panes] = children(tabs, ['div', ['blk-tabpanes']])
+  const [pane] = children(panes, ['div', ['blk-tabpane']])
+  const [, paneFirst, , paneH2] = children(pane, ['div', ['blk-tabname']], ['h3'], ['p'], ['h2'], ['p'])
+  near(drawn.computed(paneFirst, fit).paddingTop, 0, "a pane's first heading (after its hidden name) adds nothing")
+  sameRoom(room(drawn, paneH2, fit), { above: 24 * fit, under: 6 * fit }, "a pane: an H2, in slide px, not the pane's smaller em")
+  const [stageTabs] = children(flowOf({ editing: true }), ['div', ['blk-tabs']])
+  const [stagePanes] = children(stageTabs, ['div', ['blk-tabpanes']])
+  const [stagePane] = children(stagePanes, ['div', ['blk-tabpane']])
+  const [, stageFirst, , stageH3] = children(stagePane, ['ritemark-comment'], ['h2'], ['p'], ['h3'], ['p'])
+  near(stage.computed(stageFirst, fit).paddingTop, 0, "the stage: a pane's first heading after a note adds nothing")
+  sameRoom(room(stage, stageH3, fit), { above: 18 * fit, under: 6 * fit }, "the stage: a pane's H3")
+}
+
+// None at the start of the flow, on the renderer and on the stage (a note first).
+{
+  const [h2] = children(flowOf(), ['h2'], ['p'])
+  near(drawn.computed(h2).paddingTop, 0, "the flow's first heading adds nothing above it")
+  const [, h3] = children(flowOf({ editing: true }), ['ritemark-comment'], ['h3'], ['p'])
+  near(stage.computed(h3).paddingTop, 0, "the stage: the flow's first heading after a note adds nothing")
+  const [, , mid] = children(flowOf({ editing: true }), ['p'], ['ritemark-comment'], ['h2'], ['p'])
+  sameRoom(room(stage, mid), { above: 24, under: 6 }, 'the stage: a note before a mid-slide H2 changes nothing')
+}
+
+// The title's line keeps its close place and its room under it; the title keeps .5 em under it otherwise.
+{
+  const [h1, line, , heading] = children(flowOf(), ['h1'], ['h2'], ['p'], ['h2'])
+  near(drawn.computed(line).paddingTop, 0, "the title's line adds nothing above it")
+  near(drawn.computed(line).marginBottom, 31.2 * 0.7, "the title's line keeps .7 em under it")
+  near(drawn.computed(h1).marginBottom, 48 * 0.12, 'the title keeps its line close')
+  near(room(drawn, heading).above, 24, 'a later H2 is a heading')
+  const [lone] = children(flowOf(), ['h1'], ['p'])
+  near(drawn.computed(lone).marginBottom, 48 * 0.5, 'the title keeps .5 em under it')
+  for (const notes of [1, 2, 3]) {
+    const specs: Array<[string, string[]?]> = [['h1'], ...Array.from({ length: notes }, (): [string] => ['ritemark-comment']), ['h2'], ['p']]
+    const elements = children(flowOf({ editing: true }), ...specs)
+    const stageLine = elements[elements.length - 2]
+    near(stage.computed(stageLine).paddingTop, 0, `${notes} note(s): the title's line adds nothing above it`)
+    near(stage.computed(stageLine).marginBottom, 31.2 * 0.7, `${notes} note(s): the title's line keeps .7 em under it`)
+  }
+}
+
+// A Label right before a heading stays 8 px above it, with or without notes between; a box's headings are unchanged.
+{
+  const [, , , h2] = children(flowOf(), ['h1'], ['p'], ['p', ['blk-label']], ['h2'], ['p'])
+  sameRoom(room(drawn, h2), { above: 8, under: 6 }, 'a Label over an H2')
+  for (const notes of [1, 2]) {
+    const specs: Array<[string, string[]?]> = [['p'], ['p', ['blk-label']], ...Array.from({ length: notes }, (): [string] => ['ritemark-comment']), ['h3'], ['p']]
+    const elements = children(flowOf({ editing: true }), ...specs)
+    sameRoom(room(stage, elements[elements.length - 2]), { above: 8, under: 6 }, `the stage, ${notes} note(s): a Label over an H3`)
+  }
+  const [boxes] = children(flowOf(), ['div', ['blk-boxes']])
+  const [box] = children(boxes, ['div', ['blk-box']])
+  const [, boxH3, , boxH2] = children(box, ['div', ['blk-icon']], ['h3'], ['p'], ['h2'])
+  for (const heading of [boxH3, boxH2]) {
+    near(drawn.computed(heading).paddingTop, 0, "a box's heading adds nothing above it")
+    near(drawn.computed(heading).marginBottom, 0, "a box's heading keeps the box's own gap")
+  }
+  const [stageBoxes] = children(flowOf({ editing: true }), ['div', ['blk-boxes']])
+  const [stageBox] = children(stageBoxes, ['div', ['blk-box']])
+  const [, inner] = children(stageBox, ['span', ['blk-icon']], ['div', ['blk-inner']])
+  const [, stageBoxH3] = children(inner, ['p'], ['h3'])
+  near(stage.computed(stageBoxH3).paddingTop, 0, "the stage: a box's heading adds nothing above it")
+}
+
+// The fit, on the same realistic slide: before #901 (Sprint 168 PR 3's record: 453 of 460 px at 100 % with the old H2,
+// then 440 at 92 % with the grown one) and now. Each mid-slide H2 trades .7 em (21.84 px) under it for 6 under and
+// 12 above, so the slide is shorter and its words never need a smaller step than before.
+{
+  const pr3 = modelFlow(SLIDE, 'pr3')
+  const now = modelFlow(SLIDE, 'now')
+  const pr3Fit = fitFlow(pr3 as unknown as HTMLElement)
+  const nowFit = fitFlow(now as unknown as HTMLElement)
+  const pr3Fitted = pr3.content()
+  const nowFitted = now.content()
+  now.style.setProperty('--fit', '1')
+  const nowFull = now.content()
+  console.log(`slideHeadings: the fit, before #901 fitted at ${BLOCK_FIT_STEPS[pr3Fit.step]} (${pr3Fitted.toFixed(1)} of 460); now ${nowFull.toFixed(1)} of 460 at 1, fitted at ${BLOCK_FIT_STEPS[nowFit.step]} (${nowFitted.toFixed(1)} of 460)`)
+  assert.ok(nowFit.step <= pr3Fit.step, 'no smaller fit step than before #901')
+  assert.equal(nowFit.full, false)
+  assert.ok(nowFitted <= 460, 'nothing past the bottom')
 }
 
 console.log('slideHeadings: passed')
