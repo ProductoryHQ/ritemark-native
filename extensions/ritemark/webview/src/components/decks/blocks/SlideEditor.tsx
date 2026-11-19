@@ -89,7 +89,7 @@ import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
 import { BehindChip } from './BehindChip'
-import { behindChipCorner, behindChipPlace, type ChipPlace } from './behindChipPlace'
+import { CHIP_WIDTH_EMPTY, CHIP_WIDTH_FILLED, behindChipCorner, behindChipPlace, type ChipPlace } from './behindChipPlace'
 import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, sameSidePath, type SlideDocKit, type SlidePictureTarget } from './slidePictureSwap'
 
@@ -1114,6 +1114,14 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const chipCorner = behindChipCorner(slideLogo, cover)
   const chipLogoWidth = drawsLogo(slideLogo, cover) ? slideLogo.width : null
   const [chipPlace, setChipPlace] = useState<ChipPlace | null>(null)
+  // The words move as they are typed: measured again after each change of them (and of the slide's look).
+  const [wordsMoved, setWordsMoved] = useState(0)
+  useEffect(() => {
+    if (!editor || side !== 'behind') return
+    const moved = () => setWordsMoved(count => count + 1)
+    editor.on('update', moved)
+    return () => { editor.off('update', moved) }
+  }, [editor, side])
   useLayoutEffect(() => {
     if (side !== 'behind') return
     const frameElement = frameRef.current
@@ -1121,14 +1129,21 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     if (!frameElement || !flow) return
     const box = frameElement.getBoundingClientRect()
     const words = flow.getBoundingClientRect()
+    const relative = (rect: DOMRect) => ({ left: rect.left - box.left, top: rect.top - box.top, right: rect.right - box.left, bottom: rect.bottom - box.top })
+    // Each block of words, and the logo: the chip at its full size goes where none of them is.
+    const blocks = [...Array.from(flow.children), ...Array.from(frameElement.querySelectorAll('.slide-logo'))]
+      .map(element => element.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0)
+      .map(relative)
     const next = behindChipPlace(
       { width: box.width, height: box.height },
       { top: words.top - box.top, bottom: words.bottom - box.top },
       chipCorner,
       chipLogoWidth === null ? null : { width: chipLogoWidth },
+      { blocks, width: behindFilled ? CHIP_WIDTH_FILLED : CHIP_WIDTH_EMPTY },
     )
     setChipPlace(current => (current && current.corner === next.corner && current.edge === next.edge && current.right === next.right && current.scale === next.scale ? current : next))
-  }, [side, lookKey, chipCorner, chipLogoWidth, editor])
+  }, [side, lookKey, chipCorner, chipLogoWidth, editor, wordsMoved, behindFilled])
   // A picture pasted while the slide's own picture is chosen (the words gave up the keys, so the paste reaches the
   // page): it replaces that picture, as a paste on a chosen picture in the words does (experience 49).
   useEffect(() => {
@@ -1179,6 +1194,19 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             setTableTarget(SlideTableHandles ? tableMenuTargetAt(editor.view, event.target) : null)
           }}
         >
+          {/* Sprint 167 PR 4: the picture Behind's corner chip. First in the frame, so React always inserts it before
+              the slide's canvas: the bubble menu at the frame's end is moved to the page's body (appendToBody), and a
+              node inserted before it (the chip came after the canvas) made React's insertBefore throw and the deck
+              view went blank when Behind was chosen in Slide settings. Its z-index lifts it over the canvas. */}
+          {side === 'behind' && chipPlace && !makerOnSide ? (
+            <BehindChip
+              place={chipPlace}
+              filled={behindFilled}
+              keep={sideChosen}
+              onChoose={() => (behindFilled ? chooseSide() : choosePicture(false))}
+              onChatgpt={() => startPictureMaker({ kind: 'side' }, 'new', null)}
+            />
+          ) : null}
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})`, ...logoMarks.style } as CSSProperties}>
             {side ? (
               // Experience 49: the slide's picture beside or behind the words, with its own tools when chosen.
@@ -1212,15 +1240,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             {/* Sprint 162 PR 4: the theme's logo in its corner, over the words, as every other view draws it. */}
             <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isCoverSlide(shownMarkdown)} />
           </div>
-          {side === 'behind' && chipPlace && !makerOnSide ? (
-            <BehindChip
-              place={chipPlace}
-              filled={behindFilled}
-              keep={sideChosen}
-              onChoose={() => (behindFilled ? chooseSide() : choosePicture(false))}
-              onChatgpt={() => startPictureMaker({ kind: 'side' }, 'new', null)}
-            />
-          ) : null}
           {missingSpots.map(spot => (
             <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>
               <Button
@@ -1240,7 +1259,13 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
-          {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
+          {/* The bubble menu's own element leaves the frame as soon as TipTap's plugin takes it (it moves it to the
+              page's body), so it sits in a box of its own that stays: React inserts anything new in the frame (a
+              missing picture's Replace picture…) before this box, never before the element that left. Without it, a
+              picture going missing while its slide was on the stage blanked the deck view (Sprint 167 PR 4). */}
+          <div className="deck-bubble-box" style={{ display: 'contents' }}>
+            {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
+          </div>
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
           ) : null}

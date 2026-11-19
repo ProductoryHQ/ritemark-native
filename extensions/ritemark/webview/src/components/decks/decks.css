@@ -543,8 +543,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide:hover > .deck-behind-chip, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) { padding: 4px 4px 4px 6px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 8px 20px -10px rgba(30, 27, 75, .5); }
 .deck-slide:hover > .deck-behind-chip .deck-behind-chip-dot, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) .deck-behind-chip-dot { width: 18px; background: none; box-shadow: none; }
 .deck-slide:hover > .deck-behind-chip .deck-behind-chip-full, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) .deck-behind-chip-full { display: inline-flex; }
-/* A picture Behind chosen: the ring goes round the whole slide (the sketch's), not inside it. */
-.deck-slide.is-behind-chosen { outline: 2px solid var(--r-accent); outline-offset: 4px; }
+/* A picture Behind chosen: the ring goes round the whole slide, on its edge (the stage clips anything outside it). */
+.deck-slide.is-behind-chosen::after { content: ""; position: absolute; inset: 0; z-index: 6; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--r-accent); pointer-events: none; }
 .deck-slide.is-behind-chosen .deck-sl.pic-behind .photo.is-chosen::after { content: none; }
 @media (prefers-reduced-motion: reduce) { .deck-slide > .deck-behind-chip { transition: none; } }
 .deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }

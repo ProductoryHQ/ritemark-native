@@ -19,6 +19,11 @@ export const CHIP_GAP = 3
 export const CHIP_MIN_SCALE = 0.55
 /** How far in from the slide's right edge, at its full size. */
 export const CHIP_RIGHT = 12
+/** How far in from the slide's top or bottom edge at its full size, when the words leave it room there. */
+export const CHIP_EDGE = 10
+/** The open chip's width at its full size, empty (Picture behind · Choose… · ChatGPT) and with a picture (· Choose). */
+export const CHIP_WIDTH_EMPTY = 262
+export const CHIP_WIDTH_FILLED = 172
 /** The logo's right edge from the slide's, on the 960 px canvas (`slide.css` `.slide-logo.is-top-right`). */
 const LOGO_RIGHT = 30
 /** The least band the chip fits in at its smallest. */
@@ -62,7 +67,20 @@ export function behindChipPlace(
   flow: { top: number; bottom: number },
   corner: ChipCorner,
   logo?: Pick<SlideLogo, 'width'> | null,
+  words?: { blocks: ReadonlyArray<Box>; width: number },
 ): ChipPlace {
+  // The words as they stand (each block's box, and the logo's, from the slide's top left): when the chip at its full
+  // size in its corner is clear of every one, it is drawn so, however low the band (a title slide's low words leave the
+  // whole bottom right free). Otherwise it keeps to the band, which holds whatever the words become.
+  if (words) {
+    const full: ChipPlace = { corner, edge: CHIP_EDGE, right: CHIP_RIGHT, scale: 1 }
+    const box = grown(chipBox(full, slide, words.width), CHIP_GAP)
+    if (!words.blocks.some(block => meets(box, block))) {
+      const band = corner === 'top-right' ? flow.top : slide.height - flow.bottom
+      // Never nearer its edge than it would sit in the band at its full size.
+      return band >= CHIP_HEIGHT + CHIP_GAP * 2 ? behindChipPlace(slide, flow, corner, logo) : full
+    }
+  }
   const topBand = Math.max(0, flow.top)
   const bottomBand = Math.max(0, slide.height - flow.bottom)
   if (corner === 'bottom-right' && bottomBand < LEAST_BAND && topBand > bottomBand && logo) {
@@ -74,8 +92,13 @@ export function behindChipPlace(
   return placeIn(band, corner, Math.max(CHIP_GAP, CHIP_RIGHT * scale), scale)
 }
 
-/** The chip's box on the slide (from its top left), `width` wide when open at full size: for the test. */
-export function chipBox(place: ChipPlace, slide: { width: number; height: number }, width: number): { left: number; top: number; right: number; bottom: number } {
+export interface Box { left: number; top: number; right: number; bottom: number }
+
+const grown = (box: Box, by: number): Box => ({ left: box.left - by, top: box.top - by, right: box.right + by, bottom: box.bottom + by })
+const meets = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+
+/** The chip's box on the slide (from its top left), `width` wide when open at full size. */
+export function chipBox(place: ChipPlace, slide: { width: number; height: number }, width: number): Box {
   const height = CHIP_HEIGHT * place.scale
   const right = slide.width - place.right
   const top = place.corner === 'top-right' ? place.edge : slide.height - place.edge - height

@@ -91,6 +91,17 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
   const low = behindChipPlace(slide, { top: 46, bottom: 506 }, 'bottom-right', { width: 120 })
   assert.equal(low.corner, 'bottom-right')
   assert.ok(low.scale < 1 && low.scale * CHIP_HEIGHT + CHIP_GAP * 2 <= 34 + 0.01, 'made smaller to fit the low band')
+  // The words as they stand: a title slide's words end well above the bottom, so beside a top-right logo the chip is
+  // full size bottom right (its words readable), clear of every block; a block in its corner keeps it to the band.
+  const cover = [{ left: 64, top: 300, right: 896, bottom: 420 }, { left: 64, top: 430, right: 896, bottom: 466 }]
+  const roomy = behindChipPlace(slide, { top: 46, bottom: 506 }, 'bottom-right', { width: 120 }, { blocks: cover, width: 262 })
+  assert.deepEqual(roomy, { corner: 'bottom-right', edge: 10, right: 12, scale: 1 })
+  const roomyBox = chipBox(roomy, slide, 262)
+  assert.ok(cover.every(block => roomyBox.top > block.bottom), 'clear of the words')
+  const full = [{ left: 64, top: 46, right: 896, bottom: 506 }]
+  assert.deepEqual(behindChipPlace(slide, { top: 46, bottom: 506 }, 'bottom-right', { width: 120 }, { blocks: full, width: 262 }), low, 'a full slide: the band')
+  // A top band roomy enough for the full chip keeps it centred there, never pushed nearer the edge.
+  assert.deepEqual(behindChipPlace(slide, { top: 84, bottom: 506 }, 'top-right', null, { blocks: [], width: 262 }), behindChipPlace(slide, { top: 84, bottom: 506 }, 'top-right'))
   // A slide so small that the low band can't hold it: top right after all, left of the logo.
   const small = behindChipPlace({ width: 560, height: 315 }, { top: 46 * 560 / 960, bottom: 315 - 34 * 560 / 960 }, 'bottom-right', { width: 120 })
   assert.equal(small.corner, 'top-right')
@@ -117,7 +128,7 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
   const css = fs.readFileSync(path.join(here, '..', 'decks.css'), 'utf8')
   assert.match(css, /\.deck-slide > \.deck-behind-chip\.is-filled:where\(:not\(\.is-keep\):not\(:focus-within\)\) \{ opacity: 0; pointer-events: none; \}/)
   assert.match(css, /\.deck-slide:hover > \.deck-behind-chip \.deck-behind-chip-full, \.deck-slide > \.deck-behind-chip:is\(\.is-keep, :focus-within\) \.deck-behind-chip-full \{ display: inline-flex; \}/)
-  assert.match(css, /\.deck-slide\.is-behind-chosen \{ outline: 2px solid var\(--r-accent\); outline-offset: 4px; \}/, 'the ring round the whole slide')
+  assert.match(css, /\.deck-slide\.is-behind-chosen::after \{ content: ""; position: absolute; inset: 0; z-index: 6; border-radius: inherit; box-shadow: inset 0 0 0 3px var\(--r-accent\);/, "the ring round the whole slide")
   assert.ok(!/ title=/.test(renderToStaticMarkup(createElement(BehindChip, { place, filled: false, keep: false, onChoose: noop, onChatgpt: noop }))))
 }
 
@@ -164,6 +175,13 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
   assert.match(editor, /document\.addEventListener\('paste', paste\)/)
   assert.match(editor, /onDrop=\{event => \{\n\s+if \(event\.defaultPrevented\) return/)
   assert.match(editor, /side === 'behind' && chipPlace && !makerOnSide \? \(/)
+  // The app run's fault (Behind chosen in Slide settings, or a picture going missing on the stage, blanked the deck
+  // view: React's insertBefore met the bubble menu's element, which TipTap moves out of the frame): the chip is the
+  // frame's first child, and the bubble menu sits in a box of its own that stays, so nothing is inserted before it.
+  const chipAt = editor.indexOf('<BehindChip')
+  const canvasAt = editor.indexOf('<div className={classes} style={{ transform:')
+  assert.ok(chipAt > 0 && chipAt < canvasAt, 'the chip comes before the canvas')
+  assert.match(editor, /<div className="deck-bubble-box" style=\{\{ display: 'contents' \}\}>\n\s+\{editor \? <FormattingBubbleMenu editor=\{editor\} appendToBody \/> : null\}\n\s+<\/div>/)
 }
 
 console.log('behindChip: passed')

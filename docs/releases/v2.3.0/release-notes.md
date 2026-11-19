@@ -72,6 +72,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
 - **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
+- **Put a picture behind a slide's words.** In **Slide settings…**, choose **Behind** and pick a picture, or paste or drop one anywhere on the slide. Point at the slide to find **Choose…** in its corner. Click where there are no words to choose the picture, then replace or remove it.
 <!-- DECKS END -->
 
 ## Smaller changes
