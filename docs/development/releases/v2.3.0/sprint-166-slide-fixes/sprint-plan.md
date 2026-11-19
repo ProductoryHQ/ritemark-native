@@ -32,9 +32,9 @@ As designed (his own 16 November ask, built for the full-slide view): in Slide o
 
 Seen on main: the full-slide wheel effect in `extensions/ritemark/webview/src/components/decks/DeckView.tsx` (about lines 961–985) is attached only to the stage and only while the full-slide view is on, and returns early when the stage can scroll and the pointer isn't over the slide, so the empty bands may do nothing. Other suspects: the effect running before the stage exists after the view switch, the slide editor taking the wheel, the trackpad threshold. The empty bands should step whenever the stage itself has nothing to scroll.
 
-- [ ] A test that fails before the fix.
-- [ ] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
-- [ ] Typing, selecting and scrolling inside the words still behave as before.
+- [x] A test that fails before the fix.
+- [x] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
+- [x] Typing, selecting and scrolling inside the words still behave as before.
 
 **Order:** PR 1, PR 3 and PR 4 can start at once; PR 4 changes `SlideBlockBar.tsx`, so it waits if Sprint 164 PR 3 (the Label block) is changing the same lines. PR 2 starts after Sprint 164 PR 1 (#819) merges, because both change `DeckView.tsx`.
 
@@ -44,8 +44,9 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 - [#827](https://github.com/ProductoryHQ/ritemark-native/issues/827): for the same content the editor draws a table's rows about 56–58 slide px tall and the wall about 42 (the wall is right), so an editor column holds more and scrolls. The design says the slide being edited looks as its thumbnail does. Likely the cells' paragraphs or the editor's td borders.
 - [#828](https://github.com/ProductoryHQ/ritemark-native/issues/828): on the published page at 720 px the table's bordered frame takes the full width while the table stops at about a quarter of it. The frame hugs the table: its own width up to the column's, and only then does it scroll inside, with the fade. Check whether it predates #821 (the wrapper likely comes from #780).
-- [ ] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
-- [ ] Shots of the same table in the editor, on the wall and on the 720 px page.
+- [x] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
+- [x] Shots of the same table in the editor, on the wall and on the 720 px page.
+- Causes (PR 3): #827, a stage cell holds its words in a paragraph and the slide's 12 px under every paragraph reached it (58–59 slide px a row against the wall's 46–47); #828, the page's one-column rule made a slide's table a full-width block (`display: block` with no width, from #807 on 19 November, before #821, not #780's `.tw`).
 
 ## Fix 4: the split's drag guide (PR 4, issue #829)
 
@@ -61,17 +62,39 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 6: the Present bar at the screen's foot (PR 6, issue #842)
 [#842](https://github.com/ProductoryHQ/ritemark-native/issues/842): the wall's floating bar sits at the screen's foot, centred, its bottom 12 px from the edge, never over the slide's words: in the ground below the 16:9 content on a wider screen (1440×900 leaves a 45 px band), in the slide's own bottom margin on a 16:9 screen. It still shows on pointer movement and fades after 2 s.
-- [ ] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right.
+- [x] The bar sits 12 px from the screen's foot, its box outside the content box at 16:10 and 16:9 sizes (`wallBar.test.ts`, PR 6).
+- [x] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right (`proof/pr6-present-bar/`).
+- [x] The Experience lead's rule: while the bar shows, the quiet line fades out with the bar's timing and comes back when the bar fades (`wallBar.test.ts`); one shot at 1440×900 with the bar showing and the line hidden (`proof/pr6-present-bar/present-bar-line-hidden-1440x900.png`).
 
 ### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
 - [ ] A test, and one shot with the Link dialog open.
 
+## Added on 19 November, second time (Jarmo: "jah, lisa mõlemad sprinti 166")
+
+### Fix 8: a Button's own words (PR 8, issue #848)
+[#848](https://github.com/ProductoryHQ/ritemark-native/issues/848): the button's words can't be typed into, or nothing shows they can. The design (decks README, Button, Editing) says a click chooses the block and then its words and the words beside it are typed in place. Likely cause, not proven: with no words the pill's editable span has no width (the placeholder is a CSS `::before` with `pointer-events: none` beside a `contenteditable=false` icon), so the caret can't get in; or the open Address sheet keeps the focus. A live check first; if it works and is only undiscoverable, it goes back to the Experience lead as UX.
+- [ ] A test that fails before; shots of an empty and a filled button being typed into.
+
+### Fix 9: an unknown icon name (PR 9, issue #850)
+[#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
+- [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+
+## Added on 19 November, third time (Jarmo: "jah kõigile kolmele")
+
+### Fix 10: a gesture over the slide in Slide and handout (PR 10, issue #855)
+[#855](https://github.com/ProductoryHQ/ritemark-native/issues/855): over the slide, a gesture means the same in every view. In Slide and handout a wheel or flick over the slide moves one slide, as in Slide only, and the handout scrolls to that slide's part (the strip click's path); over the handout's text the wheel scrolls the text as now and the slide follows the part being read; a long column or pane still scrolls first (#849).
+- [ ] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+
+### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
+[#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
+- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+
 ## For every PR
 
 - REVIEW.md tier: Standard. The PR fills Risk and How to revert; the review record names the reviewed commit; the Experience lead looks at the shots before the merge.
 - One plain line each in the Decks section of `docs/releases/v2.3.0/release-notes.md`.
-- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842` and `#846`, one per PR.
+- `Closes #822`, `#824`, `#827` with `#828`, `#829`, `#841`, `#842`, `#846`, `#848`, `#850`, `#855` and `#856`, one per PR.
 - The full test chain once on each final head; `qa-validator` at the sprint's end.
 - Synthetic decks only in tests and shots; never real client material.
 
