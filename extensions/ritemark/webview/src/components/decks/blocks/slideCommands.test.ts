@@ -727,4 +727,188 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
   assert.ok(blockSlideHtml(markdown).includes('<mark class="cb-fill">[one line]</mark>'), 'drawn with its place marked')
 }
 
+// ---- Sprint 168 PR 2 (the decks README, "Quotes, prompts and heading levels on a slide", item 2): on a slide, Code
+// block on words inside a quote takes them out of it as one code block, through the slide's own code block commands
+// (the bubble's `toggleCodeBlock`, the / menu's `setCodeBlock`); the Text editor's code block keeps its commands.
+{
+  const { SlideCodeBlock, CodeBlockWithCopyExtension } = await import('../../../extensions/CodeBlockWithCopyExtension')
+  const { getExtensionField } = await import('@tiptap/core')
+  type Commands = Record<'toggleCodeBlock' | 'setCodeBlock', (attributes?: Record<string, unknown>) => (props: unknown) => boolean>
+  const commandsOf = (extension: typeof SlideCodeBlock): Commands =>
+    (getExtensionField(extension, 'addCommands', { name: 'codeBlock', options: extension.options, storage: {}, editor: null as never, type: slideSchema.nodes.codeBlock }) as () => Commands)()
+  /** A code block command run as a TipTap chain runs it: on its transaction, today's own path recorded (`toggleNode`, `setNode`). */
+  const run = (extension: typeof SlideCodeBlock, name: 'toggleCodeBlock' | 'setCodeBlock', tr: Transaction, dispatch = true) => {
+    const today: string[] = []
+    const commands = { toggleNode: () => { today.push('toggleNode'); return true }, setNode: () => { today.push('setNode'); return true } }
+    const done = commandsOf(extension)[name]()({ tr, state: null, dispatch: dispatch ? () => undefined : undefined, commands })
+    return { done, today }
+  }
+  /** The place just before (or after) `text` on the stage. */
+  const placeOf = (doc: PMNode, text: string, after = false) => {
+    let at = -1
+    doc.descendants((node, pos) => {
+      if (at >= 0 || !node.isText) return
+      const found = node.text!.indexOf(text)
+      if (found >= 0) at = pos + found + (after ? text.length : 0)
+    })
+    assert.ok(at >= 0, text)
+    return at
+  }
+  const quoteDeck = (slide: string[]) => [
+    '---', 'deck: 2', '---', '',
+    '```slide', '---', 'id: q1', '---', ...slide, '```', '',
+    '## A prompt', '', 'Paste it in.', '',
+  ].join('\n')
+  const PROMPT_SLIDE = ['# A prompt', '', '> You are an analyst.', '>', '> Write a summary of [the report].', '>', '> Stop there.']
+  const QUOTE_DECK = quoteDeck(PROMPT_SLIDE)
+  const markdownOf = (stage: ReturnType<typeof stageOn>) => slideDataOf('', slidesOf(stage.outer.doc)[0].node.attrs.body).markdown!
+  /** The stage on the prompt slide with `from`…`to` chosen, then the bubble's Code block. */
+  const bubbleCode = (text: string, from: string, to: string | null) => {
+    const deck = openDeck(text)
+    assert.equal(deck.save(deck.state.doc), text, 'an untouched deck with a quote: byte for byte')
+    const stage = stageOn(deck, 0)
+    const doc = stage.inner.doc
+    const selection = TextSelection.create(doc, placeOf(doc, from), to === null ? placeOf(doc, from) : placeOf(doc, to, true))
+    const tr = stage.inner.tr.setSelection(selection)
+    const { done, today } = run(SlideCodeBlock, 'toggleCodeBlock', tr)
+    assert.ok(done, 'Code block ran')
+    assert.deepEqual(today, [], "a quote's words never take today's path (a code block nested in the quote)")
+    assert.equal(tr.getMeta(SLIDE_COMMAND), true, 'an undo step of its own')
+    stage.apply(tr)
+    return { deck, stage }
+  }
+
+  // The whole quote chosen: the quote goes and one code block stands in its place, its paragraphs a blank line apart.
+  {
+    const { stage } = bubbleCode(QUOTE_DECK, 'You are', 'Stop there.')
+    const markdown = markdownOf(stage)
+    assert.equal(markdown, '# A prompt\n\n```\nYou are an analyst.\n\nWrite a summary of [the report].\n\nStop there.\n```', markdown)
+    assert.ok(!stage.inner.doc.toString().includes('blockquote'), 'no quote is left')
+    assert.equal(saveSlide(loadSlide(markdown)), markdown, "the slide's Markdown reads back as written")
+    const saved = stage.save()
+    assert.ok(saved.includes('````slide\n'), "the slide's fence grows past the code block's")
+    assertStable(saved, 'a quote made a code block')
+    // Copy and ↗: drawn as every code block on a slide is.
+    const html = blockSlideHtml(markdown)
+    assert.ok(html.includes('class="cb-copy"') && html.includes('class="cb-open"'), 'Copy and ↗')
+    assert.ok(!html.includes('<blockquote'), html)
+    // The selection stays on the same words, now in the code block.
+    const { $from, $to } = stage.inner.selection
+    assert.equal($from.parent.type.name, 'codeBlock')
+    assert.equal(stage.inner.doc.textBetween($from.pos, $to.pos), 'You are an analyst.\n\nWrite a summary of [the report].\n\nStop there.')
+    stage.undo()
+    assert.equal(stage.save(), QUOTE_DECK, 'one Undo gives the quote back exactly')
+  }
+
+  // The caret in the middle paragraph of three: that paragraph becomes the code block, the quote split around it.
+  {
+    const { stage } = bubbleCode(QUOTE_DECK, 'summary', null)
+    const markdown = markdownOf(stage)
+    assert.equal(markdown, '# A prompt\n\n> You are an analyst.\n\n```\nWrite a summary of [the report].\n```\n\n> Stop there.', markdown)
+    assert.equal(saveSlide(loadSlide(markdown)), markdown, "the slide's Markdown reads back as written")
+    assertStable(stage.save(), 'the middle paragraph made a code block')
+    const { $from, empty } = stage.inner.selection
+    assert.ok(empty && $from.parent.type.name === 'codeBlock' && $from.parent.textContent.slice(0, $from.parentOffset) === 'Write a ', 'the caret stays where it was in the words')
+    stage.undo()
+    assert.equal(stage.save(), QUOTE_DECK, 'one Undo gives the quote back exactly')
+  }
+
+  // Several paragraphs chosen (the first two): one code block holds them; the rest stays a quote under it.
+  {
+    const { stage } = bubbleCode(QUOTE_DECK, 'are an', 'Write a')
+    assert.equal(markdownOf(stage), '# A prompt\n\n```\nYou are an analyst.\n\nWrite a summary of [the report].\n```\n\n> Stop there.')
+    stage.undo()
+    assert.equal(stage.save(), QUOTE_DECK)
+  }
+
+  // A part of the quote with no words goes with it; a quote in a quote is left too; line breaks stay lines.
+  {
+    const { stage } = bubbleCode(quoteDeck(['# A prompt', '', '> > You are an analyst.  ', '> > Be brief.']), 'You are', null)
+    assert.equal(markdownOf(stage), '# A prompt\n\n```\nYou are an analyst.\nBe brief.\n```', 'out of both quotes, its line break a line')
+    const deck = openDeck(QUOTE_DECK)
+    const inner = stageOn(deck, 0)
+    // An empty line typed at the quote's end (Enter after "Stop there."), then the caret back in the words.
+    inner.caretAfter('Stop there.')
+    inner.apply(inner.inner.tr.split(inner.inner.selection.from))
+    const tr = inner.inner.tr.setSelection(TextSelection.create(inner.inner.doc, placeOf(inner.inner.doc, 'Stop')))
+    assert.ok(run(SlideCodeBlock, 'toggleCodeBlock', tr).done)
+    inner.apply(tr)
+    assert.equal(markdownOf(inner), '# A prompt\n\n> You are an analyst.\n>\n> Write a summary of [the report].\n\n```\nStop there.\n```', 'the empty line after it goes, no empty quote is left')
+  }
+
+  // A list in the quote keeps its marks as words; a quote in a column stays in its column.
+  {
+    const { stage } = bubbleCode(quoteDeck(['# A prompt', '', '> Ask for:', '>', '> 1. risks', '> 2. costs']), 'Ask', 'costs')
+    assert.equal(markdownOf(stage), '# A prompt\n\n```\nAsk for:\n\n1. risks\n2. costs\n```')
+    const columns = [':::: columns', '::: column', '> You are an analyst.', '>', '> Stop there.', ':::', '', '::: column', 'Right', ':::', '::::']
+    const boxed = bubbleCode(quoteDeck(['# A prompt', '', ...columns]), 'Stop', null).stage
+    assert.equal(markdownOf(boxed), ['# A prompt', '', ':::: columns', '::: column', '> You are an analyst.', '', '```', 'Stop there.', '```', ':::', '', '::: column', 'Right', ':::', '::::'].join('\n'), 'the code block stays in its column')
+    boxed.undo()
+    assert.equal(boxed.save(), quoteDeck(['# A prompt', '', ...columns]))
+  }
+
+  // The / menu's Code block on an empty line in the quote: the line out of the quote as an empty code block, the
+  // menu's query never written, one Undo for the whole.
+  {
+    const deck = openDeck(QUOTE_DECK)
+    const stage = stageOn(deck, 0)
+    stage.caretAfter('You are an analyst.')
+    stage.apply(stage.inner.tr.split(stage.inner.selection.from))
+    const from = stage.inner.selection.from
+    stage.apply(stage.inner.tr.insertText('/code'), true)
+    // The menu's chain: the / and its query out, then setCodeBlock, marked as an undo step of its own.
+    const tr = stage.inner.tr.delete(from, from + 5)
+    assert.ok(run(SlideCodeBlock, 'setCodeBlock', tr).done)
+    stage.apply(tr.setMeta(SLIDE_COMMAND, true))
+    stage.apply(stage.inner.tr.insertText('Summarise [the report].'))
+    assert.equal(markdownOf(stage), '# A prompt\n\n> You are an analyst.\n\n```\nSummarise [the report].\n```\n\n> Write a summary of [the report].\n>\n> Stop there.')
+    stage.undo()
+    stage.undo()
+    assert.equal(stage.save(), QUOTE_DECK, 'the words typed, then the code block: the file as it was before the /')
+  }
+
+  // Unchanged: Code block outside a quote, on a code block (it toggles back), on a quote holding a picture, and as
+  // TipTap's `can()` (nothing is written). The Text editor's code block takes today's path in a quote too.
+  {
+    const deck = openDeck(QUOTE_DECK)
+    const stage = stageOn(deck, 0)
+    const doc = stage.inner.doc
+    const outside = stage.inner.tr.setSelection(TextSelection.create(doc, placeOf(doc, 'A prompt')))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', outside).today, ['toggleNode'], 'outside a quote: as everywhere')
+    assert.ok(!outside.docChanged)
+    const inQuote = () => stage.inner.tr.setSelection(TextSelection.create(doc, placeOf(doc, 'summary')))
+    const asked = inQuote()
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', asked, false), { done: true, today: [] }, 'can(): yes')
+    assert.ok(!asked.docChanged, 'can() writes nothing')
+    const text = inQuote()
+    assert.deepEqual(run(CodeBlockWithCopyExtension as typeof SlideCodeBlock, 'toggleCodeBlock', text).today, ['toggleNode'], "the Text editor's Code block: today's path")
+    assert.ok(!text.docChanged)
+    const coded = bubbleCode(QUOTE_DECK, 'summary', null).stage
+    const back = coded.inner.tr
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', back).today, ['toggleNode'], 'Code block on a code block toggles it back')
+    // A quote holding a picture: its line alone leaves it; the whole quote chosen (its block bar) takes today's path,
+    // so the picture is never dropped.
+    const pictured = stageOn(openDeck(quoteDeck(['# A prompt', '', '> ![Chart](chart.png)', '>', '> Read it.'])), 0)
+    const pictureDoc = pictured.inner.doc
+    const line = pictured.inner.tr.setSelection(TextSelection.create(pictureDoc, placeOf(pictureDoc, 'Read')))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', line).today, [])
+    pictured.apply(line)
+    assert.equal(markdownOf(pictured), '# A prompt\n\n> ![Chart](chart.png)\n\n```\nRead it.\n```')
+    pictured.undo()
+    let quoteAt = -1
+    pictured.inner.doc.forEach((node, offset) => { if (node.type.name === 'blockquote') quoteAt = offset })
+    const whole = pictured.inner.tr.setSelection(NodeSelection.create(pictured.inner.doc, quoteAt))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', whole).today, ['toggleNode'], 'a picture in the chosen words: today\'s path')
+    assert.ok(!whole.docChanged, 'nothing dropped')
+    // The quote chosen whole with words only: all of it leaves.
+    const chosenQuote = stageOn(openDeck(QUOTE_DECK), 0)
+    let wordsAt = -1
+    chosenQuote.inner.doc.forEach((node, offset) => { if (node.type.name === 'blockquote') wordsAt = offset })
+    const wholeWords = chosenQuote.inner.tr.setSelection(NodeSelection.create(chosenQuote.inner.doc, wordsAt))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', wholeWords).today, [])
+    chosenQuote.apply(wholeWords)
+    assert.equal(markdownOf(chosenQuote), '# A prompt\n\n```\nYou are an analyst.\n\nWrite a summary of [the report].\n\nStop there.\n```')
+  }
+}
+
 console.log('slideCommands: passed')
