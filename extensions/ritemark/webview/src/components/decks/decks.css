@@ -422,6 +422,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing th { border: 0; }
 .deck-sl.is-blocks.is-editing td { border-left: 0; border-right: 0; border-bottom: 0; }
 .deck-sl.is-blocks.is-editing .tableWrapper { overflow: visible; margin: 0; }
+/* A cell's words sit in a paragraph on the stage (the editor's schema) and bare in the renderer's drawing, so the
+   paragraph takes none of a block's 12 px under it: a row is as tall as in the thumbnail and on the wall (#827). */
+.deck-sl.is-blocks.is-editing :is(th, td) > p { margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); object-fit: contain; }
 .deck-sl.is-blocks.is-editing .blk-flow img.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); }
 /* The Agenda on the stage (small details 14): drawn from the deck, chosen whole with a click, deleted whole. */
