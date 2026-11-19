@@ -200,5 +200,10 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
   const hint = tools.slice(tools.indexOf('export function UnknownIconHint'), tools.indexOf('/** The Steps pill being typed in'))
   assert.ok(hint.includes('<Tooltip') && hint.includes('>Choose an icon</Button>') && !/\stitle=/.test(hint), 'a tooltip with Choose an icon')
   assert.ok(stage.includes('<UnknownIconHint') && stage.includes('current: hint.name'), "Choose an icon opens the box's icon menu")
+  // Review: the hint never outlives its box's place: a change to the slide's words, an icon menu opening, a pointer
+  // that never came, a badge that went or became known each end it, and it follows the badge while it shows.
+  assert.ok(stage.includes('if (transaction.docChanged) setIconHint(null)'), 'a change to the words ends it')
+  assert.ok(/setIconPick\(\{ pos, rect[^\n]*\n\s*setIconHint\(null\)/.test(stage), 'the icon menu ends it')
+  assert.ok(hint.includes('HINT_WAIT_MS') && hint.includes("classList.contains('is-unknown')") && hint.includes('requestAnimationFrame(follow)'), 'the place waits, checks and follows')
   console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
 }

@@ -58,8 +58,10 @@ export interface IconHint {
  * banner, no toast.
  *
  * The tooltip's trigger is a round place over the badge, in a layer of the slide's frame (so a wheel over it still
- * reaches the stage, and it moves with the slide as the stage scrolls), put there when the pointer comes onto the badge
- * (`SlideDivHandlers.hintIcon`) and gone once the pointer has left it and the tooltip has closed.
+ * reaches the stage), put there when the pointer comes onto the badge (`SlideDivHandlers.hintIcon`). It follows the
+ * badge while it shows (the slide may scale or move under it), and goes once the pointer has left it and the tooltip
+ * has closed, when the pointer had already gone before it came, when the badge is gone or known, or at a key. The
+ * stage ends it too when the slide's words change (`SlideEditor`), so its box's place is never an old one.
  */
 export function UnknownIconHint({ frame, hint, onChoose, onDone }: {
   frame: HTMLElement | null
@@ -67,13 +69,13 @@ export function UnknownIconHint({ frame, hint, onChoose, onDone }: {
   onChoose: (hint: IconHint, rect: DOMRect) => void
   onDone: () => void
 }) {
-  // The layer, the frame's last child while the frame is there (SlideBlockBar's way: React inserting beside the frame's
-  // other children failed).
+  // A layer of its own, the frame's last child while the frame is there (SlideBlockBar's way: React inserting beside
+  // the frame's other children failed), over the block bar's (`deck-icon-hint-layer`, whatever order they came in).
   const [layer, setLayer] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
     if (!frame) return
     const element = document.createElement('div')
-    element.className = 'deck-block-layer'
+    element.className = 'deck-block-layer deck-icon-hint-layer'
     frame.append(element)
     setLayer(element)
     return () => { element.remove(); setLayer(null) }
@@ -82,26 +84,45 @@ export function UnknownIconHint({ frame, hint, onChoose, onDone }: {
   return createPortal(<UnknownIconPlace key={`${hint.pos}:${hint.name}`} frame={frame} hint={hint} onChoose={onChoose} onDone={onDone} />, layer)
 }
 
+/** How long the place waits for the pointer: one that had already left the badge never comes (a quick sweep). */
+const HINT_WAIT_MS = 400
+
 function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElement; hint: IconHint; onChoose: (hint: IconHint, rect: DOMRect) => void; onDone: () => void }) {
   const open = useRef(false)
-  const over = useRef(true)
-  // A new size of the stage scales the slide: the place would stay where the badge was. A key ends it too (an edit
-  // may move the box).
+  const over = useRef(false)
+  const measure = useCallback(() => {
+    const badge = hint.anchor.getBoundingClientRect()
+    const origin = frame.getBoundingClientRect()
+    return { left: badge.left - origin.left, top: badge.top - origin.top, width: badge.width, height: badge.height }
+  }, [frame, hint.anchor])
+  const [place, setPlace] = useState(measure)
   useEffect(() => {
+    // A key ends it (an edit may move the box); so does a pointer that never comes onto the place.
     const end = () => onDone()
-    window.addEventListener('resize', end)
     window.addEventListener('keydown', end, true)
-    return () => {
-      window.removeEventListener('resize', end)
-      window.removeEventListener('keydown', end, true)
+    const wait = window.setTimeout(() => { if (!over.current && !open.current) onDone() }, HINT_WAIT_MS)
+    // The badge's place, each frame while the hint shows: a new stage size or a move of the slide carries it along.
+    let frameId = 0
+    const follow = () => {
+      if (!hint.anchor.isConnected || !hint.anchor.classList.contains('is-unknown')) {
+        onDone()
+        return
+      }
+      const next = measure()
+      setPlace(now => (now.left === next.left && now.top === next.top && now.width === next.width && now.height === next.height ? now : next))
+      frameId = requestAnimationFrame(follow)
     }
-  }, [onDone])
-  const badge = hint.anchor.getBoundingClientRect()
-  const origin = frame.getBoundingClientRect()
+    frameId = requestAnimationFrame(follow)
+    return () => {
+      window.removeEventListener('keydown', end, true)
+      window.clearTimeout(wait)
+      cancelAnimationFrame(frameId)
+    }
+  }, [hint.anchor, measure, onDone])
   const words = unknownIconWords(hint.name)
   const choose = () => onChoose(hint, hint.anchor.getBoundingClientRect())
   return (
-    <div className="deck-block-at" style={{ left: badge.left - origin.left, top: badge.top - origin.top, width: badge.width, height: badge.height, zIndex: 5 }}>
+    <div className="deck-block-at" style={{ ...place, zIndex: 5 }}>
       <Tooltip
         className="size-full"
         // Beside the badge, where a box has nothing (under it is the box's heading).
@@ -125,6 +146,7 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
           onMouseDown={event => event.preventDefault()}
           onClick={choose}
           onPointerEnter={() => { over.current = true }}
+          onPointerMove={() => { over.current = true }}
           onPointerLeave={() => {
             over.current = false
             if (!open.current) onDone()

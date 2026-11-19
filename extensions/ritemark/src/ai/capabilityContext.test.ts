@@ -17,6 +17,7 @@ import {
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
 } from './capabilityContext';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -178,11 +179,10 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
 
 // ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
 test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
-  const iconSet = fs.readFileSync(path.join(__dirname, '../../webview/src/components/decks/slide/iconSet.ts'), 'utf8');
-  const names = [...iconSet.matchAll(/\{ name: '([a-z-]+)', phosphor:/g)].map((match) => match[1]);
-  const aliases = [...iconSet.slice(iconSet.indexOf('const ALIASES')).matchAll(/^ {2}'([a-z-]+)': '[a-z-]+',$/gm)].map((match) => match[1]);
-  assert.equal(names.length, 24, "today's 24");
-  assert.ok(aliases.length >= 13, 'and the other names drawn as them');
+  // The names the slide draws (iconSet.ts): every one, and every other name for one, must be in the line.
+  const names = [...SLIDE_ICON_NAMES];
+  const aliases = [...SLIDE_ICON_ALIASES];
+  assert.ok(names.length > 0 && aliases.length > 0);
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
     const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
     const line = text.split('\n').find((entry) => entry.startsWith("- A box's `icon` is one of these names:"));

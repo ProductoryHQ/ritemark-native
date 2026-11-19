@@ -641,6 +641,14 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   /** #850: the box's unknown icon being pointed at (its tooltip). */
   const [iconHint, setIconHint] = useState<IconHint | null>(null)
   const endIconHint = useCallback(() => setIconHint(null), [])
+  // Any change to the slide's words ends it (yours, an undo, or an AI's edit of the file): the box's place it holds may
+  // be another block's now.
+  useEffect(() => {
+    if (!editor || !iconHint) return
+    const changed = ({ transaction }: { transaction: Transaction }) => { if (transaction.docChanged) setIconHint(null) }
+    editor.on('transaction', changed)
+    return () => { editor.off('transaction', changed) }
+  }, [editor, iconHint])
   const [pillEdit, setPillEdit] = useState<PillEdit | null>(null)
   const [webPageAt, setWebPageAt] = useState<number | null>(null)
   /** Where the / menu's Picture goes once the host has saved it. */
@@ -843,6 +851,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     pickIcon: (pos, anchor, current) => {
       const rect = anchor.getBoundingClientRect()
       setIconPick({ pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current })
+      setIconHint(null)
     },
     // #850: never while the icon menu is open for it (the badge is under the menu's own place).
     hintIcon: (pos, anchor, name) => {
