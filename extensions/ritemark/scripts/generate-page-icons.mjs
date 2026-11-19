@@ -1,23 +1,30 @@
-// Sprint 159: writes webview/src/components/decks/slide/pageIcons.ts, the icons the published handout page draws as
-// inline SVG: the slide icons (iconSet.ts) and the page's own few (Copy, the tick, Contents, the arrows, a folder).
-// They come from @phosphor-icons/core's regular SVGs, the same drawings the deck view's Phosphor icons are, so a box's
-// icon looks the same on the page. pageIcons.test.ts reads the same files and fails when the module drifts.
+// Sprint 159, widened in Sprint 169 (#866): writes two modules from @phosphor-icons/core's regular weight, beside
+// iconSet.ts in webview/src/components/decks/slide/:
+// - pageIcons.ts: every regular icon's drawing (1,512 in 2.1.1), as inline SVG for a box's icon on every surface, the
+//   published page's own few (Copy, the tick, Contents, the arrows, a folder) and the dashed circle of an unknown name.
+//   They are the same drawings as the deck view's Phosphor icons, so an icon looks the same everywhere.
+// - iconIndex.ts: each regular icon's Phosphor tags (English), the icon menu's search index (iconSearch.ts), kept apart
+//   so only the code that searches carries it.
+// slideMarkup.test.ts and iconSearch.test.ts read the package too and fail when a module drifts.
 //
 // Run from extensions/ritemark: node scripts/generate-page-icons.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { icons as catalog } from '@phosphor-icons/core';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const core = path.join(root, 'node_modules', '@phosphor-icons', 'core');
-const out = path.join(root, 'webview', 'src', 'components', 'decks', 'slide', 'pageIcons.ts');
+const slide = path.join(root, 'webview', 'src', 'components', 'decks', 'slide');
+const out = path.join(slide, 'pageIcons.ts');
+const indexOut = path.join(slide, 'iconIndex.ts');
 
 /**
  * The Phosphor names in iconSet.ts's SLIDE_ICONS, and its `UNKNOWN_ICON` (#850: the dashed circle a box draws for a name
- * Ritemark doesn't know), read from its text so the list can't drift.
+ * Ritemark doesn't know), read from its text: the module must carry them.
  */
 function slideIconNames() {
-  const text = fs.readFileSync(path.join(root, 'webview', 'src', 'components', 'decks', 'slide', 'iconSet.ts'), 'utf8');
+  const text = fs.readFileSync(path.join(slide, 'iconSet.ts'), 'utf8');
   const unknown = /export const UNKNOWN_ICON = '([a-z0-9-]+)'/.exec(text);
   if (!unknown) throw new Error('iconSet.ts has no UNKNOWN_ICON');
   return [...[...text.matchAll(/phosphor: '([a-z0-9-]+)'/g)].map((match) => match[1]), unknown[1]];
@@ -29,8 +36,15 @@ function slideIconNames() {
  */
 export const PAGE_ONLY = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'caret-left', 'caret-right', 'folder', 'file-text', 'arrow-up-right', 'notebook', 'x'];
 
+/** Every regular icon's name, from the package's drawings, in order; the ones Ritemark draws by name must be there. */
 export function iconNames() {
-  return [...new Set([...slideIconNames(), ...PAGE_ONLY])].sort();
+  const names = fs.readdirSync(path.join(core, 'assets', 'regular'))
+    .filter((file) => file.endsWith('.svg'))
+    .map((file) => file.slice(0, -'.svg'.length))
+    .sort();
+  const missing = [...slideIconNames(), ...PAGE_ONLY].filter((name) => !names.includes(name));
+  if (missing.length) throw new Error(`@phosphor-icons/core has no regular ${missing.join(', ')}`);
+  return names;
 }
 
 /** An SVG file's drawing: what is inside its <svg> element. */
@@ -44,21 +58,47 @@ export function readIcon(name) {
   return svgInner(fs.readFileSync(path.join(core, 'assets', 'regular', `${name}.svg`), 'utf8'));
 }
 
+/** Joins an icon's tags in iconIndex.ts; no Phosphor tag has one. */
+export const TAG_SEPARATOR = ',';
+
+const BY_NAME = new Map(catalog.map((icon) => [icon.name, icon]));
+
+/**
+ * An icon's Phosphor tags for the search: lower case, once each, without the catalog's `*new*` and `*updated*` marks
+ * (they say when an icon came, not what it is).
+ */
+export function iconTags(name) {
+  const entry = BY_NAME.get(name);
+  if (!entry) throw new Error(`@phosphor-icons/core's catalog has no ${name}`);
+  const tags = [...new Set(entry.tags.filter((tag) => !tag.startsWith('*')).map((tag) => tag.trim().toLowerCase()))].filter(Boolean);
+  for (const tag of tags) if (tag.includes(TAG_SEPARATOR)) throw new Error(`${name}'s tag ${JSON.stringify(tag)} holds the separator`);
+  return tags;
+}
+
 function main() {
   const version = JSON.parse(fs.readFileSync(path.join(core, 'package.json'), 'utf8')).version;
-  const entries = iconNames().map((name) => `  '${name}': ${JSON.stringify(readIcon(name))},`);
-  const text = `/**
+  const names = iconNames();
+  const listed = catalog.map((icon) => icon.name).sort();
+  if (listed.join('\n') !== names.join('\n')) throw new Error("the catalog's names and the regular drawings differ");
+
+  const entries = names.map((name) => `  '${name}': ${JSON.stringify(readIcon(name))},`);
+  fs.writeFileSync(out, `/**
  * Generated by scripts/generate-page-icons.mjs from @phosphor-icons/core ${version} (regular weight). Do not edit:
- * run the script again. pageIcons.test.ts checks it against the package.
+ * run the script again. slideMarkup.test.ts checks it against the package.
  *
- * The published handout page's icons as inline SVG (Sprint 159): the slide icons a box can carry, the Arrows look's
- * arrow, and the page's own (Copy, the tick, Contents, the arrows under the slide, a folder and a document).
+ * Every Phosphor regular icon's drawing, by its Phosphor name (Sprint 169, #866), as inline SVG: a box's icon may be any
+ * of them (iconSet.ts's \`slideIcon\`); the published page also draws its own from here (Copy, the tick, Contents, the
+ * arrows under the slide, a folder and a document) and carries only the icons it uses. No imports: the webview and the
+ * extension host both read it.
  */
 export const PAGE_ICON_PATHS = {
 ${entries.join('\n')}
 } as const
 
 export type PageIconName = keyof typeof PAGE_ICON_PATHS
+
+/** Every icon's name, in order. */
+export const PAGE_ICON_NAMES = Object.keys(PAGE_ICON_PATHS) as readonly PageIconName[]
 
 /** One icon as an inline SVG, drawn in the text's colour and hidden from screen readers (its button has words). */
 export function iconSvg(name: PageIconName, size = 20): string {
@@ -68,9 +108,25 @@ export function iconSvg(name: PageIconName, size = 20): string {
 export function isPageIconName(name: string): name is PageIconName {
   return Object.prototype.hasOwnProperty.call(PAGE_ICON_PATHS, name)
 }
-`;
-  fs.writeFileSync(out, text);
-  console.log(`wrote ${path.relative(root, out)}: ${entries.length} icons`);
+`);
+
+  const tags = names.map((name) => `  '${name}': ${JSON.stringify(iconTags(name).join(TAG_SEPARATOR))},`);
+  fs.writeFileSync(indexOut, `/**
+ * Generated by scripts/generate-page-icons.mjs from @phosphor-icons/core ${version}. Do not edit: run the script again.
+ * iconSearch.test.ts checks it against the package.
+ *
+ * The icon menu's search index (Sprint 169, #866): each regular icon's Phosphor tags, in English, joined by
+ * \`${TAG_SEPARATOR}\`. Only iconSearch.ts reads it, so the index goes only where the search does.
+ */
+import type { PageIconName } from './pageIcons'
+
+export const ICON_TAG_SEPARATOR = ${JSON.stringify(TAG_SEPARATOR)}
+
+export const ICON_TAGS: Readonly<Record<PageIconName, string>> = {
+${tags.join('\n')}
+}
+`);
+  console.log(`wrote ${path.relative(root, out)}: ${entries.length} icons; ${path.relative(root, indexOut)}: ${tags.length}`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

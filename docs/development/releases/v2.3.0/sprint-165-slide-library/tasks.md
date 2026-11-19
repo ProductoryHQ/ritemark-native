@@ -19,9 +19,9 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] Tests, shots, lead's look, release-notes line, Risk and How to revert
 
 ## PR 3: Search once per slide (`sprint-165-slide-library-pr3`)
-- [ ] Grouping by the chosen lineage test; library first
-- [ ] "also in N older decks", "Folder › Deck · date", the tick
-- [ ] Tests, shots, lead's look, release-notes line, Risk and How to revert
+- [x] Grouping by the chosen lineage test; library first
+- [x] "also in N older decks", "Folder › Deck · date", the tick
+- [x] Tests, shots, lead's look, release-notes line, Risk and How to revert
 
 ## PR 4: The offer (`sprint-165-slide-library-pr4`)
 - [ ] The offer function (no AI call) with the chosen rule

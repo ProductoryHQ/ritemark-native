@@ -17,7 +17,8 @@ import {
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
 } from './capabilityContext';
-import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, slideIcon } from '../../webview/src/components/decks/slide/iconSet';
+import { isPageIconName } from '../../webview/src/components/decks/slide/pageIcons';
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -178,17 +179,31 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
 });
 
 // ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
-test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
-  // The names the slide draws (iconSet.ts): every one, and every other name for one, must be in the line.
+test('deck guidance names any Phosphor icon, lists Ritemark\'s own names, and says another draws a dashed circle', () => {
+  // Sprint 169 (#866; the Experience lead on #879): "any Phosphor regular icon name", about twenty common ones as
+  // examples (each a real icon), then every grid name and alias that isn't a Phosphor name, each with the icon it draws.
   const names = [...SLIDE_ICON_NAMES];
   const aliases = [...SLIDE_ICON_ALIASES];
   assert.ok(names.length > 0 && aliases.length > 0);
+  const head = "- A box's `icon` is the name of any Phosphor regular icon";
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
     const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
-    const line = text.split('\n').find((entry) => entry.startsWith("- A box's `icon` is one of these names:"));
+    const line = text.split('\n').find((entry) => entry.startsWith(head));
     assert.ok(line, `${runtime}: the icon line`);
-    for (const name of [...names, ...aliases]) assert.ok(line.includes(`\`${name}\``), `${runtime}: ${name}`);
-    assert.ok(line.includes("a name Ritemark doesn't know draws a dashed circle"), `${runtime}: what an unknown name does`);
+    assert.ok(line.length < 1500, `${runtime}: short, not the whole list (${line.length})`);
+    const ownNamesAt = line.indexOf('These names are read too');
+    assert.ok(ownNamesAt > 0, `${runtime}: the line goes on to Ritemark's own names`);
+    const examples = [...line.slice(0, ownNamesAt).matchAll(/`([a-z0-9-]+)`/g)].map((match) => match[1]).filter((name) => name !== 'icon');
+    assert.ok(examples.length >= 18 && examples.length <= 25, `${runtime}: about twenty examples (${examples.length})`);
+    for (const name of examples) assert.equal(slideIcon(name)?.phosphor, name, `${runtime}: ${name} is a Phosphor icon`);
+    for (const name of [...names, ...aliases]) {
+      const drawn = slideIcon(name)!.phosphor;
+      assert.ok(isPageIconName(name) ? drawn === name : line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
+    }
+    for (const [name, drawn] of [['mail', 'envelope-simple'], ['search', 'magnifying-glass'], ['bot', 'robot']]) assert.ok(line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
+    // Phosphor's own names are never listed as a Ritemark name for another icon.
+    for (const name of ['check', 'envelope', 'chat', 'book', 'folder']) assert.ok(!line.includes(`\`${name}\` (`), `${runtime}: ${name}`);
+    assert.ok(line.includes('A name that is neither draws a dashed circle'), `${runtime}: what an unknown name does`);
   }
 });
 

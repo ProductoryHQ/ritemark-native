@@ -322,7 +322,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings-row { display: flex; align-items: center; justify-content: space-between; }
 
 /* Sprint 157, PR 4: the Slide library place (README frame 3; prototype .lsearch, .row, .lgrid, .lit, .lhint). */
-.deck-lib { min-height: 100vh; padding: 4px 8px 16px; box-sizing: border-box; color: var(--r-ink-strong); }
+/* #877: the foot note keeps room under it at the end of the scroll. */
+.deck-lib { min-height: 100vh; padding: 4px 8px 32px; box-sizing: border-box; color: var(--r-ink-strong); }
 .deck-lib-search { display: flex; align-items: center; gap: 8px; height: 32px; margin: 2px 0 8px; padding: 0 10px; border-radius: 7px; background: var(--r-surface); box-shadow: inset 0 0 0 1px var(--r-hairline-strong); color: var(--r-ink-muted); }
 .deck-lib-search:focus-within { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder, var(--r-accent)); }
 .deck-lib-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: 400 13px/32px var(--ritemark-ui-font-family); color: var(--r-ink-strong); }
@@ -447,6 +448,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing ritemark-comment { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-child(1 of :not(ritemark-comment)) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
+/* Sprint 168 PR 1 (review): a quote's last paragraph keeps no 6 px under it when a note follows it in the quote. */
+.deck-sl.is-blocks.is-editing blockquote > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
 /* The first block after a title with any number of notes between (review of #766: `h1 + *` with notes skipped). */
 .deck-sl.is-blocks.is-editing h1 ~ :not(ritemark-comment):not(h1 ~ :not(ritemark-comment) ~ *) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
@@ -551,3 +554,14 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-section:hover .deck-lib-take-slot,
 .deck-lib-section-head:has(:focus-visible) .deck-lib-take-slot { opacity: 1; pointer-events: auto; }
 .deck-lib-take[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+/* Sprint 165 PR 3 (README "Search shows each slide once", library-panel.html): a hit's place and "also in N older
+   decks" under its title, muted; the tick on a thumbnail whose copy is already in the open deck. */
+.deck-lib-place { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font: 400 11px/14px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.deck-lib-also { font: 400 11px/14px var(--ritemark-ui-font-family); color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
+.deck-lib-tile .deck-lib-title + .deck-lib-place { margin-top: -1px; }
+.deck-lib-here { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 0 0 1px var(--r-hairline); }
+.deck-lib-here > svg { width: 10px; height: 10px; }
+.deck-lib-group-hits { display: flex; align-items: baseline; gap: 6px; }
+.deck-lib-group-count { margin-left: auto; letter-spacing: 0; text-transform: none; font-weight: 400; font-variant-numeric: tabular-nums; }
+.deck-lib-menu-place { padding: 0 8px 4px; max-width: 240px; font: 400 11.5px/15px var(--ritemark-ui-font-family); color: var(--r-ink-muted); overflow-wrap: anywhere; }
+.deck-lib-menu-here { display: flex; align-items: center; gap: 4px; padding: 0 8px 6px; font: 400 11.5px/15px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
