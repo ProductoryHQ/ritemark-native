@@ -11,7 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse } from 'node-html-parser';
 import { AGENDA_HINT, agendaHtml, agendaMarks, type AgendaEntry } from './agenda';
-import { agendaOf, blockCanvasMarkup, blockHasAgenda, blockPicturePaths, blockSlideHtml, blockStepsTagOf, isSectionSlide } from './slideRenderer';
+import { agendaOf, blockCanvasMarkup, blockHasAgenda, blockPicturePaths, blockSlideHtml, blockStepsLabelOf, isSectionSlide } from './slideRenderer';
 import { parseDeck, slideDataOf } from '../deckFormat';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { presentSlidesOf } from '../present/presentSession';
@@ -73,7 +73,7 @@ const deckSlides = (text: string) => parseDeck(text).slides.map((block, index) =
   assert.ok(!blockSlideHtml('::: agenda\nSECRET\n:::', { agenda: { entries, hint: false } }).includes('SECRET'));
   // Nor is anything in it read: a picture is never asked for or published, a Steps block makes no exercise (review).
   assert.deepEqual(blockPicturePaths('# Today\n\n::: agenda\n![Logo](images/logo.png)\n:::'), []);
-  assert.equal(blockStepsTagOf('# Today\n\n::: agenda\n::: steps\n1. One\n:::\n:::'), null);
+  assert.equal(blockStepsLabelOf('# Today\n\n::: agenda\n::: steps\n1. One\n:::\n:::'), null);
   assert.equal(blockHasAgenda('# Today\n\n::: agenda\n:::'), true);
   assert.equal(blockHasAgenda('# Today\n\n```\n::: agenda\n:::\n```'), false, 'in code it is words');
   assert.equal(blockHasAgenda('::: steps\n1. a\n:::'), false);

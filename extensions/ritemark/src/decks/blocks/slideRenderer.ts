@@ -825,12 +825,6 @@ export function blockStepsLabelOf(markdown: string): string | null {
   return found;
 }
 
-/**
- * Sprint 164 PR 3: the old name of `blockStepsLabelOf`, kept only while `DeckView.tsx` (PR 1's, #819, until it merges)
- * still imports it for Settings' Label row, which no longer draws (`SlideSettings`). It goes in the follow-up.
- */
-export const blockStepsTagOf = blockStepsLabelOf;
-
 const agendaCache = new Map<string, boolean>();
 
 /** Does a block slide hold an Agenda block (at any level, outside code)? Read once per Markdown. */

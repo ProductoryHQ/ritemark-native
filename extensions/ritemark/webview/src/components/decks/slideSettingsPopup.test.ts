@@ -28,8 +28,8 @@ const { libraryBadge } = await import('./SlideStrip')
 
 const noop = () => {}
 const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8')
-const settings = (kind: string, data: Record<string, unknown>, about: unknown, extra: Record<string, unknown> = {}) => parse(renderToStaticMarkup(createElement(SlideSettings, {
-  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, onUndo: noop, about: about as never, ...extra,
+const settings = (kind: string, data: Record<string, unknown>, about: unknown) => parse(renderToStaticMarkup(createElement(SlideSettings, {
+  number: 6, kind, data, onKind: noop, onChange: noop, onClose: noop, about: about as never,
 })))
 
 // ---- A changed library slide: its line, the sentence and the buttons first, then a line, then the slide's settings.
@@ -68,7 +68,7 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, e
 {
   const data = { from: 'Slide library/Agents.deck.md#p1 @k2' }
   const about = createElement(SlideAbout, { data, hidden: '' })
-  const root = settings('', data, about, { stepsTag: { value: 'Exercise', onChange: noop } })
+  const root = settings('', data, about)
   const text = root.textContent
   const order = ['From the library · Agents', 'Picture'].map(words => {
     const at = text.indexOf(words)
@@ -76,8 +76,8 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, e
     return at
   })
   assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, then Picture')
-  for (const [kind, extra] of [['', { stepsTag: { value: 'Harjutus', onChange: noop } }], ['exercise', {}]] as const) {
-    const shown = settings(kind, { tag: 'Harjutus' }, null, extra)
+  for (const kind of ['', 'exercise']) {
+    const shown = settings(kind, { tag: 'Harjutus' }, null)
     assert.ok(!shown.textContent.includes('Label') && !shown.textContent.includes('Harjutus'), `${kind || 'block slide'}: no Label row`)
     assert.equal(shown.querySelectorAll('input').filter(input => input.getAttribute('type') !== 'radio').length, 0, `${kind || 'block slide'}: no field to type in`)
   }
