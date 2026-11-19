@@ -239,4 +239,28 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.ok(view.includes('const stop = wheelStop(state, delta, currentRef.current)'))
 }
 
+// A thumbnail on the strip is a picture of the slide (#856, the Experience lead): nothing inside it takes a click or a
+// wheel, so a click anywhere on it chooses the slide, and its columns and panes never show or catch a scrollbar. Before,
+// a click on the exact centre of a thumbnail with a long column hit that column's scaled-down scrollbar: no click
+// reached the thumbnail, and the slide wasn't chosen.
+{
+  const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  // A rule whose selector is exactly this, after the rule or the comment before it.
+  const rule = (selector: string) => new RegExp(`(^|\\}|\\*/) ?${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`).exec(css)?.[2] ?? null
+  // The picture and everything in it: no pointer, so the thumbnail's own row (pick, drag, menu) gets every click and wheel.
+  const picture = rule('.deck-thumb .deck-thumb-slide, .deck-thumb .deck-thumb-slide *')
+  assert.ok(picture?.includes('pointer-events: none'), 'nothing in the picture takes the pointer')
+  // `*` and two classes outrank the stage's own pointer layers (one class), should a thumbnail ever draw one.
+  assert.ok(!/\.deck-thumb[^{]*pointer-events: auto/.test(css), 'and nothing in a thumbnail takes it back')
+  // The columns and panes keep their room (the stage's column has its scrollbar's room too, so the words wrap the same)
+  // and their fade, but draw no scrollbar; above the slide's own rule (five classes), and only on the strip.
+  const bars = rule('.deck-strip .deck-thumb .deck-thumb-slide .deck-sl.is-blocks :is(.blk-column, .blk-tabpane)')
+  assert.ok(bars?.includes('scrollbar-color: transparent transparent'), 'no scrollbar shows in a thumbnail')
+  const slideCss = readFileSync(new URL('./slide/slide.css', import.meta.url), 'utf8')
+  assert.ok(slideCss.includes('.deck-sl.is-blocks .blk-flow > .blk-columns > .blk-column { min-height: 0; overflow: hidden auto; scrollbar-width: thin;'), "the stage's columns still scroll, with their scrollbar")
+  // The thumbnail still chooses its slide on a click on itself.
+  const strip = readFileSync(new URL('./SlideStrip.tsx', import.meta.url), 'utf8')
+  assert.ok(/data-thumb=\{index\}[^]*?onClick=\{\(\) => actions\.pick\(index\)\}[^]*?<div className="deck-thumb-slide">/.test(strip), "the thumbnail's own click picks it")
+}
+
 console.log('slideNav: passed')

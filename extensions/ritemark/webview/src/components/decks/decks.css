@@ -57,6 +57,11 @@
 .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent); }
 .deck-thumb.is-current .deck-thumb-no { color: var(--r-accent); font-weight: 700; }
 .deck-thumb.is-skip .deck-thumb-slide { opacity: 0.4; }
+/* A thumbnail is a picture of the slide (#856): nothing in it takes a click or a wheel, so a click anywhere on it is
+   the thumbnail's (it chooses the slide), and the wheel scrolls the strip. Its columns and panes keep their room and
+   their fade, as the stage's do, but draw no scrollbar. */
+.deck-thumb .deck-thumb-slide, .deck-thumb .deck-thumb-slide * { pointer-events: none; }
+.deck-strip .deck-thumb .deck-thumb-slide .deck-sl.is-blocks :is(.blk-column, .blk-tabpane) { scrollbar-color: transparent transparent; }
 .deck-thumb .deck-thumb-eye { position: absolute; left: 58px; top: 22px; width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; color: #1C1F4A; } /* the ink on its own white, in Ritemark Dark too (the ink token is white there) */
 :where(:root:not([data-input-mode="pointer"])) .deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
 
