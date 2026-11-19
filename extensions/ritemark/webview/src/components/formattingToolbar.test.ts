@@ -5,7 +5,7 @@
  * Run: npx tsx webview/src/components/formattingToolbar.test.ts
  */
 import assert from 'node:assert/strict'
-import { formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 
 const base = { empty: false, inCodeBlock: false, equationSelected: false, editorHasFocus: true, focusInToolbar: false }
 
@@ -37,6 +37,18 @@ for (const editorHasFocus of [true, false]) {
       !formattingToolbarShows({ ...base, editorHasFocus, focusInToolbar }),
     )
   }
+}
+
+// #822: the slide's bubble leaves the scaled frame into the app's React root, never `document.body`, where React
+// hears none of its buttons (none of B, I, H1–H3, the lists, quote, code or link changed the slide's words).
+{
+  const root = { id: 'root' } as unknown as Element
+  const body = { id: 'body' } as unknown as Element
+  const doc = { getElementById: (id: string) => (id === 'root' ? root : null), body }
+  assert.equal(bubbleHost(doc), root, 'the bubble goes into the React root')
+  assert.notEqual(bubbleHost(doc), body)
+  // A page without the app's root (none today) still gets a place to draw it.
+  assert.equal(bubbleHost({ getElementById: () => null, body }), body)
 }
 
 console.log('formattingToolbar: all passed')
