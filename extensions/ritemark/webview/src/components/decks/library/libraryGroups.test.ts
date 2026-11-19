@@ -123,4 +123,5 @@ console.log('libraryGroups: ok')
   assert.match(css, /\.deck-lib-section:hover \.deck-lib-take-slot/, 'shown while the pointer is over the section')
   assert.match(css, /\.deck-lib-section-head:has\(:focus-visible\) \.deck-lib-take-slot/, 'shown while the heading holds the keyboard, not after a click')
   assert.match(rule('.deck-lib-section-title'), /-webkit-line-clamp: 2/, 'two lines before an ellipsis')
+  assert.match(rule('.deck-lib-section-head'), /align-items: flex-start/, "the number sits on a two-line title's first line")
 }
