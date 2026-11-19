@@ -17,6 +17,7 @@ import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
 import { loadSlide } from './slideEditorHarness'
+import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
 
 type Outline = string[]
 
@@ -149,3 +150,71 @@ for (const slide of slides) {
 }
 assert.ok(blockSlides >= 30, `the fixtures and the demo project give enough slides (${blockSlides})`)
 console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same outline in the renderer and the slide editor (${SPIKE.length} spike slides, ${blockSlides} from the fixtures and the demo project)`)
+
+// #850 (Sprint 166 PR 9): a box whose icon Ritemark doesn't know draws the same badge on the stage as in the renderer,
+// the dashed circle; pointing at it asks the stage for its tooltip with the name as written; a click opens the icon
+// menu with that name as the current one (so No icon can take it out). A known icon is drawn as before. Red on main:
+// the stage drew the box's empty place (hidden) and the renderer nothing.
+{
+  const calls: string[] = []
+  const handlers: SlideDivHandlers = {
+    pickIcon: (_pos, _anchor, current) => { calls.push(`pick ${current}`) },
+    hintIcon: (_pos, _anchor, name) => { calls.push(`hint ${name}`) },
+  }
+  const makeView = (slideDivWithView(handlers).config.addNodeView as () => (props: unknown) => { dom: HTMLElement })()
+  // domino has no `append`, which the node view uses (a browser does): for this check only.
+  const elementProto = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div'))) as { append?: unknown; appendChild: (node: unknown) => unknown }
+  if (typeof (document.createElement('div') as { append?: unknown }).append !== 'function') {
+    Object.defineProperty(elementProto, 'append', { configurable: true, value(this: typeof elementProto, ...nodes: unknown[]) { for (const node of nodes) this.appendChild(node) } })
+  }
+  const stageBadge = (markdown: string) => {
+    const doc = loadSlide(markdown)
+    let boxPos = -1
+    doc.descendants((node, pos) => {
+      if (boxPos < 0 && node.type.name === 'slideDiv' && String(node.attrs.class).split(' ').includes('box')) boxPos = pos
+    })
+    assert.ok(boxPos >= 0, `a box in ${markdown}`)
+    const view = makeView({ node: doc.nodeAt(boxPos), getPos: () => boxPos, editor: { state: { doc } } })
+    return view.dom.firstElementChild as HTMLElement
+  }
+  const slide = (icon: string) => `:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`
+  const rendered = (icon: string) => /<span class="(blk-icon[^"]*)">(<svg[\s\S]*?<\/svg>)<\/span>/.exec(draw(slide(icon)))
+  for (const [icon, known] of [['xyz-unknown', false], ['lightbulb', true], ['chat', true]] as const) {
+    const badge = stageBadge(slide(icon))
+    const drawn = rendered(icon)
+    assert.ok(drawn, `the renderer draws ${icon}'s badge`)
+    assert.equal(badge.className, `${drawn[1]} is-pickable`, `${icon}: the stage's badge is the renderer's, and clickable`)
+    assert.equal(badge.innerHTML.replace(/<path([^>]*)><\/path>/g, '<path$1/>'), drawn[2], `${icon}: the same drawing`)
+    assert.equal(badge.hidden, false)
+    assert.equal(badge.getAttribute('aria-label'), known ? 'Change the icon' : 'No icon named “xyz-unknown”: choose an icon')
+    assert.equal(badge.getAttribute('data-icon'), known ? null : 'xyz-unknown')
+    assert.equal(drawn[1].includes('is-unknown'), !known)
+  }
+  // Pointing at the unknown badge asks for its tooltip; a known one asks for none. A click opens the menu.
+  const fire = (target: HTMLElement, type: string) => {
+    const event = document.createEvent('Event')
+    event.initEvent(type, false, true)
+    target.dispatchEvent(event)
+  }
+  const unknown = stageBadge(slide(' Xyz-Unknown '))
+  fire(unknown, 'mouseenter')
+  fire(unknown, 'click')
+  const known = stageBadge(slide('lightbulb'))
+  fire(known, 'mouseenter')
+  fire(known, 'click')
+  assert.deepEqual(calls, ['hint Xyz-Unknown', 'pick Xyz-Unknown', 'pick lightbulb'], 'the name as written (trimmed); a known icon by its own name')
+  assert.equal(unknownIconWords('xyz'), 'No icon named “xyz”')
+  // The tooltip is the stage's (ui/tooltip.tsx) with Choose an icon, which opens the icon menu; never a native title.
+  const tools = fs.readFileSync(path.join(here, 'SlideBlockTools.tsx'), 'utf8')
+  const stage = fs.readFileSync(path.join(here, 'SlideEditor.tsx'), 'utf8')
+  const hint = tools.slice(tools.indexOf('export function UnknownIconHint'), tools.indexOf("/** A web page's address as the slide keeps it"))
+  assert.ok(hint.length > 0 && hint.length < 8000, 'the hint, and only it')
+  assert.ok(hint.includes('<Tooltip') && hint.includes('>Choose an icon</Button>') && !/\stitle=/.test(hint), 'a tooltip with Choose an icon')
+  assert.ok(stage.includes('<UnknownIconHint') && stage.includes('current: hint.name'), "Choose an icon opens the box's icon menu")
+  // Review: the hint never outlives its box's place: a change to the slide's words, an icon menu opening, a pointer
+  // that never came, a badge that went or became known each end it, and it follows the badge while it shows.
+  assert.ok(stage.includes('if (transaction.docChanged) setIconHint(null)'), 'a change to the words ends it')
+  assert.ok(/setIconPick\(\{ pos, rect[^\n]*\n\s*setIconHint\(null\)/.test(stage), 'the icon menu ends it')
+  assert.ok(hint.includes('HINT_WAIT_MS') && hint.includes("classList.contains('is-unknown')") && hint.includes('requestAnimationFrame(follow)'), 'the place waits, checks and follows')
+  console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
+}
