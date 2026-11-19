@@ -272,6 +272,25 @@ function declarations(css: string, selector: string): Map<string, string> {
   return found;
 }
 
+/**
+ * Every rule whose selector, in any spelling or list, has a chosen tab itself as its subject (its last compound holds
+ * `.blk-tab` and `.is-active`, with no pseudo-element), with the line-drawing properties it sets (review on #812).
+ */
+function chosenTabPainters(css: string): string[] {
+  const found: string[] = [];
+  const plain = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const rule of plain.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const painted = rule[2].split(';').map(part => part.split(':')[0].trim()).filter(name => /^(?:background|background-color|background-image|border|border-bottom|box-shadow)$/.test(name));
+    if (!painted.length) continue;
+    for (const selector of rule[1].split(',')) {
+      // The last compound, without its `:not(…)`s (an unchosen tab's hover is not the chosen tab's).
+      const subject = (selector.trim().split(/\s*[\s>+~]\s*/).pop() ?? '').replace(/:not\([^)]*\)/g, '');
+      if (/\.blk-tab(?![\w-])/.test(subject) && /\.is-active(?![\w-])/.test(subject) && !subject.includes('::')) found.push(`${selector.trim()} { ${painted.join(', ')} }`);
+    }
+  }
+  return found;
+}
+
 /** A length in px from a shorthand's `at`th value (`padding: 5px 5px 10px`, `inset: 0 0 -10px`). */
 function pxAt(value: string | undefined, at: number): number {
   const part = (value ?? '').split(/\s+/)[at] ?? '';
@@ -316,10 +335,11 @@ test('the chosen tab joins its pane with no hairline: one ground across the join
   checkJoin(css, { tab: '.deck-sl.is-blocks .blk-tab', band: '.deck-sl.is-blocks .blk-tabbar', panes: '.deck-sl.is-blocks .blk-tabpanes', smallestScale: thumb / 960 });
   // The open pane lies above the band's room, so a click there still lands in it (README "Tabs in the editor").
   assert.ok(/\.blk-tabpane:nth-child\(24\) \{ visibility: visible; z-index: 1; \}/.test(css), 'the open pane is above the band');
-  // Nothing on the page, in a Borderless deck or for the keyboard gives the chosen tab a ground (or a line) of its own.
-  for (const sheet of [PAGE_CSS, css]) {
-    assert.ok(!/\.blk-tab\.is-active(?!::before)[^{,]*\{[^}]*\b(?:background|border-bottom|box-shadow)\b/.test(sheet), 'no other rule draws at the chosen tab\'s foot');
-  }
+  // Nothing on the page, in the editors, in a Borderless deck or for the keyboard gives the chosen tab a ground (or a
+  // line) of its own, however its selector is written.
+  const index = fs.readFileSync(path.join(webview, 'index.css'), 'utf8');
+  for (const sheet of [PAGE_CSS, css, index]) assert.deepEqual(chosenTabPainters(sheet), [], 'no other rule draws at the chosen tab\'s foot');
+  assert.deepEqual(chosenTabPainters('.x, .deck-sl.is-blocks .blk-tabs > .blk-tabbar > .blk-tab.is-active:hover { background: red }'), ['.deck-sl.is-blocks .blk-tabs > .blk-tabbar > .blk-tab.is-active:hover { background }'], 'the check sees a rule in a list or spelt another way');
   const pageRing = declarations(PAGE_CSS, '.layer .deck-sl.is-blocks .blk-tab:focus-visible');
   assert.ok(pageRing.has('outline') && !pageRing.has('box-shadow'), 'the page\'s keyboard ring is an outline, drawn over the ground');
 });
