@@ -72,6 +72,8 @@ What they show: H1 > H2 > H3 > body reads at a glance, all in Source Serif 4 bol
 
 Not run: Windows; the presenter view (it needs a second display); the published page and the strip on Paper (they draw with the same `slide.css` and renderer). The deck file was byte for byte the same after the run.
 
+**Follow-up:** [#906](https://github.com/ProductoryHQ/ritemark-native/pull/906) fixes the spacing note above ([#901](https://github.com/ProductoryHQ/ritemark-native/issues/901)): an H2 to H6 has 6 px under it and room of its own above it (24 px in all over an H2, 18 over an H3 to H6), the same in the flow and in Tabs and Columns. Approved under the overnight delegation by the Development manager and the Experience lead (20 November). The realistic slide still fits at 92 %; shots in `proof/followup-heading-spacing/`.
+
 ## Release notes
 One line per PR, in plain words for people, written with the `release-notes` skill:
 - PR 1: a quote on a slide has its own look, with a line for who said it.
