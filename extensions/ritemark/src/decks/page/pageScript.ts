@@ -703,13 +703,23 @@ const PAGE_BEHAVIOUR = String.raw`
 
   // ---- a wide table's soft edges: the side with more to scroll to fades (PAGE_EDGE_RULE)
   list(doc.querySelectorAll('.tw')).forEach(function (table) { watchTableEdges(table, table.firstElementChild || table, window); });
+  // a slide's table scrolls in its own frame only where the page reads as one column (#828), so it is watched from the
+  // first time it does: at the start and after a resize; the watch stops by itself on a frame that doesn't scroll
+  function watchSlideTables() {
+    list(doc.querySelectorAll('.deck-sl.is-blocks table')).forEach(function (table) {
+      if (table.hasAttribute('data-edges') || !/^(auto|scroll)$/.test(window.getComputedStyle(table).overflowX)) return;
+      table.setAttribute('data-edges', '');
+      watchTableEdges(table, table, window);
+    });
+  }
+  watchSlideTables();
 
   // ---- start: the slide the address names (#6), else this reader's last slide with "Start from the beginning", else
   // the first; shown whole, as a jump is
   var resizeTimer = 0;
   window.addEventListener('resize', function () {
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(function () { finishMotion(); layout(); fitTabBands(); }, 40);
+    resizeTimer = window.setTimeout(function () { finishMotion(); layout(); fitTabBands(); watchSlideTables(); }, 40);
   });
   var linked = linkedPart(window.location.hash, count);
   var returned = linked === null ? readPlace(storage, placeKey, count) : null;
