@@ -2,9 +2,9 @@
  * Sprint 161 (PR 3; experience 46, frames 22, 23, 24 and 26): what the slide's own / menu and its blocks do to the
  * slide editor's document. Pure ProseMirror, so the tests drive the same steps the stage takes.
  *
- *  - **The / menu** (frame 22) in four groups: Text (Title, Heading, Bullet list, Numbered list, Code block, with their
- *    Markdown shortcuts), Blocks (Columns, Boxes, Steps, Table, Tabs, Button, the Agenda of small details 14, and the
- *    Label of Sprint 164 PR 3), Media (Picture, Web page) and Slides (New slide below, Split slide here). Web page is a
+ *  - **The / menu** (frame 22) in four groups: Text (Heading 1, Heading 2, Heading 3, Bullet list, Numbered list, Code
+ *    block, with their Markdown shortcuts), Blocks (Columns, Boxes, Steps, Table, Tabs, Button, the Agenda of small
+ *    details 14, and the Label of Sprint 164 PR 3), Media (Picture, Web page) and Slides (New slide below, Split slide here). Web page is a
  *    link to the page, in the picture's group; no live page is drawn.
  *  - **A block** goes where the / was typed: in place of the empty line, else after the block the caret is in. Its
  *    lines are the ones the conversion writes (`:::: columns`, `::: box`, `::: steps`), so a new block saves as an AI
@@ -29,6 +29,7 @@ import { BULLET_LIST_KEYWORDS, BUTTON_KEYWORDS, CODE_BLOCK_KEYWORDS, LABEL_KEYWO
 import { OPEN_FENCE, parseFenceAttributes, withFenceValue } from '../../../../../src/decks/blocks/fencedDiv'
 import { AGENDA_CLOSE, AGENDA_OPEN } from '../../../../../src/decks/blocks/agenda'
 import { canHoldTabs } from '../../../extensions/tabs/tabsCommands'
+import { tabsLevelOf } from '../../../extensions/tabs/tabsMarkdown'
 
 /** Meta on a slide editor transaction that the stage writes to the deck as an undo step of its own (`blockPlacement`). */
 export { SLIDE_COMMAND }
@@ -40,8 +41,13 @@ export function isOwnStep(tr: Transaction): boolean {
 
 /** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows and its hidden search words (18 November). */
 export const SLIDE_ITEMS: BlockItemDef[] = [
-  { group: 'Text', title: 'Title', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['h1', 'heading 1', 'pealkiri'] },
-  { group: 'Text', title: 'Heading', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['h2', 'subheading', 'alapealkiri'] },
+  // Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide"): the Text editor's names and
+  // order, H1 > H2 > H3; the old Title and Heading are Heading 1 and Heading 2, found by their old words too. All three
+  // names start with "Heading", so /heading lists them in order and Enter gives Heading 1, as in the Text editor (the
+  // Experience lead on #889: consistency).
+  { group: 'Text', title: 'Heading 1', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['title', 'h1', 'pealkiri'] },
+  { group: 'Text', title: 'Heading 2', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['subtitle', 'subheading', 'h2', 'alapealkiri'] },
+  { group: 'Text', title: 'Heading 3', description: '', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, shortcut: '###', keywords: ['h3'] },
   { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: BULLET_LIST_KEYWORDS },
   { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: NUMBERED_LIST_KEYWORDS },
   // Sprint 163 PR 1: prompts live on the slide, each in a code block with its own Copy (the decks README).
@@ -68,16 +74,20 @@ export const SLIDE_ITEMS: BlockItemDef[] = [
 const NOT_IN_A_PANE = new Set(['agenda', 'newSlideBelow', 'splitSlide', 'tabs'])
 
 /**
- * Sprint 163: the slide's / menu where the caret is. In a tab's pane, never Tabs, the Title or the slide's own items;
- * in a box, Steps or a table cell, never Tabs (`canHoldTabs`).
+ * Sprint 163: the slide's / menu where the caret is. In a tab's pane, never Tabs, Heading 1 (the title) or the slide's
+ * own items; in a box, Steps or a table cell, never Tabs (`canHoldTabs`). Sprint 168 PR 3: nor, in a pane, the heading
+ * at the tabs' own level, which the pane keeps one level under them (`tabsMarkdown`'s pane headings): under `##` tabs,
+ * Heading 2 would come out as Heading 3, the item after it.
  */
 export function slideItemsAt(state: EditorState): BlockItemDef[] {
-  const inPane = (() => {
+  const tabsLevel = (() => {
     const $from = state.selection.$from
-    for (let depth = $from.depth; depth > 0; depth--) if ($from.node(depth).type.name === 'tabPane') return true
-    return false
+    for (let depth = $from.depth; depth > 1; depth--) if ($from.node(depth).type.name === 'tabPane') return tabsLevelOf($from.node(depth - 1))
+    return null
   })()
-  if (inPane) return SLIDE_ITEMS.filter(item => !NOT_IN_A_PANE.has(item.nodeType) && !(item.nodeType === 'heading' && item.attrs?.level === 1))
+  if (tabsLevel !== null) {
+    return SLIDE_ITEMS.filter(item => !NOT_IN_A_PANE.has(item.nodeType) && !(item.nodeType === 'heading' && (item.attrs?.level === 1 || item.attrs?.level === tabsLevel)))
+  }
   return canHoldTabs(state) ? SLIDE_ITEMS : SLIDE_ITEMS.filter(item => item.nodeType !== 'tabs')
 }
 

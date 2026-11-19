@@ -23,6 +23,6 @@ Examples for the manual and test matrix. Synthetic decks only, never Jarmo's rea
 - A slide with h1, h2 and h3 together: three clearly different sizes in order, h2 in the heading colour, bold.
 - An h2 directly after the h1: the title's line, weight 500, sub colour, at 1.3em.
 - A box's h3: as it is today.
-- The / menu on a slide shows Heading 1, Heading 2, Heading 3 with `#`, `##`, `###`; typing "title" finds Heading 1, "subtitle" Heading 2, "heading" Heading 3, "pealkiri" Heading 1, "alapealkiri" Heading 2.
+- The / menu on a slide shows Heading 1, Heading 2, Heading 3 with `#`, `##`, `###`; typing "title" finds Heading 1, "subtitle" Heading 2, "h3" Heading 3, "pealkiri" Heading 1, "alapealkiri" Heading 2; "heading" lists all three in order, Heading 1 first, as in the Text editor.
 - The bubble still offers H1/H2/H3.
 - A realistic synthetic deck with an h2 in the middle of a slide: the fit steps the words down and nothing overflows, on the editor, wall and page.

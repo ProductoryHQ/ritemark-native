@@ -23,15 +23,15 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-168-qu
 
 ## PR 3: heading levels, R3 (High), branch `sprint-168-quotes-headings-pr3`, after Sprint 164 PR 3 merges
 - [x] Issue created in milestone v2.3.0 (manager): #865: to be created
-- [ ] h2 and h3 values in `slide.css`; the title's line keeps its look
-- [ ] / menu: Heading 1, 2, 3 with the hidden words; "Title" and "Heading" renamed (no real removal); the bubble unchanged
-- [ ] One realistic synthetic deck with an h2 mid-slide checked through the fit
-- [ ] Tests: menu entries and keywords; the fit with the larger h2
-- [ ] Shots: a slide with h1, h2 and h3 together; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] h2 and h3 values in `slide.css`; the title's line keeps its look
+- [x] / menu: Heading 1, 2, 3 with the hidden words; "Title" and "Heading" renamed (no real removal); the bubble unchanged
+- [x] One realistic synthetic deck with an h2 mid-slide checked through the fit (three h2s: 453 of 460 px at 100 % before; after, 440 of 460 at 92 %, nothing past the bottom)
+- [x] Tests: menu entries and keywords; the fit with the larger h2 (`blocks/slideHeadings.test.ts`: computed sizes through slide.css and decks.css, the box's h3, the fit)
+- [x] Shots: a slide with h1, h2 and h3 together, the title's line, the / menu, the realistic deck before and after (`proof/pr3-headings/`); the Experience lead's look follows
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review (High, two rounds; #889)
 
 ## Sprint end
-- [ ] Full test chain once per final head
-- [ ] `qa-validator` sign-off
-- [ ] `docs/development/architecture.md` updated if structure changed
-- [ ] Worktree hygiene report after merge (`node ./scripts/worktree-hygiene.mjs --check`)
+- [x] Full test chain once per final head: EXIT 0 on #880's `8310e024`, #872's `ad14293f` and #889's `b92b8c31`, each named in that PR's Review record
+- [ ] `qa-validator` sign-off: not yet. On 20 November it passed every PR check and blocked only on these records and the Paper shot, which the close-out PR adds; its sign-off on that PR is still to come
+- [x] `docs/development/architecture.md` updated if structure changed: PR 1's row came with #880; PRs 2 and 3 get one row in the close-out PR
+- [x] Worktree hygiene report after merge: `node ./scripts/worktree-hygiene.mjs --report` from the main checkout, report dated 2026-11-19 (run on 20 November, 00:2x Tallinn). PR 3's worktree is listed safe to remove; PR 1's and PR 2's are held back for uncommitted files (their review files). Nothing deleted

@@ -6,7 +6,7 @@ Track: Lightweight (small bug fixes, one PR each, no new dependency). Decks stay
 
 Branch: `sprint-166-slide-fixes` (this plan); the fixes on `sprint-166-slide-fixes-pr1` to `-pr4`.
 
-Status: **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167). Phase 3 (DEVELOP).
+Status: **Done** 20 November 2026 (close-out below), with one open follow-up outside its eleven issues: a choice from the strip leaves the slide's pane where it was (close-out, second point), for the Development manager to file as an issue on the v2.3.0 milestone. **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167).
 
 ## Goal
 
@@ -51,7 +51,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 ## Fix 4: the split's drag guide (PR 4, issue #829)
 
 [#829](https://github.com/ProductoryHQ/ritemark-native/issues/829): with the 32 px gap, the drag guide at the ⅓ and ⅔ snap points sits about 5 px off the middle of the gap. It goes to the middle, as the handle already is.
-- [ ] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
+- [x] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
+- Built (PR 4): the guide was drawn at a third of the two columns' span, gap included, but the grid shares only their room without the gap, so it stood a sixth of the gap off the split at ⅓ and ⅔ (½ was right). It now stands where the handle will be once the line lands: the room shared as the drop writes it (whole percents) plus half the gap measured on the screen, so the fit and the stage's scale are in it (`splitGuideX`, `splitShares` in `blockBar.ts`). In the app at 1440×900: within 0.01 px of the gap's middle at ⅓, ½ and ⅔, at the full fit and at 60 % (main's formula, on the same columns: 2.0 px off at ⅓ and ⅔ at the full fit); dragged from an even split to ⅓, the guide stood exactly where the handle landed. Found in the same run and fixed: pointed at, the split drew the ghost Button's light hover fill as a 12 px bar around its line; now only the line shows. Test: `blockBar.test.ts`. Shot: `proof/pr4-split-guide/`. No release-notes line: Decks is new in 2.3, so nobody has seen the old guide.
 
 
 ## Added on 19 November (scope change, Jarmo: "jah, lisa need kolm sprinti 166")
@@ -108,6 +109,22 @@ Which of the bubble's items belong on a slide (a checklist, H1 or H2) is a later
 ## Removals (HARD RULE #1)
 
 None.
+
+## Close-out (20 November 2026)
+
+**The 11 PRs, all merged on 19 November:** PR 1 [#845](https://github.com/ProductoryHQ/ritemark-native/pull/845) (3fe5e92c, #822), PR 2 [#849](https://github.com/ProductoryHQ/ritemark-native/pull/849) (92e7d35a, #824), PR 3 [#851](https://github.com/ProductoryHQ/ritemark-native/pull/851) (0bfdb2e2, #827 and #828), PR 4 [#893](https://github.com/ProductoryHQ/ritemark-native/pull/893) (c25a6687, #829), PR 5 [#852](https://github.com/ProductoryHQ/ritemark-native/pull/852) (ae8e7194, #841), PR 6 [#857](https://github.com/ProductoryHQ/ritemark-native/pull/857) (a4a8aa69, #842), PR 7 [#862](https://github.com/ProductoryHQ/ritemark-native/pull/862) (5b60d217, #846), PR 8 [#873](https://github.com/ProductoryHQ/ritemark-native/pull/873) (a480997f, #848), PR 9 [#874](https://github.com/ProductoryHQ/ritemark-native/pull/874) (ef180955, #850), PR 10 [#871](https://github.com/ProductoryHQ/ritemark-native/pull/871) (a0eb710a, #855), PR 11 [#875](https://github.com/ProductoryHQ/ritemark-native/pull/875) (330ca30b, #856).
+
+**`qa-validator`, 19 November:** every check passed apart from two: the release-notes lines for #846 and #856 were missing, and the live checks the PRs could not run were still open. This close-out adds both lines and runs those checks.
+
+**The live checks** (one isolated launch on main `c25a6687`, a synthetic deck of 12 block slides, two of them with a 20-point column; the run and its numbers in [`proof/closeout-live/README.md`](proof/closeout-live/README.md)):
+
+- **The slide's pane keeps its place by direction (#871): as designed.** In Slide and handout, with the slide wider than its room (a 1440×560 window, the split dragged right, so the pane scrolls 122 px), a notch or flick going on shows the next slide's pane from its top, going back from its end, over the slide and over the band under it. Shots: [`1-forward-pane-at-top-1440x560.png`](proof/closeout-live/1-forward-pane-at-top-1440x560.png), [`2-back-pane-at-end-1440x560.png`](proof/closeout-live/2-back-pane-at-end-1440x560.png).
+- **A chosen slide from its top: not met by the strip.** In the same window, with the pane scrolled to its end, a click on a thumbnail, and Home, End and ↓ on the strip, choose the slide but leave the pane at its end, so the new slide shows from its foot (its title out of view). The wheel's step sets the pane; the strip's choice doesn't. The open follow-up named in the Status line. In Slide only the slide always fits its pane, so Home and End there show the whole slide. Shot: [`3-strip-click-pane-left-at-end-1440x560.png`](proof/closeout-live/3-strip-click-pane-left-at-end-1440x560.png). Contents: the deck's editor has none to drive. The go-to box on the wall and in the presenter view was not driven; the wall shows the whole slide.
+- **Thumbnail clicks (#875): as designed in all three places.** On the wall's **All slides** grid and on the presenter view's row and Next, two wheel notches over a thumbnail's 20-point column left it unscrolled (0 of 500 px), and a click on a thumbnail's centre or in its column's words chose that slide. Shots: [`4-wall-grid-after-wheel-1440x900.png`](proof/closeout-live/4-wall-grid-after-wheel-1440x900.png), [`5-presenter-centre-click-1440x900.png`](proof/closeout-live/5-presenter-centre-click-1440x900.png).
+- **The gesture in both views (#871, #849): as designed** with protocol wheel events (mouse notches and a 40-event flick). In Slide only: one slide per notch or flick over the slide and the band; a flick over the long column scrolls it and keeps the slide. Slide and handout: as in the first point. Shot: [`6-slide-only-after-flicks-1440x900.png`](proof/closeout-live/6-slide-only-after-flicks-1440x900.png).
+- **#860, a renderer crash and Reopen:** the text is not doubled. Shot: [`7-860-crash-reopen-not-doubled-1440x900.png`](proof/closeout-live/7-860-crash-reopen-not-doubled-1440x900.png).
+
+**Not run:** a real trackpad and a real mouse (the gestures were protocol events of the same shape; real hardware stays with Jarmo), the presenter view on a real second display (it ran in the dev build's windowed mode on one display), the go-to box, and Windows.
 
 ## Approval
 

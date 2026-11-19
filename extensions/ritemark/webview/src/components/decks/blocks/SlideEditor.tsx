@@ -89,6 +89,7 @@ import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
 import { BehindChip } from './BehindChip'
+import { BubbleMenuBox } from './BubbleMenuBox'
 import { CHIP_WIDTH_EMPTY, CHIP_WIDTH_FILLED, behindChipCorner, behindChipPlace, type ChipPlace } from './behindChipPlace'
 import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, sameSidePath, type SlideDocKit, type SlidePictureTarget } from './slidePictureSwap'
@@ -1268,13 +1269,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
-          {/* The bubble menu's own element leaves the frame as soon as TipTap's plugin takes it (it moves it to the
-              page's body), so it sits in a box of its own that stays: React inserts anything new in the frame (a
-              missing picture's Replace picture…) before this box, never before the element that left. Without it, a
-              picture going missing while its slide was on the stage blanked the deck view (Sprint 167 PR 4). */}
-          <div className="deck-bubble-box" style={{ display: 'contents' }}>
-            {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
-          </div>
+          {/* The bubble menu in a box of its own that stays in the frame (`BubbleMenuBox`): TipTap takes its element
+              out, and a node React inserted before it blanked the deck view (Sprint 167 PR 4). */}
+          <BubbleMenuBox>{editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}</BubbleMenuBox>
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
           ) : null}

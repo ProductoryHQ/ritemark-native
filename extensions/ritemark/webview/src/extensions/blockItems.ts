@@ -109,7 +109,7 @@ function startsAWord(phrase: string, query: string): boolean {
 export function filterSlashItems(items: BlockItemDef[], query: string): BlockItemDef[] {
   const wanted = fold(query.trim())
   if (!wanted) return items
-  // Only marks typed: the item's own shortcut finds it ("/#" Title and Heading, "/***" Split slide here, "/-" Bullet list).
+  // Only marks typed: the item's own shortcut finds it ("/#" the three headings, "/***" Split slide here, "/-" Bullet list).
   if (!compact(wanted)) return items.filter(item => fold(item.title).startsWith(wanted) || item.shortcut?.startsWith(wanted))
   const first: BlockItemDef[] = []
   const rest: BlockItemDef[] = []

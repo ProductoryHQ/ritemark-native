@@ -92,6 +92,13 @@ export class DeckIndex {
     }
   }
 
+  /** Sprint 165 PR 4: does the index hold a deck inside this project-relative folder (a folder deleted at once)? */
+  holdsUnder(folder: string): boolean {
+    const prefix = `${folder.replace(/\/+$/, '')}/`;
+    for (const path of this.entries.keys()) if (path.startsWith(prefix)) return true;
+    return false;
+  }
+
   /** "The same slide" over every slide of every deck, as of the last update. */
   same(): SameSlides {
     if (!this.grouped || this.grouped.version !== this.version) {

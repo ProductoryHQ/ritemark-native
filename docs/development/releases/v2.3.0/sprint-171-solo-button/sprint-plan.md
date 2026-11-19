@@ -39,8 +39,15 @@ None.
 
 ## Approval
 
-- [ ] The Development manager and the Experience lead approved this sprint plan (delegated by Jarmo; pending)
+- [x] The Development manager and the Experience lead approved this sprint plan (delegated by Jarmo on 19 November 2026: "1 jah", "kinnitatud"; the Experience lead's approval came with the correction below)
 
 ## The Experience lead's correction (19 November, with the approval)
 
 The README's rule is that a lone button never moves under the pointer that chooses it, in a Text document too. Check the Text document's solo button: if it jumps as well, fix it the same way; if not, leave `buttonBlock.css` alone. Before and after shots for both surfaces.
+
+## Close-out (19 November 2026)
+
+- PR 1, [#890](https://github.com/ProductoryHQ/ritemark-native/pull/890), merged (`3435f67b`) and closed [#876](https://github.com/ProductoryHQ/ritemark-native/issues/876). The Text document's lone button jumped too, so `buttonBlock.css` got the same fix; before and after shots for both surfaces are in `proof/`.
+- Tests: #890's review record says the full chain ran once on its final head, `5f358114`, but its exit code was not written down. Main's code with #890 in it later passed the full chain with EXIT 0 on #892's final head, `5bb9c4da` (Sprint 164 PR 4's review record), which is the evidence this close-out relies on.
+- `qa-validator` at the sprint's end (19 November): every check passed apart from the unticked approval line above, which this close-out ticks, and the missing exit code, answered in the line before.
+- Not run: Windows (the fix is CSS that doesn't differ by platform).

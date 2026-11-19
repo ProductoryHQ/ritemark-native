@@ -182,13 +182,7 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
   // An empty Behind place: a press chooses it, never opens the file picker by surprise (the chip's Choose… does).
   const side = fs.readFileSync(path.join(here, 'SidePicture.tsx'), 'utf8')
   assert.ok(side.includes("if (!url && !missing && side !== 'behind') props.onReplace()"))
-  // The app run's fault (Behind chosen in Slide settings, or a picture going missing on the stage, blanked the deck
-  // view: React's insertBefore met the bubble menu's element, which TipTap moves out of the frame): the chip is the
-  // frame's first child, and the bubble menu sits in a box of its own that stays, so nothing is inserted before it.
-  const chipAt = editor.indexOf('<BehindChip')
-  const canvasAt = editor.indexOf('<div className={classes} style={{ transform:')
-  assert.ok(chipAt > 0 && chipAt < canvasAt, 'the chip comes before the canvas')
-  assert.match(editor, /<div className="deck-bubble-box" style=\{\{ display: 'contents' \}\}>\n\s+\{editor \? <FormattingBubbleMenu editor=\{editor\} appendToBody \/> : null\}\n\s+<\/div>/)
+  // The app run's fault (Behind chosen in Slide settings blanked the deck view) is tested in bubbleMenuBox.test.ts.
 }
 
 console.log('behindChip: passed')

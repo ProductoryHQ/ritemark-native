@@ -135,15 +135,20 @@
    the page draw with this file, so one rule holds everywhere; the old kinds' titles (.st, .stc) and box heads (.bh)
    too. Balance keeps the line count greedy wrapping gives, so the fit's measures (heights, overflow) don't change. */
 .deck-sl :is(h1, h2, h3, h4, h5, h6, .st, .stc, .bh) { text-wrap: balance; }
+/* Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide", item 3): the slide's headings in
+   the document's order, H1 the largest (the title, 2 em), then H2 (1.3 em, bold, the heading colour), then H3 (1.15 em).
+   A box's H3 keeps its own size (`.blk-box h3`, under). */
 .deck-sl.is-blocks h1 { margin: 0 0 .5em; font: 700 2em/1.12 var(--s-fh, 'Sofia Sans'), sans-serif; letter-spacing: -.3px; color: var(--s-hd, #fff); }
-.deck-sl.is-blocks h2 { margin: 0 0 .7em; font: 600 1.12em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-sub, #C7CAEB); }
-.deck-sl.is-blocks h3 { margin: 0 0 .35em; font: 700 1.25em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h2 { margin: 0 0 .7em; font: 700 1.3em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
+.deck-sl.is-blocks h3 { margin: 0 0 .35em; font: 700 1.15em/1.2 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks h4, .deck-sl.is-blocks h5, .deck-sl.is-blocks h6 { margin: 0 0 .45em; font: 600 .95em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
 /* The title's room (the Experience lead, #760): half its own size before whatever follows it, set on the title alone
    (the next block adds none), so it is the same on the stage, the strip, the wall, the presenter view and the page; a
-   line under it (an H2) stays close, as frame 21 draws it. Inside the flow, so the fit measures it. */
+   line under it (an H2) stays close, as frame 21 draws it. Inside the flow, so the fit measures it. That H2 is the
+   title's own line (Sprint 168 PR 3): the quiet sub colour and weight 500, at the H2's size, still above an H3's. */
 .deck-sl.is-blocks h1 + * { margin-top: 0; }
 .deck-sl.is-blocks h1:has(+ h2) { margin-bottom: .12em; }
+.deck-sl.is-blocks h1 + h2 { font-weight: 500; color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks p { margin: 0 0 calc(12px * var(--fit, 1)); }
 .deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: 1.25em; }
 /* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
@@ -418,9 +423,11 @@
 
 /* Borderless: the block slide's words on white */
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }
-.deck-slide.is-borderless .deck-sl.is-blocks h1, .deck-slide.is-borderless .deck-sl.is-blocks h3, .deck-slide.is-borderless .deck-sl.is-blocks h4,
+.deck-slide.is-borderless .deck-sl.is-blocks h1, .deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks h3, .deck-slide.is-borderless .deck-sl.is-blocks h4,
 .deck-slide.is-borderless .deck-sl.is-blocks strong, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li, .deck-slide.is-borderless .deck-sl.is-blocks blockquote { color: var(--s-hd, #1C1F4A); }
-.deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by { color: var(--s-sub, #5B5F86); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by { color: var(--s-sub, #5B5F86); }
+/* The title's own line (an H2 right under the H1) stays quiet on white too (Sprint 168 PR 3). */
+.deck-slide.is-borderless .deck-sl.is-blocks h1 + h2 { color: var(--s-sub, #5B5F86); }
 .deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
