@@ -67,6 +67,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
+- **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
 <!-- DECKS END -->
 
 ## Smaller changes
