@@ -34,8 +34,12 @@ const { slideMarkup, escapeHtml, styleText } = await import('./slideMarkup')
 const { BUILT_IN_THEME } = await import('../../../../../src/decks/deckTheme')
 const { blockSlideMarkup } = await import('../../../../../src/decks/blocks/slideRenderer')
 const { publicSlide } = await import('../../../../../src/decks/page/publicDeck')
-const { PAGE_ICON_PATHS, iconSvg } = await import('./pageIcons')
+const { PAGE_ICON_NAMES, PAGE_ICON_PATHS, iconSvg } = await import('./pageIcons')
 const { SLIDE_ICONS, UNKNOWN_ICON } = await import('./iconSet')
+
+/** An icon's drawing (its path's `d`) as `pageIcons.ts` has it, and every icon path in some markup, in order. */
+const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
+const iconPaths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))
 
 /** A node as a comparable tree: tag, attributes (style as a sorted map, `data-fit` left out), text, children. */
 function shape(node: HTMLNode): unknown {
@@ -112,15 +116,13 @@ for (const borderless of [false, true]) {
     const page = shown.kind === '' ? blockSlideMarkup(shown.data, drawing) : slideMarkup(slide.kind, slide.data, drawing)
     assert.deepEqual(shape(parse(page)), shape(parse(react)), label)
     // Each icon's drawing, too: the path React's Phosphor icon draws is the one the page draws.
-    const paths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))
+    const paths = iconPaths
     assert.deepEqual(paths(page), paths(react), `${label}: the icons`)
     if (slide.label === 'boxes with any Phosphor icon') {
-      const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
       // An older deck's box (the nine kinds draw as blocks on the strip and the page): `chat` is Phosphor's chat too.
       assert.deepEqual(paths(react), [drawn('truck'), drawn('rocket-launch'), drawn('users-three'), drawn('chat')], `${label}: each its own`)
     }
     if (slide.label === 'boxes with truck, folder, an alias and an unknown name') {
-      const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
       assert.deepEqual(paths(react), [drawn('truck'), drawn('folder'), drawn('envelope-simple'), drawn('circle-dashed')], `${label}: each its own`)
       const badges = (html: string) => parse(html).querySelectorAll('.blk-box > span').map(span => span.getAttribute('class'))
       assert.deepEqual(badges(react), ['blk-icon', 'blk-icon', 'blk-icon', 'blk-icon is-unknown'], `${label}: #850's look for the unknown name`)
@@ -175,44 +177,51 @@ for (const borderless of [false, true]) {
   assert.match(iconSvg('copy', 14), /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="14" height="14" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">/)
 }
 
-console.log('slideMarkup: passed')
-
-// Sprint 169 PR 2 (#867): a slide's icon in React (`SlideIconGlyph`) is the page's inline SVG (`iconSvg`), byte for byte.
-for (const name of ['truck', 'folder', 'list-checks', 'circle-dashed', 'arrow-right'] as const) {
-  for (const size of [16, 20, 28]) {
-    assert.equal(renderToStaticMarkup(createElement(SlideIconGlyph, { name, size })), iconSvg(name, size), `${name} at ${size}`)
-  }
+// Sprint 169 PR 2 (#867): a slide's icon in React (`SlideIconGlyph`) is the page's inline SVG (`iconSvg`), byte for
+// byte, for every icon in the set and the sizes slides and the menu use.
+for (const name of PAGE_ICON_NAMES) {
+  assert.equal(renderToStaticMarkup(createElement(SlideIconGlyph, { name, size: 20 })), iconSvg(name, 20), name)
 }
+for (const size of [16, 28]) assert.equal(renderToStaticMarkup(createElement(SlideIconGlyph, { name: 'truck', size })), iconSvg('truck', size), `truck at ${size}`)
 
 // Sprint 169 PR 2: the old layout (a kind a build may draw by its layout) draws a box's icon from the full set, as the
 // page does: any Phosphor name, an alias, the grid's own, and #850's dashed circle (`ic is-unknown`) for a name no icon
 // has. Red before: the chrome's Icon drew only the 24 (truck and folder came out as empty badges).
 {
-  const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
   const data: SlideData = { title: 'Shipping', items: items(5, index => ({ icon: ['truck', 'folder', 'mail', 'list-checks', 'not-a-real-icon'][index] })) }
-  const paths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))
   const marks = (html: string) => parse(html).querySelectorAll('span.ic').map(span => span.getAttribute('class'))
   for (const borderless of [false, true]) {
     const react = renderToStaticMarkup(createElement(LayoutSlideCanvas, { kind: 'boxes', data, width: 960, theme: BUILT_IN_THEME, borderless, assets: {} }))
     const page = slideMarkup('boxes', data, { theme: BUILT_IN_THEME, borderless, width: 960, inlineTheme: true })
     assert.deepEqual(shape(parse(page)), shape(parse(react)), `the old layout, borderless ${borderless}`)
-    assert.deepEqual(paths(react), [drawn('truck'), drawn('folder'), drawn('envelope-simple'), drawn('list-checks'), drawn('circle-dashed')], 'each its own')
-    assert.deepEqual(paths(page), paths(react), 'the page draws the same')
+    assert.deepEqual(iconPaths(react), [drawn('truck'), drawn('folder'), drawn('envelope-simple'), drawn('list-checks'), drawn('circle-dashed')], 'each its own')
+    assert.deepEqual(iconPaths(page), iconPaths(react), 'the page draws the same')
     assert.deepEqual(marks(react), ['ic sm', 'ic sm', 'ic sm', 'ic sm', 'ic sm is-unknown'], "#850's look (five boxes draw small)")
   }
+  // On the stage: each icon's picker says what it is, an unknown name as a block slide's badge says it (#850); an item
+  // with no icon, or a name of spaces, gets the empty place, never an empty badge (review of #904).
+  const editing = { onText: () => {}, onKey: () => false, onSetIcon: () => {}, focusPath: null, onFocused: () => {} }
+  const withBlank: SlideData = { ...data, items: [...data.items!.slice(0, 2), { heading: 'Blank', icon: '   ' }, { heading: 'None' }, data.items![4]] }
+  const stage = parse(renderToStaticMarkup(createElement(LayoutSlideCanvas, { kind: 'boxes', data: withBlank, width: 960, theme: BUILT_IN_THEME, borderless: false, assets: {}, editing })))
+  assert.deepEqual(stage.querySelectorAll('.pickic').map(span => span.getAttribute('aria-label')), [
+    'Change the icon', 'Change the icon', 'Add an icon', 'Add an icon', 'No icon named “not-a-real-icon”: choose an icon',
+  ])
+  assert.deepEqual(iconPaths(stage.toString()), [drawn('truck'), drawn('folder'), drawn('plus'), drawn('plus'), drawn('circle-dashed')])
+  const blankPage = slideMarkup('boxes', withBlank, { theme: BUILT_IN_THEME, borderless: false })
+  assert.equal(parse(blankPage).querySelectorAll('span.ic').length, 3, 'off the stage, a name of spaces draws no badge')
   // The colour: the theme's placeholder, on a card and borderless, as a block slide's unknown badge.
   const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
   assert.ok(css.includes('.deck-sl .ic.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }'), 'the placeholder colour')
   assert.ok(css.includes('.deck-slide.is-borderless .deck-sl .ic.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }'), 'borderless too')
 }
 
-// The icon menu draws its choices as the slide does, never through the chrome's Icon (its No icon cross stays chrome).
+// The icon menu draws its choices as the slide does; the chrome's Icon draws only its No icon cross (the menu can't be
+// rendered outside an open Radix menu, so its source is read). SlideCanvas draws no chrome icon at all.
 {
-  // Named not after the grid: Tailwind scans tests, and a negated variable of that name reads as its important class.
   const menuSource = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
-  assert.ok(menuSource.includes('<SlideIconGlyph name={icon.phosphor} size={16} />'), 'the menu draws the slide glyph')
-  assert.equal(menuSource.includes('<Icon name={icon.phosphor}'), false, 'and not the chrome icon')
+  assert.ok(/<SlideIconGlyph name=\{\w+\.phosphor\}/.test(menuSource), 'the menu draws the slide glyph')
+  assert.deepEqual(menuSource.match(/<Icon\b[^>]*>/g), ['<Icon name="x" size={14} tone="inherit" />'], 'the chrome icon only for No icon')
   const canvas = readFileSync(fileURLToPath(new URL('./SlideCanvas.tsx', import.meta.url)), 'utf8')
-  assert.equal(canvas.includes("from '../../ui/Icon'"), false, 'SlideCanvas draws no chrome icon')
+  assert.equal(/<Icon\b|ui\/Icon'/.test(canvas), false, 'SlideCanvas draws no chrome icon')
 }
-console.log('slideMarkup: every slide icon is drawn from the full set, in React and on the page alike')
+console.log('slideMarkup: passed (every slide icon is drawn from the full set, in React and on the page alike)')

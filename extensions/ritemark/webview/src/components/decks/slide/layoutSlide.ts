@@ -51,6 +51,8 @@ export interface MarkBox {
   /** An icon by its Ritemark name; `iconIndex` makes it the item's icon, chosen from the grid on the stage. */
   icon?: string
   iconIndex?: number
+  /** Sprint 169 PR 2: the stage's empty place for an icon not yet chosen (its `plus`), not an icon the item carries. */
+  placeholder?: boolean
 }
 
 export interface GroupBox {
@@ -234,8 +236,9 @@ export function layoutSlide(kind: string, data: SlideData, options: { editing?: 
     text(`items.${index}.text`, cls, `items.${index}.text`, items[index]?.text ?? '', placeholder, style, multiline)
   const icon = (index: number, style?: BoxStyle, small?: boolean): MarkBox | null => {
     const name = items[index]?.icon
-    if (name) return { type: 'mark', key: `icon.${index}`, cls: small ? 'ic sm' : 'ic', icon: name, iconIndex: index, style }
-    if (editing) return { type: 'mark', key: `icon.${index}`, cls: small ? 'ic sm noic' : 'ic noic', icon: 'plus', iconIndex: index, style }
+    // A name of spaces is no icon, as on a block slide (`boxIconOf`): the empty place, never an empty badge.
+    if (name?.trim()) return { type: 'mark', key: `icon.${index}`, cls: small ? 'ic sm' : 'ic', icon: name, iconIndex: index, style }
+    if (editing) return { type: 'mark', key: `icon.${index}`, cls: small ? 'ic sm noic' : 'ic noic', icon: 'plus', iconIndex: index, style, placeholder: true }
     return null
   }
 

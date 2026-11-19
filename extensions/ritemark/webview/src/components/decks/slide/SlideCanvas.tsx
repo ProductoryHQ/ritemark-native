@@ -19,7 +19,6 @@ import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/conv
 import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
-import { boxIconOf } from './iconSet'
 import { SlideIconGlyph } from './SlideIconGlyph'
 import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
@@ -28,6 +27,7 @@ import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, editedItemWords, layoutS
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
 import { fitFlow, fitKeyOf, fitLookOf, stageFitFor, subscribeStageFit } from '../blocks/slideFit'
+import { unknownIconWords } from '../blocks/slideDivView'
 
 export { CANVAS_HEIGHT, CANVAS_WIDTH }
 
@@ -208,7 +208,7 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
       const mark = layoutMarkOf(box)
       const glyph = mark.icon ? <SlideIconGlyph name={mark.icon} size={20} /> : box.text
       if (editing && box.iconIndex !== undefined) {
-        return <IconPicker box={box} cls={mark.cls} glyph={glyph} editing={editing} />
+        return <IconPicker box={box} mark={mark} glyph={glyph} editing={editing} />
       }
       return <span className={mark.cls} style={px(box.style)}>{glyph}</span>
     }
@@ -266,21 +266,22 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
 
 /**
  * A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. The current icon
- * is the one the box carries, by its name as `boxIconOf` reads it (an unknown one as written, so No icon can take it
- * out, as on a block slide); none for the empty place (`noic`).
+ * is the one the box carries, as `layoutMarkOf` read it (an unknown one as written, so No icon can take it out, and
+ * named as unknown, as on a block slide); none for the empty place.
  */
-function IconPicker({ box, cls, glyph, editing }: { box: MarkBox; cls: string; glyph: ReactNode; editing: SlideEditing }) {
+function IconPicker({ box, mark, glyph, editing }: { box: MarkBox; mark: ReturnType<typeof layoutMarkOf>; glyph: ReactNode; editing: SlideEditing }) {
   const index = box.iconIndex ?? 0
-  const current = box.cls.split(' ').includes('noic') ? null : boxIconOf(box.icon)?.name ?? null
+  const current = mark.name
+  const label = current === null ? 'Add an icon' : mark.unknown ? `${unknownIconWords(current)}: choose an icon` : 'Change the icon'
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <span
-          className={`${cls} pickic`}
+          className={`${mark.cls} pickic`}
           style={px(box.style)}
           role="button"
           tabIndex={0}
-          aria-label={current ? 'Change the icon' : 'Add an icon'}
+          aria-label={label}
           onMouseDown={event => event.preventDefault()}
         >
           {glyph}

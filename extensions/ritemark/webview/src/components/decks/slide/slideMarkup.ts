@@ -64,9 +64,15 @@ function text(box: TextBox, tag: 'div' | 'span' = 'div', style: BoxStyle | undef
  * layout's own `arrow-right` and `plus`), and for a name Ritemark doesn't know #850's dashed circle, `is-unknown`, in
  * the theme's placeholder colour (slide.css). A mark without an icon (a number, a dot) is its words.
  */
-export function layoutMarkOf(entry: MarkBox): { cls: string; icon: PageIconName | null } {
+export function layoutMarkOf(entry: MarkBox): { cls: string; icon: PageIconName | null; name: string | null; unknown: boolean } {
   const icon = boxIconOf(entry.icon)
-  return { cls: icon && !icon.known ? `${entry.cls} is-unknown` : entry.cls, icon: icon?.phosphor ?? null }
+  return {
+    cls: icon && !icon.known ? `${entry.cls} is-unknown` : entry.cls,
+    icon: icon?.phosphor ?? null,
+    // The name the icon menu marks as current (an unknown one as written); none for the stage's empty place.
+    name: entry.placeholder ? null : icon?.name ?? null,
+    unknown: !!icon && !icon.known,
+  }
 }
 
 function box(entry: SlideBox, pictureUrl: (path: string) => string | null): string {
