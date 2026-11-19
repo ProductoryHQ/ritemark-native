@@ -73,7 +73,7 @@ import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, type DeckFold, type DeckViewMode } from './DeckFolds'
+import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, openingFold, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
@@ -294,8 +294,9 @@ export function DeckView({
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
   const [current, setCurrent] = useState(0)
   const [stripWanted, setStripWanted] = useState(true)
-  // Fold either side (16 November): the slide, the handout, or neither, as this deck's view kept it.
-  const [fold, setFold] = useState<DeckFold>(storedFold)
+  // Fold either side (16 November): the slide, the handout, or neither. Every deck opens in Slide only (19 November);
+  // the choice lives while the deck is open and is never kept.
+  const [fold, setFold] = useState<DeckFold>(openingFold)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
   const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
@@ -936,13 +937,12 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [above, avail, stripWidth, pick])
 
-  /** The view switch (17 November): Slide only, Slide and handout, or Handout only; the deck's view keeps the choice,
+  /** The view switch (17 November): Slide only, Slide and handout, or Handout only; the choice holds while the deck is open,
    *  and the part being read stays at the top. Slide settings stay: they belong to the current slide, which the strip
    *  still rings. */
   const chooseView = useCallback((view: DeckViewMode) => {
     const next = foldOfView(view)
     setFold(next)
-    keepFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [pick])
 

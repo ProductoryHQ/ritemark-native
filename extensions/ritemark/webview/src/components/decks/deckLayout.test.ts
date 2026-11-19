@@ -28,7 +28,7 @@ const {
   ABOVE_PANE_MIN, ABOVE_RATIO_DEFAULT, ABOVE_STAGE_ROOM, rowsUnder, ABOVE_RATIO_MAX, ABOVE_RATIO_MIN, BESIDE_ROOM, BESIDE_SLIDE_MIN, BESIDE_TEXT_MIN,
   BIG_MAX, ORIENTATION_HYSTERESIS, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, slideWidthFor,
 } = await import('./deckLayout')
-const { deckViewState, keepDeckViewState, keepFold } = await import('./DeckFolds')
+const { deckViewState, keepDeckViewState } = await import('./DeckFolds')
 const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
 
 // The rule: beside from a room of 1,100 (a 400 px slide and 600 px of text), above under it.
@@ -133,7 +133,7 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + ABOVE_STAGE_ROOM <= height)
 }
 
-// Each orientation keeps its own share in the view state, beside the fold, and both come back after a reload (the
+// Each orientation keeps its own share in the view state, and both come back after a reload (the
 // webview's state outlives a reload; the view reads it again at mount).
 {
   viewState = undefined
@@ -141,10 +141,9 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(initialAboveRatio(deckViewState().deckAboveRatio), ABOVE_RATIO_DEFAULT, 'nothing kept: half above')
   keepDeckViewState({ deckRatio: 0.55 })
   keepDeckViewState({ deckAboveRatio: 0.35 })
-  keepFold('handout')
-  assert.deepEqual(viewState, { deckRatio: 0.55, deckAboveRatio: 0.35, deckFold: 'handout' }, 'one never overwrites the other')
+  assert.deepEqual(viewState, { deckRatio: 0.55, deckAboveRatio: 0.35 }, 'one never overwrites the other')
   keepDeckViewState({ deckRatio: 0.6 })
-  assert.deepEqual(viewState, { deckRatio: 0.6, deckAboveRatio: 0.35, deckFold: 'handout' }, 'dragging beside keeps the share above')
+  assert.deepEqual(viewState, { deckRatio: 0.6, deckAboveRatio: 0.35 }, 'dragging beside keeps the share above')
   // The reload: the state is read again from scratch.
   const reloaded = JSON.parse(JSON.stringify(viewState))
   viewState = reloaded

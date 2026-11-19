@@ -4,11 +4,11 @@ Gate: no code until Jarmo approves the plan and each PR's branch is created from
 
 ## PR 1: Slide only (Standard), branch `sprint-164-deck-finish-pr1`
 - [x] Issue created in milestone v2.3.0 (manager): #816
-- [ ] Decks open in Slide only, new decks included; the chosen view is kept while open; reopened starts in Slide only (R1)
-- [ ] Under 600 px and the published page unchanged
-- [ ] Test: opens in Slide only, keeps the view while open, reopens in Slide only
-- [ ] Shots: a deck just opened and a new deck; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Decks open in Slide only, new decks included; the chosen view is kept while open; reopened starts in Slide only (R1)
+- [x] Under 600 px and the published page unchanged
+- [x] Test: opens in Slide only, keeps the view while open, reopens in Slide only
+- [x] Shots: a deck just opened and a new deck; the Experience lead's look
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 2: spacing, variant D (High), branch `sprint-164-deck-finish-pr2`
 - [x] Issue created in milestone v2.3.0 (manager): #817

@@ -1,7 +1,8 @@
 /**
  * Slide, both or handout (experience 46; the view switch of 17 November, which replaced the fold arrows of 16 November):
- * the slide or the handout folds away, never both, chosen on the deck's bar; each deck keeps its choice in its own view
- * state, never in the file; the line between the panes only drags.
+ * the slide or the handout folds away, never both, chosen on the deck's bar; every deck opens in Slide only and the
+ * choice lives only while it is open, never in the file or the view state (19 November); the line between the panes
+ * only drags.
  *
  * Run: npx tsx webview/src/components/decks/DeckFolds.test.ts
  */
@@ -27,7 +28,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckViewSwitch, foldFrom, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, viewOfFold, viewParts } = await import('./DeckFolds')
+const { DeckViewSwitch, foldFrom, foldOfView, foldedSides, openingFold, viewOfFold, viewParts } = await import('./DeckFolds')
 type DeckViewMode = 'slide' | 'both' | 'handout'
 
 const draw = (view: DeckViewMode, above = false) =>
@@ -89,25 +90,21 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.deepEqual(foldedSides('slide', false), { slideShown: true, handoutShown: false })
 }
 
-// Each deck keeps its choice in its own view state, beside the divider's share; nothing goes to the host or the file.
+// Every deck opens in Slide only (19 November), a new deck too: nothing kept decides the start, and a fold an older
+// build kept is removed, beside the divider's share, which stays. Nothing goes to the host or the file.
 {
-  viewState = { deckRatio: 0.55 }
-  assert.equal(storedFold(), null)
-  keepFold('slide')
-  assert.deepEqual(viewState, { deckRatio: 0.55, deckFold: 'slide' })
-  assert.equal(storedFold(), 'slide')
-  keepFold('handout')
-  assert.deepEqual(viewState, { deckRatio: 0.55, deckFold: 'handout' })
-  keepFold(null)
-  assert.deepEqual(viewState, { deckRatio: 0.55 }, 'both sides shown is no entry at all')
-  keepFold('handout')
-  keepDeckViewState({ deckRatio: 0.5 })
-  assert.deepEqual(viewState, { deckRatio: 0.5, deckFold: 'handout' }, 'dragging the divider keeps the view')
   viewState = undefined
-  keepFold('slide')
-  assert.deepEqual(viewState, { deckFold: 'slide' })
+  assert.equal(viewOfFold(openingFold()), 'slide', 'a new deck: nothing kept, Slide only')
+  assert.equal(viewState, undefined, 'opening writes nothing')
+  for (const kept of ['slide', 'handout', null, 'both']) {
+    viewState = { deckRatio: 0.55, deckFold: kept }
+    assert.equal(viewOfFold(openingFold()), 'slide', `reopened after ${String(kept)} was kept: Slide only`)
+    assert.deepEqual(viewState, { deckRatio: 0.55 }, 'the old fold goes, the share stays')
+  }
+  viewState = { deckRatio: 0.5 }
+  assert.equal(viewOfFold(openingFold()), 'slide')
+  assert.deepEqual(viewState, { deckRatio: 0.5 }, 'nothing written when nothing old is kept')
   assert.deepEqual(posted, [], 'the view never reaches the host')
-  // What the view kept is read strictly: anything else (a deck opened again has nothing kept) opens with both.
   assert.equal(foldFrom('slide'), 'slide')
   assert.equal(foldFrom('handout'), 'handout')
   for (const stored of [undefined, null, '', 'both', 1, true, {}]) assert.equal(foldFrom(stored), null)
@@ -148,8 +145,16 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(view.includes('<Popover open={settingsFor !== null}') && !view.includes('settingsReady'), 'Settings go with their slide, shown or hidden')
   assert.ok(!block('const chooseView = useCallback(').includes('setSettingsFor'), 'hiding the slide leaves Settings as they are')
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the view')
-  assert.ok(view.includes('useState<DeckFold>(storedFold)'), 'the view the deck kept, at mount')
-  assert.ok(block('const chooseView = useCallback(').includes('keepFold(next)'), 'kept when a part is pressed')
+  assert.ok(view.includes('useState<DeckFold>(openingFold)'), 'Slide only at mount, every deck')
+  const choose = block('const chooseView = useCallback(')
+  assert.ok(choose.includes('setFold(next)') && !/keep|saveState|deckFold/.test(choose), 'held while open, never kept')
+  assert.ok(!/deckFold|storedFold|keepFold/.test(view), 'nothing else reads or keeps the view')
+  // The published page is the reader's: its code never reads the editor's view, so Slide and text stays its default.
+  const { readdirSync } = await import('node:fs')
+  const publishDir = new URL('../../../../src/publish/', import.meta.url)
+  const pageSources = readdirSync(publishDir, { recursive: true }).map(String).filter(name => /\.tsx?$/.test(name))
+  assert.ok(pageSources.length > 0, 'the page code is read')
+  for (const name of pageSources) assert.ok(!/DeckFolds|openingFold/.test(readFileSync(new URL(name, publishDir), 'utf8')), `${name} keeps its own default`)
   assert.ok(!/sendToExtension\([^)]*fold/i.test(view), 'never sent to the host')
   const insert = block('insert: (at, kind) => {')
   assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')

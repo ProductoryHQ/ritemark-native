@@ -6,9 +6,10 @@
  * line between the panes, because chevrons beside a slide read as previous and next ("kasutaja arvab, et saab
  * navigeerida slaidide vahel"). The line between the panes only drags.
  *
- * The view is one value (the fold: which side is folded away), so the two sides can never both be hidden. Each deck
- * keeps it in its own view state, as it keeps the divider's share, never in the file: opening a deck writes nothing,
- * and a deck opened again shows both.
+ * The view is one value (the fold: which side is folded away), so the two sides can never both be hidden. Since
+ * 19 November every deck opens in Slide only, a new deck too (Jarmo: "slide only should be default view"): the view
+ * lives only while the deck is open (its webview keeps its context when hidden), and nothing is stored in the file or
+ * remembered, so a deck opened again starts in Slide only. A fold an older build kept in the view state is dropped.
  */
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -23,8 +24,8 @@ export function foldFrom(stored: unknown): DeckFold {
   return stored === 'slide' || stored === 'handout' ? stored : null
 }
 
-/** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`), its share of the
- *  height above it (`deckAboveRatio`), and the fold. Never the file. */
+/** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`) and its share of the
+ *  height above it (`deckAboveRatio`). Never the file. `deckFold` is only what older builds kept; it is removed. */
 export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckFold?: unknown; deckConversionNoticed?: unknown }
 
 /** This deck's kept view state, or nothing when the view has none. */
@@ -47,11 +48,12 @@ export function keepDeckViewState(change: DeckViewState) {
   }
 }
 
-/** The fold this deck's view kept, if any. */
-export const storedFold = (): DeckFold => foldFrom(deckViewState().deckFold)
-
-/** Keeps the fold in this deck's view state; both sides shown is no entry at all. */
-export const keepFold = (fold: DeckFold) => keepDeckViewState({ deckFold: fold ?? undefined })
+/** The fold every deck opens with: the handout folded away, Slide only. Never read from anything kept; a fold an older
+ *  build kept in this deck's view state is removed, so nothing older can bring back a different start. */
+export function openingFold(): DeckFold {
+  if (deckViewState().deckFold !== undefined) keepDeckViewState({ deckFold: undefined })
+  return 'handout'
+}
 
 /** What each side shows, from the fold and whether the desk has room for the handout at all. */
 export function foldedSides(fold: DeckFold, handoutRoom: boolean): { slideShown: boolean; handoutShown: boolean } {
