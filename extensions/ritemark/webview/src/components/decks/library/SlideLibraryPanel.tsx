@@ -594,24 +594,24 @@ export function SlideLibraryPanel() {
           {choosing ? (
             <>
               <Tooltip label={ticked.length ? `Copy the ${ticked.length === 1 ? 'ticked slide' : `${ticked.length} ticked slides`} into the library's topic Every training` : 'Tick at least one slide to add it'}>
-                <Button size="compact" aria-disabled={!ticked.length || offerBusy} onClick={() => send('library/offer-add', ticked)}>
+                <Button size="compact" className="deck-lib-offer-button" aria-disabled={!ticked.length || offerBusy} onClick={() => send('library/offer-add', ticked)}>
                   {addChosenLabel(ticked.length)}
                 </Button>
               </Tooltip>
               <Tooltip label="Back to the offer, nothing added">
-                <Button variant="outline" size="compact" onClick={cancel}>Cancel</Button>
+                <Button variant="outline" size="compact" className="deck-lib-offer-button" onClick={cancel}>Cancel</Button>
               </Tooltip>
             </>
           ) : (
             <>
               <Tooltip label={`Copy ${count === 1 ? 'this slide' : `these ${count} slides`} into the library's topic Every training`}>
-                <Button size="compact" aria-disabled={offerBusy} onClick={() => send('library/offer-add', offered)}>{addAllLabel(count)}</Button>
+                <Button size="compact" className="deck-lib-offer-button" aria-disabled={offerBusy} onClick={() => send('library/offer-add', offered)}>{addAllLabel(count)}</Button>
               </Tooltip>
               <Tooltip label="Pick which of these slides to add">
-                <Button ref={chooseButton} variant="outline" size="compact" aria-disabled={offerBusy} onClick={() => { if (!offerBusy) setChoosing(new Set(keys)) }}>Choose…</Button>
+                <Button ref={chooseButton} variant="outline" size="compact" className="deck-lib-offer-button" aria-disabled={offerBusy} onClick={() => { if (!offerBusy) setChoosing(new Set(keys)) }}>Choose…</Button>
               </Tooltip>
               <Tooltip label={count === 1 ? 'Hide this slide: it won’t be offered again' : 'Hide these slides: they won’t be offered again'}>
-                <Button variant="outline" size="compact" aria-disabled={offerBusy} onClick={() => send('library/offer-not-now', offered)}>Not now</Button>
+                <Button variant="outline" size="compact" className="deck-lib-offer-button" aria-disabled={offerBusy} onClick={() => send('library/offer-not-now', offered)}>Not now</Button>
               </Tooltip>
             </>
           )}

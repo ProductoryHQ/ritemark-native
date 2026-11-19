@@ -564,12 +564,14 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* Sprint 165 PR 4 (README "The library offers what he repeats", library-panel.html): the offer at the library's top, a
    soft accent card whose tiles line up with the topics' below; Choose… ticks them; the notice's Undo after Add. */
 .deck-lib-offer { margin: 2px 0 8px; padding: 10px 0 10px; border-radius: 10px; background: color-mix(in srgb, var(--r-accent-soft) 40%, var(--vscode-sideBar-background, var(--r-surface))); box-shadow: inset 0 0 0 1px var(--r-accent-soft); }
-.deck-lib-offer-text { margin: 0 10px 2px; font: 400 12.5px/1.4 var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+.deck-lib-offer-text { margin: 0 8px 2px; font: 400 12.5px/1.4 var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .deck-lib-offer-text b { font-weight: 600; color: var(--r-ink-strong); }
 .deck-lib-offer .deck-lib-offer-grid { padding-bottom: 6px; }
-.deck-lib-offer-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px; }
+.deck-lib-offer-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px; }
+/* The three fit on one row in the narrow column (the sketch's 12 px buttons), as Take section's do; a narrower one wraps. */
+.deck-lib-offer-actions .deck-lib-offer-button { height: 26px; padding: 0 8px; font-size: 12px; }
 .deck-lib-offer-actions [aria-disabled="true"] { opacity: 0.5; cursor: default; }
-.deck-lib-choice .deck-lib-tickbox { position: absolute; left: 4px; top: 4px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--r-surface); color: var(--r-surface); box-shadow: inset 0 0 0 1.5px var(--r-hairline-strong); }
+.deck-lib-choice .deck-lib-tickbox { position: absolute; right: 4px; top: 4px; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--r-surface); color: var(--r-surface); box-shadow: inset 0 0 0 1.5px var(--r-hairline-strong); }
 .deck-lib-choice.on .deck-lib-tickbox { background: var(--r-accent); box-shadow: none; }
 .deck-lib-choice:not(.on) .deck-lib-thumb > :not(.deck-lib-tickbox) { opacity: 0.45; }
 .deck-lib-choice:not(.on) .deck-lib-title { color: var(--r-ink-muted); }

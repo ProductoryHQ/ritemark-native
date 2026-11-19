@@ -88,8 +88,17 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     if (this.watching.length) return;
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
     const isDeck = (uri: vscode.Uri) => /\.deck\.md$/i.test(uri.fsPath);
+    // Sprint 165 PR 4: a folder of decks deleted at once (the Slide library folder, say) is reported as the folder
+    // alone, which the deck watcher never matches: any other delete outside Git's and the tools' folders lists the
+    // decks again, so the place never keeps showing decks that are gone (and the offer comes back).
+    const deletes = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
+    const listedAgain = (uri: vscode.Uri) => {
+      if (!isDeck(uri) && !/[\\/](?:\.git|node_modules|\.ritemark)(?:[\\/]|$)/.test(uri.fsPath)) this.refreshSoon();
+    };
     this.watching = [
       watcher,
+      deletes,
+      deletes.onDidDelete(listedAgain),
       watcher.onDidCreate(uri => this.deckChanged(uri)),
       watcher.onDidDelete(uri => this.deckChanged(uri)),
       watcher.onDidChange(uri => this.deckChanged(uri)),
