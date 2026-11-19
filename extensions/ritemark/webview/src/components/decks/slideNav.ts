@@ -86,9 +86,9 @@ export function boxScrolls(box: Pick<WheelBox, 'scrollTop' | 'scrollHeight' | 'c
 }
 
 /**
- * Where the stage's wheel moves the slide: 'alone' in Slide only, where the slide and the space around it do; 'beside'
- * in Slide and handout (#855), where the slide itself does and the space around it stays the stage's own scroll. Null
- * with no slide shown (Handout only), where there is no stage.
+ * Where the stage's wheel moves the slide: 'alone' in Slide only, 'beside' in Slide and handout (#855). In both, the
+ * slide's side of the room (the slide and the space around it in its pane) means slides, and the handout's side means
+ * text (the Experience lead, 19 November). Null with no slide shown (Handout only), where there is no stage.
  */
 export type StageWheel = 'alone' | 'beside'
 
@@ -99,13 +99,12 @@ export function stageWheelOf(slideShown: boolean, handoutShown: boolean): StageW
 /**
  * The box that takes a wheel event over the stage, or null when nothing under the pointer scrolls that way and the
  * slide moves. A box is a pane or a column on the slide that holds more than its room (the design: it scrolls, in the
- * editor too), or the stage itself. In Slide only the slide fits the stage, so over the slide the stage never counts
- * and the slide moves; outside it the stage takes the wheel while it is taller than its room and can scroll that way,
- * and at its end the next gesture moves the slide (before, the bands did nothing once the stage could scroll).
- * Beside the handout the slide keeps its width however short the window, so the stage can be shorter than the slide:
- * over the slide the stage then scrolls first, as a long column does, so the slide's foot can be reached, and at its
- * end the next gesture moves the slide (review of #871). Outside the slide the stage always takes the gesture, as
- * before #855, so the space around the slide and a row under it never step: there only the slide does.
+ * editor too), or the stage itself, the slide's pane, while it is taller than its room and can scroll that way: it
+ * scrolls first, and at its end the next gesture moves the slide (before #824, the bands did nothing once the stage
+ * could scroll). Everywhere else on the slide's side the slide moves. In Slide only the slide fits the stage, so over
+ * the slide the stage never counts; beside the handout the slide keeps its width however short the window, so the
+ * stage can be shorter than the slide, and it scrolls first over the slide too, so the slide's foot can be reached
+ * (review of #871).
  */
 export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string, view: StageWheel = 'alone'): T | null {
   let overSlide = false
@@ -114,10 +113,8 @@ export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta
     // The cheap reads first: only a box with room left that way is asked for its style.
     if (hasRoom(box, delta) && boxScrolls(box, overflowOf(box), delta)) return box
   }
-  const stageScrolls = hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta)
-  if (overSlide) return view === 'beside' && stageScrolls ? stage : null
-  if (view === 'beside') return stage
-  return stageScrolls ? stage : null
+  if (overSlide && view === 'alone') return null
+  return hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
 }
 
 /**
@@ -132,7 +129,7 @@ export function wheelRoute(gesture: WheelGesture, delta: number, now: number, ta
   const current = gestureAt(gesture, delta, now)
   if (current.held) return { gesture: { ...current, last: now }, move: 0, scroll: hasRoom(current.held, delta) }
   const box = !current.spent && Number.isFinite(delta) && delta !== 0 ? takerOf() : null
-  // The browser scrolls the box while it has room: beside the handout the stage takes the bands' gesture even with none.
+  // The browser scrolls the box while it has room (a box is taken only with room, so at the start it always has).
   if (box) return { gesture: { sum: 0, spent: false, last: now, held: box }, move: 0, scroll: hasRoom(box, delta) }
   return { ...wheelStep(current, delta, now), scroll: false }
 }

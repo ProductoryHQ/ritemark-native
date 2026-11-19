@@ -101,20 +101,22 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(taker(box('group', tallAtEnd), tallAtEnd, 100), 'slide', "the band at the stage's end moves the slide (it did nothing)")
   assert.equal(taker(box('group', tallAtEnd), tallAtEnd, -100), 'stage', 'and up scrolls the stage back')
 
-  // Slide and handout (#855, the Experience lead after Jarmo's "mina eelistan alati consistencyt"): over the slide, a
-  // gesture means the same in every view. Before, the stage's wheel listened in Slide only, so over the slide beside
-  // the handout nothing moved. Over the slide the slide moves and a long column scrolls first, as in Slide only; the
-  // space around it and a row under it stay the stage's own scroll, whether or not it can scroll: they never step.
+  // Slide and handout (#855, the Experience lead after Jarmo's "mina eelistan alati consistencyt"): a gesture means the
+  // same in every view, by side of the room. Before, the stage's wheel listened in Slide only, so beside the handout
+  // nothing on the slide's side moved the slide. Anywhere on the slide's side (the slide and the space around it in its
+  // pane) a gesture means slides: a long column first, then the stage while it can scroll, then the slide, as in Slide
+  // only. The handout's side means text (the scroll rule, untouched).
   const beside = (target: Box | null, on: Box, delta: number) => wheelTaker(target, on, delta, overflowOf, 'beside')?.name ?? 'slide'
   assert.equal(beside(words, stage, 100), 'slide', 'beside the handout, over the words: the slide moves')
   assert.equal(beside(big, stage, -100), 'slide')
   assert.equal(beside(inColumn, stage, 100), 'column', 'a long column scrolls first')
   assert.equal(beside(inColumn, stage, -100), 'slide', 'at its top, up moves the slide back')
   assert.equal(beside(inColumnAtEnd, stage, 100), 'slide', 'at its end, down moves the slide on')
-  assert.equal(beside(group, stage, 100), 'stage', 'the band beside the handout stays the stage (it has nothing to scroll)')
-  assert.equal(beside(stage, stage, 100), 'stage')
-  assert.equal(beside(tallGroup, tall, 100), 'stage', 'a row under the slide scrolls the stage')
-  assert.equal(beside(box('group', tallAtEnd), tallAtEnd, 100), 'stage', "at the stage's end the band still never steps")
+  assert.equal(beside(group, stage, 100), 'slide', 'the band beside the handout: the slide moves (the stage fits)')
+  assert.equal(beside(stage, stage, -100), 'slide', 'over the stage itself')
+  assert.equal(beside(tallGroup, tall, 100), 'stage', 'a stage taller than its room scrolls first under the band')
+  assert.equal(beside(box('group', tallAtEnd), tallAtEnd, 100), 'slide', "at the stage's end the band moves the slide on")
+  assert.equal(beside(box('group', tallAtEnd), tallAtEnd, -100), 'stage', 'and up scrolls the stage back first')
   // Beside the handout the slide keeps its width in a short window, so it can be taller than the stage (review of #871):
   // over the slide the stage then scrolls first, as a long column does, so the slide's foot can be reached; at its end
   // the slide moves. In Slide only the slide fits the stage, and over it the slide moves, as before.
@@ -189,19 +191,32 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(route(flick('slide')).asked, 2)
   // A first event with no delta decides nothing.
   assert.equal(route([[0, 0, 'slide'], [30, 16, 'column']]).column, 30)
-  // Beside the handout (#855) a gesture that starts on the band is the stage's to its end, even with nothing to scroll:
-  // a flick there moves no slide, and the browser is let scroll only while the stage has room.
+  // Beside the handout (#855) the band is the slide's side of the room: a flick there moves one slide when the stage
+  // fits, and when it is taller than its room the flick scrolls it first (its momentum stays with it) and the next
+  // flick at its end moves the slide.
   {
-    const fits = box('stage', null, 'auto', 780, 780)
-    let gesture: WheelGesture = NO_GESTURE
-    const out = { moves: 0, scrolled: 0 }
-    for (const [delta, at] of flick('band')) {
-      const step = wheelRoute(gesture, delta, at, () => wheelTaker(box('group', fits), fits, delta, overflowOf, 'beside'))
-      gesture = step.gesture
-      out.moves += Math.abs(step.move)
-      if (step.scroll) out.scrolled++
+    const run = (stageBox: Box, flicks: number) => {
+      let gesture: WheelGesture = NO_GESTURE
+      const out = { moves: 0, scrolled: 0 }
+      for (let n = 0; n < flicks; n++) {
+        for (const [delta, at] of flick('band', n * (40 * 16 + WHEEL_QUIET_MS))) {
+          const step = wheelRoute(gesture, delta, at, () => wheelTaker(box('group', stageBox), stageBox, delta, overflowOf, 'beside'))
+          const latched = gesture.held
+          gesture = step.gesture
+          out.moves += step.move
+          if (step.scroll) {
+            out.scrolled++
+            const scroller = (gesture.held ?? latched) as Box
+            scroller.scrollTop = Math.max(0, Math.min(scroller.scrollHeight - scroller.clientHeight, scroller.scrollTop + delta))
+          }
+        }
+      }
+      return out
     }
-    assert.deepEqual(out, { moves: 0, scrolled: 0 }, 'a flick on the band beside the handout: nothing moves')
+    assert.deepEqual(run(box('stage', null, 'auto', 780, 780), 1), { moves: 1, scrolled: 0 }, 'a flick on the band beside the handout: one slide')
+    const short = box('stage', null, 'auto', 895, 780, 0)
+    assert.deepEqual(run(short, 2), { moves: 1, scrolled: 7 }, 'a stage taller than its room: the first flick scrolls it to its end, the second steps')
+    assert.equal(short.scrollTop, 115)
   }
 }
 

@@ -982,10 +982,10 @@ export function DeckView({
   }, [orientation, pick])
 
   // The full slide view (Jarmo, 16 November): with the handout hidden, the wheel anywhere over the stage (the slide and
-  // the empty bands around it) and the keys move between slides (slideNav.ts), through the strip's own path. Over the
-  // slide, a gesture means the same in every view (#855): beside the handout too, the wheel over the slide moves one
-  // slide and the handout scrolls to its part, as a thumbnail's click does; the space around it keeps the stage's own
-  // scroll, and the handout's wheel stays the scroll rule's.
+  // the empty bands around it) and the keys move between slides (slideNav.ts), through the strip's own path. A gesture
+  // means the same in every view, by side of the room (#855, the Experience lead): beside the handout too, the wheel
+  // anywhere on the slide's side moves one slide and the handout scrolls to its part, as a thumbnail's click does; on
+  // the handout's side it scrolls the text (the scroll rule's).
   const fullSlide = slideShown && !handoutShown
   const stageWheel = stageWheelOf(slideShown, handoutShown)
   const goTo = useCallback((index: number) => {
@@ -1001,10 +1001,10 @@ export function DeckView({
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const delta = wheelPixels(event, stage.clientHeight)
-      // A pane or a column that holds more than its room scrolls first; in Slide only so does the stage under the empty
-      // bands while it can (a short window); beside the handout the bands are always the stage's, and so is the slide
-      // while the stage, shorter than the slide, can scroll; everything else moves the slide, one per gesture (#824, #855). What is under the pointer is asked only while the gesture is
-      // undecided, not through a flick's momentum.
+      // A pane or a column that holds more than its room scrolls first, then the stage while it can (a short window; in
+      // Slide only, under the bands alone, as the slide fits there); everything else on the slide's side moves the
+      // slide, one per gesture (#824, #855). What is under the pointer is asked only while the gesture is undecided,
+      // not through a flick's momentum.
       const takerOf = () => wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY, stageWheel)
       const route = wheelRoute(gesture, delta, event.timeStamp, takerOf)
       gesture = route.gesture
