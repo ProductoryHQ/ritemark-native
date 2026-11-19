@@ -156,6 +156,25 @@ Text`],
 | --- | --- |
 | 1 | 2 |
 :::`],
+  // Sprint 168 PR 1 (#863): a quote's attribution is drawn from its last line as written; nothing is added to the file.
+  ['a quote with its attribution', `# What the team said
+
+> We used to spend Monday morning sorting the inbox.
+>
+> — Team lead, Harbour Logistics`],
+  ['quotes in a column, en dash and one dash line', `:::: columns
+::: column
+> The replies sound like us.
+>
+> – Customer service
+
+> — A quote of one dash line
+:::
+::: column
+> Words
+> — after a line break
+:::
+::::`],
 ]
 
 

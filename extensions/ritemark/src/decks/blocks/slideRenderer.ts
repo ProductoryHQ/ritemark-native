@@ -338,6 +338,39 @@ function pictureHtml(href: string, text: string, block?: string): string {
   return '<span class="blk-pic empty"></span>';
 }
 
+/**
+ * Sprint 168 PR 1 (#863, the decks README "A quote is a voice, not a box"): a quote's attribution, "— Team lead", is its
+ * last paragraph when that opens with an em or en dash and a space and something is drawn above it in the same quote (a
+ * quote of that one line is its words: the Experience lead, 19 November). The renderer writes this class on it, and the
+ * slide editor's decoration (`blocks/slideQuote.ts`) the same on the stage, so slide.css draws it alike everywhere. In the
+ * file it is just the quote's last line.
+ */
+export const QUOTE_BY_CLASS = 'blk-by';
+
+/** Do a paragraph's words, as drawn, open as an attribution: "— " or "– "? */
+export function isQuoteByWords(words: string): boolean {
+  return /^[—–] /.test(words);
+}
+
+/** A paragraph's words from its drawn HTML: no tags, and a dash written as an entity read as the dash it draws. */
+function drawnWordsOf(html: string): string {
+  return html.replace(/<[^>]*>/g, '').replace(/^&(?:mdash|#8212|#[xX]2014);/, '—').replace(/^&(?:ndash|#8211|#[xX]2013);/, '–');
+}
+
+/**
+ * A quote, drawn as marked draws it, with its attribution marked. Each of its blocks is drawn once, in order, so the
+ * renderer's counters (One by one, Steps, Tabs) step as they would without this rule; what draws nothing (a blank line,
+ * a comment note, an empty Label) is never "above" the attribution.
+ */
+function quoteHtml(blocks: string[]): string {
+  const drawn = blocks.flatMap((html, index) => (html.trim() ? [index] : []));
+  const last = drawn[drawn.length - 1];
+  if (drawn.length >= 2 && blocks[last].startsWith('<p>') && isQuoteByWords(drawnWordsOf(blocks[last]))) {
+    blocks[last] = `<p class="${QUOTE_BY_CLASS}">${blocks[last].slice('<p>'.length)}`;
+  }
+  return `<blockquote>\n${blocks.join('')}</blockquote>\n`;
+}
+
 /** Build a renderer instance: the slide's scoped `marked` with the `:::` blocks and the slide's own rules. */
 /**
  * marked's tokenizer, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it in its raw mode,
@@ -411,6 +444,12 @@ function createSlideMarked(): Marked {
         }
         if (!isAlonePicture(paragraph)) return false;
         return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
+      },
+    }, {
+      // Sprint 168 PR 1 (#863): a quote with its attribution marked (`quoteHtml`).
+      name: 'blockquote',
+      renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
+        return quoteHtml((token as Tokens.Blockquote).tokens.map(block => this.parser.parse([block])));
       },
     }, {
       // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.

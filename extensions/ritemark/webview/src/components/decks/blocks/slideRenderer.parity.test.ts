@@ -3,7 +3,9 @@
  * outline (depth, kind, words) of the renderer's HTML and of the slide editor's document must match: on the spike's
  * slides (with its gap closed: a picture alone in a paragraph is a block in both), on the v2 fixtures, and on every
  * slide of the demo project's decks as `legacyToBlocks` draws it. Sprint 164 PR 3: the Label on both sides, and an old
- * Steps pill as the Label the stage opens it with (`SlideEditor.stageMarkdownOf`, `withStepsLabels`). Run with `npx tsx`.
+ * Steps pill as the Label the stage opens it with (`SlideEditor.stageMarkdownOf`, `withStepsLabels`). Sprint 168 PR 1
+ * (#863): a quote, and its attribution marked on the same paragraph by the renderer and the stage's decoration
+ * (`slideQuote.ts`). Run with `npx tsx`.
  */
 import { strict as assert } from 'node:assert'
 import * as fs from 'node:fs'
@@ -18,6 +20,7 @@ import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
 import { loadSlide } from './slideEditorHarness'
 import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
+import { quoteByOffset } from './slideQuote'
 
 type Outline = string[]
 
@@ -45,6 +48,8 @@ function outlineOfHTML(html: string): Outline {
       if (tag === 'li' || tag === 'th' || tag === 'td') { out.push(`${depth}:${tag} ${words(child)}`); continue }
       // A code block's Copy and ↗ (Sprint 163 PR 1) are the renderer's own drawing: its words are its code's.
       if (tag === 'pre') { const code = child.querySelector('code'); out.push(`${depth}:pre ${code ? words(code) : words(child)}`); continue }
+      // Sprint 168 PR 1: a quote's attribution (its class, `blk-by`).
+      if (tag === 'p' && classes.includes('blk-by')) { out.push(`${depth}:p.by ${words(child)}`); continue }
       if (/^(h[1-6]|p)$/.test(tag)) { out.push(`${depth}:${tag} ${words(child)}`); continue }
       if (tag === 'img') { out.push(`${depth}:img ${child.getAttribute('src')}`); continue }
       walk(child, depth)
@@ -58,7 +63,9 @@ function outlineOfDoc(doc: PMNode): Outline {
   const out: Outline = []
   const text = (node: PMNode) => node.textContent.replace(/\s+/g, ' ').trim()
   const walk = (node: PMNode, depth: number) => {
-    node.forEach(child => {
+    // Sprint 168 PR 1: a quote's attribution, as the stage's decoration marks it.
+    const by = node.type.name === 'blockquote' ? quoteByOffset(node) : null
+    node.forEach((child, offset) => {
       switch (child.type.name) {
         case 'slideDiv': {
           const classes = String(child.attrs.class).split(' ')
@@ -67,12 +74,13 @@ function outlineOfDoc(doc: PMNode): Outline {
           break
         }
         case 'heading': out.push(`${depth}:h${child.attrs.level} ${text(child)}`); break
-        case 'paragraph': out.push(`${depth}:p ${text(child)}`); break
+        case 'paragraph': out.push(`${depth}:${offset === by ? 'p.by' : 'p'} ${text(child)}`); break
         case 'codeBlock': out.push(`${depth}:pre ${text(child)}`); break
         case 'buttonBlock': out.push(`${depth}:button ${text(child)}`); break
         // An empty Label takes no room on the stage and is never drawn elsewhere.
         case 'slideLabel': if (text(child)) out.push(`${depth}:label ${text(child)}`); break
         case 'image': out.push(`${depth}:img ${child.attrs.src}`); break
+        case 'blockquote': out.push(`${depth}:blockquote`); walk(child, depth + 1); break
         case 'bulletList': out.push(`${depth}:ul`); walk(child, depth + 1); break
         case 'orderedList': out.push(`${depth}:ol`); walk(child, depth + 1); break
         case 'listItem': out.push(`${depth}:li ${text(child)}`); break
@@ -119,6 +127,10 @@ const SPIKE = [
   '[Workshop · day 1]{.label}\n\n# Agents at work\n\n:::: columns\n::: column\n[Before]{.label}\n\n### Copilot\nText\n:::\n::: column\n[]{.label}\n\nAfter\n:::\n::::',
   ':::: boxes\n::: box\n[Tip]{.label}\n\nOne line\n:::\n::::\n\nWords\n[not a label]{.label}\n\n[a link](https://example.com){.label}',
   '# Steps with an old pill\n\n::: {.steps tag="Harjutus · 1 / 2"}\n1. Open the file\n:::\n\n::: {.steps tag=""}\n1. Emptied\n:::',
+  // Sprint 168 PR 1: quotes with their attribution (an em and an en dash), in a column, and two that have none: a quote
+  // of one dash line, and a dash line after a line break in the same paragraph.
+  '# What the team said\n\n:::: columns\n::: column\nAfter four weeks with the shared inbox:\n:::\n::: column\n> We used to spend Monday morning sorting the inbox.\n>\n> — Team lead, Harbour Logistics\n\n> The replies sound like us.\n>\n> – Customer service\n:::\n::::',
+  '> — A quote of one dash line\n\n> Words\n> — after a line break\n\n> **Bold** words\n>\n> **— A.** Writer',
 ]
 
 const here = path.dirname(fileURLToPath(import.meta.url))
