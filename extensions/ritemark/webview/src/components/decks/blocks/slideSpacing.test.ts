@@ -101,6 +101,8 @@ for (const fit of [1, 0.7]) {
 assert.match(css, /\.deck-sl\.is-blocks \.blk-flow > :last-child \{ margin-bottom: 0; \}/, 'none under the last block')
 assert.match(css, /\.deck-sl\.is-blocks \.blk-column > :last-child, \.deck-sl\.is-blocks \.blk-box > :last-child \{ margin-bottom: 0; \}/, 'none under a column\'s or a box\'s last block')
 assert.match(css, /\.deck-sl\.is-blocks \.blk-tabpane > :last-child \{ margin-bottom: 0; \}/, 'none under a pane\'s last block')
+// On the stage, a comment note (never drawn) after the last block doesn't give that block its 12 back.
+assert.ok(decks.includes('.deck-sl.is-blocks.is-editing :is(.blk-column, .blk-box > .blk-inner, .blk-tabpane) > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }'), 'the stage skips a trailing comment note')
 // No column carries its own space: the first-column exception is gone with it.
 assert.ok(!css.includes('.blk-column:first-child { padding-left'), 'no first-column padding rule')
 // No block keeps today's em top margins.

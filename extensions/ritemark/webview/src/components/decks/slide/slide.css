@@ -304,7 +304,7 @@
    pill leaves the flow for the column's top (its left stays where it stands, the column's own); the column makes room
    for it: the pill's 28 px and a 10 px gap. A hidden pill (the stage's, emptied) or none takes no room.
    A Columns block aligned Middle or Bottom keeps the pill in its flow, under the heading: its column's words move down
-   and a pill pinned to the top would be left behind. The pill's width stops at the column's right padding (1.1em). */
+   and a pill pinned to the top would be left behind. The pill's width and top still allow for the column padding removed in Sprint 164 PR 2; PR 3 replaces this rule. */
 .deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden])) { position: relative; padding-top: calc(4.8px * var(--fit, 1) + 38px); }
 .deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute; top: calc(4.8px * var(--fit, 1)); max-width: calc(100% - 26.4px * var(--fit, 1)); margin: 0; }
 /* The slide's title in such a column, and its steps, at the prototype's sizes (workbook.html: 38 and 18 slide units),
@@ -405,7 +405,7 @@
    top so nothing moves; the open pane, above the band, keeps its clicks and its words start below it. */
 .deck-sl.is-blocks .blk-tab::before { content: ''; position: absolute; inset: 0 0 -10px; z-index: -1; border-radius: inherit; background: transparent; transition: background-color .12s; pointer-events: none; }
 .deck-sl.is-blocks .blk-tab.is-active::before { background: var(--s-tpane, #0E0F2C); }
-/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 16 to 10 (slide units),
+/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 13 (slide px times the fit; Sprint 164) to 10 (slide units),
    then the label steps down from 14.5 to 13, then 12, the tab keeping its 38 height; only then does the band scroll,
    with its fade (`tabsFit.ts` measures and sets `data-fit`). */
 .deck-sl.is-blocks .blk-tabs[data-fit="1"] > .blk-tabbar > .blk-tab { padding: 0 .69em; }
