@@ -1,0 +1,87 @@
+# Sprint 163: the published deck is the participant's workbook
+
+Track: Full. It adds two blocks to the deck and Text file format (Tabs and Button) and replaces the published page's template and script.<br>
+Release tier: **extension**, for every PR and follow-up: only `src/`, `webview/src/`, `media/webview.js`, `media/office-preview.js`, tests and proof changed, and nothing touches `patches/`. Decks stays behind `ritemark.features.decks`; Tabs, Button and the code block's Copy reach every Text document too, behind no flag. Since `main` carries shell-tier changes from v2.2.0 on, this sprint reaches people with 2.3's full release ([the release plan](../release-plan.md)).<br>
+**Status:** **Done**, 19 November 2026. All five PRs and four follow-ups are on `main`, 830b6022 … 89dce0dc (#804–#812). What was not run is under [Close-out](#close-out). **Approved** by Jarmo on 18 November 2026, in the Development manager session. Asked "Kas kinnitad sprindi 163?" (do you approve Sprint 163?), he answered: "ja kindlasti tee öösel ära ka muudatused published versioonis samuti siis uued blokid jne mida experience saatis" (and be sure to make the changes to the published version tonight too, and the new blocks and the rest that Experience sent). The Experience lead reviewed the plan the same evening, and their four moves are written in. The ticks on an exercise's steps stay (no removal was asked).<br>
+**Where the plan lived:** it was written and approved in the governance repo, `ritemark-dev`: [`releases/v2.3.0/analysis/2026-11-18-sprint-163-workbook-plan.md`](../../../../../../releases/v2.3.0/analysis/2026-11-18-sprint-163-workbook-plan.md), and lived only there until 19 November, when this file was written after the fact to bring 2.3 back to the process rules. The approved plan's text is kept below, with PR numbers added; the PRs as merged, the branches and the close-out are new.<br>
+**Release:** v2.3.0.<br>
+**Why:** Jarmo, 18 November: "see minu jaoks on nagu töövihik kaasategijale" (to me it's like a workbook for the participant) and "ma üha rohkem usun, et sisuliselt 1:1 sama" (I believe more and more that the page and Present are essentially 1:1 the same).<br>
+**Design:** experience 46, the decks README in ritemark-dev, 3b73605 to 6679d58, with the Workbook page and Tabs editor prototypes it links.<br>
+**Already there before it:** one slide renderer for the slide, the strip, the wall and the page (Sprint 161, decision 4); Present's transitions, reveal and spotlight (#792, #799, #790); the published page with Contents, the remembered place, `#N` links (#787), Copy on prompts, Open in Claude/ChatGPT (#788) and print (#793).<br>
+**Branches:** one per PR, each from `origin/main`: `sprint-163-pr1-code-block`, `sprint-163-pr2-tabs`, `sprint-163-pr3-button`, `sprint-163-pr4-player`, `sprint-163-pr5-exercise-claude`, and for the follow-ups `decks-heading-balance-picture-spinner`, `sprint-163-item20-shared-row`, `decks-smoke-fixes-19nov` and `fix-tab-join-hairline`. There was no branch named after this folder (`sprint-163-workbook`), which the sprint branch rule asks for.
+
+## What Jarmo can do after it
+- Put an exercise on the slide: steps on the left, its prompts in tabs on the right, each prompt a code block with Copy, and the material as a button that opens its SharePoint or Drive address.
+- Use Tabs anywhere: on a slide, in a column, in the handout, or in any Text document. Use Button the same way.
+- Publish, and each participant gets the same slides as the wall, one at a time, filling the window. The page's own controls are one quiet line at the foot, and More opens the slide's text beside it. On half a laptop screen, the slide's blocks stack in one column.
+
+## PRs
+| # | What | Tier | PR | Merged |
+|---|---|---|---|---|
+| 1 | **Code block on the slide:** it joins the slide's / menu. Copy belongs to each code block, on the slide, the wall and the page. `[places to fill in]` are highlighted. Beside Copy, a small ↗ icon button ("Open in…") opens a two-item menu, Open in Claude and Open in ChatGPT, on the slide, the wall and the page alike; `open-in: none` hides it. | Standard in the plan; run at **High** | [#804](https://github.com/ProductoryHQ/ritemark-native/pull/804) | 830b6022, 18 Nov |
+| 2 | **Tabs block:** Quarto's `::: {.panel-tabset}` with `##` per tab, read and written byte-stable in decks and Text documents. Each pane holds ordinary blocks. In the editor: / → Tabs, +, double-click to rename, drag to move, the tab's menu, Columns ⇄ Tabs, and the block dissolves when one tab is left. On a slide, a pane or a Columns column that holds too much scrolls with a fade. A Tabs block is as tall as its tallest tab, never taller than its room. Print shows every tab. Its hidden / words: tab, tabs, tabset, sakid, sakk, vahelehed. In Present, the tab chosen on the presenter view shows on the wall. | High (file format) | [#805](https://github.com/ProductoryHQ/ritemark-native/pull/805) | d2bfee9d, 19 Nov |
+| 3 | **Button block:** `[words](https://…){.button}`, the address sheet (full https addresses only), its icon from the address, and the bar's Address, Open and Delete. It opens in a new tab on the wall and the page. Its hidden / words: link, file, material, download, nupp, fail, materjal. | High (file format, links) | [#806](https://github.com/ProductoryHQ/ritemark-native/pull/806) | 5131ad1a, 19 Nov |
+| 4 | **One player:** the published page draws with Present's player, 1:1: the slide fills the window, one slide at a time, the transition, item 20's arrival and the one-by-one reveal on the reader's press. The quiet line holds the client and session, More, ‹ 7 / 12 ›, Contents and the progress line, and the wall shows it without buttons. More opens a side panel, and a narrow window stacks the blocks in one column. A Borderless deck's page is white to the window's edges, as on the wall, with the quiet line in the theme's ink. The page's own template goes. Print still gives the handout. This also fixes the two bugs on today's page: the file name showing instead of the session's title, and `#26` leaving the text behind. | High (public page, CSP) | [#807](https://github.com/ProductoryHQ/ritemark-native/pull/807) | 956bc5fe, 19 Nov |
+| 5 | **The exercise layout and Claude:** the title and steps in the left column, the tabs from the top on the right. The DECKS instructions teach Claude tabs, prompts as code blocks, and buttons. | Standard | [#808](https://github.com/ProductoryHQ/ritemark-native/pull/808) | c9da6bae, 19 Nov |
+
+**Follow-ups**, not in the approved plan's table, built under the second overnight grant and on Jarmo's report of 19 November ([the release plan](../release-plan.md), *Work outside sprints*, defines the grants):
+
+| Follow-up | What | Tier | PR | Merged |
+|---|---|---|---|---|
+| Headings and the picture spinner | Balanced slide headings, and a spinner on the strip's thumbnail while ChatGPT makes its picture | Standard | [#809](https://github.com/ProductoryHQ/ritemark-native/pull/809) | 01b0f8a8, 19 Nov |
+| Item 20 on the wall | The content arrives in a row on the wall too, from one implementation shared with the page | High | [#810](https://github.com/ProductoryHQ/ritemark-native/pull/810) | 00266c71, 19 Nov |
+| The 19 November smoke run | Five finish fixes, and the Text editor's menus in sentence case | High | [#811](https://github.com/ProductoryHQ/ritemark-native/pull/811) | 8698b197, 19 Nov |
+| The tab's join | No hairline under the chosen tab in the Tabs block | Standard | [#812](https://github.com/ProductoryHQ/ritemark-native/pull/812) | 89dce0dc, 19 Nov |
+
+Each PR gets the Experience lead's look before it merges. Order: PR 1 first, then 2 and 3 side by side, then 4 (which draws what 1 to 3 add), then 5. Builders run two at a time at most, while disk allows.
+
+## What changes on today's page
+- **The ticks stay** (HARD RULE #1; Jarmo didn't ask for them to go). On the page, a tap on a step's number turns it into a check, kept on the reader's device only, like the remembered place. The wall never shows ticks, and Contents marks a finished exercise as today. The Experience lead draws it in the workbook page.
+- The page's white card, its top bar and its sticky slide beside the text give way to the player. Contents, the remembered place, `#N`, Copy, Open in Claude/ChatGPT, print and the full-size picture all stay.
+
+## Not in it
+Quizzes and flashcards, the room's answers on the wall, files carried by Publish (files stay links), and the view switch and dragged split (dropped on 18 November).
+
+## Still open
+- Jarmo's own test of the two Open in links: a prompt must land in the box and never be sent. If ChatGPT sends it, its menu item goes.
+
+## Close-out
+
+All five PRs and the four follow-ups merged on 18 and 19 November. Each has a Review record on its PR naming the reviewed commit, and its proof under this folder's `proof/`.
+
+| PR | What it did | Review | The Experience lead |
+|---|---|---|---|
+| 1, #804 | / → Code block on the slide; Copy on every code block, on the slide, the wall, the presenter view and the page, from one component and the one slide renderer; ↗ Open in… with Claude and ChatGPT, opened by the host only for the addresses it builds itself; `[places to fill in]` marked in prose code blocks; a slide's code block saves byte for byte | High, one round: 4 Important and 6 Nit findings, 9 fixed and 1 kept; `/security-review` with no finding at confidence 8 or above | The lead's update (ritemark-dev a58b6e4): Copy and a round ↗ on a line of their own, the words under them at full width; a Text document's code block with no language marks its places too |
+| 2, #805 | The Tabs block in Quarto's tabset form, byte for byte when untouched, on a slide, in a column, in the handout and in any Text document; the tab's menu, rename, drag, Columns ⇄ Tabs; a tab chosen on the presenter view shows on the wall; print shows every tab | High, one round: 10 findings, all fixed with tests; security review with no findings | Folded in: the + on the tabs' line; a tab is never cut (its padding, then a smaller label, and only then the band scrolls with a fade) |
+| 3, #806 | The Button block, `[words](https://…){.button}`: full https addresses only on every path (the sheet, Open, the wall's request, the host, the renderer, the page); its icon from the address; in a Tabs pane too | High, one round: 10 findings, all fixed with tests, and 3 more from the live run; security review with nothing at confidence 8 or above | The lead's placeholder note: measured equal to the words, and the rule now inherits their font and colour |
+| 4, #807 | The published page plays as Present's player: one slide at a time filling the window, the quiet line, More, one column under 860 px, the ticks as checkboxes on the page only, print as a handout; the session's title is the deck's own words, and `#26` opens slide 26 and its text. The CSP keeps its shape | High, one round: 10 findings (4 Important), all fixed with tests; security review with no findings at confidence 8 or above | The lead's review: (a) one column at reading size, the Tabs block too, fixed; (b) item 20 on the wall left this PR for a follow-up (#810) |
+| 5, #808 | The exercise layout, an ordinary Columns block, drawn as the prototype (the pill above the title, the steps' sizes); a narrow Button card stacks; the DECKS instructions teach prompts as code blocks, Tabs, Button, and a four-backtick fence for a slide that holds a code block | Standard, one round: 9 findings, 7 fixed and 2 accepted | The stacking Button card is the lead's ask (18 November); the lead OK'd the PR before its merge, in a message to the Development manager (recorded in the manager's state, not in the PR) |
+| #809 | `text-wrap: balance` on every slide heading, measured to change no fit; a spinner on a slide's thumbnail while ChatGPT makes its picture | Standard, one round: 9 findings, 5 fixed (one in part) and 4 answered | Both come from the lead's reviews of Sprint 163 and #803, and the spinner was redrawn to the lead's drawing (64a72e30) |
+| #810 | Item 20, the content arriving in a row, plays on the wall as on the page: one rule for how a slide arrived (`WallState.arrival`) and one drawing, which the page's script carries as the wall's own source | High, one round: 4 Important findings fixed with tests, 5 Nits (2 fixed, 3 answered); security review with no findings | The lead OK'd it before the merge, in a message to the Development manager (recorded in the manager's state, not in the PR); the Push and Zoom wall frames were left to the integrated smoke run |
+| #811 | The finish anomalies from the integrated smoke run of `main` at 00266c71 on 19 November, run before Jarmo's dev window moved to `main` ahead of his 09:00 training: Tabs give the keys back after the tab's menu; the Button's address sheet stays in the window, and a new Button left with no address is taken away; no edit ring over Copy or ↗; Push clips only above and below; print waits for every picture; the Text editor's menus in sentence case | High, one round: 10 findings (7 fixed, 2 changed in part, 1 kept); security review with no findings | The lead's answers folded in, and at the lead's request: no dead ⌘Z after a dropped new Button, and one indigo ring for a chosen Button |
+| #812 | The chosen tab joins its pane with no hairline, on the stage, the strip, the wall, the presenter view, the page and in Text documents (Jarmo, 19 November: "tabi bottom border … imepeenike joon", the tab's bottom border, a very thin line) | Standard, one round: 6 findings, 2 fixed and 4 answered | The lead approved the design on all nine shots before the merge |
+
+**Changed during the sprint:**
+- **PR 1 ran at High,** not the plan's Standard, because the published page's script, and so its CSP hash, changes.
+- **PR 5 merged before PR 4** (c9da6bae, then 956bc5fe). PR 4 merged `main` with PR 5 in, and checked the exercise column and the stacked Button in the player and in one column.
+- **Item 20 on the wall moved out of PR 4** into #810, on the Experience lead's review: the wall needed a new field from the host saying how a slide arrived, and a player shared with the page, and changing the wall's motion hours before Jarmo's 09:00 training was the larger risk.
+- **Four follow-ups** (#809–#812) were added after the plan.
+- **Tabs, Button and the code block's Copy reach every Text document,** behind no flag, as the design asks. A Markdown file that already holds a Quarto tabset now opens as tabs, and saves byte for byte.
+
+**Codex:** its automatic review failed on #804 to #811, because the account had reached its Codex usage limit, and it was not tagged again. It reviewed #812, with no findings.
+
+**Not run** (from each PR's Review record):
+- **Windows,** for every PR. #812 names 125 % and 150 % scaling.
+- **Open in Claude and Open in ChatGPT** were never followed, since no session was signed in. Jarmo's own check that a prompt lands in the box and is never sent is still open (*Still open*, above).
+- **A Button pressed live,** in the editor and on the wall: both open the system browser, so the route is unit-tested instead. The presenter view's Now with a button wasn't tried.
+- **A real second display:** the start row while the wall's window moves to its display, the presenter view's Now controls (unit tests only), and Push and Zoom on the wall by eye (only Fade was shot).
+- **The page in real browsers:** every page shot came from a local build or the page harness, and nothing was published. Not tried: Safari and Firefox, a swipe on a real phone, a screen reader hearing the focus move to the new slide, the Tabs page on screen (#805 checked print and the HTML only), and the page through the real Publish sheet (#812 built it with the same `pageHtml`).
+- **Touch,** dragging a tab on screen, and a Borderless deck with Tabs on screen (#805).
+- **#811's review fixes** (dfb46672) weren't run in a window: a new Button taken back on a slide, the indigo ring on a chosen Button, and a tab click moving the keys. Its print fix wasn't reproduced in a browser, and Safari's delayed print after ⌘P wasn't tried.
+- **Smaller ones:** the still spinner under Reduce motion (its CSS and a test only); a Text document's code block still shows an empty last line, as before this sprint; in a tight Tabs band the ⌄ still lacks room, as before; #808's and #810's shots were taken before their review fixes, which don't change what they show; #807 has no "before" shot of the file-name bug.
+- **An anomaly, named:** #807's dev run showed a copilot-chat activation error toast. The PR says it came from the shared dev tree's built-in extension, not from this sprint. Its root cause isn't recorded.
+
+**Not done at the sprint's end:**
+- The plan lived only in the governance repo until this file was written on 19 November, and the PRs ran on per-PR branches with no `sprint-163-workbook` branch.
+- `qa-validator` didn't run at the end of the sprint. It ran on 19 November as part of the repair, on a tree equal to `main` at 89dce0dc: **PASS** (every PR has a Review record naming its head, the flag holds, `tsc` and the webview typecheck exit 0, the bundle is fresh, no HARD RULE #1 removal). Its one gap, the code block's row in `architecture.md`, was added with this plan.
+- The Not run items above aren't rows in `docs/releases/v2.3.0/TEST-CHECKLIST.md` yet, and the CHANGELOG has no section for this sprint.
