@@ -158,6 +158,6 @@ console.log('libraryGroups: ok')
     return found < 0 ? '' : css.slice(found, css.indexOf('}', found))
   }
   assert.match(rule('.deck-lib-here'), /position: absolute/, 'the tick sits on the thumbnail')
-  assert.match(rule('.deck-lib-here'), /var\(--r-success\)/, "in the theme's success colour")
+  assert.match(rule('.deck-lib-here'), /color: var\(--r-ink-strong\)/, 'in ink: green is only the ready dot (greenIsTheReadyDot.test.ts)')
   assert.match(rule('.deck-lib-place'), /-webkit-line-clamp: 2/, 'a long place takes two lines before an ellipsis')
 }
