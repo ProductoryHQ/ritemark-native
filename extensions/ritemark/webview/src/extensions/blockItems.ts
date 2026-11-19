@@ -24,11 +24,6 @@ export interface BlockItemDef {
    * English and Estonian, since people write both; a word may be a phrase ("two columns").
    */
   keywords?: string[]
-  /**
-   * Sprint 168 PR 3: hidden words that, typed whole, put this item first. On a slide "heading" is Heading 3's (the decks
-   * README, "Quotes, prompts and heading levels on a slide"), though all three headings' names start with it.
-   */
-  firstFor?: string[]
 }
 
 /** Hidden words of the items both menus have, kept once so the two menus find the same (experience 22). */
@@ -109,24 +104,21 @@ function startsAWord(phrase: string, query: string): boolean {
 /**
  * The / menu's filter (experience 22, Jarmo 18 November): what's typed after / finds an item when it starts any word of
  * its name or of its hidden words, in any case and without accents. Items whose name starts with it come first, then the
- * other matches, each in the menu's own order. An empty query keeps the whole menu. An item's `firstFor` word typed
- * whole puts that item before them all.
+ * other matches, each in the menu's own order. An empty query keeps the whole menu.
  */
 export function filterSlashItems(items: BlockItemDef[], query: string): BlockItemDef[] {
   const wanted = fold(query.trim())
   if (!wanted) return items
   // Only marks typed: the item's own shortcut finds it ("/#" the three headings, "/***" Split slide here, "/-" Bullet list).
   if (!compact(wanted)) return items.filter(item => fold(item.title).startsWith(wanted) || item.shortcut?.startsWith(wanted))
-  const picked: BlockItemDef[] = []
   const first: BlockItemDef[] = []
   const rest: BlockItemDef[] = []
   for (const item of items) {
     const title = fold(item.title)
-    if (item.firstFor?.some(word => compact(fold(word)) === compact(wanted))) picked.push(item)
-    else if (title.startsWith(wanted) || compact(title).startsWith(compact(wanted))) first.push(item)
+    if (title.startsWith(wanted) || compact(title).startsWith(compact(wanted))) first.push(item)
     else if ([item.title, ...(item.keywords ?? [])].some(phrase => startsAWord(phrase, wanted))) rest.push(item)
   }
-  return [...picked, ...first, ...rest]
+  return [...first, ...rest]
 }
 
 /**

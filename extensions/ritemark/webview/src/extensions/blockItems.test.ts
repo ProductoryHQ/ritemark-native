@@ -76,9 +76,9 @@ assert.deepEqual(titles(text, 'title'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'grid'), ['Boxes', 'Table'])
 
 // Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide"): the slide's headings have the
-// Text editor's names, Heading 1, 2 and 3, and the old Title's and Heading's words still find them. "heading" is
-// Heading 3's word: typed whole it puts Heading 3 first (its `firstFor`), so /heading never makes a second title; typed in
-// part it lists the three in order, as the Text editor does, which has no such word.
+// Text editor's names, Heading 1, 2 and 3, and the old Title's and Heading's words still find them. All three names
+// start with "Heading", so /heading lists them in order and Enter gives Heading 1, as in the Text editor (the Experience
+// lead on #889: consistency).
 assert.deepEqual(SLIDE_ITEMS.filter(item => item.nodeType === 'heading').map(item => [item.title, item.attrs?.level, item.shortcut, item.icon]), [
   ['Heading 1', 1, '#', 'text-h-one'],
   ['Heading 2', 2, '##', 'text-h-two'],
@@ -90,7 +90,7 @@ assert.deepEqual(
   blockItems.filter(item => item.nodeType === 'heading').map(item => [item.title, item.icon, item.attrs]),
   "the Text editor's names, icons and levels",
 )
-const HIDDEN: Record<string, string[]> = { 'Heading 1': ['title', 'h1', 'pealkiri'], 'Heading 2': ['subtitle', 'subheading', 'h2', 'alapealkiri'], 'Heading 3': ['heading', 'h3'] }
+const HIDDEN: Record<string, string[]> = { 'Heading 1': ['title', 'h1', 'pealkiri'], 'Heading 2': ['subtitle', 'subheading', 'h2', 'alapealkiri'], 'Heading 3': ['h3'] }
 for (const [title, words] of Object.entries(HIDDEN)) {
   assert.deepEqual(SLIDE_ITEMS.find(item => item.title === title)?.keywords, words, `${title}'s hidden words`)
   for (const word of words) assert.ok(titles(SLIDE_ITEMS, word).includes(title), `/${word} finds ${title}`)
@@ -102,16 +102,13 @@ assert.deepEqual(titles(SLIDE_ITEMS, 'pealkiri'), ['Heading 1'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'alapealkiri'), ['Heading 2'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'h2'), ['Heading 2'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'h3'), ['Heading 3'])
-assert.deepEqual(titles(SLIDE_ITEMS, 'heading'), ['Heading 3', 'Heading 1', 'Heading 2'])
-assert.deepEqual(titles(SLIDE_ITEMS, 'HEADING '), ['Heading 3', 'Heading 1', 'Heading 2'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'heading'), ['Heading 1', 'Heading 2', 'Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'HEADING '), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'head'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'heading 1'), ['Heading 1'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'heading 3'), ['Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'heading3'), ['Heading 3'])
 assert.deepEqual(titles(text, 'heading'), ['Heading 1', 'Heading 2', 'Heading 3'], 'the same as the Text editor')
-
-// `firstFor` is the slide's Heading 3's alone: no other item of either menu has it, so no other query changes order.
-assert.deepEqual([...text, ...SLIDE_ITEMS].filter(item => item.firstFor).map(item => [item.title, item.firstFor]), [['Heading 3', ['heading']]])
 
 // In a deck, Divider is also found by "slide" (experience 22).
 assert.deepEqual(titles(deck, 'new'), [DECK_DIVIDER_TITLE])

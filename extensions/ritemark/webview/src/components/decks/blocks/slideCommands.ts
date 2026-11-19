@@ -42,11 +42,12 @@ export function isOwnStep(tr: Transaction): boolean {
 /** The slide's / menu (frame 22), in its groups, with the shortcuts the design shows and its hidden search words (18 November). */
 export const SLIDE_ITEMS: BlockItemDef[] = [
   // Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide"): the Text editor's names and
-  // order, H1 > H2 > H3; the old Title and Heading are Heading 1 and Heading 2, found by their old words too. "heading"
-  // is Heading 3's word: typed whole, it puts Heading 3 first, so /heading never makes a second title.
+  // order, H1 > H2 > H3; the old Title and Heading are Heading 1 and Heading 2, found by their old words too. All three
+  // names start with "Heading", so /heading lists them in order and Enter gives Heading 1, as in the Text editor (the
+  // Experience lead on #889: consistency).
   { group: 'Text', title: 'Heading 1', description: '', icon: 'text-h-one', nodeType: 'heading', attrs: { level: 1 }, shortcut: '#', keywords: ['title', 'h1', 'pealkiri'] },
   { group: 'Text', title: 'Heading 2', description: '', icon: 'text-h-two', nodeType: 'heading', attrs: { level: 2 }, shortcut: '##', keywords: ['subtitle', 'subheading', 'h2', 'alapealkiri'] },
-  { group: 'Text', title: 'Heading 3', description: '', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, shortcut: '###', keywords: ['heading', 'h3'], firstFor: ['heading'] },
+  { group: 'Text', title: 'Heading 3', description: '', icon: 'text-h-three', nodeType: 'heading', attrs: { level: 3 }, shortcut: '###', keywords: ['h3'] },
   { group: 'Text', title: 'Bullet list', description: '', icon: 'list', nodeType: 'bulletList', shortcut: '-', keywords: BULLET_LIST_KEYWORDS },
   { group: 'Text', title: 'Numbered list', description: '', icon: 'list-numbers', nodeType: 'orderedList', shortcut: '1.', keywords: NUMBERED_LIST_KEYWORDS },
   // Sprint 163 PR 1: prompts live on the slide, each in a code block with its own Copy (the decks README).
