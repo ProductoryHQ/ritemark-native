@@ -258,7 +258,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     editor.on('focus', later)
     // A press in the slide's words opens the bar again (after Esc or a press outside it).
     const dom = editor.view.dom
-    const press = () => { setOpen(true); later() }
+    // A press the stage took for the picture Behind (between the words, cancelled on its way down) opens nothing here.
+    const press = (event: PointerEvent) => { if (event.defaultPrevented) return; setOpen(true); later() }
     dom.addEventListener('pointerdown', press)
     window.addEventListener('resize', later)
     // The stage scrolls, so the bar in `document.body` follows its block.

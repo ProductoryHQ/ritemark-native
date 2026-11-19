@@ -1468,6 +1468,34 @@ export function DeckView({
     sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
   }, [editor, idOf, shown])
 
+  /**
+   * Sprint 167 PR 4 (decks README item D): Slide settings' Choose… and Replace… under Behind, and Behind chosen with no
+   * picture: the computer's file picker, then the picture saved beside the deck for the slide the settings are for,
+   * which puts it into its place (`pictureIntoSlide`).
+   */
+  const choosePictureForSlide = useCallback(() => {
+    // The slide the settings are for: by its id when it has one, read now without writing anything, so slides moved
+    // while the picker is open never send the picture elsewhere; an old slide without one gets it (`idOf`) only once a
+    // file is chosen, so a cancelled picker leaves the deck as it was (review).
+    const at = shown
+    const known = editor ? slidesOf(editor.state.doc)[at]?.data.id : undefined
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.addEventListener('change', () => {
+      const file = input.files?.[0]
+      if (!file) return
+      void readFileAsBase64(file).then(dataUrl => {
+        const id = known || idOf(at)
+        if (!id) return
+        // Into the slide's place, never at a caret: a / menu picture still on its way for this slide is no longer one.
+        if (caretPictureFor.current === id) caretPictureFor.current = null
+        sendToExtension('deck/save-image', { slideId: id, dataUrl, filename: getUniqueImageFilename(file) })
+      })
+    })
+    input.click()
+  }, [editor, idOf, shown])
+
   useEffect(() => onMessage(message => {
     // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
     if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
@@ -2111,6 +2139,7 @@ export function DeckView({
               )}
               onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
               onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
+              onChoosePicture={choosePictureForSlide}
               onClose={() => setSettingsFor(null)}
             />
           ) : null}

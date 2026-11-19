@@ -17,7 +17,8 @@ import { Tooltip } from '../../ui/tooltip'
 import { copyPicture, stageBounds } from '../../pictures/PictureTools'
 import type { SidePlace } from './slidePicturePlace'
 
-const OWN_LAYERS = '[data-radix-popper-content-wrapper], .picture-bar'
+// Sprint 167 PR 4: the picture Behind's corner chip is the picture's own too (its Choose keeps the picture chosen).
+const OWN_LAYERS = '[data-radix-popper-content-wrapper], .picture-bar, .deck-behind-chip'
 
 export interface SidePictureProps {
   side: SidePlace
@@ -53,6 +54,7 @@ export interface SidePictureProps {
 export function SidePicture(props: SidePictureProps) {
   const { side, url, path, missing, alt, focus, chosen } = props
   const ref = useRef<HTMLDivElement | null>(null)
+  const dotRef = useRef<HTMLSpanElement | null>(null)
   const [draft, setDraft] = useState<{ x: number; y: number } | null>(null)
   const dragging = useRef(false)
   const [, redraw] = useState(0)
@@ -119,13 +121,17 @@ export function SidePicture(props: SidePictureProps) {
             if (event.button !== 0) return
             event.preventDefault()
             props.onChoose()
-            // An empty place opens the file picker at once (experience 49).
-            if (!url && !missing) props.onReplace()
+            // An empty place beside the words opens the file picker at once (experience 49). Behind, the place is the
+            // whole slide around its words, with nothing on it that says so, so a press there only chooses it; its
+            // Choose… is the corner chip (Sprint 167 PR 4, review).
+            if (!url && !missing && side !== 'behind') props.onReplace()
           }}
           // A double click on the picture chooses another one, as ⋯ → Replace picture… does.
           onDoubleClick={() => { if (url) props.onReplace() }}
         >
-          {!url ? (
+          {/* Sprint 167 PR 4 (decks README item D): an empty place Behind has no prompt in the middle, where it ran over
+              the title; its Choose… and ChatGPT are on the corner chip (`BehindChip`). */}
+          {!url && side !== 'behind' ? (
             <span className="photo-hint">
               <Icon name="image" size={20} tone="inherit" />
               Choose, paste or drop a picture
@@ -153,8 +159,23 @@ export function SidePicture(props: SidePictureProps) {
           ) : null}
           {chosen && url ? (
             <span
+              ref={dotRef}
               className="photo-focus"
               role="slider"
+              // Sprint 167 PR 4: the bar's Focus brings the keyboard here; the arrow keys move what stays in view, 5 %
+              // a press (1 % with Shift), each move one undo step.
+              tabIndex={0}
+              onKeyDown={event => {
+                const steps: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+                const step = steps[event.key]
+                if (!step) return
+                event.preventDefault()
+                event.stopPropagation()
+                const by = event.shiftKey ? 1 : 5
+                const x = Math.max(0, Math.min(100, point.x + step[0] * by))
+                const y = Math.max(0, Math.min(100, point.y + step[1] * by))
+                if (x !== point.x || y !== point.y) props.onFocus(`${x},${y}`)
+              }}
               aria-label="What stays in view"
               aria-valuetext={`${point.x}% across, ${point.y}% down`}
               style={{ left: `${point.x}%`, top: `${point.y}%` }}
@@ -186,8 +207,9 @@ export function SidePicture(props: SidePictureProps) {
       {chosen ? (
         <PictureBar
           anchor={props.barHidden ? null : ref.current?.getBoundingClientRect() ?? null}
-          // A slide-wide place: the bar inside it, at its bottom, kept on the slide's side (experience 49).
-          inside
+          // A side place: the bar inside it, at its bottom, kept on the slide's side (experience 49). Behind, it opens
+          // under the slide (Sprint 167 PR 4, decks README item D), so it never sits over the slide's last words.
+          inside={side !== 'behind'}
           bounds={ref.current ? stageBounds(ref.current) : undefined}
           context="slide"
           kind="side"
@@ -210,6 +232,7 @@ export function SidePicture(props: SidePictureProps) {
           onComment={props.onComment}
           onChatgpt={props.onChatgpt}
           chatgptCanChange={props.chatgptCanChange}
+          onFocusPoint={url ? () => dotRef.current?.focus({ preventScroll: true }) : undefined}
           onReplace={props.onReplace}
           onCopy={() => {
             if (!url) return

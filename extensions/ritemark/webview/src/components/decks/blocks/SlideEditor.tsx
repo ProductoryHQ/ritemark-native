@@ -39,7 +39,7 @@ import { closeHistory, undoDepth } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, drawsLogo, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -88,6 +88,9 @@ import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
+import { BehindChip } from './BehindChip'
+import { BubbleMenuBox } from './BubbleMenuBox'
+import { CHIP_WIDTH_EMPTY, CHIP_WIDTH_FILLED, behindChipCorner, behindChipPlace, type ChipPlace } from './behindChipPlace'
 import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, sameSidePath, type SlideDocKit, type SlidePictureTarget } from './slidePictureSwap'
 
@@ -266,6 +269,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   fitKeyRef.current = shownMarkdown === nodeMarkdown ? fitKeyOf(nodeMarkdown, header.image, header.picture, fitLookOf(borderless, theme), contentPlaceFitKey(nodeMarkdown, header.valign, sidePictureOf(header))) : null
   /** Lays Replace picture… over each missing picture (set below, once the editor is made). */
   const placeMissingRef = useRef<() => void>(() => {})
+  /** Sprint 167 PR 4: places the picture Behind's corner chip clear of the words (set below, with the slide's look). */
+  const placeChipRef = useRef<() => void>(() => {})
+  const [chipPlace, setChipPlace] = useState<ChipPlace | null>(null)
 
   /**
    * Write the stage's Markdown to the slide's node: one transaction, converting the deck first when it holds v1 slides.
@@ -586,6 +592,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       actionsRef.current.onFull?.(full)
     }
     placeMissingRef.current()
+    placeChipRef.current()
   }, [editor])
   // A slide that leaves the stage is no longer the full one, and its step is no longer the stage's.
   useEffect(() => () => {
@@ -975,6 +982,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       // The words give up the keys, so Backspace removes the picture, never a letter (review of #774).
       editor.commands.blur()
     }
+    // And so does any other place that was typed in (the handout beside the slide, a comment), Sprint 167 PR 4 review.
+    const typing = document.activeElement as HTMLElement | null
+    if (typing && (typing.isContentEditable || typing.matches?.('input, textarea'))) typing.blur()
     setSideChosen(true)
   }
 
@@ -1098,22 +1108,97 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
   // Sprint 162 PR 4: a top-right logo's room for the title, as every other view draws it (`logoCanvasMarks`).
-  const logoMarks = logoCanvasMarks(themeSlideLogo(theme, borderless), isCoverSlide(shownMarkdown), contentPlaceOf(shownMarkdown, header.valign, side))
+  const slideLogo = themeSlideLogo(theme, borderless)
+  const cover = isCoverSlide(shownMarkdown)
+  const logoMarks = logoCanvasMarks(slideLogo, cover, contentPlaceOf(shownMarkdown, header.valign, side))
   // 18 November: a picture alone on the slide (or under its title only) is centred, as every other view draws it.
   // Sprint 167 PR 3: the content Top, Middle or Bottom (`valign:`), as every other view draws it (`placeClass`, above).
-  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), placeClass, logoMarks.cls].filter(Boolean).join(' ')
+  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), placeClass, logoMarks.cls].filter(Boolean).join(' ')
+
+  // ---- Sprint 167 PR 4 (decks README item D): the picture Behind, from the slide's corner and from anywhere on it.
+  const behindFilled = side === 'behind' && !!header.image?.trim()
+  /** A left press on the words' box itself (between or after its blocks, no word under it) of a slide with a picture Behind. */
+  // A plain single press only: Shift (extending the words' selection), ⌘, Ctrl (the Mac's right-click) and Alt, and a
+  // double press, stay the words' (review).
+  const pressOnEmptyWords = (event: { button: number; detail: number; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; target: EventTarget | null }) =>
+    event.button === 0 && event.detail <= 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
+    && behindFilled && !!editor && !editor.isDestroyed && event.target === editor.view.dom
+  // The chip's corner: top right, or bottom right beside a top-right logo on this slide (Sprint 167 PR 1's corners);
+  // its place and size: in the band between the slide's edge and its words' box, measured (`behindChipPlace.ts`).
+  const chipCorner = behindChipCorner(slideLogo, cover)
+  const chipLogoWidth = drawsLogo(slideLogo, cover) ? slideLogo.width : null
+  // Measured wherever the words may have moved: each fit (typing, fonts, a picture loading, an Agenda drawn again, the
+  // settle after the slide arrives) and each render, as Replace picture… is; set only when the place changes.
+  placeChipRef.current = () => {
+    if (side !== 'behind') return
+    const frameElement = frameRef.current
+    const flow = frameElement?.querySelector<HTMLElement>('.blk-flow')
+    if (!frameElement || !flow) return
+    const box = frameElement.getBoundingClientRect()
+    const words = flow.getBoundingClientRect()
+    const relative = (rect: DOMRect) => ({ left: rect.left - box.left, top: rect.top - box.top, right: rect.right - box.left, bottom: rect.bottom - box.top })
+    // Each block of words, and the logo: the chip at its full size goes where none of them is.
+    const blocks = [...Array.from(flow.children), ...Array.from(frameElement.querySelectorAll('.slide-logo'))]
+      .map(element => element.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0)
+      .map(relative)
+    const next = behindChipPlace(
+      { width: box.width, height: box.height },
+      { top: words.top - box.top, bottom: words.bottom - box.top },
+      chipCorner,
+      chipLogoWidth === null ? null : { width: chipLogoWidth },
+      { blocks, width: behindFilled ? CHIP_WIDTH_FILLED : CHIP_WIDTH_EMPTY },
+    )
+    setChipPlace(current => (current && current.corner === next.corner && current.edge === next.edge && current.right === next.right && current.scale === next.scale ? current : next))
+  }
+  // The fit measures it as the words move (`refit`); here, when the slide's look, its picture or the logo change.
+  useLayoutEffect(() => { placeChipRef.current() }, [side, lookKey, behindFilled, chipCorner, chipLogoWidth, editor])
+  // A picture pasted while the slide's own picture is chosen (the words gave up the keys, so the paste reaches the
+  // page): it replaces that picture, as a paste on a chosen picture in the words does (experience 49).
+  useEffect(() => {
+    if (!sideChosen) return
+    const paste = (event: ClipboardEvent) => {
+      const target = event.target as Element | null
+      if (event.defaultPrevented || target?.closest?.('input, textarea, [contenteditable="true"], [data-radix-popper-content-wrapper]')) return
+      if (takeImageFile(event.clipboardData, true, (dataUrl, filename) => onPictureRef.current(dataUrl, filename))) event.preventDefault()
+    }
+    document.addEventListener('paste', paste)
+    return () => document.removeEventListener('paste', paste)
+  }, [sideChosen])
   return (
     <>
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={setFrameRef}
-          className={`deck-slide${borderless ? ' is-borderless' : ''}`}
+          className={`deck-slide${borderless ? ' is-borderless' : ''}${side === 'behind' && sideChosen ? ' is-behind-chosen' : ''}`}
           data-step={fitStepRef.current}
           style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
           // A right press keeps the selection as it is (the Mac would select the word under it), so "with a selection,
           // it's on the words" means the words the person chose.
           onMouseDown={event => { if (event.button === 2) event.preventDefault() }}
+          // Sprint 167 PR 4: with a picture Behind, a press where there are no words (the words' box itself, between and
+          // after its blocks) chooses the picture, its ring round the slide and its bar under it; a press on words puts
+          // the caret there, as ever. The press goes on to the page (an open popover still closes on it), but its
+          // mousedown is cancelled on the way down: the browser puts no caret and moves no focus, and ProseMirror leaves
+          // a cancelled event alone, so the keys stay the picture's (Backspace removes it, never a letter; review).
+          onPointerDownCapture={event => {
+            if (!pressOnEmptyWords(event)) return
+            // Cancelled, never stopped: the block's bar opens nothing for it, and an open popover still closes.
+            event.preventDefault()
+            chooseSide()
+          }}
+          onMouseDownCapture={event => {
+            if (pressOnEmptyWords(event)) event.preventDefault()
+          }}
+          // A picture dropped anywhere on the slide, its edges too (outside the words' box): into the slide's place
+          // (Behind, Left or Right), or a Picture block when it has none. A drop on the words is theirs (`handleDrop`).
+          // Only a picture is taken: another file dropped on the slide's edges is left alone, as before (review).
+          onDragOver={event => { if (Array.from(event.dataTransfer.items).some(item => item.kind === 'file' && item.type.startsWith('image/'))) event.preventDefault() }}
+          onDrop={event => {
+            if (event.defaultPrevented) return
+            if (takePicture(event.dataTransfer, false, event.target)) event.preventDefault()
+          }}
           onContextMenu={event => {
             if (!editor || editor.isDestroyed) return
             closedOutside.current = false
@@ -1125,6 +1210,19 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             setTableTarget(SlideTableHandles ? tableMenuTargetAt(editor.view, event.target) : null)
           }}
         >
+          {/* Sprint 167 PR 4: the picture Behind's corner chip. First in the frame, so React always inserts it before
+              the slide's canvas: the bubble menu at the frame's end is moved to the page's body (appendToBody), and a
+              node inserted before it (the chip came after the canvas) made React's insertBefore throw and the deck
+              view went blank when Behind was chosen in Slide settings. Its z-index lifts it over the canvas. */}
+          {side === 'behind' && chipPlace && !makerOnSide ? (
+            <BehindChip
+              place={chipPlace}
+              filled={behindFilled}
+              keep={sideChosen}
+              onChoose={() => (behindFilled ? chooseSide() : choosePicture(false))}
+              onChatgpt={() => startPictureMaker({ kind: 'side' }, 'new', null)}
+            />
+          ) : null}
           <div className={classes} style={{ transform: `scale(${width / BLOCK_CANVAS_WIDTH})`, ...logoMarks.style } as CSSProperties}>
             {side ? (
               // Experience 49: the slide's picture beside or behind the words, with its own tools when chosen.
@@ -1177,7 +1275,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
-          {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
+          {/* The bubble menu in a box of its own that stays in the frame (`BubbleMenuBox`): TipTap takes its element
+              out, and a node React inserted before it blanked the deck view (Sprint 167 PR 4). */}
+          <BubbleMenuBox>{editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}</BubbleMenuBox>
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />
           ) : null}

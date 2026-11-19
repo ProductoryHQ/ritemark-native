@@ -22,6 +22,9 @@
  * when its header says nothing (a title or section slide Bottom, a picture alone Middle, the rest Top:
  * `contentPlaceDefault`); choosing another writes `valign:`, and choosing the default again takes the line out.
  *
+ * Sprint 167 PR 4 (decks README item D, #838): choosing Behind with no picture opens the file picker at once, and under
+ * Behind sit Replace… and Remove for its picture (Choose… while the place is empty).
+ *
  * The popover holds only the slide's own settings. From 16 to 17 November its last section was the deck's own choice,
  * Card or Borderless ("This deck · all 15 slides"); since Sprint 162 that choice lives in the Theme menu on the deck's
  * bar (`ThemeMenu.tsx`, step-3-themes.md), with the deck's theme, and writes the deck's front matter the same way.
@@ -93,6 +96,32 @@ export function contentPlaceChange(data: SlideData, place: ContentPlace): Pick<S
   return { valign: place === contentPlaceDefault(data.markdown ?? '', sidePictureOf(data)) ? undefined : place }
 }
 
+/** Remove under Behind: the picture goes, its place stays (only Picture: None takes it away). Its file is never touched. */
+export function behindRemoved(): Pick<SlideData, 'image' | 'alt' | 'focus'> {
+  return { image: undefined, alt: undefined, focus: undefined }
+}
+
+/** Under Behind: Replace… and Remove for the picture there, or Choose… for an empty place. */
+function BehindActions({ filled, onChoose, onRemove }: { filled: boolean; onChoose: () => void; onRemove: () => void }) {
+  return (
+    <div className="deck-settings-behind" role="group" aria-label="The picture behind">
+      <Tooltip label={filled ? 'Choose another picture from the computer for behind the words' : 'Choose a picture from the computer for behind the words'}>
+        <Button type="button" variant="outline" size="compact" onClick={onChoose}>
+          <Icon name="image" size={14} tone="inherit" />
+          {filled ? 'Replace…' : 'Choose…'}
+        </Button>
+      </Tooltip>
+      {filled ? (
+        <Tooltip label="Take the picture off the slide; its file stays in the folder">
+          <Button type="button" variant="ghost" size="compact" onClick={onRemove}>
+            Remove
+          </Button>
+        </Tooltip>
+      ) : null}
+    </div>
+  )
+}
+
 interface SlideSettingsProps {
   number: number
   kind: string
@@ -103,6 +132,11 @@ interface SlideSettingsProps {
   onClose: () => void
   /** The lines about the slide, first (`SlideAbout`); none, and the settings start at once. */
   about?: ReactNode
+  /**
+   * Sprint 167 PR 4 (decks README item D): the computer's file picker for the slide's picture Behind; the picture chosen
+   * goes into the place. Absent: Behind has no Choose…, Replace… or Remove here.
+   */
+  onChoosePicture?: () => void
 }
 
 /** The library's topic or the deck a copy came from, as its plain line before the host has read the copy's state. */
@@ -143,7 +177,7 @@ export function SlideAbout({ data, sourceLines, hidden }: SlideAboutProps) {
   )
 }
 
-export function SlideSettings({ number, kind, data, onKind, onChange, onClose, about }: SlideSettingsProps) {
+export function SlideSettings({ number, kind, data, onKind, onChange, onClose, about, onChoosePicture }: SlideSettingsProps) {
   return (
     <section aria-label={`Settings of slide ${number}`}>
       <header className="deck-settings-head">
@@ -194,9 +228,15 @@ export function SlideSettings({ number, kind, data, onKind, onChange, onClose, a
             variant="picture"
             className="deck-settings-pics"
             value={data.picture || 'none'}
-            onValueChange={picture => onChange({ picture: picture === 'none' ? undefined : picture })}
+            onValueChange={picture => {
+              onChange({ picture: picture === 'none' ? undefined : picture })
+              // Behind chosen with no picture opens the file picker at once (decks README item D): its place has no
+              // prompt of its own on the slide, only the corner chip.
+              if (picture === 'behind' && !data.image?.trim()) onChoosePicture?.()
+            }}
             options={PICTURES}
           />
+          {data.picture === 'behind' && onChoosePicture ? <BehindActions filled={!!data.image?.trim()} onChoose={onChoosePicture} onRemove={() => onChange(behindRemoved())} /> : null}
         </>
       ) : null}
       {isBlockSlide(kind) ? (
