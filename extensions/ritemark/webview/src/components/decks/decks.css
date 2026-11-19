@@ -520,6 +520,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .vscode-reduce-motion .deck-spot .deck-sl :is(.blk-flow *, .photo) { transition: none; }
 /* Sprint 165 PR 2 (README "A section in one move"): an open deck's sections, each heading its number, title and Take section. */
 .deck-lib-section-head { display: flex; align-items: center; gap: 8px; min-height: 28px; margin: 6px 8px 0; }
-.deck-lib-section-number { display: inline-grid; place-items: center; flex: none; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--r-surface-soft); color: var(--r-ink-body); font: 700 11px/1 var(--ritemark-ui-font-family); }
-.deck-lib-section-title { flex: 1; min-width: 0; font: 600 12.5px/1.25 var(--ritemark-ui-font-family); color: var(--r-ink-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.deck-lib-take { flex: none; white-space: nowrap; }
+.deck-lib-section-number { display: inline-grid; place-items: center; flex: none; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--r-warning-surface, var(--r-surface-soft)); color: var(--r-warning-ink, var(--r-ink-body)); font: 700 11px/1 var(--ritemark-ui-font-family); }
+.deck-lib-section-title { flex: 1; min-width: 0; font: 600 12.5px/1.25 var(--ritemark-ui-font-family); color: var(--r-ink-strong); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.deck-lib-take { flex: none; white-space: nowrap; height: 24px; padding: 0 8px; gap: 4px; font-size: 12px; }
