@@ -1059,15 +1059,38 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     assert.equal(markdownOf(allWords), '# What the team said\n\n```\nIt took ten minutes.\n\nPaste the report, then ask.\n```\n\n> — Team lead')
     allWords.undo()
     assert.equal(allWords.save(), quoteDeck(SAID))
-    // An en dash is an attribution too; a hyphen is not.
+    // An en dash is an attribution too, and so is a dash before a no-break space; a hyphen or no dash is not.
     const en = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '– '))), 'Paste', null).stage
-    assert.ok(markdownOf(en).includes('> It took ten minutes.\n>\n> – Team lead\n\n```'), markdownOf(en))
-    const hyphen = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '- '))), 'Paste', null).stage
-    assert.ok(markdownOf(hyphen).endsWith('```\n\n> \\- Team lead') || markdownOf(hyphen).endsWith('```\n\n> - Team lead'), markdownOf(hyphen))
+    assert.equal(markdownOf(en), '# What the team said\n\n> It took ten minutes.\n>\n> – Team lead\n\n```\nPaste the report, then ask.\n```')
+    const nbsp = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '—\u00a0'))), 'Paste', null).stage
+    assert.ok(markdownOf(nbsp).includes('> It took ten minutes.\n>\n> —'), markdownOf(nbsp))
+    const hyphen = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', '\\- '))), 'Paste', null).stage
+    assert.equal(markdownOf(hyphen), '# What the team said\n\n> It took ten minutes.\n\n```\nPaste the report, then ask.\n```\n\n> \\- Team lead')
+    const plain = bubbleCode(quoteDeck(SAID.map(line => line.replace('— ', ''))), 'Paste', null).stage
+    assert.equal(markdownOf(plain), '# What the team said\n\n> It took ten minutes.\n\n```\nPaste the report, then ask.\n```\n\n> Team lead')
+    // An empty line after the attribution, or between the words and the code: the attribution still goes right under
+    // the words, and the empty lines around the code go.
+    const trailing = stageOn(openDeck(quoteDeck(SAID)), 0)
+    trailing.caretAfter('Team lead')
+    trailing.apply(trailing.inner.tr.split(trailing.inner.selection.from))
+    const trailingTr = trailing.inner.tr.setSelection(TextSelection.create(trailing.inner.doc, placeOf(trailing.inner.doc, 'Paste')))
+    assert.ok(run(SlideCodeBlock, 'toggleCodeBlock', trailingTr).done)
+    trailing.apply(trailingTr)
+    assert.equal(markdownOf(trailing), '# What the team said\n\n> It took ten minutes.\n>\n> — Team lead\n\n```\nPaste the report, then ask.\n```')
+    const gap = stageOn(openDeck(quoteDeck(SAID)), 0)
+    gap.caretAfter('ten minutes.')
+    gap.apply(gap.inner.tr.split(gap.inner.selection.from))
+    const gapTr = gap.inner.tr.setSelection(TextSelection.create(gap.inner.doc, placeOf(gap.inner.doc, 'Paste')))
+    assert.ok(run(SlideCodeBlock, 'toggleCodeBlock', gapTr).done)
+    gap.apply(gapTr)
+    assert.equal(markdownOf(gap), '# What the team said\n\n> It took ten minutes.\n>\n> — Team lead\n\n```\nPaste the report, then ask.\n```')
+    gap.undo()
+    gap.undo()
+    assert.equal(gap.save(), quoteDeck(SAID), 'the empty line, then the code block: the quote as it was')
   }
 
-  // Round two of the review: a code block's language stays; a list whose last item is empty still counts as chosen
-  // whole; a quote of code with an empty line, chosen whole, toggles back; a selection made backwards stays backwards.
+  // Rounds two and three of the review: a code block's language stays; a list whose last item is empty still counts
+  // as chosen whole; a quote of code with an empty line, chosen whole, comes out; a selection made backwards stays so.
   {
     const TEXT_CODE = ['# A prompt', '', '> Context first.', '>', '> ```text', '> Summarise it.', '> ```']
     const kept = stageOn(openDeck(quoteDeck(TEXT_CODE)), 0)
@@ -1080,9 +1103,12 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     const twoTr = twoStage.inner.tr.setSelection(TextSelection.create(twoStage.inner.doc, placeOf(twoStage.inner.doc, 'One'), placeOf(twoStage.inner.doc, 'two()', true)))
     // All code: toggled back, as before; and with a line of words among two languages, today's path too.
     assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', twoTr).today, ['toggleNode'])
+    // A line of words and two languages: one code block out of the quote, with no language (neither fits both).
     const mixed = stageOn(openDeck(quoteDeck(['# A prompt', '', '> Both:', '>', ...two.slice(2)])), 0)
     const mixedTr = mixed.inner.tr.setSelection(TextSelection.create(mixed.inner.doc, placeOf(mixed.inner.doc, 'Both'), placeOf(mixed.inner.doc, 'two()', true)))
-    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', mixedTr).today, ['toggleNode'], 'two languages: never one of them for both')
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', mixedTr).today, [])
+    mixed.apply(mixedTr)
+    assert.equal(markdownOf(mixed), '# A prompt\n\n```\nBoth:\n\nOne\n\ntwo()\n```')
 
     const listed = stageOn(openDeck(quoteDeck(['# A prompt', '', '> Ask for:', '>', '> 1. risks', '> 2. costs'])), 0)
     listed.caretAfter('costs')
@@ -1090,6 +1116,8 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     assert.equal(markdownOf(listed).split('\n').length, 7, markdownOf(listed))
     const listedTr = listed.inner.tr.setSelection(TextSelection.create(listed.inner.doc, placeOf(listed.inner.doc, 'Ask'), placeOf(listed.inner.doc, 'costs', true)))
     assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', listedTr).today, [], 'an empty last item: the list still chosen whole')
+    listed.apply(listedTr)
+    assert.equal(markdownOf(listed), '# A prompt\n\n```\nAsk for:\n\n1. risks\n2. costs\n```', 'and no mark without words')
 
     const spacer = stageOn(openDeck(quoteDeck(['# A prompt', '', '> ```text', '> Summarise it.', '> ```'])), 0)
     let codeEnd = -1
@@ -1098,7 +1126,10 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     let spacerAt = -1
     spacer.inner.doc.forEach((node, offset) => { if (node.type.name === 'blockquote') spacerAt = offset })
     const spacerTr = spacer.inner.tr.setSelection(NodeSelection.create(spacer.inner.doc, spacerAt))
-    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', spacerTr).today, ['toggleNode'], 'code and an empty line: toggled back')
+    // Code and an empty line chosen whole: the code leaves the quote with its language; the empty line goes.
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', spacerTr).today, [])
+    spacer.apply(spacerTr)
+    assert.equal(markdownOf(spacer), '# A prompt\n\n```text\nSummarise it.\n```')
 
     const back = stageOn(openDeck(QUOTE_DECK), 0)
     const backTr = back.inner.tr.setSelection(TextSelection.create(back.inner.doc, placeOf(back.inner.doc, 'Write a', true), placeOf(back.inner.doc, 'You')))

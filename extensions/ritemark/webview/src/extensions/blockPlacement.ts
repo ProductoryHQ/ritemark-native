@@ -59,7 +59,19 @@ export function placeBlock(tr: Transaction, at: number, node: PMNode): number {
 /** Between two paragraphs' words in the code block: a blank line, as between paragraphs in the file. */
 const PARAGRAPH_GAP = '\n\n'
 
-/** A block's blocks' words, one after another with `gap` between; null when one of them has no words form. */
+/** The first and last of `parts` that has words (-1, -2 when none has): empty lines at either end aren't written. */
+function wordedEnds(parts: string[]): [number, number] {
+  let first = 0
+  let last = parts.length - 1
+  while (first <= last && parts[first] === '') first++
+  while (last >= first && parts[last] === '') last--
+  return first <= last ? [first, last] : [-1, -2]
+}
+
+/**
+ * A block's blocks' words, one after another with `gap` between, empty lines at either end left out; null when one of
+ * them has no words form.
+ */
 function joinedWords(node: PMNode, gap: string): string | null {
   const parts: string[] = []
   for (let index = 0; index < node.childCount; index++) {
@@ -67,7 +79,8 @@ function joinedWords(node: PMNode, gap: string): string | null {
     if (words === null) return null
     parts.push(words)
   }
-  return parts.join(gap)
+  const [first, last] = wordedEnds(parts)
+  return parts.slice(first, last + 1).join(gap)
 }
 
 /**
@@ -90,15 +103,21 @@ function codeWordsOf(node: PMNode): string | null {
   const name = node.type.name
   if (name === 'blockquote') return joinedWords(node, PARAGRAPH_GAP)
   if (name !== 'bulletList' && name !== 'orderedList' && name !== 'taskList') return null
-  const first = Number(node.attrs.start)
-  const items: string[] = []
+  const start = Number(node.attrs.start)
+  const words: string[] = []
   for (let index = 0; index < node.childCount; index++) {
-    const item = node.child(index)
-    const words = joinedWords(item, '\n')
-    if (words === null) return null
-    const mark = name === 'orderedList' ? `${(Number.isFinite(first) ? first : 1) + index}. ` : name === 'taskList' ? `- [${item.attrs.checked ? 'x' : ' '}] ` : '- '
+    const item = joinedWords(node.child(index), '\n')
+    if (item === null) return null
+    words.push(item)
+  }
+  // An empty item at the list's start or end (Enter after the last one) isn't written: no mark without words.
+  const [first, last] = wordedEnds(words)
+  const items: string[] = []
+  for (let index = Math.max(first, 0); index <= last; index++) {
+    const checked = !!node.child(index).attrs.checked
+    const mark = name === 'orderedList' ? `${(Number.isFinite(start) ? start : 1) + index}. ` : name === 'taskList' ? `- [${checked ? 'x' : ' '}] ` : '- '
     const under = ' '.repeat(mark.length)
-    items.push(words.split('\n').map((line, at) => (at === 0 ? mark + line : line ? under + line : line)).join('\n'))
+    items.push(words[index].split('\n').map((line, at) => (at === 0 ? mark + line : line ? under + line : line)).join('\n'))
   }
   return items.join('\n')
 }
@@ -130,8 +149,11 @@ function wordsSpan(node: PMNode, pos: number): { start: number; end: number } {
   return span.length ? { start: span[0].start, end: span[span.length - 1].end } : { start: -1, end: -1 }
 }
 
-/** A quote's attribution line: a paragraph that starts with a dash, "— Name" or "– Name" (the spec's R1). */
-const isAttribution = (node: PMNode) => node.type.name === 'paragraph' && /^[\u2014\u2013] /.test(node.textContent)
+/** A quote's attribution line: a paragraph that starts with a dash and a space, "— Name" or "– Name" (the spec's R1). */
+const isAttribution = (node: PMNode) => node.type.name === 'paragraph' && /^[\u2014\u2013][ \u00a0]/.test(node.textContent)
+
+/** An empty line: a line with nothing in it. */
+const isEmptyLine = (node: PMNode) => node.isTextblock && node.content.size === 0
 
 /**
  * Sprint 168 PR 2 (the decks README, "Quotes, prompts and heading levels on a slide", item 2; Jarmo's quote held a
@@ -142,14 +164,13 @@ const isAttribution = (node: PMNode) => node.type.name === 'paragraph' && /^[\u2
  * the code block holds only it ("— Name"), it joins the part before; with no words before, it stays a one-line quote.
  * It leaves every quote around them (a quote in a quote) but never a box, a column, a list or a tab's pane, and it is
  * one transaction marked `SLIDE_COMMAND`, so one Undo gives the quote back as it was. The words keep their letters and
- * line breaks, and a chosen code block's language stays; their marks (bold, a link's address, a comment's highlight)
- * go, as in any code block.
+ * line breaks, empty lines at the ends aside, and a chosen code block's language stays (two different ones: none);
+ * their marks (bold, a link's address, a comment's highlight) go, as in any code block.
  *
  * Nothing changes, and false is returned, when the selection isn't inside one quote; when it is all in code blocks
  * already (Code block then toggles them back); when it takes only part of a list or of a quote in the quote (the rest
- * of it would go with it); when the chosen code blocks have different languages; or when a chosen block holds what a
- * code block can't (a picture, math, a table). Code block then does what it does everywhere. With `dispatch` false it
- * only says whether it would (TipTap's `can()`).
+ * of it would go with it); or when a chosen block holds what a code block can't (a picture, math, a table). Code block
+ * then does what it does everywhere. With `dispatch` false it only says whether it would (TipTap's `can()`).
  */
 export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unknown> | null, dispatch = true): boolean {
   const doc = tr.doc
@@ -166,14 +187,18 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
   // The innermost quote holding the whole selection, and its blocks the selection is in.
   const range = $from.blockRange($to, node => node.type === quote)
   if (!range) return false
-  // All code already (empty lines aside): Code block toggles it back, as it does everywhere.
+  // All code already: Code block toggles it back, as it does everywhere. A chosen code block's language stays (a
+  // ```text prompt, a diagram); of two different ones neither can.
   let lines = 0
   let codeLines = 0
+  const languages = new Set<string>()
   doc.nodesBetween(from, to, node => {
     if (!node.isTextblock) return true
-    if (node.type === code) codeLines++
-    else if (node.content.size === 0) return false
     lines++
+    if (node.type === code) {
+      codeLines++
+      if (node.attrs.language) languages.add(String(node.attrs.language))
+    }
     return false
   })
   if (lines > 0 && codeLines === lines) return false
@@ -192,15 +217,10 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
   }
   const parts = chosen.map(codeWordsOf)
   if (parts.some(part => part === null)) return false
-  const words = parts.join(PARAGRAPH_GAP)
-  // A chosen code block's language stays (a ```text prompt, a diagram); two different ones can't both.
-  const languages = new Set<string>()
-  for (const node of chosen) {
-    node.descendants(child => { if (child.type === code && child.attrs.language) languages.add(String(child.attrs.language)); return !child.isTextblock })
-    if (node.type === code && node.attrs.language) languages.add(String(node.attrs.language))
-  }
-  if (languages.size > 1) return false
-  const language = attributes?.language ?? [...languages][0] ?? null
+  // Empty lines at the ends of the chosen ones aren't written.
+  const [firstWords, lastWords] = wordedEnds(parts as string[])
+  const words = (parts as string[]).slice(firstWords, lastWords + 1).join(PARAGRAPH_GAP)
+  const language = attributes?.language ?? (languages.size === 1 ? [...languages][0] : null)
 
   // On a scratch copy first: the steps are taken only when the code block got out of at least one quote.
   const step = new Transform(doc)
@@ -223,15 +243,20 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
       place = $place.start()
     }
     // The attribution stays with the words above the code block: a part after it that holds only "— Name" (empty lines
-    // aside) joins the part before. With no words before, it stays where it is, a quote of one line.
+    // aside) joins the part before, right under its words. With no words before, it stays where it is, a one-line quote.
     const $now = step.doc.resolve(place)
     const rest = $now.parent
     const here = $now.index()
-    const last = rest.child(rest.childCount - 1)
-    if (here > 0 && here + 1 < rest.childCount && isAttribution(last) && emptyLines(rest, here + 1, rest.childCount - 1)) {
+    const after: PMNode[] = []
+    for (let index = here + 1; index < rest.childCount; index++) if (!isEmptyLine(rest.child(index))) after.push(rest.child(index))
+    if (here > 0 && after.length === 1 && isAttribution(after[0])) {
+      let kept = here
+      while (kept > 0 && isEmptyLine(rest.child(kept - 1))) kept--
+      const under = $now.posAtIndex(kept)
       step.delete(place + size, $now.end())
-      step.insert(place, last)
-      place += last.nodeSize
+      step.delete(under, place)
+      step.insert(under, after[0])
+      place = under + after[0].nodeSize
     }
     const lift = step.doc.resolve(place).blockRange(step.doc.resolve(place + size))!
     const before = step.steps.length
@@ -244,14 +269,24 @@ export function codeOutOfQuote(tr: Transaction, attributes?: Record<string, unkn
 
   // The offset in the code block's words of a place in the chosen blocks: in a line, the same letter; in a list or a
   // quote (chosen whole), its start or its end.
+  // Empty lines left out at the ends stand at the words' start or end.
   const starts: number[] = []
-  parts.reduce((offset, part) => { starts.push(offset); return offset + part!.length + PARAGRAPH_GAP.length }, 0)
+  let offset = 0
+  parts.forEach((part, index) => {
+    if (index < firstWords) starts.push(0)
+    else if (index > lastWords) starts.push(words.length)
+    else {
+      starts.push(offset)
+      offset += part!.length + PARAGRAPH_GAP.length
+    }
+  })
+  const clamp = (offset: number) => Math.max(0, Math.min(offset, words.length))
   const wordAt = (pos: number, atEnd: boolean) => {
     for (let index = 0; index < chosen.length; index++) {
       const node = chosen[index]
       if (pos <= at[index] || pos >= at[index] + node.nodeSize) continue
-      if (node.isTextblock) return Math.min(starts[index] + pos - at[index] - 1, words.length)
-      return atEnd ? starts[index] + parts[index]!.length : starts[index]
+      if (node.isTextblock) return clamp(starts[index] + pos - at[index] - 1)
+      return clamp(atEnd ? starts[index] + parts[index]!.length : starts[index])
     }
     return atEnd ? words.length : 0
   }
