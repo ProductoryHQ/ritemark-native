@@ -81,7 +81,7 @@ const slides: Array<{ kind: string; data: SlideData; label: string }> = [
   { label: 'boxes', kind: 'boxes', data: { title: "An assistant's four parts", items: items(4, index => ({ icon: ['list-checks', 'book-open', 'puzzle', 'nope'][index] })) } },
   { label: 'boxes in a grid', kind: 'boxes', data: { title: 'Six boxes', items: items(6, () => ({ icon: 'wrench' })) } },
   // Sprint 169 (#866): icons outside the 24, by their Phosphor names.
-  { label: 'boxes with any Phosphor icon', kind: 'boxes', data: { title: 'Delivery', items: items(3, index => ({ icon: ['truck', 'Rocket-Launch', 'users-three'][index] })) } },
+  { label: 'boxes with any Phosphor icon', kind: 'boxes', data: { title: 'Delivery', items: items(4, index => ({ icon: ['truck', 'Rocket-Launch', 'users-three', 'chat'][index] })) } },
   { label: 'boxes beside a picture', kind: 'boxes', data: { title: 'Beside', items: items(3), picture: 'left', image: 'images/missing.png' } },
   { label: 'steps', kind: 'boxes', data: { title: 'Steps', look: 'steps', items: items(4) } },
   { label: 'line', kind: 'boxes', data: { title: 'A scheduled prompt', look: 'line', items: items(4) } },
@@ -113,7 +113,8 @@ for (const borderless of [false, true]) {
     assert.deepEqual(paths(page), paths(react), `${label}: the icons`)
     if (slide.label === 'boxes with any Phosphor icon') {
       const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
-      assert.deepEqual(paths(react), [drawn('truck'), drawn('rocket-launch'), drawn('users-three')], `${label}: each its own`)
+      // An older deck's box (the nine kinds draw as blocks on the strip and the page): `chat` is Phosphor's chat too.
+      assert.deepEqual(paths(react), [drawn('truck'), drawn('rocket-launch'), drawn('users-three'), drawn('chat')], `${label}: each its own`)
     }
   }
 }

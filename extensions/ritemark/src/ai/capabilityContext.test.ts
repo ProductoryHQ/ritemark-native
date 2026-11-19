@@ -191,7 +191,9 @@ test('deck guidance names any Phosphor icon, lists Ritemark\'s own names, and sa
     const line = text.split('\n').find((entry) => entry.startsWith(head));
     assert.ok(line, `${runtime}: the icon line`);
     assert.ok(line.length < 1500, `${runtime}: short, not the whole list (${line.length})`);
-    const examples = [...line.slice(0, line.indexOf('These names are read too')).matchAll(/`([a-z0-9-]+)`/g)].map((match) => match[1]).filter((name) => name !== 'icon');
+    const ownNamesAt = line.indexOf('These names are read too');
+    assert.ok(ownNamesAt > 0, `${runtime}: the line goes on to Ritemark's own names`);
+    const examples = [...line.slice(0, ownNamesAt).matchAll(/`([a-z0-9-]+)`/g)].map((match) => match[1]).filter((name) => name !== 'icon');
     assert.ok(examples.length >= 18 && examples.length <= 25, `${runtime}: about twenty examples (${examples.length})`);
     for (const name of examples) assert.equal(slideIcon(name)?.phosphor, name, `${runtime}: ${name} is a Phosphor icon`);
     for (const name of [...names, ...aliases]) {

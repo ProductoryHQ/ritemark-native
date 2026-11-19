@@ -42,10 +42,14 @@ const ICON_EXAMPLES: readonly PageIconName[] = [
  * on every deck turn), then Ritemark's own names with the icon each draws; the dashed circle stays the net for a name
  * that is neither.
  */
-function iconLine(): string {
+const ICON_LINE = (() => {
   const own = RITEMARK_ICON_NAMES.map(({ name, phosphor }) => `\`${name}\` (${phosphor})`).join(', ');
   const examples = ICON_EXAMPLES.map((name) => `\`${name}\``).join(', ');
-  return `- A box's \`icon\` is the name of any Phosphor regular icon, as on phosphoricons.com (lower case, words joined by hyphens), for example ${examples}. These names are read too, each as the icon in brackets: ${own}. A name that is neither draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+  return `- A box's \`icon\` is the name of any Phosphor regular icon (lower case, words joined by hyphens), for example ${examples}. These names are read too, each as the icon in brackets: ${own}. A name that is neither draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+})();
+
+function iconLine(): string {
+  return ICON_LINE;
 }
 
 /**
