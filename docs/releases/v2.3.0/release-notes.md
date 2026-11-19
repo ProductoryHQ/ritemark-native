@@ -54,6 +54,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **The page keeps its look until you update it.** Change the theme, and the page online changes only with **Update the page**.
 - **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
+- **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 <!-- DECKS END -->
 
 ## Smaller changes

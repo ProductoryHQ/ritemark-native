@@ -634,7 +634,12 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks .blk-column { padding: 0 0 .8em; }
   .layer.flow .deck-sl.is-blocks .blk-boxes { display: grid; grid-template-columns: minmax(0, 1fr) !important; grid-auto-flow: row !important; gap: 10px; }
   .layer.flow .deck-sl.is-blocks .blk-box { padding: 14px 16px; }
-  .layer.flow .deck-sl.is-blocks table { display: block; overflow-x: auto; max-width: 100%; }
+  /* A slide's table hugs its columns (#828): its frame (the table's own box, with its border) is the table's width up to
+     the column's, and only then scrolls inside, the side with more to scroll to fading as the handout's .tw does. */
+  .layer.flow .deck-sl.is-blocks table { display: block; overflow-x: auto; width: fit-content; max-width: 100%; scrollbar-width: thin; scrollbar-color: rgba(127, 127, 160, .4) transparent; }
+  .layer.flow .deck-sl.is-blocks table:is(.is-scrollable-left, .is-scrollable-right) { --fade-l: #000; --fade-r: #000; -webkit-mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; mask: linear-gradient(to right, var(--fade-l), #000 24px, #000 calc(100% - 24px), var(--fade-r)), linear-gradient(#000 0 0) bottom / 100% var(--rm-fade-bar, 0px) no-repeat; }
+  .layer.flow .deck-sl.is-blocks table.is-scrollable-left { --fade-l: transparent; }
+  .layer.flow .deck-sl.is-blocks table.is-scrollable-right { --fade-r: transparent; }
   .layer.flow .deck-sl.is-blocks .blk-pic { max-height: 60vh; }
   .layer.flow .deck-sl.is-blocks .blk-steps ol > li { padding-left: 46px; min-height: 32px; margin-bottom: .7em; }
   .layer.flow .deck-sl.is-blocks .blk-steps .tick { width: 32px; height: 32px; top: -3px; border-radius: 8px; font-size: 16px; }

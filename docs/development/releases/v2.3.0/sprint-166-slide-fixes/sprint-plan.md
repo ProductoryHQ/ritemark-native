@@ -44,8 +44,9 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 - [#827](https://github.com/ProductoryHQ/ritemark-native/issues/827): for the same content the editor draws a table's rows about 56–58 slide px tall and the wall about 42 (the wall is right), so an editor column holds more and scrolls. The design says the slide being edited looks as its thumbnail does. Likely the cells' paragraphs or the editor's td borders.
 - [#828](https://github.com/ProductoryHQ/ritemark-native/issues/828): on the published page at 720 px the table's bordered frame takes the full width while the table stops at about a quarter of it. The frame hugs the table: its own width up to the column's, and only then does it scroll inside, with the fade. Check whether it predates #821 (the wrapper likely comes from #780).
-- [ ] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
-- [ ] Shots of the same table in the editor, on the wall and on the 720 px page.
+- [x] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
+- [x] Shots of the same table in the editor, on the wall and on the 720 px page.
+- Causes (PR 3): #827, a stage cell holds its words in a paragraph and the slide's 12 px under every paragraph reached it (58–59 slide px a row against the wall's 46–47); #828, the page's one-column rule made a slide's table a full-width block (`display: block` with no width, from #807 on 19 November, before #821, not #780's `.tw`).
 
 ## Fix 4: the split's drag guide (PR 4, issue #829)
 
