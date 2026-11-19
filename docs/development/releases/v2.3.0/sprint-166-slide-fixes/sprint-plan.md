@@ -32,9 +32,9 @@ As designed (his own 16 November ask, built for the full-slide view): in Slide o
 
 Seen on main: the full-slide wheel effect in `extensions/ritemark/webview/src/components/decks/DeckView.tsx` (about lines 961–985) is attached only to the stage and only while the full-slide view is on, and returns early when the stage can scroll and the pointer isn't over the slide, so the empty bands may do nothing. Other suspects: the effect running before the stage exists after the view switch, the slide editor taking the wheel, the trackpad threshold. The empty bands should step whenever the stage itself has nothing to scroll.
 
-- [ ] A test that fails before the fix.
-- [ ] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
-- [ ] Typing, selecting and scrolling inside the words still behave as before.
+- [x] A test that fails before the fix.
+- [x] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
+- [x] Typing, selecting and scrolling inside the words still behave as before.
 
 **Order:** PR 1, PR 3 and PR 4 can start at once; PR 4 changes `SlideBlockBar.tsx`, so it waits if Sprint 164 PR 3 (the Label block) is changing the same lines. PR 2 starts after Sprint 164 PR 1 (#819) merges, because both change `DeckView.tsx`.
 
@@ -44,8 +44,9 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 - [#827](https://github.com/ProductoryHQ/ritemark-native/issues/827): for the same content the editor draws a table's rows about 56–58 slide px tall and the wall about 42 (the wall is right), so an editor column holds more and scrolls. The design says the slide being edited looks as its thumbnail does. Likely the cells' paragraphs or the editor's td borders.
 - [#828](https://github.com/ProductoryHQ/ritemark-native/issues/828): on the published page at 720 px the table's bordered frame takes the full width while the table stops at about a quarter of it. The frame hugs the table: its own width up to the column's, and only then does it scroll inside, with the fade. Check whether it predates #821 (the wrapper likely comes from #780).
-- [ ] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
-- [ ] Shots of the same table in the editor, on the wall and on the 720 px page.
+- [x] Tests that fail before: the editor's row height equals the wall's for the same table; the page's frame width equals the table's up to the column.
+- [x] Shots of the same table in the editor, on the wall and on the 720 px page.
+- Causes (PR 3): #827, a stage cell holds its words in a paragraph and the slide's 12 px under every paragraph reached it (58–59 slide px a row against the wall's 46–47); #828, the page's one-column rule made a slide's table a full-width block (`display: block` with no width, from #807 on 19 November, before #821, not #780's `.tw`).
 
 ## Fix 4: the split's drag guide (PR 4, issue #829)
 

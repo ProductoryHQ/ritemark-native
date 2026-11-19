@@ -45,6 +45,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Write on the slide as in a document.** Type a title, text and lists, with no layout to choose. Type / for columns, boxes, steps, tabs, a button, a picture or a table.
 - **Write the handout beside the slides.** Participants read it. A comment stays with you and never goes out.
 - **A deck opens on its slides.** Every deck opens showing only the slide. The switch on the deck's bar shows the handout beside it, or the handout alone.
+- **Scroll to the next slide.** With only the slide shown, one scroll over the slide or the space around it moves one slide. The arrow keys, Page Up, Page Down, Home and End do the same when you're not typing. A long column on the slide scrolls first.
 - **Give the deck a look, yourself or with AI.** **Theme** on the deck's bar picks a theme and changes its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
 - **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
 - **Present from Ritemark.** **Present** shows only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
@@ -55,6 +56,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
+- **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
 <!-- DECKS END -->
 
