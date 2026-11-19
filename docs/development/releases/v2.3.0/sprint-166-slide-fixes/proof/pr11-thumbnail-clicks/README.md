@@ -21,14 +21,18 @@ The thumbnail's columns draw no scrollbar now (`scrollbar-color` transparent in 
 - [before-centre-click-misses-1440x900.png](before-centre-click-misses-1440x900.png) and [before-strip-detail-3x.png](before-strip-detail-3x.png): main. A wheel notch over thumbnail 2 scrolled the column inside it, and its scrollbar shows as a thin line; a click on its centre left slide 3 chosen.
 - [after-centre-click-chooses-slide-2-1440x900.png](after-centre-click-chooses-slide-2-1440x900.png) and [after-strip-detail-3x.png](after-strip-detail-3x.png): this branch. A click on the exact centre of thumbnail 2 chose it: the stage shows slide 2, the thumbnail is ringed, its column has no scrollbar and keeps its fade.
 
+## After the review
+
+The launch above ran the first version of the rule, on the strip's thumbnails only. The review (round one, #875) found the same pictures in three more places, and the rule now covers them all, in one place (`decks.css`, which the wall and the presenter view load too): the strip's thumbnails and the copy a drag lifts, the wall's grid of slides, and the presenter view's row and Next. Nothing in the slide inside them takes the pointer, and no block in them draws a scrollbar, whatever its own rule sets (a column, a pane, a code block). On the strip the outcome should be the one in the table: the click's target is now the picture's frame around the slide rather than the thumbnail's row, and it reaches the thumbnail's own click from there. That is covered by the test, not by a second launch.
+
 ## The test
 
-`webview/src/components/decks/slideNav.test.ts` (#856 block) reads the strip's rules: nothing in a thumbnail's picture takes the pointer, nothing in a thumbnail takes it back, its columns and panes draw no scrollbar (above the slide's own rule), the stage's columns still scroll with theirs, and the thumbnail's own click picks the slide. On main it fails at "nothing in the picture takes the pointer".
+`webview/src/components/decks/slideNav.test.ts` (#856 block) reads the rule: nothing in a thumbnail's slide takes the pointer, in the strip, the drag's lifted copy, the wall's grid and the presenter view's row and Next; no block in it draws a scrollbar; the only rules that give the pointer back are the stage's own layers and the wall's bar (a new one fails the test until it is checked against the thumbnails); the stage's columns and panes still scroll; and each thumbnail's own click (strip, wall grid, presenter row) chooses its slide. On main it fails at "nothing in the picture takes the pointer".
 
 ## Not verified
 
 - A real mouse and trackpad (protocol events).
 - The wheel scrolling the strip itself over a thumbnail: this deck's strip is too short to scroll. With nothing in the picture taking the pointer, the wheel's target is the thumbnail, inside the strip.
 - A drag of a thumbnail to a new place after the change: the drag starts on the thumbnail's own row, which now gets the press directly instead of from the picture inside it.
-- The wall's grid of slides and the presenter view's row and Next: they draw the same thumbnails, and the column inside one may catch a click the same way. This PR changes the strip only.
+- The wall's grid of slides and the presenter view's row and Next, live: the rule covers them since the review, and the test reads it, but no Present window was opened for them (their fault was found by reading, not reproduced).
 - Windows.
