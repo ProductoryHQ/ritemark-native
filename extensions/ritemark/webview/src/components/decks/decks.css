@@ -407,10 +407,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing th { border: 0; }
 .deck-sl.is-blocks.is-editing td { border-left: 0; border-right: 0; border-bottom: 0; }
 .deck-sl.is-blocks.is-editing .tableWrapper { overflow: visible; margin: 0; }
-.deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
+.deck-sl.is-blocks.is-editing .blk-flow img { display: block; max-width: 100%; max-height: 310px; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); object-fit: contain; }
 .deck-sl.is-blocks.is-editing .blk-flow img.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); }
 /* The Agenda on the stage (small details 14): drawn from the deck, chosen whole with a click, deleted whole. */
-.deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host { margin: 0 0 .55em; border-radius: 6px; }
+.deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host { margin: 0 0 calc(12px * var(--fit, 1)); border-radius: 6px; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host > .blk-agenda { margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > .blk-agenda-host:last-child { margin-bottom: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); outline-offset: 4px; }
@@ -431,7 +431,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
-.deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { padding-left: 0; box-shadow: none; }
+.deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { box-shadow: none; }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { color: var(--s-acc, #E0A21F); }
