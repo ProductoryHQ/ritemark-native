@@ -1,7 +1,8 @@
 /**
  * Slide, both or handout (experience 46; the view switch of 17 November, which replaced the fold arrows of 16 November):
- * the slide or the handout folds away, never both, chosen on the deck's bar; each deck keeps its choice in its own view
- * state, never in the file; the line between the panes only drags.
+ * the slide or the handout folds away, never both, chosen on the deck's bar; every deck opens in Slide only and the
+ * choice lives only while it is open, never in the file or the view state (19 November); the line between the panes
+ * only drags.
  *
  * Run: npx tsx webview/src/components/decks/DeckFolds.test.ts
  */
@@ -27,7 +28,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckViewSwitch, foldFrom, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, viewOfFold, viewParts } = await import('./DeckFolds')
+const { DeckViewSwitch, OPENING_FOLD, foldForFind, foldOfView, foldedSides, viewOfFold, viewParts } = await import('./DeckFolds')
 type DeckViewMode = 'slide' | 'both' | 'handout'
 
 const draw = (view: DeckViewMode, above = false) =>
@@ -89,28 +90,33 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.deepEqual(foldedSides('slide', false), { slideShown: true, handoutShown: false })
 }
 
-// Each deck keeps its choice in its own view state, beside the divider's share; nothing goes to the host or the file.
+// Every deck opens in Slide only (19 November), a new deck too: the start is a constant, and a fold an older build kept
+// in the view state is never read. Nothing goes to the host or the file.
 {
-  viewState = { deckRatio: 0.55 }
-  assert.equal(storedFold(), null)
-  keepFold('slide')
-  assert.deepEqual(viewState, { deckRatio: 0.55, deckFold: 'slide' })
-  assert.equal(storedFold(), 'slide')
-  keepFold('handout')
-  assert.deepEqual(viewState, { deckRatio: 0.55, deckFold: 'handout' })
-  keepFold(null)
-  assert.deepEqual(viewState, { deckRatio: 0.55 }, 'both sides shown is no entry at all')
-  keepFold('handout')
-  keepDeckViewState({ deckRatio: 0.5 })
-  assert.deepEqual(viewState, { deckRatio: 0.5, deckFold: 'handout' }, 'dragging the divider keeps the view')
-  viewState = undefined
-  keepFold('slide')
-  assert.deepEqual(viewState, { deckFold: 'slide' })
+  assert.equal(viewOfFold(OPENING_FOLD), 'slide', 'Slide only')
+  const folds = (await import('node:fs')).readFileSync(new URL('./DeckFolds.tsx', import.meta.url), 'utf8').replace(/\/\*\*[\s\S]*?\*\//g, '')
+  assert.ok(!/deckFold|[Ss]toredFold|keepFold/.test(folds), 'nothing reads or keeps a fold')
   assert.deepEqual(posted, [], 'the view never reaches the host')
-  // What the view kept is read strictly: anything else (a deck opened again has nothing kept) opens with both.
-  assert.equal(foldFrom('slide'), 'slide')
-  assert.equal(foldFrom('handout'), 'handout')
-  for (const stored of [undefined, null, '', 'both', 1, true, {}]) assert.equal(foldFrom(stored), null)
+}
+
+// Find borrows the handout: opened in Slide only it shows the handout beside, closed it goes back to Slide only; opened
+// in another view it changes nothing; a view chosen while it is open (the loan cleared) holds when it closes.
+{
+  const open = foldForFind(true, 'handout', false)
+  assert.deepEqual(open, { fold: null, borrowed: true }, 'Slide only: the handout comes in, on loan')
+  assert.deepEqual(foldForFind(false, open.fold, open.borrowed), { fold: 'handout', borrowed: false }, 'closed: Slide only again')
+  for (const fold of [null, 'slide'] as const) {
+    const opened = foldForFind(true, fold, false)
+    assert.deepEqual(opened, { fold, borrowed: false }, `${String(fold)}: nothing to borrow`)
+    assert.deepEqual(foldForFind(false, opened.fold, opened.borrowed), { fold, borrowed: false }, `${String(fold)}: as it was`)
+  }
+  // No room for the handout (under 600 px): nothing to borrow. A deck with no slide left when Find closes keeps the handout.
+  assert.deepEqual(foldForFind(true, 'handout', false, false), { fold: 'handout', borrowed: false }, 'no room: nothing borrowed')
+  assert.deepEqual(foldForFind(false, null, true, true, false), { fold: null, borrowed: false }, 'no slide left: the handout stays')
+  // The person picks Handout only while Find is open: chooseView clears the loan, and closing Find keeps that view.
+  assert.deepEqual(foldForFind(false, 'slide', false), { fold: 'slide', borrowed: false }, 'the chosen view holds')
+  // And picks Slide only while Find is open: the handout folds, and closing Find keeps Slide only.
+  assert.deepEqual(foldForFind(false, 'handout', false), { fold: 'handout', borrowed: false })
 }
 
 // The deck view (its editor can't be drawn here, so its source is read): the switch on the bar right after the strip's
@@ -148,8 +154,24 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(view.includes('<Popover open={settingsFor !== null}') && !view.includes('settingsReady'), 'Settings go with their slide, shown or hidden')
   assert.ok(!block('const chooseView = useCallback(').includes('setSettingsFor'), 'hiding the slide leaves Settings as they are')
   assert.ok(block('{stripShown ? ( <SlideStrip').length > 0 && !block('{stripShown ? ( <SlideStrip').includes('slideShown'), 'the strip stays, whatever the view')
-  assert.ok(view.includes('useState<DeckFold>(storedFold)'), 'the view the deck kept, at mount')
-  assert.ok(block('const chooseView = useCallback(').includes('keepFold(next)'), 'kept when a part is pressed')
+  assert.ok(view.includes('useState<DeckFold>(OPENING_FOLD)'), 'Slide only at mount, every deck')
+  assert.ok(/if \(slidesOf\(editor\.state\.doc\)\.length === 0\) setFold\(current => \(current === 'handout' \? null : current\)\)/.test(view), 'a deck with no slide opens with the handout')
+  const findEffect = block('const next = foldForFind(')
+  assert.ok(view.includes('const next = foldForFind(findOpen, seen.fold, findBorrowedHandout.current, seen.handoutRoom, seen.hasSlides)') && /pick\(currentRef\.current\)\) \}, \[findOpen\]\)/.test(view.slice(view.indexOf('const next = foldForFind('))), 'Find borrows the handout as it opens and closes, and only then')
+  assert.ok(findEffect.length > 0)
+  assert.ok(block('const chooseView = useCallback(').includes('findBorrowedHandout.current = false'), 'a view chosen while Find is open ends the loan')
+  // The choice holds while the deck is open because its webview keeps its context when hidden.
+  const provider = readFileSync(new URL('../../../../src/ritemarkEditor.ts', import.meta.url), 'utf8').replace(/\s+/g, ' ')
+  assert.ok(provider.includes('webviewOptions: { retainContextWhenHidden: true }'), 'the deck keeps its view while hidden')
+  const choose = block('const chooseView = useCallback(')
+  assert.ok(choose.includes('setFold(next)') && !/keep|saveState|deckFold/.test(choose), 'held while open, never kept')
+  assert.ok(!/deckFold|storedFold|keepFold/.test(view), 'nothing else reads or keeps the view')
+  // The published page is the reader's: its code never reads the editor's view, so Slide and text stays its default.
+  const { readdirSync } = await import('node:fs')
+  const decksDir = new URL('../../../../src/decks/', import.meta.url)
+  const pageSources = readdirSync(decksDir, { recursive: true }).map(String).filter(name => /\.tsx?$/.test(name) && !/\.test\./.test(name) && /^page\/|deckPublish|deckPages/.test(name))
+  assert.ok(pageSources.includes('deckPublish.ts') && pageSources.includes('deckPages.ts'), 'the page code is read')
+  for (const name of pageSources) assert.ok(!/DeckFolds|OPENING_FOLD|deckFold/.test(readFileSync(new URL(name, decksDir), 'utf8')), `${name} keeps its own default`)
   assert.ok(!/sendToExtension\([^)]*fold/i.test(view), 'never sent to the host')
   const insert = block('insert: (at, kind) => {')
   assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')
