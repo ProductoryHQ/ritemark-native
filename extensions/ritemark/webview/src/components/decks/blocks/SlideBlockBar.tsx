@@ -26,8 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, deleteBlock, divAttributesOf, dropGaps,
-  gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, snapSplit, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
@@ -55,8 +55,11 @@ interface Placed {
   block: Box
   /** The block on the screen, for the bar in `document.body`. */
   screen: DOMRect
-  /** Columns: the lines between them, each its x in the frame and the two columns' outer edges on the screen. */
-  lines: { x: number; left: number; right: number }[]
+  /**
+   * Columns: the lines between them, each its x in the frame, and on the screen its two columns' outer edges, the gap
+   * between them, and the whole grid's edges (the first column's left, the last one's right).
+   */
+  lines: { x: number; left: number; right: number; gap: number; grid: { left: number; right: number } }[]
   /** A list's or Steps' numbers or bullets: their middle's x in the frame (the + goes under them). */
   markerX: number | null
   /** The slide's pane on the screen: the bar stays inside it. */
@@ -214,11 +217,12 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const lines: Placed['lines'] = []
     if (block.kind === 'columns') {
       const columns = Array.from(dom.children).filter(child => child.classList.contains('blk-column')) as HTMLElement[]
-      for (let index = 0; index + 1 < columns.length; index++) {
+      const grid = columns.length ? { left: columns[0].getBoundingClientRect().left, right: columns[columns.length - 1].getBoundingClientRect().right } : null
+      for (let index = 0; grid && index + 1 < columns.length; index++) {
         const a = columns[index].getBoundingClientRect()
         const b = columns[index + 1].getBoundingClientRect()
         // The split's handle sits in the middle of the gap between the two columns (README "Spacing on the slide").
-        lines.push({ x: (a.right + b.left) / 2 - origin.left, left: a.left, right: b.right })
+        lines.push({ x: (a.right + b.left) / 2 - origin.left, left: a.left, right: b.right, gap: b.left - a.right, grid })
       }
     }
     // A list's or Steps' markers sit left of its first item's words: the + goes under their middle.
@@ -398,13 +402,15 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     // A drop on a document that changed meanwhile is no drop: the line's place was read from the one before.
     const startDoc = editor.state.doc
     const origin = frame.getBoundingClientRect()
-    let fraction = splitPlace(event.clientX, edges.left, edges.right)
+    const shares = columnShares(chosen.node)
+    let fraction = splitPlace(event.clientX, edges.left, edges.right, edges.gap)
     const show = () => {
-      const x = edges.left + snapSplit(fraction) * (edges.right - edges.left) - origin.left
+      // In the middle of the gap the line will have (#829), as the handle is once it lands.
+      const x = splitGuideX(edges.grid, edges.gap, shares, line, fraction) - origin.left
       setDrag({ kind: 'split', x, top: placed.block.top, height: placed.block.height })
     }
     show()
-    const onMove = (move: PointerEvent) => { fraction = splitPlace(move.clientX, edges.left, edges.right); show() }
+    const onMove = (move: PointerEvent) => { fraction = splitPlace(move.clientX, edges.left, edges.right, edges.gap); show() }
     const end = (drop: boolean) => {
       handle.removeEventListener('pointermove', onMove)
       handle.removeEventListener('pointerup', onUp)
@@ -488,7 +494,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
               <Tooltip label="Drag to change the columns' widths" suppressed={!!drag}>
                 <Button
                   variant="ghost"
-                  className="deck-block-split"
+                  // Pointed at, only the line shows: no ghost hover fill (it drew a light 12 px bar on the slide, #829).
+                  className="deck-block-split hover:bg-transparent"
                   style={{ height: block.height }}
                   aria-label="Change the columns' widths"
                   onPointerDown={startSplit(index)}

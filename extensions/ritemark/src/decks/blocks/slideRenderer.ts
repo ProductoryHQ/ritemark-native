@@ -17,7 +17,7 @@
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
-import { isBlockSlide, sidePictureOf, type SlideData } from '../deckFormat';
+import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
@@ -338,6 +338,102 @@ function pictureHtml(href: string, text: string, block?: string): string {
   return '<span class="blk-pic empty"></span>';
 }
 
+/**
+ * Sprint 168 PR 1 (#863, the decks README "A quote is a voice, not a box"): a quote's attribution, "— Team lead", is its
+ * last paragraph when that opens with an em or en dash and a space and something is drawn above it in the same quote (a
+ * quote of that one line is its words: the Experience lead, 19 November). The renderer writes this class on it, and the
+ * slide editor's decoration (`blocks/slideQuote.ts`) the same on the stage, so slide.css draws it alike everywhere. In the
+ * file it is just the quote's last line.
+ */
+export const QUOTE_BY_CLASS = 'blk-by';
+
+/** Do a paragraph's words, as drawn, open as an attribution: "— " or "– "? */
+export function isQuoteByWords(words: string): boolean {
+  return /^[—–] /.test(words);
+}
+
+/**
+ * A paragraph's words from its drawn HTML: no tags, no space before them, and a first character written as an entity
+ * read as the character it draws (`&mdash;`, `&#8212;`, `&#x02014;`…), as the stage's words have it.
+ */
+function drawnWordsOf(html: string): string {
+  // Leading space draws nothing (`>  — A`), and the slide editor drops it as it opens the line (review of #880).
+  return html.replace(/<[^>]*>/g, '').trimStart().replace(/^&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(mdash|ndash));/, (_entity, decimal?: string, hex?: string, name?: string) => {
+    if (name) return name === 'mdash' ? '—' : '–';
+    const code = decimal ? Number(decimal) : parseInt(hex as string, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+  });
+}
+
+/**
+ * A block a quote holds that is drawn as nothing: a blank line, a comment note (the slide editor's own reader makes it a
+ * `ritemarkComment` token), an empty Label.
+ */
+function drawsNoBlock(token: Token): boolean {
+  if (token.type === 'space' || token.type === 'ritemarkComment' || isCommentBlock(token)) return true;
+  const label = token.type === 'paragraph' ? labelParagraphOf(token as Tokens.Paragraph) : null;
+  return !!label && isEmptyLabel(label.words);
+}
+
+/** The words a run of inline tokens draws, as text: no tags, no picture, no line break. */
+function inlineWordsOf(tokens: readonly Token[]): string {
+  return tokens.map(token => {
+    if (token.type === 'html' || token.type === 'image' || token.type === 'br') return '';
+    const inner = (token as { tokens?: Token[] }).tokens;
+    if (inner) return inlineWordsOf(inner);
+    return 'text' in token ? String(token.text) : '';
+  }).join('');
+}
+
+/**
+ * Sprint 168 PR 1, the Experience lead (19 November): a quote's last line after a line break in its last paragraph is
+ * its attribution too, when it opens with "— " or "– " ("> Words" then "> — X", as people and Claude often write it).
+ * That paragraph is split at the break into its words and the attribution, two paragraphs, before the renderer or the
+ * slide editor draws it: both register this as `walkTokens`, so the stage opens the attribution as a paragraph of its
+ * own and the stage, the wall and the page agree. The file is read, never changed: an untouched slide writes back as it
+ * was written (`SlideSync`), and the first real edit writes the blank `>` line between them, as other normalisations do.
+ * A break inside bold or a link, a Button's or a Label's line and a picture's are left as they are.
+ */
+export function splitQuoteByLine(token: Token): void {
+  if (token.type !== 'blockquote') return;
+  const blocks = (token as Tokens.Blockquote).tokens;
+  let at = blocks.length - 1;
+  while (at >= 0 && drawsNoBlock(blocks[at])) at--;
+  if (at < 0 || blocks[at].type !== 'paragraph') return;
+  const paragraph = blocks[at] as Tokens.Paragraph;
+  const inline = paragraph.tokens ?? [];
+  if (labelParagraphOf(paragraph) || buttonParagraphOf(inline) || isPictureParagraph(paragraph) || isAlonePicture(paragraph)) return;
+  // A last paragraph that opens with the dash under words of its own is the attribution already, whole.
+  if (blocks.slice(0, at).some(block => !drawsNoBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
+  const br = inline.map(child => child.type).lastIndexOf('br');
+  if (br <= 0) return;
+  const words = inline.slice(0, br);
+  const by = inline.slice(br + 1);
+  // Something drawn before the break: words, a picture (the slide editor opens one on its own line as a block), or any
+  // token of the editor's own reader (inline math): anything but space, a break or a tag (review of #880).
+  const drawsBefore = words.some(child => child.type !== 'br' && child.type !== 'html' && child.raw.trim() !== '');
+  if (!drawsBefore || !isQuoteByWords(drawnWordsOf(inlineWordsOf(by)))) return;
+  const raw = (tokens: Token[]) => tokens.map(child => child.raw).join('');
+  // The words keep the paragraph's own marks (as-written's `rmTight`); the attribution has a blank line before it.
+  blocks.splice(at, 1,
+    { ...paragraph, raw: raw(words), text: raw(words), tokens: words } as Tokens.Paragraph,
+    { type: 'paragraph', raw: raw(by), text: raw(by), tokens: by } as Tokens.Paragraph);
+}
+
+/**
+ * A quote, drawn as marked draws it, with its attribution marked. Each of its blocks is drawn once, in order, so the
+ * renderer's counters (One by one, Steps, Tabs) step as they would without this rule; what draws nothing (a blank line,
+ * a comment note, an empty Label) is never "above" the attribution.
+ */
+function quoteHtml(blocks: string[]): string {
+  const drawn = blocks.flatMap((html, index) => (html.trim() ? [index] : []));
+  const last = drawn[drawn.length - 1];
+  if (drawn.length >= 2 && blocks[last].startsWith('<p>') && isQuoteByWords(drawnWordsOf(blocks[last]))) {
+    blocks[last] = `<p class="${QUOTE_BY_CLASS}">${blocks[last].slice('<p>'.length)}`;
+  }
+  return `<blockquote>\n${blocks.join('')}</blockquote>\n`;
+}
+
 /** Build a renderer instance: the slide's scoped `marked` with the `:::` blocks and the slide's own rules. */
 /**
  * marked's tokenizer, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it in its raw mode,
@@ -413,6 +509,12 @@ function createSlideMarked(): Marked {
         return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
       },
     }, {
+      // Sprint 168 PR 1 (#863): a quote with its attribution marked (`quoteHtml`).
+      name: 'blockquote',
+      renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
+        return quoteHtml((token as Tokens.Blockquote).tokens.map(block => this.parser.parse([block])));
+      },
+    }, {
       // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.
       name: 'slideTabs',
       level: 'block',
@@ -467,6 +569,8 @@ function createSlideMarked(): Marked {
       },
     },
   });
+  // Sprint 168 PR 1: a quote's last line after a line break, as its attribution (`splitQuoteByLine`).
+  instance.use({ walkTokens: splitQuoteByLine });
   return instance;
 }
 
@@ -612,6 +716,40 @@ export function lonePictureClass(markdown: string, side: string | null): string 
   return lone === 'alone' ? 'is-lone-pic' : lone === 'titled' ? 'is-titled-pic' : '';
 }
 
+/**
+ * Sprint 167 PR 3 (decks README item A): where a slide's content sits when its header says nothing, which is where it
+ * is drawn today. A title or section slide (`isCoverSlide`) sits at the bottom, drawn big and low with its own foot room;
+ * a picture alone on the slide in the middle (`lonePictureOf`, experience 49); every other slide at the top. Slide
+ * settings shows this value chosen, and choosing it again takes the `valign:` line out. The theme holds no positions.
+ */
+export function contentPlaceDefault(markdown: string, side: string | null): ContentPlace {
+  if (isCoverSlide(markdown)) return 'bottom';
+  return !side && lonePictureOf(markdown) === 'alone' ? 'middle' : 'top';
+}
+
+/** Where the slide's content sits: its `valign:` line when it names a place, else the slide's own default. */
+export function contentPlaceOf(markdown: string, valign: string | undefined, side: string | null): ContentPlace {
+  return contentPlaceValue(valign) ?? contentPlaceDefault(markdown, side);
+}
+
+/**
+ * The canvas class for a slide's content place (`va-top`, `va-middle`, `va-bottom`, slide.css), or '' when it sits at
+ * its default: an untouched slide's canvas is drawn exactly as before, in every view.
+ */
+export function contentPlaceClass(markdown: string, valign: string | undefined, side: string | null): string {
+  const written = contentPlaceValue(valign);
+  return written && written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
+}
+
+/**
+ * The content place's part of a slide's fit key (`slideFit.fitKeyOf`): only a title slide's, whose place decides a
+ * top-right logo's room (`logoCanvasMarks`). Every other slide's room is the same in all three places, so its key, and
+ * the step the stage tells the strip, stay as they are when the place changes.
+ */
+export function contentPlaceFitKey(markdown: string, valign: string | undefined, side: string | null): string {
+  return isCoverSlide(markdown) ? contentPlaceClass(markdown, valign, side) : '';
+}
+
 const sectionCache = new Map<string, string | null>();
 
 /**
@@ -686,12 +824,6 @@ export function blockStepsLabelOf(markdown: string): string | null {
   stepsCache.set(markdown, found);
   return found;
 }
-
-/**
- * Sprint 164 PR 3: the old name of `blockStepsLabelOf`, kept only while `DeckView.tsx` (PR 1's, #819, until it merges)
- * still imports it for Settings' Label row, which no longer draws (`SlideSettings`). It goes in the follow-up.
- */
-export const blockStepsTagOf = blockStepsLabelOf;
 
 const agendaCache = new Map<string, boolean>();
 
@@ -887,14 +1019,16 @@ const LOGO_ROOM_CLASS: Record<Exclude<LogoPlace, 'top-right'>, string> = { 'top-
  * The canvas's class and style for the room the logo keeps on this slide ("never touch", the Experience lead, step-3-themes.md,
  * 18 November), only on a slide that shows it; the fit then makes the room:
  *  - top right (`.logo-tr`): the first block ends the logo's width and 16 px short of it, on every slide but a title
- *    slide (its words sit low);
+ *    slide whose words sit low (its default, Bottom; `place` is the slide's content place, Sprint 167 PR 3);
  *  - top left (`.logo-tl`): the words start lower by the logo's height and 12 px (38 px), so every line keeps its left edge;
  *  - bottom right (`.logo-br`) or bottom left (`.logo-bl`, Sprint 167 PR 1): the words end higher by the same, so a
  *    title slide's low words never run under it.
  */
-export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean): { cls: string; style: Record<string, string> } {
+export function logoCanvasMarks(logo: SlideLogo | null | undefined, cover: boolean, place?: ContentPlace): { cls: string; style: Record<string, string> } {
   if (!drawsLogo(logo, cover)) return { cls: '', style: {} };
-  if (logo.place === 'top-right') return cover ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
+  // Sprint 167 PR 3: a title slide moved up (Top or Middle) has its title near the logo's corner, so it keeps the room.
+  const low = cover && (place ?? 'bottom') === 'bottom';
+  if (logo.place === 'top-right') return low ? { cls: '', style: {} } : { cls: 'logo-tr', style: { '--logo-room': `${logoTitleMargin(logo)}px` } };
   return { cls: LOGO_ROOM_CLASS[logo.place], style: { '--logo-drop': `${logoDrop()}px` } };
 }
 
@@ -955,9 +1089,9 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
     photo = `<div class="photo${url ? '' : ' empty'}${gone ? ' is-missing' : ''}"${background}>${gone ? missingHtml(path) : ''}</div>${side === 'behind' ? '<div class="veil"></div>' : ''}`;
   }
   const cover = isCoverSlide(markdown);
-  const marks = logoCanvasMarks(options.logo, cover);
+  const marks = logoCanvasMarks(options.logo, cover, contentPlaceOf(markdown, data.valign, side));
   Object.assign(inner, marks.style);
-  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
+  const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), contentPlaceClass(markdown, data.valign, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
   // A picture of the slide everywhere but the published page, where the slide is what a reader reads (and ticks).
   const hidden = options.readable ? '' : ' aria-hidden="true"';

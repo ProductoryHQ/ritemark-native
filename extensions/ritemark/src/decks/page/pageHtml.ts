@@ -625,6 +625,10 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks h1 { font-size: 1.55em; }
   .layer.flow .deck-sl.is-blocks.is-cover h1 { font-size: 1.95em; }
   .layer.flow .deck-sl.is-blocks.is-cover .blk-flow { padding: 18vh 0 0; }
+  /* Sprint 167 PR 3: in one column a slide has no free height, so Top, Middle and Bottom read alike; only a title
+     slide's low start follows its place: none at Top, as every other slide starts, and half of it at Middle. */
+  .layer.flow .deck-sl.is-blocks.is-cover.va-top .blk-flow { padding-top: 0; }
+  .layer.flow .deck-sl.is-blocks.is-cover.va-middle .blk-flow { padding-top: 9vh; }
   .layer.flow .deck-sl .slide-logo { position: static; display: block; margin: 0 0 14px; }
   .layer.flow .deck-sl.is-blocks .photo { position: relative; inset: auto !important; width: auto !important; height: 34vw; max-height: 220px; margin: 0 0 16px; border-radius: 10px; }
   .layer.flow .deck-sl.is-blocks.pic-behind .photo { position: absolute; inset: -16px -16px auto !important; height: 100%; max-height: none; margin: 0; border-radius: 0; }

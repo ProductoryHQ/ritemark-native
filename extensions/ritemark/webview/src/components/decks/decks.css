@@ -307,6 +307,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+/* Sprint 167 PR 3: the Content row's three tiles (Top, Middle, Bottom), Picture's tiles across the row. */
+.deck-settings .deck-settings-places { grid-template-columns: repeat(3, 1fr); }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }
 .deck-settings .deck-settings-lays > label > span:last-child, .deck-settings .deck-settings-pics > label > span:last-child { font-size: 11px; line-height: 14px; }
 .deck-settings .deck-settings-lays > label > span:nth-of-type(1), .deck-settings .deck-settings-pics > label > span:nth-of-type(1) { margin-bottom: 4px; }
@@ -446,11 +448,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing ritemark-comment { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-child(1 of :not(ritemark-comment)) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
+/* Sprint 168 PR 1 (review): a quote's last paragraph keeps no 6 px under it when a note follows it in the quote. */
+.deck-sl.is-blocks.is-editing blockquote > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
 /* The first block after a title with any number of notes between (review of #766: `h1 + *` with notes skipped). */
 .deck-sl.is-blocks.is-editing h1 ~ :not(ritemark-comment):not(h1 ~ :not(ritemark-comment) ~ *) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
+/* The title's own line with notes between (Sprint 168 PR 3, slide.css's `h1 + h2`): quiet, weight 500, on white too. Up
+   to three notes, as the title's margin rules above, so its look and its room always agree. */
+.deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { font-weight: 500; color: var(--s-sub, #C7CAEB); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { color: var(--s-sub, #5B5F86); }
 .deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { box-shadow: none; }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }

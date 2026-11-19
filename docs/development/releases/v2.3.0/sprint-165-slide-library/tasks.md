@@ -28,7 +28,7 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] Add all, Choose…, Not now; the topic "Every training"; the hidden set
 - [x] Claude's library tool returns the same offer
 - [x] Tests, shots, release-notes line, Risk and How to revert
-- [ ] Lead's look
+- [x] Lead's look (the Experience lead approved it, 19 November)
 
 ## Sprint end
 - [ ] Full test chain once on each final head
