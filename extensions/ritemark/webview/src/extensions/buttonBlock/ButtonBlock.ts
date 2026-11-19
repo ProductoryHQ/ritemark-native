@@ -10,13 +10,14 @@
  *
  * A decoration says which button is chosen (the accent ring) and which is alone (no words beside it), and gives the two
  * empty places their faint words. Enter, Backspace and Delete keep the block's two parts apart (`buttonCommands.ts`).
+ * A press anywhere on the button, its icon included, puts the caret in its words (`pressOnPill`, #848).
  */
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { BUTTON_ATTRIBUTES, BUTTON_ICONS, BUTTON_WORDS, buttonIconFor } from '../../../../src/decks/blocks/buttonBlock'
-import { BUTTON_LABEL_NODE, BUTTON_NODE, BUTTON_WORDS_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter } from './buttonCommands'
+import { BUTTON_LABEL_NODE, BUTTON_NODE, BUTTON_WORDS_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, caretOnLabel } from './buttonCommands'
 
 /** One attribute kept as written: read from and written back to its own `data-*` attribute. */
 function data(key: string, name: string, fallback: string | null) {
@@ -172,40 +173,79 @@ function addsButton(tr: Transaction): boolean {
   })
 }
 
+/** What `pressOnPill` needs of the editor's view: enough for a test to stand in for it. */
+export interface PillView {
+  state: EditorState
+  dom: { contains(node: unknown): boolean }
+  dispatch(tr: Transaction): void
+  focus(): void
+  posAtDOM(node: globalThis.Node, offset: number): number
+}
+
+/**
+ * #848 (Jarmo, 19 November: nobody could tell how to change a button's words). A press on the button's pill outside its
+ * words, its icon (not editable) or the pill's edge, puts the caret at the end of its words and chooses the button.
+ * Left to the browser, a press on the icon put the caret at the start of the document's first line (a slide's title),
+ * and the words typed next went there. A press on the words themselves stays the browser's: the caret goes where it
+ * was pressed. Only the editor's own button (`data-button-label`, the node view's); a drawn slide's is never one.
+ */
+export function pressOnPill(view: PillView, event: MouseEvent): boolean {
+  if (event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return false
+  const target = event.target as Element | null
+  if (!target || typeof target.closest !== 'function') return false
+  const pill = target.closest('[data-button-label]')
+  if (!pill || target.closest('.blk-btn-text') || !view.dom.contains(pill)) return false
+  const words = pill.querySelector('.blk-btn-text')
+  if (!words) return false
+  const tr = caretOnLabel(view.state, view.posAtDOM(words, 0))
+  if (!tr) return false
+  // No caret of the browser's own, and no drag: the press is taken here.
+  event.preventDefault()
+  view.dispatch(tr)
+  view.focus()
+  return true
+}
+
 /**
  * The chosen button's ring (`is-chosen`, only while the editor, its bar or its sheet has the focus), a button with no
  * words beside it (`is-solo`), and the faint words of its two places while they are empty. The document is walked only
- * when it holds buttons or a change put one in: a Text document without any costs a step's slice per keystroke.
+ * when it holds buttons or a change put one in: a Text document without any costs a step's slice per keystroke. A press
+ * on the button's pill puts the caret in its words (`pressOnPill`).
  */
+export function buttonLookPlugin(): Plugin<LookState> {
+  return new Plugin<LookState>({
+    key: decorationsKey,
+    state: {
+      init: (_config, state) => lookOf(state, false),
+      apply: (tr, previous, _old, state) => {
+        const meta = tr.getMeta(decorationsKey) as boolean | undefined
+        const focused = meta === undefined ? previous.focused : meta
+        if (!tr.docChanged && !tr.selectionSet && focused === previous.focused) return previous
+        if (previous.buttons === 0 && !(tr.docChanged && addsButton(tr))) return focused === previous.focused ? previous : { ...previous, focused }
+        return lookOf(state, focused)
+      },
+    },
+    props: {
+      handleDOMEvents: {
+        focus: view => { view.dispatch(view.state.tr.setMeta(decorationsKey, true)); return false },
+        // Into the button's own bar or address sheet, the button stays chosen.
+        blur: (view, event) => {
+          const to = (event as FocusEvent).relatedTarget as Element | null
+          if (to && typeof to.closest === 'function' && to.closest('.btn-block-bar, .btn-block-sheet')) return false
+          view.dispatch(view.state.tr.setMeta(decorationsKey, false))
+          return false
+        },
+        mousedown: (view, event) => pressOnPill(view, event),
+      },
+      decorations: state => decorationsKey.getState(state)?.set ?? null,
+    },
+  })
+}
+
 const ButtonLook = Extension.create({
   name: 'buttonBlockLook',
   addProseMirrorPlugins() {
-    return [new Plugin<LookState>({
-      key: decorationsKey,
-      state: {
-        init: (_config, state) => lookOf(state, false),
-        apply: (tr, previous, _old, state) => {
-          const meta = tr.getMeta(decorationsKey) as boolean | undefined
-          const focused = meta === undefined ? previous.focused : meta
-          if (!tr.docChanged && !tr.selectionSet && focused === previous.focused) return previous
-          if (previous.buttons === 0 && !(tr.docChanged && addsButton(tr))) return focused === previous.focused ? previous : { ...previous, focused }
-          return lookOf(state, focused)
-        },
-      },
-      props: {
-        handleDOMEvents: {
-          focus: view => { view.dispatch(view.state.tr.setMeta(decorationsKey, true)); return false },
-          // Into the button's own bar or address sheet, the button stays chosen.
-          blur: (view, event) => {
-            const to = (event as FocusEvent).relatedTarget as Element | null
-            if (to && typeof to.closest === 'function' && to.closest('.btn-block-bar, .btn-block-sheet')) return false
-            view.dispatch(view.state.tr.setMeta(decorationsKey, false))
-            return false
-          },
-        },
-        decorations: state => decorationsKey.getState(state)?.set ?? null,
-      },
-    })]
+    return [buttonLookPlugin()]
   },
 })
 

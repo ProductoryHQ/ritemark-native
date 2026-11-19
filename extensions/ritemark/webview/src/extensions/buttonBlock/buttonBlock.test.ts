@@ -6,7 +6,8 @@
  *  - https only, everywhere: the address check, the sheet's Done, the renderer (the strip, the wall), the page, the
  *    wall's request and the host's deck check never let `javascript:`, `data:`, `file:` or `http:` through;
  *  - the icon follows the address;
- *  - the hidden words find Button in both / menus, after Tabs; a Button works in a Tabs pane.
+ *  - the hidden words find Button in both / menus, after Tabs; a Button works in a Tabs pane;
+ *  - #848: a press anywhere on the button's pill, its icon included, puts the caret in its words.
  */
 import { strict as assert } from 'node:assert'
 import * as fs from 'node:fs'
@@ -14,7 +15,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
-import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
+import { EditorState, TextSelection, type Plugin, type Transaction } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
 import { createDocument } from '@mixmark-io/domino'
 import { canonicalMarkdownProjection } from '../../../../src/editorSync/state'
@@ -30,7 +31,8 @@ import { DeckSlide } from '../../components/decks/handout/deckSchema'
 import { loadSlide, saveSlide } from '../../components/decks/blocks/slideEditorHarness'
 import { SLIDE_ITEMS } from '../../components/decks/blocks/slideCommands'
 import { blockItems, filterSlashItems } from '../blockItems'
-import { BUTTON_DROP, BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, deleteButton, dropNewButton, insertButton, labelEnd, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton } from './buttonCommands'
+import { BUTTON_DROP, BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, caretOnLabel, deleteButton, dropNewButton, insertButton, labelEnd, newButtonOf, setButtonAddress, sheetLeft, sheetWidth, takeBackNewButton } from './buttonCommands'
+import { buttonBlockExtensions } from './ButtonBlock'
 import type { Tokens } from 'marked'
 
 installTestDocument()
@@ -497,6 +499,127 @@ assert.equal(decodeWallRequest({ type: 'present/open-link', url: 42 }), null)
   insertButton(empty, pane + 2)
   const placed = buttonAt(EditorState.create({ doc: empty.doc, selection: empty.selection }))
   assert.ok(placed && empty.doc.resolve(placed.pos).parent.type.name === 'tabPane', '/ → Button in a pane: in the pane')
+}
+
+// ---------------------------------------------------------------------------
+// #848 (Jarmo, 19 November: nobody could tell how to change a button's words). A press anywhere on the button's pill,
+// its icon included, puts the caret in its words, on a slide and in a Text document. Before, a press on the icon (not
+// editable) was left to the browser, which put the caret at the start of the first line: the words went into the title.
+// ---------------------------------------------------------------------------
+{
+  // The editor's own Button block extensions, as the editors load them: the press is the look plugin's.
+  const look = buttonBlockExtensions.find(extension => extension.name === 'buttonBlockLook')
+  assert.ok(look, 'the Button block has its look')
+  const lookPlugin = (): Plugin => {
+    const made = (look!.config.addProseMirrorPlugins as unknown as () => Plugin[]).call({})
+    return made[0]
+  }
+
+  /** The node view's pill as the editor draws it: the icon (not editable), then the words. */
+  const pillOf = (label: string) => {
+    const root = document.createElement('div')
+    const pill = document.createElement('span')
+    pill.className = 'blk-btn'
+    pill.setAttribute('data-button-label', '')
+    const icon = document.createElement('span')
+    icon.className = 'blk-btn-icon'
+    icon.setAttribute('contenteditable', 'false')
+    const glyph = document.createElement('span')
+    glyph.className = 'is-file'
+    icon.appendChild(glyph)
+    const words = document.createElement('span')
+    words.className = 'blk-btn-text'
+    words.textContent = label
+    pill.appendChild(icon)
+    pill.appendChild(words)
+    root.appendChild(pill)
+    return { root, pill, icon, glyph, words }
+  }
+
+  /** A press, as the browser hands it to the editor. */
+  const press = (target: unknown, extra: Partial<MouseEvent> = {}) => {
+    const event = { button: 0, shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, target, prevented: false, preventDefault() { event.prevented = true }, ...extra }
+    return event
+  }
+
+  const cases: Array<{ where: string; doc: PMNode; save: (doc: PMNode) => string; label: string; typed: string }> = []
+  for (const label of ['', 'Open the sample']) {
+    const line = `Use it. [${label}](https://example.com/a.pdf){.button}`
+    const slideMarkdown = `# Exercise\n\n${line}`
+    cases.push({ where: `a slide, ${label ? 'filled' : 'empty'}`, doc: loadSlide(slideMarkdown), save: saveSlide, label, typed: slideMarkdown.replace(`[${label}]`, `[${label}Go]`) })
+    const text = `# Notes\n\n${line}\n`
+    const opened = openDocument(text)
+    cases.push({ where: `a Text document, ${label ? 'filled' : 'empty'}`, doc: opened.doc, save: doc => saveDocument(opened, doc), label, typed: text.replace(`[${label}]`, `[${label}Go]`) })
+  }
+
+  for (const { where, doc, save, label, typed } of cases) {
+    let pos = -1
+    doc.descendants((node, at) => { if (node.type.name === BUTTON_NODE) pos = at; return pos < 0 })
+    const node = doc.nodeAt(pos)!
+    const wordsStart = labelEnd(node, pos) - node.child(1).content.size
+    const plugin = lookPlugin()
+    // The caret where a fresh editor has it: the start of the first line (the title).
+    const drawn = pillOf(label)
+    let focused = 0
+    const view = {
+      state: EditorState.create({ doc, plugins: [plugin] }),
+      dom: drawn.root,
+      dispatch(tr: Transaction) { view.state = view.state.apply(tr) },
+      focus() { focused++ },
+      posAtDOM(dom: unknown, offset: number) {
+        assert.equal(dom, drawn.words, `${where}: the place is read from the button's words`)
+        assert.equal(offset, 0)
+        return wordsStart
+      },
+    }
+    assert.notEqual(view.state.selection.$from.parent.type.name, 'buttonLabel', `${where}: the caret starts in the title`)
+    const handler = plugin.props.handleDOMEvents?.mousedown as ((view: unknown, event: unknown) => boolean) | undefined
+    assert.ok(handler, `${where}: a press on the pill is the button's own (#848)`)
+
+    // On the icon (the glyph inside it, as an SVG's path is): the caret goes to the end of the button's words.
+    for (const target of [drawn.glyph, drawn.icon, drawn.pill]) {
+      view.state = EditorState.create({ doc, plugins: [plugin] })
+      const event = press(target)
+      assert.equal(handler!(view, event), true, `${where}: a press on ${target === drawn.pill ? "the pill's edge" : 'the icon'} is taken`)
+      assert.ok(event.prevented, `${where}: the browser puts no caret of its own`)
+      const { $from, empty } = view.state.selection
+      assert.ok(empty && $from.parent.type.name === 'buttonLabel', `${where}: the caret is in the button's words`)
+      assert.equal($from.pos, wordsStart + label.length, `${where}: at their end`)
+      assert.equal(buttonAt(view.state)?.pos, pos, `${where}: the button is chosen`)
+    }
+    assert.equal(focused, 3, `${where}: the editor takes the focus`)
+    // Typed next: the words go onto the button, and the title is as it was.
+    assert.equal(save(view.state.apply(view.state.tr.insertText('Go')).doc), typed, `${where}: typed onto the button`)
+
+    // The words themselves are the browser's (the caret where they were pressed); so are other presses.
+    view.state = EditorState.create({ doc, plugins: [plugin] })
+    for (const [what, event] of [
+      ['the words', press(drawn.words)],
+      ['a right press', press(drawn.glyph, { button: 2 })],
+      ['a shift press', press(drawn.glyph, { shiftKey: true })],
+      ['a ⌘ press', press(drawn.glyph, { metaKey: true })],
+    ] as const) {
+      assert.equal(handler!(view, event), false, `${where}: ${what} is left to the browser`)
+      assert.ok(!event.prevented)
+    }
+    // A drawn button (the strip's, the wall's: no `data-button-label`) and one outside this editor are never taken.
+    const outside = pillOf(label)
+    assert.equal(handler!({ ...view, dom: drawn.root }, press(outside.glyph)), false, `${where}: another editor's button`)
+    const shown = document.createElement('span')
+    shown.className = 'blk-btn'
+    const shownIcon = document.createElement('span')
+    shownIcon.className = 'blk-btn-icon'
+    shown.appendChild(shownIcon)
+    drawn.root.appendChild(shown)
+    assert.equal(handler!(view, press(shownIcon)), false, `${where}: a drawn button isn't the editor's`)
+  }
+
+  // `caretOnLabel` only acts from a place in a button's words.
+  const doc = loadSlide('# Exercise\n\n[Open](https://example.com){.button}')
+  const state = EditorState.create({ doc })
+  assert.equal(caretOnLabel(state, 1), null, 'in the title: nothing')
+  assert.equal(caretOnLabel(state, -1), null)
+  assert.equal(caretOnLabel(state, doc.content.size + 5), null)
 }
 
 console.log('buttonBlock: all passed')

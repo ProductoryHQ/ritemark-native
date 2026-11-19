@@ -70,6 +70,17 @@ export function labelEnd(node: PMNode, pos: number): number {
 }
 
 /**
+ * A press on the button outside its words (#848: its icon, or the pill's edge): the caret goes to the end of the
+ * button's own words, from `inside`, a place in them. Null when `inside` isn't in a button's words.
+ */
+export function caretOnLabel(state: EditorState, inside: number): Transaction | null {
+  if (!Number.isInteger(inside) || inside < 0 || inside > state.doc.content.size) return null
+  const $inside = state.doc.resolve(inside)
+  if ($inside.parent.type.name !== BUTTON_LABEL_NODE) return null
+  return state.tr.setSelection(TextSelection.create(state.doc, $inside.end()))
+}
+
+/**
  * The address sheet's Done: the button at `pos` takes `typed` as its address (a full https one, else null: the sheet
  * says why), and the caret goes onto its words. Empty: the address stays as it was, and only the caret moves.
  */

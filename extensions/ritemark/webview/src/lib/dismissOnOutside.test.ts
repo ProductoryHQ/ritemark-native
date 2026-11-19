@@ -202,6 +202,39 @@ function desk() {
   assert.equal(open, false, 'a press on the strip closes the sheet')
 }
 
+// ---- #848: a Button's address sheet belongs to its button too (`alsoInside`). A press on the button (its icon, its
+// words) is not outside: the sheet stays, and the focus goes where the press puts it. A press anywhere else closes it.
+{
+  const doc = new FakeDoc()
+  const bar = doc.body.add(new FakeNode('DIV'))
+  const address = bar.add(new FakeNode('BUTTON'))
+  const editor = doc.body.add(new FakeNode('DIV'))
+  const title = editor.add(new FakeNode('H1'))
+  const button = editor.add(new FakeNode('DIV'))
+  const pill = button.add(new FakeNode('SPAN'))
+  const icon = pill.add(new FakeNode('SVG'))
+  const words = pill.add(new FakeNode('SPAN'))
+  const sheet = doc.body.add(new FakeNode('DIV'))
+  const field = sheet.add(new FakeNode('INPUT'))
+  let open = true
+  let closes = 0
+  attachDismissOnOutside(doc, () => (open ? sheet : null), () => address, () => { open = false; closes++ }, () => address, () => button)
+  field.focus()
+  for (const target of [icon, words, pill, button]) doc.press(target)
+  assert.equal(open, true, "a press on the sheet's own button keeps the sheet")
+  assert.equal(doc.activeElement, field, 'and moves no focus itself')
+  doc.press(title)
+  assert.equal(open, false, 'a press elsewhere in the editor closes it')
+  assert.equal(closes, 1)
+  // Without one (every other popup), nothing changes: a press on that button is outside.
+  const other = new FakeDoc()
+  const otherButton = other.body.add(new FakeNode('DIV'))
+  let otherOpen = true
+  attachDismissOnOutside(other, () => (otherOpen ? sheet : null), () => address, () => { otherOpen = false })
+  other.press(otherButton)
+  assert.equal(otherOpen, false, 'no alsoInside: a press on the button is outside, as before')
+}
+
 // ---- Closed or detached: nothing more happens, and no listener is left behind.
 {
   const d = desk()
@@ -238,6 +271,7 @@ const here = (path: string) => readFileSync(fileURLToPath(new URL(path, import.m
   const property = here('../components/properties/AddPropertyMenu.tsx')
   assert.match(property, /useDismissOnOutside\(menuRef, onClose, \{/)
   assert.doesNotMatch(property, /addEventListener\('mousedown'/, 'the old mousedown that reopened the menu on its own button is gone')
+  assert.match(here('../extensions/buttonBlock/ButtonBlockTools.tsx'), /useDismissOnOutside\(sheetRef, \(\) => closeSheet\(false\), \{ trigger: \(\) => addressRef\.current, alsoInside: sheetButton, enabled: !!sheet \}\)/, "a Button's sheet keeps on a press on its button (#848)")
   assert.match(here('../components/flows/NodeConfigPanel.tsx'), /useDismissOnOutside\(varPickerRef, \(\) => setShowVarPicker\(false\), \{ enabled: showVarPicker, trigger: varFieldRef \}\)/)
 }
 
