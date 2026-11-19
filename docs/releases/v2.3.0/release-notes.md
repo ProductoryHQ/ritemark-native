@@ -46,6 +46,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Write the handout beside the slides.** Participants read it. A comment stays with you and never goes out.
 - **A deck opens on its slides.** Every deck opens showing only the slide. The switch on the deck's bar shows the handout beside it, or the handout alone.
 - **Scroll to the next slide.** With only the slide shown, one scroll over the slide or the space around it moves one slide. The arrow keys, Page Up, Page Down, Home and End do the same when you're not typing. A long column on the slide scrolls first.
+- **Scroll the slide beside the handout too.** With the handout shown, one scroll over the slide or the space around it moves one slide, and the handout goes to its part. Scrolling the handout still moves the slide along as you read.
 - **Give the deck a look, yourself or with AI.** **Theme** on the deck's bar picks a theme and changes its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
 - **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
 - **Present from Ritemark.** **Present** shows only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
