@@ -196,6 +196,8 @@ export function SlideLibraryPanel() {
         setFocusSearch((count) => count + 1)
       } else if (message.type === 'library/notice' && typeof message.text === 'string') {
         setNotice({ text: message.text, ...(typeof message.undo === 'string' ? { undo: message.undo } : {}) })
+        // The host's answer to an offer press, whatever it was: the buttons work again.
+        setOfferBusy(false)
       }
       else if (message.type === 'library/show' && (message.section === 'topics' || message.section === 'other')) {
         const section = message.section

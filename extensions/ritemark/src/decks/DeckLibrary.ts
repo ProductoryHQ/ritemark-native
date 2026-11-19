@@ -32,6 +32,9 @@ export interface DeckFiles {
    * write made has no Undo.
    */
   remove?(path: string): Promise<void>;
+  /** Sprint 165 PR 4: is there a folder here; and take away a folder a write made, only while it is empty. */
+  folderExists?(path: string): Promise<boolean>;
+  removeEmptyFolder?(path: string): Promise<void>;
 }
 
 /** A topic is a deck directly in the Slide library folder. */
@@ -111,6 +114,8 @@ export interface TopicWrite {
   count: number;
   /** Files the write made besides the topic (the built-in theme's, when the project had none), with their text. */
   made: Array<{ path: string; text: string }>;
+  /** Folders the write made (`Slide library/Themes`, `Slide library`), the deepest first. */
+  madeFolders: string[];
 }
 
 /**
@@ -409,7 +414,11 @@ export class DeckLibrary {
     if (previous !== null) writableDeckText(path, previous);
     const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
     const parts: CopiedPart[] = [];
+    // A slide named twice goes in once.
+    const named = new Set<string>();
     for (const slide of slides) {
+      if (named.has(`${slide.path}#${slide.id}`)) continue;
+      named.add(`${slide.path}#${slide.id}`);
       const source = normalizePath(slide.path);
       if (!source || source !== slide.path || !/\.deck\.md$/i.test(source)) throw new Error(`${slide.path} is no deck in this project.`);
       if (isTopicPath(source)) throw new Error(`${deckName(source)} is already in the library.`);
@@ -421,7 +430,9 @@ export class DeckLibrary {
     const written = parts.map(part => partText(part.kind, part.body, withPartHeading(part.kind, slideDataOf(part.kind, part.body), part.handout)));
     const kinds = parts.map(part => part.kind);
     // A topic made here names the built-in theme, whose file is made with it when the project has none; it says
-    // `handout: text`, as every deck the library writes a heading into.
+    // `handout: text`, as every deck the library writes a heading into. The folders made for them are noted for Undo.
+    const folders = previous === null ? [BUILT_IN_THEME_PATH.slice(0, BUILT_IN_THEME_PATH.lastIndexOf('/')), LIBRARY_FOLDER] : [];
+    const missing = this.files.folderExists ? (await Promise.all(folders.map(async folder => ((await this.files.folderExists!(folder)) ? null : folder)))).filter((folder): folder is string => !!folder) : [];
     const made = previous === null ? await this.builtInTheme() : [];
     const text = previous === null
       ? withTextHandoutMark(newTopicText(BUILT_IN_THEME_PATH, written.join('\n\n'), kinds.some(isBlockSlide)))
@@ -430,10 +441,10 @@ export class DeckLibrary {
       await this.files.write(path, text, { create: previous === null });
     } catch (error) {
       // Nothing went in: the theme file made for it goes again.
-      await this.removeMade(made);
+      await this.removeMade(made, missing);
       throw error;
     }
-    return { path, previous, written: text, count: parts.length, made };
+    return { path, previous, written: text, count: parts.length, made, madeFolders: missing };
   }
 
   /**
@@ -445,7 +456,7 @@ export class DeckLibrary {
     if (write.previous !== null) await this.files.write(write.path, write.previous);
     else if (this.files.remove) await this.files.remove(write.path);
     else return false;
-    await this.removeMade(write.made);
+    await this.removeMade(write.made, write.madeFolders);
     return true;
   }
 
@@ -461,12 +472,17 @@ export class DeckLibrary {
     }
   }
 
-  /** Files a write made, taken away again while each is as it was written. */
-  private async removeMade(made: ReadonlyArray<{ path: string; text: string }>): Promise<void> {
-    if (!this.files.remove) return;
+  /**
+   * Files a write made, taken away again while each is as it was written and no deck names it in its `theme:` line (a
+   * topic made meanwhile may), then the folders it made, while they are empty.
+   */
+  private async removeMade(made: ReadonlyArray<{ path: string; text: string }>, folders: readonly string[] = []): Promise<void> {
+    const named = made.length ? new Set((await this.deckThemeList()).map(deck => deck.theme?.trim()).filter(Boolean)) : new Set<string | undefined>();
     for (const file of made) {
+      if (!this.files.remove || named.has(file.path)) continue;
       if ((await this.files.read(file.path)) === file.text) await this.files.remove(file.path).catch(() => undefined);
     }
+    for (const folder of folders) await this.files.removeEmptyFolder?.(folder).catch(() => undefined);
   }
 
   /** The deck's slide `id` as written, for the AI's library tools (they name a slide, the buttons send its text). */

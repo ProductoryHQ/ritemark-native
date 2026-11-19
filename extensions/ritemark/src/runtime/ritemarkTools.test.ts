@@ -566,17 +566,26 @@ async function main(): Promise<void> {
     await library.insertCopies('Clients/Alpha.deck.md', ['ap01'], 'Clients/Beta.deck.md', undefined);
     // Two families: no offer, and Claude is told why.
     assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /make 2 families .* at least 3/);
+    // Three families sharing nothing: no slide is in enough of them (not "the library has them").
+    files['Talks/Delta.deck.md'] = ['---\ndeck: 2\n---\n', ...own('Delta')].join('\n');
+    assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /none is in a third of the project's 3 families/);
+    delete files['Talks/Delta.deck.md'];
     files['Talks/Gamma.deck.md'] = ['---\ndeck: 2\n---\n', ...own('Gamma'), block('gp01', "# Today's plan\n\nMorning and afternoon")].join('\n');
     const listed = (await runTool(tool('list_repeated_slides'), {}, context)).text;
     assert.match(listed, /^This slide is in most of the project's decks \(they make 3 families\):\n- "Today's plan" · Talks\/Gamma\.deck\.md#gp01 · in 3 decks, 3 families/);
     assert.equal(Object.keys(files).some((path) => path.startsWith('Slide library/')), false, 'listing writes nothing');
+    // Only a slide offered now; one named twice goes in once.
+    const notOffered = await runTool(tool('add_repeated_slides'), { slides: ['Clients/Alpha.deck.md#al0q'] }, context);
+    assert.equal(notOffered.isError, true);
+    assert.match(notOffered.text, /isn't offered now/);
     // Add: by the slide named, into Every training; then nothing is left to offer.
-    const added = await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md#gp01'] }, context);
+    const added = await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md#gp01', 'Talks/Gamma.deck.md#gp01'] }, context);
     assert.equal(added.text, 'Added 1 slide to the library under Every training (a new topic).');
     const topic = slidesOfText(files['Slide library/Every training.deck.md']);
     assert.equal(topic.length, 1);
     assert.match(topic[0].data.from ?? '', /^Talks\/Gamma\.deck\.md#gp01 @/);
     assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /library already has/);
+    assert.match((await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md#gp01'] }, context)).text, /isn't offered now/, 'never added twice');
     assert.equal((await runTool(tool('add_repeated_slides'), {}, context)).text, 'No slide is offered now, so nothing was added.');
     assert.equal((await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md'] }, context)).isError, true, 'a slide needs its id');
     assert.equal((await runTool(tool('add_repeated_slides'), { slides: ['../x.deck.md#ab12'] }, context)).isError, true);

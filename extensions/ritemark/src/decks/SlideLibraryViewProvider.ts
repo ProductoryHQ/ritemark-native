@@ -89,11 +89,15 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
     const isDeck = (uri: vscode.Uri) => /\.deck\.md$/i.test(uri.fsPath);
     // Sprint 165 PR 4: a folder of decks deleted at once (the Slide library folder, say) is reported as the folder
-    // alone, which the deck watcher never matches: any other delete outside Git's and the tools' folders lists the
-    // decks again, so the place never keeps showing decks that are gone (and the offer comes back).
+    // alone, which the deck watcher never matches. A delete of a folder that held indexed decks reads them again, so
+    // the place never keeps showing decks that are gone (and the offer comes back); any other delete does nothing.
     const deletes = vscode.workspace.createFileSystemWatcher('**/*', true, true, false);
     const listedAgain = (uri: vscode.Uri) => {
-      if (!isDeck(uri) && !/[\\/](?:\.git|node_modules|\.ritemark)(?:[\\/]|$)/.test(uri.fsPath)) this.refreshSoon();
+      const current = this.index;
+      const relative = current && !isDeck(uri) ? projectRelative(current.root, uri.fsPath) : null;
+      if (!current || !relative || !current.index.holdsUnder(relative)) return;
+      current.index.invalidate();
+      this.refreshSoon();
     };
     this.watching = [
       watcher,
@@ -158,9 +162,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private async handle(message: unknown): Promise<void> {
     const request = decodeLibraryRequest(message);
     if (!request) {
-      // A section the decoder refused (an id twice, too many slides) says so instead of doing nothing.
-      if (typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'library/insert-section') {
-        await this.post({ type: 'library/notice', text: 'The section could not be taken.' });
+      // A section or an offer the decoder refused (an id twice, too many slides) says so instead of doing nothing; the
+      // offer's buttons wait for an answer.
+      const type = typeof message === 'object' && message !== null ? (message as { type?: unknown }).type : undefined;
+      if (type === 'library/insert-section') await this.post({ type: 'library/notice', text: 'The section could not be taken.' });
+      else if (type === 'library/offer-add' || type === 'library/offer-not-now') {
+        await this.post({ type: 'library/notice', text: 'The offer could not do that. Try again.' });
+        await this.refresh();
       }
       return;
     }
@@ -212,36 +220,52 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
    */
   private async addOffered(slides: Array<{ path: string; id: string }>): Promise<void> {
     const library = isEnabled('decks') ? this.library() : null;
-    if (!library) return;
+    if (!library) {
+      await this.post({ type: 'library/notice', text: 'Open a project folder to keep a slide library.' });
+      await this.refresh();
+      return;
+    }
+    // The place's new state goes first, then the notice: the notice frees the offer's buttons, which must not show
+    // the slides just added for a second press.
+    let notice: Record<string, unknown>;
+    let reveal: string | null = null;
     try {
       const write = await library.addCopiesToTopic(slides, EVERY_TRAINING);
-      const token = this.keep(write);
       this.index?.index.invalidate(write.path);
-      await this.post({ type: 'library/reveal', path: write.path });
-      await this.post({
+      reveal = write.path;
+      notice = {
         type: 'library/notice',
         text: `${write.count === 1 ? '1 slide' : `${write.count} slides`} added to the library, in ${EVERY_TRAINING}.`,
-        undo: token,
-      });
+        undo: this.keep(write),
+      };
     } catch (error) {
-      await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The slides could not be added.' });
+      notice = { type: 'library/notice', text: error instanceof Error ? error.message : 'The slides could not be added.' };
     }
     await this.refresh();
+    if (reveal) await this.post({ type: 'library/reveal', path: reveal });
+    await this.post(notice);
   }
 
   /** Not now: the slides (every copy of each) are kept beside the library and never offered again. */
   private async notNow(slides: Array<{ path: string; id: string }>): Promise<void> {
     const library = isEnabled('decks') ? this.library() : null;
     const index = library ? this.indexOf() : null;
-    if (!library || !index) return;
+    if (!library || !index) {
+      await this.post({ type: 'library/notice', text: 'Open a project folder to keep a slide library.' });
+      await this.refresh();
+      return;
+    }
+    let text: string;
     try {
       const decks = await index.decks();
       await hideFromOffer(library.files, notNowSlides(decks, index.same(), slides));
-      await this.post({ type: 'library/notice', text: slides.length === 1 ? 'Hidden. This slide won’t be offered again.' : 'Hidden. These slides won’t be offered again.' });
+      text = slides.length === 1 ? 'Hidden. This slide won’t be offered again.' : 'Hidden. These slides won’t be offered again.';
     } catch (error) {
-      await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The offer could not be hidden.' });
+      text = error instanceof Error ? error.message : 'The offer could not be hidden.';
     }
+    // The state first, then the notice that frees the buttons (as Add does).
     await this.refresh();
+    await this.post({ type: 'library/notice', text });
   }
 
   /** The notice's Undo: the write taken back while nothing changed the topic since. */
@@ -250,17 +274,17 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const write = this.writes.get(token);
     this.writes.delete(token);
     if (!library || !write) return;
-    let undone = false;
+    let text: string;
     try {
-      undone = await library.undoTopicWrite(write);
-    } catch {
-      undone = false;
+      text = (await library.undoTopicWrite(write))
+        ? 'Undone. The slides are out of the library again.'
+        : `${EVERY_TRAINING} was changed since, so it is left as it is.`;
+    } catch (error) {
+      // The Trash refused (a drive without one), say: the slides stay, and the person is told why.
+      text = `The slides could not be taken out: ${error instanceof Error ? error.message : 'the file could not be moved to the Trash'}.`;
     }
     this.index?.index.invalidate(write.path);
-    await this.post({
-      type: 'library/notice',
-      text: undone ? 'Undone. The slides are out of the library again.' : `${EVERY_TRAINING} was changed since, so it is left as it is.`,
-    });
+    await this.post({ type: 'library/notice', text });
     await this.refresh();
   }
 

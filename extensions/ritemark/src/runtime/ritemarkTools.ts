@@ -634,7 +634,9 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
             return {
               text: offer.families < OFFER_MIN_FAMILIES
                 ? `No slide is offered: the project's decks make ${offer.families} famil${offer.families === 1 ? 'y' : 'ies'} (decks copied from each other count as one), and it takes at least ${OFFER_MIN_FAMILIES}.`
-                : 'No slide is offered: the library already has the slides in most decks, or the user hid them with Not now.',
+                : offer.withheld > 0
+                  ? 'No slide is offered: the library already has the slides in most decks, or the user hid them with Not now.'
+                  : `No slide is offered: none is in a third of the project's ${offer.families} families of decks (and in at least ${OFFER_MIN_FAMILIES}).`,
             };
           }
           const lines = offer.slides.map(slide => `- "${slide.title || 'Untitled slide'}" · ${slide.path}#${slide.id} · in ${slide.decks} decks, ${slide.families} families`);
@@ -650,21 +652,26 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
       {
         name: 'add_repeated_slides',
         description:
-          `Copy slides that list_repeated_slides gave into the Slide library's topic "${EVERY_TRAINING}" (made when it isn't there), as the library's Add all does: each a copy with its \`from:\` line, its handout and its prompts, in one write; the decks are never changed. Only when the user asks for it.`,
+          `Copy slides that list_repeated_slides offers into the Slide library's topic "${EVERY_TRAINING}" (made when it isn't there), as the library's Add all does: each a copy with its \`from:\` line, its handout and its prompts, in one write; the decks are never changed. Only slides offered now (not ones the library has or the user hid). Only when the user asks for it.`,
         input: {
           slides: z.array(z.string().min(3).max(1100)).min(1).max(MAX_OFFER).optional()
             .describe('The slides to add, each as `<deck path>#<slide id>` the way list_repeated_slides gives them. Left out: every slide offered now.'),
         },
         run: async (args) => {
           const { library: project } = library();
+          const offered = (await projectOffer(project)).offer.slides.map(slide => ({ path: slide.path, id: slide.id }));
+          const isOffered = new Set(offered.map(slide => `${slide.path}#${slide.id}`));
           const chosen = args.slides
-            ? (args.slides as string[]).map(entry => {
+            ? [...new Set(args.slides as string[])].map(entry => {
               const cut = entry.lastIndexOf('#');
               const id = entry.slice(cut + 1).trim();
               if (cut < 0 || !/^[0-9a-z]{1,16}$/i.test(id)) throw new Error(`${entry} names no slide. Use list_repeated_slides to see them.`);
-              return { path: deckPathOf(entry.slice(0, cut)), id };
+              const slide = { path: deckPathOf(entry.slice(0, cut)), id };
+              // Only what the library offers now: never a slide it has already, nor one the user hid with Not now.
+              if (!isOffered.has(`${slide.path}#${slide.id}`)) throw new Error(`${entry} isn't offered now. Use list_repeated_slides to see the slides that are.`);
+              return slide;
             })
-            : (await projectOffer(project)).offer.slides.map(slide => ({ path: slide.path, id: slide.id }));
+            : offered;
           if (!chosen.length) return { text: 'No slide is offered now, so nothing was added.' };
           const write = await project.addCopiesToTopic(chosen, EVERY_TRAINING);
           return { text: `Added ${write.count === 1 ? '1 slide' : `${write.count} slides`} to the library under ${EVERY_TRAINING}${write.previous === null ? ' (a new topic)' : ''}.` };

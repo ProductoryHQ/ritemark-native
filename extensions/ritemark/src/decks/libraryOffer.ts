@@ -62,7 +62,15 @@ export interface LibraryOffer {
   slides: OfferedSlide[];
   /** How many families the project's decks make. */
   families: number;
+  /** Slides in enough families but left out: the library has them, or Not now hid them. */
+  withheld: number;
 }
+
+/**
+ * A slide id the place and the tools can send (`deckProtocol.ts`): a slide whose id was written by hand otherwise
+ * ("intro-1") is never offered, as it could be neither added nor hidden.
+ */
+const SENDABLE_ID = /^[0-9a-z]{1,16}$/i;
 
 /** One slide Not now hid: its title (for a person reading the file), its copies' places and its words' hashes. */
 export interface NotNowSlide {
@@ -192,28 +200,35 @@ export function offerOf(decks: readonly OfferDeck[], same: SameSlides, notNow: N
   const family = familiesOf(sets);
   const familyCount = new Set(family.values()).size;
   const need = Math.max(OFFER_MIN_FAMILIES, Math.ceil(familyCount * OFFER_SHARE));
-  if (familyCount < need) return { slides: [], families: familyCount };
+  if (familyCount < need) return { slides: [], families: familyCount, withheld: 0 };
   const hidden = hiddenSets(notNow);
   const offered: Array<OfferedSlide & { modified: number }> = [];
+  let withheld = 0;
   for (const members of groups.values()) {
-    // The library has it already.
-    if (members.some(member => decks[member.deck].summary.topic)) continue;
     const families = new Set(members.flatMap(member => (family.has(member.deck) ? [family.get(member.deck)!] : [])));
     if (families.size < need) continue;
+    // The library has it already.
+    if (members.some(member => decks[member.deck].summary.topic)) {
+      withheld++;
+      continue;
+    }
     const isHidden = members.some(member => {
       const deck = decks[member.deck];
       const id = deck.summary.slides[member.at].id;
       const hash = wordsHash(deck.words[member.at] ?? []);
       return (id !== undefined && hidden.places.has(`${deck.summary.path}#${id}`)) || (hash !== null && hidden.words.has(hash));
     });
-    if (isHidden) continue;
+    if (isHidden) {
+      withheld++;
+      continue;
+    }
     // Its newest copy: the slide in the deck changed last (ties by path, then place), one with an id; the open deck's
     // only when no other deck has one.
     let newest: Member | null = null;
     const isOpen = (member: Member) => decks[member.deck].summary.path === options.active;
     for (const member of members) {
       const slide = decks[member.deck].summary.slides[member.at];
-      if (!slide.id) continue;
+      if (!slide.id || !SENDABLE_ID.test(slide.id)) continue;
       if (!newest || (isOpen(newest) && !isOpen(member))) {
         newest = member;
         continue;
@@ -240,6 +255,7 @@ export function offerOf(decks: readonly OfferDeck[], same: SameSlides, notNow: N
   return {
     slides: offered.slice(0, MAX_OFFER).map(slide => ({ path: slide.path, index: slide.index, id: slide.id, title: slide.title, families: slide.families, decks: slide.decks })),
     families: familyCount,
+    withheld,
   };
 }
 
@@ -280,11 +296,21 @@ export async function readNotNow(files: Pick<DeckFiles, 'read'>): Promise<NotNow
   return parseNotNow(await files.read(NOT_NOW_PATH));
 }
 
-/** Not now for these slides, added to what the project keeps: they aren't offered again. */
+/**
+ * Not now for these slides, added to what the project keeps: they aren't offered again. A file that is there but isn't
+ * JSON (edited by hand) is never written over, which would bring back every slide it hid: the person is told instead.
+ */
 export async function hideFromOffer(files: Pick<DeckFiles, 'read' | 'write'>, slides: readonly NotNowSlide[]): Promise<void> {
   if (!slides.length) return;
-  const kept = await readNotNow(files);
-  await files.write(NOT_NOW_PATH, notNowText({ slides: [...kept.slides, ...slides] }));
+  const text = await files.read(NOT_NOW_PATH);
+  if (text !== null && text.trim()) {
+    try {
+      JSON.parse(text);
+    } catch {
+      throw new Error(`${NOT_NOW_PATH} can't be read, so nothing was hidden. Fix it or delete it, then try again.`);
+    }
+  }
+  await files.write(NOT_NOW_PATH, notNowText({ slides: [...parseNotNow(text).slides, ...slides] }));
 }
 
 /**

@@ -16,10 +16,19 @@ import {
 } from './libraryOffer';
 import { copiedDeckText } from './newDeck';
 
-/** An in-memory project whose files' times the test sets. `remove` as the Trash does. */
-function project(files: Record<string, string>, times: Record<string, number>) {
+/**
+ * An in-memory project whose files' times the test sets. `remove` as the Trash does; a folder is there while a file is
+ * in it, or while `emptyFolders` names it (a folder the person made and left empty).
+ */
+function project(files: Record<string, string>, times: Record<string, number>, emptyFolders = new Set<string>()) {
   let clock = Date.parse('2026-11-19T12:00');
+  const holds = (folder: string) => Object.keys(files).some(path => path.startsWith(`${folder}/`));
   const deckFiles: DeckFiles = {
+    async folderExists(folder) { return emptyFolders.has(folder) || holds(folder); },
+    async removeEmptyFolder(folder) {
+      if (holds(folder)) throw new Error('not empty');
+      emptyFolders.delete(folder);
+    },
     async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map(path => ({ path, modified: times[path] ?? 1 })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text, options) {
@@ -218,7 +227,7 @@ async function run() {
     for (let n = 2; n <= 5; n++) files[`A/Course ${n}.deck.md`] = withOwn(files['A/Course 1.deck.md'], 'Alpha', 20 + n);
     files['B/Course 1.deck.md'] = deck(...own('Beta', 8), slide('bp01', PLAN), slide('bq01', QUESTIONS));
     const { offer } = await offerNow(deckFiles);
-    assert.deepEqual(offer, { slides: [], families: 2 });
+    assert.deepEqual(offer, { slides: [], families: 2, withheld: 0 });
     // A third family brings it.
     files['C/Talk.deck.md'] = deck(...own('Gamma', 5), slide('gp01', PLAN));
     const third = await offerNow(deckFiles);
@@ -237,6 +246,7 @@ async function run() {
     assert.equal(write.previous, null, 'made');
     assert.equal(write.count, 5);
     assert.deepEqual(write.made.map(file => file.path), [BUILT_IN_THEME_PATH]);
+    assert.deepEqual(write.madeFolders, ['Slide library/Themes', 'Slide library'], 'the folders it made, the deepest first');
     const text = files[topic];
     assert.ok(text.startsWith(`---\ndeck: 2\ntheme: ${BUILT_IN_THEME_PATH}\nhandout: text\n---\n\n`), text.slice(0, 120));
     assert.ok(isTextHandout(text));
@@ -359,6 +369,58 @@ async function run() {
     assert.ok(offer.slides.every(entry => entry.path !== KEYNOTE), 'another deck\'s copy');
     // The Keynote's copies left out, the plan's newest is the Kickoff's (5 Nov), the others' a Fernhollow deck's.
     assert.deepEqual(offer.slides.map(entry => entry.title).slice(0, 3), ["Today's plan", 'Thank you', 'Questions and next steps']);
+  }
+
+  // ---- Review round 1 (#895). A slide whose id was written by hand ("intro-1") is never offered: it could be neither
+  // added nor hidden. The slides left out because the library has them are counted. A slide named twice goes in once.
+  {
+    const files: Record<string, string> = {};
+    const times: Record<string, number> = {};
+    const deckFiles = project(files, times);
+    const library = new DeckLibrary(deckFiles);
+    for (const [at, name] of ['Alpha', 'Beta', 'Gamma'].entries()) {
+      files[`Talks/${name}.deck.md`] = deck(...own(name, 5), slide('intro-1', '# Welcome\n\nCoffee is in the kitchen'), slide(`p${at}aa`, PLAN));
+    }
+    const { offer, titles } = await offerNow(deckFiles);
+    assert.deepEqual(titles, ["Today's plan"], 'the hand-written ids\' slide is not offered');
+    assert.equal(offer.withheld, 0);
+    await library.addCopiesToTopic([offer.slides[0], offer.slides[0]].map(entry => ({ path: entry.path, id: entry.id })), EVERY_TRAINING);
+    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`]).length, 1, 'named twice, added once');
+    const after = (await offerNow(deckFiles)).offer;
+    assert.deepEqual([after.slides.length, after.withheld], [0, 1], 'withheld: the library has it');
+
+    // Not now over a file that isn't JSON (edited by hand): refused, the file as it was, nothing it hid comes back.
+    const broken = '{ "slides": [ { "places": ["A.deck.md#ab12"] }, ] }';
+    files[NOT_NOW_PATH] = broken;
+    await assert.rejects(hideFromOffer(deckFiles, [{ places: ['Talks/Alpha.deck.md#p0aa'], words: [] }]), /can't be read, so nothing was hidden/);
+    assert.equal(files[NOT_NOW_PATH], broken);
+  }
+  {
+    // A Slide library folder the person made and left empty stays after Undo; only Themes, which the add made, goes.
+    const files: Record<string, string> = {};
+    const times: Record<string, number> = {};
+    const deckFiles = project(files, times, new Set(['Slide library']));
+    const library = new DeckLibrary(deckFiles);
+    files['A/One.deck.md'] = deck(slide('ap01', PLAN));
+    const write = await library.addCopiesToTopic([{ path: 'A/One.deck.md', id: 'ap01' }], EVERY_TRAINING);
+    assert.deepEqual(write.madeFolders, ['Slide library/Themes']);
+    // A topic made meanwhile names the theme file: Undo leaves it.
+    files['Slide library/Openings.deck.md'] = `---\ndeck: 2\ntheme: ${BUILT_IN_THEME_PATH}\n---\n\n${slide('op01', '# Welcome')}`;
+    assert.equal(await library.undoTopicWrite(write), true);
+    assert.equal(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`], undefined);
+    assert.ok(files[BUILT_IN_THEME_PATH], 'the theme file a topic names stays');
+    assert.ok(await deckFiles.folderExists!('Slide library'), 'the person\'s own folder stays');
+  }
+  {
+    // A folder deleted at once (the watcher reports the folder alone): the index says whether it held decks.
+    const { deckFiles } = await balanced();
+    const index = new DeckIndex(deckFiles);
+    await index.decks();
+    assert.ok(index.holdsUnder('Clients'));
+    assert.ok(index.holdsUnder('Clients/Northwind/'));
+    assert.ok(!index.holdsUnder('Client'), 'a folder whose name only starts the same');
+    assert.ok(!index.holdsUnder('Talks/Kickoff.deck.md'), 'a deck is no folder');
+    assert.ok(!index.holdsUnder('build'));
   }
 
   console.log('libraryOffer: all tests passed');
