@@ -2,7 +2,8 @@
  * Moving between slides in the full slide view (Jarmo, 16 November: "full slide views peaks mouse scroll ja arrows
  * navigeerima slaidide vahel edasi-tagasi"). With the handout hidden, the slide fills the deck view, and there is no
  * handout to scroll: the wheel over the slide and the keys go to the next or previous slide instead. Skipped slides
- * count, since this is editing, not Present. With the handout shown, scrolling stays the scroll rule's.
+ * count, since this is editing, not Present. Over the slide, a gesture means the same in every view (#855): beside the
+ * handout too, the wheel over the slide moves one slide, while the handout's own wheel stays the scroll rule's.
  *
  * Pure functions, kept apart from the deck view so they can be tested on their own.
  */
@@ -85,20 +86,35 @@ export function boxScrolls(box: Pick<WheelBox, 'scrollTop' | 'scrollHeight' | 'c
 }
 
 /**
- * The box that takes a wheel event over the stage in the full slide view, or null when nothing under the pointer
- * scrolls that way and the slide moves. A box is a pane or a column on the slide that holds more than its room (the
- * design: it scrolls, in the editor too), or, outside the slide, the stage itself when it is taller than its room. Over
- * the slide the stage never counts, so the slide always moves there, as before; over the empty bands the stage scrolls
- * to its end first and the next gesture moves the slide (before, the bands did nothing once the stage could scroll).
+ * Where the stage's wheel moves the slide: 'alone' in Slide only, where the slide and the space around it do; 'beside'
+ * in Slide and handout (#855), where the slide itself does and the space around it stays the stage's own scroll. Null
+ * with no slide shown (Handout only), where there is no stage.
  */
-export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string): T | null {
+export type StageWheel = 'alone' | 'beside'
+
+export function stageWheelOf(slideShown: boolean, handoutShown: boolean): StageWheel | null {
+  return !slideShown ? null : handoutShown ? 'beside' : 'alone'
+}
+
+/**
+ * The box that takes a wheel event over the stage, or null when nothing under the pointer scrolls that way and the
+ * slide moves. A box is a pane or a column on the slide that holds more than its room (the design: it scrolls, in the
+ * editor too), or, outside the slide, the stage itself. Over the slide the stage never counts, so the slide moves
+ * there, in both views. Outside it, in Slide only, the stage takes the wheel while it is taller than its room and can
+ * scroll that way, and at its end the next gesture moves the slide (before, the bands did nothing once the stage could
+ * scroll); beside the handout the stage always takes it, as before #855, so the space around the slide and a row under
+ * it never step: there only the slide does.
+ */
+export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string, view: StageWheel = 'alone'): T | null {
   let overSlide = false
   for (let box: T | null = target; box && box !== stage; box = box.parentElement as T | null) {
     if (box.classList?.contains('deck-big')) overSlide = true
     // The cheap reads first: only a box with room left that way is asked for its style.
     if (hasRoom(box, delta) && boxScrolls(box, overflowOf(box), delta)) return box
   }
-  return !overSlide && hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
+  if (overSlide) return null
+  if (view === 'beside') return stage
+  return hasRoom(stage, delta) && boxScrolls(stage, overflowOf(stage), delta) ? stage : null
 }
 
 /**
@@ -113,7 +129,8 @@ export function wheelRoute(gesture: WheelGesture, delta: number, now: number, ta
   const current = gestureAt(gesture, delta, now)
   if (current.held) return { gesture: { ...current, last: now }, move: 0, scroll: hasRoom(current.held, delta) }
   const box = !current.spent && Number.isFinite(delta) && delta !== 0 ? takerOf() : null
-  if (box) return { gesture: { sum: 0, spent: false, last: now, held: box }, move: 0, scroll: true }
+  // The browser scrolls the box while it has room: beside the handout the stage takes the bands' gesture even with none.
+  if (box) return { gesture: { sum: 0, spent: false, last: now, held: box }, move: 0, scroll: hasRoom(box, delta) }
   return { ...wheelStep(current, delta, now), scroll: false }
 }
 

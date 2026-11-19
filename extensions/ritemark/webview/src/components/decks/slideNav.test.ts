@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { NO_GESTURE, WHEEL_QUIET_MS, WHEEL_STEP, boxScrolls, slideKeyOf, slideKeyTarget, wheelPixels, wheelRoute, wheelStep, wheelTaker, type WheelBox, type WheelGesture } from './slideNav'
+import { NO_GESTURE, WHEEL_QUIET_MS, WHEEL_STEP, boxScrolls, slideKeyOf, slideKeyTarget, stageWheelOf, wheelPixels, wheelRoute, wheelStep, wheelTaker, type WheelBox, type WheelGesture } from './slideNav'
 
 /** A run of wheel events, `[delta, ms]`, from no gesture: the moves they make. */
 function moves(events: Array<[number, number]>): number[] {
@@ -101,6 +101,28 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(taker(box('group', tallAtEnd), tallAtEnd, 100), 'slide', "the band at the stage's end moves the slide (it did nothing)")
   assert.equal(taker(box('group', tallAtEnd), tallAtEnd, -100), 'stage', 'and up scrolls the stage back')
 
+  // Slide and handout (#855, the Experience lead after Jarmo's "mina eelistan alati consistencyt"): over the slide, a
+  // gesture means the same in every view. Before, the stage's wheel listened in Slide only, so over the slide beside
+  // the handout nothing moved. Over the slide the slide moves and a long column scrolls first, as in Slide only; the
+  // space around it and a row under it stay the stage's own scroll, whether or not it can scroll: they never step.
+  const beside = (target: Box | null, on: Box, delta: number) => wheelTaker(target, on, delta, overflowOf, 'beside')?.name ?? 'slide'
+  assert.equal(beside(words, stage, 100), 'slide', 'beside the handout, over the words: the slide moves')
+  assert.equal(beside(big, stage, -100), 'slide')
+  assert.equal(beside(inColumn, stage, 100), 'column', 'a long column scrolls first')
+  assert.equal(beside(inColumn, stage, -100), 'slide', 'at its top, up moves the slide back')
+  assert.equal(beside(inColumnAtEnd, stage, 100), 'slide', 'at its end, down moves the slide on')
+  assert.equal(beside(group, stage, 100), 'stage', 'the band beside the handout stays the stage (it has nothing to scroll)')
+  assert.equal(beside(stage, stage, 100), 'stage')
+  assert.equal(beside(tallGroup, tall, 100), 'stage', 'a row under the slide scrolls the stage')
+  assert.equal(beside(box('group', tallAtEnd), tallAtEnd, 100), 'stage', "at the stage's end the band still never steps")
+  assert.equal(beside(tallBig, tall, 100), 'slide', 'over the slide on a tall stage: the slide moves')
+  assert.equal(wheelTaker(group, stage, 100, overflowOf, 'alone')?.name ?? 'slide', 'slide', "Slide only's bands are unchanged")
+  // Which views route the stage's wheel: Slide only and Slide and handout, never Handout only (no slide on show).
+  assert.equal(stageWheelOf(true, false), 'alone', 'Slide only')
+  assert.equal(stageWheelOf(true, true), 'beside', 'Slide and handout: the wheel over the slide moves it too')
+  assert.equal(stageWheelOf(false, true), null, 'Handout only: no stage')
+  assert.equal(stageWheelOf(false, false), null)
+
   /**
    * A run of wheel events, `[delta, ms, over]`, on a long column (882 in 382) and a tall stage, each scrolled as the
    * browser would when the route lets it (the latched box takes the delta, up to its end). The moves, how many events
@@ -160,6 +182,20 @@ function moves(events: Array<[number, number]>): number[] {
   assert.equal(route(flick('slide')).asked, 2)
   // A first event with no delta decides nothing.
   assert.equal(route([[0, 0, 'slide'], [30, 16, 'column']]).column, 30)
+  // Beside the handout (#855) a gesture that starts on the band is the stage's to its end, even with nothing to scroll:
+  // a flick there moves no slide, and the browser is let scroll only while the stage has room.
+  {
+    const fits = box('stage', null, 'auto', 780, 780)
+    let gesture: WheelGesture = NO_GESTURE
+    const out = { moves: 0, scrolled: 0 }
+    for (const [delta, at] of flick('band')) {
+      const step = wheelRoute(gesture, delta, at, () => wheelTaker(box('group', fits), fits, delta, overflowOf, 'beside'))
+      gesture = step.gesture
+      out.moves += Math.abs(step.move)
+      if (step.scroll) out.scrolled++
+    }
+    assert.deepEqual(out, { moves: 0, scrolled: 0 }, 'a flick on the band beside the handout: nothing moves')
+  }
 }
 
 /** A fake element: its tag, whether it's editable, and the selectors it sits inside. */
@@ -216,24 +252,27 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   assert.equal(key('ArrowRight', {}, 'button'), 5)
 }
 
-// The deck view (its source read): only with the handout hidden, through the strip's own path (pick), and the scroll
-// rule untouched otherwise.
+// The deck view (its source read): the wheel whenever the slide is shown (#855), the keys only with the handout hidden,
+// both through the strip's own path (pick), and the handout's scroll rule untouched.
 {
   const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(view.includes('const fullSlide = slideShown && !handoutShown'))
-  assert.ok(/if \(!fullSlide \|\| !stage\) return/.test(view) && /if \(!fullSlide\) return/.test(view), 'both listen only in the full slide view')
-  assert.ok(/const goTo = useCallback\([^]*?pick\(next\)/.test(view), "the strip's own pick moves the slide")
+  assert.ok(view.includes('const stageWheel = stageWheelOf(slideShown, handoutShown)'), 'the views the wheel listens in')
+  assert.ok(/if \(!stageWheel \|\| !stage\) return/.test(view), 'the wheel: in Slide only and in Slide and handout')
+  assert.ok(!/if \(!fullSlide \|\| !stage\) return/.test(view), 'no longer in Slide only alone (#855)')
+  assert.ok(/if \(!fullSlide\) return/.test(view), 'the keys: in Slide only, as before')
+  assert.ok(/const goTo = useCallback\([^]*?pick\(next\)/.test(view), "the strip's own pick moves the slide (and scrolls the handout to its part)")
   assert.ok(view.includes("stage.addEventListener('wheel', onWheel, { passive: false })"), 'the wheel over the stage')
   // #824: what scrolls first decides, and the bands are no longer left out once the stage can scroll.
   // The wiring only (the rules are tested above): the stage's wheel asks wheelTaker through wheelRoute, and prevents the
   // default only when the route doesn't scroll a box.
   const wheel = /const onWheel = \(event: WheelEvent\) => \{([^]*?)\n?\s*\} stage\.addEventListener\('wheel'/.exec(view)?.[1] ?? ''
-  assert.ok(/wheelTaker\(event\.target[^)]*, stage, delta,/.test(wheel), 'what is under the pointer, up to the stage')
+  assert.ok(/wheelTaker\(event\.target[^)]*, stage, delta, .*?, stageWheel\)/.test(wheel), 'what is under the pointer, up to the stage, by the view')
   assert.ok(/wheelRoute\(gesture, delta, event\.timeStamp, \w+\)/.test(wheel))
   assert.ok(/if \(!route\.scroll\) event\.preventDefault\(\)/.test(wheel) && !/^\s*event\.preventDefault\(\)/.test(wheel))
-  // The slide's scrolling boxes keep a turn's rest to themselves in Slide only, so it never scrolls the stage.
+  // The slide's scrolling boxes keep a turn's rest to themselves in both views, so it never scrolls the stage.
   const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
-  assert.ok(css.includes('.deck-stage.is-alone .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }'))
+  assert.ok(css.includes('.deck-stage .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }'))
   assert.ok(!view.includes("!target?.closest?.('.deck-big')) return"), 'the early return for the bands is gone')
   // The handout's wheel rule is still there for the handout.
   assert.ok(view.includes('const stop = wheelStop(state, delta, currentRef.current)'))
