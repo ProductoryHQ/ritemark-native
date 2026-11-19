@@ -76,6 +76,8 @@ import {
   Copy,
   CurrencyDollar,
   Dot,
+  DotOutline,
+  Smiley,
   DotsThree,
   DotsThreeVertical,
   Download,
@@ -272,6 +274,9 @@ const iconMap = {
   'copy': Copy,
   'currency-dollar': CurrencyDollar,
   'dot': Dot,
+  // Sprint 167 PR 2: a Boxes block's Mark menu (Icon, Dot; Number and Arrow are `list-numbers` and `arrow-right`).
+  'dot-outline': DotOutline,
+  'smiley': Smiley,
   'dots-three': DotsThree,
   'dots-three-vertical': DotsThreeVertical,
   'download': Download,
