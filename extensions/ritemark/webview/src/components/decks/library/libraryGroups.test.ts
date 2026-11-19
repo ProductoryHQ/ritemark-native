@@ -1,6 +1,7 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
-import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionIds, sectionsOf, slideCount } from './libraryGroups'
+import { readFileSync } from 'node:fs'
+import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -103,4 +104,23 @@ console.log('libraryGroups: ok')
   assert.equal(sectionIds([{ id: 'a1' }, { id: 'a1' }]), null, 'an id twice')
   assert.equal(sectionIds([{ id: 'intro-1' }]), null, 'a hand-written id the host refuses')
   assert.equal(sectionIds(Array.from({ length: 201 }, (_, i) => ({ id: `i${i}` }))), null)
+}
+
+// The Experience lead on #861: Take section names the count, keeps its reasons when it can't be taken, and shows only
+// while the pointer is over its section or the heading holds the keyboard, so at rest the title has the full width.
+{
+  assert.equal(takeSectionTip('Insert after slide 2', ['a', 'b', 'c'], 3), 'Take section · 3 slides')
+  assert.equal(takeSectionTip('Insert after slide 2', ['a'], 1), 'Take section · 1 slide')
+  assert.equal(takeSectionTip(null, ['a'], 1), 'Open a deck to insert this section into it.')
+  assert.match(takeSectionTip('Insert as slide 1', null, 2), /need ids/)
+  const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  const rule = (selector: string) => {
+    const at = css.indexOf(`${selector} {`)
+    return at < 0 ? '' : css.slice(at, css.indexOf('}', at))
+  }
+  assert.match(rule('.deck-lib-take-slot'), /position: absolute/, 'at rest the button takes no room from the title')
+  assert.match(rule('.deck-lib-take-slot'), /opacity: 0/)
+  assert.match(css, /\.deck-lib-section:hover \.deck-lib-take-slot/, 'shown while the pointer is over the section')
+  assert.match(css, /\.deck-lib-section-head:focus-within \.deck-lib-take-slot/, 'shown while the heading holds the keyboard')
+  assert.match(rule('.deck-lib-section-title'), /-webkit-line-clamp: 2/, 'two lines before an ellipsis')
 }

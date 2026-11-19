@@ -121,3 +121,13 @@ export function sectionIds(slides: ReadonlyArray<{ id?: string }>): string[] | n
   if (!ids.every(id => /^[0-9a-z]{1,16}$/i.test(id)) || new Set(ids).size !== ids.length) return null
   return ids
 }
+
+/**
+ * Take section's tooltip (the Experience lead on #861): the count when it can be taken ("Take section · 3 slides"),
+ * else why not.
+ */
+export function takeSectionTip(label: string | null, ids: readonly string[] | null, slides: number): string {
+  if (!label) return 'Open a deck to insert this section into it.'
+  if (!ids) return "This section's slides need ids of their own. Open its deck once to give them."
+  return `Take section · ${slideCount(slides)}`
+}

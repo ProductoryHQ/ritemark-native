@@ -14,7 +14,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { deckExpanded, deckMeta, groupByFolder, sectionIds, sectionsOf, type DeckSection } from './libraryGroups'
+import { deckExpanded, deckMeta, groupByFolder, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -270,20 +270,14 @@ export function SlideLibraryPanel() {
     const sectionBlock = (shown: LibraryDeck, section: DeckSection<LibrarySlide>) => {
       const ids = sectionIds(section.slides)
       const ready = !!label && !!ids
-      const count = section.slides.length === 1 ? '1 slide' : `${section.slides.length} slides`
-      const where = state.active && state.active.count > 0 && state.active.current >= 0
-        ? `after slide ${Math.min(state.active.current, state.active.count - 1) + 1}`
-        : 'at the start of the open deck'
-      const tip = !label
-        ? 'Open a deck to insert this section into it.'
-        : ready
-          ? `Insert its ${count} ${where}, with their handout and prompts`
-          : "This section's slides need ids of their own. Open its deck once to give them."
+      const tip = takeSectionTip(label, ids, section.slides.length)
       return (
         <div key={`${shown.path}#section-${section.slides[0].index}`} className="deck-lib-section">
           <div className="deck-lib-section-head">
             {section.number ? <span className="deck-lib-section-number">{section.number}</span> : null}
             <span className="deck-lib-section-title">{section.title}</span>
+            {/* #861: shown only while the pointer is over the section or the heading holds the keyboard (CSS). */}
+            <span className="deck-lib-take-slot">
             <Tooltip label={tip} side="bottom">
               <Button
                 variant="secondary"
@@ -297,6 +291,7 @@ export function SlideLibraryPanel() {
                 Take section
               </Button>
             </Tooltip>
+            </span>
           </div>
           {grid(section.slides)}
         </div>
