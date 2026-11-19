@@ -3,12 +3,12 @@
 Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-block-details-prN` is created before its first edit. Shots on synthetic decks only.
 
 ## PR 1: logo corner, E (High), branch `sprint-167-block-details-pr1`, can start now
-- [x] Issue created in milestone v2.3.0 (manager): #835: to be created
-- [ ] Where becomes Top | Bottom and Left | Right; old theme values still read (R6)
-- [ ] Room for the logo in all four corners on the editor, strip, wall and page
-- [ ] Tests: theme file round-trip, the four corners
-- [ ] Shots of a title slide with the logo bottom left; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Issue created in milestone v2.3.0 (manager): #835
+- [x] Where becomes Top | Bottom and Left | Right; old theme values still read (R6)
+- [x] Room for the logo in all four corners on the editor, strip, wall and page
+- [x] Tests: theme file round-trip, the four corners
+- [x] Shots of a title slide with the logo bottom left; the Experience lead's look
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 2: Mark, C (Standard), branch `sprint-167-block-details-pr2`, after Sprint 164 PR 3 merges
 - [x] Issue created in milestone v2.3.0 (manager): #836: to be created

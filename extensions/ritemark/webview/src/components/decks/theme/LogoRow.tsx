@@ -15,7 +15,7 @@
  * The picture is always an `<img>`: an SVG logo is never put into the tab as markup.
  */
 import { useState, type DragEvent } from 'react'
-import { BUILT_IN_THEME, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, groundOf, offersSecondLogo, otherGround, secondLogoGround, type DeckTheme, type LogoGround, type LogoOn, type LogoPlace } from '../../../../../src/decks/deckTheme'
+import { BUILT_IN_THEME, DEFAULT_LOGO_ON, DEFAULT_LOGO_PLACE, groundOf, offersSecondLogo, otherGround, secondLogoGround, type DeckTheme, type LogoGround, type LogoEdge, type LogoOn, type LogoSide, logoEdgeOf, logoPlaceOf, logoSideOf } from '../../../../../src/decks/deckTheme'
 import { SECOND_LOGO_FIELDS, type ThemeChanges } from '../../../../../src/decks/themeFile'
 import type { ThemeLogoState } from '../../../../../src/decks/themeProtocol'
 import { LOGO_TOO_LARGE, logoKindOfName, MAX_LOGO_BYTES } from '../../../../../src/decks/themeLogo'
@@ -25,10 +25,14 @@ import { Icon } from '../../ui/Icon'
 import { SegmentedControl } from '../../ui/segmented-control'
 import { Tooltip } from '../../ui/tooltip'
 
-export const LOGO_PLACE_OPTIONS: Array<{ value: LogoPlace; label: string }> = [
-  { value: 'top-left', label: 'Top left' },
-  { value: 'top-right', label: 'Top right' },
-  { value: 'bottom-right', label: 'Bottom right' },
+/** Sprint 167 PR 1: Where is two segments, Top | Bottom and Left | Right, so any of the four corners can be chosen. */
+export const LOGO_EDGE_OPTIONS: Array<{ value: LogoEdge; label: string }> = [
+  { value: 'top', label: 'Top' },
+  { value: 'bottom', label: 'Bottom' },
+]
+export const LOGO_SIDE_OPTIONS: Array<{ value: LogoSide; label: string }> = [
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
 ]
 export const LOGO_ON_OPTIONS: Array<{ value: LogoOn; label: string }> = [
   { value: 'every-slide', label: 'Every slide' },
@@ -223,9 +227,14 @@ export function LogoRows({ theme, logo, ground, onChange }: LogoRowsProps) {
       {offered && secondProblem ? <p className="theme-logo-problem" role="status">{secondProblem}</p> : null}
       <div className="theme-row">
         <span className="theme-row-label">Where</span>
-        <Tooltip label="The corner of the slide the logo sits in" className="theme-seg">
-          <SegmentedControl aria-label="Where the logo sits" className="theme-seg-control" value={place} onValueChange={value => onChange({ logoAt: value as LogoPlace })} options={LOGO_PLACE_OPTIONS} />
-        </Tooltip>
+        <div className="theme-seg-pair">
+          <Tooltip label="The logo at the top of the slide, or at the bottom" className="theme-seg">
+            <SegmentedControl aria-label="The logo at the top or the bottom" className="theme-seg-control" value={logoEdgeOf(place)} onValueChange={value => onChange({ logoAt: logoPlaceOf(value as LogoEdge, logoSideOf(place)) })} options={LOGO_EDGE_OPTIONS} />
+          </Tooltip>
+          <Tooltip label="The logo on the left of the slide, or on the right" className="theme-seg">
+            <SegmentedControl aria-label="The logo on the left or the right" className="theme-seg-control" value={logoSideOf(place)} onValueChange={value => onChange({ logoAt: logoPlaceOf(logoEdgeOf(place), value as LogoSide) })} options={LOGO_SIDE_OPTIONS} />
+          </Tooltip>
+        </div>
       </div>
       <div className="theme-row">
         <span className="theme-row-label">On</span>

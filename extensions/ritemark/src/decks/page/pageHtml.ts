@@ -620,7 +620,7 @@ svg { flex: none; }
   .layer.flow > .deck-slide { position: relative; inset: auto; width: auto; height: auto; overflow: visible; }
   .layer.flow .deck-sl { position: relative; width: auto; height: auto; transform: none; overflow: visible; }
   .layer.flow .deck-sl.is-blocks .blk-flow { position: relative; inset: auto; top: auto; left: auto; right: auto; bottom: auto; --fit: 1 !important; font-size: 16.5px; overflow: visible; }
-  .layer.flow .deck-sl.is-blocks.logo-tl .blk-flow, .layer.flow .deck-sl.is-blocks.logo-br .blk-flow { top: auto; bottom: auto; }
+  .layer.flow .deck-sl.is-blocks.logo-tl .blk-flow, .layer.flow .deck-sl.is-blocks.logo-br .blk-flow, .layer.flow .deck-sl.is-blocks.logo-bl .blk-flow { top: auto; bottom: auto; }
   .layer.flow .deck-sl.is-blocks.logo-tr .blk-flow > :first-child { margin-right: 0; }
   .layer.flow .deck-sl.is-blocks h1 { font-size: 1.55em; }
   .layer.flow .deck-sl.is-blocks.is-cover h1 { font-size: 1.95em; }
