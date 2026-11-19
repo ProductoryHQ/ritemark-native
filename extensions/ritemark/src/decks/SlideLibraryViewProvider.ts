@@ -238,7 +238,9 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     // #877 (the Experience lead): the decks whose folder or name has the words, as closed rows above the slides.
     const named = found ? namedDecks(indexed, query, { active: active?.path, limit: MAX_NAMED_DECKS }) : null;
     const here = same ? inOpenDeck(indexed, same, active?.path) : [];
-    const { assets, themes } = this.view ? await looksOf(this.view.webview, named ? [...decks, ...named.decks] : decks) : { assets: {}, themes: {} };
+    // Each deck's pictures once: a named deck can be a hit deck too.
+    const drawn = named ? [...new Map([...decks, ...named.decks].map(deck => [deck.path, deck] as const)).values()] : decks;
+    const { assets, themes } = this.view ? await looksOf(this.view.webview, drawn) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
     this.stateActive = active?.path ?? null;
     await this.post({

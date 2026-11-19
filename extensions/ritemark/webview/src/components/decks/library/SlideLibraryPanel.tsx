@@ -141,6 +141,8 @@ export function SlideLibraryPanel() {
   const [selected, setSelected] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [openOthers, setOpenOthers] = useState(false)
+  // #877: the Decks group's rows open on their own, apart from browsing's, and start closed at each search.
+  const [openNamed, setOpenNamed] = useState<Record<string, boolean>>({})
   const field = useRef<HTMLInputElement>(null)
   // The field shows once the place's Search is pressed (as Tasks' does), and stays while it holds words.
   const [searchOpen, setSearchOpen] = useState(false)
@@ -180,6 +182,9 @@ export function SlideLibraryPanel() {
     const timer = setTimeout(() => sendToExtension('library/search', { query }), query.trim() ? 150 : 0)
     return () => clearTimeout(timer)
   }, [query])
+
+  // A new search's Decks group starts closed.
+  useEffect(() => setOpenNamed({}), [state?.query])
 
   useEffect(() => {
     if (!focusSearch) return
@@ -244,8 +249,9 @@ export function SlideLibraryPanel() {
    * A slide's tile: its thumbnail, title and menu. In a search (Sprint 165 PR 3) also its place and "also in N older
    * decks"; anywhere, the tick when its copy is already in the open deck.
    */
-  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; hit?: { place: string; where: string; meta: string; also: string | null } }) => {
-    const key = `${deck.path}#${slide.id ?? slide.index}`
+  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string; also: string | null } }) => {
+    // A Decks group's tile (#877) is keyed apart: the same slide can be among the hits under it.
+    const key = `${options.named ? 'decks:' : ''}${deck.path}#${slide.id ?? slide.index}`
     const title = titleOf(slide)
     const number = options.numbered ? `${slide.index + 1}. ` : ''
     const inOpenDeck = here.has(`${deck.path}#${slide.index}`)
@@ -308,10 +314,11 @@ export function SlideLibraryPanel() {
    */
   const deckRows = (deck: LibraryDeck, numbered: boolean, named = false) => {
     // "From another deck…" opens the newest other deck; the others stay one click away.
-    const expanded = named ? open[deck.path] === true : deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
+    const expanded = named ? openNamed[deck.path] === true : deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
+    const toggle = () => (named ? setOpenNamed : setOpen)((value) => ({ ...value, [deck.path]: !expanded }))
     const grid = (slides: LibrarySlide[]) => (
       <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
-        <div className="deck-lib-grid">{slides.map((slide) => tile(deck, slide, { numbered }))}</div>
+        <div className="deck-lib-grid">{slides.map((slide) => tile(deck, slide, { numbered, named }))}</div>
       </AgendaContext.Provider>
     )
     // Sprint 165 PR 2: an open deck shows its sections, each with Take section; a search's hits stay one grid (a
@@ -367,7 +374,7 @@ export function SlideLibraryPanel() {
           type="button"
           className="deck-lib-row"
           aria-expanded={expanded}
-          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+          onClick={toggle}
         >
           <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
           <Icon name="presentation" size={16} tone="inherit" />
@@ -379,7 +386,7 @@ export function SlideLibraryPanel() {
             name={deck.name}
             meta={deckMeta(deck.modified, deck.slides.length)}
             expanded={expanded}
-            onToggle={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+            onToggle={toggle}
           />
         )}
         {expanded ? (
@@ -415,7 +422,7 @@ export function SlideLibraryPanel() {
             {decks.map((deck) => deckRows(deck, true, true))}
           </>
         ) : null}
-        {shown.length ? slideHits(shown, search.total) : null}
+        {shown.length ? slideHits(shown, search.total) : <p className="deck-lib-none">No slide has these words.</p>}
       </>
     )
   }

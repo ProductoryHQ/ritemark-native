@@ -164,13 +164,18 @@ export function alsoLine(count: number, library: boolean): string | null {
   return `also in ${count} ${library ? '' : 'older '}${count === 1 ? 'deck' : 'decks'}`
 }
 
+/** A search group's count: "4 slides" or "1 deck", or "60 of 412 slides" when the list stops short. */
+function countOf(shown: number, total: number, noun: 'slide' | 'deck'): string {
+  if (total > shown) return `${shown} of ${total} ${noun}s`
+  return shown === 1 ? `1 ${noun}` : `${shown} ${noun}s`
+}
+
 /** The search heading's count: "4 slides", or "60 of 412 slides" when the list stops short. */
 export function hitsCount(shown: number, total: number): string {
-  return total > shown ? `${shown} of ${total} slides` : slideCount(shown)
+  return countOf(shown, total, 'slide')
 }
 
 /** The Decks group's count (#877): "2 decks", or "8 of 20 decks" when the list stops short. */
 export function decksCount(shown: number, total: number): string {
-  if (total > shown) return `${shown} of ${total} decks`
-  return shown === 1 ? '1 deck' : `${shown} decks`
+  return countOf(shown, total, 'deck')
 }

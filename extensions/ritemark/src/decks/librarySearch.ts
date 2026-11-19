@@ -221,16 +221,27 @@ export function searchLibrary(
 export const MAX_NAMED_DECKS = 8;
 
 /**
- * Search's Decks group (the Experience lead on #877): the decks whose folder or name holds each word typed ("Harbour"
- * finds the decks in Harbour Logistics), whole, in the listing's order, the open deck left out. A deck's name matching
- * never lists its slides as hits: its row shows instead, closed.
+ * The words of a deck's place, lower case: its folders' and its own name's, for the Decks group. A topic's are its name
+ * alone: "Slide library" is the library, so "slide" or "library" doesn't list every topic.
+ */
+function placeWords(deck: DeckSummary): string[] {
+  const place = deck.topic ? deck.name : deck.path.replace(/\.deck\.md$/i, '');
+  return place.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+/**
+ * Search's Decks group (the Experience lead on #877): the decks whose folder or name has each word typed at the start
+ * of one of its words ("Harbour" or "harb" finds the decks in Harbour Logistics; "3" finds "Context 3", not "2023"),
+ * whole, in the listing's order, the open deck left out. A deck's name matching never lists its slides as hits: its
+ * row shows instead, closed.
  */
 export function namedDecks(decks: readonly IndexedDeck[], query: string, options: { active?: string | null; limit?: number } = {}): { decks: DeckSummary[]; total: number } {
-  const terms = searchTerms(query);
+  const terms = searchTerms(query).map(term => term.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')).filter(Boolean);
   if (!terms.length) return { decks: [], total: 0 };
   const found = decks.filter(deck => {
-    const place = deck.summary.path.replace(/\.deck\.md$/i, '').toLowerCase();
-    return deck.summary.path !== options.active && terms.every(term => place.includes(term));
+    if (deck.summary.path === options.active) return false;
+    const words = placeWords(deck.summary);
+    return terms.every(term => words.some(word => word.startsWith(term)));
   });
   return { decks: found.slice(0, options.limit ?? MAX_NAMED_DECKS).map(deck => deck.summary), total: found.length };
 }

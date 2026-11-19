@@ -66,6 +66,9 @@ async function run() {
   // The open deck: a copy of the library's context slide, and a slide of its own.
   files[OPEN] = deck(slide('o1aa', '# New client kickoff\n\nWelcome, Fernhollow'));
   await library.insertCopies(TOPIC, ['l2aa'], OPEN, undefined);
+  // A deck whose name has a year, for the Decks group's word starts.
+  files['Talks/Kickoff 2023.deck.md'] = deck(slide('y1aa', '# Year in review'));
+  times['Talks/Kickoff 2023.deck.md'] = day('2026-08-01T10:00');
   // Typed again by hand in two decks, no lineage: the same words exactly.
   files['Talks/Talk A.deck.md'] = deck(slide('t1aa', '# Questions?\n\nAsk anything about today'));
   files['Talks/Talk B.deck.md'] = deck(slide('t2aa', '# questions\n\nAsk anything about today!'));
@@ -181,6 +184,11 @@ async function run() {
     assert.equal(whole.slides.length, slidesOfText(files[C3]).length, 'a named deck comes whole');
     assert.ok(Array.isArray(whole.agenda), 'with its Agenda');
     assert.deepEqual(namedDecks(decks, 'every training').decks.map(entry => entry.path), [TOPIC], 'a topic by its name');
+    assert.deepEqual(namedDecks(decks, 'library').decks, [], 'a topic by its own name only: "Slide library" is the library');
+    assert.deepEqual(namedDecks(decks, 'north').decks.map(entry => entry.path), [C2, C1], 'the start of a word');
+    assert.deepEqual(namedDecks(decks, '3').decks.map(entry => entry.path), [C3], 'a word\'s start, so "3" is not in "2023"');
+    assert.deepEqual(namedDecks(decks, 'ontoso').decks, [], 'never inside a word');
+    assert.deepEqual(namedDecks(decks, '2023').decks.map(entry => entry.path), ['Talks/Kickoff 2023.deck.md']);
     assert.deepEqual(namedDecks(decks, 'new client', { active: OPEN }).decks, [], 'never the open deck');
     assert.deepEqual(namedDecks(decks, 'new client', { active: null }).decks.map(entry => entry.path), [OPEN]);
     assert.deepEqual(namedDecks(decks, '   '), { decks: [], total: 0 });
