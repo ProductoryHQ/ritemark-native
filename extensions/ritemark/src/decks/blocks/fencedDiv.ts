@@ -156,8 +156,33 @@ export function withFenceValue(openLine: string, key: string, value: string | nu
   return `${indent}${open[1]} {${parts.join(' ')}}`;
 }
 
-/** The Boxes looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go. */
-export const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(['steps', 'line', 'arrows']);
+/**
+ * Sprint 167 PR 2 (the decks README, item C, "Numbered boxes"): a Boxes block's Mark, the block bar's name for the look
+ * that draws its boxes' mark. Icon is the default look (`boxes`: each box's own icon) and writes nothing; Number, Dot and
+ * Arrow are the looks that draw their own mark (`OWN_MARK_LOOKS`), as old decks write them (`look="steps"`). Number is
+ * the slide's counter (slide.css), so the numbers follow the boxes' order through every move, add and delete.
+ */
+export type BoxesMark = 'icon' | 'number' | 'dot' | 'arrow';
+export const BOXES_MARKS: readonly BoxesMark[] = ['icon', 'number', 'dot', 'arrow'];
+/** The look each Mark writes on the block's own line; Icon writes none. */
+export const MARK_LOOK: Readonly<Record<BoxesMark, string | null>> = { icon: null, number: 'steps', dot: 'line', arrow: 'arrows' };
+/** Each own-mark look's Mark, read back. */
+const LOOK_MARK: ReadonlyMap<string, BoxesMark> = new Map(BOXES_MARKS.flatMap(mark => (MARK_LOOK[mark] === null ? [] : [[MARK_LOOK[mark]!, mark] as const])));
+
+/**
+ * The Boxes looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go: Mark's looks, so a
+ * look the slide draws and the bar's Mark never part (review of #878).
+ */
+export const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(LOOK_MARK.keys());
+
+/**
+ * A Boxes block's Mark, read as it is drawn: the renderer and the stage draw a look by its exact word, and any look
+ * other than the three own-mark ones (`boxes`, none, or one this reader doesn't know) draws icons, so it is Icon.
+ */
+export function boxesMarkOf(attrs: FenceAttributes): BoxesMark {
+  const look = attrs.values.look;
+  return (look === undefined ? undefined : LOOK_MARK.get(look)) ?? 'icon';
+}
 
 /** The block classes a slide draws. Any other class is drawn as a plain group of its blocks. */
 export const SLIDE_BLOCK_CLASSES = ['columns', 'column', 'boxes', 'box', 'steps'] as const;
