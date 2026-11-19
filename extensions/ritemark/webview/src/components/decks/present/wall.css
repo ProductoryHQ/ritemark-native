@@ -86,3 +86,16 @@
 @keyframes wall-timer-pulse { 0%, 100% { opacity: 0.9; transform: scale(1); } 50% { opacity: 1; transform: scale(1.12); } }
 @media (prefers-reduced-motion: reduce) { .wall-timer.is-pulsing { animation: none; } }
 .vscode-reduce-motion .wall-timer.is-pulsing { animation: none; }
+
+/* Sprint 163 PR 4 (the decks README, "The page and Present are one player"): the quiet line at the wall's foot, the
+   published page's own without its buttons: the client and the session on the left, "7 / 12" on the right, in the
+   slide's ink on its ground, and the accent's 2 px line for how far along it is. The slide keeps its 16:9 area above it
+   (DeckWall's WALL_LINE_HEIGHT); the blank, the QR code and a filled wall cover it as they cover the slide. */
+.wall-line { position: absolute; left: 0; right: 0; bottom: 0; height: 44px; padding: 0 20px; display: flex; align-items: center; gap: 16px; pointer-events: none;
+  font: 500 13.5px/1 'Sofia Sans', var(--ritemark-ui-font-family), sans-serif; color: color-mix(in srgb, var(--wall-line-ink, #fff) 60%, transparent); }
+.wall-line-who { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wall-line-who b { font-weight: 700; color: var(--wall-line-ink, #fff); }
+.wall-line-pos { font-weight: 600; color: color-mix(in srgb, var(--wall-line-ink, #fff) 78%, transparent); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wall-line-progress { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--wall-accent, #F2B544); transition: width 0.3s ease; }
+@media (prefers-reduced-motion: reduce) { .wall-line-progress { transition: none; } }
+.vscode-reduce-motion .wall-line-progress { transition: none; }

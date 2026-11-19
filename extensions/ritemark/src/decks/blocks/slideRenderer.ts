@@ -87,6 +87,13 @@ interface RenderState {
   /** Sprint 163 PR 1: a code block's ↗ Open in… (off for a deck with `open-in: none`). */
   openIn: boolean;
   /**
+   * Sprint 163 PR 4 (the decks README, "The ticks stay"): on the published page only, each step of a Steps block gets
+   * its tick, a checkbox over its number; `steps` counts the slide's Steps blocks as they are drawn, so a tick is named
+   * by its block and its step. Never on the wall, the presenter view, the stage or the strip.
+   */
+  ticks: boolean;
+  steps: number;
+  /**
    * Sprint 163 PR 3: a Button block's button as a real link that opens a new tab (the published page), else with its
    * address on it for the host to open (the wall, the presenter view; the strip and the stage never open it).
    */
@@ -106,7 +113,7 @@ interface RenderState {
   tabs: { chosen: readonly number[] | null; next: number };
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
 
 let state: RenderState = freshState();
 
@@ -185,6 +192,42 @@ function markListItems(html: string, only?: 'ol'): string {
   });
 }
 
+/** The check a ticked step shows in place of its number (the page's CSS shows one or the other). */
+const TICK_CHECK = iconSvg('check', 20);
+
+/**
+ * Sprint 163 PR 4: the published page's ticks. Each step of the Steps block's own numbered list (its first top-level
+ * `<ol>`, as `markListItems` reads it) ends with a checkbox drawn over its number: `data-step="<block>.<step>"`, so the page
+ * keeps it per deck, slide and step. Not ticked when drawn: the page's script reads the reader's own ticks.
+ */
+function tickListItems(html: string, block: number): string {
+  let depth = 0;
+  let marking = false;
+  let done = false;
+  let step = 0;
+  // The renderer's own markup: every word in it is escaped, so a tag here is one it drew.
+  return html.replace(/<(\/?)(ul|ol|li)\b([^>]*)>/g, (tag, close: string, name: string) => {
+    if (done) return tag;
+    if (name === 'li') {
+      if (!marking || depth !== 1) return tag;
+      if (!close) {
+        step += 1;
+        return tag;
+      }
+      // Last in its step, so the step's own first element keeps the step's first-line style (slide.css).
+      return `<button class="tick" type="button" role="checkbox" aria-checked="false" aria-label="Step ${step} done" data-step="${block}.${step}"><span class="tick-n">${step}</span>${TICK_CHECK}</button>${tag}`;
+    }
+    if (close) {
+      depth -= 1;
+      if (marking && depth === 0) done = true;
+    } else {
+      if (depth === 0 && name === 'ol') marking = true;
+      depth += 1;
+    }
+    return tag;
+  });
+}
+
 function divHtml(token: SlideDivToken, inner: () => string): string {
   // The Agenda (small details 14): drawn from the deck, never from what the block holds (nothing, as `/Agenda` writes it).
   if (isAgendaClasses(token.attrs.classes)) return agendaHtml(state.agenda, state.at);
@@ -233,8 +276,10 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
     }
     case 'steps': {
       const tag = stepsTagOf(token.attrs);
+      const block = state.steps++;
       const body = within();
-      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${reveals ? markListItems(body, 'ol') : body}</div>\n`;
+      const items = reveals ? markListItems(body, 'ol') : body;
+      return `<div class="blk-steps"${revealMark}>${tag ? `<span class="blk-pill">${esc(tag)}</span>` : ''}${state.ticks ? tickListItems(items, block) : items}</div>\n`;
     }
     default: {
       const body = within();
@@ -660,6 +705,8 @@ export interface BlockDrawingContext {
    * presenter view's Now chose it. Left out: each shows its first tab.
    */
   tabs?: readonly number[] | null;
+  /** Sprint 163 PR 4: the published page's ticks on a Steps block's steps (`tickListItems`). Left out: none. */
+  ticks?: boolean;
   /** Sprint 163 PR 3: a button as a real link to a new tab (the published page only). Left out: the address on it. */
   buttonLinks?: boolean;
 }
@@ -671,7 +718,7 @@ const CODE_ICONS = { copy: iconSvg('copy', 15), check: iconSvg('check', 15), ope
 export function blockSlideHtml(markdown: string, options: BlockDrawingContext = {}): string {
   const previous = state;
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
-  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
+  state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, ticks: options.ticks === true, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
   try {
     return slideMarked.parse(markdown, { async: false }) as string;
   } finally {
@@ -724,6 +771,9 @@ export interface BlockSlideMarkupOptions {
   at?: number | null;
   /** Sprint 163 PR 1: a code block's ↗ Open in…; false for a deck with `open-in: none`. */
   openIn?: boolean;
+  /** Sprint 163 PR 4, the published page only: the steps' ticks, and the slide read as text (no `aria-hidden`). */
+  ticks?: boolean;
+  readable?: boolean;
   /** Sprint 163 PR 3: a button as a real link to a new tab: the published page only. */
   buttonLinks?: boolean;
 }
@@ -828,7 +878,7 @@ export function slideLogoHtml(logo: SlideLogo | null | undefined, cover: boolean
  * A block slide's canvas (its `.deck-sl`, 960 × 540, scaled to `width` when given): the picture beside or behind, and
  * the flow of its blocks at the fit's step. The deck view's `BlockSlideCanvas` puts it in its own `.deck-slide`.
  */
-export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at' | 'openIn' | 'buttonLinks'> & { reveal?: number | null; tabs?: readonly number[] | null }): string {
+export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarkupOptions, 'step' | 'pictureUrl' | 'missing' | 'width' | 'logo' | 'agenda' | 'at' | 'openIn' | 'ticks' | 'readable' | 'buttonLinks'> & { reveal?: number | null; tabs?: readonly number[] | null }): string {
   const pictureUrl = options.pictureUrl ?? (() => null);
   const missing = options.missing ?? (() => false);
   const markdown = data.markdown ?? '';
@@ -851,8 +901,10 @@ export function blockCanvasMarkup(data: SlideData, options: Pick<BlockSlideMarku
   Object.assign(inner, marks.style);
   const classes = ['deck-sl', 'is-blocks', side ? `pic-${side}` : '', cover ? 'is-cover' : '', lonePictureClass(markdown, side), marks.cls].filter(Boolean).join(' ');
   const innerStyle = styleText(inner);
-  return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''} aria-hidden="true">${photo}`
-    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, openIn: options.openIn, tabs: options.tabs, buttonLinks: options.buttonLinks })}</div>`
+  // A picture of the slide everywhere but the published page, where the slide is what a reader reads (and ticks).
+  const hidden = options.readable ? '' : ' aria-hidden="true"';
+  return `<div class="${classes}"${innerStyle ? ` style="${esc(innerStyle)}"` : ''}${hidden}>${photo}`
+    + `<div class="blk-flow" style="--fit:${fitOf(options.step)}">${blockSlideHtml(markdown, { pictureUrl, missing, agenda: options.agenda, at: options.at, reveal: options.reveal, openIn: options.openIn, ticks: options.ticks, tabs: options.tabs, buttonLinks: options.buttonLinks })}</div>`
     + `${slideLogoHtml(options.logo, cover)}</div>`;
 }
 

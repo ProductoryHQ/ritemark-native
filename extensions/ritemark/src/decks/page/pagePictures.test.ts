@@ -64,11 +64,11 @@ assert.ok(!html.includes(PRIVATE_NOTE), 'the picture\'s comment is on the page')
 assert.ok(!JSON.stringify(deck).includes(PRIVATE_NOTE), 'the picture\'s comment is in publicDeck');
 
 // The slide's picture: its width and its crop's frame; the side picture at its focus point.
-const framed = root.querySelector('.stage .deck-sl .pic.blk-pic');
+const framed = root.querySelector('.layer .deck-sl .pic.blk-pic');
 assert.ok(framed, 'the slide\'s cropped picture has its frame');
 assert.match(framed!.getAttribute('style') ?? '', /width:260px/);
-assert.match(root.querySelector('.stage .deck-sl .pic-box')!.getAttribute('style') ?? '', /aspect-ratio:1\.7778/);
-assert.match(root.querySelector('.stage .deck-sl .photo')!.getAttribute('style') ?? '', /background-position:30% 70%/);
+assert.match(root.querySelector('.layer .deck-sl .pic-box')!.getAttribute('style') ?? '', /aspect-ratio:1\.7778/);
+assert.match(root.querySelector('.layer .deck-sl .photo')!.getAttribute('style') ?? '', /background-position:30% 70%/);
 
 // The handout's picture: half the column, its description as its caption.
 const handout = root.querySelector('.part .pic.has-caption');
@@ -89,11 +89,11 @@ const plain = pageHtml(publicDeck(DECK.replace('{width=260px crop=16:9 focus=40,
 assert.ok(/<img style="width:400px;max-width:100%" class="blk-pic" src="[^"]*agents\.png"/.test(plain), 'a sized picture is the slide\'s own .blk-pic');
 assert.ok(!/class="pic blk-pic/.test(plain), 'no frame cuts it');
 assert.ok(PAGE_SCRIPT.includes('function openZoom(picture)'));
-assert.ok(PAGE_SCRIPT.includes(".part img, .pre img, .stage .deck-sl img, .stage .deck-sl .photo"));
+assert.ok(PAGE_SCRIPT.includes(".part img, .pre img, .layer .deck-sl img, .layer .deck-sl .photo"));
 assert.equal(scriptBuildsReferences(PAGE_SCRIPT), false, 'the full-size view loads nothing and names no file');
 // Review of #774: a picture that is a link's words opens the link; a picture Behind is reachable through the words.
 assert.ok(PAGE_SCRIPT.includes("if (picture.closest('a')) return;"));
-assert.ok(html.includes('.stage .deck-sl.pic-behind .veil, .stage .deck-sl.pic-behind .blk-flow { pointer-events: none; }'));
+assert.ok(html.includes('.layer .deck-sl.pic-behind .veil, .layer .deck-sl.pic-behind .blk-flow { pointer-events: none; }'));
 
 // Show in Finder: only a picture beside the document and inside the project.
 const posix = path.posix;

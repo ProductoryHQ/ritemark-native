@@ -174,25 +174,23 @@ const pill = (kind: string, data: Parameters<typeof layoutSlide>[1], editing = f
   for (const [line, words] of [['', 'Exercise'], ['tag: Harjutus\n', 'Harjutus'], ['tag: "Teema: <1> & 2"\n', 'Teema: <1> & 2'], ['tag: ""\n', null]] as const) {
     const { deck, root } = page(deckText(line))
     const slide = root.querySelector('.deck-sl .blk-pill')
-    const label = root.querySelector('.part .lab .tag')
     const contents = root.querySelector('.toc .tag')
     const onWall = wall(deckText(line)).querySelector('.deck-sl .blk-pill')
     if (words === null) {
       assert.equal(slide, null, 'the page draws no pill on the slide')
-      assert.equal(label, null, 'nor beside the part')
       assert.equal(contents, null, 'nor in Contents')
       assert.equal(onWall, null, 'the wall draws none')
       assert.match(deck.slides[0].data.markdown ?? '', /::: \{\.steps tag=""\}/)
     } else {
-      for (const [where, node] of [['slide', slide], ['part', label], ['contents', contents], ['wall', onWall]] as const) {
+      for (const [where, node] of [['slide', slide], ['contents', contents], ['wall', onWall]] as const) {
         assert.equal(node?.text, words, `${where}: ${words}`)
       }
       assert.equal(/tag=/.test(deck.slides[0].data.markdown ?? ''), !!line, 'the page holds the line only when it is written')
     }
     // Contents still knows it is an exercise, pill or none, so it ticks it once its steps are done.
-    assert.equal(root.querySelector('.part')!.hasAttribute('data-exercise'), true)
+    assert.equal(root.querySelector('#frame > .layer')!.hasAttribute('data-exercise'), true)
   }
-  assert.ok(PAGE_SCRIPT.includes("part.hasAttribute('data-exercise')"))
+  assert.ok(PAGE_SCRIPT.includes("layer.hasAttribute('data-exercise')"))
   assert.ok(!PAGE_SCRIPT.includes('.lab .tag'))
   // A changed pill is a changed page; a deck without the line keeps its digest.
   const digest = (text: string) => deckDigest(publicDeck(text, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME }))
