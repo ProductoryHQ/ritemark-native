@@ -46,15 +46,15 @@ Sprint 164 works in `DeckView.tsx`, `DeckFolds.tsx`, `slide.css` and the slide r
 None found. The README's "one kind of library slide" needs nothing removed: `kind` in `DeckLibrary.ts` and `deckLibraryFormat.ts` is the slide's layout, not a template-or-reusable mark, and the library already keeps its topics as decks in the `Slide library` folder. Confirmed by a read-only look. If a PR finds code that really goes, it is listed here and waits for Jarmo's yes by name.
 
 ## Success Criteria
-- [ ] Other decks show under folder headings (project name for the top level), ordered by newest deck, with name, date and slide count; every deck starts closed.
-- [ ] Take section puts a whole section after the current slide, in order, as copies with handout and prompts, and one undo removes it all.
-- [ ] Search lists each slide once at its newest copy, library first, with "also in N older decks" and the tick for the open deck.
-- [ ] The offer shows up to six repeated slides, never adds by itself, and Not now hides them for good.
-- [ ] The offer's rule and the lineage test are chosen by the Experience lead from PR 0's findings before PR 3 and PR 4 start.
-- [ ] No real deck or slide of Jarmo's was opened, read, counted or quoted, in research, tests or shots.
-- [ ] The Experience lead has seen each PR's shots before it merges.
-- [ ] The full test chain ran once on each final head.
-- [ ] `qa-validator` has signed off at the sprint's end.
+- [x] Other decks show under folder headings (project name for the top level), ordered by newest deck, with name, date and slide count; every deck starts closed.
+- [x] Take section puts a whole section after the current slide, in order, as copies with handout and prompts, and one undo removes it all.
+- [x] Search lists each slide once at its newest copy, library first, with "also in N older decks" and the tick for the open deck.
+- [x] The offer shows up to six repeated slides, never adds by itself, and Not now hides them for good.
+- [x] The offer's rule and the lineage test are chosen by the Experience lead from PR 0's findings before PR 3 and PR 4 start.
+- [x] No real deck or slide of Jarmo's was opened, read, counted or quoted, in research, tests or shots.
+- [x] The Experience lead has seen each PR's shots before it merges.
+- [x] The full test chain ran once on each final head.
+- [x] `qa-validator` has signed off at the sprint's end.
 
 ## Release notes
 One line per PR, in plain words for people, written with the `release-notes` skill. Decks is behind its flag, so these wait with the rest of Decks.
@@ -70,3 +70,10 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 
 ## Approval
 - [x] Jarmo approved this sprint plan (19 November 2026)
+
+## Close-out (20 November 2026)
+- PR 0 [#840](https://github.com/ProductoryHQ/ritemark-native/pull/840) (research; closes #830), PR 1 [#843](https://github.com/ProductoryHQ/ritemark-native/pull/843) (other decks by folder; #831), PR 2 [#861](https://github.com/ProductoryHQ/ritemark-native/pull/861) (sections and Take section; #832), PR 3 [#877](https://github.com/ProductoryHQ/ritemark-native/pull/877) (search once per slide; #833), PR 4 [#895](https://github.com/ProductoryHQ/ritemark-native/pull/895) (the offer; #834): all merged, each after the Experience lead's look at its shots, all on synthetic decks.
+- Tests: see `tasks.md`'s Sprint end. #895's full chain (EXIT 0 on `e4487e1a`) is the evidence for #861 and #877, whose records gave no exit code.
+- Held for Jarmo: [#887](https://github.com/ProductoryHQ/ritemark-native/issues/887), one search field instead of two in the library place. The second field is VS Code's own view filter, so the fix changes patch 018 and is shell-tier; it waits for his word and is not part of this sprint.
+- Claude's `add_repeated_slides` (PR 4) writes into the library like `add_to_library`, without asking in Ask mode; whether it should ask is Jarmo's call, asked on 20 November.
+- Not run: ⌘Z after Take section in the live app (covered by the unit test on the same transaction), Windows.
