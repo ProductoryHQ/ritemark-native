@@ -982,6 +982,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       // The words give up the keys, so Backspace removes the picture, never a letter (review of #774).
       editor.commands.blur()
     }
+    // And so does any other place that was typed in (the handout beside the slide, a comment), Sprint 167 PR 4 review.
+    const typing = document.activeElement as HTMLElement | null
+    if (typing && (typing.isContentEditable || typing.matches?.('input, textarea'))) typing.blur()
     setSideChosen(true)
   }
 
@@ -1115,8 +1118,11 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // ---- Sprint 167 PR 4 (decks README item D): the picture Behind, from the slide's corner and from anywhere on it.
   const behindFilled = side === 'behind' && !!header.image?.trim()
   /** A left press on the words' box itself (between or after its blocks, no word under it) of a slide with a picture Behind. */
-  const pressOnEmptyWords = (event: { button: number; target: EventTarget | null }) =>
-    event.button === 0 && behindFilled && !!editor && !editor.isDestroyed && event.target === editor.view.dom
+  // A plain single press only: Shift (extending the words' selection), ⌘, Ctrl (the Mac's right-click) and Alt, and a
+  // double press, stay the words' (review).
+  const pressOnEmptyWords = (event: { button: number; detail: number; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; target: EventTarget | null }) =>
+    event.button === 0 && event.detail <= 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey
+    && behindFilled && !!editor && !editor.isDestroyed && event.target === editor.view.dom
   // The chip's corner: top right, or bottom right beside a top-right logo on this slide (Sprint 167 PR 1's corners);
   // its place and size: in the band between the slide's edge and its words' box, measured (`behindChipPlace.ts`).
   const chipCorner = behindChipCorner(slideLogo, cover)
@@ -1145,7 +1151,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     )
     setChipPlace(current => (current && current.corner === next.corner && current.edge === next.edge && current.right === next.right && current.scale === next.scale ? current : next))
   }
-  useLayoutEffect(() => { placeChipRef.current() })
+  // The fit measures it as the words move (`refit`); here, when the slide's look, its picture or the logo change.
+  useLayoutEffect(() => { placeChipRef.current() }, [side, lookKey, behindFilled, chipCorner, chipLogoWidth, editor])
   // A picture pasted while the slide's own picture is chosen (the words gave up the keys, so the paste reaches the
   // page): it replaces that picture, as a paste on a chosen picture in the words does (experience 49).
   useEffect(() => {
@@ -1172,18 +1179,14 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           onMouseDown={event => { if (event.button === 2) event.preventDefault() }}
           // Sprint 167 PR 4: with a picture Behind, a press where there are no words (the words' box itself, between and
           // after its blocks) chooses the picture, its ring round the slide and its bar under it; a press on words puts
-          // the caret there, as ever. Caught on the way down, before the words' editor sees it, so neither the caret nor
-          // the focus goes into the words: the keys stay the picture's (Backspace removes it, never a letter; review).
+          // the caret there, as ever. The press goes on to the page (an open popover still closes on it), but its
+          // mousedown is cancelled on the way down: the browser puts no caret and moves no focus, and ProseMirror leaves
+          // a cancelled event alone, so the keys stay the picture's (Backspace removes it, never a letter; review).
           onPointerDownCapture={event => {
-            if (!pressOnEmptyWords(event)) return
-            event.preventDefault()
-            event.stopPropagation()
-            chooseSide()
+            if (pressOnEmptyWords(event)) chooseSide()
           }}
           onMouseDownCapture={event => {
-            if (!pressOnEmptyWords(event)) return
-            event.preventDefault()
-            event.stopPropagation()
+            if (pressOnEmptyWords(event)) event.preventDefault()
           }}
           // A picture dropped anywhere on the slide, its edges too (outside the words' box): into the slide's place
           // (Behind, Left or Right), or a Picture block when it has none. A drop on the words is theirs (`handleDrop`).

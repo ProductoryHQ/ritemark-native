@@ -100,7 +100,9 @@ function draw(boxed: boolean): { before: string; after: string; error: unknown }
 {
   const editor = fs.readFileSync(path.join(here, 'SlideEditor.tsx'), 'utf8')
   assert.ok(editor.includes('<BubbleMenuBox>{editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}</BubbleMenuBox>'))
-  assert.ok(editor.indexOf('<BehindChip') < editor.indexOf('<div className={classes} style={{ transform:'))
+  const chipAt = editor.indexOf('<BehindChip')
+  const canvasAt = editor.indexOf('<div className={classes} style={{ transform:')
+  assert.ok(chipAt > 0 && canvasAt > 0 && chipAt < canvasAt, 'the chip comes before the canvas')
 }
 
 console.log('bubbleMenuBox: passed')

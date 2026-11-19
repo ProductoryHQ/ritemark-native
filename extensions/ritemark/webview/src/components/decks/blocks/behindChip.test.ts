@@ -172,8 +172,11 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
 {
   const editor = fs.readFileSync(path.join(here, 'SlideEditor.tsx'), 'utf8')
   // Caught on the way down (capture), so the words' editor never takes the caret or the focus; only on the box itself.
-  assert.ok(editor.includes('onPointerDownCapture') && editor.includes('onMouseDownCapture'))
-  assert.ok(editor.includes('event.target === editor.view.dom'))
+  assert.match(editor, /onPointerDownCapture=\{event => \{\s+if \(pressOnEmptyWords\(event\)\) chooseSide\(\)\s+\}\}/)
+  assert.match(editor, /onMouseDownCapture=\{event => \{\s+if \(pressOnEmptyWords\(event\)\) event\.preventDefault\(\)\s+\}\}/)
+  assert.match(editor, /const pressOnEmptyWords = [^\n]*\n[^\n]*!event\.shiftKey && !event\.ctrlKey && !event\.metaKey && !event\.altKey\n[^\n]*event\.target === editor\.view\.dom/)
+  // Never stops the press: an open popover still closes on it.
+  assert.ok(!/pressOnEmptyWords\(event\)[^\n]*\n[^\n]*stopPropagation/.test(editor))
   assert.ok(editor.includes("document.addEventListener('paste', paste)"))
   // Only a picture is taken on the slide's edges: another file's drag isn't accepted there.
   assert.ok(editor.includes("item.kind === 'file' && item.type.startsWith('image/')"))
