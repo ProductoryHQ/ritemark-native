@@ -446,6 +446,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing ritemark-comment { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-child(1 of :not(ritemark-comment)) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
+/* Sprint 168 PR 1 (review): a quote's last paragraph keeps no 6 px under it when a note follows it in the quote. */
+.deck-sl.is-blocks.is-editing blockquote > :nth-last-child(1 of :not(ritemark-comment)) { margin-bottom: 0; }
 /* The first block after a title with any number of notes between (review of #766: `h1 + *` with notes skipped). */
 .deck-sl.is-blocks.is-editing h1 ~ :not(ritemark-comment):not(h1 ~ :not(ritemark-comment) ~ *) { margin-top: 0; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
