@@ -14,6 +14,7 @@ import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
 import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 import { transitionOf, type DeckTransition } from './deckTransition';
+import { slideArrivalOf, type SlideArrival } from './slideArrival';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
 import { isTab, tabsOf, type WallTabs } from './wallTabs';
 import { COPY_MAX_TEXT, isOpenInAddress } from '../blocks/codeTools';
@@ -135,6 +136,13 @@ export interface WallState {
    * does, without its buttons: the client (the deck's folder) and the session (`publicDeck.sessionTitleOf`).
    */
   line: WallLine;
+  /**
+   * README item 20: how the slide on the wall arrived (`slideArrival.ts`): a press going on, Home or the start bring its
+   * content in a row; going back or a jump show it whole. Null for the same slide drawn again (blanking, the QR code, the
+   * spotlight, a filled picture, a tab, the timer): nothing arrives. Only the wall moves: the presenter view's state has
+   * none.
+   */
+  arrival: SlideArrival | null;
 }
 
 /** The quiet line's words. */
@@ -318,6 +326,7 @@ export function wallStateOf(
   timer: WallTimer | null = null,
   reveal: WallReveal | null = null,
   tabs: readonly number[] = [],
+  arrival: SlideArrival | null = null,
 ): WallState {
   const address = wallPageAddress(page);
   return {
@@ -341,6 +350,7 @@ export function wallStateOf(
     tabs: tabsOf(tabs),
     openIn: look.openIn !== false,
     line: lineOf(look.line),
+    arrival: slideArrivalOf(arrival),
   };
 }
 

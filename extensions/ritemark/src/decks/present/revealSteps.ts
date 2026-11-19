@@ -39,11 +39,6 @@ export function revealOnArrival(count: number, arrival: RevealArrival): WallReve
   return { shown: arrival === 'first' ? 1 : count, count };
 }
 
-/** Which way a move reaches a slide: → and Home open it with its first item; ←, End and a number show it whole. */
-export function arrivalOf(move: 'next' | 'back' | 'first' | 'last' | 'go'): RevealArrival {
-  return move === 'next' || move === 'first' ? 'first' : 'whole';
-}
-
 /**
  * → or ← on a slide with items still to show or to hide: the step, or null when the press is a move to another slide
  * (no items, the last one shown and →, the first one and ←).

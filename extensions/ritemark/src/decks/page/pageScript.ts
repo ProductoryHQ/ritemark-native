@@ -6,9 +6,10 @@
  *    centred above the quiet line (the wall's `wallSlideSize`), and a picture beside or behind runs to the window's edges
  *    (`wallBleed`). Below 860 px the page's CSS lays the slide's blocks in one column and the page scrolls instead.
  *  - **The wall's motion** (README items 18 to 20), with the wall's own numbers (`wallMotion.ts`, put into the script
- *    below): going on, the slide before leaves as one and the new slide's pieces arrive in a row, in reading order
- *    (`rowDelays`); going back or a jump shows the slide whole with the deck's transition (Fade, Push, Zoom); None and
- *    reduced motion cut. A press during any of it puts everything at its end at once and goes on.
+ *    below): going on (and Home), the slide before leaves as one and the new slide's pieces arrive in a row, in reading
+ *    order; going back or a jump shows the slide whole with the deck's transition (Fade, Push, Zoom); None and reduced
+ *    motion cut. The row is the wall's own code, not a copy: which arrival plays it (`slideArrival.ts`) and its drawing
+ *    (`rowArrival.ts`) go in as their source. A press during any of it puts everything at its end at once and goes on.
  *  - **One by one** (item 18): a slide whose blocks reveal opens with their first item when the reader goes on to it; each
  *    press shows the next with the wall's rise, and back hides the last; a jump, Contents or going back shows it whole.
  *  - **The quiet line**: ‹ n / N ›, the 2 px line for how far along, More (the slide's text beside it, or under it in one
@@ -25,27 +26,25 @@
  * HTML (text goes in through `textContent`), so 2.2's gather sees every file the page uses and its
  * `scriptBuildsReferences` stays false (the test checks).
  */
-import { EASE_IN_OUT, EASE_OUT, MOTION_MS, REVEAL_MS, REVEAL_RISE, ROW, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { EASE_IN_OUT, EASE_OUT, MOTION_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { ROW_NUMBERS, rowPlayer } from '../../../webview/src/components/decks/present/rowArrival';
+import { opensOnward, rowPlays } from '../present/slideArrival';
 
 import { PAGE_TABS_FIT } from '../blocks/tabsFit';
 
 /**
- * The wall's motion, as plain JavaScript with the wall's own numbers (`pageScript.test.ts` runs it): the row's timing
- * (README item 20: 70 ms apart up to eight pieces, the gap shrinking to 28 ms at least with more, and from the 14th piece
- * on the rest come with the 14th) and the one-by-one steps (item 18, `revealSteps.ts`).
+ * The wall's motion, as plain JavaScript with the wall's own numbers (`pageScript.test.ts` runs it): the transitions for
+ * a slide shown whole, the one-by-one steps (item 18, `revealSteps.ts`), and README item 20's row, which is the wall's
+ * own code: the source of `slideArrival.opensOnward` and `rowPlays` (how the slide arrived decides row or whole) and of
+ * `rowArrival.rowPlayer` (the drawing), called with the wall's numbers, so the page and the wall move the same.
  */
 export const PAGE_MOTION_RULE = String.raw`
   var MOTION = { fade: ${MOTION_MS.fade}, push: ${MOTION_MS.push}, zoom: ${MOTION_MS.zoom} };
   var ZOOM_FROM = ${ZOOM_FROM}, REVEAL_MS = ${REVEAL_MS}, REVEAL_RISE = ${REVEAL_RISE};
-  var ROW_GAP = ${ROW.gap}, ROW_MIN_GAP = ${ROW.minGap}, ROW_SPAN = ${ROW.span}, ROW_LAST = ${ROW.last}, ROW_MS = ${ROW.ms}, ROW_RISE = ${ROW.rise}, ROW_ZOOM = ${ROW.zoom}, LEAVE_MS = ${ROW.leaveMs}, PUSH_ROW_GAP = ${ROW.pushGap}, PUSH_MS = ${MOTION_MS.push};
   var EASE_OUT = '${EASE_OUT}', EASE_IN_OUT = '${EASE_IN_OUT}';
-  // When each of a slide's n pieces starts, after the lead.
-  function rowDelays(n, lead, push) {
-    var gap = push ? PUSH_ROW_GAP : n <= 8 ? ROW_GAP : Math.max(ROW_MIN_GAP, Math.round(ROW_SPAN / (n - 1)));
-    var out = [];
-    for (var index = 0; index < n; index++) out.push(lead + Math.min(index, ROW_LAST) * gap);
-    return out;
-  }
+  var opensOnward = (${String(opensOnward)});
+  var rowPlays = (${String(rowPlays)});
+  var ROW_PLAYER = (${String(rowPlayer)})(${JSON.stringify(ROW_NUMBERS)});
   // A slide reached by going on opens with its first item; any other way, whole. Null: nothing to reveal.
   function revealOnArrival(count, onward) { return count > 0 ? (onward ? 1 : count) : null; }
   // A press on a slide with items: the next shown, or the last hidden; null when the press moves to another slide.
@@ -222,70 +221,34 @@ const PAGE_BEHAVIOUR = String.raw`
     leavers.forEach(function (layer) { layer.classList.remove('leaving'); });
     leavers = [];
   }
-  function animate(element, keyframes, ms, delay, easing) {
+  // The slide going keeps its end (gone) until the run ends and it is taken away; the slide coming waits unseen until
+  // its animation starts and is as drawn once it ends.
+  function animate(element, keyframes, ms, delay, easing, fill) {
     if (!element || typeof element.animate !== 'function') return 0;
-    running.push(element.animate(keyframes, { duration: ms, delay: delay || 0, easing: easing || 'ease', fill: 'backwards' }));
+    running.push(element.animate(keyframes, { duration: ms, delay: delay || 0, easing: easing || 'ease', fill: fill || 'backwards' }));
     return (delay || 0) + ms;
   }
-  // A slide's pieces in reading order (README item 20): the title, a paragraph, each point of a list, each box, step and
-  // column, a table, a picture in the words. An item not shown yet waits; the logo never moves.
-  function piecesOf(layer) {
-    var flow = layer.querySelector('.blk-flow'), out = [];
-    if (!flow) return [layer.querySelector('.deck-sl') || layer];
-    var walk = function (element) {
-      if (element.hasAttribute('data-reveal-hidden')) return;
-      var tag = element.tagName;
-      var c = element.classList;
-      if (tag === 'UL' || tag === 'OL' || c.contains('blk-boxes') || c.contains('blk-columns') || c.contains('blk-steps') || c.contains('blk-group')) {
-        list(element.children).forEach(walk);
-        return;
-      }
-      out.push(element);
-    };
-    list(flow.children).forEach(walk);
-    return out;
-  }
   function frameWidth() { return frame.getBoundingClientRect().width || window.innerWidth; }
-  // Going on: the slide before leaves as one, and the new one's pieces arrive in a row (README item 20).
+  // Going on: the slide before leaves as one, and the new one's pieces arrive in a row (README item 20): the wall's own
+  // drawing (ROW_PLAYER, rowArrival.ts).
   function arrive(leaving, entering) {
-    var end = 0, push = transition === 'push', width = frameWidth();
-    if (leaving) {
-      end = push
-        ? animate(leaving, [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-width) + 'px)' }], PUSH_MS, 0, EASE_IN_OUT)
-        : animate(leaving, [{ opacity: 1 }, { opacity: 0 }], LEAVE_MS, 0, 'cubic-bezier(0.4, 0, 1, 1)');
-    }
-    var lead = push ? 0 : leaving ? LEAVE_MS - 10 : 0;
-    var pieces = piecesOf(entering), delays = rowDelays(pieces.length, lead, push);
-    pieces.forEach(function (piece, index) {
-      var frames = push
-        ? [{ transform: 'translateX(960px)' }, { transform: 'none' }]
-        : transition === 'zoom'
-          ? [{ opacity: 0, transform: 'scale(' + ROW_ZOOM + ')' }, { opacity: 1, transform: 'none' }]
-          : [{ opacity: 0, transform: 'translateY(' + ROW_RISE + 'px)' }, { opacity: 1, transform: 'none' }];
-      end = Math.max(end, animate(piece, frames, push ? PUSH_MS : ROW_MS, delays[index], push ? EASE_IN_OUT : EASE_OUT));
-    });
-    // A picture on the side slides in from its own edge as the title comes; one Behind settles under the words.
-    var photo = entering.querySelector('.deck-sl.is-blocks .photo');
-    if (photo && !push) {
-      var sl = photo.parentNode;
-      if (sl.classList.contains('pic-behind')) end = Math.max(end, animate(photo, [{ transform: 'scale(1.04)' }, { transform: 'none' }], 900, 0, EASE_OUT));
-      else end = Math.max(end, animate(photo, [{ opacity: 0, transform: 'translateX(' + (sl.classList.contains('pic-left') ? -28 : 28) + 'px)' }, { opacity: 1, transform: 'none' }], ROW_MS, lead, EASE_OUT));
-    }
-    return end;
+    var played = ROW_PLAYER.play(entering, leaving, { transition: transition, width: frameWidth() });
+    running = running.concat(played.animations);
+    return played.end;
   }
   // Going back or a jump: the slide whole, with the deck's transition (the wall's playStep).
   function whole(leaving, entering, back) {
     var width = frameWidth(), way = back ? -1 : 1;
     if (transition === 'push') {
       animate(entering, [{ transform: 'translateX(' + (way * width) + 'px)' }, { transform: 'translateX(0)' }], MOTION.push, 0, EASE_IN_OUT);
-      return animate(leaving, [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-way * width) + 'px)' }], MOTION.push, 0, EASE_IN_OUT);
+      return animate(leaving, [{ transform: 'translateX(0)' }, { transform: 'translateX(' + (-way * width) + 'px)' }], MOTION.push, 0, EASE_IN_OUT, 'forwards');
     }
     if (transition === 'zoom') {
       animate(entering, [{ opacity: 0, transform: 'scale(' + ZOOM_FROM + ')' }, { opacity: 1, transform: 'scale(1)' }], MOTION.zoom, 0, EASE_OUT);
-      return animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION.zoom, 0, EASE_OUT);
+      return animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION.zoom, 0, EASE_OUT, 'forwards');
     }
     animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOTION.fade, 0, 'ease');
-    return animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION.fade, 0, 'ease');
+    return animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION.fade, 0, 'ease', 'forwards');
   }
 
   // ---- one by one (README item 18): the items not shown yet keep their places, hidden
@@ -320,7 +283,10 @@ const PAGE_BEHAVIOUR = String.raw`
     if ((window.location.hash || '') === wanted) return;
     try { window.history.replaceState(null, '', wanted || (window.location.pathname + window.location.search)); } catch (error) { /* a page opened where the address can't change */ }
   }
-  // how: 'next' (a press going on), 'back' (a press going back), 'jump' (Contents, a link, Home, End), 'still' (as it is)
+  // how the slide arrives (the wall's own words, slideArrival.ts): 'next' (a press going on), 'home' (Home, which opens
+  // the first slide as a press going on does), 'back' (a press going back), 'jump' (Contents, a link, End, the address),
+  // or 'still' (as it is). 'next' and 'home' open with the first item and bring the content in a row; the rest show the
+  // slide whole.
   function go(index, how) {
     if (!count) return;
     index = Math.max(0, Math.min(count - 1, index));
@@ -330,7 +296,8 @@ const PAGE_BEHAVIOUR = String.raw`
     // reader then names ("Slide 3 of 8: ...").
     var focusWasOn = moved && leaving && doc.activeElement && leaving.contains(doc.activeElement);
     cur = index;
-    shown = revealOnArrival(itemsOf(index), how === 'next' && moved);
+    var onward = moved && opensOnward(how);
+    shown = revealOnArrival(itemsOf(index), onward);
     drawReveal(entering, shown);
     layers.forEach(function (layer, at) {
       layer.classList.toggle('on', at === index);
@@ -349,7 +316,10 @@ const PAGE_BEHAVIOUR = String.raw`
     if (stillFor(transition, reduced())) return;
     leaving.classList.add('leaving');
     leavers.push(leaving);
-    var end = narrow() ? arrive(null, entering) : how === 'next' ? arrive(leaving, entering) : whole(leaving, entering, how === 'back');
+    // In one column the slide before is out of the column at once, so only the new one moves: in a row, or fading in.
+    var end = rowPlays(onward, transition, reduced(), false)
+      ? arrive(narrow() ? null : leaving, entering)
+      : narrow() ? animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOTION.fade, 0, 'ease') : whole(leaving, entering, how === 'back');
     runTimer = window.setTimeout(finishMotion, end + 20);
   }
   // A press: the next item of a slide that reveals, else the next slide; back hides the last item shown, else goes back.
@@ -542,7 +512,7 @@ const PAGE_BEHAVIOUR = String.raw`
     var key = event.key;
     if (key === 'ArrowRight' || key === 'PageDown' || key === 'j' || (key === ' ' && !narrow() && !(target && target.closest('button, a, [role="checkbox"]')))) { event.preventDefault(); step(true); }
     else if (key === 'ArrowLeft' || key === 'PageUp' || key === 'k') { event.preventDefault(); step(false); }
-    else if (key === 'Home') { event.preventDefault(); go(0, 'jump'); }
+    else if (key === 'Home') { event.preventDefault(); go(0, 'home'); }
     else if (key === 'End') { event.preventDefault(); go(count - 1, 'jump'); }
   });
   var touchX = null, touchY = null, touchFrom = null;

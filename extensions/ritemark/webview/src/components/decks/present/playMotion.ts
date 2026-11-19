@@ -15,6 +15,7 @@
  * Used by the wall, and by the Theme menu's preview on the stage (only the deck's transition there, never a move).
  */
 import { EASE_IN_OUT, EASE_OUT, matchMotion, motionKeysOf, MOTION_MS, MOVE_FADE_MS, REVEAL_MS, REVEAL_RISE, ZOOM_FROM, type MotionDirection, type MotionDrawing, type MotionPair, type MotionStep } from './wallMotion'
+import { ROW_PLAYER, type RowHow, type RowTransition } from './rowArrival'
 
 /** Reduced motion, the system's or VS Code's own setting (the class it puts on a webview's body). */
 export function prefersReducedMotion(): boolean {
@@ -37,11 +38,27 @@ interface Layers {
   distance: number
 }
 
-/** Draw one step; the drawing's `finish` puts everything at its end at once and takes away what the step added. */
-export function playStep(step: MotionStep, direction: MotionDirection, layers: Layers, pairs: readonly MotionPair<HTMLElement>[] = []): MotionDrawing {
+/** A step's drawing, and how long it runs (the row's last piece may come after the transition's own length). */
+export interface StepDrawing extends MotionDrawing {
+  ms: number
+}
+
+/**
+ * Draw one step; the drawing's `finish` puts everything at its end at once and takes away what the step added. With
+ * `row` (README item 20, `slideArrival.rowPlays`: a press going on), Fade, Push and Zoom bring the new slide's content in
+ * a row (`rowArrival.ts`, the page's own drawing too), and a smooth move's other elements arrive in a row behind the
+ * gliding ones; without it the slide comes whole.
+ */
+export function playStep(step: MotionStep, direction: MotionDirection, layers: Layers, pairs: readonly MotionPair<HTMLElement>[] = [], row = false): StepDrawing {
   const animations: Animation[] = []
   const undo: Array<() => void> = []
   const { leaving, entering, distance } = layers
+  let ms = MOTION_MS[step]
+  const inRow = (how: RowHow) => {
+    const played = ROW_PLAYER.play(entering, leaving, how)
+    animations.push(...played.animations)
+    ms = Math.max(ms, played.end)
+  }
   const animate = (element: HTMLElement, keyframes: Keyframe[], ms: number, easing: string) => {
     if (typeof element.animate !== 'function') return
     const animation = element.animate(keyframes, { duration: ms, easing, fill: 'both' })
@@ -50,7 +67,10 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
     // slide now shown. The slide before keeps its end (gone) until it is taken away.
     if (element !== leaving) undo.push(() => animation.cancel())
   }
-  switch (step) {
+  switch (row && step !== 'none' && step !== 'move' ? 'row' : step) {
+    case 'row':
+      inRow({ transition: step as RowTransition, width: distance })
+      break
     case 'fade':
       animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOTION_MS.fade, 'ease')
       animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION_MS.fade, 'ease')
@@ -66,7 +86,9 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
       animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOTION_MS.zoom, EASE_OUT)
       break
     case 'move':
-      animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOVE_FADE_MS, 'ease')
+      // In a row, what doesn't glide arrives behind what does (README item 20); else it cross-fades.
+      if (row) inRow({ transition: 'fade', width: distance, skip: pairs.map(pair => pair.to), leave: false })
+      else animate(entering, [{ opacity: 0 }, { opacity: 1 }], MOVE_FADE_MS, 'ease')
       animate(leaving, [{ opacity: 1 }, { opacity: 0 }], MOVE_FADE_MS, 'ease')
       glide(entering, pairs, animate, undo)
       break
@@ -75,6 +97,26 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
       leaving.style.visibility = 'hidden'
       break
   }
+  let done = false
+  return {
+    ms,
+    finish: () => {
+      if (done) return
+      done = true
+      for (const animation of animations) {
+        try {
+          animation.finish()
+        } catch {
+          // An animation whose element left the page: nothing to finish.
+        }
+      }
+      for (const step of undo.reverse()) step()
+    },
+  }
+}
+
+/** A drawing made of animations already started: its `finish` puts each at its end, once. */
+export function drawingOf(animations: readonly Animation[]): MotionDrawing {
   let done = false
   return {
     finish: () => {
@@ -87,7 +129,6 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
           // An animation whose element left the page: nothing to finish.
         }
       }
-      for (const step of undo.reverse()) step()
     },
   }
 }

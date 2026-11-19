@@ -75,7 +75,8 @@ import {
   type WallState,
 } from './presentProtocol';
 import { readSystemClock } from './systemClock';
-import { arrivalOf, revealCountOf, revealKept, revealOnArrival, revealStepOf, type RevealArrival, type WallReveal } from './revealSteps';
+import { revealCountOf, revealKept, revealOnArrival, revealStepOf, type WallReveal } from './revealSteps';
+import { arrivalOfMove, opensOnward, type SlideArrival } from './slideArrival';
 import { deckLookOf, deckTransitionOf, frontMatterValue, PresentSession, PresentStartError, presentTitleOf, type DeckTransition, type PresentMove } from './presentSession';
 
 /** Where the presentation was started from: the deck's document, and its view to return to. */
@@ -137,8 +138,12 @@ interface Running {
   reveal: WallReveal | null;
   /** Sprint 163 PR 4: the quiet line's words for the deck's version they were read from. */
   line?: { version: number; value: { client: string; session: string } };
-  /** How the slide the next wall state brings opens (a move just reached it), or null: the same slide, its step kept. */
-  arrival: RevealArrival | null;
+  /**
+   * How the slide the next wall state brings arrived (a move just reached it: `slideArrival.ts`), or null: the same slide,
+   * its step kept. It decides how the slide opens (its first item or whole, README item 18) and whether its content comes
+   * in a row (item 20).
+   */
+  arrival: SlideArrival | null;
 }
 
 /** The shell's commands (patch 018). */
@@ -268,9 +273,10 @@ export class DeckPresenter implements vscode.Disposable {
       page: null,
       blankSerial: 0,
       timer: null,
-      // The first slide opens with its first item (README item 18), as one reached with → does.
+      // The first slide opens with its first item (README item 18), as one reached with → does, its content arriving in
+      // a row from the theme's ground (item 20).
       reveal: null,
-      arrival: 'first',
+      arrival: 'start',
     };
     this.running = running;
     // Whether the deck is published, and where: the wall and the presenter view get it once it is known, and again
@@ -547,7 +553,7 @@ export class DeckPresenter implements vscode.Disposable {
         // Home, End and a number reach the slide they name even when the wall is on it already (it opens again as they
         // open it); → and ← at the deck's ends go nowhere, and the step stays.
         const named = move.type === 'first' || move.type === 'last' || (move.type === 'go' && running.session.slideNumbered(move.number) !== undefined);
-        if (moved || named) running.arrival = arrivalOf(move.type);
+        if (moved || named) running.arrival = arrivalOfMove(move.type);
         // Sprint 163: a slide a move reaches shows every Tabs block's first tab (a reveal step above keeps them, and a
         // press that goes nowhere too).
         if (moved || named) running.tabs = [];
@@ -602,9 +608,10 @@ export class DeckPresenter implements vscode.Disposable {
     // README item 18: a slide a move just reached opens as the move opens it (its first item, or whole); the same slide
     // drawn again keeps its step, within its items now.
     const count = revealCountOf(wallSlideOf(view.current));
-    running.reveal = running.arrival ? revealOnArrival(count, running.arrival) : revealKept(running.reveal, count);
+    const arrival = running.arrival;
+    running.reveal = arrival ? revealOnArrival(count, opensOnward(arrival) ? 'first' : 'whole') : revealKept(running.reveal, count);
     running.arrival = null;
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal, running.tabs);
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal, running.tabs, arrival);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
       running.tabs = [];
@@ -626,7 +633,8 @@ export class DeckPresenter implements vscode.Disposable {
       await this.showWall(running);
       return;
     }
-    const state: WallState = { ...onWall, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, timer: running.timer, reveal: running.reveal, tabs: tabsOf(running.tabs) };
+    // The same slide: nothing arrives (README item 20: the slide is simply shown again, never in a row).
+    const state: WallState = { ...onWall, arrival: null, presenter: { available: this.presenterAvailable(running), on: !!running.presenter }, blank: shownBlank(running.blank, running.page), page: running.page, spot: running.focus.spot, fill: running.focus.fill, timer: running.timer, reveal: running.reveal, tabs: tabsOf(running.tabs) };
     running.wallState = state;
     await post(running.wall.panel.webview, state);
     await this.showPresenter(running);

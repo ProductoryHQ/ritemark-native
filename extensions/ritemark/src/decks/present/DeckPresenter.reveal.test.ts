@@ -114,7 +114,9 @@ const { DeckPresenter } = require('./DeckPresenter') as typeof import('./DeckPre
 const { DECK_PRESENTER_VIEW_TYPE, DECK_WALL_VIEW_TYPE } = require('./presentProtocol') as typeof import('./presentProtocol');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { arrivalOf, revealCountOf, revealKept, revealLabel, revealOnArrival, revealStepOf } = require('./revealSteps') as typeof import('./revealSteps');
+const { revealCountOf, revealKept, revealLabel, revealOnArrival, revealStepOf } = require('./revealSteps') as typeof import('./revealSteps');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { arrivalOfMove, opensOnward } = require('./slideArrival') as typeof import('./slideArrival');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { blockSlideHtml, blockRevealCount } = require('../blocks/slideRenderer') as typeof import('../blocks/slideRenderer');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -175,7 +177,7 @@ const DECK = `---\ndeck: 2\nhandout: text\n---\n\n${blockSlide('s1', '# Start')}
   assert.deepEqual(revealStepOf({ shown: 3, count: 4 }, 'back'), { shown: 2, count: 4 });
   assert.equal(revealStepOf({ shown: 1, count: 4 }, 'back'), null, 'at the first item ← moves');
   assert.equal(revealStepOf(null, 'next'), null);
-  assert.deepEqual(['next', 'back', 'first', 'last', 'go'].map(move => arrivalOf(move as never)), ['first', 'whole', 'first', 'whole', 'whole']);
+  assert.deepEqual(['next', 'back', 'first', 'last', 'go'].map(move => opensOnward(arrivalOfMove(move as never)) ? 'first' : 'whole'), ['first', 'whole', 'first', 'whole', 'whole']);
   assert.deepEqual(revealKept({ shown: 2, count: 4 }, 3), { shown: 2, count: 3 }, 'an edit keeps the step');
   assert.deepEqual(revealKept({ shown: 4, count: 4 }, 5), { shown: 5, count: 5 }, 'a whole slide stays whole');
   assert.deepEqual(revealKept(null, 3), { shown: 3, count: 3 }, 'items that came with an edit show: nothing hides under the room');
@@ -230,9 +232,17 @@ async function main(): Promise<void> {
       assert.deepEqual(onLaptop().reveal, reveal, `${label}: Now's step`);
     };
     const press = async (type: string, from = laptop, extra: Record<string, unknown> = {}) => { from.send({ type, ...extra }); await settle(); };
+    // README item 20: how the slide on the wall arrived, which decides row or whole there; the presenter view never has it.
+    const arrived = (arrival: string | null, label: string) => {
+      assert.equal((last(wall, 'present/wall') as { arrival?: unknown }).arrival, arrival, `${label}: arrived as ${arrival}`);
+      assert.ok(!('arrival' in last(laptop, 'present/presenter')), `${label}: the presenter view has no arrival (it never animates)`);
+    };
 
     // Slide 1 shows whole; Next shows slide 2 as it opens, with its first item.
     at(1, null, 'the start');
+    const states = wall.posted.filter(message => message.type === 'present/wall');
+    assert.equal(states[0].arrival, 'start', 'the wall\'s first state: presenting starts, the first slide arriving in a row');
+    assert.ok(states.slice(1).every(message => message.arrival === null), 'what follows on the same slide (the page\'s address) arrives as nothing');
     assert.equal(onLaptop().next!.number, 2);
     assert.deepEqual(onLaptop().nextReveal, { shown: 1, count: 4 });
     assert.equal(onLaptop().nextIsItem, false);
@@ -240,6 +250,7 @@ async function main(): Promise<void> {
     // → opens slide 2 with the title and its first item; Next is its next item.
     await press('present/next');
     at(2, { shown: 1, count: 4 }, '→ to slide 2');
+    arrived('next', '→ to slide 2');
     assert.equal(onLaptop().nextIsItem, true);
     assert.equal(onLaptop().next!.number, 2, 'Next is the same slide');
     assert.deepEqual(onLaptop().nextReveal, { shown: 2, count: 4 }, 'with its next item');
@@ -247,11 +258,13 @@ async function main(): Promise<void> {
     // Each → (or a clicker's PageDown, the same request) shows the next item; ← hides the last one shown.
     await press('present/next', wall);
     at(2, { shown: 2, count: 4 }, 'the second item');
+    arrived(null, 'an item shown on the same slide');
     assert.equal(revealLabel(onLaptop().reveal as never), 'Shown 2 of 4');
     await press('present/back');
     at(2, { shown: 1, count: 4 }, '← hides it');
     await press('present/back');
     at(1, null, '← at the first item goes back a slide');
+    arrived('back', '← back a slide');
 
     // Coming back from the next slide shows it whole, as it was left.
     await press('present/next');
@@ -268,7 +281,11 @@ async function main(): Promise<void> {
     // The go-to box (and the grid, the row) jumps to the slide shown whole; End too; Home opens as → does.
     await press('present/go', laptop, { number: 3 });
     at(3, { shown: 2, count: 2 }, 'a typed number: whole');
+    arrived('jump', 'a typed number');
+    await press('present/last');
+    arrived('jump', 'End');
     await press('present/first');
+    arrived('home', 'Home');
     await press('present/next');
     at(2, { shown: 1, count: 4 }, 'Home, then →');
     await press('present/go', laptop, { number: 2 });
@@ -282,6 +299,7 @@ async function main(): Promise<void> {
     at(2, { shown: 2, count: 4 }, 'two shown');
     await press('present/spot', wall, { item: 1 });
     assert.equal(onWall().spot, 1);
+    arrived(null, 'the spotlight');
     assert.deepEqual(onWall().reveal, { shown: 2, count: 4 }, 'a spotlight is no step');
     await press('present/next', wall);
     at(2, { shown: 3, count: 4 }, '→ with a spotlight on: the next item');
@@ -292,13 +310,16 @@ async function main(): Promise<void> {
       await press('present/blank', wall, { to });
       assert.equal(onWall().blank, to, `${to}: the wall is covered`);
       assert.deepEqual(onWall().reveal, { shown: 3, count: 4 }, `${to}: the step is kept`);
+      arrived(null, `${to}: covered`);
       await press('present/blank', wall, { to: null });
       at(2, { shown: 3, count: 4 }, `${to}: back at the same step`);
+      arrived(null, `${to}: the slide back, whole`);
     }
     // A filled wall pauses it the same way.
     await press('present/fill', wall, { item: 0 });
     await press('present/fill', wall, { item: null });
     at(2, { shown: 3, count: 4 }, 'a filled wall: back at the same step');
+    arrived(null, 'back from a filled picture, whole');
 
     // An edit to the slide on the wall waits for the next move (as blanking does); the step is kept within its items.
     document.text = DECK.replace('### Four', '### Four, edited');
@@ -308,6 +329,7 @@ async function main(): Promise<void> {
     wall.send({ type: 'present/ready' });
     await settle();
     at(2, { shown: 4, count: 4 }, 'the wall drawn again keeps its step');
+    arrived(null, 'the wall drawn again: nothing arrives');
     assert.ok(JSON.stringify(onWall().slide).includes('Four, edited'), 'and shows the edit');
 
     // The slide on the wall deleted in the editor during a step: it has no items left to show, so → moves on

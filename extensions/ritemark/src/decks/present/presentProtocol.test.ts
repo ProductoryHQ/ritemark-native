@@ -80,7 +80,11 @@ const look = { borderless: false, theme: BUILT_IN_THEME };
   const session = new PresentSession(TEXT, { from: 'start' });
   session.move(TEXT, { type: 'next' });
   const state = wallStateOf(session.view(), look, {});
-  assert.deepEqual(Object.keys(state).sort(), ['assets', 'blank', 'borderless', 'count', 'fill', 'line', 'openIn', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'tabs', 'theme', 'timer', 'transition', 'type']);
+  assert.deepEqual(Object.keys(state).sort(), ['arrival', 'assets', 'blank', 'borderless', 'count', 'fill', 'line', 'openIn', 'page', 'position', 'presenter', 'reveal', 'skipped', 'slide', 'slides', 'spot', 'tabs', 'theme', 'timer', 'transition', 'type']);
+  // README item 20: no arrival unless the host gives one (the same slide drawn again), and only one of the five.
+  assert.equal(state.arrival, null);
+  for (const arrival of ['next', 'home', 'back', 'jump', 'start'] as const) assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, null, [], arrival).arrival, arrival);
+  assert.equal(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, null, [], 'sideways' as never).arrival, null);
   // README item 18: no step unless the host gives one, and only a step that is one gets through.
   assert.equal(state.reveal, null);
   assert.deepEqual(wallStateOf(session.view(), look, {}, undefined, null, null, undefined, null, { shown: 2, count: 4 }).reveal, { shown: 2, count: 4 });
