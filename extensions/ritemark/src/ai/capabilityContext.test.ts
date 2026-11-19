@@ -17,7 +17,8 @@ import {
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
 } from './capabilityContext';
-import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, slideIcon } from '../../webview/src/components/decks/slide/iconSet';
+import { PAGE_ICON_NAMES } from '../../webview/src/components/decks/slide/pageIcons';
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -179,15 +180,24 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
 
 // ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
 test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
-  // The names the slide draws (iconSet.ts): every one, and every other name for one, must be in the line.
+  // Sprint 169 (#866): every Phosphor regular name (pageIcons.ts), then the grid's names and aliases that aren't the
+  // Phosphor name of what they draw, each with its icon; together every name slideIcon reads.
   const names = [...SLIDE_ICON_NAMES];
   const aliases = [...SLIDE_ICON_ALIASES];
-  assert.ok(names.length > 0 && aliases.length > 0);
+  assert.ok(names.length > 0 && aliases.length > 0 && PAGE_ICON_NAMES.length === 1512);
+  const head = "- A box's `icon` is the name of a Phosphor regular icon, one of: ";
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
     const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
-    const line = text.split('\n').find((entry) => entry.startsWith("- A box's `icon` is one of these names:"));
+    const line = text.split('\n').find((entry) => entry.startsWith(head));
     assert.ok(line, `${runtime}: the icon line`);
-    for (const name of [...names, ...aliases]) assert.ok(line.includes(`\`${name}\``), `${runtime}: ${name}`);
+    const listed = line.slice(head.length, line.indexOf('. These names are read too')).split(', ');
+    assert.deepEqual(listed, [...PAGE_ICON_NAMES], `${runtime}: every Phosphor name, in order`);
+    for (const name of [...names, ...aliases]) {
+      const drawn = slideIcon(name)!.phosphor;
+      assert.ok(drawn === name ? listed.includes(name) : line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
+    }
+    // Phosphor names an old deck's alias reads as another icon say so.
+    for (const [name, drawn] of [['check', 'check-circle'], ['envelope', 'envelope-simple'], ['mail', 'envelope-simple']]) assert.ok(line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
     assert.ok(line.includes("a name Ritemark doesn't know draws a dashed circle"), `${runtime}: what an unknown name does`);
   }
 });
@@ -238,7 +248,8 @@ test('deck guidance says what "this slide" means', () => {
 // ── Sprint 162 PR 5: themes, taught the same way to every AI with the deck tools ──
 test('deck guidance teaches themes: the folder, the fields, the six fonts and the contrast rule', () => {
   const renders = (['claude-code', 'codex', 'opencode'] as const).map((runtime) => renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true })));
-  const themeLines = (text: string) => text.split('\n').filter((line) => line.startsWith('- ') && /set_deck_theme|`theme:` line|brand|this deck or all/.test(line));
+  // A whole word: the icon line's Phosphor names hold `brandy` (Sprint 169).
+  const themeLines = (text: string) => text.split('\n').filter((line) => line.startsWith('- ') && /set_deck_theme|`theme:` line|\bbrand\b|this deck or all/.test(line));
   for (const text of renders) {
     for (const needle of [
       '`<Name>.theme.md` file in `Slide library/Themes/`', '`theme:` line',

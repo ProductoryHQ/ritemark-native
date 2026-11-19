@@ -23,16 +23,18 @@
 import type { AgentId } from '../agent/types';
 import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
 import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
-import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import { RITEMARK_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import { PAGE_ICON_NAMES } from '../../webview/src/components/decks/slide/pageIcons';
 
 /**
  * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with, so an AI never
- * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Today's 24 and the other names drawn
- * as them; every Phosphor name once the icon search lands (Sprint 169).
+ * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Sprint 169 (#866): every Phosphor
+ * regular name, as a plain list (backticks round 1,512 names would cost more than they say), then Ritemark's own names
+ * with the icon each draws.
  */
 function iconLine(): string {
-  const list = (names: readonly string[]) => names.map((name) => `\`${name}\``).join(', ');
-  return `- A box's \`icon\` is one of these names: ${list(SLIDE_ICON_NAMES)}; these are read as one of them too: ${list(SLIDE_ICON_ALIASES)}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+  const own = RITEMARK_ICON_NAMES.map(({ name, phosphor }) => `\`${name}\` (${phosphor})`).join(', ');
+  return `- A box's \`icon\` is the name of a Phosphor regular icon, one of: ${PAGE_ICON_NAMES.join(', ')}. These names are read too, each as the icon in brackets: ${own}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
 }
 
 /**

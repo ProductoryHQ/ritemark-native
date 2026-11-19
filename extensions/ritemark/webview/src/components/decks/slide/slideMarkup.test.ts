@@ -80,6 +80,8 @@ const slides: Array<{ kind: string; data: SlideData; label: string }> = [
   { label: 'points, a picture on the right', kind: 'points', data: { title: 'Today', items: items(3), picture: 'right', image: 'images/chart.png' } },
   { label: 'boxes', kind: 'boxes', data: { title: "An assistant's four parts", items: items(4, index => ({ icon: ['list-checks', 'book-open', 'puzzle', 'nope'][index] })) } },
   { label: 'boxes in a grid', kind: 'boxes', data: { title: 'Six boxes', items: items(6, () => ({ icon: 'wrench' })) } },
+  // Sprint 169 (#866): icons outside the 24, by their Phosphor names.
+  { label: 'boxes with any Phosphor icon', kind: 'boxes', data: { title: 'Delivery', items: items(3, index => ({ icon: ['truck', 'Rocket-Launch', 'users-three'][index] })) } },
   { label: 'boxes beside a picture', kind: 'boxes', data: { title: 'Beside', items: items(3), picture: 'left', image: 'images/missing.png' } },
   { label: 'steps', kind: 'boxes', data: { title: 'Steps', look: 'steps', items: items(4) } },
   { label: 'line', kind: 'boxes', data: { title: 'A scheduled prompt', look: 'line', items: items(4) } },
@@ -109,6 +111,10 @@ for (const borderless of [false, true]) {
     // Each icon's drawing, too: the path React's Phosphor icon draws is the one the page draws.
     const paths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))
     assert.deepEqual(paths(page), paths(react), `${label}: the icons`)
+    if (slide.label === 'boxes with any Phosphor icon') {
+      const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
+      assert.deepEqual(paths(react), [drawn('truck'), drawn('rocket-launch'), drawn('users-three')], `${label}: each its own`)
+    }
   }
 }
 
@@ -137,15 +143,16 @@ for (const borderless of [false, true]) {
   assert.ok(at(1) < at(0) && at(2) < at(1), 'each step is a size smaller')
 }
 
-// The icons: every slide icon and the page's own are in the module, and each is the package's drawing.
+// The icons: every regular icon (Sprint 169), the slide icons and the page's own among them, each the package's drawing.
 {
   const core = fileURLToPath(new URL('../../../../../node_modules/@phosphor-icons/core/assets/regular/', import.meta.url))
   const names = Object.keys(PAGE_ICON_PATHS)
+  assert.equal(names.length, 1512, "every one of @phosphor-icons/core 2.1.1's regular icons")
   for (const icon of SLIDE_ICONS) assert.ok(names.includes(icon.phosphor), `${icon.phosphor} is in pageIcons.ts`)
   // #850: the dashed circle an unknown icon name draws.
   assert.ok(names.includes(UNKNOWN_ICON), `${UNKNOWN_ICON} is in pageIcons.ts`)
   for (const name of ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'folder', 'file-text']) assert.ok(names.includes(name), name)
-  // The generator writes the module as it is (every icon the page draws, the ones added by hand before too).
+  // The generator writes the module as it is.
   const generator = new URL('../../../../../scripts/generate-page-icons.mjs', import.meta.url).href
   const { iconNames } = (await import(generator)) as { iconNames: () => string[] }
   assert.deepEqual(iconNames(), [...names].sort(), 'node scripts/generate-page-icons.mjs writes these icons')

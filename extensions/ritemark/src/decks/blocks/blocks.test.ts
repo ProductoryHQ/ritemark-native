@@ -200,7 +200,7 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
   assert.ok(dashed, 'the page carries the dashed circle');
   const boxes = (icon: string) => blockSlideHtml(`:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`);
   // A name Ritemark doesn't know: the badge, in its usual place before the words, with the dashed circle.
-  for (const name of ['xyz', 'rocket-launch', 'Lightbulbs']) {
+  for (const name of ['xyz', 'rocket-launchpad', 'Lightbulbs']) {
     const html = boxes(name);
     assert.ok(html.includes(`<div class="blk-box"><span class="blk-icon is-unknown">${iconSvg(UNKNOWN_ICON as PageIconName, 28)}</span><h3>Idea</h3>`), `${name}: ${html}`);
     assert.ok(!html.includes(name), `${name}: the unknown name itself is never drawn`);
@@ -228,6 +228,20 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
   for (const borderless of [false, true]) {
     assert.ok(blockSlideMarkup(slide.data, { theme: BUILT_IN_THEME, borderless }).includes('<span class="blk-icon is-unknown">'), `the wall, borderless ${borderless}`);
   }
+});
+
+test('Sprint 169 (#866): a box draws any Phosphor regular icon by its name (red on main: the dashed circle)', () => {
+  const boxes = (icon: string) => blockSlideHtml(`:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`);
+  // Names outside the grid of 24, as written by hand or by an AI, any case and spacing.
+  for (const [written, drawn] of [['truck', 'truck'], [' Rocket-Launch ', 'rocket-launch'], ['USERS-THREE', 'users-three'], ['circle-dashed', 'circle-dashed']] as const) {
+    const html = boxes(written);
+    assert.ok(html.includes(`<div class="blk-box"><span class="blk-icon">${iconSvg(drawn, 28)}</span><h3>Idea</h3>`), `${written}: ${html}`);
+    assert.ok(!html.includes('is-unknown'), `${written} is known`);
+  }
+  // The wall and the presenter view draw it with the same renderer.
+  const deck = '---\ndeck: 2\n---\n\n```slide\n---\nid: t1\n---\n# Parts\n\n:::: boxes\n::: {.box icon="truck"}\n### Delivery\n:::\n::::\n```\n';
+  const [slide] = wallStateOf(new PresentSession(deck, { from: 'start' }).view(), { borderless: false, theme: BUILT_IN_THEME }, {}).slides;
+  assert.ok(blockSlideMarkup(slide.data, { theme: BUILT_IN_THEME, borderless: false }).includes(`<span class="blk-icon">${iconSvg('truck', 28)}</span>`), 'the wall');
 });
 
 test('the cover look and the fit', () => {
