@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: three user-facing requirements, a file-format and migration change, and a view-to-renderer-to-published-page flow). Override with: "use plain full track".
 Branch: sprint-164-deck-finish
 Release tier: extension
-Status: **Approved** by Jarmo on 19 November 2026, with the three removals by name: "kinnitan sprindi 164 koos eemaldustega" (I approve Sprint 164 with the removals). Phase 3 (DEVELOP): PR 1 and PR 2 started.
+Status: **Approved** by Jarmo on 19 November 2026, with the three removals by name: "kinnitan sprindi 164 koos eemaldustega" (I approve Sprint 164 with the removals). Phase 3 (DEVELOP): PR 1 and PR 2 started. **Done** on 19 November: see Close-out.
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint (the release plan is written elsewhere and is not edited here). The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`), agreed with Jarmo on 19 November in ritemark-dev commits 3eb72b7, 5bc0f70 and 7382bee.
 
@@ -60,6 +60,20 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - The spacing change touches every surface, so the before and after shots matter more than any test.
 - The file form `[text]{.label}` may clash with the parser (tell the Experience lead if it does).
 - Migration must not lose a person's pill words.
+
+## Close-out
+Sprint 164 closed on 19 November 2026.
+
+- **PR 1, [#819](https://github.com/ProductoryHQ/ritemark-native/pull/819)** (Standard): every deck, new ones too, opens in Slide only; the view chosen is kept while the deck is open, and a reopened deck starts in Slide only again. Nothing is written to the file.
+- **PR 2, [#821](https://github.com/ProductoryHQ/ritemark-native/pull/821)** (High): spacing on the slide follows variant D: 12 px under blocks, 18 px inside surfaces (table cells 18 and 9), 32 px between columns with no column padding, and 16 px between boxes, on the editor, the strip, the wall and the page.
+- **PR 3, [#858](https://github.com/ProductoryHQ/ritemark-native/pull/858)** (High): Label is a block of its own, added from the / menu and written `[text]{.label}`. An existing Steps pill becomes a Label in the same place, with the person's words. The three removals Jarmo approved by name are done: Settings' Label row, the last-label rule and the pill's padding-top rule.
+- **PR 4, [#892](https://github.com/ProductoryHQ/ritemark-native/pull/892)** (Standard): the dead code PR 3 left only so that `DeckView.tsx` still compiled is gone (`withStepsTag`, the `blockStepsTagOf` alias, `SlideSettings`' `stepsTag`/`onUndo` props, DeckView's `stepsTagSetting`, `updateSlideMarkdown`). No behaviour changes.
+
+The Experience lead approved the shots of #819, #821 and #858. The full test chain ran once on each final head (the PRs' Review records), and `qa-validator` signed off on 19 November.
+
+**The decision about a bare `::: steps`.** Jarmo said a Label is free and tied to no block. So a Steps block written without a pill (`::: steps`) no longer draws the default "Exercise" pill. A pill that was written (`tag="…"`) becomes a Label with its words, and a v1 Exercise slide still converts with "Exercise" as its Label.
+
+**Not run:** Windows, and the presenter view on a second display.
 
 ## Approval
 - [x] Jarmo approved this sprint plan (19 November 2026), with the three removals

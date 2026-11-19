@@ -39,7 +39,7 @@ import { closeHistory, undoDepth } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -263,7 +263,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const fitKeyRef = useRef<string | null>(null)
   /** This stage, as the owner of the step it tells (`clearStageFit`). */
   const fitOwner = useRef({})
-  fitKeyRef.current = shownMarkdown === nodeMarkdown ? fitKeyOf(nodeMarkdown, header.image, header.picture, fitLookOf(borderless, theme)) : null
+  fitKeyRef.current = shownMarkdown === nodeMarkdown ? fitKeyOf(nodeMarkdown, header.image, header.picture, fitLookOf(borderless, theme), contentPlaceFitKey(nodeMarkdown, header.valign, sidePictureOf(header))) : null
   /** Lays Replace picture… over each missing picture (set below, once the editor is made). */
   const placeMissingRef = useRef<() => void>(() => {})
 
@@ -594,7 +594,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     clearStageFit(fitOwner.current)
   }, [])
   // Once per change of the words (the editor's update), and when the size, the look or the cover look change.
-  const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}`
+  // Sprint 167 PR 3: the content's place too (a title slide moved up keeps a top-right logo's room), worked out once.
+  const placeClass = contentPlaceClass(shownMarkdown, header.valign, sidePictureOf(header))
+  const lookKey = `${width}\u0000${borderless}\u0000${JSON.stringify(theme)}\u0000${isCoverSlide(shownMarkdown)}\u0000${slide.data.picture ?? ""}\u0000${placeClass}`
   useLayoutEffect(() => { refit(true) }, [refit, lookKey])
   // The words just written reach the slide's node, and its thumbnail, after the update that measured them: the step is
   // told again under their key.
@@ -1096,9 +1098,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const sideUrl = side && header.image ? assets[header.image.trim()] : undefined
   const sideMissing = !!side && !sideUrl && !!header.image && missing.has(header.image.trim())
   // Sprint 162 PR 4: a top-right logo's room for the title, as every other view draws it (`logoCanvasMarks`).
-  const logoMarks = logoCanvasMarks(themeSlideLogo(theme, borderless), isCoverSlide(shownMarkdown))
+  const logoMarks = logoCanvasMarks(themeSlideLogo(theme, borderless), isCoverSlide(shownMarkdown), contentPlaceOf(shownMarkdown, header.valign, side))
   // 18 November: a picture alone on the slide (or under its title only) is centred, as every other view draws it.
-  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), logoMarks.cls].filter(Boolean).join(' ')
+  // Sprint 167 PR 3: the content Top, Middle or Bottom (`valign:`), as every other view draws it (`placeClass`, above).
+  const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), placeClass, logoMarks.cls].filter(Boolean).join(' ')
   return (
     <>
     <ContextMenu>
