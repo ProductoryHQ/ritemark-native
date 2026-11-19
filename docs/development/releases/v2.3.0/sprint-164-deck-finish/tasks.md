@@ -12,12 +12,12 @@ Gate: no code until Jarmo approves the plan and each PR's branch is created from
 
 ## PR 2: spacing, variant D (High), branch `sprint-164-deck-finish-pr2`
 - [x] Issue created in milestone v2.3.0 (manager): #817
-- [ ] One before shot
-- [ ] 12 px under blocks, old top margins removed (R2)
-- [ ] 18 px inside surfaces, table cells 18 and 9
-- [ ] 32 px between columns, no column padding, boxes 16 px
+- [x] One before shot
+- [x] 12 px under blocks, old top margins removed (R2)
+- [x] 18 px inside surfaces, table cells 18 and 9
+- [x] 32 px between columns, no column padding, boxes 16 px
 - [ ] Shots against variant D on the editor, strip, wall and page, and the fit levels; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 3: Label (High), branch `sprint-164-deck-finish-pr3`, starts after PR 2 merges
 - [x] Issue created in milestone v2.3.0 (manager): #818
