@@ -4,16 +4,17 @@
  * the project, each opening the same way. A slide is clicked for "Insert after slide N", which the host copies into
  * the deck that is open (`library/insert`); the copy keeps a `from:` line when it came from a topic.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { Icon } from '../../ui/Icon'
+import { Tooltip } from '../../ui/tooltip'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from '../../../../../src/decks/deckTheme'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { deckDate, deckExpanded, groupByFolder, slideCount } from './libraryGroups'
+import { deckExpanded, deckMeta, groupByFolder } from './libraryGroups'
 import '../decks.css'
 
 interface LibrarySlide {
@@ -74,6 +75,36 @@ export function insertLabel(active: ActiveDeck | null): string | null {
   return `Insert after slide ${Math.min(active.current, active.count - 1) + 1}`
 }
 
+/**
+ * Sprint 165 PR 1 (the Experience lead): an other deck's row, on two lines. The name takes up to two lines before an
+ * ellipsis, and only a name cut there gets its full text in a tooltip; under it, "18 Nov · 9 slides", muted.
+ */
+function DeckRow({ name, meta, expanded, onToggle }: { name: string; meta: string; expanded: boolean; onToggle: () => void }) {
+  const nameRef = useRef<HTMLSpanElement>(null)
+  const [cut, setCut] = useState(false)
+  useLayoutEffect(() => {
+    const element = nameRef.current
+    if (!element) return
+    const measure = () => setCut(element.scrollHeight > element.clientHeight + 1)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [name])
+  return (
+    <Tooltip label={name} side="right" hoverOnly suppressed={!cut} className="flex w-full">
+      <button type="button" className="deck-lib-row deck-lib-row-two" aria-expanded={expanded} aria-label={`${name}, ${meta}`} onClick={onToggle}>
+        <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
+        <Icon name="presentation" size={16} tone="inherit" />
+        <span className="deck-lib-deck-text">
+          <span ref={nameRef} className="deck-lib-deck-name">{name}</span>
+          <span className="deck-lib-deck-meta">{meta}</span>
+        </span>
+      </button>
+    </Tooltip>
+  )
+}
+
 export function SlideLibraryPanel() {
   const [state, setState] = useState<LibraryState | null>(null)
   const [query, setQuery] = useState('')
@@ -99,7 +130,7 @@ export function SlideLibraryPanel() {
         setQuery('')
         sendToExtension('library/search', { query: '' })
         // Other decks open with their slides, so a slide is one click away.
-        requestAnimationFrame(() => document.querySelector(section === 'other' ? '.deck-lib-group' : '.deck-lib-search, .deck-lib-row')?.scrollIntoView({ block: 'start' }))
+        requestAnimationFrame(() => document.querySelector(section === 'other' ? '.deck-lib-group-other' : '.deck-lib-search, .deck-lib-row')?.scrollIntoView({ block: 'start' }))
         // Each open starts as asked: "From another deck…" opens the newest other deck, "From the library…" does not.
         setOpenOthers(section === 'other')
       } else if (message.type === 'library/reveal' && typeof message.path === 'string') {
@@ -182,6 +213,7 @@ export function SlideLibraryPanel() {
     const expanded = deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
     return (
       <div key={deck.path}>
+        {deck.topic ? (
         <button
           type="button"
           className="deck-lib-row"
@@ -191,14 +223,16 @@ export function SlideLibraryPanel() {
           <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
           <Icon name="presentation" size={16} tone="inherit" />
           <span className="deck-lib-name">{deck.name}</span>
-          {deck.topic ? (
-            <span className="deck-lib-count">{deck.slides.length}</span>
-          ) : (
-            <span className="deck-lib-count" aria-label={`${deckDate(deck.modified) ? `changed ${deckDate(deck.modified)}, ` : ''}${slideCount(deck.slides.length)}`}>
-              {deckDate(deck.modified) ? `${deckDate(deck.modified)} · ` : ''}{deck.slides.length}
-            </span>
-          )}
+          <span className="deck-lib-count">{deck.slides.length}</span>
         </button>
+        ) : (
+          <DeckRow
+            name={deck.name}
+            meta={deckMeta(deck.modified, deck.slides.length)}
+            expanded={expanded}
+            onToggle={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+          />
+        )}
         {expanded ? (
           <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
           <div className="deck-lib-grid">
@@ -267,11 +301,12 @@ export function SlideLibraryPanel() {
         />
       </label>
       ) : null}
+      {topics.length || !searching ? <div className="deck-lib-group">Library</div> : null}
       {topics.map((deck) => deckRows(deck, false))}
       {topics.length === 0 && !searching ? (
         <p className="deck-lib-none">No topics yet. Add a slide to the library from a deck's slide menu.</p>
       ) : null}
-      {folders.length ? <div className="deck-lib-group">Other decks</div> : null}
+      {folders.length ? <div className="deck-lib-group deck-lib-group-other">Other decks</div> : null}
       {folders.map((group) => (
         <div key={group.folder || '.'} className="deck-lib-folder-group">
           <div className="deck-lib-folder">

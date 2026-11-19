@@ -13,9 +13,17 @@ export interface GroupedDeck {
 export interface DeckFolder<T extends GroupedDeck> {
   /** The folder's project-relative path ('' for the project's top level). */
   folder: string
-  /** The heading: the folder's path as written, or the project's name for the top level. */
+  /** The heading: the folder's path with › between folders, or the project's name for the top level. */
   name: string
   decks: T[]
+}
+
+/** Between a folder and the one inside it, and between a folder and a deck: "Clients › North" (search uses it too). */
+export const PLACE_SEPARATOR = ' › '
+
+/** A folder's heading: its project-relative path with › between the folders ("Clients › North"). */
+export function folderHeading(folder: string): string {
+  return folder.split('/').filter(Boolean).join(PLACE_SEPARATOR)
 }
 
 /** The folder a deck is in, project-relative ('' at the top level). */
@@ -32,7 +40,7 @@ export function groupByFolder<T extends GroupedDeck>(decks: readonly T[], projec
     const folder = folderOfDeck(deck.path)
     let group = folders.get(folder)
     if (!group) {
-      group = { folder, name: folder || projectName || 'This project', decks: [] }
+      group = { folder, name: folderHeading(folder) || projectName || 'This project', decks: [] }
       folders.set(folder, group)
     }
     group.decks.push(deck)
@@ -51,7 +59,7 @@ export function deckDate(modified: number, now: number = Date.now()): string {
   return day.getFullYear() === new Date(now).getFullYear() ? text : `${text} ${day.getFullYear()}`
 }
 
-/** A deck's count of slides as its row's tooltip says it. */
+/** A deck's count of slides as its row says it. */
 export function slideCount(count: number): string {
   return count === 1 ? '1 slide' : `${count} slides`
 }
@@ -64,4 +72,10 @@ export function deckExpanded(path: string, options: { searching: boolean; open: 
   if (options.searching) return true
   if (options.open[path] !== undefined) return options.open[path]
   return options.openNewest && path === options.newest
+}
+
+/** A deck row's second line: "18 Nov · 9 slides", or only the count when the date is unknown. */
+export function deckMeta(modified: number, count: number, now: number = Date.now()): string {
+  const date = deckDate(modified, now)
+  return date ? `${date} · ${slideCount(count)}` : slideCount(count)
 }
