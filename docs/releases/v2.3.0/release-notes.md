@@ -59,6 +59,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 - **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
+- **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
 <!-- DECKS END -->
 
 ## Smaller changes
