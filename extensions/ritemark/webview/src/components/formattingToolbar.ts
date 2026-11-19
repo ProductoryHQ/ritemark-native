@@ -43,3 +43,13 @@ export function formattingToolbarShows(input: {
 export function toolbarHidesAfterClick(input: { editorHasFocus: boolean; focusInToolbar: boolean }): boolean {
   return !input.editorHasFocus && !input.focusInToolbar
 }
+
+/**
+ * Sprint 166 (#822): where a bubble that must leave its editor's frame goes: the app's React root (`#root`), not
+ * `document.body`. React hears a press only inside the root it was mounted on, so a bubble in `body` drew its buttons
+ * but their `onMouseDown` and `onClick` never ran: no B, I, heading, list or link changed the slide's words, and the
+ * press blurred the slide. The root is outside the stage's scaled frame, so the bubble is still drawn at full size.
+ */
+export function bubbleHost(doc: { getElementById(id: string): Element | null; body: Element }): Element {
+  return doc.getElementById('root') ?? doc.body
+}

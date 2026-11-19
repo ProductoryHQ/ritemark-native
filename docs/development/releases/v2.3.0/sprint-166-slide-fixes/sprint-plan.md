@@ -18,11 +18,11 @@ Issue [#822](https://github.com/ProductoryHQ/ritemark-native/issues/822), milest
 
 Likely cause, not yet proven: the bubble reads the slide editor's selection but its commands run on another editor instance, or the click blurs the slide and the selection is lost first. The first step is a test that reproduces it. Where to look: `extensions/ritemark/webview/src/components/decks/blocks/SlideEditor.tsx` (`<FormattingBubbleMenu editor={editor} appendToBody />`) and `extensions/ritemark/webview/src/components/FormattingBubbleMenu.tsx`, which the Text editor uses too.
 
-- [ ] A test that fails before the fix; the cause found and fixed at its source.
-- [ ] Each bubble button changes the text on a plain slide body and in a Columns block (Jarmo's case).
-- [ ] ⌘B and ⌘I from the keyboard still work; ⌘Z after a bubble change undoes it.
-- [ ] The Text editor's bubble is unchanged.
-- [ ] Two shots or a short recording, before and after, on a synthetic deck.
+- [x] A test that fails before the fix; the cause found and fixed at its source.
+- [x] Each bubble button changes the text on a plain slide body and in a Columns block (Jarmo's case).
+- [x] ⌘B and ⌘I from the keyboard still work; ⌘Z after a bubble change undoes it.
+- [x] The Text editor's bubble is unchanged.
+- [x] Two shots or a short recording, before and after, on a synthetic deck.
 
 ## Fix 2: moving between slides in Slide only (PR 2, issue #824)
 

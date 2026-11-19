@@ -17,7 +17,7 @@ import { commentBoxStorage, startComment } from '../extensions/comment/CommentNo
 import type { Selection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import type { Instance as TippyInstance } from 'tippy.js'
-import { formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
 
 /**
@@ -39,7 +39,8 @@ interface FormattingBubbleMenuProps {
   /** Sprint 94 (#81): show the "Comment" action (gated on the comment-callouts flag). */
   commentCallouts?: boolean
   /**
-   * Sprint 161 (PR 2): put the menu in `document.body`. The deck's stage draws its slide scaled (`transform: scale`),
+   * Sprint 161 (PR 2): put the menu outside the editor's frame, in the app's React root (`bubbleHost`, #822; in
+   * `document.body` React never heard its buttons). The deck's stage draws its slide scaled (`transform: scale`),
    * and tippy's default puts an interactive menu beside its reference, inside the scaled frame, drawn small and
    * offset by the scale (spike §1).
    */
@@ -303,7 +304,7 @@ export function FormattingBubbleMenu({
         editor={editor}
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
-          ...(appendToBody ? { appendTo: () => document.body } : {}),
+          ...(appendToBody ? { appendTo: () => bubbleHost(editor.view.dom.ownerDocument) } : {}),
           onCreate: (instance) => {
             toolbarTippy.current = instance
           },
