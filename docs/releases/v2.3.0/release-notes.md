@@ -57,15 +57,18 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
 - **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides, with their handout and prompts, after the slide you're on, and one undo takes them out again.
+- **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it, and a tick marks the slides already in your deck.
 - **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 - **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
 - **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
+- **Show who said a quote.** End a quote on a slide with a line that starts with a long dash (— or –), such as "— Team lead". That line shows smaller, under the quote's words, and the quote gets a bar in your theme's colour.
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
 - **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
+- **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
 <!-- DECKS END -->
 
 ## Smaller changes

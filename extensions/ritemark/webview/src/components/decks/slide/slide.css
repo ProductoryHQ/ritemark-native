@@ -248,8 +248,18 @@
 /* The slide editor: the chosen button's two places to type while they are empty. Its ring is the one every chosen
    block has (`.deck-block-ring`, drawn by ButtonBlockTools in the frame); amber stays the words' focus (--s-foc). */
 .deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
-/* #841: the slide owns its quote's whole look; VS Code's webview sheet (a fill and a border colour) and .ProseMirror's (a 3 px border and its padding) never reach it. */
-.deck-sl.is-blocks blockquote { margin: 0 0 calc(12px * var(--fit, 1)); padding: 0 0 0 .8em; background: none; border: 0; border-radius: 0; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
+/* #841: the slide owns its quote's whole look; VS Code's webview sheet (a fill and a border colour) and .ProseMirror's (a 3 px border and its padding) never reach it.
+   Sprint 168 PR 1 (#863, the decks README "A quote is a voice, not a box"; quote-on-slide.html): no fill, a 3 px bar in
+   the full accent and 18 px from it to the words, which are in the heading colour, 8% larger, weight 500, 6 px between
+   its paragraphs. Its attribution (`.blk-by`, written by the renderer and the stage's decoration on a last paragraph
+   that opens with "— " or "– " under words of its own) is 0.74 of the quote, weight 600, in the sub colour, 10 px under
+   the words. In the file it is just the quote's last line. */
+.deck-sl.is-blocks blockquote { margin: 0 0 calc(12px * var(--fit, 1)); padding: calc(2px * var(--fit, 1)) 0 calc(2px * var(--fit, 1)) calc(18px * var(--fit, 1)); background: none; border: 0; border-radius: 0; box-shadow: inset 3px 0 0 var(--s-acc, #F2B544); color: var(--s-hd, #fff); font-size: 1.08em; font-weight: 500; line-height: 1.4; }
+.deck-sl.is-blocks blockquote > p { margin: 0 0 calc(6px * var(--fit, 1)); }
+.deck-sl.is-blocks blockquote > :last-child { margin-bottom: 0; }
+.deck-sl.is-blocks blockquote > p.blk-by { margin-top: calc(10px * var(--fit, 1)); font-size: .74em; font-weight: 600; color: var(--s-sub, #C7CAEB); }
+/* A bold name in the attribution stays in its quiet colour (the slide's `strong` is the heading colour). */
+.deck-sl.is-blocks blockquote > p.blk-by strong, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by strong { color: inherit; }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
@@ -384,8 +394,8 @@
 /* Borderless: the block slide's words on white */
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }
 .deck-slide.is-borderless .deck-sl.is-blocks h1, .deck-slide.is-borderless .deck-sl.is-blocks h3, .deck-slide.is-borderless .deck-sl.is-blocks h4,
-.deck-slide.is-borderless .deck-sl.is-blocks strong, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li { color: var(--s-hd, #1C1F4A); }
-.deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote { color: var(--s-sub, #5B5F86); }
+.deck-slide.is-borderless .deck-sl.is-blocks strong, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li, .deck-slide.is-borderless .deck-sl.is-blocks blockquote { color: var(--s-hd, #1C1F4A); }
+.deck-slide.is-borderless .deck-sl.is-blocks h2, .deck-slide.is-borderless .deck-sl.is-blocks.is-cover p, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by { color: var(--s-sub, #5B5F86); }
 .deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }

@@ -1,5 +1,5 @@
 /**
- * The block's bar (experience 46, 17 November): Turn into, Boxes' Width, Style and alignment, Columns' count, split and
+ * The block's bar (experience 46, 17 November): Turn into, Boxes' Width, Style, Mark and alignment, Columns' count, split and
  * frame 23's tools, Add and Delete, the ⋮ drag, Tab across items, and the handles at the smallest stage. Driven the way
  * the stage drives them: the slide editor's document on its own pipeline (`slideEditorHarness`), the slide's sync, and
  * the deck as the deck view's editor holds it, with its history, saved through the editor's own Markdown pipeline.
@@ -16,7 +16,7 @@ import { closeHistory, history, undo } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
 import { slideDataOf, withBlockMarkdown } from '../../../../../src/decks/deckFormat'
-import { BOX_AUTO_MIN, BOX_GAP, boxesLookOf, columnWidthOf, columnsAlignOf, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, BOX_AUTO_MIN, BOX_GAP, MARK_LOOK, OPEN_FENCE, OWN_MARK_LOOKS, boxesLookOf, boxesMarkOf, columnWidthOf, columnsAlignOf, parseFenceAttributes, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { BUILT_IN_THEME } from '../../../../../src/decks/deckTheme'
 import { contrast, themeVars } from '../theme/themeVars'
@@ -37,6 +37,7 @@ import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
   FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind,
+  MARK_LABEL, MARK_MENU_TIP, MARK_TIP, divAttributesOf, setBoxesMark,
 } from './blockBar'
 
 installTestDocument()
@@ -719,7 +720,10 @@ stable(COLUMNS, 'three columns')
   assert.ok(/Present/.test(REVEAL_TIP) && /one by one/.test(REVEAL_TIP), REVEAL_TIP)
   assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Width or count, Style')
   assert.equal(FOLD_AT.reveal, FOLD_AT.alignment + 1, 'Reveal folds right after the alignment')
-  assert.equal(MAX_FOLD, FOLD_AT.style, 'every group can fold')
+  // Sprint 167 PR 2: Boxes' Mark, a menu already, folds last, to its value's icon (review of #878: else the Boxes bar at
+  // its last fold was a menu wider than before, and ran past a narrow pane).
+  assert.ok(FOLD_AT.style < FOLD_AT.mark, 'Style, then Mark')
+  assert.equal(MAX_FOLD, FOLD_AT.mark, 'every group can fold')
   {
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
     assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
@@ -779,4 +783,177 @@ stable(COLUMNS, 'three columns')
   }
 }
 
-console.log('blockBar: Turn into, Width, Style, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')
+// ---- Sprint 167 PR 2 (the decks README, item C): Mark, Icon · Number · Dot · Arrow, after Filled and Outline. Each is
+// a look drawn today (old decks use them); Icon is the default and writes nothing; Number is the slide's own counter.
+{
+  const lineOf = (open: string) => parseFenceAttributes(OPEN_FENCE.exec(open)![2])!
+  // The four marks are the four looks: Icon the default look, the others exactly the looks that draw their own mark.
+  assert.deepEqual(BOXES_MARKS, ['icon', 'number', 'dot', 'arrow'], "the menu's order")
+  assert.deepEqual(BOXES_MARKS.map(mark => MARK_LABEL[mark]), ['Icon', 'Number', 'Dot', 'Arrow'])
+  assert.equal(MARK_LOOK.icon, null, 'Icon writes no look')
+  assert.deepEqual(new Set(BOXES_MARKS.map(mark => MARK_LOOK[mark]).filter(look => look !== null)), OWN_MARK_LOOKS, 'Number, Dot, Arrow are the own-mark looks')
+  for (const mark of BOXES_MARKS) assert.ok(MARK_TIP[mark].length > 0, `${mark} has a tooltip`)
+  assert.ok(/icon/.test(MARK_MENU_TIP) && /number/.test(MARK_MENU_TIP), MARK_MENU_TIP)
+  // An old deck's look reads as its Mark, by the word that draws it; none, `boxes` and a word no look draws are Icon.
+  for (const [line, mark] of [
+    [':::: boxes', 'icon'], [':::: {.boxes look="boxes"}', 'icon'], [':::: {.boxes look="steps"}', 'number'], [':::: {.boxes look="line"}', 'dot'],
+    [':::: {.boxes look="arrows"}', 'arrow'], [':::: {.boxes look="cards"}', 'icon'], [':::: {.boxes look="Steps"}', 'icon'],
+  ] as const) {
+    assert.equal(boxesMarkOf(lineOf(line)), mark, line)
+    const drawn = blockSlideHtml(`${line}\n::: {.box icon="lightbulb"}\n### A\n:::\n::::`)
+    assert.equal(drawn.includes('class="blk-icon"'), mark === 'icon', `${line}: an icon drawn only under Icon`)
+  }
+
+  // Each mark round-trips: written on the block's own line only, the same bytes on the next open, read back as itself,
+  // drawn as its look; the boxes keep their own icons in the file, and Icon draws them again.
+  const ICONS = ['# Plan', '', ':::: boxes', '::: {.box icon="lightbulb"}', '### One', '', 'Map the inbox.', ':::', '', '::: {.box icon="target"}', '### Two', ':::', '', '::: box', '### Three', ':::', '::::'].join('\n')
+  stable(ICONS, 'boxes with icons')
+  const LINE: Record<BoxesMark, string> = { icon: ':::: boxes', number: ':::: {.boxes look="steps"}', dot: ':::: {.boxes look="line"}', arrow: ':::: {.boxes look="arrows"}' }
+  const state = stateWith(ICONS, 'Two')
+  const chosen = chosenBlockAt(state)!
+  assert.equal(chosen.kind, 'boxes')
+  assert.equal(boxesMarkOf(divAttributesOf(chosen.node)), 'icon', 'Icon is the default')
+  assert.equal(setBoxesMark(state, chosen.pos, 'icon'), null, 'Icon on Icon: no change')
+  for (const mark of BOXES_MARKS.filter(mark => mark !== 'icon')) {
+    const tr = setBoxesMark(state, chosen.pos, mark)
+    assert.ok(tr && tr.getMeta(SLIDE_COMMAND) === true, `${mark}: an undo step of its own`)
+    const markdown = after(tr)
+    assert.equal(markdown, ICONS.replace(':::: boxes', LINE[mark]), `${mark} is written on the block's line only`)
+    stable(markdown, mark)
+    const again = stateWith(markdown, 'Two')
+    const read = chosenBlockAt(again)!
+    assert.equal(boxesMarkOf(divAttributesOf(read.node)), mark, `${mark} reads back as itself`)
+    assert.equal(setBoxesMark(again, read.pos, mark), null, `${mark} on ${mark}: no change`)
+    assert.ok(markdown.includes('icon="lightbulb"') && markdown.includes('icon="target"'), `${mark}: each box keeps its icon in the file`)
+    const html = blockSlideHtml(markdown)
+    assert.ok(html.includes(`data-look="${MARK_LOOK[mark]}"`), `${mark} drawn as its look`)
+    assert.ok(!html.includes('class="blk-icon"'), `${mark}: no icon drawn`)
+    assert.equal((html.match(/class="blk-mark"/g) ?? []).length, mark === 'arrow' ? 3 : 0, `${mark}: an arrow on each box only under Arrow`)
+    // And back to Icon: the line as it was, the icons drawn again.
+    const back = after(setBoxesMark(again, read.pos, 'icon'))
+    assert.equal(back, ICONS, `${mark} → Icon: the same bytes as before`)
+    assert.equal((blockSlideHtml(back).match(/class="blk-icon"/g) ?? []).length, 2, "Icon draws each box's own icon again")
+    // From every mark to every other, only the look changes.
+    for (const other of BOXES_MARKS.filter(other => other !== mark && other !== 'icon')) {
+      assert.equal(after(setBoxesMark(again, read.pos, other)), ICONS.replace(':::: boxes', LINE[other]), `${mark} → ${other}`)
+    }
+  }
+  // With the block's other values: Mark goes beside them, and Icon takes only the look out again.
+  {
+    const valued = ICONS.replace(':::: boxes', ':::: {.boxes width="s" fill="outline"}')
+    const valuedState = stateWith(valued, 'Two')
+    const numbered = after(setBoxesMark(valuedState, blockPos(valuedState), 'number'))
+    assert.ok(numbered.includes(':::: {.boxes width="s" fill="outline" look="steps"}'), numbered)
+    const numberedState = stateWith(numbered, 'Two')
+    assert.equal(after(setBoxesMark(numberedState, blockPos(numberedState), 'icon')), valued, 'Icon takes only the look out')
+  }
+  // A look written as `look="boxes"` or a word no look draws reads Icon, and keeps its line when Icon is picked.
+  for (const line of [':::: {.boxes look="boxes"}', ':::: {.boxes look="cards"}']) {
+    const written = ICONS.replace(':::: boxes', line)
+    stable(written, line)
+    const writtenState = stateWith(written, 'Two')
+    assert.equal(setBoxesMark(writtenState, blockPos(writtenState), 'icon'), null, `${line}: Icon is no change`)
+    assert.equal(after(setBoxesMark(writtenState, blockPos(writtenState), 'dot')), ICONS.replace(':::: boxes', ':::: {.boxes look="line"}'), `${line} → Dot`)
+  }
+  // Only a Boxes block has a Mark.
+  {
+    const steps = stateWith(['# Plan', '', '::: steps', '1. Open the file', ':::'].join('\n'), 'Open')
+    assert.equal(setBoxesMark(steps, blockPos(steps), 'number'), null, 'Steps has no Mark')
+  }
+
+  // The deck: untouched, a deck with each look saves byte for byte; a Mark changes only its block's line, and one Undo
+  // gives the file back.
+  for (const mark of BOXES_MARKS) {
+    const text = DECK(ICONS.replace(':::: boxes', LINE[mark]))
+    const deck = openDeck(text)
+    assert.equal(deck.save(deck.state.doc), text, `an untouched deck with ${mark} is the same bytes`)
+    for (const other of BOXES_MARKS.filter(other => other !== mark)) {
+      const stage = stageOn(deck, 0)
+      stage.caretIn('Two')
+      stage.apply(setBoxesMark(stage.inner, blockPos(stage.inner), other))
+      assert.equal(stage.save(), DECK(ICONS.replace(':::: boxes', LINE[other])), `${mark} → ${other}: the block's line changes, nothing else`)
+      stage.undo()
+      assert.equal(stage.save(), text, `${mark} → ${other}: one Undo gives the file back`)
+    }
+  }
+
+  // Number follows the boxes' order through a move, an add and a delete: it is slide.css's counter over the block's
+  // boxes, never a number in the file. The rule, then the numbers as that rule draws them.
+  const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
+  assert.match(css, /\.deck-sl\.is-blocks \.blk-boxes \{[^}]*counter-reset: blk-box;/, 'each Boxes block counts its own boxes from 1')
+  assert.match(css, /\.deck-sl\.is-blocks \.blk-box \{ counter-increment: blk-box;/, 'every box counts')
+  assert.match(css, /\.deck-sl\.is-blocks \.blk-boxes\[data-look="steps"\] > \.blk-box::before \{ content: counter\(blk-box\);/, 'Number draws the count')
+  /** The numbers the rule draws: each `steps` block's boxes, in order, by their heading (or their words). */
+  const numbers = (markdown: string): string[] => {
+    const body = createDocument(`<body>${blockSlideHtml(markdown)}</body>`).body as unknown as HTMLElement
+    const out: string[] = []
+    for (const block of Array.from(body.querySelectorAll('.blk-boxes[data-look="steps"]'))) {
+      Array.from(block.children).filter(child => child.classList.contains('blk-box')).forEach((box, index) => out.push(`${index + 1} ${(box.querySelector('h3')?.textContent ?? box.textContent ?? '').trim()}`))
+    }
+    return out
+  }
+  const NUMBERED = ICONS.replace(':::: boxes', LINE.number)
+  assert.deepEqual(numbers(NUMBERED), ['1 One', '2 Two', '3 Three'])
+  const text = DECK(NUMBERED)
+  const deck = openDeck(text)
+  /** The slide's Markdown in a saved deck. */
+  const slideOf = (saved: string) => saved.slice(saved.indexOf('---\n', saved.indexOf('id: a1')) + 4, saved.indexOf('\n```\n'))
+  assert.equal(slideOf(text), NUMBERED)
+  /** The Boxes block's box at `index`, with its place in the slide's document. */
+  const boxAt = (doc: PMNode, index: number) => {
+    let found: { pos: number; node: PMNode } | null = null
+    doc.forEach((block, offset) => {
+      if (block.type.name !== 'slideDiv' || found) return
+      let seen = 0
+      block.forEach((box, inner) => { if (!found && box.type.name === 'slideDiv' && seen++ === index) found = { pos: offset + 1 + inner, node: box } })
+    })
+    assert.ok(found, `box ${index}`)
+    return found as unknown as { pos: number; node: PMNode }
+  }
+  // A move: the first box after the second, as one step (the step a box's own Move right takes).
+  {
+    const stage = stageOn(deck, 0)
+    stage.caretIn('Two')
+    const first = boxAt(stage.inner.doc, 0)
+    const second = boxAt(stage.inner.doc, 1)
+    stage.apply(stage.inner.tr.insert(second.pos + second.node.nodeSize, first.node).delete(first.pos, first.pos + first.node.nodeSize).setMeta(SLIDE_COMMAND, true))
+    const moved = slideOf(stage.save())
+    assert.deepEqual(numbers(moved), ['1 Two', '2 One', '3 Three'], `a move: the numbers follow the order\n${moved}`)
+    assert.ok(!/^\d/m.test(moved), 'no number is written in the file')
+    stage.undo()
+    assert.equal(stage.save(), text, 'and one Undo gives the file back')
+  }
+  // An add: Add's new box is the next number.
+  {
+    const stage = stageOn(deck, 0)
+    stage.caretIn('Two')
+    stage.apply(addItem(stage.inner, blockPos(stage.inner)))
+    stage.type('Four')
+    assert.deepEqual(numbers(slideOf(stage.save())), ['1 One', '2 Two', '3 Three', '4 Four'], 'an add: the new box is number 4')
+  }
+  // A delete: the boxes after it move up a number.
+  {
+    const stage = stageOn(deck, 0)
+    stage.caretIn('Two')
+    const first = boxAt(stage.inner.doc, 0)
+    stage.apply(stage.inner.tr.delete(first.pos, first.pos + first.node.nodeSize).setMeta(SLIDE_COMMAND, true))
+    assert.deepEqual(numbers(slideOf(stage.save())), ['1 Two', '2 Three'], 'a delete: the numbers close up')
+  }
+
+  // The bar: Mark is a menu that shows its value, right after Filled and Outline (before Width), each choice with its
+  // word and icon; it is a menu already, so it never folds.
+  const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  const style = barSource.indexOf('<Group label="Style"')
+  const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(')
+  const width = barSource.indexOf('<Group label="Width"')
+  assert.ok(style > 0 && markAt > style && width > markAt, 'Style, then Mark, then Width')
+  assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
+  assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
+  // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
+  // tooltip says it.
+  assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
+  assert.match(barSource, /\{bare && current\.icon \? null : current\.label\}/)
+  assert.match(barSource, /<Tooltip label=\{bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : tip \?\? label\}>/)
+}
+
+console.log('blockBar: Turn into, Width, Style, Mark, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')

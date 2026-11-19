@@ -338,6 +338,102 @@ function pictureHtml(href: string, text: string, block?: string): string {
   return '<span class="blk-pic empty"></span>';
 }
 
+/**
+ * Sprint 168 PR 1 (#863, the decks README "A quote is a voice, not a box"): a quote's attribution, "— Team lead", is its
+ * last paragraph when that opens with an em or en dash and a space and something is drawn above it in the same quote (a
+ * quote of that one line is its words: the Experience lead, 19 November). The renderer writes this class on it, and the
+ * slide editor's decoration (`blocks/slideQuote.ts`) the same on the stage, so slide.css draws it alike everywhere. In the
+ * file it is just the quote's last line.
+ */
+export const QUOTE_BY_CLASS = 'blk-by';
+
+/** Do a paragraph's words, as drawn, open as an attribution: "— " or "– "? */
+export function isQuoteByWords(words: string): boolean {
+  return /^[—–] /.test(words);
+}
+
+/**
+ * A paragraph's words from its drawn HTML: no tags, no space before them, and a first character written as an entity
+ * read as the character it draws (`&mdash;`, `&#8212;`, `&#x02014;`…), as the stage's words have it.
+ */
+function drawnWordsOf(html: string): string {
+  // Leading space draws nothing (`>  — A`), and the slide editor drops it as it opens the line (review of #880).
+  return html.replace(/<[^>]*>/g, '').trimStart().replace(/^&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(mdash|ndash));/, (_entity, decimal?: string, hex?: string, name?: string) => {
+    if (name) return name === 'mdash' ? '—' : '–';
+    const code = decimal ? Number(decimal) : parseInt(hex as string, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+  });
+}
+
+/**
+ * A block a quote holds that is drawn as nothing: a blank line, a comment note (the slide editor's own reader makes it a
+ * `ritemarkComment` token), an empty Label.
+ */
+function drawsNoBlock(token: Token): boolean {
+  if (token.type === 'space' || token.type === 'ritemarkComment' || isCommentBlock(token)) return true;
+  const label = token.type === 'paragraph' ? labelParagraphOf(token as Tokens.Paragraph) : null;
+  return !!label && isEmptyLabel(label.words);
+}
+
+/** The words a run of inline tokens draws, as text: no tags, no picture, no line break. */
+function inlineWordsOf(tokens: readonly Token[]): string {
+  return tokens.map(token => {
+    if (token.type === 'html' || token.type === 'image' || token.type === 'br') return '';
+    const inner = (token as { tokens?: Token[] }).tokens;
+    if (inner) return inlineWordsOf(inner);
+    return 'text' in token ? String(token.text) : '';
+  }).join('');
+}
+
+/**
+ * Sprint 168 PR 1, the Experience lead (19 November): a quote's last line after a line break in its last paragraph is
+ * its attribution too, when it opens with "— " or "– " ("> Words" then "> — X", as people and Claude often write it).
+ * That paragraph is split at the break into its words and the attribution, two paragraphs, before the renderer or the
+ * slide editor draws it: both register this as `walkTokens`, so the stage opens the attribution as a paragraph of its
+ * own and the stage, the wall and the page agree. The file is read, never changed: an untouched slide writes back as it
+ * was written (`SlideSync`), and the first real edit writes the blank `>` line between them, as other normalisations do.
+ * A break inside bold or a link, a Button's or a Label's line and a picture's are left as they are.
+ */
+export function splitQuoteByLine(token: Token): void {
+  if (token.type !== 'blockquote') return;
+  const blocks = (token as Tokens.Blockquote).tokens;
+  let at = blocks.length - 1;
+  while (at >= 0 && drawsNoBlock(blocks[at])) at--;
+  if (at < 0 || blocks[at].type !== 'paragraph') return;
+  const paragraph = blocks[at] as Tokens.Paragraph;
+  const inline = paragraph.tokens ?? [];
+  if (labelParagraphOf(paragraph) || buttonParagraphOf(inline) || isPictureParagraph(paragraph) || isAlonePicture(paragraph)) return;
+  // A last paragraph that opens with the dash under words of its own is the attribution already, whole.
+  if (blocks.slice(0, at).some(block => !drawsNoBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
+  const br = inline.map(child => child.type).lastIndexOf('br');
+  if (br <= 0) return;
+  const words = inline.slice(0, br);
+  const by = inline.slice(br + 1);
+  // Something drawn before the break: words, a picture (the slide editor opens one on its own line as a block), or any
+  // token of the editor's own reader (inline math): anything but space, a break or a tag (review of #880).
+  const drawsBefore = words.some(child => child.type !== 'br' && child.type !== 'html' && child.raw.trim() !== '');
+  if (!drawsBefore || !isQuoteByWords(drawnWordsOf(inlineWordsOf(by)))) return;
+  const raw = (tokens: Token[]) => tokens.map(child => child.raw).join('');
+  // The words keep the paragraph's own marks (as-written's `rmTight`); the attribution has a blank line before it.
+  blocks.splice(at, 1,
+    { ...paragraph, raw: raw(words), text: raw(words), tokens: words } as Tokens.Paragraph,
+    { type: 'paragraph', raw: raw(by), text: raw(by), tokens: by } as Tokens.Paragraph);
+}
+
+/**
+ * A quote, drawn as marked draws it, with its attribution marked. Each of its blocks is drawn once, in order, so the
+ * renderer's counters (One by one, Steps, Tabs) step as they would without this rule; what draws nothing (a blank line,
+ * a comment note, an empty Label) is never "above" the attribution.
+ */
+function quoteHtml(blocks: string[]): string {
+  const drawn = blocks.flatMap((html, index) => (html.trim() ? [index] : []));
+  const last = drawn[drawn.length - 1];
+  if (drawn.length >= 2 && blocks[last].startsWith('<p>') && isQuoteByWords(drawnWordsOf(blocks[last]))) {
+    blocks[last] = `<p class="${QUOTE_BY_CLASS}">${blocks[last].slice('<p>'.length)}`;
+  }
+  return `<blockquote>\n${blocks.join('')}</blockquote>\n`;
+}
+
 /** Build a renderer instance: the slide's scoped `marked` with the `:::` blocks and the slide's own rules. */
 /**
  * marked's tokenizer, except that an inline `<code>`, `<pre>`, `<kbd>` or `<script>` never puts it in its raw mode,
@@ -413,6 +509,12 @@ function createSlideMarked(): Marked {
         return `${this.parser.parseInline(paragraph.tokens ?? []).trim()}\n`;
       },
     }, {
+      // Sprint 168 PR 1 (#863): a quote with its attribution marked (`quoteHtml`).
+      name: 'blockquote',
+      renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
+        return quoteHtml((token as Tokens.Blockquote).tokens.map(block => this.parser.parse([block])));
+      },
+    }, {
       // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.
       name: 'slideTabs',
       level: 'block',
@@ -467,6 +569,8 @@ function createSlideMarked(): Marked {
       },
     },
   });
+  // Sprint 168 PR 1: a quote's last line after a line break, as its attribution (`splitQuoteByLine`).
+  instance.use({ walkTokens: splitQuoteByLine });
   return instance;
 }
 

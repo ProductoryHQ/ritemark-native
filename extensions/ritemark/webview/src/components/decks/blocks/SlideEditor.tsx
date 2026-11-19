@@ -61,6 +61,7 @@ import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, sa
 import { SlideLabel, labelNode } from './slideLabel'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
+import { SlideQuoteBy } from './slideQuote'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
@@ -378,7 +379,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // Sprint 163 PR 1: the Text document's code block, with Copy always shown and its ↗ Open in… beside it.
     codeBlock: SlideCodeBlock,
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
+    // Sprint 168 PR 1 (#863): a quote's attribution marked as the renderer marks it.
+    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource), SlideLabel],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
