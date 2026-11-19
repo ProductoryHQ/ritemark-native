@@ -75,7 +75,7 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish } from './DeckPublish'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
-import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
+import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
 import { isMac } from '../../hooks/usePlatform'
 import './decks.css'
@@ -981,8 +981,9 @@ export function DeckView({
     return () => cancelAnimationFrame(frame)
   }, [orientation, pick])
 
-  // The full slide view (Jarmo, 16 November): with the handout hidden, the wheel over the slide and the keys move
-  // between slides (slideNav.ts), through the strip's own path. With the handout shown, the scroll rule stays.
+  // The full slide view (Jarmo, 16 November): with the handout hidden, the wheel anywhere over the stage (the slide and
+  // the empty bands around it) and the keys move between slides (slideNav.ts), through the strip's own path. With the
+  // handout shown, the scroll rule stays.
   const fullSlide = slideShown && !handoutShown
   const goTo = useCallback((index: number) => {
     const count = countRef.current
@@ -996,13 +997,15 @@ export function DeckView({
     let gesture = NO_GESTURE
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
-      const target = event.target as Element | null
-      // A stage taller than its room (a short window) still scrolls, outside the slide itself.
-      if (stage.scrollHeight > stage.clientHeight + 1 && !target?.closest?.('.deck-big')) return
-      event.preventDefault()
-      const step = wheelStep(gesture, wheelPixels(event, stage.clientHeight), event.timeStamp)
-      gesture = step.gesture
-      if (step.move !== 0) goTo(Math.min(currentRef.current, countRef.current - 1) + step.move)
+      const delta = wheelPixels(event, stage.clientHeight)
+      // A pane or a column that holds more than its room scrolls first, and so does the stage under the empty bands
+      // while it can (a short window); everything else moves the slide, one per gesture (#824). What is under the
+      // pointer is asked only while the gesture is undecided, not through a flick's momentum.
+      const takerOf = () => wheelTaker(event.target as HTMLElement | null, stage, delta, box => getComputedStyle(box).overflowY)
+      const route = wheelRoute(gesture, delta, event.timeStamp, takerOf)
+      gesture = route.gesture
+      if (!route.scroll) event.preventDefault()
+      if (route.move !== 0) goTo(Math.min(currentRef.current, countRef.current - 1) + route.move)
     }
     stage.addEventListener('wheel', onWheel, { passive: false })
     return () => stage.removeEventListener('wheel', onWheel)
