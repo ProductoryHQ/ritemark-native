@@ -39,7 +39,7 @@ import { closeHistory, undoDepth } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, drawsLogo, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -88,6 +88,8 @@ import { isRelativeImagePath } from '../../../../../src/utils/imagePaths'
 import { topBlockAt } from './slideCommentPlace'
 import { sendToExtension } from '../../../bridge'
 import { SidePicture } from './SidePicture'
+import { BehindChip } from './BehindChip'
+import { behindChipCorner, behindChipPlace, type ChipPlace } from './behindChipPlace'
 import { EMPTY_SIDE, flowToSide, sideToText, type SideHeader } from './slidePicturePlace'
 import { pictureNthAt, picturePosOf, putSlidePicture, samePicture, sameSidePath, type SlideDocKit, type SlidePictureTarget } from './slidePictureSwap'
 
@@ -1102,18 +1104,70 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // 18 November: a picture alone on the slide (or under its title only) is centred, as every other view draws it.
   // Sprint 167 PR 3: the content Top, Middle or Bottom (`valign:`), as every other view draws it (`placeClass`, above).
   const classes = ['deck-sl', 'is-blocks', 'is-editing', side ? `pic-${side}` : '', isCoverSlide(shownMarkdown) ? 'is-cover' : '', lonePictureClass(shownMarkdown, side), placeClass, logoMarks.cls].filter(Boolean).join(' ')
+
+  // ---- Sprint 167 PR 4 (decks README item D): the picture Behind, from the slide's corner and from anywhere on it.
+  const behindFilled = side === 'behind' && !!header.image?.trim()
+  // The chip's corner: top right, or bottom right beside a top-right logo on this slide (Sprint 167 PR 1's corners);
+  // its place and size: in the band between the slide's edge and its words' box, measured (`behindChipPlace.ts`).
+  const slideLogo = themeSlideLogo(theme, borderless)
+  const cover = isCoverSlide(shownMarkdown)
+  const chipCorner = behindChipCorner(slideLogo, cover)
+  const chipLogoWidth = drawsLogo(slideLogo, cover) ? slideLogo.width : null
+  const [chipPlace, setChipPlace] = useState<ChipPlace | null>(null)
+  useLayoutEffect(() => {
+    if (side !== 'behind') return
+    const frameElement = frameRef.current
+    const flow = frameElement?.querySelector<HTMLElement>('.blk-flow')
+    if (!frameElement || !flow) return
+    const box = frameElement.getBoundingClientRect()
+    const words = flow.getBoundingClientRect()
+    const next = behindChipPlace(
+      { width: box.width, height: box.height },
+      { top: words.top - box.top, bottom: words.bottom - box.top },
+      chipCorner,
+      chipLogoWidth === null ? null : { width: chipLogoWidth },
+    )
+    setChipPlace(current => (current && current.corner === next.corner && current.edge === next.edge && current.right === next.right && current.scale === next.scale ? current : next))
+  }, [side, lookKey, chipCorner, chipLogoWidth, editor])
+  // A picture pasted while the slide's own picture is chosen (the words gave up the keys, so the paste reaches the
+  // page): it replaces that picture, as a paste on a chosen picture in the words does (experience 49).
+  useEffect(() => {
+    if (!sideChosen) return
+    const paste = (event: ClipboardEvent) => {
+      const target = event.target as Element | null
+      if (event.defaultPrevented || target?.closest?.('input, textarea, [contenteditable="true"], [data-radix-popper-content-wrapper]')) return
+      if (takeImageFile(event.clipboardData, true, (dataUrl, filename) => onPictureRef.current(dataUrl, filename))) event.preventDefault()
+    }
+    document.addEventListener('paste', paste)
+    return () => document.removeEventListener('paste', paste)
+  }, [sideChosen])
   return (
     <>
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           ref={setFrameRef}
-          className={`deck-slide${borderless ? ' is-borderless' : ''}`}
+          className={`deck-slide${borderless ? ' is-borderless' : ''}${side === 'behind' && sideChosen ? ' is-behind-chosen' : ''}`}
           data-step={fitStepRef.current}
           style={{ width, height: Math.round(width * BLOCK_CANVAS_HEIGHT / BLOCK_CANVAS_WIDTH), ...(themeStyle(theme, borderless) as CSSProperties) }}
           // A right press keeps the selection as it is (the Mac would select the word under it), so "with a selection,
           // it's on the words" means the words the person chose.
           onMouseDown={event => { if (event.button === 2) event.preventDefault() }}
+          // Sprint 167 PR 4: with a picture Behind, a press where there are no words (the words' box itself, between and
+          // after its blocks) chooses the picture, its ring round the slide and its bar under it; a press on words puts
+          // the caret there, as ever.
+          onPointerDown={event => {
+            if (event.button !== 0 || !behindFilled || !editor || editor.isDestroyed || event.target !== editor.view.dom) return
+            event.preventDefault()
+            chooseSide()
+          }}
+          // A picture dropped anywhere on the slide, its edges too (outside the words' box): into the slide's place
+          // (Behind, Left or Right), or a Picture block when it has none. A drop on the words is theirs (`handleDrop`).
+          onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault() }}
+          onDrop={event => {
+            if (event.defaultPrevented) return
+            if (takePicture(event.dataTransfer, false, event.target)) event.preventDefault()
+          }}
           onContextMenu={event => {
             if (!editor || editor.isDestroyed) return
             closedOutside.current = false
@@ -1158,6 +1212,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             {/* Sprint 162 PR 4: the theme's logo in its corner, over the words, as every other view draws it. */}
             <SlideLogoImage logo={themeSlideLogo(theme, borderless)} cover={isCoverSlide(shownMarkdown)} />
           </div>
+          {side === 'behind' && chipPlace && !makerOnSide ? (
+            <BehindChip
+              place={chipPlace}
+              filled={behindFilled}
+              keep={sideChosen}
+              onChoose={() => (behindFilled ? chooseSide() : choosePicture(false))}
+              onChatgpt={() => startPictureMaker({ kind: 'side' }, 'new', null)}
+            />
+          ) : null}
           {missingSpots.map(spot => (
             <Tooltip key={`${spot.side}:${spot.path}:${spot.nth}`} label={`Choose a picture for ${spot.path}`}>
               <Button

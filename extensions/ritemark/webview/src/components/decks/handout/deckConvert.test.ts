@@ -15,7 +15,7 @@ import { EditorState, Plugin, TextSelection, type Transaction } from '@tiptap/pm
 import { closeHistory, history, undo, redo, undoDepth } from '@tiptap/pm/history'
 import { canonicalMarkdownProjection } from '../../../../../src/editorSync/state'
 import { joinFrontMatter, splitFrontMatter } from '../../../../../src/editorSync/frontMatter'
-import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, slideDataOf, withWrittenHandout } from '../../../../../src/decks/deckFormat'
+import { TEXT_HANDOUT_KEY, TEXT_HANDOUT_VALUE, slideDataOf, withWrittenHandout, writeSlideData } from '../../../../../src/decks/deckFormat'
 import { slideStamp, slideStamps } from '../../../../../src/decks/deckLibraryFormat'
 import { convertDeckText } from '../../../../../src/decks/blocks/convertDeck'
 import { publicDeck } from '../../../../../src/decks/page/publicDeck'
@@ -471,6 +471,40 @@ const blockSlide = '```slide\n---\nid: b1\n---\n# Already blocks\n```\n\n## Alre
   assert.equal(save(back.doc), OLD, 'one Undo: byte for byte')
   // What the slides show before the edit is what it writes: the stage and the strip draw an old pill as its Label.
   assert.equal(slideDataOf('', slidesOf(edited.doc)[0].node.attrs.body).markdown, '[Harjutus · 1 / 2]{.label}\n\n# Try it\n\n::: steps\n1. Open the file\n:::')
+}
+
+// ---- Sprint 167 PR 4 (decks README item D, #838): a picture Behind keeps the file format it had (`picture: behind`,
+// `image:`, `alt:`, `focus:` in the slide's header). A deck with an empty and a filled Behind opens and saves byte for
+// byte; a picture pasted or dropped anywhere on the slide (or chosen from the chip or Slide settings) lands behind, and
+// on a filled place replaces it with a fresh description and focus; Remove takes the picture out and keeps the place.
+{
+  const BEHIND = [
+    '---', 'deck: 2', 'handout: text', '---', '',
+    '```slide', '---', 'id: e1', 'picture: behind', '---', '# Agents at work', '', 'Harbour Logistics · 12 November', '```', '',
+    '## Agents at work', '', 'Words.', '',
+    '```slide', '---', 'id: f2', 'picture: behind', 'image: images/dock.jpg', 'alt: The dock at dawn', 'focus: 40,30', '---', '# Three berths', '```', '',
+    '## Three berths', '', 'More words.', '',
+  ].join('\n')
+  const { state, save } = stateOf(BEHIND, deckPlugins())
+  assert.equal(save(state.doc), BEHIND, 'opened and saved untouched: byte for byte')
+  // Empty Behind: the picture goes into the place, the words untouched, nothing else written.
+  const filled = state.apply(pictureIntoSlide(state, 'e1', 'images/pasted shot.png')!)
+  const first = slideDataOf('', slidesOf(filled.doc)[0].node.attrs.body)
+  assert.deepEqual([first.picture, first.image, first.alt, first.focus], ['behind', 'images/pasted shot.png', undefined, undefined])
+  assert.equal(first.markdown, '# Agents at work\n\nHarbour Logistics · 12 November', 'the words never get the picture')
+  assert.equal(save(filled.doc), BEHIND.replace('picture: behind\n---\n# Agents', 'picture: behind\nimage: images/pasted shot.png\n---\n# Agents'))
+  let back = filled
+  undo(back, next => { back = back.apply(next) })
+  assert.equal(save(back.doc), BEHIND, 'one Undo: byte for byte')
+  // A filled Behind: replaced, its old description and focus point gone with the old picture.
+  const replaced = state.apply(pictureIntoSlide(state, 'f2', 'images/new dock.png')!)
+  const second = slideDataOf('', slidesOf(replaced.doc)[1].node.attrs.body)
+  assert.deepEqual([second.picture, second.image, second.alt, second.focus], ['behind', 'images/new dock.png', undefined, undefined])
+  // Remove (the bar's ⋯ or Slide settings): the place stays, empty; written back, the header holds only `picture: behind`.
+  const removedBody = writeSlideData('', slidesOf(state.doc)[1].node.attrs.body, { ...slideDataOf('', slidesOf(state.doc)[1].node.attrs.body), image: undefined, alt: undefined, focus: undefined })
+  assert.equal(removedBody, '---\nid: f2\npicture: behind\n---\n# Three berths')
+  // And Picture: None after it takes the place away, leaving the slide as if it never had one.
+  assert.equal(writeSlideData('', removedBody, { ...slideDataOf('', removedBody), picture: undefined }), '---\nid: f2\n---\n# Three berths')
 }
 
 console.log('deckConvert: passed')

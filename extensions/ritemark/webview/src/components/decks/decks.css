@@ -309,6 +309,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
 /* Sprint 167 PR 3: the Content row's three tiles (Top, Middle, Bottom), Picture's tiles across the row. */
 .deck-settings .deck-settings-places { grid-template-columns: repeat(3, 1fr); }
+/* Sprint 167 PR 4: under Behind, Replace… and Remove for its picture (Choose… for an empty place). */
+.deck-settings .deck-settings-behind { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }
 .deck-settings .deck-settings-lays > label > span:last-child, .deck-settings .deck-settings-pics > label > span:last-child { font-size: 11px; line-height: 14px; }
 .deck-settings .deck-settings-lays > label > span:nth-of-type(1), .deck-settings .deck-settings-pics > label > span:nth-of-type(1) { margin-bottom: 4px; }
@@ -524,6 +526,27 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide .deck-block-split:is(:hover, :focus-visible)::after { opacity: 1; }
 .deck-block-drop { position: absolute; z-index: 6; height: 2px; border-radius: 1px; background: var(--r-accent); pointer-events: none; }
 .deck-block-guide { position: absolute; z-index: 6; width: 2px; background: var(--r-accent); pointer-events: none; }
+/* Sprint 167 PR 4 (decks README item D): the picture Behind's corner chip (`blocks/BehindChip.tsx`), in the slide's
+   frame at the page's own size, made smaller (`--chip-scale`) to fit the band between the slide's edge and its words
+   (`behindChipPlace.ts`). Empty, at rest only its round picture handle shows, like the block's white handles; with a picture,
+   nothing. It opens while the pointer is over the slide, the keyboard is in it or the place is chosen. */
+.deck-slide > .deck-behind-chip { position: absolute; z-index: 7; right: var(--chip-right, 12px); display: inline-flex; align-items: center; height: 32px; box-sizing: border-box; padding: 4px; border-radius: 16px; background: transparent; color: var(--r-ink-strong); font: 600 12.5px/1.2 var(--ritemark-ui-font-family); white-space: nowrap; transform: scale(var(--chip-scale, 1)); transition: opacity .12s ease; }
+.deck-slide > .deck-behind-chip.is-top-right { top: var(--chip-edge, 12px); transform-origin: right top; }
+.deck-slide > .deck-behind-chip.is-bottom-right { bottom: var(--chip-edge, 12px); transform-origin: right bottom; }
+.deck-behind-chip .deck-behind-chip-dot { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 5px -2px rgba(30, 27, 75, .3); }
+.deck-behind-chip .deck-behind-chip-full { display: none; align-items: center; gap: 4px; }
+.deck-behind-chip .deck-behind-chip-words { padding: 0 4px 0 2px; }
+.deck-behind-chip .deck-behind-chip-button { height: 24px; padding: 0 8px; gap: 4px; border-radius: 6px; background: var(--r-accent-soft, #EEF2FF); color: var(--r-accent); font: 700 12px/1.2 var(--ritemark-ui-font-family); }
+.deck-behind-chip .deck-behind-chip-button:hover { background: var(--r-accent); color: #fff; }
+.deck-slide > .deck-behind-chip.is-filled:where(:not(.is-keep):not(:focus-within)) { opacity: 0; pointer-events: none; }
+.deck-slide:hover > .deck-behind-chip.is-filled { opacity: 1; pointer-events: auto; }
+.deck-slide:hover > .deck-behind-chip, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) { padding: 4px 4px 4px 6px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 8px 20px -10px rgba(30, 27, 75, .5); }
+.deck-slide:hover > .deck-behind-chip .deck-behind-chip-dot, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) .deck-behind-chip-dot { width: 18px; background: none; box-shadow: none; }
+.deck-slide:hover > .deck-behind-chip .deck-behind-chip-full, .deck-slide > .deck-behind-chip:is(.is-keep, :focus-within) .deck-behind-chip-full { display: inline-flex; }
+/* A picture Behind chosen: the ring goes round the whole slide (the sketch's), not inside it. */
+.deck-slide.is-behind-chosen { outline: 2px solid var(--r-accent); outline-offset: 4px; }
+.deck-slide.is-behind-chosen .deck-sl.pic-behind .photo.is-chosen::after { content: none; }
+@media (prefers-reduced-motion: reduce) { .deck-slide > .deck-behind-chip { transition: none; } }
 .deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
 .deck-block-bar .deck-bar-seg { display: inline-flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
 .deck-block-bar .deck-bar-seg .deck-bar-choice { height: 24px; padding: 0 8px; }

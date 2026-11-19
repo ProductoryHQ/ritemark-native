@@ -778,6 +778,11 @@ body {
 .deck-sl .photo-focus:active {
   cursor: grabbing;
 }
+/* Sprint 167 PR 4: the bar's Focus brings the keyboard to the dot, and the arrow keys move it. */
+.deck-sl .photo-focus:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
 
 /* ============================================================
    Sprint 94 (#81) — comment callouts (margin model)

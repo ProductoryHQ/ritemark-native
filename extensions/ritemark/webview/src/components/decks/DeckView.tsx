@@ -1450,6 +1450,28 @@ export function DeckView({
     sendToExtension('deck/save-image', { slideId: id, dataUrl, filename })
   }, [editor, idOf, shown])
 
+  /**
+   * Sprint 167 PR 4 (decks README item D): Slide settings' Choose… and Replace… under Behind, and Behind chosen with no
+   * picture: the computer's file picker, then the picture saved beside the deck for the slide the settings are for,
+   * which puts it into its place (`pictureIntoSlide`).
+   */
+  const choosePictureForSlide = useCallback(() => {
+    const id = idOf(shown)
+    if (!id) return
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.addEventListener('change', () => {
+      const file = input.files?.[0]
+      if (!file) return
+      void readFileAsBase64(file).then(dataUrl => {
+        if (caretPictureFor.current === id) caretPictureFor.current = null
+        sendToExtension('deck/save-image', { slideId: id, dataUrl, filename: getUniqueImageFilename(file) })
+      })
+    })
+    input.click()
+  }, [idOf, shown])
+
   useEffect(() => onMessage(message => {
     // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
     if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
@@ -2092,6 +2114,7 @@ export function DeckView({
               )}
               onKind={kind => changeSlide(data => convertKind(data, kind), kind)}
               onChange={patch => changeSlide(data => ({ ...data, ...patch }))}
+              onChoosePicture={choosePictureForSlide}
               onClose={() => setSettingsFor(null)}
             />
           ) : null}
