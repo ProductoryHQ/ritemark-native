@@ -121,8 +121,10 @@ export function SidePicture(props: SidePictureProps) {
             if (event.button !== 0) return
             event.preventDefault()
             props.onChoose()
-            // An empty place opens the file picker at once (experience 49).
-            if (!url && !missing) props.onReplace()
+            // An empty place beside the words opens the file picker at once (experience 49). Behind, the place is the
+            // whole slide around its words, with nothing on it that says so, so a press there only chooses it; its
+            // Choose… is the corner chip (Sprint 167 PR 4, review).
+            if (!url && !missing && side !== 'behind') props.onReplace()
           }}
           // A double click on the picture chooses another one, as ⋯ → Replace picture… does.
           onDoubleClick={() => { if (url) props.onReplace() }}

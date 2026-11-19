@@ -171,10 +171,17 @@ const logo = (place: LogoPlace, on: 'every-slide' | 'title-slides' = 'every-slid
 // app run proves the behaviour, `proof/pr4-picture-behind/`.)
 {
   const editor = fs.readFileSync(path.join(here, 'SlideEditor.tsx'), 'utf8')
-  assert.match(editor, /event\.button !== 0 \|\| !behindFilled \|\| !editor \|\| editor\.isDestroyed \|\| event\.target !== editor\.view\.dom\) return/)
-  assert.match(editor, /document\.addEventListener\('paste', paste\)/)
-  assert.match(editor, /onDrop=\{event => \{\n\s+if \(event\.defaultPrevented\) return/)
-  assert.match(editor, /side === 'behind' && chipPlace && !makerOnSide \? \(/)
+  // Caught on the way down (capture), so the words' editor never takes the caret or the focus; only on the box itself.
+  assert.ok(editor.includes('onPointerDownCapture') && editor.includes('onMouseDownCapture'))
+  assert.ok(editor.includes('event.target === editor.view.dom'))
+  assert.ok(editor.includes("document.addEventListener('paste', paste)"))
+  // Only a picture is taken on the slide's edges: another file's drag isn't accepted there.
+  assert.ok(editor.includes("item.kind === 'file' && item.type.startsWith('image/')"))
+  // The chip is measured with every fit and render, never by a state counter per key.
+  assert.ok(editor.includes('placeChipRef.current()') && !editor.includes('wordsMoved'))
+  // An empty Behind place: a press chooses it, never opens the file picker by surprise (the chip's Choose… does).
+  const side = fs.readFileSync(path.join(here, 'SidePicture.tsx'), 'utf8')
+  assert.ok(side.includes("if (!url && !missing && side !== 'behind') props.onReplace()"))
   // The app run's fault (Behind chosen in Slide settings, or a picture going missing on the stage, blanked the deck
   // view: React's insertBefore met the bubble menu's element, which TipTap moves out of the frame): the chip is the
   // frame's first child, and the bubble menu sits in a box of its own that stays, so nothing is inserted before it.

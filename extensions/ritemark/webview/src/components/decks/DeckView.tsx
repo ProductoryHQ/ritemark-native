@@ -1456,8 +1456,9 @@ export function DeckView({
    * which puts it into its place (`pictureIntoSlide`).
    */
   const choosePictureForSlide = useCallback(() => {
-    const id = idOf(shown)
-    if (!id) return
+    // The slide the settings are for, by its place now; its id is read (and, for an old slide without one, written)
+    // only once a file is chosen, so a cancelled picker leaves the deck as it was (review).
+    const at = shown
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'image/*'
@@ -1465,7 +1466,10 @@ export function DeckView({
       const file = input.files?.[0]
       if (!file) return
       void readFileAsBase64(file).then(dataUrl => {
-        if (caretPictureFor.current === id) caretPictureFor.current = null
+        const id = idOf(at)
+        if (!id) return
+        // As `onPicture` sends a pasted picture: into the slide's place, never at a caret.
+        caretPictureFor.current = null
         sendToExtension('deck/save-image', { slideId: id, dataUrl, filename: getUniqueImageFilename(file) })
       })
     })
