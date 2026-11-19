@@ -73,7 +73,7 @@ import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, keepFold, storedFold, type DeckFold, type DeckViewMode } from './DeckFolds'
+import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
@@ -98,7 +98,7 @@ const STAGE_MIN = 300
 const NARROW_DESK = 900
 const NARROWEST_DESK = 600
 
-/** The slide's share, as this deck's view kept it (`deckViewState`, with the fold): of the width with the slide beside
+/** The slide's share, as this deck's view kept it (`deckViewState`; the view itself is never kept): of the width with the slide beside
  *  the handout, and of the height with the slide above it. Each orientation keeps its own. */
 const storedRatio = () => deckViewState().deckRatio
 const keepRatio = (ratio: number) => keepDeckViewState({ deckRatio: ratio })
@@ -294,8 +294,9 @@ export function DeckView({
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
   const [current, setCurrent] = useState(0)
   const [stripWanted, setStripWanted] = useState(true)
-  // Fold either side (16 November): the slide, the handout, or neither, as this deck's view kept it.
-  const [fold, setFold] = useState<DeckFold>(storedFold)
+  // Fold either side (16 November): the slide, the handout, or neither. Every deck opens in Slide only (19 November);
+  // the choice lives while the deck is open and is never kept.
+  const [fold, setFold] = useState<DeckFold>(OPENING_FOLD)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
   const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
@@ -487,8 +488,13 @@ export function DeckView({
       setHandoutText(handoutHasText(editor.state.doc))
     }
     refresh()
+    // A deck that opens with no slide has nothing to show in Slide only: it opens with the handout beside, to type in.
+    if (slidesOf(editor.state.doc).length === 0) setFold(current => (current === 'handout' ? null : current))
     return onDocChanged(editor, refresh)
   }, [editor])
+
+  // The Find loan (`foldForFind`, after `chooseView`) can end while Find is open.
+  const findBorrowedHandout = useRef(false)
 
   const count = slides.length
   // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
@@ -936,15 +942,32 @@ export function DeckView({
     target.addEventListener('pointercancel', up)
   }, [above, avail, stripWidth, pick])
 
-  /** The view switch (17 November): Slide only, Slide and handout, or Handout only; the deck's view keeps the choice,
+  /** The view switch (17 November): Slide only, Slide and handout, or Handout only; the choice holds while the deck is open,
    *  and the part being read stays at the top. Slide settings stay: they belong to the current slide, which the strip
    *  still rings. */
   const chooseView = useCallback((view: DeckViewMode) => {
     const next = foldOfView(view)
+    findBorrowedHandout.current = false
     setFold(next)
-    keepFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
   }, [pick])
+
+  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only borrows the handout, beside the
+  // slide, so the bar and its matches show (not on a desk with no room for the handout). Closing Find (Esc or its ×)
+  // gives it back: the view returns to Slide only, unless the person chose a view while Find was open (`chooseView`
+  // ends the loan), which then holds, or the deck has no slide left to show. As after any fold, the part being read
+  // stays at the top. The rest is read when Find opens or closes, never as a reason to decide again.
+  const findOpen = Boolean(findBar)
+  const findSees = useRef({ fold, handoutRoom: true, hasSlides: true, pick })
+  findSees.current = { fold, handoutRoom: !(deskWidth > 0 && deskWidth < NARROWEST_DESK), hasSlides: count > 0, pick }
+  useEffect(() => {
+    const seen = findSees.current
+    const next = foldForFind(findOpen, seen.fold, findBorrowedHandout.current, seen.handoutRoom, seen.hasSlides)
+    findBorrowedHandout.current = next.borrowed
+    if (next.fold === seen.fold) return
+    setFold(next.fold)
+    requestAnimationFrame(() => seen.pick(currentRef.current))
+  }, [findOpen])
 
   // When the slide moves beside or above, the part being read stays at the top, as after a drag or a fold. Not at the
   // first decision, as the deck opens.
