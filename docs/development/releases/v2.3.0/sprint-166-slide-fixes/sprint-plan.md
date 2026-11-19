@@ -85,7 +85,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 10: a gesture over the slide in Slide and handout (PR 10, issue #855)
 [#855](https://github.com/ProductoryHQ/ritemark-native/issues/855): over the slide, a gesture means the same in every view. In Slide and handout a wheel or flick over the slide moves one slide, as in Slide only, and the handout scrolls to that slide's part (the strip click's path); over the handout's text the wheel scrolls the text as now and the slide follows the part being read; a long column or pane still scrolls first (#849).
-- [ ] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+- [x] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+- Built (PR 10): the stage's wheel listened in Slide only. It now listens whenever the slide is shown, through the same rule (`slideNav.ts`, `stageWheelOf`). By side of the room (the Experience lead): anywhere on the slide's side, the slide and the space around it in its pane, a gesture means slides; on the handout's side it means text. A long column first, then the slide's pane while it can scroll, then the slide. Proof: `proof/pr10-gesture-both-views/`.
 
 ### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
 [#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
