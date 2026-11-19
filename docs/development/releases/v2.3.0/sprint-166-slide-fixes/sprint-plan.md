@@ -85,11 +85,13 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 10: a gesture over the slide in Slide and handout (PR 10, issue #855)
 [#855](https://github.com/ProductoryHQ/ritemark-native/issues/855): over the slide, a gesture means the same in every view. In Slide and handout a wheel or flick over the slide moves one slide, as in Slide only, and the handout scrolls to that slide's part (the strip click's path); over the handout's text the wheel scrolls the text as now and the slide follows the part being read; a long column or pane still scrolls first (#849).
-- [ ] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+- [x] A test that fails before; the slide index after each gesture in Slide and handout, at 1440×900.
+- Built (PR 10): the stage's wheel listened in Slide only. It now listens whenever the slide is shown, through the same rule (`slideNav.ts`, `stageWheelOf`). By side of the room (the Experience lead): anywhere on the slide's side, the slide and the space around it in its pane, a gesture means slides; on the handout's side it means text. A long column first, then the slide's pane while it can scroll, then the slide. Proof: `proof/pr10-gesture-both-views/`.
 
 ### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
 [#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
-- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- [x] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- Built (PR 11): nothing in a thumbnail's slide takes the pointer (`decks.css`), so every click and wheel there is the thumbnail's own, and no block in it draws a scrollbar (each keeps its room and fade). One rule for every thumbnail: the strip and a drag's lifted copy, the wall's grid, and the presenter view's row and Next (widened in review). Proof: `proof/pr11-thumbnail-clicks/`.
 
 ## For every PR
 

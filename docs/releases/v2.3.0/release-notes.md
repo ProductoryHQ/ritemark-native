@@ -46,6 +46,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Write the handout beside the slides.** Participants read it. A comment stays with you and never goes out.
 - **A deck opens on its slides.** Every deck opens showing only the slide. The switch on the deck's bar shows the handout beside it, or the handout alone.
 - **Scroll to the next slide.** With only the slide shown, one scroll over the slide or the space around it moves one slide. The arrow keys, Page Up, Page Down, Home and End do the same when you're not typing. A long column on the slide scrolls first.
+- **Scroll the slide beside the handout too.** With the handout shown, one scroll over the slide or the space around it moves one slide, and the handout goes to its part. Scrolling the handout still moves the slide along as you read.
 - **Give the deck a look, yourself or with AI.** **Theme** on the deck's bar picks a theme and changes its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
 - **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
 - **Present from Ritemark.** **Present** shows only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
@@ -65,6 +66,8 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
 - **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
+- **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
+- **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
 <!-- DECKS END -->
 
 ## Smaller changes

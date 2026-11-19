@@ -12,7 +12,8 @@
  *    one kind can show (a box's icon, Boxes' Width, Style and alignment, Steps' label, the columns' split) stays with
  *    that kind: ⌘Z brings it back. A comment on an item stays with it, or with the block where the kind has no room.
  *  - **Boxes:** Width (`width`), Style (`fill`), alignment (`align`): one value each on the block's own line
- *    (`setBlockValue`, `withFenceValue`), none is the default.
+ *    (`setBlockValue`, `withFenceValue`), none is the default. Mark (Sprint 167 PR 2, README item C): Icon, Number, Dot
+ *    or Arrow, the block's look (`look`, `setBoxesMark`); Icon is the default and writes none.
  *  - **Columns:** the count (2, 3, 4): a new column comes empty; a lower count takes an empty column first, wherever it
  *    stands, and with none empty the last column's words join the one before it, so nothing typed is lost. Remove a column (frame 23) takes the caret's column and its words away, as Delete
  *    block takes the block's. The split: the line between two columns snaps to ⅓, ½ and ⅔ of the two, and is written as
@@ -30,8 +31,8 @@
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { liftTarget } from '@tiptap/pm/transform'
-import { OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { SLIDE_COMMAND, slideDivNode } from './slideCommands'
+import { MARK_LOOK, OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, boxesMarkOf, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type BoxesMark, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { SLIDE_COMMAND, setBlockValue, slideDivNode } from './slideCommands'
 import { addTab, columnsToTabs, tabsAround, tabsToColumns } from '../../../extensions/tabs/tabsCommands'
 
 /**
@@ -66,10 +67,11 @@ export const REVEAL_TIP = 'In Present, show the items one by one: the slide open
 /**
  * When the bar is wider than the slide's pane, its own groups fold one by one (the lead on #773), in this order: the
  * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then Width or the Columns count, then
- * Style. `fold` counts the folds; a group is folded from its number on.
+ * Style, and last Boxes' Mark (Sprint 167 PR 2), a menu already, which keeps its value as its icon only, the word in its
+ * tooltip. `fold` counts the folds; a group is folded from its number on.
  */
-export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4 } as const
-export const MAX_FOLD = FOLD_AT.style
+export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4, mark: 5 } as const
+export const MAX_FOLD = FOLD_AT.mark
 
 /** A Columns block holds two to four columns from the bar (more can be written, and are kept). */
 export const MIN_COLUMNS = 2
@@ -165,6 +167,27 @@ export function setReveal(state: EditorState, pos: number, one: boolean): Transa
     tr.lift(range, target)
   }
   return tr.setMeta(SLIDE_COMMAND, true)
+}
+
+/** Sprint 167 PR 2 (README item C): the Mark menu's words, in its order (`BOXES_MARKS`), and each choice's tooltip. */
+export const MARK_LABEL: Readonly<Record<BoxesMark, string>> = { icon: 'Icon', number: 'Number', dot: 'Dot', arrow: 'Arrow' }
+export const MARK_TIP: Readonly<Record<BoxesMark, string>> = {
+  icon: "Each box's own icon",
+  number: 'The boxes numbered in their order',
+  dot: 'A dot on each box',
+  arrow: 'An arrow on each box',
+}
+export const MARK_MENU_TIP = 'What each box shows at its top: its icon, its number, a dot or an arrow'
+
+/**
+ * Mark on a Boxes block's bar (README item C): its look on the block's own line (`look="steps"`), or none for Icon, one
+ * transaction and one ⌘Z. The mark it shows already is no change, so a look written another way (`look="boxes"`, or a
+ * word no look draws) keeps its line. The boxes' own `icon` values stay: Icon draws them again.
+ */
+export function setBoxesMark(state: EditorState, pos: number, mark: BoxesMark): Transaction | null {
+  const block = blockAt(state, pos)
+  if (!block || block.kind !== 'boxes' || boxesMarkOf(divAttributesOf(block.node)) === mark) return null
+  return setBlockValue(state, pos, 'look', MARK_LOOK[mark])
 }
 
 /** The block the bar is for: its place, its node and its kind. */

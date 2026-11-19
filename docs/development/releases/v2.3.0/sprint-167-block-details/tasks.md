@@ -12,11 +12,12 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-bl
 
 ## PR 2: Mark, C (Standard), branch `sprint-167-block-details-pr2`, after Sprint 164 PR 3 merges
 - [x] Issue created in milestone v2.3.0 (manager): #836: to be created
-- [ ] Mark menu after Filled and Outline, showing its value (R3)
-- [ ] Icon, Number, Dot, Arrow map to the existing looks; Number follows moves, adds, deletes
-- [ ] Tests: each mark round-trips; numbering after a move
-- [ ] Shots of the four marks; the Experience lead's look
-- [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
+- [x] Mark menu after Filled and Outline, showing its value (R3)
+- [x] Icon, Number, Dot, Arrow map to the existing looks; Number follows moves, adds, deletes
+- [x] Tests: each mark round-trips; numbering after a move
+- [x] Shots of the four marks, in the editor and on the wall, and the menu open (`proof/pr2-mark/`)
+- [ ] The Experience lead's look (before the merge)
+- [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 3: content position, A (High), branch `sprint-167-block-details-pr3`, after Sprint 164 PR 2 and PR 3 merge
 - [x] Issue created in milestone v2.3.0 (manager): #837: to be created
