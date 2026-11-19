@@ -61,10 +61,10 @@ assert.deepEqual(titles(SLIDE_ITEMS, 'slaid'), ['New slide below'])
 assert.deepEqual(titles(text, 'heading1'), ['Heading 1'])
 assert.deepEqual(titles(text, 'draw.io'), ['Diagram'])
 assert.deepEqual(titles(text, 'drawio'), ['Diagram'])
-assert.deepEqual(titles(SLIDE_ITEMS, 'h1'), ['Title'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'h1'), ['Heading 1'])
 
 // Names that start with the query come first, then the other matches, each in the menu's own order.
-assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading', 'Code block', 'Tabs', 'Agenda', 'Label', 'Picture', 'New slide below'])
+assert.deepEqual(titles(SLIDE_ITEMS, 's'), ['Steps', 'Split slide here', 'Heading 2', 'Code block', 'Tabs', 'Agenda', 'Label', 'Picture', 'New slide below'])
 
 // Sprint 164 PR 3 (the decks README): the Label, by its name and its hidden words, English and Estonian, without accents;
 // the slide's / menu only.
@@ -74,6 +74,37 @@ assert.ok(!titles(text, 'label').includes('Label') && !titles(text, 'pill').incl
 assert.deepEqual(titles(text, 'ta'), ['Task list', 'Table', 'Tabs', 'Bullet list'])
 assert.deepEqual(titles(text, 'title'), ['Heading 1', 'Heading 2', 'Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, 'grid'), ['Boxes', 'Table'])
+
+// Sprint 168 PR 3 (the decks README, "Quotes, prompts and heading levels on a slide"): the slide's headings have the
+// Text editor's names, Heading 1, 2 and 3, and the old Title's and Heading's words still find them. "Heading" is in all
+// three names, so it lists all three in order, as in the Text editor; it is Heading 3's hidden word too.
+assert.deepEqual(SLIDE_ITEMS.filter(item => item.nodeType === 'heading').map(item => [item.title, item.attrs?.level, item.shortcut, item.icon]), [
+  ['Heading 1', 1, '#', 'text-h-one'],
+  ['Heading 2', 2, '##', 'text-h-two'],
+  ['Heading 3', 3, '###', 'text-h-three'],
+])
+assert.ok(!SLIDE_ITEMS.some(item => item.title === 'Title' || item.title === 'Heading'), '"Title" and "Heading" are gone as names')
+assert.deepEqual(
+  SLIDE_ITEMS.filter(item => item.nodeType === 'heading').map(item => [item.title, item.icon, item.attrs]),
+  blockItems.filter(item => item.nodeType === 'heading').map(item => [item.title, item.icon, item.attrs]),
+  "the Text editor's names, icons and levels",
+)
+const HIDDEN: Record<string, string[]> = { 'Heading 1': ['title', 'h1', 'pealkiri'], 'Heading 2': ['subtitle', 'subheading', 'h2', 'alapealkiri'], 'Heading 3': ['heading', 'h3'] }
+for (const [title, words] of Object.entries(HIDDEN)) {
+  assert.deepEqual(SLIDE_ITEMS.find(item => item.title === title)?.keywords, words, `${title}'s hidden words`)
+  for (const word of words) assert.ok(titles(SLIDE_ITEMS, word).includes(title), `/${word} finds ${title}`)
+}
+assert.deepEqual(titles(SLIDE_ITEMS, 'title'), ['Heading 1'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'subtitle'), ['Heading 2'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'sub'), ['Heading 2'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'pealkiri'), ['Heading 1'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'alapealkiri'), ['Heading 2'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'h2'), ['Heading 2'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'h3'), ['Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'heading'), ['Heading 1', 'Heading 2', 'Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'heading 3'), ['Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, 'heading3'), ['Heading 3'])
+assert.deepEqual(titles(text, 'heading'), ['Heading 1', 'Heading 2', 'Heading 3'], 'the same as the Text editor')
 
 // In a deck, Divider is also found by "slide" (experience 22).
 assert.deepEqual(titles(deck, 'new'), [DECK_DIVIDER_TITLE])
@@ -89,8 +120,9 @@ assert.deepEqual(titles(text, '-'), [])
 assert.deepEqual(titles(text, 'io'), [])
 assert.deepEqual(titles(SLIDE_ITEMS, 'slidebelow'), ['New slide below'])
 // Marks alone find the item whose shortcut they start (review of #802).
-assert.deepEqual(titles(SLIDE_ITEMS, '#'), ['Title', 'Heading'])
-assert.deepEqual(titles(SLIDE_ITEMS, '##'), ['Heading'])
+assert.deepEqual(titles(SLIDE_ITEMS, '#'), ['Heading 1', 'Heading 2', 'Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, '##'), ['Heading 2', 'Heading 3'])
+assert.deepEqual(titles(SLIDE_ITEMS, '###'), ['Heading 3'])
 assert.deepEqual(titles(SLIDE_ITEMS, '***'), ['Split slide here'])
 assert.deepEqual(titles(SLIDE_ITEMS, '-'), ['Bullet list'])
 // The deck's list is built once, so its items keep their identity from keystroke to keystroke.

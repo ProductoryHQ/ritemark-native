@@ -450,6 +450,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
 .deck-sl.is-blocks.is-editing h1:has(+ ritemark-comment + ritemark-comment + ritemark-comment + h2) { margin-bottom: .12em; }
+/* The title's own line with notes between (Sprint 168 PR 3, slide.css's `h1 + h2`): quiet, weight 500, on white too. */
+.deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { font-weight: 500; color: var(--s-sub, #C7CAEB); }
+.deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { color: var(--s-sub, #5B5F86); }
 .deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { box-shadow: none; }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
