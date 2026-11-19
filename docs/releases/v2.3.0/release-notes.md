@@ -59,7 +59,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 - **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
-- **Take a prompt out of a quote.** On a slide, select its words and choose **Code block** on the toolbar or in the / menu. They become one block with **Copy**, and the rest of the quote stays a quote.
+- **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose code on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 <!-- DECKS END -->
 
 ## Smaller changes

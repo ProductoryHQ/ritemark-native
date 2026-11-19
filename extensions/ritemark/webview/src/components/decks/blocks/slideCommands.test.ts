@@ -838,8 +838,22 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
 
   // A list in the quote keeps its marks as words; a quote in a column stays in its column.
   {
-    const { stage } = bubbleCode(quoteDeck(['# A prompt', '', '> Ask for:', '>', '> 1. risks', '> 2. costs']), 'Ask', 'costs')
+    const LIST = ['# A prompt', '', '> Ask for:', '>', '> 1. risks', '> 2. costs']
+    const { stage } = bubbleCode(quoteDeck(LIST), 'Ask', 'costs')
     assert.equal(markdownOf(stage), '# A prompt\n\n```\nAsk for:\n\n1. risks\n2. costs\n```')
+    assert.equal(stage.inner.doc.textBetween(stage.inner.selection.from, stage.inner.selection.to), 'Ask for:\n\n1. risks\n2. costs', 'the chosen words stay chosen')
+    // Only part of the list chosen (the caret in one item, or two words across items): today's path, so no item the
+    // selection left out goes with it. The same for part of a quote in the quote.
+    const partly = (lines: string[], from: string, to: string | null) => {
+      const doc = stageOn(openDeck(quoteDeck(lines)), 0).inner
+      const tr = doc.tr.setSelection(TextSelection.create(doc.doc, placeOf(doc.doc, from), to === null ? placeOf(doc.doc, from) : placeOf(doc.doc, to, true)))
+      const result = run(SlideCodeBlock, 'toggleCodeBlock', tr)
+      assert.ok(!tr.docChanged, `${from}…${to}: nothing moved by the slide's own step`)
+      return result.today
+    }
+    assert.deepEqual(partly(LIST, 'risks', null), ['toggleNode'], 'the caret in one item')
+    assert.deepEqual(partly(LIST, 'Ask', 'risks'), ['toggleNode'], 'the line above and one of two items')
+    assert.deepEqual(partly(['# A prompt', '', '> Context first.', '>', '> > One', '> >', '> > Two'], 'Context', 'One'), ['toggleNode'], 'part of a quote in the quote')
     const columns = [':::: columns', '::: column', '> You are an analyst.', '>', '> Stop there.', ':::', '', '::: column', 'Right', ':::', '::::']
     const boxed = bubbleCode(quoteDeck(['# A prompt', '', ...columns]), 'Stop', null).stage
     assert.equal(markdownOf(boxed), ['# A prompt', '', ':::: columns', '::: column', '> You are an analyst.', '', '```', 'Stop there.', '```', ':::', '', '::: column', 'Right', ':::', '::::'].join('\n'), 'the code block stays in its column')
@@ -886,6 +900,13 @@ for (const kind of ['columns', 'boxes', 'steps', 'table'] as SlideBlockKind[]) {
     const coded = bubbleCode(QUOTE_DECK, 'summary', null).stage
     const back = coded.inner.tr
     assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', back).today, ['toggleNode'], 'Code block on a code block toggles it back')
+    // A quote holding only code, chosen whole by its block bar: toggled back too, its language kept.
+    const fenced = stageOn(openDeck(quoteDeck(['# A prompt', '', '> ```text', '> Summarise it.', '> ```'])), 0)
+    let fencedAt = -1
+    fenced.inner.doc.forEach((node, offset) => { if (node.type.name === 'blockquote') fencedAt = offset })
+    const fencedTr = fenced.inner.tr.setSelection(NodeSelection.create(fenced.inner.doc, fencedAt))
+    assert.deepEqual(run(SlideCodeBlock, 'toggleCodeBlock', fencedTr).today, ['toggleNode'], 'a quote of code chosen whole: toggled back')
+    assert.ok(!fencedTr.docChanged)
     // A quote holding a picture: its line alone leaves it; the whole quote chosen (its block bar) takes today's path,
     // so the picture is never dropped.
     const pictured = stageOn(openDeck(quoteDeck(['# A prompt', '', '> ![Chart](chart.png)', '>', '> Read it.'])), 0)

@@ -10,7 +10,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import type { RawCommands } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import { CodeBlockWithCopy } from '../components/CodeBlockWithCopy'
-import { codeOutOfQuote } from '../components/decks/blocks/slideCommands'
+import { codeOutOfQuote } from './blockPlacement'
 
 export const CodeBlockWithCopyExtension = CodeBlockLowlight.extend({
   addNodeView() {
