@@ -5,7 +5,7 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 ## PR 0: Research (`sprint-165-slide-library-pr0`)
 - [x] Synthetic fixture generator (invented decks: copies of each other, real recurring slides, a mix)
 - [x] Measure candidate rules for "same slide" and "in most decks"
-- [ ] Findings note to the Experience lead; wait for the chosen rules
+- [x] Findings note to the Experience lead (`research/library-rules.md`); he chose rule G (the same slide) and rule F4 (most decks) before PR 3 and PR 4 started
 - [x] No real deck or slide opened, read, counted or quoted
 
 ## PR 1: Other decks by folder (`sprint-165-slide-library-pr1`)
@@ -31,6 +31,6 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] Lead's look (the Experience lead approved it, 19 November)
 
 ## Sprint end
-- [ ] Full test chain once on each final head
-- [ ] `qa-validator` sign-off
-- [ ] Release plan row and `docs/development/architecture.md` updated if the library's structure changed
+- [x] Full test chain once on each final head: EXIT 0 in the Review records of #843 (PR 1) and #895 (PR 4); #861 (PR 2) and #877 (PR 3) recorded no exit code on their final heads, and both are covered by #895's full chain on `e4487e1a` (EXIT 0), whose tree holds them. PR 0 is docs and a script, with no chain
+- [x] `qa-validator` sign-off (20 November): every PR check passed; it asked for these records, the release plan's row, #887's note and the architecture rows, which this close-out adds
+- [x] Release plan row and `docs/development/architecture.md` updated (the close-out adds the row for PRs 1 and 2 beside PR 3's and PR 4's)
