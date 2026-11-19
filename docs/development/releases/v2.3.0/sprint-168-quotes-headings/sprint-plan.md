@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: three user-facing requirements, a view-to-editor-to-renderer-to-published-page flow, and editor-command edge cases). Override with: "use plain full track".
 Branch: sprint-168-quotes-headings
 Release tier: extension
-Status: **Waiting for Jarmo's approval.** Phase 2 (PLAN). No code, no PR branches yet.
+Status: **Approved** by Jarmo on 19 November 2026: "jah kõigile kolmele" (yes to all three). Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Quotes, prompts and heading levels on a slide", ritemark-dev commit 1d0f3f6), with the sketch in `quote-on-slide.html` beside it. Jarmo agreed it with the Experience lead ("jah, saada arendusse"). That sent it to planning. It is not his approval of this sprint.
 
@@ -22,9 +22,9 @@ Make a quote look like a quote on every surface, let a prompt leave a quote as a
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0, to be created by the manager when the sprint starts.
-- PR 1: to be created
-- PR 2: to be created
-- PR 3: to be created
+- PR 1: [#863](https://github.com/ProductoryHQ/ritemark-native/issues/863)
+- PR 2: [#864](https://github.com/ProductoryHQ/ritemark-native/issues/864)
+- PR 3: [#865](https://github.com/ProductoryHQ/ritemark-native/issues/865)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
@@ -72,4 +72,4 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - Experience lead: the attribution rule says a last paragraph starting with "— " or "– ". Should a quote with only that one line be drawn as an attribution, or as words? The plan assumes words (an attribution needs words above it).
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026)
