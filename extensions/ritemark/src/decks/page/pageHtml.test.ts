@@ -21,7 +21,7 @@ import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
-// @ts-expect-error: the generator is plain JavaScript, with no types (the page's own icons, one list).
+// The page's own icons, from the one list the generator keeps (plain JavaScript; tests aren't type-checked).
 import { PAGE_ONLY } from '../../../scripts/generate-page-icons.mjs';
 
 const extension = path.resolve(__dirname, '..', '..', '..');

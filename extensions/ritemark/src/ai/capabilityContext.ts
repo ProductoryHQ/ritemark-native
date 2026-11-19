@@ -23,23 +23,21 @@
 import type { AgentId } from '../agent/types';
 import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
 import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
-import { RITEMARK_ICON_NAMES, slideIcon } from '../../webview/src/components/decks/slide/iconSet';
-import { PAGE_ICON_NAMES } from '../../webview/src/components/decks/slide/pageIcons';
+import { RITEMARK_ICON_NAMES, ownIconNames } from '../../webview/src/components/decks/slide/iconSet';
 
 let iconLineText: string | null = null;
 
 /**
  * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with, so an AI never
  * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Sprint 169 (#866): every Phosphor
- * regular name that draws its own icon, as a plain list (backticks round 1,500 names would cost more than they say),
- * then Ritemark's own names with the icon each draws; the five Phosphor names an old deck's alias reads as one of the
- * grid's (`check`, `folder`…) are only in that second list. Built once: it is the same for every turn.
+ * regular name that draws its own icon (`ownIconNames`), as a plain list (backticks round every one would cost more than
+ * they say), then Ritemark's own names with the icon each draws; a Phosphor name an old deck's alias reads as one of the
+ * grid's (`check`, `folder`) is only in that second list. Built once: it is the same for every turn.
  */
 function iconLine(): string {
   if (iconLineText !== null) return iconLineText;
-  const phosphor = PAGE_ICON_NAMES.filter((name) => slideIcon(name)?.phosphor === name);
-  const own = RITEMARK_ICON_NAMES.map(({ name, phosphor: drawn }) => `\`${name}\` (${drawn})`).join(', ');
-  iconLineText = `- A box's \`icon\` is the name of a Phosphor regular icon, one of: ${phosphor.join(', ')}. These names are read too, each as the icon in brackets: ${own}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+  const own = RITEMARK_ICON_NAMES.map(({ name, phosphor }) => `\`${name}\` (${phosphor})`).join(', ');
+  iconLineText = `- A box's \`icon\` is the name of a Phosphor regular icon, one of: ${ownIconNames().join(', ')}. These names are read too, each as the icon in brackets: ${own}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
   return iconLineText;
 }
 

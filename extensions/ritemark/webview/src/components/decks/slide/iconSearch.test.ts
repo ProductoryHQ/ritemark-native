@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS } from './pageIcons'
-import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, gridIcon, slideIcon } from './iconSet'
+import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, gridIcon, ownIconNames, slideIcon } from './iconSet'
 import { searchIcons } from './iconSearch'
 
 let passed = 0
@@ -51,6 +51,16 @@ test('the generated modules are @phosphor-icons/core 2.1.1: every regular drawin
     assert.equal(ICON_TAGS[icon.name as keyof typeof ICON_TAGS], iconTags(icon.name).join(ICON_TAG_SEPARATOR), `${icon.name}'s tags; run node scripts/generate-page-icons.mjs`)
   }
   assert.ok(ICON_TAGS.truck.split(ICON_TAG_SEPARATOR).includes('delivery') && ICON_TAGS.users.split(ICON_TAG_SEPARATOR).includes('people'))
+  // The rule itself, apart from the generator: Phosphor's tags, lower case and trimmed, once each, no catalog marks.
+  for (const icon of catalog) {
+    const tags = ICON_TAGS[icon.name as keyof typeof ICON_TAGS].split(ICON_TAG_SEPARATOR).filter(Boolean)
+    assert.equal(new Set(tags).size, tags.length, `${icon.name}: each tag once`)
+    for (const tag of tags) {
+      assert.ok(tag === tag.trim().toLowerCase() && !tag.startsWith('*'), `${icon.name}: ${tag}`)
+      assert.ok(icon.tags.some(source => source.trim().toLowerCase() === tag), `${icon.name}: ${tag} is Phosphor's`)
+    }
+    for (const source of icon.tags) if (!source.startsWith('*') && source.trim()) assert.ok(tags.includes(source.trim().toLowerCase()), `${icon.name}: ${source} kept`)
+  }
   assert.ok(!Object.values(ICON_TAGS).some(tags => tags.includes('*new*') || tags.includes('*updated*')), 'no catalog marks')
 })
 
@@ -87,7 +97,8 @@ test('the 24 and their aliases resolve as before, so an old deck reads and draws
     }
     assert.equal(slideIcon(` ${name.toUpperCase()} `)?.phosphor, phosphor, name)
   }
-  // The old layout's picker and drawing keep to the 24 (Sprint 169 PR 2 widens them).
+  // The old layout's picker and drawing keep to the 24 (Sprint 169 PR 2 widens them), reading names as slideIcon does.
+  assert.equal(gridIcon(' Puzzle Piece ')?.name, 'puzzle')
   assert.equal(gridIcon('truck'), null)
   assert.equal(gridIcon('envelope-simple'), null)
 })
@@ -140,6 +151,8 @@ test('the search finds nothing for nonsense or nothing, and offers only names th
   }
   // Every drawing a name reaches can be found: all but the five an old deck's alias reads as the grid's.
   assert.equal(seen.size, PAGE_ICON_NAMES.length - 5)
+  assert.deepEqual([...seen].sort(), [...ownIconNames()].sort(), 'the same names the DECKS rules list')
+  assert.deepEqual(PAGE_ICON_NAMES.filter(name => !ownIconNames().includes(name)), ['book', 'chat', 'check', 'envelope', 'folder'])
   // A query is text, never a pattern.
   for (const query of ['.*', '(', '[', '\\', '?', '+']) assert.doesNotThrow(() => searchIcons(query), query)
 })

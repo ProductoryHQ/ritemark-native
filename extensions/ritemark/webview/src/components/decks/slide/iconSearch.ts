@@ -6,8 +6,7 @@
  * Its own module, apart from iconSet.ts, so the index (iconIndex.ts) reaches only the code that searches.
  */
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
-import { PAGE_ICON_NAMES } from './pageIcons'
-import { SLIDE_ICONS, SLIDE_ICON_ALIASES, slideIcon, type SlideIcon } from './iconSet'
+import { SLIDE_ICONS, SLIDE_ICON_ALIASES, ownIconNames, slideIcon, type SlideIcon } from './iconSet'
 
 /** How a query meets an icon, best first. */
 const Match = { Name: 0, NameStart: 1, NameWord: 2, Tag: 3, TagStart: 4, NamePart: 5 } as const
@@ -27,16 +26,14 @@ interface Entry {
 let entries: Entry[] | null = null
 
 /**
- * One entry per drawing a name reaches, built on the first search. A Phosphor icon whose own name the grid reads as
- * another of its icons (`check`, `envelope`, `chat`, `book`, `folder`: an old deck's names) has no name to write, so
- * it isn't offered.
+ * One entry per drawing a name reaches (`ownIconNames`), built on the first search. A Phosphor icon whose own name the
+ * grid reads as another of its icons (`check`, `folder`: an old deck's names) has no name to write, so it isn't offered.
  */
 function index(): Entry[] {
   if (entries) return entries
   const byDrawing = new Map<string, Entry>()
-  for (const phosphor of PAGE_ICON_NAMES) {
-    const icon = slideIcon(phosphor)
-    if (!icon || icon.phosphor !== phosphor) continue
+  for (const phosphor of ownIconNames()) {
+    const icon = slideIcon(phosphor) as SlideIcon
     byDrawing.set(phosphor, { icon, names: [phosphor], tags: ICON_TAGS[phosphor].split(ICON_TAG_SEPARATOR), grid: false })
   }
   for (const grid of SLIDE_ICONS) {
