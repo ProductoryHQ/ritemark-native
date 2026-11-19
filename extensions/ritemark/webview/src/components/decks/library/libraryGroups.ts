@@ -131,3 +131,27 @@ export function takeSectionTip(label: string | null, ids: readonly string[] | nu
   if (!ids) return "This section's slides need ids of their own. Open its deck once to give them."
   return `Take section · ${slideCount(slides)}`
 }
+
+/**
+ * Sprint 165 PR 3 (README "Search shows each slide once"): where a search hit's copy is, "Folder › Deck · 12 Nov", with
+ * the same › as the folder headings (the project's name for a deck at its top level).
+ */
+export function placeLine(path: string, name: string, modified: number, projectName: string, now: number = Date.now()): string {
+  const folder = folderHeading(folderOfDeck(path)) || projectName || 'This project'
+  const date = deckDate(modified, now)
+  return `${folder}${PLACE_SEPARATOR}${name}${date ? ` · ${date}` : ''}`
+}
+
+/**
+ * The line under a hit: "also in 3 older decks", the other decks that have the same slide (the open deck left out: it
+ * has the tick). A library slide's copies can be newer than its topic, so it says "also in 3 decks". Null for none.
+ */
+export function alsoLine(count: number, library: boolean): string | null {
+  if (!Number.isFinite(count) || count <= 0) return null
+  return `also in ${count} ${library ? '' : 'older '}${count === 1 ? 'deck' : 'decks'}`
+}
+
+/** The search heading's count: "4 slides", or "60 of 412 slides" when the list stops short. */
+export function hitsCount(shown: number, total: number): string {
+  return total > shown ? `${shown} of ${total} slides` : slideCount(shown)
+}

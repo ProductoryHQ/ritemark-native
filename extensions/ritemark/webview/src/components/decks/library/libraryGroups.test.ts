@@ -1,7 +1,7 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
+import { alsoLine, deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, hitsCount, placeLine, sectionIds, sectionsOf, slideCount, takeSectionTip } from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -128,4 +128,30 @@ console.log('libraryGroups: ok')
   assert.match(rule('.deck-lib-section-number'), /margin-top: -1px/)
   assert.match(rule('.deck-lib-take-slot'), /top: 1px/, 'Take section on the first line too')
   assert.doesNotMatch(rule('.deck-lib-take-slot'), /top: 50%/)
+}
+
+// ---- Sprint 165 PR 3: a search hit's place line, "also in N older decks", the heading's count, and the tick's look.
+{
+  const at = day('2026-11-12T10:00')
+  assert.equal(placeLine('Harbour/day 2.deck.md', 'day 2', at, 'Trainings', now), 'Harbour › day 2 · 12 Nov')
+  assert.equal(placeLine('Clients/North/plan.deck.md', 'plan', day('2025-06-01T10:00'), 'Trainings', now), 'Clients › North › plan · 1 Jun 2025', "the folder heading's ›, and the year")
+  assert.equal(placeLine('Kickoff.deck.md', 'Kickoff', at, 'Trainings', now), 'Trainings › Kickoff · 12 Nov', "the project's name for its top level")
+  assert.equal(placeLine('Slide library/Every training.deck.md', 'Every training', 0, '', now), 'Slide library › Every training', 'no date read: no date')
+  assert.equal(placeLine('Kickoff.deck.md', 'Kickoff', at, '', now), 'This project › Kickoff · 12 Nov')
+  assert.equal(alsoLine(3, false), 'also in 3 older decks')
+  assert.equal(alsoLine(1, false), 'also in 1 older deck')
+  assert.equal(alsoLine(4, true), 'also in 4 decks', "a library slide's copies needn't be older")
+  assert.equal(alsoLine(1, true), 'also in 1 deck')
+  assert.equal(alsoLine(0, false), null)
+  assert.equal(hitsCount(4, 4), '4 slides')
+  assert.equal(hitsCount(1, 1), '1 slide')
+  assert.equal(hitsCount(60, 412), '60 of 412 slides')
+  const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  const rule = (selector: string) => {
+    const found = css.indexOf(`${selector} {`)
+    return found < 0 ? '' : css.slice(found, css.indexOf('}', found))
+  }
+  assert.match(rule('.deck-lib-here'), /position: absolute/, 'the tick sits on the thumbnail')
+  assert.match(rule('.deck-lib-here'), /var\(--r-success\)/, "in the theme's success colour")
+  assert.match(rule('.deck-lib-place'), /-webkit-line-clamp: 2/, 'a long place takes two lines before an ellipsis')
 }

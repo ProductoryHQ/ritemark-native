@@ -15,8 +15,9 @@ import type { DeckLibrary, DeckSummary } from './DeckLibrary';
 import { readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
 import { themePathOf } from './deckTheme';
 import { folderOf, normalizePath, slidesOfText } from './deckLibraryFormat';
-import { projectRoot } from './deckDocuments';
+import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { decodeLibraryRequest } from './deckProtocol';
+import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, searchLibrary, type IndexedDeck } from './librarySearch';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -39,6 +40,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private generation = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly subscriptions: vscode.Disposable[] = [];
+  /**
+   * Sprint 165 PR 3: the project's decks, read once and then again only as they change (the watcher below names them),
+   * so typing in the search reads no file. Kept only while the decks are watched.
+   */
+  private index: { root: string; index: DeckIndex } | null = null;
+  /** The open deck the last state was worked out for: another one changes the ticks and what search may show. */
+  private stateActive: string | null = null;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -49,7 +57,11 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       // Another deck or another slide: only the active deck's line changes, so only it is sent (the page leaves the
       // active deck out of Other decks itself).
       pages.onDidChangeActive(() => {
-        if (this.ready && this.view?.visible) void this.post({ type: 'library/active', active: isEnabled('decks') ? this.pages.activeDeck() : null });
+        if (!this.ready || !this.view?.visible) return;
+        const active = isEnabled('decks') ? this.pages.activeDeck() : null;
+        void this.post({ type: 'library/active', active });
+        // Another deck in front (Sprint 165 PR 3): which slides it already has, the ticks, change with it.
+        if ((active?.path ?? null) !== this.stateActive) this.refreshSoon();
       }),
       pages.onDidRevealInLibrary(target => void this.post('section' in target
         ? { type: 'library/show', section: target.section }
@@ -66,18 +78,39 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private watchDecks(): void {
     if (this.watching.length) return;
     const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
+    const isDeck = (uri: vscode.Uri) => /\.deck\.md$/i.test(uri.fsPath);
     this.watching = [
       watcher,
-      watcher.onDidCreate(() => this.refreshSoon()),
-      watcher.onDidDelete(() => this.refreshSoon()),
-      watcher.onDidChange(() => this.refreshSoon()),
-      vscode.workspace.onDidChangeTextDocument(event => { if (/\.deck\.md$/i.test(event.document.uri.fsPath)) this.refreshSoon(); }),
+      watcher.onDidCreate(uri => this.deckChanged(uri)),
+      watcher.onDidDelete(uri => this.deckChanged(uri)),
+      watcher.onDidChange(uri => this.deckChanged(uri)),
+      vscode.workspace.onDidChangeTextDocument(event => { if (isDeck(event.document.uri)) this.deckChanged(event.document.uri); }),
+      // An open deck closed unsaved: its file's text is the deck again, at the same file time.
+      vscode.workspace.onDidCloseTextDocument(document => { if (isDeck(document.uri)) this.deckChanged(document.uri); }),
     ];
   }
 
   private stopWatching(): void {
     for (const subscription of this.watching) subscription.dispose();
     this.watching = [];
+    // Unwatched, the index would go stale: the next view reads the decks afresh.
+    this.index = null;
+  }
+
+  /** A deck's file or open text changed: the index reads it again, and the place shows it soon. */
+  private deckChanged(uri: vscode.Uri): void {
+    const current = this.index;
+    const relative = current ? projectRelative(current.root, uri.fsPath) : null;
+    if (current && relative) current.index.invalidate(relative);
+    this.refreshSoon();
+  }
+
+  /** The index of this window's project, made when first needed (and again for another project folder). */
+  private indexOf(): DeckIndex | null {
+    const root = projectRoot();
+    if (!root) return null;
+    if (this.index?.root !== root) this.index = { root, index: new DeckIndex(workspaceDeckFiles(root)) };
+    return this.index.index;
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -187,10 +220,28 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const generation = ++this.generation;
     const query = this.query;
     const library = this.library();
-    const decks = library ? await library.listDecks({ query, agenda: true }) : [];
+    const index = library ? this.indexOf() : null;
+    const active = this.pages.activeDeck();
+    let indexed: IndexedDeck[] = [];
+    try {
+      indexed = index ? await index.decks() : [];
+    } catch {
+      // The project's files couldn't be listed this time: the place keeps what it shows, and the next change tries again.
+      return;
+    }
+    const same = index?.same();
+    // Sprint 165 PR 3: a search lists each slide once (the decks sent hold only the slides it shows); the ticks mark
+    // the slides whose copy is already in the open deck, in the search and in the decks alike.
+    const found = same && query.trim() ? searchLibrary(indexed, same, query, { active: active?.path, limit: MAX_HITS }) : null;
+    const decks = found ? hitDecks(indexed, found.hits) : indexed.map(entry => entry.summary);
+    const here = same ? inOpenDeck(indexed, same, active?.path) : [];
     const { assets, themes } = this.view ? await looksOf(this.view.webview, decks) : { assets: {}, themes: {} };
     if (generation !== this.generation) return;
-    await this.post({ type: 'library/state', enabled: true, decks, assets, themes, active: this.pages.activeDeck(), query, project: !!library, projectName: projectName() });
+    this.stateActive = active?.path ?? null;
+    await this.post({
+      type: 'library/state', enabled: true, decks, assets, themes, active, query, project: !!library, projectName: projectName(), here,
+      ...(found ? { search: found } : {}),
+    });
   }
 
   private async post(message: Record<string, unknown>): Promise<void> {
