@@ -97,19 +97,14 @@ export function playStep(step: MotionStep, direction: MotionDirection, layers: L
       leaving.style.visibility = 'hidden'
       break
   }
+  const atEnd = drawingOf(animations)
   let done = false
   return {
     ms,
     finish: () => {
       if (done) return
       done = true
-      for (const animation of animations) {
-        try {
-          animation.finish()
-        } catch {
-          // An animation whose element left the page: nothing to finish.
-        }
-      }
+      atEnd.finish()
       for (const step of undo.reverse()) step()
     },
   }

@@ -324,6 +324,13 @@ class FakeClock implements MotionClock {
   const inRow = pieces().filter(entry => entry.options.fill === 'backwards')
   assert.ok(!inRow.some(entry => entry.element === title), 'the gliding title is not in the row')
   assert.deepEqual(inRow.map(label), ['DIV:One', 'P:A line after'], 'the rest arrive behind it')
+  // Push on a screen wider than the slide (review of #810): the pieces come from as far as the slide before is pushed,
+  // the screen's width, in the canvas's pixels (a slide drawn 1200 px wide on a 1440 px screen: 1152), so they start off
+  // the screen rather than in the band beside the slide.
+  proto.getBoundingClientRect = function (this: Element) { return { left: 0, top: 0, width: this.classList.contains('deck-sl') ? 1200 : 100, height: 40 } }
+  made.length = 0
+  playStep('push', 'next', layers, [], true)
+  assert.ok(pieces().length === 3 && pieces().every(entry => entry.keyframes[0].transform === 'translateX(1152px)'), pieces().map(entry => String(entry.keyframes[0].transform)).join(' '))
 
   // The wall decides with the host's arrival and the one rule (`slideArrival.rowPlays`); the start is a row from the
   // ground; the presenter view never animates (it draws no motion at all).

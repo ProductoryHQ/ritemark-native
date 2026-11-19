@@ -51,9 +51,9 @@ export const ROW_NUMBERS: RowNumbers = {
   leaveMs: ROW.leaveMs,
   pushGap: ROW.pushGap,
   pushMs: MOTION_MS.push,
-  photoMs: 900,
-  photoShift: 28,
-  behindFrom: 1.04,
+  photoMs: ROW.photoMs,
+  photoShift: ROW.photoShift,
+  behindFrom: ROW.behindFrom,
   easeOut: EASE_OUT,
   easeInOut: EASE_IN_OUT,
   leaveEase: 'cubic-bezier(0.4, 0, 1, 1)',
@@ -135,8 +135,14 @@ export function rowPlayer(row: RowNumbers): RowPlayer {
       const lead = push || !leaving ? 0 : row.leaveMs - 10
       const pieces = player.piecesOf(entering, how.skip)
       const starts = player.delays(pieces.length, lead, push)
+      // Push: the pieces come from as far as the slide before is pushed (`how.width`, screen pixels), in the canvas's own
+      // pixels, so on a screen wider than the slide they start off it, not in the band beside it.
+      const canvas = push ? entering.querySelector('.deck-sl') : null
+      const drawn = canvas && typeof canvas.getBoundingClientRect === 'function' ? canvas.getBoundingClientRect().width : 0
+      // (A slide that arrives as one piece, the layer itself, moves in screen pixels.)
+      const shift = pieces.length === 1 && pieces[0] === entering ? how.width : drawn > 0 ? Math.round(how.width / (drawn / 960)) : 960
       const from: Keyframe = push
-        ? { transform: 'translateX(960px)' }
+        ? { transform: 'translateX(' + shift + 'px)' }
         : how.transition === 'zoom'
           ? { opacity: 0, transform: 'scale(' + row.zoom + ')' }
           : { opacity: 0, transform: 'translateY(' + row.rise + 'px)' }

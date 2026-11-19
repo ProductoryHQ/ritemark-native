@@ -296,8 +296,10 @@ const PAGE_BEHAVIOUR = String.raw`
     // reader then names ("Slide 3 of 8: ...").
     var focusWasOn = moved && leaving && doc.activeElement && leaving.contains(doc.activeElement);
     cur = index;
-    var onward = moved && opensOnward(how);
-    shown = revealOnArrival(itemsOf(index), onward);
+    // As on the wall: Home opens the first slide at its first item even when it is on it already; a press that goes
+    // nowhere (back on the first slide, on at the last) keeps the step; anything else opens the slide as it arrived.
+    var onward = opensOnward(how) && (moved || how === 'home');
+    if (moved || (how !== 'next' && how !== 'back')) shown = revealOnArrival(itemsOf(index), onward);
     drawReveal(entering, shown);
     layers.forEach(function (layer, at) {
       layer.classList.toggle('on', at === index);

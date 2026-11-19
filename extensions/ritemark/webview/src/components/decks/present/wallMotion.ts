@@ -48,12 +48,13 @@ export const EASE_OUT = 'cubic-bezier(0.22, 1, 0.36, 1)'
 export const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)'
 
 /**
- * README item 20, the content arriving in a row (the published page plays it, Sprint 163 PR 4): the slide before leaves
- * as one in `leaveMs`; the new slide's pieces come `gap` ms apart (with more than eight, closer, never under `minGap`,
- * within `span`; from the `last + 1`th piece on, together), each in `ms`, rising `rise` px (Fade) or growing from `zoom`
- * (Zoom); in Push they come on the slide's heels, `pushGap` ms apart.
+ * README item 20, the content arriving in a row (the wall and the published page alike, `rowArrival.ts`): the slide
+ * before leaves as one in `leaveMs`; the new slide's pieces come `gap` ms apart (with more than eight, closer, never under
+ * `minGap`, within `span`; from the `last + 1`th piece on, together), each in `ms`, rising `rise` px (Fade) or growing
+ * from `zoom` (Zoom); in Push they come on the slide's heels, `pushGap` ms apart. A picture on the side slides in
+ * `photoShift` px from its own edge; one Behind settles from `behindFrom` in `photoMs`.
  */
-export const ROW = { gap: 70, minGap: 28, span: 480, last: 13, ms: 480, rise: 14, zoom: 0.92, leaveMs: 150, pushGap: 30 } as const
+export const ROW = { gap: 70, minGap: 28, span: 480, last: 13, ms: 480, rise: 14, zoom: 0.92, leaveMs: 150, pushGap: 30, photoMs: 900, photoShift: 28, behindFrom: 1.04 } as const
 
 /** README item 18: an item shown by → arrives in 0.2 s, rising this far (on the 960 slide) as it fades in. */
 export const REVEAL_MS = 200

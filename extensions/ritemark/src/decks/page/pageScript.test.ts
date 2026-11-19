@@ -62,7 +62,7 @@ const motion = new Function(`${PAGE_MOTION_RULE}\nreturn { MOTION, ZOOM_FROM, RE
   assert.ok(!/rowDelays|piecesOf|ROW_GAP|LEAVE_MS|data-reveal-hidden'\)\) return/.test(PAGE_SCRIPT.replace(String(rowPlayer), '')), 'no row of the page\'s own left');
   assert.ok(!PAGE_SCRIPT.includes('__name'), 'nothing a build step wrapped: the source runs alone');
   assert.deepEqual(
-    { gap: ROW_NUMBERS.gap, minGap: ROW_NUMBERS.minGap, span: ROW_NUMBERS.span, last: ROW_NUMBERS.last, ms: ROW_NUMBERS.ms, rise: ROW_NUMBERS.rise, zoom: ROW_NUMBERS.zoom, leaveMs: ROW_NUMBERS.leaveMs, pushGap: ROW_NUMBERS.pushGap, pushMs: ROW_NUMBERS.pushMs, easeOut: ROW_NUMBERS.easeOut, easeInOut: ROW_NUMBERS.easeInOut },
+    { gap: ROW_NUMBERS.gap, minGap: ROW_NUMBERS.minGap, span: ROW_NUMBERS.span, last: ROW_NUMBERS.last, ms: ROW_NUMBERS.ms, rise: ROW_NUMBERS.rise, zoom: ROW_NUMBERS.zoom, leaveMs: ROW_NUMBERS.leaveMs, pushGap: ROW_NUMBERS.pushGap, photoMs: ROW_NUMBERS.photoMs, photoShift: ROW_NUMBERS.photoShift, behindFrom: ROW_NUMBERS.behindFrom, pushMs: ROW_NUMBERS.pushMs, easeOut: ROW_NUMBERS.easeOut, easeInOut: ROW_NUMBERS.easeInOut },
     { ...ROW, pushMs: MOTION_MS.push, easeOut: EASE_OUT, easeInOut: EASE_IN_OUT },
     'the numbers are the wall\'s (wallMotion.ROW)',
   );
@@ -198,8 +198,8 @@ function recordAnimations(doc: Document, played: Played[]): void {
   };
   if (!proto.getBoundingClientRect) proto.getBoundingClientRect = () => ({ width: 1440, height: 810, left: 0, top: 0 });
 }
-function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number; motion?: boolean; transition?: string; played?: Played[] } = {}): Run {
-  const doc = domino.createDocument(html, true) as Document;
+function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number; motion?: boolean; transition?: string; played?: Played[]; page?: string } = {}): Run {
+  const doc = domino.createDocument(options.page ?? html, true) as Document;
   // The page's own script element stays out: the test runs the same text itself.
   doc.querySelector('script')?.remove();
   if (options.transition) doc.body.setAttribute('data-transition', options.transition);
@@ -423,6 +423,26 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
   run.key('End');
   assert.ok(played.length > 0 && inner().length === 0, 'End: whole');
   settleRun();
+}
+// As on the wall (review of #810): Home opens the first slide at its first item even when it is on it already, and a
+// press that goes nowhere (back on the first slide) keeps the step rather than showing every item.
+{
+  const firstReveals = publicDeck([
+    '---', 'deck: 2', 'title: T', '---', '',
+    slide('# Your list\n\n::: incremental\n- One\n- Two\n- Three\n:::'), '',
+    slide('# Next'), '',
+  ].join('\n'), { folderName: 'F', deckName: 'd', theme: BUILT_IN_THEME });
+  const run = runPage({ page: pageHtml(firstReveals, assets, { digest: deckDigest(firstReveals), pictureUrl: () => null }) });
+  const hidden = () => run.doc.querySelectorAll('#s1 [data-reveal-hidden]').length;
+  assert.equal(hidden(), 0, 'opened as it is: whole');
+  run.key('Home');
+  assert.equal(hidden(), 2, 'Home on the first slide: its first item, as on the wall');
+  run.key('ArrowRight');
+  assert.equal(hidden(), 1);
+  run.key('ArrowLeft');
+  run.key('ArrowLeft');
+  assert.equal(run.on(), 0);
+  assert.equal(hidden(), 2, 'back on the first slide at its first item goes nowhere and keeps the step');
 }
 // None and reduced motion: no row, nothing moves at all; one column brings the new slide alone.
 {

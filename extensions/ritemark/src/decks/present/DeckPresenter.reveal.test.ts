@@ -25,6 +25,7 @@ interface StubPanel {
 }
 
 const panels: StubPanel[] = [];
+const placeAnswer = { value: 'moved' as 'moved' | 'opened' };
 let changeListener: ((event: { document: unknown }) => void) | null = null;
 
 class TabInputWebview {
@@ -82,12 +83,17 @@ const vscodeMod = {
   },
   commands: {
     getCommands: async () => ['_ritemark.present.place', '_ritemark.present.displays'],
-    executeCommand: async (command: string) => {
+    executeCommand: async (command: string, args?: { viewType?: string }) => {
       if (command === '_ritemark.present.displays') {
         return [{ name: 'Built-in Retina Display', primary: true, internal: true }, { name: 'Projector', primary: false, internal: false }];
       }
-      // The window moved and kept its page: no load to wait for.
-      return 'moved';
+      // 'moved': the window moved and kept its page, no load to wait for. 'opened': it opened in a window of its own
+      // and its page loads again there.
+      if (placeAnswer.value === 'opened') {
+        const panel = panels.filter(each => each.viewType === args?.viewType && !each.disposed).pop();
+        if (panel) setTimeout(() => panel.send({ type: 'present/ready' }), 0);
+      }
+      return placeAnswer.value;
     },
   },
   ViewColumn: { Active: -1 },
@@ -344,6 +350,28 @@ async function main(): Promise<void> {
     assert.ok(JSON.stringify(onWall().slide).includes('Two steps'));
     assert.deepEqual(onWall().reveal, { shown: 1, count: 2 }, 'opening with its first item');
 
+    presenter.stop();
+    await settle();
+
+    // README item 20, review of #810: the wall's window opens on its display and its page loads again there. That page,
+    // the one the room sees, gets the start too (the first page got it while the window was still moving); after it,
+    // and after the first move, nothing is the start again. The first item is shown once, not again.
+    placeAnswer.value = 'opened';
+    document.text = DECK;
+    document.version = 10;
+    const before = panels.length;
+    await presenter.start(origin as never, { type: 'deck/present', from: 'here', index: 1 } as never);
+    await settle(60);
+    const wall2 = panels.slice(before).find(panel => panel.viewType === DECK_WALL_VIEW_TYPE)!;
+    const states2 = wall2.posted.filter(message => message.type === 'present/wall');
+    const readies = states2.filter(message => message.arrival === 'start');
+    assert.ok(readies.length >= 2, `the page loaded again on its display gets the start too (${states2.map(message => message.arrival).join(', ')})`);
+    assert.ok(states2.every(message => JSON.stringify(message.reveal) === JSON.stringify({ shown: 1, count: 4 })), 'the first item, every time: the step is taken once');
+    wall2.send({ type: 'present/next' });
+    await settle();
+    wall2.send({ type: 'present/ready' });
+    await settle();
+    assert.equal(last(wall2, 'present/wall').arrival, null, 'a reload after a move is no start');
     presenter.stop();
     await settle();
   } finally {

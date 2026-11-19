@@ -144,6 +144,12 @@ interface Running {
    * in a row (item 20).
    */
   arrival: SlideArrival | null;
+  /**
+   * The presentation is starting: until the wall's window is on its display (its page may load again there, and that page
+   * is the one the room sees) and before any move, the wall's state says the slide arrived as the start (README item 20,
+   * the first slide in a row from the ground). The step (`arrival`) is taken once, so the first item isn't shown again.
+   */
+  starting: boolean;
 }
 
 /** The shell's commands (patch 018). */
@@ -277,6 +283,7 @@ export class DeckPresenter implements vscode.Disposable {
       // a row from the theme's ground (item 20).
       reveal: null,
       arrival: 'start',
+      starting: true,
     };
     this.running = running;
     // Whether the deck is published, and where: the wall and the presenter view get it once it is known, and again
@@ -305,6 +312,7 @@ export class DeckPresenter implements vscode.Disposable {
     // focus (the presenter's keys and clicker work there). Each panel is made in the deck's group, where it is the
     // tab in front, so its page loads before it moves (a panel behind another tab loads nothing).
     await this.place(running, running.wall, DECK_WALL_VIEW_TYPE, running.wallDisplay, WINDOWED_WALL);
+    running.starting = false;
     // (A presenter view turned on from the wall's bar while the wall was being placed is there already.)
     if (this.presenterAvailable(running) && this.presenterWanted() && !running.ended && !running.presenter) {
       this.addPresenter(running);
@@ -534,6 +542,7 @@ export class DeckPresenter implements vscode.Disposable {
         // A move (a button, the row, the grid) brings the slide back too, on the slide it moves to.
         running.blank = null;
         running.blankSerial++;
+        running.starting = false;
         // A move clears the spotlight and the filled wall: → and a clicker clear it and go on, in one press.
         running.focus = NO_FOCUS;
         const move = moveOf(request);
@@ -598,6 +607,11 @@ export class DeckPresenter implements vscode.Disposable {
   private async showWall(running: Running): Promise<void> {
     if (running.ended) return;
     const view = running.session.view();
+    // How this view's slide arrived, taken with the view (a move during the await below brings its own). Until the wall
+    // is on its display, its page may load again there (that page is the one the room sees): it gets the start too.
+    const arrival = running.arrival;
+    running.arrival = null;
+    const shownAs = arrival ?? (running.starting ? 'start' : null);
     const look = await this.look(running);
     const assets = this.assets(running, running.wall, wallPicturePaths(view));
     if (running.ended) return;
@@ -608,10 +622,8 @@ export class DeckPresenter implements vscode.Disposable {
     // README item 18: a slide a move just reached opens as the move opens it (its first item, or whole); the same slide
     // drawn again keeps its step, within its items now.
     const count = revealCountOf(wallSlideOf(view.current));
-    const arrival = running.arrival;
     running.reveal = arrival ? revealOnArrival(count, opensOnward(arrival) ? 'first' : 'whole') : revealKept(running.reveal, count);
-    running.arrival = null;
-    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal, running.tabs, arrival);
+    let state = wallStateOf(view, look, assets, presenter, running.blank, running.page, running.focus, running.timer, running.reveal, running.tabs, shownAs);
     if (running.wallState && JSON.stringify(running.wallState.slide) !== JSON.stringify(state.slide)) {
       running.focus = NO_FOCUS;
       running.tabs = [];
