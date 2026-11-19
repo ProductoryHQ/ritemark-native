@@ -51,7 +51,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 ## Fix 4: the split's drag guide (PR 4, issue #829)
 
 [#829](https://github.com/ProductoryHQ/ritemark-native/issues/829): with the 32 px gap, the drag guide at the ⅓ and ⅔ snap points sits about 5 px off the middle of the gap. It goes to the middle, as the handle already is.
-- [ ] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
+- [x] A test of the guide's position at ⅓ and ⅔; one shot while dragging.
+- Built (PR 4): the guide was drawn at a third of the two columns' span, gap included, but the grid shares only their room without the gap, so it stood a sixth of the gap off the split at ⅓ and ⅔ (½ was right). It now stands where the handle will be once the line lands: the room shared as the drop writes it (whole percents) plus half the gap measured on the screen, so the fit and the stage's scale are in it (`splitGuideX`, `splitShares` in `blockBar.ts`). In the app at 1440×900: within 0.01 px of the gap's middle at ⅓, ½ and ⅔, at the full fit and at 60 % (main's formula, on the same columns: 2.0 px off at ⅓ and ⅔ at the full fit); dragged from an even split to ⅓, the guide stood exactly where the handle landed. Found in the same run and fixed: pointed at, the split drew the ghost Button's light hover fill as a 12 px bar around its line; now only the line shows. Test: `blockBar.test.ts`. Shot: `proof/pr4-split-guide/`. No release-notes line: Decks is new in 2.3, so nobody has seen the old guide.
 
 
 ## Added on 19 November (scope change, Jarmo: "jah, lisa need kolm sprinti 166")

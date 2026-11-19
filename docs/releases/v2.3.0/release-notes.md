@@ -66,10 +66,12 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Show who said a quote.** End a quote on a slide with a line that starts with a long dash (— or –), such as "— Team lead". That line shows smaller, under the quote's words, and the quote gets a bar in your theme's colour.
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
 - **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
+- **Give a box any of 1,500 icons.** Ask the AI for one, or write an icon's name from the Phosphor set, such as truck. It looks the same while you edit, present and share.
 - **A button that stands alone stays put when you click it.** The button no longer jumps away from your pointer, on a slide or in a document.
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
+- **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
 - **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
 <!-- DECKS END -->
 

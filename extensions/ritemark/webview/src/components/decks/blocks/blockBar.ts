@@ -624,20 +624,47 @@ export function setColumnSplit(state: EditorState, pos: number, line: number, fr
   if (!block || block.kind !== 'columns') return null
   const columns = columnsOf(block.node, pos)
   if (line < 0 || line >= columns.length - 1) return null
-  const shares = columnShares(block.node)
-  const pair = shares[line] + shares[line + 1]
-  const snapped = snapSplit(fraction)
-  shares[line] = pair * snapped
-  shares[line + 1] = pair * (1 - snapped)
-  const even = 100 / columns.length
-  const isEven = shares.every(share => Math.abs(share - even) < 0.5)
+  const written = splitShares(columnShares(block.node), line, fraction)
   const tr = state.tr
   columns.forEach((column, index) => {
     const open = String(column.node.attrs.open ?? '')
-    const next = withFenceValue(open, 'width', isEven ? null : `${Math.round(shares[index])}%`)
+    const next = withFenceValue(open, 'width', written ? `${written[index]}%` : null)
     if (next !== null && next !== open) tr.setNodeMarkup(column.pos, undefined, { ...column.node.attrs, open: next })
   })
   return tr.docChanged ? tr.setMeta(SLIDE_COMMAND, true) : null
+}
+
+/**
+ * The columns' shares once the line after column `line` lands at `fraction` (snapped), as `setColumnSplit` writes
+ * them: whole percents, or null back at an even split (no width is written).
+ */
+export function splitShares(shares: readonly number[], line: number, fraction: number): number[] | null {
+  const next = [...shares]
+  const pair = next[line] + next[line + 1]
+  const snapped = snapSplit(fraction)
+  next[line] = pair * snapped
+  next[line + 1] = pair * (1 - snapped)
+  const even = 100 / next.length
+  return next.every(share => Math.abs(share - even) < 0.5) ? null : next.map(share => Math.round(share))
+}
+
+/**
+ * Where the split's guide stands while it drags (#829), on the screen: in the middle of the gap the line after column
+ * `index` will have once dropped at `fraction`, where its handle then sits. The grid shares its room, the columns' span
+ * from `grid.left` (the first column's left edge) to `grid.right` (the last one's right) without the gaps between them
+ * (`gap`: the slide's 32 px times its fit and the stage's scale), so a third of the two columns' span is not a third of
+ * their room: the guide stood a sixth of the gap off the split at ⅓ and ⅔. Every column's share is taken as the drop
+ * writes it (whole percents, `splitShares`), since rounding one outside the pair moves the pair too. `shares` are the
+ * columns' now (`columnShares`).
+ */
+export function splitGuideX(grid: { left: number; right: number }, gap: number, shares: readonly number[], index: number, fraction: number): number {
+  const drawn = splitShares(shares, index, fraction) ?? shares.map(() => 1)
+  const total = drawn.reduce((sum, share) => sum + share, 0)
+  const room = Math.max(0, grid.right - grid.left - gap * (drawn.length - 1))
+  // Shares that round to nothing (a hand-written 0.4 %) still give a place, never NaN.
+  const before = drawn.slice(0, index + 1).reduce((sum, share) => sum + share, 0)
+  const share = total > 0 ? before / total : (index + 1) / drawn.length
+  return grid.left + share * room + gap * index + gap / 2
 }
 
 // ---------------------------------------------------------------------------
@@ -795,12 +822,13 @@ export function barLeft(blockLeft: number, width: number, pane: { left: number; 
 
 /**
  * Where a pointer at `x` (screen) lies along two columns from `left` to `right` (screen), 0 to 1. Screen pixels are the
- * slide's times its scale on both sides of the division, so the place is the same at any stage size.
+ * slide's times its scale on both sides of the division, so the place is the same at any stage size. Read in the two
+ * columns' room, without the `gap` between them (#829), as the guide is drawn: a pointer on the guide reads its snap.
  */
-export function splitPlace(x: number, left: number, right: number): number {
-  const width = right - left
+export function splitPlace(x: number, left: number, right: number, gap = 0): number {
+  const width = right - left - gap
   if (!(width > 0)) return 0.5
-  return Math.max(0, Math.min(1, (x - left) / width))
+  return Math.max(0, Math.min(1, (x - left - gap / 2) / width))
 }
 
 /** The gap a pointer at `y` drops a block into: the allowed gap whose line is nearest. `lines` maps a gap to its y. */

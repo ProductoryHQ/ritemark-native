@@ -23,16 +23,33 @@
 import type { AgentId } from '../agent/types';
 import { DECK_FONT_LIST, THEMES_FOLDER } from '../decks/deckTheme';
 import { ACCENT_RATIO, TEXT_RATIO } from '../decks/themeChange';
-import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import { RITEMARK_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
+import type { PageIconName } from '../../webview/src/components/decks/slide/pageIcons';
 
 /**
- * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with, so an AI never
- * guesses a name the slide can't draw (one it doesn't know draws a dashed circle). Today's 24 and the other names drawn
- * as them; every Phosphor name once the icon search lands (Sprint 169).
+ * Sprint 169 (the Experience lead, 19 November): common names a training deck reaches for, so the AI writes Phosphor's
+ * names in Phosphor's way. Typed, so each is a real regular icon.
  */
+const ICON_EXAMPLES: readonly PageIconName[] = [
+  'truck', 'users-three', 'user-circle', 'envelope-simple', 'chat-circle-text', 'calendar-check', 'clock',
+  'chart-line-up', 'chart-pie-slice', 'currency-eur', 'shopping-cart', 'buildings', 'briefcase', 'graduation-cap',
+  'lightbulb', 'brain', 'robot', 'shield-check', 'lock-key', 'gear', 'rocket-launch', 'handshake',
+];
+
+/**
+ * #850 (Sprint 166 PR 9): the names a box's icon may carry, read from the icon set the slide draws with. Sprint 169
+ * (#866): any Phosphor regular icon name, a few common ones as examples (the whole list would cost thousands of tokens
+ * on every deck turn), then Ritemark's own names with the icon each draws; the dashed circle stays the net for a name
+ * that is neither.
+ */
+const ICON_LINE = (() => {
+  const own = RITEMARK_ICON_NAMES.map(({ name, phosphor }) => `\`${name}\` (${phosphor})`).join(', ');
+  const examples = ICON_EXAMPLES.map((name) => `\`${name}\``).join(', ');
+  return `- A box's \`icon\` is the name of any Phosphor regular icon (lower case, words joined by hyphens), for example ${examples}. These names are read too, each as the icon in brackets: ${own}. A name that is neither draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+})();
+
 function iconLine(): string {
-  const list = (names: readonly string[]) => names.map((name) => `\`${name}\``).join(', ');
-  return `- A box's \`icon\` is one of these names: ${list(SLIDE_ICON_NAMES)}; these are read as one of them too: ${list(SLIDE_ICON_ALIASES)}. Use no other name: a name Ritemark doesn't know draws a dashed circle in the icon's place. For a box with no icon, write \`::: box\`.`;
+  return ICON_LINE;
 }
 
 /**
@@ -194,7 +211,7 @@ const SECTIONS: CapabilitySection[] = [
             '- Find and read slides with the `ritemark_decks` tools (list_decks, read_deck). Put a slide from the library or another deck into a deck only with insert_slides, so the copy gets its `from:` line; never paste a library slide in by hand.',
             '- Never change anything in `Slide library/` unless the user asks for it; then use update_library_slide or add_to_library.',
             // Sprint 161 (PR 2): block slides, written like text (the Pandoc and Quarto `:::` blocks for columns, boxes and steps)
-            '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `) and a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: images/x.png`); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](images/x.png)`). Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
+            '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `), a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: images/x.png`) and where its content sits (`valign: middle` or `bottom`; a title or section slide sits low by itself, so for it `valign: top` or `middle`; leave the line out for the slide\'s own place); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](images/x.png)`). Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
             '- A slide\'s blocks are Pandoc\'s fenced divs, each closed by a line of as many colons as opened it: `:::: columns` holding two or three `::: column` (each with a `### ` heading and its lines); `:::: boxes` (or `:::: {.boxes look="steps"}`, `"arrows"`, `"line"`) holding `::: box` or `::: {.box icon="lightbulb"}`; and `::: steps` around a numbered list.',
             // Sprint 166 PR 9 (#850): the icon names a box may carry
             iconLine(),

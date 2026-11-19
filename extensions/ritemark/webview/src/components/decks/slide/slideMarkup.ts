@@ -10,7 +10,7 @@
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { themeStyle } from '../theme/themeVars'
-import { slideIcon } from './iconSet'
+import { gridIcon } from './iconSet'
 import { CANVAS_HEIGHT, CANVAS_WIDTH, layoutSlide, type BoxStyle, type SlideBox, type TextBox } from './layoutSlide'
 import { iconSvg, isPageIconName } from './pageIcons'
 import { slideLogoHtml, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
@@ -58,10 +58,10 @@ function text(box: TextBox, tag: 'div' | 'span' = 'div', style: BoxStyle | undef
   return `<${tag}${attr('class', box.cls || undefined)}${attr('style', styleText(style))}>${escapeHtml(box.text)}</${tag}>`
 }
 
-/** The icon `SlideCanvas` draws for a mark: the Arrows look's arrow, or a box's icon by its slide name. */
+/** The icon `SlideCanvas` draws for a mark: the Arrows look's arrow, or a box's icon by its slide name (the grid's 24). */
 function glyph(icon: string | undefined): string | null {
   if (!icon) return null
-  const name = icon === 'arrow-right' ? 'arrow-right' : slideIcon(icon)?.phosphor
+  const name = icon === 'arrow-right' ? 'arrow-right' : gridIcon(icon)?.phosphor
   return name && isPageIconName(name) ? iconSvg(name, 20) : null
 }
 
