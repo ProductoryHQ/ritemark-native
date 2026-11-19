@@ -31,6 +31,7 @@ import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
 import { LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
+import { splitQuoteByLine } from '../../../../../src/decks/blocks/slideRenderer'
 import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
 import type { Node as PMNode } from '@tiptap/pm/model'
 
@@ -88,6 +89,9 @@ slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked
 slideEditorMarked.use(buttonMarkedExtension)
 // Sprint 164 PR 3: the Label, on a slide only.
 slideEditorMarked.use(labelMarkedExtension)
+// Sprint 168 PR 1: a quote's last line after a line break opens as its attribution, a paragraph of its own, as the
+// renderer draws it (`splitQuoteByLine`); an untouched slide still writes back as written (`SlideSync`).
+slideEditorMarked.use({ walkTokens: splitQuoteByLine })
 
 let slideComments = false
 
