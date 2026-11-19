@@ -180,24 +180,25 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
 
 // ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
 test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
-  // Sprint 169 (#866): every Phosphor regular name (pageIcons.ts), then the grid's names and aliases that aren't the
-  // Phosphor name of what they draw, each with its icon; together every name slideIcon reads.
+  // Sprint 169 (#866): every Phosphor regular name (pageIcons.ts) that draws its own icon, then the grid's names and
+  // aliases that aren't the Phosphor name of what they draw, each with its icon; together every name slideIcon reads.
   const names = [...SLIDE_ICON_NAMES];
   const aliases = [...SLIDE_ICON_ALIASES];
   assert.ok(names.length > 0 && aliases.length > 0 && PAGE_ICON_NAMES.length === 1512);
+  // An old deck's alias reads these Phosphor names as one of the grid's icons (review of #879: never listed as their own).
+  const shadowed: Record<string, string> = { check: 'check-circle', envelope: 'envelope-simple', chat: 'chat-text', book: 'book-open', folder: 'folder-open' };
   const head = "- A box's `icon` is the name of a Phosphor regular icon, one of: ";
   for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
     const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
     const line = text.split('\n').find((entry) => entry.startsWith(head));
     assert.ok(line, `${runtime}: the icon line`);
     const listed = line.slice(head.length, line.indexOf('. These names are read too')).split(', ');
-    assert.deepEqual(listed, [...PAGE_ICON_NAMES], `${runtime}: every Phosphor name, in order`);
+    assert.deepEqual(listed, PAGE_ICON_NAMES.filter((name) => !(name in shadowed)), `${runtime}: every Phosphor name that draws its own icon, in order`);
     for (const name of [...names, ...aliases]) {
       const drawn = slideIcon(name)!.phosphor;
       assert.ok(drawn === name ? listed.includes(name) : line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
     }
-    // Phosphor names an old deck's alias reads as another icon say so.
-    for (const [name, drawn] of [['check', 'check-circle'], ['envelope', 'envelope-simple'], ['mail', 'envelope-simple']]) assert.ok(line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
+    for (const [name, drawn] of [...Object.entries(shadowed), ['mail', 'envelope-simple']]) assert.ok(line.includes(`\`${name}\` (${drawn})`), `${runtime}: ${name}`);
     assert.ok(line.includes("a name Ritemark doesn't know draws a dashed circle"), `${runtime}: what an unknown name does`);
   }
 });

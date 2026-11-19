@@ -92,11 +92,12 @@ function labelOf(phosphor: string): string {
  * The icon for a name a slide carries, or null when Phosphor has no regular icon by it (a box then draws
  * `UNKNOWN_ICON`). Sprint 169 (#866): the grid's 24 and its aliases first, as before, so `check` stays the grid's
  * circled check and an old deck draws the same; then a Phosphor name one of the 24 draws (`envelope-simple` is `mail`);
- * then any Phosphor regular icon by its own name, in any case.
+ * then any Phosphor regular icon by its own name, in any case, with spaces for its hyphens (`User Circle`), as the
+ * icon menu's search reads it.
  */
 export function slideIcon(name: string | undefined): SlideIcon | null {
   if (!name) return null
-  const key = name.trim().toLowerCase()
+  const key = name.trim().toLowerCase().replace(/\s+/g, '-')
   const grid = gridIcon(key) ?? BY_DRAWING.get(key)
   if (grid) return grid
   return isPageIconName(key) ? { name: key, phosphor: key, label: labelOf(key) } : null

@@ -21,6 +21,8 @@ import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { PRIVATE_DECK, PRIVATE_WORDS, PUBLIC_WORDS } from './testing/privateDeck';
+// @ts-expect-error: the generator is plain JavaScript, with no types (the page's own icons, one list).
+import { PAGE_ONLY } from '../../../scripts/generate-page-icons.mjs';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
 const assets: PageAssets = {
@@ -541,8 +543,9 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.ok(page.includes(`<span class="blk-icon">${iconSvg('users-three', 28)}</span><h3>Team</h3>`), 'users-three, by its name in any case');
   assert.ok(!page.includes('class="blk-icon is-unknown"'), 'both are known');
   const drawn = PAGE_ICON_NAMES.filter(name => page.includes(PAGE_ICON_PATHS[name]));
-  // The page's own icons (generate-page-icons.mjs's PAGE_ONLY: Copy, the tick, More, the arrows, Contents, the close ×).
-  const own: PageIconName[] = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'caret-left', 'caret-right', 'folder', 'file-text', 'arrow-up-right', 'notebook', 'x'];
+  // The page's own icons (Copy, the tick, More, the arrows, Contents, the close ×), as the generator lists them.
+  const own = PAGE_ONLY as PageIconName[];
+  assert.ok(own.includes('copy') && own.includes('x'));
   const extra = drawn.filter(name => !own.includes(name) && name !== 'truck' && name !== 'users-three');
   assert.deepEqual(extra, [], 'no drawing the deck does not use');
   assert.equal(page.split(PAGE_ICON_PATHS.truck).length - 1, 2, "truck's drawing once for each of its two boxes");

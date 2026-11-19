@@ -61,12 +61,14 @@ export function readIcon(name) {
 /** Joins an icon's tags in iconIndex.ts; no Phosphor tag has one. */
 export const TAG_SEPARATOR = ',';
 
+const BY_NAME = new Map(catalog.map((icon) => [icon.name, icon]));
+
 /**
  * An icon's Phosphor tags for the search: lower case, once each, without the catalog's `*new*` and `*updated*` marks
  * (they say when an icon came, not what it is).
  */
 export function iconTags(name) {
-  const entry = catalog.find((icon) => icon.name === name);
+  const entry = BY_NAME.get(name);
   if (!entry) throw new Error(`@phosphor-icons/core's catalog has no ${name}`);
   const tags = [...new Set(entry.tags.filter((tag) => !tag.startsWith('*')).map((tag) => tag.trim().toLowerCase()))].filter(Boolean);
   for (const tag of tags) if (tag.includes(TAG_SEPARATOR)) throw new Error(`${name}'s tag ${JSON.stringify(tag)} holds the separator`);

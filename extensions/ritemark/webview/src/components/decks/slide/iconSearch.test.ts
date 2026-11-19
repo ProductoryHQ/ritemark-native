@@ -21,6 +21,9 @@ function test(name: string, run: () => void) {
 }
 
 const core = fileURLToPath(new URL('../../../../../node_modules/@phosphor-icons/core/assets/regular/', import.meta.url))
+// The generator's own reading of an icon's tags (review of #879: one rule, so a regenerated index can't drift from it).
+const generator = new URL('../../../../../scripts/generate-page-icons.mjs', import.meta.url).href
+const { iconTags } = (await import(generator)) as { iconTags: (name: string) => string[] }
 
 /** What each grid name and alias drew before Sprint 169 (iconSet.ts on main): an old deck must draw the same. */
 const BEFORE: Record<string, [name: string, phosphor: string]> = {
@@ -43,10 +46,11 @@ test('the generated modules are @phosphor-icons/core 2.1.1: every regular drawin
   assert.equal(files.length, 1512)
   assert.deepEqual([...PAGE_ICON_NAMES], files, 'pageIcons.ts has every regular icon, in order')
   assert.deepEqual(Object.keys(ICON_TAGS), files, 'iconIndex.ts has every regular icon, in order')
+  assert.deepEqual(catalog.map(icon => icon.name).sort(), files, "the catalog's names are the drawings'")
   for (const icon of catalog) {
-    const tags = [...new Set(icon.tags.filter(tag => !tag.startsWith('*')).map(tag => tag.trim().toLowerCase()))].filter(Boolean)
-    assert.equal(ICON_TAGS[icon.name as keyof typeof ICON_TAGS], tags.join(ICON_TAG_SEPARATOR), `${icon.name}'s tags; run node scripts/generate-page-icons.mjs`)
+    assert.equal(ICON_TAGS[icon.name as keyof typeof ICON_TAGS], iconTags(icon.name).join(ICON_TAG_SEPARATOR), `${icon.name}'s tags; run node scripts/generate-page-icons.mjs`)
   }
+  assert.ok(ICON_TAGS.truck.split(ICON_TAG_SEPARATOR).includes('delivery') && ICON_TAGS.users.split(ICON_TAG_SEPARATOR).includes('people'))
   assert.ok(!Object.values(ICON_TAGS).some(tags => tags.includes('*new*') || tags.includes('*updated*')), 'no catalog marks')
 })
 
@@ -62,6 +66,9 @@ test('every name in the set resolves, in any case and spacing', () => {
   assert.deepEqual(slideIcon('truck'), { name: 'truck', phosphor: 'truck', label: 'Truck' })
   assert.deepEqual(slideIcon('User-Circle'), { name: 'user-circle', phosphor: 'user-circle', label: 'User circle' })
   assert.deepEqual(boxIconOf(' Rocket-Launch '), { known: true, name: 'rocket-launch', phosphor: 'rocket-launch' })
+  // Spaces for hyphens, as the search reads them (review of #879).
+  assert.deepEqual(boxIconOf('User  Circle'), { known: true, name: 'user-circle', phosphor: 'user-circle' })
+  assert.equal(slideIcon('puzzle piece')?.name, 'puzzle')
   // A Phosphor name one of the 24 draws is that grid icon, so the menu marks it either way.
   assert.equal(slideIcon('envelope-simple')?.name, 'mail')
   assert.equal(slideIcon('magnifying-glass')?.name, 'search-check')
