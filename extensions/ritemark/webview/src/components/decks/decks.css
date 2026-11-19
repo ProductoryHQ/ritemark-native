@@ -479,6 +479,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* Sprint 161 (PR 3; README frame 4). A box's icon is clicked to choose another, and a box with none shows a faint place
    for one (on the stage only). */
 .deck-sl.is-blocks.is-editing .blk-icon.is-pickable:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+/* #850: the place over a box's unknown icon while it is pointed at, its tooltip's trigger (`UnknownIconHint`), ringed
+   as the icon itself is. */
+.deck-block-layer.deck-icon-hint-layer { z-index: 4; }
+.deck-icon-hint { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.deck-icon-hint:hover { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
 /* Sprint 164 PR 3 (the decks README, "Label, a block of its own"): the Label typed in place, like every word on the
    slide, its words never cut while the caret is in them. Empty, it shows "Label" faint while the caret is in it and
    takes no room while it is elsewhere, as the renderer draws nothing for it. A comment note on the heading under it

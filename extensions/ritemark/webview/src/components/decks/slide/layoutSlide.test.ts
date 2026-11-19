@@ -7,7 +7,7 @@ import { BUILT_IN_THEME, parseTheme } from '../../../../../src/decks/deckTheme'
 import { BOTTOM, fitSize, layoutSlide, linesOf, textBoxes, type GroupBox, type SlideBox } from './layoutSlide'
 import { addRow, insertItemAfter, isEmptyItem, nextCell, removeItem, setIcon, setPath } from './slideEdits'
 import { contrast, themeVars } from '../theme/themeVars'
-import { slideIcon } from './iconSet'
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
 
 const long = 'A rather long title that keeps going well past what one line can hold on a slide, and then some more'
 const items = (count: number, text = 'One line of text under it') =>
@@ -129,6 +129,14 @@ for (const kind of SLIDE_KINDS) {
 assert.equal(slideIcon('list-checks')?.phosphor, 'list-checks')
 assert.equal(slideIcon('chat')?.name, 'message-square')
 assert.equal(slideIcon('nope'), null)
+// #850: a box's icon, the dashed circle for a name Ritemark doesn't know (kept as written), nothing for no name.
+assert.deepEqual(boxIconOf('list-checks'), { known: true, name: 'list-checks', phosphor: 'list-checks' })
+assert.deepEqual(boxIconOf(' Chat '), { known: true, name: 'message-square', phosphor: 'chat-text' })
+assert.deepEqual(boxIconOf(' Rocket-Launch '), { known: false, name: 'Rocket-Launch', phosphor: UNKNOWN_ICON })
+assert.equal(UNKNOWN_ICON, 'circle-dashed')
+for (const none of [undefined, '', '   ']) assert.equal(boxIconOf(none), null)
+assert.equal(SLIDE_ICON_NAMES.length, 24)
+for (const name of [...SLIDE_ICON_NAMES, ...SLIDE_ICON_ALIASES]) assert.equal(boxIconOf(name)?.known, true, name)
 
 // An item kind with no items offers the first one on the stage (review of PR 2), but draws none on a thumbnail.
 for (const kind of ['points', 'boxes', 'exercise']) {
