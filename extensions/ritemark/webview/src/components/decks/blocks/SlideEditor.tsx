@@ -32,7 +32,7 @@ import type { Schema } from '@tiptap/pm/model'
 import Placeholder from '@tiptap/extension-placeholder'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { PluginKey, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
-import { closeHistory } from '@tiptap/pm/history'
+import { closeHistory, undoDepth } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
@@ -65,8 +65,7 @@ import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
 import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
 import { ButtonBlockTools } from '../../../extensions/buttonBlock/ButtonBlockTools'
-import { BUTTON_DROP } from '../../../extensions/buttonBlock/buttonCommands'
-import { BUTTON_ASK, buttonNode } from '../../../extensions/buttonBlock/buttonCommands'
+import { BUTTON_ASK, BUTTON_DROP, buttonNode } from '../../../extensions/buttonBlock/buttonCommands'
 import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
 import { keyPastNotes, type SlideTarget } from './slideCommentPlace'
@@ -233,6 +232,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const stepRef = useRef<'none' | 'command' | 'after'>('none')
   /** The next write is a new button taken away (`BUTTON_DROP`): out of the deck's undo history. */
   const quietRef = useRef(false)
+  /** A new button was just added (`BUTTON_ASK`): its write records the deck's undo depth after it (`addedDepthRef`). */
+  const askRef = useRef(false)
+  /** The deck's undo depth just after a new button was written: while it holds, undoing takes back exactly that. */
+  const addedDepthRef = useRef<number | null>(null)
   /** PR 3: words not yet written because the / menu was open (or an input method composing). */
   const heldRef = useRef(false)
   /** Is the slide full: its words at the smallest step and still more than it holds (told to the deck's bar). */
@@ -278,6 +281,10 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // Known as the stage's own before anything hears of it, so its echo is never taken for a change from elsewhere.
     syncRef.current?.wrote(markdown, doc)
     editorOuter.view.dispatch(tr)
+    if (askRef.current) {
+      askRef.current = false
+      addedDepthRef.current = undoDepth(editorOuter.state)
+    }
     setShownMarkdown(markdown)
     onWritingRef.current()
   }, [])
@@ -405,6 +412,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       // A table's row, column, move, sort or alignment (experience 48) is an undo step of its own too.
       if (isOwnStep(transaction)) stepRef.current = 'command'
       if (transaction.getMeta(BUTTON_DROP)) quietRef.current = true
+      if (transaction.getMeta(BUTTON_ASK)) askRef.current = true
       // An input method's word is written once it is composed (the composition's end), never mid-word; the / menu's
       // query once the menu has closed (PR 3).
       if (updated.view.composing || slashOpen(updated.state)) {
@@ -441,6 +449,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
 
   /** Write the stage's words to the node when the node lacks them. */
   function writeNow(current: TipTapEditor | CoreEditor) {
+    // Read once and cleared before any early return, so it never reaches a later, unrelated write (review of #811).
+    const quiet = quietRef.current
+    quietRef.current = false
     const sync = syncRef.current
     if (!sync || current.isDestroyed) return
     const markdown = sync.toWrite(current.state.doc)
@@ -450,13 +461,24 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     }
     // A block from the / menu is an undo step of its own, and so is the first typing after it (else it would join it).
     const step = stepRef.current
-    const quiet = quietRef.current
-    quietRef.current = false
     write(markdown, current.state.doc, step !== 'none', quiet)
     stepRef.current = step === 'command' ? 'after' : 'none'
   }
 
   /** Words held while the / menu was open (or an input method composed): written once neither is so. */
+  /**
+   * A new button left without an address (the Experience lead, 19 November: no dead ⌘Z): its adding is the deck's last
+   * undo step while the depth written after it holds, so undoing that step takes it back and leaves no step at all; the
+   * slide follows the deck. False otherwise: the button then goes out of the history (`dropNewButton`).
+   */
+  function takeBackNewButton(): boolean {
+    const outer = outerRef.current
+    const depth = addedDepthRef.current
+    addedDepthRef.current = null
+    if (outer.isDestroyed || depth === null || undoDepth(outer.state) !== depth) return false
+    return outer.commands.undo()
+  }
+
   function flushHeld(current: TipTapEditor | CoreEditor, leaving = false) {
     if (!heldRef.current || current.isDestroyed || current.view.composing || (!leaving && slashOpen(current.state))) return
     heldRef.current = false
@@ -1161,7 +1183,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
           <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} pickIcon={divHandlers.pickIcon} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
-          <ButtonBlockTools editor={editor} frame={frame} />
+          <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
           {commentCallouts && editor ? (
             <SlideComments editor={editor} frame={frame} slideNumber={slide.index + 1} open={commentOpen} onOpenTaken={onCommentOpened} />

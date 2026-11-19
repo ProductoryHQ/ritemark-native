@@ -167,7 +167,8 @@ export function rowPlayer(row: RowNumbers): RowPlayer {
       // unclipped (the page's reading layout) is left as it is.
       const flow = push && played.animations.length ? (entering.querySelector('.deck-sl.is-blocks .blk-flow') as HTMLElement | null) : null
       const view = flow && flow.ownerDocument ? flow.ownerDocument.defaultView : null
-      if (flow && flow.style && view && typeof view.getComputedStyle === 'function' && view.getComputedStyle(flow).overflow !== 'visible') {
+      // A row already open on it (the same slide arriving again) counts as clipped: its inline 'visible' is the row's own.
+      if (flow && flow.style && view && typeof view.getComputedStyle === 'function' && (flow.hasAttribute('data-row-open') || view.getComputedStyle(flow).overflow !== 'visible')) {
         const mark = String(Number(flow.getAttribute('data-row-open') || '0') + 1)
         flow.setAttribute('data-row-open', mark)
         flow.style.overflow = 'visible'

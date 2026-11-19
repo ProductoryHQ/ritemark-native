@@ -113,7 +113,7 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
   const kept = Array.from(root.querySelectorAll('.prefetch[hidden] img')).map(img => img.getAttribute('src'));
   assert.deepEqual(kept, [ground], 'the ground, once, as a hidden picture');
   assert.equal(root.querySelector('.prefetch')!.getAttribute('aria-hidden'), 'true');
-  assert.ok(!root.querySelector('.prefetch img[loading]'), 'fetched with the page, not when near');
+  assert.equal(root.querySelectorAll('.prefetch img[loading="lazy"]').length, 1, 'never before the page\'s first paint: the script fetches them once it has loaded');
   const none = pageHtml(publicDeck('---\ndeck: 2\n---\n\n```slide\n# No picture\n```\n', { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest: 'd', pictureUrl });
   assert.ok(!none.includes('class="prefetch"'), 'no ground, no hidden pictures');
 }

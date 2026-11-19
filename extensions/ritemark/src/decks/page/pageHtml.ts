@@ -993,9 +993,10 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   });
   // The pictures a slide draws as its ground (on the side, Behind), once more as hidden pictures (the smoke run of 19
   // November): a slide not yet shown is hidden, so its ground would be fetched only as it prints, and a first print could
-  // miss it. Hidden, they all come as the page loads, and print finds them in (`pageScript`: ⌘P waits for every picture).
+  // miss it. Hidden, they all come once the page has loaded, and print finds them in (`pageScript`: ⌘P waits for them).
   const grounds = [...new Set(layers.flatMap(layer => Array.from(layer.matchAll(/background-image:url\(&quot;(.*?)&quot;\)/g), found => found[1])))];
-  const prefetch = grounds.length ? `<div class="prefetch" hidden aria-hidden="true">${grounds.map(url => `<img src="${url}" alt="">`).join('')}</div>` : '';
+  // Lazy, so they never compete with the page's first paint: the script fetches them once the page has loaded.
+  const prefetch = grounds.length ? `<div class="prefetch" hidden aria-hidden="true">${grounds.map(url => `<img src="${url}" alt="" loading="lazy">`).join('')}</div>` : '';
   const preamble = handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: options.pictureUrl, openIn });
   // Which slides have no handout: read once, for More and for print.
   const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));

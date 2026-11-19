@@ -242,8 +242,8 @@
 .deck-sl.is-blocks .blk-btn.is-unset { opacity: .6; }
 /* A thumbnail's button is drawn, never pressed: a click there is the thumbnail's (as the code block's controls). */
 .deck-thumb .blk-btn, .wall-grid .blk-btn, .pv-row .blk-btn, .pv-side .blk-btn { pointer-events: none; }
-/* The slide editor: the chosen button's accent ring, and its two places to type while they are empty. */
-.deck-sl.is-blocks .blk-button.is-chosen { outline: 2px solid var(--s-acc, #F2B544); outline-offset: calc(5px * var(--fit, 1)); }
+/* The slide editor: the chosen button's two places to type while they are empty. Its ring is the one every chosen
+   block has (`.deck-block-ring`, drawn by ButtonBlockTools in the frame); amber stays the words' focus (--s-foc). */
 .deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
 .deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }

@@ -543,7 +543,7 @@ assert.ok(!/\bfetch\b|XMLHttpRequest|sendBeacon|WebSocket|EventSource|navigator\
 
 // The smoke run of 19 November (E): print waits for every picture. A slide not yet shown never fetched its ground, and a
 // picture in the text waits until it is near: the page fetches them all once it has loaded, and Cmd+P (Ctrl+P) prints
-// once every picture is in (at most 5 s). With every picture in, Cmd+P is the browser's own.
+// once every picture is in (at most 3 s). With every picture in, Cmd+P is the browser's own.
 async function printWaits(): Promise<void> {
   const ticks = async () => { for (let at = 0; at < 6; at++) await Promise.resolve(); };
   const pictured = publicDeck([
@@ -594,12 +594,12 @@ async function printWaits(): Promise<void> {
     const printed = { count: 0 };
     const { run } = start(printed);
     assert.equal(run.key('P', undefined, { ctrlKey: true }), true);
-    run.advance(4999);
+    run.advance(2999);
     await ticks();
     assert.equal(printed.count, 0);
     run.advance(1);
     await ticks();
-    assert.equal(printed.count, 1, 'a picture that never comes holds print 5 s at most');
+    assert.equal(printed.count, 1, 'a picture that never comes holds print 3 s at most');
   }
   {
     const printed = { count: 0 };

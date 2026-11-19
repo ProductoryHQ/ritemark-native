@@ -33,7 +33,9 @@ function slide(n: number, overflow = 'hidden') {
     getAttribute: (name: string) => attributes.get(name) ?? null,
     setAttribute: (name: string, value: string) => { attributes.set(name, value) },
     removeAttribute: (name: string) => { attributes.delete(name) },
-    ownerDocument: { defaultView: { getComputedStyle: () => ({ overflow }) } },
+    hasAttribute: (name: string) => attributes.has(name),
+    // As a browser reads it: the inline style first (a row's own 'visible'), then the sheet's.
+    ownerDocument: { defaultView: { getComputedStyle: () => ({ overflow: flow.style.overflow || overflow }) } },
   }
   const canvas = { getBoundingClientRect: () => ({ width: 1440 }) }
   const entering = {

@@ -238,18 +238,6 @@ export function deleteTab(state: EditorState, pos: number, index: number): Trans
 /** What a tab's menu does. */
 export type TabAction = 'rename' | 'duplicate' | 'left' | 'right' | 'delete'
 
-/**
- * The pane the caret goes into after the menu's `action` on tab `index` of `count` (the smoke run of 19 November: the
- * editor takes the keys back at once, so ⌘Z and typing work). Null: Rename (the name is typed first), or Delete tab with
- * two tabs or fewer, where the block dissolves and the caret stays in the words that took its place.
- */
-export function paneAfterTabMenu(action: TabAction, index: number, count: number): number | null {
-  if (action === 'rename') return null
-  if (action === 'duplicate') return index + 1
-  if (action === 'left') return Math.max(0, index - 1)
-  if (action === 'right') return Math.min(count - 1, index + 1)
-  return count > 2 ? Math.min(index, count - 2) : null
-}
 
 /** The block taken away, tab `index`'s blocks left where it was. */
 export function dissolveTabs(state: EditorState, pos: number, index: number): Transaction | null {

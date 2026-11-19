@@ -26,7 +26,7 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../components/ui/dropdown-menu'
 import { TabPane, TabsBlock, tabNameOf } from './tabsMarkdown'
 import { fitTabBands } from '../../../../src/decks/blocks/tabsFit'
-import { addTab, deleteTab, duplicateTab, moveTab, paneAfterTabMenu, paneSelection, renameTab, setPendingRename, takePendingRename, type TabAction } from './tabsCommands'
+import { addTab, deleteTab, duplicateTab, moveTab, paneSelection, renameTab, setPendingRename, takePendingRename, type TabAction } from './tabsCommands'
 
 export type TabsVariant = 'slide' | 'text'
 
@@ -216,7 +216,8 @@ function TabBand({ names, active, renaming, focusActive, onPick, onRenameStart, 
                 onClick={event => {
                   if ((event.target as HTMLElement).closest('.blk-tab-dd')) return
                   if (dragged.current) { dragged.current = false; return }
-                  onPick(index, false)
+                  // A click while the band has the keys (after the arrows) moves them to the tab it opens.
+                  onPick(index, !!event.currentTarget.parentElement?.contains(document.activeElement))
                 }}
                 onDoubleClick={event => { if (!(event.target as HTMLElement).closest('.blk-tab-dd')) onRenameStart(index) }}
                 onContextMenu={event => { event.stopPropagation(); onPick(index, false) }}
@@ -431,9 +432,9 @@ class TabsNodeView implements NodeView {
   }
 
   /**
-   * After a change from the band (the tab's menu, a rename): the editor takes the keys again, the caret in pane `index`,
-   * so ⌘Z and typing work at once. A block that dissolved has gone: the caret stays where its change put it, in the words
-   * that took its place. Once more after the menu has closed, which may otherwise leave the focus on a tab.
+   * After a change from the band (the tab's menu, a rename): the editor takes the keys again, so ⌘Z and typing work at
+   * once; the caret goes to pane `index` (a rename), else stays where the change put it. Once more after the menu has
+   * closed, which may otherwise leave the focus on a tab.
    */
   private toEditor(index: number | null) {
     const pos = this.destroyed ? null : this.pos()
@@ -462,7 +463,7 @@ class TabsNodeView implements NodeView {
   /** A move from the tab's menu: as a drag, and the editor takes the keys back, in the moved tab's pane. */
   private moveFromMenu = (from: number, to: number) => {
     this.move(from, to)
-    this.toEditor(to)
+    this.toEditor(null)
   }
 
   private act = (action: TabAction, index: number) => {
@@ -470,17 +471,18 @@ class TabsNodeView implements NodeView {
     if (pos === null) return
     const state = this.view.state
     if (action === 'rename') { this.startRename(index, true); return }
-    const pane = paneAfterTabMenu(action, index, this.node.childCount)
+    // Each change puts the caret in its tab's pane itself (the copy, the moved tab, the one that opens after a delete, or
+    // the words left when the block dissolves): the editor only takes the keys back.
     if (action === 'duplicate') {
       if (run(this.view, duplicateTab(state, pos, index))) { this.active = index + 1; this.render() }
-      this.toEditor(pane)
+      this.toEditor(null)
       return
     }
     if (action === 'left' || action === 'right') { this.moveFromMenu(index, action === 'left' ? index - 1 : index + 1); return }
     if (action === 'delete') {
       // The tab after it opens (the one before at the end); with one tab left the block dissolves into its words.
       run(this.view, deleteTab(state, pos, index))
-      this.toEditor(pane)
+      this.toEditor(null)
     }
   }
 
