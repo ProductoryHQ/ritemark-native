@@ -390,6 +390,11 @@
 .deck-sl.is-blocks.va-top .blk-flow { align-content: start; justify-content: flex-start; }
 .deck-sl.is-blocks.va-middle .blk-flow { align-content: center; align-content: safe center; justify-content: center; justify-content: safe center; }
 .deck-sl.is-blocks.va-bottom .blk-flow { align-content: end; align-content: safe end; justify-content: flex-end; justify-content: safe flex-end; }
+/* The last block's own trailing margin (its last list item's, a Steps block's list's) would leave a few px under the
+   words at Middle and Bottom: it is taken out there, so Bottom ends the words at the flow's foot. Nothing inside a block
+   moves, and the slides at Top draw as before. */
+.deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :last-child > :is(li, ol, ul):last-child,
+.deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :last-child > :is(ol, ul):last-child > li:last-child { margin-bottom: 0; }
 /* A picture alone moves with the flow too: its own centring's auto margins give way to the place chosen. */
 .deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic):is(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img) { margin-top: 0; margin-bottom: 0; }
 

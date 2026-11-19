@@ -128,6 +128,14 @@ const SECTION = '2\n\n# The afternoon';
       assert.match(selector, /:is\(\.is-lone-pic, \.is-titled-pic\):is\(\.va-top, \.va-middle, \.va-bottom\)/, 'only a lone picture');
       continue;
     }
+    if (/\.blk-flow > :last-child >/.test(selector)) {
+      // The last block's trailing margin (its last list item's, a Steps list's) only, at Middle and Bottom: the words end
+      // at the flow's foot. Nothing inside a block moves (only the last item of the last block's own list).
+      assert.deepEqual(props, ['margin-bottom'], selector);
+      const end = '.deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :last-child >';
+      assert.equal(selector.trim(), `${end} :is(li, ol, ul):last-child, ${end} :is(ol, ul):last-child > li:last-child`);
+      continue;
+    }
     for (const prop of props) assert.ok(['align-content', 'justify-content'].includes(prop), `${selector}: only alignment (${prop})`);
   }
   assert.match(flatCss, /\.va-middle \.blk-flow \{ align-content: center; align-content: safe center; justify-content: center; justify-content: safe center; \}/);
