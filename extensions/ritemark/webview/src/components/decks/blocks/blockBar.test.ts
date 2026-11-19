@@ -880,7 +880,7 @@ stable(COLUMNS, 'three columns')
   const width = barSource.indexOf('<Group label="Width"')
   assert.ok(style > 0 && markAt > style && width > markAt, 'Style, then Mark, then Width')
   assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
-  assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'dot-outline', arrow: 'arrow-right' \}/)
+  assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it.
   assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
 }

@@ -36,7 +36,7 @@ import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar', tabs: 'tabs' }
 /** Sprint 167 PR 2: the Mark menu's icons (README item C, `block-details.html`). */
-const MARK_ICON: Record<BoxesMark, PhosphorIconName> = { icon: 'smiley', number: 'list-numbers', dot: 'dot-outline', arrow: 'arrow-right' }
+const MARK_ICON: Record<BoxesMark, PhosphorIconName> = { icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' }
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '', tabs: 'Add a tab' }
 
 export interface SlideBlockBarProps {

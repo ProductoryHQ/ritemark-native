@@ -76,7 +76,7 @@ import {
   Copy,
   CurrencyDollar,
   Dot,
-  DotOutline,
+  Record as RecordIcon,
   Smiley,
   DotsThree,
   DotsThreeVertical,
@@ -274,8 +274,8 @@ const iconMap = {
   'copy': Copy,
   'currency-dollar': CurrencyDollar,
   'dot': Dot,
-  // Sprint 167 PR 2: a Boxes block's Mark menu (Icon, Dot; Number and Arrow are `list-numbers` and `arrow-right`).
-  'dot-outline': DotOutline,
+  // Sprint 167 PR 2: a Boxes block's Mark menu (Icon and Dot; Number and Arrow are `list-numbers` and `arrow-right`). Phosphor's `Record` is renamed, so it never hides TypeScript's `Record`.
+  'record': RecordIcon,
   'smiley': Smiley,
   'dots-three': DotsThree,
   'dots-three-vertical': DotsThreeVertical,
