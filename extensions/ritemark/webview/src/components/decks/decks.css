@@ -461,6 +461,15 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    to three notes, as the title's margin rules above, so its look and its room always agree. */
 .deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { font-weight: 500; color: var(--s-sub, #C7CAEB); }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { color: var(--s-sub, #5B5F86); }
+/* #901 (slide.css's heading room): with notes between, never drawn, a heading that starts its flow, column or pane, or
+   sits under a Label, adds no room above it, and the title's line keeps its place and its room under it. */
+/* An empty Label that is never drawn (the renderer draws nothing for it) leaves the heading under it its room, as on
+   the wall; the first rule after it still takes the room off a heading that starts its flow, column or pane. */
+.deck-sl.is-blocks.is-editing .blk-label.is-empty[data-placeholder=""] + h2 { padding-top: calc(12px * var(--fit, 1)); }
+.deck-sl.is-blocks.is-editing .blk-label.is-empty[data-placeholder=""] + :is(h3, h4, h5, h6) { padding-top: calc(6px * var(--fit, 1)); }
+.deck-sl.is-blocks.is-editing :is(.blk-flow, .blk-column, .blk-tabpane) > :is(h2, h3, h4, h5, h6):nth-child(1 of :not(ritemark-comment, .blk-label.is-empty[data-placeholder=""])) { padding-top: 0; }
+.deck-sl.is-blocks.is-editing :is(.blk-label + ritemark-comment + *, .blk-label + ritemark-comment + ritemark-comment + *, .blk-label + ritemark-comment + ritemark-comment + ritemark-comment + *):is(h2, h3, h4, h5, h6) { padding-top: 0; }
+.deck-sl.is-blocks.is-editing :is(h1 + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + h2, h1 + ritemark-comment + ritemark-comment + ritemark-comment + h2) { padding-top: 0; margin-bottom: .7em; }
 .deck-sl.is-blocks.is-editing .blk-column:nth-child(1 of .blk-column) { box-shadow: none; }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-sl.is-blocks.is-editing.is-cover .blk-flow > p:nth-child(1 of :not(ritemark-comment)):has(+ ritemark-comment + h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
@@ -503,7 +512,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-label.is-empty[data-placeholder=""] { height: 0; margin: 0; padding: 0; background: none; }
 .deck-sl.is-blocks.is-editing .blk-label.is-empty:not([data-placeholder=""])::before { content: attr(data-placeholder); opacity: .55; pointer-events: none; }
 .deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + :is(h1, h2, h3, h4, h5, h6)),
-.deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + ritemark-comment + :is(h1, h2, h3, h4, h5, h6)) { margin-bottom: calc(8px * var(--fit, 1)); }
+.deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + ritemark-comment + :is(h1, h2, h3, h4, h5, h6)),
+.deck-sl.is-blocks.is-editing .blk-label:has(+ ritemark-comment + ritemark-comment + ritemark-comment + :is(h1, h2, h3, h4, h5, h6)) { margin-bottom: calc(8px * var(--fit, 1)); }
 /* The empty place is never drawn on the slide: the caret's box shows the icon handle instead, the ⋮'s and the +'s
    size, over its top edge at the right, in the handles' layer (`deck-block-icon`; the lead's follow-up to #773). It
    takes no room: the box, the slide's fit and the thumbnail stay as they are while the caret moves from box to box. */
