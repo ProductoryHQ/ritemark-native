@@ -28,7 +28,8 @@ const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
 type HTMLNode = ReturnType<typeof parse>
-const { SlideCanvas } = await import('./SlideCanvas')
+const { SlideCanvas, LayoutSlideCanvas } = await import('./SlideCanvas')
+const { SlideIconGlyph } = await import('./SlideIconGlyph')
 const { slideMarkup, escapeHtml, styleText } = await import('./slideMarkup')
 const { BUILT_IN_THEME } = await import('../../../../../src/decks/deckTheme')
 const { blockSlideMarkup } = await import('../../../../../src/decks/blocks/slideRenderer')
@@ -82,6 +83,8 @@ const slides: Array<{ kind: string; data: SlideData; label: string }> = [
   { label: 'boxes in a grid', kind: 'boxes', data: { title: 'Six boxes', items: items(6, () => ({ icon: 'wrench' })) } },
   // Sprint 169 (#866): icons outside the 24, by their Phosphor names.
   { label: 'boxes with any Phosphor icon', kind: 'boxes', data: { title: 'Delivery', items: items(4, index => ({ icon: ['truck', 'Rocket-Launch', 'users-three', 'chat'][index] })) } },
+  // Sprint 169 PR 2 (#867): the Experience lead's truck and folder, an alias, and a name no icon has.
+  { label: 'boxes with truck, folder, an alias and an unknown name', kind: 'boxes', data: { title: 'Shipping', items: items(4, index => ({ icon: ['truck', 'folder', 'mail', 'not-a-real-icon'][index] })) } },
   { label: 'boxes beside a picture', kind: 'boxes', data: { title: 'Beside', items: items(3), picture: 'left', image: 'images/missing.png' } },
   { label: 'steps', kind: 'boxes', data: { title: 'Steps', look: 'steps', items: items(4) } },
   { label: 'line', kind: 'boxes', data: { title: 'A scheduled prompt', look: 'line', items: items(4) } },
@@ -115,6 +118,13 @@ for (const borderless of [false, true]) {
       const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
       // An older deck's box (the nine kinds draw as blocks on the strip and the page): `chat` is Phosphor's chat too.
       assert.deepEqual(paths(react), [drawn('truck'), drawn('rocket-launch'), drawn('users-three'), drawn('chat')], `${label}: each its own`)
+    }
+    if (slide.label === 'boxes with truck, folder, an alias and an unknown name') {
+      const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
+      assert.deepEqual(paths(react), [drawn('truck'), drawn('folder'), drawn('envelope-simple'), drawn('circle-dashed')], `${label}: each its own`)
+      const badges = (html: string) => parse(html).querySelectorAll('.blk-box > span').map(span => span.getAttribute('class'))
+      assert.deepEqual(badges(react), ['blk-icon', 'blk-icon', 'blk-icon', 'blk-icon is-unknown'], `${label}: #850's look for the unknown name`)
+      assert.deepEqual(badges(page), badges(react), `${label}: the page's badges`)
     }
   }
 }
@@ -166,3 +176,41 @@ for (const borderless of [false, true]) {
 }
 
 console.log('slideMarkup: passed')
+
+// Sprint 169 PR 2 (#867): a slide's icon in React (`SlideIconGlyph`) is the page's inline SVG (`iconSvg`), byte for byte.
+for (const name of ['truck', 'folder', 'list-checks', 'circle-dashed', 'arrow-right'] as const) {
+  for (const size of [16, 20, 28]) {
+    assert.equal(renderToStaticMarkup(createElement(SlideIconGlyph, { name, size })), iconSvg(name, size), `${name} at ${size}`)
+  }
+}
+
+// Sprint 169 PR 2: the old layout (a kind a build may draw by its layout) draws a box's icon from the full set, as the
+// page does: any Phosphor name, an alias, the grid's own, and #850's dashed circle (`ic is-unknown`) for a name no icon
+// has. Red before: the chrome's Icon drew only the 24 (truck and folder came out as empty badges).
+{
+  const drawn = (name: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[name])![1]
+  const data: SlideData = { title: 'Shipping', items: items(5, index => ({ icon: ['truck', 'folder', 'mail', 'list-checks', 'not-a-real-icon'][index] })) }
+  const paths = (html: string) => parse(html).querySelectorAll('svg path').map(path => path.getAttribute('d'))
+  const marks = (html: string) => parse(html).querySelectorAll('span.ic').map(span => span.getAttribute('class'))
+  for (const borderless of [false, true]) {
+    const react = renderToStaticMarkup(createElement(LayoutSlideCanvas, { kind: 'boxes', data, width: 960, theme: BUILT_IN_THEME, borderless, assets: {} }))
+    const page = slideMarkup('boxes', data, { theme: BUILT_IN_THEME, borderless, width: 960, inlineTheme: true })
+    assert.deepEqual(shape(parse(page)), shape(parse(react)), `the old layout, borderless ${borderless}`)
+    assert.deepEqual(paths(react), [drawn('truck'), drawn('folder'), drawn('envelope-simple'), drawn('list-checks'), drawn('circle-dashed')], 'each its own')
+    assert.deepEqual(paths(page), paths(react), 'the page draws the same')
+    assert.deepEqual(marks(react), ['ic sm', 'ic sm', 'ic sm', 'ic sm', 'ic sm is-unknown'], "#850's look (five boxes draw small)")
+  }
+  // The colour: the theme's placeholder, on a card and borderless, as a block slide's unknown badge.
+  const css = readFileSync(fileURLToPath(new URL('./slide.css', import.meta.url)), 'utf8')
+  assert.ok(css.includes('.deck-sl .ic.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }'), 'the placeholder colour')
+  assert.ok(css.includes('.deck-slide.is-borderless .deck-sl .ic.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }'), 'borderless too')
+}
+
+// The icon menu draws its choices as the slide does, never through the chrome's Icon (its No icon cross stays chrome).
+{
+  const grid = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
+  assert.ok(grid.includes('<SlideIconGlyph name={icon.phosphor} size={16} />') && !grid.includes('<Icon name={icon.phosphor}'), 'the menu')
+  const canvas = readFileSync(fileURLToPath(new URL('./SlideCanvas.tsx', import.meta.url)), 'utf8')
+  assert.ok(!canvas.includes("from '../../ui/Icon'"), "SlideCanvas draws no chrome icon")
+}
+console.log('slideMarkup: every slide icon is drawn from the full set, in React and on the page alike')

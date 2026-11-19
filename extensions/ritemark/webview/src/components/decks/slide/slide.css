@@ -29,6 +29,8 @@
 .deck-sl .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); margin-bottom: 18px; }
 .deck-sl .ic svg { width: 28px; height: 28px; }
 .deck-sl .ic.sm svg { width: 18px; height: 18px; }
+/* Sprint 169 PR 2 (#867): the old layout's unknown icon name, #850's dashed circle in the placeholder colour, as a block slide's. */
+.deck-sl .ic.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-sl .pickic:hover, :where(:root:not([data-input-mode="pointer"])) .deck-sl .pickic:focus-visible { outline: 0; box-shadow: 0 0 0 3px var(--s-foc, rgba(242,181,68,.6)); }
 .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(242,181,68,.35)); color: var(--s-acct, rgba(242,181,68,.6)); }
 .deck-sl .picbox { position: absolute; border-radius: var(--s-r2, 10px); overflow: hidden; display: grid; place-items: center; background: var(--s-pic, rgba(255,255,255,.05)); }
@@ -91,6 +93,7 @@
 .deck-slide.is-borderless .deck-sl .bx, .deck-slide.is-borderless .deck-sl .cl { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl .bx.alt { background: var(--s-box2, #F6F6FB); }
 .deck-slide.is-borderless .deck-sl .ic { background: var(--s-accs, rgba(242,181,68,.2)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl .ic.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }
 .deck-slide.is-borderless .deck-sl .noic { background: transparent; box-shadow: inset 0 0 0 2px var(--s-accl, rgba(224,162,31,.4)); color: var(--s-acct, rgba(176,122,18,.7)); }
 .deck-slide.is-borderless .deck-sl .cl .ch { color: var(--s-acct, #B07A12); }
 .deck-slide.is-borderless .deck-sl .ln { background: var(--s-accl, rgba(224,162,31,.5)); }

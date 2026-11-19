@@ -17,13 +17,13 @@ import { AgendaContext } from './agendaContext'
 import { DeckOpenInContext } from './codeToolsClick'
 import { blockDataOf, drawsAsBlocks } from '../../../../../src/decks/blocks/convertDeck'
 import { deckFont, type DeckTheme } from '../../../../../src/decks/deckTheme'
-import { Icon } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
 import { themeStyle } from '../theme/themeVars'
-import { gridIcon } from './iconSet'
+import { boxIconOf } from './iconSet'
+import { SlideIconGlyph } from './SlideIconGlyph'
 import { IconGridItems } from './IconGrid'
 import { oneLine } from './slideEdits'
-import { isLayoutTitleSlide } from './slideMarkup'
+import { isLayoutTitleSlide, layoutMarkOf } from './slideMarkup'
 import { BOTTOM, CANVAS_HEIGHT, CANVAS_WIDTH, MAX_STEP, editedItemWords, layoutSlide, pastedItemWords, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
 // The slide's rules, shared with the published handout page (Sprint 159): every view that draws a slide gets them.
 import './slide.css'
@@ -204,13 +204,13 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
     case 'text':
       return <SlideText box={box} editing={editing} />
     case 'mark': {
-      // The old layout draws the grid's 24 through the chrome's Icon (`gridIcon`), as before Sprint 169.
-      const icon = box.icon ? (box.icon === 'plus' ? 'plus' : box.icon === 'arrow-right' ? 'arrow-right' : gridIcon(box.icon)?.phosphor) : undefined
-      const glyph = icon ? <Icon name={icon} size={20} tone="inherit" /> : box.text
+      // Sprint 169 PR 2 (#867): the old layout's icon from the full set, as the page draws it (`layoutMarkOf`).
+      const mark = layoutMarkOf(box)
+      const glyph = mark.icon ? <SlideIconGlyph name={mark.icon} size={20} /> : box.text
       if (editing && box.iconIndex !== undefined) {
-        return <IconPicker box={box} glyph={glyph} editing={editing} />
+        return <IconPicker box={box} cls={mark.cls} glyph={glyph} editing={editing} />
       }
-      return <span className={box.cls} style={px(box.style)}>{glyph}</span>
+      return <span className={mark.cls} style={px(box.style)}>{glyph}</span>
     }
     case 'group':
       return (
@@ -264,15 +264,19 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
   }
 }
 
-/** A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. */
-function IconPicker({ box, glyph, editing }: { box: MarkBox; glyph: ReactNode; editing: SlideEditing }) {
+/**
+ * A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. The current icon
+ * is the one the box carries, by its name as `boxIconOf` reads it (an unknown one as written, so No icon can take it
+ * out, as on a block slide); none for the empty place (`noic`).
+ */
+function IconPicker({ box, cls, glyph, editing }: { box: MarkBox; cls: string; glyph: ReactNode; editing: SlideEditing }) {
   const index = box.iconIndex ?? 0
-  const current = box.icon === 'plus' ? null : gridIcon(box.icon)?.name ?? null
+  const current = box.cls.split(' ').includes('noic') ? null : boxIconOf(box.icon)?.name ?? null
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <span
-          className={`${box.cls} pickic`}
+          className={`${cls} pickic`}
           style={px(box.style)}
           role="button"
           tabIndex={0}
@@ -399,7 +403,7 @@ export const SlideCanvas = memo(function SlideCanvas({ kind, data, width, theme,
   return <LayoutSlideCanvas kind={kind} data={data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />
 })
 
-const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
+export const LayoutSlideCanvas = memo(function LayoutSlideCanvas({ kind, data, width, theme, borderless, assets, editing }: SlideCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null)
   // The measuring pass's step, for these words in these fonts; new words, another font (Sprint 162 PR 3) or a font
   // that has just loaded start again from the estimate.

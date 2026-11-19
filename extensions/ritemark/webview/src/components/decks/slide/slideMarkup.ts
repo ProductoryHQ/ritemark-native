@@ -5,14 +5,14 @@
  * and Borderless.
  *
  * Pure and DOM-free: the extension host builds the page with it (`src/decks/page/pageHtml.ts`). Every word is escaped.
- * The icons are `pageIcons.ts`'s inline SVG, the same Phosphor drawings the deck view's `Icon` draws.
+ * The icons are `pageIcons.ts`'s inline SVG, the drawings `SlideCanvas` draws with `SlideIconGlyph` (Sprint 169 PR 2).
  */
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { themeStyle } from '../theme/themeVars'
-import { gridIcon } from './iconSet'
-import { CANVAS_HEIGHT, CANVAS_WIDTH, layoutSlide, type BoxStyle, type SlideBox, type TextBox } from './layoutSlide'
-import { iconSvg, isPageIconName } from './pageIcons'
+import { boxIconOf } from './iconSet'
+import { CANVAS_HEIGHT, CANVAS_WIDTH, layoutSlide, type BoxStyle, type MarkBox, type SlideBox, type TextBox } from './layoutSlide'
+import { iconSvg, type PageIconName } from './pageIcons'
 import { slideLogoHtml, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 
 /** Sprint 162 PR 4: an old slide drawn big and low, as a title slide: a Title or a Section slide. */
@@ -58,11 +58,15 @@ function text(box: TextBox, tag: 'div' | 'span' = 'div', style: BoxStyle | undef
   return `<${tag}${attr('class', box.cls || undefined)}${attr('style', styleText(style))}>${escapeHtml(box.text)}</${tag}>`
 }
 
-/** The icon `SlideCanvas` draws for a mark: the Arrows look's arrow, or a box's icon by its slide name (the grid's 24). */
-function glyph(icon: string | undefined): string | null {
-  if (!icon) return null
-  const name = icon === 'arrow-right' ? 'arrow-right' : gridIcon(icon)?.phosphor
-  return name && isPageIconName(name) ? iconSvg(name, 20) : null
+/**
+ * A mark of the old layout as `SlideCanvas` and the page draw it (Sprint 169 PR 2, #867): its icon from the full set,
+ * read by `boxIconOf` as a block slide's box reads it (any Phosphor regular name, the grid's names and aliases, the
+ * layout's own `arrow-right` and `plus`), and for a name Ritemark doesn't know #850's dashed circle, `is-unknown`, in
+ * the theme's placeholder colour (slide.css). A mark without an icon (a number, a dot) is its words.
+ */
+export function layoutMarkOf(entry: MarkBox): { cls: string; icon: PageIconName | null } {
+  const icon = boxIconOf(entry.icon)
+  return { cls: icon && !icon.known ? `${entry.cls} is-unknown` : entry.cls, icon: icon?.phosphor ?? null }
 }
 
 function box(entry: SlideBox, pictureUrl: (path: string) => string | null): string {
@@ -70,8 +74,8 @@ function box(entry: SlideBox, pictureUrl: (path: string) => string | null): stri
     case 'text':
       return text(entry)
     case 'mark': {
-      const svg = glyph(entry.icon)
-      return `<span class="${escapeHtml(entry.cls)}"${attr('style', styleText(entry.style))}>${svg ?? escapeHtml(entry.text ?? '')}</span>`
+      const mark = layoutMarkOf(entry)
+      return `<span class="${escapeHtml(mark.cls)}"${attr('style', styleText(entry.style))}>${mark.icon ? iconSvg(mark.icon, 20) : escapeHtml(entry.text ?? '')}</span>`
     }
     case 'group':
       return `<div class="${escapeHtml(entry.cls)}"${attr('style', styleText(entry.style))}>${entry.children.map(child => box(child, pictureUrl)).join('')}</div>`
