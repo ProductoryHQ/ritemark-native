@@ -307,6 +307,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings-k { margin: 12px 0 6px; font-size: 11px; font-weight: 600; line-height: 14px; letter-spacing: .5px; text-transform: uppercase; color: var(--r-ink-muted); }
 .deck-settings .deck-settings-lays { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
 .deck-settings .deck-settings-pics { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+/* Sprint 167 PR 3: the Content row's three tiles (Top, Middle, Bottom), Picture's tiles across the row. */
+.deck-settings .deck-settings-places { grid-template-columns: repeat(3, 1fr); }
 .deck-settings .deck-settings-lays > label, .deck-settings .deck-settings-pics > label { padding: 2px 2px 4px; }
 .deck-settings .deck-settings-lays > label > span:last-child, .deck-settings .deck-settings-pics > label > span:last-child { font-size: 11px; line-height: 14px; }
 .deck-settings .deck-settings-lays > label > span:nth-of-type(1), .deck-settings .deck-settings-pics > label > span:nth-of-type(1) { margin-bottom: 4px; }

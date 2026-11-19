@@ -380,6 +380,18 @@
 /* A short line over the title (an old Section slide's number) is drawn big in the accent, as the Section slide drew it. */
 .deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { margin: 0 0 .1em; font: 700 4.4em/1 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-acc, #F2B544); }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-cover .blk-flow > p:first-child:has(+ h1) { color: var(--s-acc, #E0A21F); }
+/* Sprint 167 PR 3 (decks README item A): the slide's content Top, Middle or Bottom, as Slide settings' Content row writes
+   it (`valign:` in the slide's header), and only where it isn't the slide's own default (`contentPlaceClass`: a title
+   slide sits at the bottom, a picture alone in the middle, the rest at the top), so an untouched slide is drawn as
+   before. The whole flow moves together, title included, inside the same room: nothing here sets the flow's edges or
+   padding, so the fit measures the same in all three, and `safe` draws a full slide from its top in all three. A block
+   flow moves by `align-content`, a flex one (a picture, Columns, Tabs, a title slide) by `justify-content`; each is
+   nothing to the other. A title slide keeps its foot room in every place. A Columns block keeps its own alignment. */
+.deck-sl.is-blocks.va-top .blk-flow { align-content: start; justify-content: flex-start; }
+.deck-sl.is-blocks.va-middle .blk-flow { align-content: center; align-content: safe center; justify-content: center; justify-content: safe center; }
+.deck-sl.is-blocks.va-bottom .blk-flow { align-content: end; align-content: safe end; justify-content: flex-end; justify-content: safe flex-end; }
+/* A picture alone moves with the flow too: its own centring's auto margins give way to the place chosen. */
+.deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic):is(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img) { margin-top: 0; margin-bottom: 0; }
 
 /* Borderless: the block slide's words on white */
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }

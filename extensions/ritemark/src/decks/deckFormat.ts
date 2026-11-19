@@ -71,6 +71,13 @@ export interface SlideData {
   alt?: string;
   /** Experience 49: what stays in view of a side picture that fills its place, `x,y` in percent (50,50 the middle). */
   focus?: string;
+  /**
+   * Sprint 167 PR 3 (decks README item A): where the slide's content sits, `top`, `middle` or `bottom`, the whole flow
+   * together, title included. Written only when it isn't the slide's own default (a title or section slide sits at the
+   * bottom, a picture alone in the middle, every other slide at the top: `slideRenderer.contentPlaceDefault`), so an
+   * untouched deck has no such line. Named as the Columns block's `valign` is.
+   */
+  valign?: string;
   skip?: boolean;
   /** Keep it here: a changed library copy that stays changed (written by Keep it here). */
   kept?: boolean;
@@ -108,7 +115,7 @@ export function isDefaultExerciseTag(data: SlideData): boolean {
 }
 
 /** The scalar keys, in the order the writer puts a new key. */
-const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'alt', 'focus', 'skip', 'kept', 'from'] as const;
+const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'alt', 'focus', 'valign', 'skip', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept', 'section']);
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
@@ -705,7 +712,17 @@ export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | nu
 }
 
 /** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
-export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'alt', 'focus', 'kept', 'section'] as const;
+export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'alt', 'focus', 'kept', 'section', 'valign'] as const;
+
+/** Sprint 167 PR 3: the three places a slide's content can sit (`valign:`), from the top down. */
+export const CONTENT_PLACES = ['top', 'middle', 'bottom'] as const;
+export type ContentPlace = (typeof CONTENT_PLACES)[number];
+
+/** A `valign:` value as one of the three places, or null for none (or a value this build doesn't know). */
+export function contentPlaceValue(value: string | undefined): ContentPlace | null {
+  const place = value?.trim().toLowerCase();
+  return (CONTENT_PLACES as readonly string[]).includes(place ?? '') ? place as ContentPlace : null;
+}
 
 /** A block slide's body in its two parts, as written. */
 export interface BlockSlideParts {
@@ -742,8 +759,10 @@ export function splitBlockSlide(body: string): BlockSlideParts {
     }
     const key = KEY_LINE.exec(line);
     // `alt:` and `focus:` come only with a side picture's `picture:`/`image:`: alone they never make a header, so a
-    // slide's words written `---`, `focus: this week`, `---` stay words (review of #774).
-    if (key && (HEADER_KEYS as readonly string[]).includes(key[1]) && key[1] !== 'alt' && key[1] !== 'focus') ownKey = true;
+    // slide's words written `---`, `focus: this week`, `---` stay words (review of #774). `valign:` makes one only with a
+    // place it names (Sprint 167 PR 3), so a slide whose header holds nothing else keeps it.
+    if (key && (HEADER_KEYS as readonly string[]).includes(key[1]) && key[1] !== 'alt' && key[1] !== 'focus'
+      && (key[1] !== 'valign' || contentPlaceValue(readScalar(key[2] ?? '')) !== null)) ownKey = true;
     if (line.trim() === '' || /^\s*#/.test(line) || key) continue;
     return { header: null, head: '', markdown: body };
   }
