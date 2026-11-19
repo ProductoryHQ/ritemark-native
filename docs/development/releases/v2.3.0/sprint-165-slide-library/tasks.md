@@ -9,9 +9,9 @@ Nothing starts until Jarmo approves the plan. The manager creates one issue per 
 - [x] No real deck or slide opened, read, counted or quoted
 
 ## PR 1: Other decks by folder (`sprint-165-slide-library-pr1`)
-- [ ] Host: folder, last-modified day, slide count per deck
-- [ ] Panel: folder headings, order, row, closed by default
-- [ ] Tests, shots on synthetic decks, lead's look, release-notes line, Risk and How to revert
+- [x] Host: folder, last-modified day, slide count per deck
+- [x] Panel: folder headings, order, row, closed by default
+- [x] Tests, shots on synthetic decks, lead's look, release-notes line, Risk and How to revert
 
 ## PR 2: Sections and Take section (`sprint-165-slide-library-pr2`)
 - [ ] Section detection and heading, with tests
