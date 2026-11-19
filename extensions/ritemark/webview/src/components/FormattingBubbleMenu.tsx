@@ -17,7 +17,7 @@ import { commentBoxStorage, startComment } from '../extensions/comment/CommentNo
 import type { Selection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import type { Instance as TippyInstance } from 'tippy.js'
-import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick, toolbarOnLinkDialog } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
 
 /**
@@ -71,6 +71,43 @@ export function FormattingBubbleMenu({
   // saved comment latched (#687). It stays hidden until the selection changes
   // or the editor gets the focus again.
   const hiddenFor = useRef<Selection | null>(null)
+  // #846: the Link dialog's state for `shouldShow`, which TipTap calls outside React's render.
+  const linkDialogOpenRef = useRef(false)
+
+  // #846: the toolbar goes while its Link dialog is open, and comes back after it closes (Cancel, Esc, Apply or
+  // Remove) if the words are still selected and the editor has the focus again.
+  useEffect(() => {
+    if (!editor) return
+    const wasOpen = linkDialogOpenRef.current
+    linkDialogOpenRef.current = showLinkDialog
+    const tip = toolbarTippy.current
+    if (!tip) return
+    if (showLinkDialog) {
+      tip.hide()
+      return
+    }
+    if (!wasOpen) return
+    // After Radix has given the focus back to the editor (onCloseAutoFocus, a 0 ms timer of its own).
+    const timer = setTimeout(() => {
+      if (editor.isDestroyed) return
+      const { state, view } = editor
+      const action = toolbarOnLinkDialog({
+        open: false,
+        shows:
+          !(hiddenFor.current && state.selection.eq(hiddenFor.current)) &&
+          formattingToolbarShows({
+            empty: state.selection.empty,
+            inCodeBlock: editor.isActive('codeBlock'),
+            equationSelected: isEquationNodeSelection(state.selection),
+            pictureSelected: isPictureSelection(state.selection),
+            editorHasFocus: view.hasFocus(),
+            focusInToolbar: tip.popper.contains(tip.popper.ownerDocument.activeElement),
+          }),
+      })
+      if (action === 'show') tip.show()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [showLinkDialog, editor])
 
   useEffect(() => {
     if (!editor) return
@@ -327,6 +364,8 @@ export function FormattingBubbleMenu({
             // Sprint 143 (#513): only while the editor (or the toolbar) has the focus, never over a comment's box.
             editorHasFocus: view.hasFocus(),
             focusInToolbar: element.contains(element.ownerDocument.activeElement),
+            // #846: never over (or behind) its own Link dialog.
+            linkDialogOpen: linkDialogOpenRef.current,
           })
         }}
       >
@@ -552,7 +591,17 @@ export function FormattingBubbleMenu({
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-          <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96">
+          <Dialog.Content
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-surface rounded-lg shadow-xl p-6 z-50 w-96"
+            // #846: the focus goes back to the words, not to the page (on a slide Radix gave it to <body>), so the
+            // selection is still drawn and the bubble comes back over it.
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              // view.focus(), not commands.focus(): no animation frame, so it also runs in a window drawn in the
+              // background, and it puts the kept selection back.
+              if (!editor.isDestroyed) editor.view.focus()
+            }}
+          >
             <Dialog.Title className="text-lg font-semibold mb-4">
               {editingLink ? 'Edit Link' : 'Add Link'}
             </Dialog.Title>

@@ -65,7 +65,7 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
-- [ ] A test, and one shot with the Link dialog open.
+- [x] A test, and one shot with the Link dialog open.
 
 ## Added on 19 November, second time (Jarmo: "jah, lisa mõlemad sprinti 166")
 

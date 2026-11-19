@@ -5,7 +5,7 @@
  * Run: npx tsx webview/src/components/formattingToolbar.test.ts
  */
 import assert from 'node:assert/strict'
-import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick, toolbarOnLinkDialog } from './formattingToolbar'
 
 const base = { empty: false, inCodeBlock: false, equationSelected: false, editorHasFocus: true, focusInToolbar: false }
 
@@ -50,5 +50,19 @@ for (const editorHasFocus of [true, false]) {
   // A page without the app's root (none today) still gets a place to draw it.
   assert.equal(bubbleHost({ getElementById: () => null, body }), body)
 }
+
+// #846: the bubble steps aside while its Link dialog is open, on a slide and in the Text editor alike.
+// Open: never shows, whatever the focus and selection (the dialog's input has the focus, the words stay selected).
+for (const editorHasFocus of [true, false]) {
+  for (const focusInToolbar of [true, false]) {
+    assert.equal(formattingToolbarShows({ ...base, editorHasFocus, focusInToolbar, linkDialogOpen: true }), false)
+  }
+}
+assert.equal(formattingToolbarShows({ ...base, linkDialogOpen: false }), true, 'closed: the rule as before')
+assert.equal(toolbarOnLinkDialog({ open: true, shows: true }), 'hide', 'the dialog opens: the bubble goes')
+// Cancel or Esc: the words are still selected and the editor has the focus back, so the bubble returns.
+assert.equal(toolbarOnLinkDialog({ open: false, shows: true }), 'show')
+// Closed with nothing to format (Apply collapsed the selection, or the focus went elsewhere): it stays away.
+assert.equal(toolbarOnLinkDialog({ open: false, shows: false }), 'stay-hidden')
 
 console.log('formattingToolbar: all passed')
