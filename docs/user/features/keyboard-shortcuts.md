@@ -32,8 +32,8 @@ All shortcuts use Mac notation. Cmd = Command key (⌘), Control = Control key (
 
 | Action | Shortcut |
 |--------|----------|
-| Bullet List | Cmd+Shift+8 |
-| Numbered List | Cmd+Shift+7 |
+| Bullet list | Cmd+Shift+8 |
+| Numbered list | Cmd+Shift+7 |
 
 ---
 
@@ -41,7 +41,7 @@ All shortcuts use Mac notation. Cmd = Command key (⌘), Control = Control key (
 
 | Action | Shortcut |
 |--------|----------|
-| Code Block | Cmd+Shift+C |
+| Code block | Cmd+Shift+C |
 
 ---
 

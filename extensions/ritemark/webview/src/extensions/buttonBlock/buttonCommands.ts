@@ -16,6 +16,9 @@ const OWN_STEP = SLIDE_COMMAND
 
 /** Meta on the transaction that adds a button: its address sheet opens at once (`ButtonBlockTools`). */
 export const BUTTON_ASK = 'buttonAskAddress'
+/** Meta on the transaction that takes away a new button left without an address (`dropNewButton`): a slide writes it
+ *  to the deck out of the undo history too. */
+export const BUTTON_DROP = 'buttonDropNew'
 
 export const BUTTON_NODE = 'buttonBlock'
 export const BUTTON_WORDS_NODE = 'buttonWords'
@@ -107,6 +110,34 @@ export function insertButton(tr: Transaction, at: number): Transaction {
   if (placed < 0) return tr
   tr.setSelection(TextSelection.create(tr.doc, placed + 2))
   return tr.setMeta(OWN_STEP, true).setMeta(BUTTON_ASK, true).scrollIntoView()
+}
+
+/** The address sheet's width (`buttonBlock.css`: 360, never wider than the window less 8 a side). */
+export function sheetWidth(windowWidth: number): number {
+  return Math.max(0, Math.min(360, windowWidth - 16))
+}
+
+/**
+ * Where the address sheet's left edge goes (the smoke run of 19 November; the Experience lead): under the button's card,
+ * lined up with its left edge; where that would run past the editor's right edge (a card in a right-hand box), lined up
+ * with the card's right edge instead. Never out of the editor's visible area (`bounds`, 8 in from the window's edges), so
+ * Done is always in view.
+ */
+export function sheetLeft(card: { left: number; right: number }, width: number, bounds: { left: number; right: number }): number {
+  const left = card.left + width <= bounds.right ? card.left : card.right - width
+  return Math.max(bounds.left, Math.min(left, bounds.right - width))
+}
+
+/**
+ * A new button left before it has an address (its sheet closed with Esc or a press elsewhere): taken away as if it had
+ * never been added, so no empty button is written. Out of the undo history (`addToHistory: false`), so ⌘Z never brings
+ * the empty button back. Null when the button has an address, or isn't there.
+ */
+export function dropNewButton(state: EditorState, pos: number): Transaction | null {
+  const node = buttonAtPos(state, pos)
+  if (!node || String(node.attrs.href ?? '')) return null
+  const tr = deleteButton(state, pos)
+  return tr ? tr.setMeta(OWN_STEP, false).setMeta('addToHistory', false).setMeta(BUTTON_DROP, true) : null
 }
 
 /** Where the caret is: in a button's words beside it, or on its button, with the button around it. */

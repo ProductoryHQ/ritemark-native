@@ -7,10 +7,12 @@
 .deck-slide { position: relative; overflow: hidden; }
 .deck-sl { position: absolute; left: 0; top: 0; width: 960px; height: 540px; transform-origin: 0 0; overflow: hidden; color: var(--s-hd, #fff); font-family: var(--s-fb, 'Sofia Sans'), sans-serif;
   background: var(--s-bg, radial-gradient(120% 95% at 88% 8%, #3D428F 0%, #1C1F4A 52%, #13153A 100%)); }
-.deck-sl [contenteditable] { outline: 0; border-radius: 4px; cursor: text; }
-.deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(255,255,255,.18)); }
-.deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
-.deck-sl [contenteditable]:empty::before { content: attr(data-ph); color: var(--s-ph, rgba(255,255,255,.35)); }
+/* Only what is edited: a part the editor keeps out (`contenteditable="false"`: a code block's Copy and ↗, the tab band)
+   gets no ring and no text cursor. `:where` keeps these rules' weight as it was, so the rules that undo them still win. */
+.deck-sl [contenteditable]:where(:not([contenteditable="false"])) { outline: 0; border-radius: 4px; cursor: text; }
+.deck-sl [contenteditable]:where(:not([contenteditable="false"])):hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(255,255,255,.18)); }
+.deck-sl [contenteditable]:where(:not([contenteditable="false"])):focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(242,181,68,.7)); }
+.deck-sl [contenteditable]:where(:not([contenteditable="false"])):empty::before { content: attr(data-ph); color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-sl .st { position: absolute; font-weight: 700; letter-spacing: -.3px; font-family: var(--s-fh, 'Sofia Sans'), sans-serif; overflow-wrap: anywhere; }
 .deck-sl .sx { position: absolute; font: 400 24px/32px var(--s-fb, 'Sofia Sans'); color: var(--s-sub, #C7CAEB); }
 .deck-sl .bar { position: absolute; width: 64px; height: 6px; border-radius: 3px; background: var(--s-acc, #F2B544); }
@@ -102,9 +104,9 @@
 .deck-slide.is-borderless .deck-sl .veil { background: var(--s-veil, linear-gradient(90deg, rgba(255,255,255,.94) 0%, rgba(255,255,255,.78) 55%, rgba(255,255,255,.35) 100%)); }
 .deck-slide.is-borderless .deck-sl .picbox { background: var(--s-pic, #F6F6FB); }
 .deck-slide.is-borderless .deck-sl .picbox.empty { box-shadow: inset 0 0 0 3px var(--s-emp, #E2E3EE); color: var(--s-empt, #8A8DAE); }
-.deck-slide.is-borderless .deck-sl [contenteditable]:hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(28,31,74,.12)); }
-.deck-slide.is-borderless .deck-sl [contenteditable]:focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(224,162,31,.75)); }
-.deck-slide.is-borderless .deck-sl [contenteditable]:empty::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:where(:not([contenteditable="false"])):hover { box-shadow: 0 0 0 2px var(--s-ring, rgba(28,31,74,.12)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:where(:not([contenteditable="false"])):focus { box-shadow: 0 0 0 2px var(--s-foc, rgba(224,162,31,.75)); }
+.deck-slide.is-borderless .deck-sl [contenteditable]:where(:not([contenteditable="false"])):empty::before { color: var(--s-ph, rgba(28,31,74,.3)); }
 /* An exercise slide's pill, typed in on the stage (16 November): it keeps its look, grows with its words on one line,
    shows the default faintly while the caret is in it empty, and goes once the caret leaves (`tag: ""`, no pill). */
 .deck-sl .tag { box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

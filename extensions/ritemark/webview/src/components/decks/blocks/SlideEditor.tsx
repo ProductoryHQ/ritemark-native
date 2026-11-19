@@ -65,6 +65,7 @@ import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
 import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
 import { ButtonBlockTools } from '../../../extensions/buttonBlock/ButtonBlockTools'
+import { BUTTON_DROP } from '../../../extensions/buttonBlock/buttonCommands'
 import { BUTTON_ASK, buttonNode } from '../../../extensions/buttonBlock/buttonCommands'
 import { tabAcross } from './blockBar'
 import { SlideCommentNode, SlideComments, caretTarget, clickTarget, startSlideComment } from '../SlideComments'
@@ -230,6 +231,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const fitStepRef = useRef(0)
   /** PR 3: the next write is an undo step of its own: a block's ('command'), then the typing after it ('after'). */
   const stepRef = useRef<'none' | 'command' | 'after'>('none')
+  /** The next write is a new button taken away (`BUTTON_DROP`): out of the deck's undo history. */
+  const quietRef = useRef(false)
   /** PR 3: words not yet written because the / menu was open (or an input method composing). */
   const heldRef = useRef(false)
   /** Is the slide full: its words at the smallest step and still more than it holds (told to the deck's bar). */
@@ -257,13 +260,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
    * Write the stage's Markdown to the slide's node: one transaction, converting the deck first when it holds v1 slides.
    * `ownStep`: an undo step of its own (a block from the / menu, an icon, a row, and the first typing after one).
    */
-  const write = useCallback((markdown: string, doc: PMNode, ownStep = false) => {
+  const write = useCallback((markdown: string, doc: PMNode, ownStep = false, quiet = false) => {
     const editorOuter = outerRef.current
     if (editorOuter.isDestroyed) return
     const entry = freshEntry(editorOuter, slideRef.current)
     if (!entry) return
     const tr = editorOuter.state.tr
     if (ownStep) closeHistory(tr)
+    // A new button left without an address goes out of the history too (`dropNewButton`): ⌘Z never brings it back.
+    if (quiet) tr.setMeta('addToHistory', false)
     convertDeckInto(tr)
     // The conversion puts comments at the ends of parts: this slide's place moves past any put before it.
     const pos = tr.mapping.map(entry.pos)
@@ -399,6 +404,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       syncRef.current?.track(transaction)
       // A table's row, column, move, sort or alignment (experience 48) is an undo step of its own too.
       if (isOwnStep(transaction)) stepRef.current = 'command'
+      if (transaction.getMeta(BUTTON_DROP)) quietRef.current = true
       // An input method's word is written once it is composed (the composition's end), never mid-word; the / menu's
       // query once the menu has closed (PR 3).
       if (updated.view.composing || slashOpen(updated.state)) {
@@ -444,7 +450,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     }
     // A block from the / menu is an undo step of its own, and so is the first typing after it (else it would join it).
     const step = stepRef.current
-    write(markdown, current.state.doc, step !== 'none')
+    const quiet = quietRef.current
+    quietRef.current = false
+    write(markdown, current.state.doc, step !== 'none', quiet)
     stepRef.current = step === 'command' ? 'after' : 'none'
   }
 

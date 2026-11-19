@@ -26,7 +26,7 @@ import { DeckSlide } from '../../components/decks/handout/deckSchema'
 import { loadSlide, saveSlide } from '../../components/decks/blocks/slideEditorHarness'
 import { SLIDE_ITEMS } from '../../components/decks/blocks/slideCommands'
 import { blockItems, filterSlashItems } from '../blockItems'
-import { BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, deleteButton, insertButton, labelEnd, setButtonAddress } from './buttonCommands'
+import { BUTTON_DROP, BUTTON_NODE, buttonAt, buttonBackspace, buttonDelete, buttonEnter, deleteButton, dropNewButton, insertButton, labelEnd, setButtonAddress, sheetLeft, sheetWidth } from './buttonCommands'
 import type { Tokens } from 'marked'
 
 installTestDocument()
@@ -265,6 +265,44 @@ for (const form of FORMS) {
   const named = setButtonAddress(EditorState.create({ doc: tr.doc, selection: tr.selection }), placed.pos, 'https://example.com/a.pdf')!
   const label = EditorState.create({ doc: named.doc, selection: named.selection }).tr.insertText('Open the sample')
   assert.equal(saveSlide(label.doc), '# Exercise\n\nText\n\n[Open the sample](https://example.com/a.pdf){.button}')
+}
+
+// The smoke run of 19 November (B): a new button left before it has an address (Esc, a press elsewhere) goes, as if it
+// had never been added: the slide is written as it was, out of the undo history. One with an address keeps it.
+{
+  const before = '# Exercise\n\nText'
+  const state = EditorState.create({ doc: loadSlide(before) })
+  const tr = state.tr.insert(state.doc.content.size, state.schema.nodes.paragraph.create())
+  insertButton(tr, tr.doc.content.size - 1)
+  const added = EditorState.create({ doc: tr.doc, selection: tr.selection })
+  const placed = buttonAt(added)!
+  assert.equal(saveSlide(added.doc), '# Exercise\n\nText\n\n[](){.button}')
+  const dropped = dropNewButton(added, placed.pos)!
+  assert.ok(dropped, 'an empty new button is taken away')
+  assert.equal(saveSlide(dropped.doc), before, 'no empty button is written')
+  assert.equal(dropped.getMeta('addToHistory'), false, '⌘Z never brings the empty button back')
+  assert.equal(dropped.getMeta(BUTTON_DROP), true, 'a slide writes it out of the deck\'s history too')
+  assert.equal(dropped.getMeta('deckSlideCommand'), false, 'not an undo step of its own')
+  // With an address: Esc keeps it.
+  const named = setButtonAddress(added, placed.pos, 'https://example.com/a.pdf')!
+  assert.equal(dropNewButton(EditorState.create({ doc: named.doc, selection: named.selection }), placed.pos), null, 'a button with an address stays')
+  assert.equal(dropNewButton(added, placed.pos + 1), null, 'nothing that isn\'t a button')
+}
+
+// (B) The address sheet lines up with the card's left edge; where that would run past the editor's right edge (a
+// right-hand box), with its right edge; never out of the editor's visible area, so Done is in view.
+{
+  const bounds = { left: 8, right: 1432 }
+  assert.equal(sheetWidth(1440), 360)
+  assert.equal(sheetWidth(300), 284, 'never wider than the window less 8 a side')
+  assert.equal(sheetLeft({ left: 200, right: 700 }, 360, bounds), 200, 'room: the card\'s left edge')
+  assert.equal(sheetLeft({ left: 1150, right: 1400 }, 360, bounds), 1040, 'a right-hand box: the card\'s right edge')
+  assert.equal(sheetLeft({ left: 1300, right: 1500 }, 360, bounds), 1072, 'a card past the edge: inside the editor')
+  assert.equal(sheetLeft({ left: -40, right: 100 }, 360, bounds), 8, 'never past the left edge either')
+  for (const card of [{ left: 1150, right: 1400 }, { left: 1300, right: 1500 }, { left: 0, right: 1440 }]) {
+    const left = sheetLeft(card, 360, bounds)
+    assert.ok(left >= bounds.left && left + 360 <= bounds.right, `Done in view for ${JSON.stringify(card)}`)
+  }
 }
 
 // The keys: Enter in the button's words ends them; the block's two parts never join.

@@ -426,42 +426,42 @@ export function FormattingBubbleMenu({
           <div className="w-px h-6 bg-hairline-strong mx-1" />
 
           {/* Bullet List Button - Toggle on/off */}
-          <Tooltip label="Bullet List">
+          <Tooltip label="Bullet list">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().toggleBulletList().run()}
               className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
                 editor.isActive('bulletList') ? 'bg-surface-soft' : ''
               }`}
-              aria-label="Bullet List"
+              aria-label="Bullet list"
             >
               <Icon name="list" size={16} />
             </button>
           </Tooltip>
 
           {/* Ordered List Button - Toggle on/off */}
-          <Tooltip label="Numbered List">
+          <Tooltip label="Numbered list">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().toggleOrderedList().run()}
               className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
                 editor.isActive('orderedList') ? 'bg-surface-soft' : ''
               }`}
-              aria-label="Numbered List"
+              aria-label="Numbered list"
             >
               <Icon name="list-numbers" size={16} />
             </button>
           </Tooltip>
 
           {/* Task List Button - Toggle on/off */}
-          <Tooltip label="Task List">
+          <Tooltip label="Task list">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().toggleTaskList().run()}
               className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
                 editor.isActive('taskList') ? 'bg-surface-soft' : ''
               }`}
-              aria-label="Task List"
+              aria-label="Task list"
             >
               <Icon name="list-checks" size={16} />
             </button>
@@ -485,14 +485,14 @@ export function FormattingBubbleMenu({
           </Tooltip>
 
           {/* Code Block Button - Toggle on/off */}
-          <Tooltip label="Code Block">
+          <Tooltip label="Code block">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().toggleCodeBlock().run()}
               className={`px-3 py-1 rounded text-sm hover:bg-surface-soft transition-colors flex items-center ${
                 editor.isActive('codeBlock') ? 'bg-surface-soft' : ''
               }`}
-              aria-label="Code Block"
+              aria-label="Code block"
             >
               <Icon name="code" size={16} />
             </button>

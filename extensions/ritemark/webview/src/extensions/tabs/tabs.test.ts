@@ -27,7 +27,7 @@ import { SLIDE_ITEMS } from '../../components/decks/blocks/slideCommands'
 import { blockItems, filterSlashItems } from '../blockItems'
 import { newTabsetMarkdown } from '../../../../src/decks/blocks/tabset'
 import { tabNameOf } from './tabsMarkdown'
-import { addTab, canHoldTabs, columnsToTabs, deleteTab, duplicateTab, flattenTabs, hasMisplacedTabs, insertTabsBlock, moveTab, paneSelection, pastedWithoutTabs, renameTab, tabsBlockNode, tabsToColumns } from './tabsCommands'
+import { addTab, canHoldTabs, columnsToTabs, deleteTab, duplicateTab, flattenTabs, hasMisplacedTabs, insertTabsBlock, moveTab, paneAfterTabMenu, paneSelection, pastedWithoutTabs, renameTab, tabsBlockNode, tabsToColumns } from './tabsCommands'
 import { Slice } from '@tiptap/pm/model'
 
 installTestDocument()
@@ -235,6 +235,27 @@ test('Delete tab takes the tab and its pane without asking, and ⌘Z brings them
   undo(state, tr => { restored = state.apply(tr) })
   assert.ok(restored)
   assert.equal(save(restored!), TABS)
+})
+
+test('after the tab\'s menu the editor takes the keys back, the caret in the chosen tab\'s pane (the smoke run of 19 November)', () => {
+  // The pane the caret goes into after each item of the menu.
+  assert.equal(paneAfterTabMenu('delete', 1, 3), 1, 'Delete tab: the tab after it opens')
+  assert.equal(paneAfterTabMenu('delete', 2, 3), 1, 'Delete tab at the end: the one before it')
+  assert.equal(paneAfterTabMenu('delete', 0, 2), null, 'two tabs: the block dissolves, the caret stays in the words left')
+  assert.equal(paneAfterTabMenu('duplicate', 0, 3), 1, 'Duplicate: the copy')
+  assert.equal(paneAfterTabMenu('left', 2, 3), 1, 'Move left: the moved tab')
+  assert.equal(paneAfterTabMenu('right', 0, 3), 1, 'Move right: the moved tab')
+  assert.equal(paneAfterTabMenu('rename', 1, 3), null, 'Rename: the name is typed first')
+  // Delete tab, then the caret where the menu puts it, then ⌘Z: the deleted tab and its words come back.
+  let state = stateOf(TABS)
+  const pos = firstTabs(state)
+  state = apply(state, deleteTab(state, pos, 1))
+  const into = paneSelection(state.doc, pos, paneAfterTabMenu('delete', 1, 3)!)!
+  state = apply(state, state.tr.setSelection(into))
+  assert.equal(state.doc.resolve(state.selection.from).node(2).attrs.line, '## 3 · Picture', 'the caret is in the pane that opened')
+  let restored: EditorState | null = null
+  undo(state, tr => { restored = state.apply(tr) })
+  assert.equal(save(restored!), TABS, '⌘Z, with the caret in the editor, brings the tab back')
 })
 
 test('with one tab left the block dissolves: that tab\'s blocks stay as ordinary blocks, and ⌘Z brings the block back', () => {

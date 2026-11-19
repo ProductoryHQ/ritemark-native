@@ -7,8 +7,10 @@
  *    stage size, so it goes in `document.body`, as the slide block's bar does, and follows its button.
  *  - **The sheet:** the address, "A full address, such as a SharePoint or Drive link. It opens in a new tab." An address
  *    that isn't a full https one is refused: "Use a full address that starts with https://". Done or Enter keeps it and
- *    puts the caret on the button's words; Esc or a press outside leaves the address as it was.
- *  - A new button (`BUTTON_ASK`) opens its sheet at once.
+ *    puts the caret on the button's words; Esc or a press outside leaves the address as it was. The sheet lines up with
+ *    the card's left edge, or its right edge where it would run past the editor's (`sheetLeft`): Done is always in view.
+ *  - A new button (`BUTTON_ASK`) opens its sheet at once. Left with Esc or a press outside before it has an address, it
+ *    goes, as if it had never been added (`dropNewButton`; the smoke run of 19 November).
  *
  * Every button has a tooltip and one line of words; a press on the bar never takes the caret out of the editor. ⌘Z is
  * the editor's (a slide's: the deck's): each change is an undo step of its own.
@@ -23,7 +25,7 @@ import { Button } from '../../components/ui/button'
 import { Tooltip } from '../../components/ui/tooltip'
 import { Icon } from '../../components/ui/Icon'
 import { useDismissOnOutside } from '../../lib/dismissOnOutside'
-import { BUTTON_ASK, buttonAt, deleteButton, setButtonAddress } from './buttonCommands'
+import { BUTTON_ASK, buttonAt, deleteButton, dropNewButton, setButtonAddress, sheetLeft, sheetWidth } from './buttonCommands'
 import { unchooseButton } from './ButtonBlock'
 import './buttonBlock.css'
 
@@ -42,6 +44,7 @@ interface Placed {
   pos: number
   href: string
   left: number
+  right: number
   top: number
   bottom: number
 }
@@ -56,7 +59,8 @@ export function openButtonAddress(href: string): boolean {
 export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps) {
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [focused, setFocused] = useState(false)
-  const [sheet, setSheet] = useState<{ pos: number } | null>(null)
+  /** The open sheet, and whether its button is new (just added, no address asked for yet). */
+  const [sheet, setSheet] = useState<{ pos: number; fresh: boolean } | null>(null)
   const [draft, setDraft] = useState('')
   const [refused, setRefused] = useState(false)
   const [barAt, setBarAt] = useState<{ left: number; top: number; above: boolean } | null>(null)
@@ -75,8 +79,8 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
       return
     }
     const rect = dom.getBoundingClientRect()
-    const next: Placed = { pos: found.pos, href: String(found.node.attrs.href ?? ''), left: rect.left, top: rect.top, bottom: rect.bottom }
-    setPlaced(current => (current && current.pos === next.pos && current.href === next.href && current.left === next.left && current.top === next.top && current.bottom === next.bottom ? current : next))
+    const next: Placed = { pos: found.pos, href: String(found.node.attrs.href ?? ''), left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }
+    setPlaced(current => (current && current.pos === next.pos && current.href === next.href && current.left === next.left && current.right === next.right && current.top === next.top && current.bottom === next.bottom ? current : next))
   }, [editor])
 
   useEffect(() => {
@@ -90,7 +94,7 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
         // Measured now, with the sheet: a sheet whose button isn't placed yet would close at once.
         measure()
         if (found) {
-          setSheet({ pos: found.pos })
+          setSheet({ pos: found.pos, fresh: true })
           setDraft(String(found.node.attrs.href ?? ''))
           setRefused(false)
         }
@@ -147,13 +151,22 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
   }, [sheet])
 
   const closeSheet = useCallback((refocus: boolean) => {
+    const was = sheet
     setSheet(null)
     setRefused(false)
     if (!editor || editor.isDestroyed) return
+    // A new button left before it has an address goes, writing nothing (one that has an address keeps it).
+    const found = was?.fresh ? buttonAt(editor.state) : null
+    const drop = found && found.pos === was?.pos ? dropNewButton(editor.state, found.pos) : null
+    if (drop) {
+      editor.view.dispatch(drop)
+      if (refocus) editor.view.focus()
+      return
+    }
     if (refocus) editor.view.focus()
     // A press elsewhere: the focus went with it, so the button is no longer chosen.
     else if (!editor.view.hasFocus()) unchooseButton(editor.view)
-  }, [editor])
+  }, [editor, sheet])
 
   useDismissOnOutside(sheetRef, () => closeSheet(false), { trigger: () => addressRef.current, enabled: !!sheet })
 
@@ -188,8 +201,9 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
 
   const canOpen = isButtonAddress(placed.href)
   const hidden = barAt ? {} : { visibility: 'hidden' as const }
+  const sheetAt = sheetLeft(placed, sheetWidth(window.innerWidth), { left: 8, right: window.innerWidth - 8 })
   const sheetStyle = barAt
-    ? (barAt.above ? { left: barAt.left, top: barAt.top - SHEET_GAP, transform: 'translateY(-100%)' } : { left: barAt.left, top: barAt.top + (barRef.current?.offsetHeight ?? 38) + SHEET_GAP })
+    ? (barAt.above ? { left: sheetAt, top: barAt.top - SHEET_GAP, transform: 'translateY(-100%)' } : { left: sheetAt, top: barAt.top + (barRef.current?.offsetHeight ?? 38) + SHEET_GAP })
     : { visibility: 'hidden' as const }
 
   return createPortal(
@@ -207,7 +221,7 @@ export function ButtonBlockTools({ editor, frame = null }: ButtonBlockToolsProps
                 if (sheet) { closeSheet(true); return }
                 setDraft(placed.href)
                 setRefused(false)
-                setSheet({ pos: placed.pos })
+                setSheet({ pos: placed.pos, fresh: false })
               }}
             >
               <Icon name="link" size={16} tone="inherit" />
