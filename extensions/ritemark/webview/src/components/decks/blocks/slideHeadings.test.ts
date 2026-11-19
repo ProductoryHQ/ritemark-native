@@ -174,14 +174,18 @@ function expand(property: string, value: string): Array<[string, string]> {
   return [[property, value]]
 }
 
-function rulesOf(...texts: string[]): Array<{ selectors: string[]; decls: Array<[string, string]> }> {
-  const rules: Array<{ selectors: string[]; decls: Array<[string, string]> }> = []
+/** Each rule's selectors and its declarations as longhands, each with whether it is `!important`. */
+function rulesOf(...texts: string[]): Array<{ selectors: string[]; decls: Array<[string, string, boolean]> }> {
+  const rules: Array<{ selectors: string[]; decls: Array<[string, string, boolean]> }> = []
   for (const text of texts) {
     for (const match of text.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-      const decls: Array<[string, string]> = []
+      const decls: Array<[string, string, boolean]> = []
       for (const part of match[2].split(';')) {
         const at = part.indexOf(':')
-        if (at > 0) decls.push(...expand(part.slice(0, at).trim(), part.slice(at + 1).trim().replace(/ ?!important$/, '')))
+        if (at <= 0) continue
+        const value = part.slice(at + 1).trim()
+        const important = / ?!important$/.test(value)
+        for (const [name, longhand] of expand(part.slice(0, at).trim(), value.replace(/ ?!important$/, ''))) decls.push([name, longhand, important])
       }
       rules.push({ selectors: splitTop(match[1], ','), decls })
     }
@@ -195,9 +199,10 @@ function cascade(rules: ReturnType<typeof rulesOf>) {
     rules.forEach((rule, order) => {
       const hit = rule.selectors.filter(selector => matches(element, selector)).map(specificityOf).sort((x, y) => weigh(y) - weigh(x))[0]
       if (!hit) return
-      for (const [name, value] of rule.decls) {
+      for (const [name, value, important] of rule.decls) {
         if (name !== property) continue
-        const decl = { property, value, specificity: weigh(hit), order }
+        // An !important declaration outranks every normal one, then specificity, then order, as the browser does.
+        const decl = { property, value, specificity: (important ? 1e9 : 0) + weigh(hit), order }
         if (!best || decl.specificity > best.specificity || (decl.specificity === best.specificity && decl.order >= best.order)) best = decl
       }
     })
@@ -285,6 +290,15 @@ function children(parent: El, ...specs: Array<[string, string[]?]>): El[] {
 }
 
 const near = (actual: number, expected: number, what: string) => assert.ok(Math.abs(actual - expected) < 1e-6, `${what}: ${actual} (expected ${expected})`)
+
+// The cascade itself: an !important declaration beats a more specific normal one; `:has(+ …)` looks at what follows.
+{
+  const tiny = cascade(rulesOf('.a h2 { color: red !important; } .x .a h2.b { color: blue; } .a h1:has(+ h2) { color: green; }'))
+  const [a] = children(el('div', ['x']), ['div', ['a']])
+  const [h1, h2] = children(a, ['h1'], ['h2', ['b']])
+  assert.equal(tiny.computed(h2).color, 'red')
+  assert.equal(tiny.computed(h1).color, 'green')
+}
 
 // ---- H1 > H2 > H3, on Card and on Borderless -------------------------------------------------------------------------
 
@@ -411,7 +425,12 @@ function layout(blocks: Block[], fit: number, oldH2: boolean): Array<{ top: numb
 function modelFlow(blocks: Block[], oldH2: boolean) {
   let fit = 1
   const room = 460
-  const at = () => layout(blocks, fit, oldH2)
+  // Laid out once per fit, as the browser lays out once per `--fit`; the getters read that layout.
+  let laid: { fit: number; blocks: ReturnType<typeof layout> } | null = null
+  const at = () => {
+    if (laid?.fit !== fit) laid = { fit, blocks: layout(blocks, fit, oldH2) }
+    return laid.blocks
+  }
   const kids = blocks.map((_, index) => ({
     get offsetTop() { return at()[index].top },
     get offsetHeight() { return at()[index].height },
