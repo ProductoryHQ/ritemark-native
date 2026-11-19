@@ -29,7 +29,7 @@ export function quoteBy(quote: PMNode): { node: PMNode; offset: number } | null 
   const drawn: Array<{ node: PMNode; offset: number }> = []
   quote.forEach((node, offset) => { if (!drawsNothing(node)) drawn.push({ node, offset }) })
   const last = drawn[drawn.length - 1]
-  if (drawn.length < 2 || last.node.type.name !== 'paragraph' || !isQuoteByWords(last.node.textContent)) return null
+  if (drawn.length < 2 || last.node.type.name !== 'paragraph' || !isQuoteByWords(last.node.textContent.trimStart())) return null
   return last
 }
 

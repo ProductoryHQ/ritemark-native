@@ -61,7 +61,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
 - **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
 - **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
-- **Show who said a quote.** End a quote on a slide with a line that starts with a dash, such as "— Team lead". That line shows smaller, under the quote's words. Quotes now stand out with a bar in your theme's colour, while you edit, present and share.
+- **Show who said a quote.** End a quote on a slide with a line that starts with a long dash (— or –), such as "— Team lead". That line shows smaller, under the quote's words, and the quote gets a bar in your theme's colour.
 - **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
 - **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
 - **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.

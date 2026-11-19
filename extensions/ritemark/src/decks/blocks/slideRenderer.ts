@@ -353,11 +353,12 @@ export function isQuoteByWords(words: string): boolean {
 }
 
 /**
- * A paragraph's words from its drawn HTML: no tags, and a first character written as an entity read as the character it
- * draws (`&mdash;`, `&#8212;`, `&#x02014;`…), as the stage's words have it.
+ * A paragraph's words from its drawn HTML: no tags, no space before them, and a first character written as an entity
+ * read as the character it draws (`&mdash;`, `&#8212;`, `&#x02014;`…), as the stage's words have it.
  */
 function drawnWordsOf(html: string): string {
-  return html.replace(/<[^>]*>/g, '').replace(/^&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(mdash|ndash));/, (_entity, decimal?: string, hex?: string, name?: string) => {
+  // Leading space draws nothing (`>  — A`), and the slide editor drops it as it opens the line (review of #880).
+  return html.replace(/<[^>]*>/g, '').trimStart().replace(/^&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(mdash|ndash));/, (_entity, decimal?: string, hex?: string, name?: string) => {
     if (name) return name === 'mdash' ? '—' : '–';
     const code = decimal ? Number(decimal) : parseInt(hex as string, 16);
     return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
@@ -408,8 +409,10 @@ export function splitQuoteByLine(token: Token): void {
   if (br <= 0) return;
   const words = inline.slice(0, br);
   const by = inline.slice(br + 1);
-  // Something drawn before the break: words, or a picture (the slide editor opens a picture on its own line as a block).
-  if ((!inlineWordsOf(words).trim() && !words.some(child => child.type === 'image')) || !isQuoteByWords(drawnWordsOf(inlineWordsOf(by)))) return;
+  // Something drawn before the break: words, a picture (the slide editor opens one on its own line as a block), or any
+  // token of the editor's own reader (inline math): anything but space, a break or a tag (review of #880).
+  const drawsBefore = words.some(child => child.type !== 'br' && child.type !== 'html' && child.raw.trim() !== '');
+  if (!drawsBefore || !isQuoteByWords(drawnWordsOf(inlineWordsOf(by)))) return;
   const raw = (tokens: Token[]) => tokens.map(child => child.raw).join('');
   // The words keep the paragraph's own marks (as-written's `rmTight`); the attribution has a blank line before it.
   blocks.splice(at, 1,

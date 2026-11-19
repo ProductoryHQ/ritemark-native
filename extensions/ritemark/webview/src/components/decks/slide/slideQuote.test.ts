@@ -140,7 +140,7 @@ assert.equal(decls(code[0].body).color, 'inherit')
 // #863: the attribution, marked alike by the renderer (the strip, the wall, the presenter view, the page) and by the
 // stage's decoration, on the same paragraph; never on a quote of that one line; the file as written, byte for byte.
 const drawnBy = (markdown: string) =>
-  [...blockSlideHtml(markdown).matchAll(/<p class="blk-by">([\s\S]*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').replace(/^&(?:mdash|#x02014);/, '—'))
+  [...blockSlideHtml(markdown).matchAll(/<p class="blk-by">([\s\S]*?)<\/p>/g)].map((m) => m[1].replace(/<[^>]*>/g, '').trimStart().replace(/^&(?:mdash|#x02014);/, '—'))
 const stageBy = (markdown: string) => {
   const doc = loadSlideWithComments(markdown)
   return quoteByDecorations(doc).find().map((d) => doc.nodeAt(d.from)?.textContent ?? '')
@@ -177,6 +177,9 @@ const QUOTES: Array<[string, string, string[], string?]> = [
   ['the dash line not last', '> — A. Writer\n>\n> Words', []],
   ['no dash', '> Words\n>\n> A. Writer', []],
   ['a dash inside the words', '> Words — and more\n>\n> words — too', []],
+  // Review of #880, round two: a space after `>` before the dash, and inline math before the break.
+  ['two spaces after the quote mark (an edit writes one, as before #863)', '> Words\n>\n>  — A. Writer', ['— A. Writer'], '> Words\n>\n> — A. Writer'],
+  ['inline math before the break', '> $x^2$\n> — A. Writer', ['— A. Writer'], '> $x^2$\n>\n> — A. Writer'],
   ['a line break with no dash after it', '> Words\n> more words', []],
   ['a dash line after a break inside bold', '> **Words\n> — A. Writer**', []],
   ['no quote at all', '# Title\n\nWords\n\n— A line of its own', []],
