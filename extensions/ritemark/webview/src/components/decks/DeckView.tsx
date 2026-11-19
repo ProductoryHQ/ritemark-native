@@ -73,7 +73,7 @@ import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
 import { DeckPublish } from './DeckPublish'
-import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, openingFold, type DeckFold, type DeckViewMode } from './DeckFolds'
+import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, wheelPixels, wheelStep, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
@@ -98,7 +98,7 @@ const STAGE_MIN = 300
 const NARROW_DESK = 900
 const NARROWEST_DESK = 600
 
-/** The slide's share, as this deck's view kept it (`deckViewState`, with the fold): of the width with the slide beside
+/** The slide's share, as this deck's view kept it (`deckViewState`; the view itself is never kept): of the width with the slide beside
  *  the handout, and of the height with the slide above it. Each orientation keeps its own. */
 const storedRatio = () => deckViewState().deckRatio
 const keepRatio = (ratio: number) => keepDeckViewState({ deckRatio: ratio })
@@ -296,7 +296,7 @@ export function DeckView({
   const [stripWanted, setStripWanted] = useState(true)
   // Fold either side (16 November): the slide, the handout, or neither. Every deck opens in Slide only (19 November);
   // the choice lives while the deck is open and is never kept.
-  const [fold, setFold] = useState<DeckFold>(openingFold)
+  const [fold, setFold] = useState<DeckFold>(OPENING_FOLD)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
   const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
@@ -488,8 +488,17 @@ export function DeckView({
       setHandoutText(handoutHasText(editor.state.doc))
     }
     refresh()
+    // A deck that opens with no slide has nothing to show in Slide only: it opens with the handout beside, to type in.
+    if (slidesOf(editor.state.doc).length === 0) setFold(current => (current === 'handout' ? null : current))
     return onDocChanged(editor, refresh)
   }, [editor])
+
+  // Find (⌘F) searches the handout and draws its bar there: opening it in Slide only brings the handout beside, so the
+  // bar and its matches show. Closing it leaves the view as it is.
+  const findOpen = Boolean(findBar)
+  useEffect(() => {
+    if (findOpen) setFold(current => (current === 'handout' ? null : current))
+  }, [findOpen])
 
   const count = slides.length
   // Small details 14: the deck's sections, for every Agenda the strip draws; the editor says so when there are none.
