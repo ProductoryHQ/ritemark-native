@@ -61,20 +61,27 @@ const settings = (kind: string, data: Record<string, unknown>, about: unknown, e
   assert.match(deck.textContent, /From Data in Excel/)
 }
 
-// ---- The popover's order (README, "Nothing around the slide", 17 November): the library section, Picture, a Steps
-// label (the deck's look left for the Theme menu in Sprint 162). Skip slide is only in the menu. A table's rows and
-// columns are the table's own + bars and grips (experience 48): Settings has no Add a row or Add a column.
+// ---- The popover's order (README, "Nothing around the slide", 17 November): the library section, then Picture (the
+// deck's look left for the Theme menu in Sprint 162). Skip slide is only in the menu. A table's rows and columns are the
+// table's own + bars and grips (experience 48): Settings has no Add a row or Add a column. Sprint 164 PR 3 (Jarmo's yes
+// by name, 19 November): no Label row, for a block slide with Steps or an old Exercise slide; the Label is a block.
 {
   const data = { from: 'Slide library/Agents.deck.md#p1 @k2' }
   const about = createElement(SlideAbout, { data, hidden: '' })
   const root = settings('', data, about, { stepsTag: { value: 'Exercise', onChange: noop } })
   const text = root.textContent
-  const order = ['From the library · Agents', 'Picture', 'Label'].map(words => {
+  const order = ['From the library · Agents', 'Picture'].map(words => {
     const at = text.indexOf(words)
     assert.ok(at >= 0, words)
     return at
   })
-  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, Picture, Label')
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'library, then Picture')
+  for (const [kind, extra] of [['', { stepsTag: { value: 'Harjutus', onChange: noop } }], ['exercise', {}]] as const) {
+    const shown = settings(kind, { tag: 'Harjutus' }, null, extra)
+    assert.ok(!shown.textContent.includes('Label') && !shown.textContent.includes('Harjutus'), `${kind || 'block slide'}: no Label row`)
+    assert.equal(shown.querySelectorAll('input').filter(input => input.getAttribute('type') !== 'radio').length, 0, `${kind || 'block slide'}: no field to type in`)
+  }
+  assert.doesNotMatch(here('./SlideSettings.tsx'), /function LabelRow|deck-settings-tag/, 'the row is gone from the popover')
   assert.ok(!text.includes('This deck'), 'no deck section')
   assert.ok(!text.includes('Skip slide'), 'Skip slide is only in the menu')
   assert.ok(!text.includes('Add a row') && !text.includes('Add a column'), 'no Add a row or Add a column: the table has its + bars')

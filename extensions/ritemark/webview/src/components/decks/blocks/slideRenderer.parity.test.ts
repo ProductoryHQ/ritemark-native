@@ -2,7 +2,8 @@
  * Sprint 161 (spike §4): the one renderer and the slide editor draw a slide the same. For the same Markdown, the block
  * outline (depth, kind, words) of the renderer's HTML and of the slide editor's document must match: on the spike's
  * slides (with its gap closed: a picture alone in a paragraph is a block in both), on the v2 fixtures, and on every
- * slide of the demo project's decks as `legacyToBlocks` draws it. Run with `npx tsx`.
+ * slide of the demo project's decks as `legacyToBlocks` draws it. Sprint 164 PR 3: the Label on both sides, and an old
+ * Steps pill as the Label the stage opens it with (`SlideEditor.stageMarkdownOf`, `withStepsLabels`). Run with `npx tsx`.
  */
 import { strict as assert } from 'node:assert'
 import * as fs from 'node:fs'
@@ -13,6 +14,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { isBlockSlide, isSlideKind, parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 import { legacyToBlocks } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
+import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
 import { loadSlide } from './slideEditorHarness'
 
@@ -29,13 +31,15 @@ function outlineOfHTML(html: string): Outline {
       const classes = (child.getAttribute('class') ?? '').split(/\s+/)
       // Sprint 163 PR 3: a Button block, its words beside it and on it (its icon is the renderer's own drawing).
       if (tag === 'div' && classes.includes('blk-button')) { out.push(`${depth}:button ${words(child)}`); continue }
+      // Sprint 164 PR 3: a Label, its words.
+      if (tag === 'div' && classes.includes('blk-label')) { out.push(`${depth}:label ${words(child)}`); continue }
       if (tag === 'div') {
         const known = classes.map(name => name.replace(/^blk-/, '')).filter(name => KNOWN.includes(name))
         out.push(`${depth}:div.${known.join(' ') || 'block'}`)
         walk(child, depth + 1)
         continue
       }
-      if (tag === 'span') continue // the Steps pill, a box's icon: the renderer's own drawing, no block of the file
+      if (tag === 'span') continue // a box's icon: the renderer's own drawing, no block of the file
       if (['ul', 'ol', 'table', 'thead', 'tbody', 'tr', 'blockquote'].includes(tag)) { out.push(`${depth}:${tag}`); walk(child, depth + 1); continue }
       if (tag === 'li' || tag === 'th' || tag === 'td') { out.push(`${depth}:${tag} ${words(child)}`); continue }
       // A code block's Copy and ↗ (Sprint 163 PR 1) are the renderer's own drawing: its words are its code's.
@@ -65,6 +69,8 @@ function outlineOfDoc(doc: PMNode): Outline {
         case 'paragraph': out.push(`${depth}:p ${text(child)}`); break
         case 'codeBlock': out.push(`${depth}:pre ${text(child)}`); break
         case 'buttonBlock': out.push(`${depth}:button ${text(child)}`); break
+        // An empty Label takes no room on the stage and is never drawn elsewhere.
+        case 'slideLabel': if (text(child)) out.push(`${depth}:label ${text(child)}`); break
         case 'image': out.push(`${depth}:img ${child.attrs.src}`); break
         case 'bulletList': out.push(`${depth}:ul`); walk(child, depth + 1); break
         case 'orderedList': out.push(`${depth}:ol`); walk(child, depth + 1); break
@@ -108,6 +114,10 @@ const SPIKE = [
   '# Prompt\n\n```\nSummarise [the report] & stop.\n```\n\n:::: columns\n::: column\n```text\nOne [place]\n```\n:::\n::: column\nB\n:::\n::::',
   // Sprint 163 PR 3: a Button block with words beside it, one alone in a column, and one with no full address.
   '# Material\n\nUse **this** & that. [Open the sample](https://example.com/a.pdf){.button}\n\n:::: columns\n::: column\n[Open](https://example.com){.button}\n:::\n::: column\n[Not yet](http://example.com){.button}\n:::\n::::',
+  // Sprint 164 PR 3: a Label over a title, in a column, in a box, an empty one, and words that only look like one.
+  '[Workshop · day 1]{.label}\n\n# Agents at work\n\n:::: columns\n::: column\n[Before]{.label}\n\n### Copilot\nText\n:::\n::: column\n[]{.label}\n\nAfter\n:::\n::::',
+  ':::: boxes\n::: box\n[Tip]{.label}\n\nOne line\n:::\n::::\n\nWords\n[not a label]{.label}\n\n[a link](https://example.com){.label}',
+  '# Steps with an old pill\n\n::: {.steps tag="Harjutus · 1 / 2"}\n1. Open the file\n:::\n\n::: {.steps tag=""}\n1. Emptied\n:::',
 ]
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -132,7 +142,8 @@ let same = 0
 const blockSlides = slides.filter(slide => slide.from !== 'spike').length
 for (const slide of slides) {
   const rendered = outlineOfHTML(draw(slide.markdown))
-  const edited = outlineOfDoc(loadSlide(slide.markdown))
+  // The stage opens a block slide with its old pills as Labels, as the renderer draws them.
+  const edited = outlineOfDoc(loadSlide(withStepsLabels(slide.markdown)))
   assert.deepEqual(rendered, edited, `${slide.from}: the renderer and the slide editor disagree on\n${slide.markdown}`)
   same += 1
 }

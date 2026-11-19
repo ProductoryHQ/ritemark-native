@@ -555,6 +555,8 @@ function blockKind(node: Element): BlockKind {
   if (node.nodeName === 'DIV' && node.hasAttribute('data-agenda')) return 'fdiv'
   // Sprint 163 PR 3: a Button block is a paragraph in the file (its words, then its `{.button}` link).
   if (node.nodeName === 'DIV' && node.hasAttribute('data-button')) return 'paragraph'
+  // Sprint 164 PR 3: a slide's Label is a paragraph in the file too (`[words]{.label}`); only the slide editor makes one.
+  if (node.nodeName === 'DIV' && node.hasAttribute('data-slide-label')) return 'paragraph'
   switch (node.nodeName) {
     case 'P': case 'IMG': return 'paragraph'
     case 'H1': case 'H2': case 'H3': case 'H4': case 'H5': case 'H6': return 'heading'
