@@ -62,7 +62,9 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 6: the Present bar at the screen's foot (PR 6, issue #842)
 [#842](https://github.com/ProductoryHQ/ritemark-native/issues/842): the wall's floating bar sits at the screen's foot, centred, its bottom 12 px from the edge, never over the slide's words: in the ground below the 16:9 content on a wider screen (1440×900 leaves a 45 px band), in the slide's own bottom margin on a 16:9 screen. It still shows on pointer movement and fades after 2 s.
-- [ ] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right.
+- [x] The bar sits 12 px from the screen's foot, its box outside the content box at 16:10 and 16:9 sizes (`wallBar.test.ts`, PR 6).
+- [x] Shots at 1440×900 and 1920×1080 with the bar showing over a slide whose code block reaches the bottom right (`proof/pr6-present-bar/`).
+- [x] The Experience lead's rule: while the bar shows, the quiet line fades out with the bar's timing and comes back when the bar fades (`wallBar.test.ts`); one shot at 1440×900 with the bar showing and the line hidden (`proof/pr6-present-bar/present-bar-line-hidden-1440x900.png`).
 
 ### Fix 7: the bubble over the Link dialog (PR 7, issue #846)
 [#846](https://github.com/ProductoryHQ/ritemark-native/issues/846): on a slide, while the bubble's Link dialog is open the bubble goes away, and it comes back after the dialog closes.
