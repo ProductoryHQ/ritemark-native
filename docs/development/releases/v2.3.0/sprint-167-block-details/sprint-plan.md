@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: five user-facing requirements, a file-format change, and a view-to-editor-to-renderer-to-published-page flow). Override with: "use plain full track".
 Branch: sprint-167-block-details
 Release tier: extension
-Status: **Waiting for Jarmo's approval.** Phase 2 (PLAN). No code, no PR branches yet.
+Status: **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167). Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Five small things from Jarmo's rundev test", ritemark-dev commit 9f05294), with the sketches in `block-details.html` beside it. Jarmo agreed the sketches with the Experience lead on 19 November ("muu on PERFECT!" for A, B, C and E, and "SOBIB D", with three refinements to D's corner chip). That sent them to planning. It is not his approval of this sprint.
 
@@ -22,11 +22,11 @@ Make five things a person could not find or do on a slide obvious: where the con
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0, which the manager creates when the sprint starts.
-- PR 1: to be created
-- PR 2: to be created
-- PR 3: to be created
-- PR 4: to be created
-- PR 5: to be created
+- PR 1: [#835](https://github.com/ProductoryHQ/ritemark-native/issues/835)
+- PR 2: [#836](https://github.com/ProductoryHQ/ritemark-native/issues/836)
+- PR 3: [#837](https://github.com/ProductoryHQ/ritemark-native/issues/837)
+- PR 4: [#838](https://github.com/ProductoryHQ/ritemark-native/issues/838)
+- PR 5: [#839](https://github.com/ProductoryHQ/ritemark-native/issues/839)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
@@ -77,4 +77,4 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - Experience lead: the README says a title or section slide "reads as Bottom". Is that only a value shown in Slide settings, or are the slides' own default positions kept in the theme? The plan assumes the first.
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026)

@@ -141,8 +141,8 @@
    line under it (an H2) stays close, as frame 21 draws it. Inside the flow, so the fit measures it. */
 .deck-sl.is-blocks h1 + * { margin-top: 0; }
 .deck-sl.is-blocks h1:has(+ h2) { margin-bottom: .12em; }
-.deck-sl.is-blocks p { margin: 0 0 .55em; }
-.deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 .55em; padding-left: 1.25em; }
+.deck-sl.is-blocks p { margin: 0 0 calc(12px * var(--fit, 1)); }
+.deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: 1.25em; }
 /* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
 .deck-sl.is-blocks ul { list-style: disc outside; }
 .deck-sl.is-blocks ol { list-style: decimal outside; }
@@ -158,7 +158,7 @@
 .deck-sl.is-blocks [data-reveal-hidden] { visibility: hidden; }
 .deck-sl.is-blocks strong { font-weight: 700; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
-.deck-sl.is-blocks pre { margin: 0 0 .55em; padding: .6em .8em; border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }
+.deck-sl.is-blocks pre { margin: 0 0 calc(12px * var(--fit, 1)); padding: calc(18px * var(--fit, 1)); border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }
 .deck-sl.is-blocks pre code { padding: 0; background: none; }
 /* Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"; workbook.html v9's `.cb`
    and `code-block-line.png`, 18 November): Copy and a round ↗ (Open in…) on a line of their own at the block's top
@@ -168,7 +168,7 @@
    line padded 8 px at its top and right, 6 px between Copy and ↗, the words 6 px under it, the block padded 16 px at
    its sides and 14 px at its foot.
    The block takes the code's own type and the slide's text colour, so its lines are the code's wherever it is drawn. */
-.deck-sl.is-blocks pre.cb { padding: 0 calc(16px * var(--fit, 1)) calc(14px * var(--fit, 1)); color: var(--s-tx, #E4E6F7); font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; }
+.deck-sl.is-blocks pre.cb { padding: 0 calc(18px * var(--fit, 1)) calc(18px * var(--fit, 1)); color: var(--s-tx, #E4E6F7); font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; }
 .deck-sl.is-blocks pre.cb > code { display: block; overflow: visible; color: inherit; font: inherit; }
 .deck-sl.is-blocks .cb-tools { position: relative; z-index: 1; display: flex; justify-content: flex-end; align-items: center; gap: calc(6px * var(--fit, 1));
   margin: 0 calc(-8px * var(--fit, 1)) calc(6px * var(--fit, 1)) 0; padding-top: calc(8px * var(--fit, 1));
@@ -212,7 +212,7 @@
    full address in a new tab, the words beside it on its left in a quiet box; with no words, the button alone. The same
    in the slide editor (`ButtonBlock`, its words and its label typed in place) and wherever the renderer draws the slide
    (`buttonBlock.buttonHtml`): the strip, the wall, the presenter view and the page. Canvas pixels times the fit. */
-.deck-sl.is-blocks .blk-button { display: flex; flex-wrap: wrap; align-items: center; gap: calc(10px * var(--fit, 1)) calc(16px * var(--fit, 1)); margin: 0 0 .55em; padding: calc(10px * var(--fit, 1)) calc(12px * var(--fit, 1)) calc(10px * var(--fit, 1)) calc(18px * var(--fit, 1));
+.deck-sl.is-blocks .blk-button { display: flex; flex-wrap: wrap; align-items: center; gap: calc(10px * var(--fit, 1)) calc(16px * var(--fit, 1)); margin: 0 0 calc(12px * var(--fit, 1)); padding: calc(10px * var(--fit, 1)) calc(12px * var(--fit, 1)) calc(10px * var(--fit, 1)) calc(18px * var(--fit, 1));
   border-radius: calc(12px * var(--fit, 1)); background: var(--s-box, rgba(255,255,255,.06)); box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.12)); box-sizing: border-box; }
 /* A narrow card stacks (the Experience lead, 18 November): narrower than 420 slide units, the words go above the button
    at the card's full width and the button sits under them, left-aligned, 10 units below; at 420 or wider they sit
@@ -245,18 +245,18 @@
 /* The slide editor: the chosen button's two places to type while they are empty. Its ring is the one every chosen
    block has (`.deck-block-ring`, drawn by ButtonBlockTools in the frame); amber stays the words' focus (--s-foc). */
 .deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
-.deck-sl.is-blocks blockquote { margin: 0 0 .55em; padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
+.deck-sl.is-blocks blockquote { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: .8em; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
-.deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: .3em 0 .55em; border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
-.deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: .45em .8em; text-align: left; vertical-align: top; }
+.deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
+.deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: calc(9px * var(--fit, 1)) calc(18px * var(--fit, 1)); text-align: left; vertical-align: top; }
 /* A column's alignment as the file writes it (`:---:`, `---:`), on the stage (the editor's `data-md-align`) and in the
    renderer's drawing (marked's `align`): the strip, the wall and the page alike (experience 48). */
 .deck-sl.is-blocks :is(th, td):is([align="center"], [data-md-align="center"]) { text-align: center; }
 .deck-sl.is-blocks :is(th, td):is([align="right"], [data-md-align="right"]) { text-align: right; }
 .deck-sl.is-blocks th { background: var(--s-thbg, rgba(242,181,68,.16)); color: var(--s-thfg, #F2B544); font-weight: 700; }
 .deck-sl.is-blocks td { border-top: 1px solid var(--s-row, rgba(255,255,255,.1)); }
-.deck-sl.is-blocks .blk-pic { display: block; max-width: 100%; max-height: 310px; margin: .2em 0 .4em; border-radius: var(--s-r2, 10px); object-fit: contain; }
+.deck-sl.is-blocks .blk-pic { display: block; max-width: 100%; max-height: 310px; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); object-fit: contain; }
 .deck-sl.is-blocks .blk-pic.empty { height: 200px; box-shadow: inset 0 0 0 3px var(--s-emp, rgba(255,255,255,.22)); }
 .deck-sl.is-blocks p .blk-pic { display: inline-block; vertical-align: middle; max-height: 2.4em; margin: 0; }
 /* The picture gives way first (17 November, the Fit rule): a slide with a picture of its own lays its blocks out in a
@@ -283,15 +283,14 @@
 .deck-slide.is-borderless .deck-sl .blk-missing-head { color: var(--s-empt, #8A8DAE); }
 .deck-slide.is-borderless .deck-sl .blk-missing-name { color: var(--s-ph, rgba(28,31,74,.45)); }
 /* Columns: side by side, a thin line between them (frame 23). */
-.deck-sl.is-blocks .blk-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); margin: .3em 0 .5em; }
+.deck-sl.is-blocks .blk-columns { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: calc(32px * var(--fit, 1)); margin: 0 0 calc(12px * var(--fit, 1)); }
 /* Columns have space between them, and no line: the line shows only while the split is pointed at or dragged (the
    block bar's split handle, decks.css). */
-.deck-sl.is-blocks .blk-column { min-width: 0; padding: .2em 1.1em; }
-.deck-sl.is-blocks .blk-column:first-child { padding-left: 0; }
+.deck-sl.is-blocks .blk-column { min-width: 0; padding: 0; }
 .deck-sl.is-blocks .blk-column > :last-child, .deck-sl.is-blocks .blk-box > :last-child { margin-bottom: 0; }
 /* Boxes: a row of cards, with an icon or the look's own mark. */
-.deck-sl.is-blocks .blk-boxes { gap: 16px; margin: .3em 0 .5em; counter-reset: blk-box; }
-.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 18px; border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); font-size: .86em; }
+.deck-sl.is-blocks .blk-boxes { gap: calc(16px * var(--fit, 1)); margin: 0 0 calc(12px * var(--fit, 1)); counter-reset: blk-box; }
+.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: calc(18px * var(--fit, 1)); border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); font-size: .86em; }
 .deck-sl.is-blocks .blk-box > * { margin-bottom: 0; }
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
 .deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
@@ -305,7 +304,7 @@
    pill leaves the flow for the column's top (its left stays where it stands, the column's own); the column makes room
    for it: the pill's 28 px and a 10 px gap. A hidden pill (the stage's, emptied) or none takes no room.
    A Columns block aligned Middle or Bottom keeps the pill in its flow, under the heading: its column's words move down
-   and a pill pinned to the top would be left behind. The pill's width stops at the column's right padding (1.1em). */
+   and a pill pinned to the top would be left behind. The pill's width and top still allow for the column padding removed in Sprint 164 PR 2; PR 3 replaces this rule. */
 .deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden])) { position: relative; padding-top: calc(4.8px * var(--fit, 1) + 38px); }
 .deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute; top: calc(4.8px * var(--fit, 1)); max-width: calc(100% - 26.4px * var(--fit, 1)); margin: 0; }
 /* The slide's title in such a column, and its steps, at the prototype's sizes (workbook.html: 38 and 18 slide units),
@@ -319,7 +318,7 @@
 .deck-sl.is-blocks .blk-steps ol > li > :not(:first-child) { margin: .1em 0 0; font-weight: 400; font-size: .82em; color: var(--s-tx, #C7CAEB); }
 /* The Agenda (the decks README, small details 14): the deck's sections, numbered, drawn from the deck. In Present the
    sections passed are muted and the next one is in the accent; an editor's deck with no sections shows a quiet line. */
-.deck-sl.is-blocks .blk-agenda { margin: 0 0 .55em; }
+.deck-sl.is-blocks .blk-agenda { margin: 0 0 calc(12px * var(--fit, 1)); }
 .deck-sl.is-blocks .blk-agenda ol { list-style: none; margin: 0; padding: 0; }
 .deck-sl.is-blocks .blk-agenda li { display: flex; align-items: baseline; gap: .75em; margin: 0 0 .5em; font: 600 1.12em/1.3 var(--s-fh, 'Sofia Sans'), sans-serif; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks .blk-agenda li::marker { content: none; }
@@ -392,12 +391,12 @@
    its pane and joins it like a folder's tab, with no line under its words. The others are plain words: brighter under
    the pointer, a soft fill when pressed, the accent's ring for the keyboard. Every pane stands in the same place, so the
    block is as tall as its tallest tab; only the chosen one shows (`data-active`, the renderer's and the stage's alike). */
-.deck-sl.is-blocks .blk-tabs { position: relative; display: flex; flex-direction: column; min-width: 0; margin: .3em 0 .55em; border-radius: var(--s-r, 14px); background: var(--s-tband, rgba(255,255,255,.07)); overflow: hidden; }
+.deck-sl.is-blocks .blk-tabs { position: relative; display: flex; flex-direction: column; min-width: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r, 14px); background: var(--s-tband, rgba(255,255,255,.07)); overflow: hidden; }
 /* Its edge over the band and the pane alike (a shadow on the block itself would go under the pane's ground). */
 .deck-sl.is-blocks .blk-tabs::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--s-boxl, rgba(255,255,255,.12)); pointer-events: none; }
 .deck-sl.is-blocks .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 10px; margin-bottom: -10px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .deck-sl.is-blocks .blk-tabbar::-webkit-scrollbar { display: none; }
-.deck-sl.is-blocks .blk-tab { flex: none; position: relative; z-index: 0; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 1.1em; border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
+.deck-sl.is-blocks .blk-tab { flex: none; position: relative; z-index: 0; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 calc(13px * var(--fit, 1)); border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
 .deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #fff); }
 /* The chosen tab's ground is one shape that runs on past its foot into the pane's, never a ground of its own that meets
    the pane's at the join: on a scaled slide (the stage, the strip, the wall, the page) the join falls inside a pixel,
@@ -406,14 +405,14 @@
    top so nothing moves; the open pane, above the band, keeps its clicks and its words start below it. */
 .deck-sl.is-blocks .blk-tab::before { content: ''; position: absolute; inset: 0 0 -10px; z-index: -1; border-radius: inherit; background: transparent; transition: background-color .12s; pointer-events: none; }
 .deck-sl.is-blocks .blk-tab.is-active::before { background: var(--s-tpane, #0E0F2C); }
-/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 16 to 10 (slide units),
+/* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 13 (slide px times the fit; Sprint 164) to 10 (slide units),
    then the label steps down from 14.5 to 13, then 12, the tab keeping its 38 height; only then does the band scroll,
    with its fade (`tabsFit.ts` measures and sets `data-fit`). */
 .deck-sl.is-blocks .blk-tabs[data-fit="1"] > .blk-tabbar > .blk-tab { padding: 0 .69em; }
 .deck-sl.is-blocks .blk-tabs[data-fit="2"] > .blk-tabbar > .blk-tab { font-size: .5417em; height: 2.92em; padding: 0 .77em; }
 .deck-sl.is-blocks .blk-tabs[data-fit="3"] > .blk-tabbar > .blk-tab { font-size: .5em; height: 3.17em; padding: 0 .83em; }
 .deck-sl.is-blocks .blk-tabpanes { flex: 0 1 auto; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); background: var(--s-tpane, #0E0F2C); }
-.deck-sl.is-blocks .blk-tabpane { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: hidden auto; box-sizing: border-box; padding: 1.07em 1.2em 1.2em; visibility: hidden; color: var(--s-tx, #D5D8F2); font-size: .625em; line-height: 1.47; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
+.deck-sl.is-blocks .blk-tabpane { grid-area: 1 / 1; min-width: 0; min-height: 0; overflow: hidden auto; box-sizing: border-box; padding: calc(18px * var(--fit, 1)); visibility: hidden; color: var(--s-tx, #D5D8F2); font-size: .625em; line-height: 1.47; scrollbar-width: thin; scrollbar-color: var(--s-ph, rgba(255,255,255,.25)) transparent; }
 .deck-sl.is-blocks .blk-tabpane > :last-child { margin-bottom: 0; }
 .deck-sl.is-blocks .blk-tabpane h3 { font-size: 1.15em; }
 .deck-sl.is-blocks .blk-tabname { display: none; }

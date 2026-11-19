@@ -215,7 +215,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, stepsLabel, pickIco
       for (let index = 0; index + 1 < columns.length; index++) {
         const a = columns[index].getBoundingClientRect()
         const b = columns[index + 1].getBoundingClientRect()
-        lines.push({ x: b.left - origin.left, left: a.left, right: b.right })
+        // The split's handle sits in the middle of the gap between the two columns (README "Spacing on the slide").
+        lines.push({ x: (a.right + b.left) / 2 - origin.left, left: a.left, right: b.right })
       }
     }
     // A list's or Steps' markers sit left of its first item's words: the + goes under their middle.

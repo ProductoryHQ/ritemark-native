@@ -51,6 +51,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Share the deck as a page.** **Publish** puts it online as one page that people open on a phone or a computer. Each prompt has **Copy**, and exercise steps can be ticked.
 - **Comments and skipped slides stay with you.** Before anything goes, Ritemark lists what goes and what stays.
 - **The page keeps its look until you update it.** Change the theme, and the page online changes only with **Update the page**.
+- **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
 <!-- DECKS END -->
 
 ## Smaller changes
