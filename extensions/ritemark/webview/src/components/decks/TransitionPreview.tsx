@@ -14,6 +14,7 @@ import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { SlideCanvas } from './slide/SlideCanvas'
 import { MOTION_MS, MotionRun, type DeckTransition, type MotionDirection } from './present/wallMotion'
+import { rowPlays } from '../../../../src/decks/present/slideArrival'
 export { previewTarget } from './present/wallMotion'
 import { playStep, prefersReducedMotion } from './present/playMotion'
 import { wallGround } from './theme/themeVars'
@@ -86,7 +87,9 @@ export function TransitionPreview({ request, target, from, to, direction, width,
       for (const animation of element.getAnimations?.() ?? []) animation.cancel()
       element.style.visibility = ''
     }
-    motion.begin(MOTION_MS[transition], playStep(transition, there, { leaving: first, entering: second, distance }), () => {
+    // README item 20: going on, the content arrives in a row, as on the wall; coming back, the slide is whole.
+    const ahead = playStep(transition, there, { leaving: first, entering: second, distance }, [], rowPlays(there === 'next', transition, false, false))
+    motion.begin(ahead.ms, ahead, () => {
       if (stopped) return
       hold = window.setTimeout(() => {
         if (stopped) return

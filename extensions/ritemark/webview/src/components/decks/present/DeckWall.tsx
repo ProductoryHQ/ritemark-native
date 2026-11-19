@@ -17,7 +17,10 @@
  *  - Between slides, the deck's transition (README item 19: Fade, the default 0.3 s fade, the one before fading out as
  *    the next fades in over the one ground; Push; Zoom; None), or the smooth move where elements match (item 17). A
  *    press during either jumps it to its end at once and goes on; with reduced motion nothing moves. The rules are
- *    `wallMotion.ts`, the drawing `playMotion.ts`.
+ *    `wallMotion.ts`, the drawing `playMotion.ts`. Item 20: a press going on (and Home, and the start of presenting)
+ *    brings the new slide's content in a row (`slideArrival.rowPlays` on the host's `arrival`, drawn by
+ *    `rowArrival.ts`, the published page's own drawing too); going back, a jump, or a slide that comes as the wall is
+ *    uncovered shows it whole.
  *  - B or "." blanks the wall to the theme's ground (white on Borderless), W to white, with the same fade. Any key or a
  *    click brings the slide back, and does nothing else (`blankKeyOf`); the presenter view says the wall is blank.
  *  - Small details item 3: for a published deck, Q (or the presenter view's "Show the page") shows the page's QR code
@@ -55,8 +58,10 @@ import { CANVAS_WIDTH } from '../slide/layoutSlide'
 import { themeVars, wallGround } from '../theme/themeVars'
 import { PageCode } from './PageCodeView'
 import { blankKeyOf, blankNow, countLabel, fillKeyOf, goToKey, settleAsked, spotClickOf, spotKeyOf, wallBleed, wallKeyOf, wallSlideSize, type SpotClick, type WallBlank } from './wallKeys'
-import { directionOf, MOTION_MS, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
-import { motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
+import { directionOf, MotionRun, REVEAL_MS, revealArrivals, revealRises, stepOf, transitionOf, type MotionDirection } from './wallMotion'
+import { drawingOf, motionPairsOf, playReveal, playStep, prefersReducedMotion } from './playMotion'
+import { ROW_PLAYER, type RowTransition } from './rowArrival'
+import { opensOnward, rowPlays, slideArrivalOf, type SlideArrival } from '../../../../../src/decks/present/slideArrival'
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
 import { useTimerNow } from './useTimerNow'
@@ -97,7 +102,10 @@ export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
   // The slide before the last move, going as the new one comes (README 19, the deck's transition, or 17's smooth move).
   // A move during a step first jumps that step to its end (`MotionRun`), so the slide going is always the whole one.
-  const [leaving, setLeaving] = useState<{ slide: WallSlide; serial: number; direction: MotionDirection; reveal: number | undefined } | null>(null)
+  // README item 20: how the new slide arrived (the host's `arrival`), and whether the wall was covered (blank, the QR
+  // code, a filled picture) when it did: a press going on brings its content in a row, anything else shows it whole.
+  // Presenting starts with the first slide arriving in a row from the theme's ground: a step with no slide going.
+  const [leaving, setLeaving] = useState<{ slide: WallSlide | null; serial: number; direction: MotionDirection; reveal: number | undefined; arrival: SlideArrival | null; wasCovered: boolean } | null>(null)
   // README item 18: the items a press just showed, rising in on the slide now (one step's own number, as a move's).
   const [arriving, setArriving] = useState<{ from: number; to: number; serial: number } | null>(null)
   const enteringRef = useRef<HTMLDivElement | null>(null)
@@ -176,7 +184,12 @@ export function DeckWall() {
         setSerial(value => value + 1)
         moves.current += 1
         // The slide going is drawn as the room last saw it: at its step (README item 18).
-        setLeaving({ slide: previous.slide, serial: moves.current, direction, reveal: previous.reveal?.shown })
+        const wasCovered = previous.blank !== null || previous.fill !== null || fillShown.current
+        setLeaving({ slide: previous.slide, serial: moves.current, direction, reveal: previous.reveal?.shown, arrival: slideArrivalOf(next.arrival), wasCovered })
+      } else if (!previous && slideArrivalOf(next.arrival) === 'start') {
+        // The presentation's first slide, its content arriving in a row from the theme's ground.
+        moves.current += 1
+        setLeaving({ slide: null, serial: moves.current, direction: 'next', reveal: undefined, arrival: 'start', wasCovered: false })
       } else {
         // README item 18: a press that showed the next item on this slide; it rises in once it is drawn.
         const arrivals = revealArrivals(previous?.reveal ?? null, next.reveal, !!previous)
@@ -207,30 +220,41 @@ export function DeckWall() {
   // The step from the slide before to this one, started once both are drawn (and fitted) and before they are painted;
   // the slide before is taken away when it ends, at its time or at a press.
   const leavingSerial = leaving?.serial
-  const leavingDirection = useRef<MotionDirection>('next')
-  leavingDirection.current = leaving?.direction ?? 'next'
+  const leavingStep = useRef(leaving)
+  leavingStep.current = leaving
   useLayoutEffect(() => {
     if (leavingSerial === undefined) return
     const run = motion.current
     const frame = window.requestAnimationFrame(() => {
-      const before = leavingRef.current
+      const step = leavingStep.current
+      const starting = step?.slide === null
+      const before = starting ? null : leavingRef.current
       const now = enteringRef.current
       const current = stateRef.current
-      if (!run || !before || !now || !current) { setLeaving(null); return }
+      if (!run || !step || (!before && !starting) || !now || !current) { setLeaving(null); return }
       // A press came since this move, before its step could start (README item 18: it showed the new slide's next
       // item): the move is at its end at once, as for any press during one, and the item's rise goes on.
       if (moves.current !== leavingSerial) { setLeaving(value => (value?.serial === leavingSerial ? null : value)); return }
       // Nothing moves under a blank wall, the page's QR code or a picture filling the wall: the slide is simply there
       // when it is shown again.
       const covered = current.blank !== null || current.fill !== null || fillShown.current
-      const still = prefersReducedMotion() || covered
+      const reduced = prefersReducedMotion()
+      const still = reduced || covered
       const transition = transitionOf(current.transition)
+      // README item 20: a press going on (and Home, and the start) brings the content in a row; going back, a jump, or
+      // a slide that comes as the wall is uncovered shows it whole. None and reduced motion: no row (`rowPlays`).
+      const row = rowPlays(opensOnward(step.arrival), transition, reduced, covered || step.wasCovered)
+      const done = () => setLeaving(value => (value?.serial === leavingSerial ? null : value))
+      if (!before) {
+        const played = row ? ROW_PLAYER.play(now, null, { transition: transition as RowTransition, width: window.innerWidth }) : null
+        run.begin(played ? played.end : 0, played ? drawingOf(played.animations) : null, done)
+        return
+      }
       // None is a cut, even where elements match: nothing to look for.
       const pairs = still || transition === 'none' ? [] : motionPairsOf(before, now)
-      const step = stepOf(transition, still, pairs.length > 0)
-      const direction = leavingDirection.current
-      const drawing = playStep(step, direction, { leaving: before, entering: now, distance: window.innerWidth }, pairs)
-      run.begin(MOTION_MS[step], drawing, () => setLeaving(value => (value?.serial === leavingSerial ? null : value)))
+      const kind = stepOf(transition, still, pairs.length > 0)
+      const drawing = playStep(kind, step.direction, { leaving: before, entering: now, distance: window.innerWidth }, pairs, row)
+      run.begin(drawing.ms, drawing, done)
     })
     return () => window.cancelAnimationFrame(frame)
   }, [leavingSerial])
@@ -498,7 +522,7 @@ export function DeckWall() {
         aria-live="polite"
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
-        {leaving ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true, leaving.reveal) : null}
+        {leaving?.slide ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true, leaving.reveal) : null}
         {layer(state.slide, '', `slide-${serial}`, false, state.reveal?.shown)}
       </div>
 

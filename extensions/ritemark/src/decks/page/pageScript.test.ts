@@ -18,6 +18,8 @@ import domino from '@mixmark-io/domino';
 import { scriptBuildsReferences } from '../../publish/references';
 import * as editorEdges from '../../../webview/src/extensions/tables/tableEdges';
 import { EASE_IN_OUT, EASE_OUT, MOTION_MS, REVEAL_MS, REVEAL_RISE, ROW, ZOOM_FROM } from '../../../webview/src/components/decks/present/wallMotion';
+import { ROW_NUMBERS, ROW_PLAYER, rowPlayer, type RowPlayer } from '../../../webview/src/components/decks/present/rowArrival';
+import { opensOnward, rowPlays } from '../present/slideArrival';
 import { revealOnArrival as hostRevealOnArrival, revealStepOf } from '../present/revealSteps';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { blockSlideMarkup } from '../blocks/slideRenderer';
@@ -40,25 +42,47 @@ interface Motion {
   ZOOM_FROM: number;
   REVEAL_MS: number;
   REVEAL_RISE: number;
-  rowDelays(n: number, lead: number, push: boolean): number[];
+  ROW_PLAYER: RowPlayer;
+  opensOnward: typeof opensOnward;
+  rowPlays: typeof rowPlays;
   revealOnArrival(count: number, onward: boolean): number | null;
   revealStep(shown: number | null, count: number, forward: boolean): number | null;
   stillFor(transition: string, reduced: boolean): boolean;
 }
-const motion = new Function(`${PAGE_MOTION_RULE}\nreturn { MOTION, ZOOM_FROM, REVEAL_MS, REVEAL_RISE, rowDelays, revealOnArrival, revealStep, stillFor };`)() as Motion;
+const motion = new Function(`${PAGE_MOTION_RULE}\nreturn { MOTION, ZOOM_FROM, REVEAL_MS, REVEAL_RISE, ROW_PLAYER, opensOnward, rowPlays, revealOnArrival, revealStep, stillFor };`)() as Motion;
 {
   assert.deepEqual(motion.MOTION, { fade: MOTION_MS.fade, push: MOTION_MS.push, zoom: MOTION_MS.zoom }, 'the wall\'s transitions');
   assert.equal(motion.ZOOM_FROM, ZOOM_FROM);
   assert.equal(motion.REVEAL_MS, REVEAL_MS);
   assert.equal(motion.REVEAL_RISE, REVEAL_RISE);
-  // Item 20: 70 ms apart up to eight pieces; with more, the gap shrinks (28 ms at least); from the 14th on, with the 14th.
-  assert.deepEqual(motion.rowDelays(4, 140, false), [140, 210, 280, 350]);
-  assert.deepEqual(motion.rowDelays(8, 0, false), [0, 70, 140, 210, 280, 350, 420, 490]);
-  const many = motion.rowDelays(30, 0, false);
+  // Item 20: the row is the wall's own code, not a copy. The page carries the source of the wall's player and of the
+  // rule for which arrival plays it, with the wall's numbers.
+  assert.ok(PAGE_MOTION_RULE.includes(`var ROW_PLAYER = (${String(rowPlayer)})(${JSON.stringify(ROW_NUMBERS)});`), 'the wall\'s player, as its source');
+  assert.ok(PAGE_MOTION_RULE.includes(`var rowPlays = (${String(rowPlays)});`) && PAGE_MOTION_RULE.includes(`var opensOnward = (${String(opensOnward)});`), 'the wall\'s rule, as its source');
+  assert.ok(!/rowDelays|piecesOf|ROW_GAP|LEAVE_MS|data-reveal-hidden'\)\) return/.test(PAGE_SCRIPT.replace(String(rowPlayer), '')), 'no row of the page\'s own left');
+  assert.ok(!PAGE_SCRIPT.includes('__name'), 'nothing a build step wrapped: the source runs alone');
+  assert.deepEqual(
+    { gap: ROW_NUMBERS.gap, minGap: ROW_NUMBERS.minGap, span: ROW_NUMBERS.span, last: ROW_NUMBERS.last, ms: ROW_NUMBERS.ms, rise: ROW_NUMBERS.rise, zoom: ROW_NUMBERS.zoom, leaveMs: ROW_NUMBERS.leaveMs, pushGap: ROW_NUMBERS.pushGap, photoMs: ROW_NUMBERS.photoMs, photoShift: ROW_NUMBERS.photoShift, behindFrom: ROW_NUMBERS.behindFrom, pushMs: ROW_NUMBERS.pushMs, easeOut: ROW_NUMBERS.easeOut, easeInOut: ROW_NUMBERS.easeInOut },
+    { ...ROW, pushMs: MOTION_MS.push, easeOut: EASE_OUT, easeInOut: EASE_IN_OUT },
+    'the numbers are the wall\'s (wallMotion.ROW)',
+  );
+  // The page's player, run alone, times the row as the wall's does. 70 ms apart up to eight pieces; with more, the gap
+  // shrinks (28 ms at least); from the 14th on, with the 14th; Push 30 ms apart.
+  for (const n of [0, 1, 4, 8, 9, 13, 14, 30]) {
+    for (const lead of [0, 140]) for (const push of [false, true]) assert.deepEqual(motion.ROW_PLAYER.delays(n, lead, push), ROW_PLAYER.delays(n, lead, push), `${n} ${lead} ${push}`);
+  }
+  assert.deepEqual(motion.ROW_PLAYER.delays(4, 140, false), [140, 210, 280, 350]);
+  const many = motion.ROW_PLAYER.delays(30, 0, false);
   assert.equal(many[1], 28, 'never closer than 28 ms');
   assert.equal(many[13], many[29], 'the 14th and every one after it together');
-  assert.ok(many[29] + 480 <= 900, 'a slide settles within about 0.9 s');
-  assert.deepEqual(motion.rowDelays(3, 0, true), [0, 30, 60], 'Push: the pieces come on the slide\'s heels, 30 ms apart');
+  assert.ok(many[29] + ROW.ms <= 900, 'a slide settles within about 0.9 s');
+  // Which arrival plays it: the page's copy answers as the wall's rule does, for every arrival, transition and motion.
+  for (const arrival of ['next', 'home', 'start', 'back', 'jump', 'still', null]) {
+    assert.equal(motion.opensOnward(arrival), opensOnward(arrival), String(arrival));
+    for (const transition of ['fade', 'push', 'zoom', 'none']) for (const reduced of [false, true]) {
+      assert.equal(motion.rowPlays(motion.opensOnward(arrival), transition, reduced, false), rowPlays(opensOnward(arrival), transition, reduced, false));
+    }
+  }
   // Item 18, as the host's own steps (`revealSteps.ts`): going on opens with the first item, any other way whole.
   for (const count of [0, 1, 4]) {
     assert.equal(motion.revealOnArrival(count, true), hostRevealOnArrival(count, 'first')?.shown ?? null);
@@ -163,10 +187,23 @@ interface Run {
   on(): number;
   advance(ms: number): void;
 }
-function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number } = {}): Run {
-  const doc = domino.createDocument(html, true) as Document;
+/** One animation the page started (with `played`): on which element, and how. */
+interface Played { element: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions }
+function recordAnimations(doc: Document, played: Played[]): void {
+  let proto = Object.getPrototypeOf(doc.body);
+  while (proto && !Object.prototype.hasOwnProperty.call(proto, 'getAttribute')) proto = Object.getPrototypeOf(proto);
+  proto.animate = function (this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+    played.push({ element: this, keyframes, options });
+    return { finish() { /* */ }, cancel() { /* */ } };
+  };
+  if (!proto.getBoundingClientRect) proto.getBoundingClientRect = () => ({ width: 1440, height: 810, left: 0, top: 0 });
+}
+function runPage(options: { hash?: string; kept?: Record<string, string>; width?: number; motion?: boolean; transition?: string; played?: Played[]; page?: string } = {}): Run {
+  const doc = domino.createDocument(options.page ?? html, true) as Document;
   // The page's own script element stays out: the test runs the same text itself.
   doc.querySelector('script')?.remove();
+  if (options.transition) doc.body.setAttribute('data-transition', options.transition);
+  if (options.played) recordAnimations(doc, options.played);
   const kept = new Map(Object.entries(options.kept ?? {}));
   const location = { hash: options.hash ?? '', pathname: '/deck/index.html', search: '', protocol: 'https:', origin: 'https://pages.example' };
   const listeners = new Map<string, Array<(event: unknown) => void>>();
@@ -180,7 +217,7 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
     history: { replaceState(_state: unknown, _title: string, url: string) { location.hash = url.startsWith('#') ? url : ''; } },
     localStorage: { getItem: (key: string) => kept.get(key) ?? null, setItem: (key: string, value: string) => { kept.set(key, value); } },
     // Reduced motion (nothing animates in a DOM without layout), and the width's own one-column rule.
-    matchMedia: (query: string) => ({ matches: query.includes('reduced-motion') || (query.includes('max-width: 860px') && width <= 860) }),
+    matchMedia: (query: string) => ({ matches: (query.includes('reduced-motion') && !options.motion) || (query.includes('max-width: 860px') && width <= 860) }),
     addEventListener(type: string, listener: (event: unknown) => void) { listeners.set(type, [...(listeners.get(type) ?? []), listener]); },
     setTimeout(run: () => void, ms: number) { timers.set(++ids, { at: now + ms, run }); return ids; },
     clearTimeout(id: number) { timers.delete(id); },
@@ -332,6 +369,103 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
   assert.ok(linked.doc.getElementById('restart')!.hasAttribute('hidden'));
 }
 
+// ---- README item 20 on the page, with motion: how a slide arrives decides row or whole, and the row is the wall's own
+// drawing (the page's animations are exactly what the wall's ROW_PLAYER starts on the same slides).
+{
+  const played: Played[] = [];
+  const run = runPage({ hash: '#2', motion: true, played });
+  const layer = (n: number) => run.doc.getElementById(`s${n}`)!;
+  const isLayer = (element: Element) => element.classList.contains('layer');
+  const inner = () => played.filter(entry => !isLayer(entry.element));
+  const settleRun = () => { run.advance(5000); played.length = 0; };
+  assert.equal(played.length, 0, 'the page opens still, as a jump does');
+
+  // → to slide 3 (its list One by one): slide 2 leaves as one in 0.15 s and stays gone; slide 3's title and first item
+  // arrive in a row, 70 ms apart after the lead; the items not shown yet wait.
+  run.key('ArrowRight');
+  assert.equal(run.on(), 2);
+  const leave = played.filter(entry => entry.element === layer(2));
+  assert.equal(leave.length, 1);
+  assert.equal(leave[0].options.duration, ROW.leaveMs);
+  assert.equal(leave[0].options.fill, 'forwards', 'the slide before stays gone until it is taken away (no flash)');
+  assert.deepEqual(inner().map(entry => entry.element.tagName), ['H1', 'LI'], 'the title, then the first item');
+  assert.deepEqual(inner().map(entry => entry.options.delay), [ROW.leaveMs - 10, ROW.leaveMs - 10 + ROW.gap]);
+  assert.ok(inner().every(entry => entry.options.fill === 'backwards' && entry.keyframes[0].transform === `translateY(${ROW.rise}px)`));
+  // The wall's own player on the same two slides starts exactly the same animations.
+  const seen = (entry: Played) => JSON.stringify({ element: `${entry.element.tagName}#${entry.element.id}:${entry.element.textContent?.slice(0, 20)}`, keyframes: entry.keyframes, options: entry.options });
+  const page = played.map(seen);
+  played.length = 0;
+  ROW_PLAYER.play(layer(3), layer(2), { transition: 'fade', width: 1440 });
+  assert.deepEqual(played.map(seen), page, 'the page and the wall move the same');
+  settleRun();
+
+  // Item 18 still works with it: the next press shows the next item with the wall's rise, nothing else moves.
+  run.key('ArrowRight');
+  assert.equal(played.length, 1);
+  assert.equal(played[0].element.getAttribute('data-reveal-item'), '1');
+  assert.equal(played[0].keyframes[0].transform, `translateY(${REVEAL_RISE}px)`);
+  settleRun();
+
+  // Going back, a jump from Contents and End show the slide whole (only the two slides move); Home is a press going on.
+  run.key('ArrowLeft');
+  run.key('ArrowLeft');
+  assert.equal(run.on(), 1, 'back to slide 2');
+  assert.ok(played.length > 0 && inner().length === 0, 'going back: whole');
+  settleRun();
+  run.click(run.doc.querySelector('#toc [data-go="3"]')!);
+  assert.equal(run.on(), 3);
+  assert.ok(played.length > 0 && inner().length === 0, 'Contents: whole');
+  settleRun();
+  run.key('Home');
+  assert.equal(run.on(), 0);
+  assert.ok(inner().length >= 2, 'Home: the first slide in a row, as → opens it');
+  settleRun();
+  run.key('End');
+  assert.ok(played.length > 0 && inner().length === 0, 'End: whole');
+  settleRun();
+}
+// As on the wall (review of #810): Home opens the first slide at its first item even when it is on it already, and a
+// press that goes nowhere (back on the first slide) keeps the step rather than showing every item.
+{
+  const firstReveals = publicDeck([
+    '---', 'deck: 2', 'title: T', '---', '',
+    slide('# Your list\n\n::: incremental\n- One\n- Two\n- Three\n:::'), '',
+    slide('# Next'), '',
+  ].join('\n'), { folderName: 'F', deckName: 'd', theme: BUILT_IN_THEME });
+  const run = runPage({ page: pageHtml(firstReveals, assets, { digest: deckDigest(firstReveals), pictureUrl: () => null }) });
+  const hidden = () => run.doc.querySelectorAll('#s1 [data-reveal-hidden]').length;
+  assert.equal(hidden(), 0, 'opened as it is: whole');
+  run.key('Home');
+  assert.equal(hidden(), 2, 'Home on the first slide: its first item, as on the wall');
+  run.key('ArrowRight');
+  assert.equal(hidden(), 1);
+  run.key('ArrowLeft');
+  run.key('ArrowLeft');
+  assert.equal(run.on(), 0);
+  assert.equal(hidden(), 2, 'back on the first slide at its first item goes nowhere and keeps the step');
+}
+// None and reduced motion: no row, nothing moves at all; one column brings the new slide alone.
+{
+  const none: Played[] = [];
+  const still = runPage({ hash: '#2', motion: true, transition: 'none', played: none });
+  still.key('ArrowRight');
+  assert.equal(still.on(), 2);
+  assert.equal(none.length, 0, 'None: a cut');
+  const reduced: Played[] = [];
+  const quiet = runPage({ hash: '#2', played: reduced });
+  quiet.key('ArrowRight');
+  assert.equal(reduced.length, 0, 'reduced motion: everything at once');
+  const column: Played[] = [];
+  const narrow = runPage({ hash: '#2', width: 720, motion: true, played: column });
+  narrow.key('ArrowRight');
+  assert.ok(column.length > 0 && column.every(entry => !entry.element.classList.contains('layer')), 'one column: the pieces in a row, the slide before already out');
+  column.length = 0;
+  narrow.advance(5000);
+  narrow.key('ArrowLeft');
+  assert.equal(narrow.on(), 1);
+  assert.ok(column.length === 1 && column[0].element.classList.contains('layer'), 'one column, back: the slide whole, fading in');
+}
+
 // One column: the frame is left to the CSS (no size set), and the page still steps.
 {
   const run = runPage({ hash: '#2', width: 720 });
@@ -343,8 +477,6 @@ function runPage(options: { hash?: string; kept?: Record<string, string>; width?
 // Review of #807: the row's numbers are the wall's own (wallMotion.ROW), a Tabs block is fitted when its slide comes in,
 // and the tick goes last in its step, so the step's own first element keeps its style.
 {
-  const row = new Function(`${PAGE_MOTION_RULE}\nreturn { ROW_GAP, ROW_MIN_GAP, ROW_SPAN, ROW_LAST, ROW_MS, ROW_RISE, ROW_ZOOM, LEAVE_MS, PUSH_ROW_GAP, PUSH_MS, EASE_OUT, EASE_IN_OUT };`)() as Record<string, number | string>;
-  assert.deepEqual(row, { ROW_GAP: ROW.gap, ROW_MIN_GAP: ROW.minGap, ROW_SPAN: ROW.span, ROW_LAST: ROW.last, ROW_MS: ROW.ms, ROW_RISE: ROW.rise, ROW_ZOOM: ROW.zoom, LEAVE_MS: ROW.leaveMs, PUSH_ROW_GAP: ROW.pushGap, PUSH_MS: MOTION_MS.push, EASE_OUT, EASE_IN_OUT });
   assert.match(PAGE_SCRIPT, /layout\(\);\n\s*\/\/ A Tabs block is measured[^\n]*\n\s*fitTabBands\(\);/, 'go() fits the tabs of the slide it shows');
   const drawn = blockSlideMarkup({ markdown: '# T\n\n::: steps\n1. **Save** it\n2. Open the file\n\n   Then read it\n:::' }, { theme: BUILT_IN_THEME, borderless: false, ticks: true });
   const items = [...drawn.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)].map(match => match[1]);

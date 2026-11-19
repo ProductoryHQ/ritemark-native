@@ -22,6 +22,7 @@ import {
   type MotionClock, type MotionElement,
 } from './wallMotion'
 import { playReveal, playStep } from './playMotion'
+import { ROW_NUMBERS } from './rowArrival'
 import { spotItems } from './spotlight'
 
 // ---- The deck's transition, and the menu's four
@@ -260,6 +261,85 @@ class FakeClock implements MotionClock {
   assert.match(wallSource, /if \(moves\.current !== leavingSerial\) \{ setLeaving\(value => \(value\?\.serial === leavingSerial \? null : value\)\); return \}/)
   // The slide on the wall and the one going are drawn at their steps; the editor's canvases never are.
   assert.match(wallSource, /layer\(state\.slide, '', `slide-\$\{serial\}`, false, state\.reveal\?\.shown\)/)
+}
+
+// ---- README item 20 on the wall: with `row` (a press going on), the new slide's content arrives in a row, drawn by the
+// one player the page carries too (`rowArrival.ts`); without it the slide comes whole, as before.
+{
+  const BOXES = ['# Four ideas', '', ':::: {.boxes reveal="one"}', ...['One', 'Two', 'Three', 'Four'].flatMap(word => ['::: box', `### ${word}`, ':::', '']), '::::', '', 'A line after them.'].join('\n')
+  const doc = createDocument(`<body><div class="wall-slide is-leaving">${blockCanvasMarkup({ markdown: '# Four ideas\n\nWords before.' }, {})}</div><div class="wall-slide">${blockCanvasMarkup({ markdown: BOXES }, { reveal: 1 })}</div></body>`)
+  const [leaving, entering] = Array.from(doc.querySelectorAll('.wall-slide')) as unknown as HTMLElement[]
+  const made: Array<{ element: Element; keyframes: Keyframe[]; options: KeyframeAnimationOptions; finished: number }> = []
+  let proto = Object.getPrototypeOf(entering)
+  while (proto && !Object.prototype.hasOwnProperty.call(proto, 'getAttribute')) proto = Object.getPrototypeOf(proto)
+  proto.animate = function (this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+    const animation = { element: this, keyframes, options, finished: 0, finish() { this.finished += 1 }, cancel() { /* */ } }
+    made.push(animation)
+    return animation
+  }
+  const layers = { leaving, entering, distance: 1440 }
+  const pieces = () => made.filter(entry => !entry.element.classList.contains('wall-slide'))
+  const label = (entry: { element: Element }) => `${entry.element.tagName}:${(entry.element.textContent ?? '').trim().slice(0, 12)}`
+
+  // Fade, in a row: the slide before leaves as one in 0.15 s and stays gone; the title, the first box (the rest wait,
+  // One by one) and the line after them come 70 ms apart once it is going; the step runs until the last is in.
+  const fade = playStep('fade', 'next', layers, [], true)
+  const leave = made.filter(entry => entry.element === leaving)
+  assert.equal(leave.length, 1)
+  assert.deepEqual([leave[0].options.duration, leave[0].options.fill], [ROW_NUMBERS.leaveMs, 'forwards'])
+  assert.equal(made.filter(entry => entry.element === entering).length, 0, 'the new slide itself doesn\'t fade: its pieces come')
+  assert.deepEqual(pieces().map(label), ['H1:Four ideas', 'DIV:One', 'P:A line after'], 'in reading order, the items not shown yet waiting')
+  assert.deepEqual(pieces().map(entry => entry.options.delay), [140, 210, 280])
+  assert.ok(pieces().every(entry => entry.keyframes[0].transform === 'translateY(14px)' && entry.options.duration === 480 && entry.options.fill === 'backwards'))
+  assert.equal(fade.ms, 280 + 480, 'the step lasts until the last piece is in')
+  fade.finish()
+  assert.ok(made.every(entry => entry.finished === 1), 'a press puts every piece at its end at once')
+  // Push and Zoom, in a row.
+  made.length = 0
+  playStep('push', 'next', layers, [], true)
+  assert.deepEqual(made.filter(entry => entry.element === leaving).map(entry => entry.keyframes[1].transform), ['translateX(-1440px)'])
+  assert.deepEqual(pieces().map(entry => [entry.keyframes[0].transform, entry.options.delay]), [['translateX(960px)', 0], ['translateX(960px)', 30], ['translateX(960px)', 60]], 'on the slide\'s heels, 30 ms apart')
+  made.length = 0
+  playStep('zoom', 'next', layers, [], true)
+  assert.ok(pieces().length === 3 && pieces().every(entry => entry.keyframes[0].transform === 'scale(0.92)'), 'Zoom: each grows from 92 %')
+  // Whole (going back, a jump, a slide that comes as the wall is uncovered): only the two slides move, as before.
+  made.length = 0
+  const whole = playStep('fade', 'next', layers, [], false)
+  assert.equal(made.length, 2)
+  assert.equal(pieces().length, 0)
+  assert.equal(whole.ms, MOTION_MS.fade)
+  // None is a cut, row or not.
+  made.length = 0
+  playStep('none', 'next', { ...layers, leaving: entering.cloneNode(true) as HTMLElement }, [], true)
+  assert.equal(made.length, 0, 'None: no row')
+  // The smooth move: what glides is left out of the row; the rest arrive behind it.
+  made.length = 0
+  const title = entering.querySelector('h1') as HTMLElement
+  // (No layout here: a box for every element, and the computed style the glide reads.)
+  proto.getBoundingClientRect = () => ({ left: 0, top: 0, width: 100, height: 40 })
+  const computed = (globalThis as { getComputedStyle?: unknown }).getComputedStyle
+  ;(globalThis as { getComputedStyle?: unknown }).getComputedStyle = () => ({ fontSize: '16px', transform: 'none' })
+  playStep('move', 'next', layers, [{ key: 'block:title#1', kind: 'block', from: leaving.querySelector('h1') as HTMLElement, to: title }], true)
+  ;(globalThis as { getComputedStyle?: unknown }).getComputedStyle = computed
+  const inRow = pieces().filter(entry => entry.options.fill === 'backwards')
+  assert.ok(!inRow.some(entry => entry.element === title), 'the gliding title is not in the row')
+  assert.deepEqual(inRow.map(label), ['DIV:One', 'P:A line after'], 'the rest arrive behind it')
+  // Push on a screen wider than the slide (review of #810): the pieces come from as far as the slide before is pushed,
+  // the screen's width, in the canvas's pixels (a slide drawn 1200 px wide on a 1440 px screen: 1152), so they start off
+  // the screen rather than in the band beside the slide.
+  proto.getBoundingClientRect = function (this: Element) { return { left: 0, top: 0, width: this.classList.contains('deck-sl') ? 1200 : 100, height: 40 } }
+  made.length = 0
+  playStep('push', 'next', layers, [], true)
+  assert.ok(pieces().length === 3 && pieces().every(entry => entry.keyframes[0].transform === 'translateX(1152px)'), pieces().map(entry => String(entry.keyframes[0].transform)).join(' '))
+
+  // The wall decides with the host's arrival and the one rule (`slideArrival.rowPlays`); the start is a row from the
+  // ground; the presenter view never animates (it draws no motion at all).
+  const wallSource = readFileSync(fileURLToPath(new NodeURL('./DeckWall.tsx', import.meta.url)), 'utf8')
+  assert.match(wallSource, /const row = rowPlays\(opensOnward\(step\.arrival\), transition, reduced, covered \|\| step\.wasCovered\)/)
+  assert.match(wallSource, /playStep\(kind, step\.direction, \{ leaving: before, entering: now, distance: window\.innerWidth \}, pairs, row\)/)
+  assert.match(wallSource, /slideArrivalOf\(next\.arrival\) === 'start'/)
+  const presenterSource = readFileSync(fileURLToPath(new NodeURL('./DeckPresenterView.tsx', import.meta.url)), 'utf8')
+  assert.ok(!/playMotion|rowArrival|playStep|\.animate\(/.test(presenterSource), 'the presenter view never animates')
 }
 
 console.log('wallMotion: all tests passed')

@@ -402,12 +402,12 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   // Each move on the wall gets a number that only counts up, so a move arriving as a step ends still gets its own step.
   const wallSource = readFileSync(fileURLToPath(new URL('./present/DeckWall.tsx', import.meta.url)), 'utf8')
   // Nothing moves under a blank wall, the QR code or a filled wall (the coordinator, 18 November): the step is None.
-  assert.match(wallSource, /const covered = current\.blank !== null \|\| current\.fill !== null \|\| fillShown\.current\n\s+const still = prefersReducedMotion\(\) \|\| covered/)
+  assert.match(wallSource, /const covered = current\.blank !== null \|\| current\.fill !== null \|\| fillShown\.current\n\s+const reduced = prefersReducedMotion\(\)\n\s+const still = reduced \|\| covered/)
   assert.match(wallSource, /stepOf\(transition, still, pairs\.length > 0\)/)
   // A spotlight or a filled wall asked during a step puts the step at its end first.
   assert.match(wallSource, /const askSpot = useCallback\(\(item: number \| null\) => \{ jump\(\); askSpotWith/)
   // (README item 18: the slide going carries the step it was left at.)
-  assert.match(wallSource, /moves\.current \+= 1\n(?:\s+\/\/[^\n]*\n)*\s+setLeaving\(\{ slide: previous\.slide, serial: moves\.current, direction, reveal: previous\.reveal\?\.shown \}\)/)
+  assert.match(wallSource, /moves\.current \+= 1\n(?:\s+\/\/[^\n]*\n)*\s+const wasCovered = [^\n]*\n\s+setLeaving\(\{ slide: previous\.slide, serial: moves\.current, direction, reveal: previous\.reveal\?\.shown, arrival: slideArrivalOf\(next\.arrival\), wasCovered \}\)/)
   // A deck naming no theme, or a missing one, has Evening ticked.
   assert.equal(body(undefined).querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')
   assert.equal(body('Slide library/Themes/Gone.theme.md').querySelectorAll('.deck-theme-row')[0].getAttribute('aria-pressed'), 'true')
