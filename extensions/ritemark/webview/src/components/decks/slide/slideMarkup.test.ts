@@ -208,9 +208,11 @@ for (const name of ['truck', 'folder', 'list-checks', 'circle-dashed', 'arrow-ri
 
 // The icon menu draws its choices as the slide does, never through the chrome's Icon (its No icon cross stays chrome).
 {
-  const grid = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
-  assert.ok(grid.includes('<SlideIconGlyph name={icon.phosphor} size={16} />') && !grid.includes('<Icon name={icon.phosphor}'), 'the menu')
+  // Named not after the grid: Tailwind scans tests, and a negated variable of that name reads as its important class.
+  const menuSource = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
+  assert.ok(menuSource.includes('<SlideIconGlyph name={icon.phosphor} size={16} />'), 'the menu draws the slide glyph')
+  assert.equal(menuSource.includes('<Icon name={icon.phosphor}'), false, 'and not the chrome icon')
   const canvas = readFileSync(fileURLToPath(new URL('./SlideCanvas.tsx', import.meta.url)), 'utf8')
-  assert.ok(!canvas.includes("from '../../ui/Icon'"), "SlideCanvas draws no chrome icon")
+  assert.equal(canvas.includes("from '../../ui/Icon'"), false, 'SlideCanvas draws no chrome icon')
 }
 console.log('slideMarkup: every slide icon is drawn from the full set, in React and on the page alike')
