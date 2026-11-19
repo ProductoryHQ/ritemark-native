@@ -5,7 +5,7 @@
  * Run: npx tsx webview/src/components/formattingToolbar.test.ts
  */
 import assert from 'node:assert/strict'
-import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick, toolbarOnLinkDialog } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 
 const base = { empty: false, inCodeBlock: false, equationSelected: false, editorHasFocus: true, focusInToolbar: false }
 
@@ -59,10 +59,7 @@ for (const editorHasFocus of [true, false]) {
   }
 }
 assert.equal(formattingToolbarShows({ ...base, linkDialogOpen: false }), true, 'closed: the rule as before')
-assert.equal(toolbarOnLinkDialog({ open: true, shows: true }), 'hide', 'the dialog opens: the bubble goes')
-// Cancel or Esc: the words are still selected and the editor has the focus back, so the bubble returns.
-assert.equal(toolbarOnLinkDialog({ open: false, shows: true }), 'show')
-// Closed with nothing to format (Apply collapsed the selection, or the focus went elsewhere): it stays away.
-assert.equal(toolbarOnLinkDialog({ open: false, shows: false }), 'stay-hidden')
+// Closed again: the editor has the focus back and the words are still selected, so it shows (Cancel or Esc).
+assert.equal(formattingToolbarShows({ ...base, editorHasFocus: true, linkDialogOpen: false }), true)
 
 console.log('formattingToolbar: all passed')

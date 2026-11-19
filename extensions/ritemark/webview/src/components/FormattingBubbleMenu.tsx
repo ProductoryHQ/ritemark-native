@@ -17,7 +17,7 @@ import { commentBoxStorage, startComment } from '../extensions/comment/CommentNo
 import type { Selection } from '@tiptap/pm/state'
 import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import type { Instance as TippyInstance } from 'tippy.js'
-import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick, toolbarOnLinkDialog } from './formattingToolbar'
+import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
 
 /**
@@ -74,40 +74,17 @@ export function FormattingBubbleMenu({
   // #846: the Link dialog's state for `shouldShow`, which TipTap calls outside React's render.
   const linkDialogOpenRef = useRef(false)
 
-  // #846: the toolbar goes while its Link dialog is open, and comes back after it closes (Cancel, Esc, Apply or
-  // Remove) if the words are still selected and the editor has the focus again.
+  // #846: the toolbar goes while its Link dialog is open. The ref is cleared at once wherever the dialog closes, so
+  // TipTap's own re-check when the editor gets its focus back (onCloseAutoFocus below, or Apply's `focus()`) shows
+  // the toolbar again, at the selection's current place.
+  const closeLinkDialog = () => {
+    linkDialogOpenRef.current = false
+    setShowLinkDialog(false)
+  }
   useEffect(() => {
-    if (!editor) return
-    const wasOpen = linkDialogOpenRef.current
     linkDialogOpenRef.current = showLinkDialog
-    const tip = toolbarTippy.current
-    if (!tip) return
-    if (showLinkDialog) {
-      tip.hide()
-      return
-    }
-    if (!wasOpen) return
-    // After Radix has given the focus back to the editor (onCloseAutoFocus, a 0 ms timer of its own).
-    const timer = setTimeout(() => {
-      if (editor.isDestroyed) return
-      const { state, view } = editor
-      const action = toolbarOnLinkDialog({
-        open: false,
-        shows:
-          !(hiddenFor.current && state.selection.eq(hiddenFor.current)) &&
-          formattingToolbarShows({
-            empty: state.selection.empty,
-            inCodeBlock: editor.isActive('codeBlock'),
-            equationSelected: isEquationNodeSelection(state.selection),
-            pictureSelected: isPictureSelection(state.selection),
-            editorHasFocus: view.hasFocus(),
-            focusInToolbar: tip.popper.contains(tip.popper.ownerDocument.activeElement),
-          }),
-      })
-      if (action === 'show') tip.show()
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [showLinkDialog, editor])
+    if (showLinkDialog) toolbarTippy.current?.hide()
+  }, [showLinkDialog])
 
   useEffect(() => {
     if (!editor) return
@@ -208,7 +185,8 @@ export function FormattingBubbleMenu({
         const { empty } = selection
 
         // Guard: Don't open dialog in code blocks (matches BubbleMenu shouldShow logic)
-        if (!empty && !editor.isActive('codeBlock')) {
+        // Only the editor with the focus: a deck mounts several slide editors, each keeping its last selection.
+        if (!empty && !editor.isActive('codeBlock') && editor.view.hasFocus()) {
           const previousUrl = editor.getAttributes('link').href
           const { from, to } = editor.state.selection
           clickedHrefRef.current = undefined
@@ -260,7 +238,7 @@ export function FormattingBubbleMenu({
       .run()
 
     if (success) {
-      setShowLinkDialog(false)
+      closeLinkDialog()
       setLinkUrl('')
       setLinkDisplayText('')
       setUrlError('')
@@ -279,7 +257,7 @@ export function FormattingBubbleMenu({
     const chain = editor.chain().focus()
     ;(range ? chain.setTextSelection({ from: range.from, to: range.to }) : chain).unsetLink().run()
     clickedHrefRef.current = undefined
-    setShowLinkDialog(false)
+    closeLinkDialog()
     setLinkUrl('')
     setLinkDisplayText('')
     setUrlError('')
@@ -581,7 +559,8 @@ export function FormattingBubbleMenu({
       <Dialog.Root
         open={showLinkDialog}
         onOpenChange={(open) => {
-          setShowLinkDialog(open)
+          if (open) setShowLinkDialog(true)
+          else closeLinkDialog()
           if (!open) {
             setLinkUrl('')
             setLinkDisplayText('')
@@ -598,7 +577,8 @@ export function FormattingBubbleMenu({
             onCloseAutoFocus={(event) => {
               event.preventDefault()
               // view.focus(), not commands.focus(): no animation frame, so it also runs in a window drawn in the
-              // background, and it puts the kept selection back.
+              // background, and it puts the kept selection back. Its focus event makes TipTap show the toolbar again.
+              linkDialogOpenRef.current = false
               if (!editor.isDestroyed) editor.view.focus()
             }}
           >
@@ -650,7 +630,7 @@ export function FormattingBubbleMenu({
                             } else {
                               openInternalLink(target.href)
                             }
-                            setShowLinkDialog(false)
+                            closeLinkDialog()
                           }}
                           className="px-3 py-2 border rounded text-ink-muted hover:text-ink-strong hover:bg-surface-muted transition-colors"
                           aria-label={isExternal ? 'Open in browser' : 'Open file'}
@@ -732,7 +712,7 @@ export function FormattingBubbleMenu({
                   </Button>
                 )}
                 <Button
-                  onClick={() => setShowLinkDialog(false)}
+                  onClick={() => closeLinkDialog()}
                   variant="outline"
                 >
                   Cancel

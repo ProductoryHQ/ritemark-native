@@ -22,7 +22,11 @@ export function formattingToolbarShows(input: {
   editorHasFocus: boolean
   /** The focus is inside the toolbar itself. */
   focusInToolbar: boolean
-  /** #846: the toolbar's Link dialog is open; the toolbar steps aside until it closes. */
+  /**
+   * #846: the toolbar's Link dialog is open. On a slide the toolbar lives in the app's root (`bubbleHost`), above the
+   * dialog's overlay, and drew over the dialog; in the Text editor it stayed up behind the overlay. It steps aside
+   * until the dialog closes, when the editor's focus comes back and TipTap checks again.
+   */
   linkDialogOpen?: boolean
 }): boolean {
   if (input.linkDialogOpen) return false
@@ -32,18 +36,6 @@ export function formattingToolbarShows(input: {
   if (input.equationSelected) return false
   if (input.pictureSelected) return false
   return true
-}
-
-/**
- * #846: what the toolbar does when its Link dialog opens or closes. On a slide the toolbar lives in the app's root
- * (`bubbleHost`), above the dialog's overlay, so it drew over the dialog; in the Text editor it stayed up behind the
- * overlay. It hides when the dialog opens. When the dialog closes it comes back if its own rule says it shows (the
- * words are still selected and the editor has the focus again): TipTap checks `shouldShow` again only on a selection
- * or document change, so a Cancel or Esc, which changes neither, would otherwise leave it hidden.
- */
-export function toolbarOnLinkDialog(input: { open: boolean; shows: boolean }): 'hide' | 'show' | 'stay-hidden' {
-  if (input.open) return 'hide'
-  return input.shows ? 'show' : 'stay-hidden'
 }
 
 /**
