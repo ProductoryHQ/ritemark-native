@@ -170,18 +170,20 @@ test('the search finds nothing for nonsense or nothing, and offers only names th
 
 test("PR 3 (#868): the deck's icons in use, in the order it first uses them, each once, known ones only", () => {
   const slides = [
-    { data: { items: [{ icon: 'truck' }, { icon: 'Mail' }, { icon: 'not-a-real-icon' }, {}] } },
-    { data: { markdown: '# Two\n\n:::: boxes\n::: {.box icon="brain"}\n### A\n:::\n::: {.box icon="truck"}\n:::\n::: box\n:::\n::::' } },
+    { kind: 'boxes', data: { title: 'One', items: [{ icon: 'truck' }, { icon: 'Mail' }, { icon: 'not-a-real-icon' }, {}] } },
+    // A layout that draws no item's icon: its items' icons are in use nowhere.
+    { kind: 'title', data: { title: 'Cover', items: [{ icon: 'acorn' }] } },
+    { kind: 'blocks', data: { markdown: '# Two\n\n:::: boxes\n::: {.box icon="brain"}\n### A\n:::\n::: {.box icon="truck"}\n:::\n::: box\n:::\n::::\n::: {.column icon="rocket"}\n:::' } },
     // A `:::` line inside a code block is code, not a box; `envelope-simple` is the grid's mail, already in.
-    { data: { markdown: '```\n::: {.box icon="rocket"}\n```\n::: {.box icon=envelope-simple}\n:::\n~~~~\n::: {.box icon="acorn"}\n~~~\n~~~~\n::: {.box icon=\'users\'}\n:::' } },
-    { data: {} },
+    { kind: 'blocks', data: { markdown: '```\n::: {.box icon="rocket"}\n```\n::: {.box icon=envelope-simple}\n:::\n~~~~\n::: {.box icon="acorn"}\n~~~\n~~~~\n::: {.box icon=\'users\'}\n:::' } },
+    { kind: 'boxes', data: {} },
   ]
   assert.deepEqual(deckIconsInUse(slides).map(icon => icon.name), ['truck', 'mail', 'brain', 'users'])
   assert.deepEqual(deckIconsInUse([]), [])
 })
 
 test('PR 3: before typing, the icons in use, then the 24, each once; then results, a page at a time', () => {
-  const inUse = deckIconsInUse([{ data: { items: [{ icon: 'truck' }, { icon: 'brain' }, { icon: 'users' }] } }])
+  const inUse = deckIconsInUse([{ kind: 'boxes', data: { items: [{ icon: 'truck' }, { icon: 'brain' }, { icon: 'users' }] } }])
   const before = iconMenuChoices('', inUse)
   assert.equal(before.searching, false)
   // In use first (users among them), then the 24 without users: 3 + 23.
@@ -215,7 +217,7 @@ test('PR 3: a Phosphor name beats an alias and a tag', () => {
 })
 
 test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the foot and back to the field', () => {
-  const move = (at: number, step: 1 | -1, count = 26, withNoIcon = true) => iconMenuMove(at, step, count, withNoIcon, 6)
+  const move = (at: number, step: 1 | -1, count = 26, withNoIcon = true) => iconMenuMove(at, step === 1 ? 'down' : 'up', count, withNoIcon, 6)
   // From the field to the first icon, a row down each time, then No icon (place 26), where it stays.
   assert.deepEqual([-1, 0, 6, 12, 18, 24].map(at => move(at, 1)), [0, 6, 12, 18, 24, 26])
   assert.equal(move(20, 1), 26, 'the last full row: on to No icon')
@@ -229,6 +231,12 @@ test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the fo
   assert.equal(move(-1, 1, 0, true), 0)
   assert.equal(move(0, -1, 0, true), -1)
   assert.equal(move(-1, 1, 0, false), -1)
+  // ← and → walk the list one icon at a time, stopping at its ends; No icon and none stay.
+  const side = (at: number, way: 'left' | 'right') => iconMenuMove(at, way, 26, true, 6)
+  assert.deepEqual([0, 5, 24, 25].map(at => side(at, 'right')), [1, 6, 25, 25])
+  assert.deepEqual([0, 1, 6].map(at => side(at, 'left')), [0, 0, 5])
+  assert.equal(side(26, 'left'), 26)
+  assert.equal(side(-1, 'right'), -1)
 })
 
 console.log(`iconSearch: ${passed} passed`)

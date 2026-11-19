@@ -504,11 +504,6 @@ export function DeckView({
   const agendaRef = useRef(agendaDrawing)
   agendaRef.current = agendaDrawing
   const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
-  // Sprint 169 PR 3 (#868): the icon menu's first view, the deck's icons in use; the same list while they are the same.
-  const iconsFound = useMemo(() => deckIconsInUse(slides), [slides])
-  const iconsKey = iconsFound.map(icon => icon.phosphor).join(' ')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const iconsInUse = useMemo(() => iconsFound, [iconsKey])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
   // this deck is New's, which AI drafts it and the project's earlier decks. Once it goes it never comes back.
@@ -566,6 +561,8 @@ export function DeckView({
   countRef.current = count
   const slidesRef = useRef(slides)
   slidesRef.current = slides
+  // Sprint 169 PR 3 (#868): the icon menu's first view, the deck's icons in use, read when a menu opens.
+  const iconsInUse = useCallback(() => deckIconsInUse(slidesRef.current), [])
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 

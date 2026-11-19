@@ -5,7 +5,8 @@
  *
  * Its own module, apart from iconSet.ts, so the index (iconIndex.ts) reaches only the code that searches.
  */
-import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { layoutSlide, type SlideBox } from './layoutSlide'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES } from './pageIcons'
@@ -94,28 +95,40 @@ export function searchIcons(query: string): SlideIcon[] {
  * layout's items (`icon:`) and a block slide's boxes (`::: {.box icon="x"}`). Only names that draw an icon; an unknown
  * one draws the dashed circle and is no choice to offer.
  */
-export function deckIconsInUse(slides: ReadonlyArray<{ data: SlideData }>): SlideIcon[] {
+export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: SlideData }>): SlideIcon[] {
   const found = new Map<string, SlideIcon>()
   const take = (name: string | undefined) => {
     const icon = slideIcon(name)
     if (icon && !found.has(icon.phosphor)) found.set(icon.phosphor, icon)
   }
-  for (const { data } of slides) {
-    for (const item of data.items ?? []) take(item.icon)
-    if (!data.markdown) continue
-    // A `:::` line inside a code block is the code's words, not a box.
-    let code: string | null = null
+  for (const { kind, data } of slides) {
+    if (data.markdown === undefined) {
+      // An old layout: the icons its layout draws (an item's `icon:` a layout never draws is in use nowhere).
+      const walk = (boxes: readonly SlideBox[]) => {
+        for (const box of boxes) {
+          if (box.type === 'group') walk(box.children)
+          else if (box.type === 'mark' && box.iconIndex !== undefined && !box.placeholder) take(box.icon)
+        }
+      }
+      walk(layoutSlide(kind, data).boxes)
+      continue
+    }
+    // A block slide's boxes. A `:::` line inside a code block is the code's words, not a box (fencedDiv's rule).
+    let code: { char: string; size: number } | null = null
     for (const line of data.markdown.split('\n')) {
-      const fence = /^ {0,3}(`{3,}|~{3,})/.exec(line)
-      if (fence) {
-        if (code === null) code = fence[1]
-        else if (fence[1][0] === code[0] && fence[1].length >= code.length && !line.trim().slice(fence[1].length).trim()) code = null
+      if (code) {
+        const close = CODE_FENCE_CLOSE.exec(line)
+        if (close && close[1][0] === code.char && close[1].length >= code.size) code = null
         continue
       }
-      if (code !== null) continue
+      const fence = CODE_FENCE.exec(line)
+      if (fence) {
+        code = { char: fence[1][0], size: fence[1].length }
+        continue
+      }
       const open = OPEN_FENCE.exec(line)
-      if (!open || !open[2].startsWith('{')) continue
-      take(parseFenceAttributes(open[2])?.values.icon)
+      const attrs = open ? parseFenceAttributes(open[2]) : null
+      if (attrs?.classes.includes('box')) take(attrs.values.icon)
     }
   }
   return [...found.values()]
@@ -139,14 +152,21 @@ export function iconMenuChoices(query: string, inUse: readonly SlideIcon[]): { i
   return { icons: found.slice(0, ICON_MENU_PAGE), total: found.length, searching: true }
 }
 
+export type IconMenuMove = 'up' | 'down' | 'left' | 'right'
+
 /**
- * Sprint 169 PR 3: where ↓ (`step` 1) or ↑ (-1) moves the menu's highlight, a row of `columns` at a time. `at` is an
- * icon's place, `count` for No icon (there only `withNoIcon`, when the box has an icon to take out), or -1 for none
- * (the field alone). ↓ from the last row goes to No icon, else to the last icon; ↑ from the first row to none.
+ * Sprint 169 PR 3: where an arrow key moves the menu's highlight. `at` is an icon's place, `count` for No icon (there
+ * only `withNoIcon`, when the box has an icon to take out), or -1 for none (the field alone). ↓ and ↑ move a row of
+ * `columns`: ↓ from the last row goes to No icon, else to the last icon; ↑ from the first row to none. ← and → move one
+ * icon along the list, stopping at its ends, and leave No icon and none as they are.
  */
-export function iconMenuMove(at: number, step: 1 | -1, count: number, withNoIcon: boolean, columns: number): number {
+export function iconMenuMove(at: number, move: IconMenuMove, count: number, withNoIcon: boolean, columns: number): number {
   const noIcon = withNoIcon ? count : -1
-  if (step === 1) {
+  if (move === 'left' || move === 'right') {
+    if (at < 0 || at >= count) return at
+    return move === 'right' ? Math.min(at + 1, count - 1) : Math.max(at - 1, 0)
+  }
+  if (move === 'down') {
     if (at < 0) return count ? 0 : noIcon
     if (at >= count) return at
     if (at + columns < count) return at + columns

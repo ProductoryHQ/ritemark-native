@@ -22,7 +22,9 @@
 export const OPEN_FENCE = /^ {0,3}(:{3,})[ \t]*(\{[^}\n]*\}|[A-Za-z][\w-]*)[ \t]*:*[ \t]*$/;
 /** A closing fence: 3+ colons and nothing else. */
 export const CLOSE_FENCE = /^ {0,3}(:{3,})[ \t]*$/;
-const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+/** A code fence opening (its marks), and one that can close it (marks alone). */
+export const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+export const CODE_FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 
 /** A div's attributes: its classes, its id and its `key="value"` pairs. */
 export interface FenceAttributes {
@@ -77,7 +79,7 @@ export function scanFencedDiv(src: string): FenceScan | null {
   for (let index = 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (code) {
-      const close = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      const close = CODE_FENCE_CLOSE.exec(line);
       if (close && close[1][0] === code.char && close[1].length >= code.size) code = null;
       continue;
     }
