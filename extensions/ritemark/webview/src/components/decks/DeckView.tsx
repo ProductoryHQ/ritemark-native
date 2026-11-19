@@ -25,6 +25,8 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
+import { DeckIconsContext } from './slide/IconGrid'
+import { deckIconsInUse } from './slide/iconSearch'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
@@ -502,6 +504,11 @@ export function DeckView({
   const agendaRef = useRef(agendaDrawing)
   agendaRef.current = agendaDrawing
   const slideAtPos = useMemo(() => new Map(slides.map(entry => [entry.pos, entry])), [slides])
+  // Sprint 169 PR 3 (#868): the icon menu's first view, the deck's icons in use; the same list while they are the same.
+  const iconsFound = useMemo(() => deckIconsInUse(slides), [slides])
+  const iconsKey = iconsFound.map(icon => icon.phosphor).join(' ')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const iconsInUse = useMemo(() => iconsFound, [iconsKey])
 
   // The handout's start card (16 November, the Experience lead's frame 20) on a deck New made: the host says whether
   // this deck is New's, which AI drafts it and the project's earlier decks. Once it goes it never comes back.
@@ -1833,6 +1840,7 @@ export function DeckView({
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
+    <DeckIconsContext.Provider value={iconsInUse}>
     <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
       <header className="deck-bar">
@@ -2114,6 +2122,7 @@ export function DeckView({
       {dialogs}
     </div>
     </DeckOpenInContext.Provider>
+    </DeckIconsContext.Provider>
     </AgendaContext.Provider>
   )
 }

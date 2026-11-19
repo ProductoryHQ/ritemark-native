@@ -1,7 +1,8 @@
 /**
  * Sprint 161 (PR 3): the slide editor's small tools that open from a block on the slide.
  *
- *  - `SlideIconPicker`: a box's icon, chosen from the grid of 24 with No icon under it (README frame 4), opened under
+ *  - `SlideIconPicker`: a box's icon, searched for or chosen from the deck's and the grid's (Sprint 169 PR 3), with No
+ *    icon under it (README frame 4), opened under
  *    the icon the person clicked. The menu sits in `document.body`, outside the scaled slide, at its own size.
  *  - `WebPageDialog`: the / menu's Web page asks for the page's address and puts it on the slide as a link (no live
  *    page is drawn: the sprint plan's "same place as a Picture with a link").
