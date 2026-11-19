@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: five user-facing requirements, a lineage rule for "the same slide", and a flow from the library panel through the host to the deck file with undo). Override with: "use plain full track".
 Branch: sprint-165-slide-library
 Release tier: extension
-Status: **Plan waiting for Jarmo's approval.** Phase 2 (PLAN). No code is written and no PR branch exists yet.
+Status: **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167). Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo, section "The library place, from first principles" (`product/design/experience/experiences/decks/README.md`, ritemark-dev 6d59a97), with the sketch `library-panel.html` beside it. Jarmo agreed the design with the Experience lead and said "jah, saada arendusse" (yes, send it to development). That sends it to planning. It is not his approval of this sprint.
 
@@ -22,11 +22,11 @@ The library place fits a trainer who builds a new training from earlier decks: O
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0, which the manager creates when the sprint starts.
-- PR 0: to be created
-- PR 1: to be created
-- PR 2: to be created
-- PR 3: to be created
-- PR 4: to be created
+- PR 0: [#830](https://github.com/ProductoryHQ/ritemark-native/issues/830)
+- PR 1: [#831](https://github.com/ProductoryHQ/ritemark-native/issues/831)
+- PR 2: [#832](https://github.com/ProductoryHQ/ritemark-native/issues/832)
+- PR 3: [#833](https://github.com/ProductoryHQ/ritemark-native/issues/833)
+- PR 4: [#834](https://github.com/ProductoryHQ/ritemark-native/issues/834)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
@@ -69,4 +69,4 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - Real decks are client material: all fixtures are synthetic, and shots too.
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026)
