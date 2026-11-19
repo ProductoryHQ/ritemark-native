@@ -395,10 +395,17 @@
 .deck-sl.is-blocks .blk-tabs { position: relative; display: flex; flex-direction: column; min-width: 0; margin: .3em 0 .55em; border-radius: var(--s-r, 14px); background: var(--s-tband, rgba(255,255,255,.07)); overflow: hidden; }
 /* Its edge over the band and the pane alike (a shadow on the block itself would go under the pane's ground). */
 .deck-sl.is-blocks .blk-tabs::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--s-boxl, rgba(255,255,255,.12)); pointer-events: none; }
-.deck-sl.is-blocks .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.deck-sl.is-blocks .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 10px; margin-bottom: -10px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .deck-sl.is-blocks .blk-tabbar::-webkit-scrollbar { display: none; }
-.deck-sl.is-blocks .blk-tab { flex: none; position: relative; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 1.1em; border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
-.deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #fff); background: var(--s-tpane, #0E0F2C); }
+.deck-sl.is-blocks .blk-tab { flex: none; position: relative; z-index: 0; display: inline-flex; align-items: center; box-sizing: border-box; height: 2.64em; padding: 0 1.1em; border: 0; border-radius: var(--s-r2, 10px) var(--s-r2, 10px) 0 0; background: transparent; color: var(--s-sub, #A9ADD6); font: 600 .6em/1 var(--s-fb, 'Sofia Sans'), sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
+.deck-sl.is-blocks .blk-tab.is-active { color: var(--s-hd, #fff); }
+/* The chosen tab's ground is one shape that runs on past its foot into the pane's, never a ground of its own that meets
+   the pane's at the join: on a scaled slide (the stage, the strip, the wall, the page) the join falls inside a pixel,
+   and two grounds that each cover part of it let the band show through as a hairline (Jarmo, 19 November). The band
+   keeps 10 px of room under its tabs for it (a whole pixel even on the strip's 96-wide thumbnail), laid over the pane's
+   top so nothing moves; the open pane, above the band, keeps its clicks and its words start below it. */
+.deck-sl.is-blocks .blk-tab::before { content: ''; position: absolute; inset: 0 0 -10px; z-index: -1; border-radius: inherit; background: transparent; transition: background-color .12s; pointer-events: none; }
+.deck-sl.is-blocks .blk-tab.is-active::before { background: var(--s-tpane, #0E0F2C); }
 /* A tab is never cut (the lead on PR 2): where the tabs don't fit, their side padding goes from 16 to 10 (slide units),
    then the label steps down from 14.5 to 13, then 12, the tab keeping its 38 height; only then does the band scroll,
    with its fade (`tabsFit.ts` measures and sets `data-fit`). */

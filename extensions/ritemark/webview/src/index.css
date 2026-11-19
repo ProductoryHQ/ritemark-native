@@ -1145,7 +1145,9 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
 .blk-tabbar .blk-tab.is-renaming { cursor: text; }
 .blk-tabbar .blk-tab-words { pointer-events: none; }
 .blk-tabbar .blk-tab.is-lifted { opacity: .45; }
-:where(:root:not([data-input-mode="pointer"])) .blk-tabbar .blk-tab:focus-visible { box-shadow: inset 0 0 0 2px var(--s-acc, var(--r-accent)); }
+/* The keyboard's ring, inside the tab's edge: an outline, drawn over the chosen tab's ground (its `::before`, which would
+   cover a shadow on the tab itself). */
+:where(:root:not([data-input-mode="pointer"])) .blk-tabbar .blk-tab:focus-visible { outline: 2px solid var(--s-acc, var(--r-accent)); outline-offset: -2px; }
 /* The ⌄ on the open tab: quiet until the tab is pointed at or its menu is open. */
 /* The open tab's ⌄ sits in the tab's own right padding (so opening a tab moves no other), at least 6 px clear of its
    last letter (the smoke run of 19 November; measured: 7.5 slide units on the stage, about 6 px in a Text document):
@@ -1179,18 +1181,23 @@ body.vscode-dark .rm-step-chip.action, body.ritemark-dark .rm-step-chip.action, 
    pane alone shows, and grows with what it holds. */
 .blk-tabs.is-text { display: flex; flex-direction: column; margin: 1.2em 0; border-radius: 12px; background: var(--r-surface-soft); overflow: hidden; }
 .blk-tabs.is-text::after { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; box-shadow: inset 0 0 0 1px var(--r-hairline); pointer-events: none; }
-.blk-tabs.is-text .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; font-size: 14px; }
+.blk-tabs.is-text .blk-tabbar { flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 5px 5px 10px; margin-bottom: -10px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; font-size: 14px; }
 .blk-tabs.is-text .blk-tabbar::-webkit-scrollbar { display: none; }
-.blk-tabs.is-text .blk-tab { flex: none; display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 9px 9px 0 0; color: var(--r-ink-muted); font: 600 14px/1 'Sofia Sans', var(--vscode-font-family, sans-serif); white-space: nowrap; transition: background-color .12s, color .12s; }
+.blk-tabs.is-text .blk-tab { flex: none; z-index: 0; display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border-radius: 9px 9px 0 0; color: var(--r-ink-muted); font: 600 14px/1 'Sofia Sans', var(--vscode-font-family, sans-serif); white-space: nowrap; transition: background-color .12s, color .12s; }
 .blk-tabs.is-text .blk-tab:not(.is-active):hover { color: var(--r-ink-body); background: color-mix(in srgb, var(--r-ink-strong) 5%, transparent); }
 .blk-tabs.is-text .blk-tab:not(.is-active):active { background: color-mix(in srgb, var(--r-ink-strong) 9%, transparent); }
-.blk-tabs.is-text .blk-tab.is-active { color: var(--r-ink-strong); background: var(--r-surface); }
+.blk-tabs.is-text .blk-tab.is-active { color: var(--r-ink-strong); }
+/* The open tab's ground runs on past its foot into the pane's, as on a slide (slide.css, the chosen tab's `::before`): a
+   zoomed window puts the join inside a pixel too, where two grounds meeting would leave a hairline of the band. The
+   panes lie above the band's room under the tabs (`z-index`), so a click there still goes into the pane. */
+.blk-tabs.is-text .blk-tab::before { content: ''; position: absolute; inset: 0 0 -10px; z-index: -1; border-radius: inherit; background: transparent; transition: background-color .12s; pointer-events: none; }
+.blk-tabs.is-text .blk-tab.is-active::before { background: var(--r-surface); }
 .blk-tabs.is-text .blk-tabbar .blk-tab-dd { width: 9px; }
 .blk-tabs.is-text .blk-tabbar .blk-tab-add { align-self: flex-end; width: 24px; height: 24px; margin: 0 0 5px 4px; color: var(--r-ink-muted); }
 .blk-tabs.is-text[data-fit="1"] .blk-tab { padding: 0 10px; }
 .blk-tabs.is-text[data-fit="2"] .blk-tab { padding: 0 10px; font-size: 13px; }
 .blk-tabs.is-text[data-fit="3"] .blk-tab { padding: 0 10px; font-size: 12px; }
-.blk-tabs.is-text .blk-tabpanes { background: var(--r-surface); }
+.blk-tabs.is-text .blk-tabpanes { z-index: 1; background: var(--r-surface); }
 .blk-tabs.is-text .blk-tabpane { display: none; padding: 12px 18px 14px; }
 .blk-tabs.is-text .blk-tabpane > :first-child { margin-top: 0; }
 .blk-tabs.is-text .blk-tabpane > :last-child { margin-bottom: 0; }
