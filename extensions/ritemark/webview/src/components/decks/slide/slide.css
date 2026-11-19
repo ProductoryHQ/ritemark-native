@@ -157,7 +157,7 @@
 .deck-sl.is-blocks .blk-flow > .blk-group[data-reveal]:last-child > :last-child { margin-bottom: 0; }
 .deck-sl.is-blocks [data-reveal-hidden] { visibility: hidden; }
 .deck-sl.is-blocks strong { font-weight: 700; color: var(--s-hd, #fff); }
-.deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
+.deck-sl.is-blocks code { font: 400 .85em/1.4 ui-monospace, Menlo, Consolas, monospace; color: inherit; padding: 1px .3em; border-radius: 4px; background: var(--s-box, rgba(255,255,255,.07)); }
 .deck-sl.is-blocks pre { margin: 0 0 calc(12px * var(--fit, 1)); padding: calc(18px * var(--fit, 1)); border-radius: var(--s-r2, 10px); background: var(--s-box, rgba(255,255,255,.07)); white-space: pre-wrap; }
 .deck-sl.is-blocks pre code { padding: 0; background: none; }
 /* Sprint 163 PR 1 (the decks README, "A prompt is a code block, and Copy is the code block's"; workbook.html v9's `.cb`
@@ -245,7 +245,7 @@
 /* The slide editor: the chosen button's two places to type while they are empty. Its ring is the one every chosen
    block has (`.deck-block-ring`, drawn by ButtonBlockTools in the frame); amber stays the words' focus (--s-foc). */
 .deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
-/* #841: the slide owns its quote's whole look; VS Code's webview sheet (a fill, a 5 px bar, its padding) and .ProseMirror's never reach it. */
+/* #841: the slide owns its quote's whole look; VS Code's webview sheet (a fill and a border colour) and .ProseMirror's (a 3 px border and its padding) never reach it. */
 .deck-sl.is-blocks blockquote { margin: 0 0 calc(12px * var(--fit, 1)); padding: 0 0 0 .8em; background: none; border: 0; border-radius: 0; box-shadow: inset 3px 0 0 var(--s-accl, rgba(242,181,68,.55)); color: var(--s-sub, #C7CAEB); }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 .deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
