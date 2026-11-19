@@ -106,7 +106,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
 
   private async handle(message: unknown): Promise<void> {
     const request = decodeLibraryRequest(message);
-    if (!request) return;
+    if (!request) {
+      // A section the decoder refused (an id twice, too many slides) says so instead of doing nothing.
+      if (typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'library/insert-section') {
+        await this.post({ type: 'library/notice', text: 'The section could not be taken.' });
+      }
+      return;
+    }
     switch (request.type) {
       case 'library/ready': {
         this.ready = true;
@@ -154,7 +160,10 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     try {
       const taken = slidesOfText(document.getText()).map(slide => slide.data.id).filter((value): value is string => !!value);
       const parts = await library.copies(path, ids, active.path, taken);
-      if (!(await this.pages.insertIntoActive(parts))) await this.post({ type: 'library/notice', text: ids.length > 1 ? 'The deck could not take the section.' : 'The deck could not take the slide.' });
+      // A section goes through the view's confirmed insert: the view answers, and the document must gain every slide.
+      const view = ids.length > 1 ? this.pages.viewOf(document.uri.fsPath) : null;
+      const done = view ? await view.insert(parts, active.current) : await this.pages.insertIntoActive(parts);
+      if (!done) await this.post({ type: 'library/notice', text: ids.length > 1 ? 'The deck could not take the section.' : 'The deck could not take the slide.' });
     } catch (error) {
       await this.post({ type: 'library/notice', text: error instanceof Error ? error.message : 'The slide could not be inserted.' });
     }

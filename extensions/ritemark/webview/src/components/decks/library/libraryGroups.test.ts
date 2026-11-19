@@ -1,6 +1,6 @@
 /** Sprint 165 PR 1: Other decks by folder, the row's date and count, and which decks start open. */
 import assert from 'node:assert/strict'
-import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionsOf, slideCount } from './libraryGroups'
+import { deckDate, deckExpanded, deckMeta, folderHeading, folderOfDeck, groupByFolder, sectionIds, sectionsOf, slideCount } from './libraryGroups'
 import { parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 
 const day = (text: string) => new Date(text).getTime()
@@ -92,4 +92,15 @@ console.log('libraryGroups: ok')
   const none = deck(block('# One'), block('# Two'), block('# Just a title'))
   assert.deepEqual(sectionsOf(none), { before: none, sections: [] })
   assert.deepEqual(sectionsOf([]), { before: [], sections: [] })
+}
+
+// A skipped section slide starts no section; Take section's ids only when the host will take them.
+{
+  const skipped = sectionsOf([{ kind: 'section', data: { number: '1', title: 'One' } }, { kind: 'section', data: { number: '2', title: 'Backup', skip: true } }, { kind: 'points', data: {} }])
+  assert.deepEqual(skipped.sections.map(section => [section.title, section.slides.length]), [['One', 3]])
+  assert.deepEqual(sectionIds([{ id: 's1' }, { id: 'a2' }]), ['s1', 'a2'])
+  assert.equal(sectionIds([{ id: 's1' }, {}]), null, 'a slide without an id')
+  assert.equal(sectionIds([{ id: 'a1' }, { id: 'a1' }]), null, 'an id twice')
+  assert.equal(sectionIds([{ id: 'intro-1' }]), null, 'a hand-written id the host refuses')
+  assert.equal(sectionIds(Array.from({ length: 201 }, (_, i) => ({ id: `i${i}` }))), null)
 }

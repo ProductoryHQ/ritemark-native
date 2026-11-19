@@ -100,7 +100,8 @@ export function sectionsOf<T extends { kind: string; data: SlideData }>(slides: 
   const before: T[] = []
   const sections: DeckSection<T>[] = []
   for (const slide of slides) {
-    if (isSectionSlide(slide.kind, slide.data)) {
+    // A skipped section slide starts no section, as the Agenda leaves it out.
+    if (slide.data.skip !== true && isSectionSlide(slide.kind, slide.data)) {
       const number = isBlockSlide(slide.kind) ? blockSectionNumberOf(slide.data.markdown ?? '') ?? '' : String(slide.data.number ?? '').trim()
       const title = typeof slide.data.title === 'string' ? slide.data.title.trim() : ''
       sections.push({ number, title: title || (number ? `Section ${number}` : 'Section'), slides: [slide] })
@@ -108,4 +109,15 @@ export function sectionsOf<T extends { kind: string; data: SlideData }>(slides: 
     else before.push(slide)
   }
   return { before, sections }
+}
+
+/** The most slides one Take section sends (the host's decoder refuses more). */
+export const MAX_SECTION_SLIDES = 200
+
+/** A section's slide ids when Take section can send them (each a slide id, none twice, at most the limit), or null. */
+export function sectionIds(slides: ReadonlyArray<{ id?: string }>): string[] | null {
+  const ids = slides.map(slide => slide.id ?? '')
+  if (ids.length === 0 || ids.length > MAX_SECTION_SLIDES) return null
+  if (!ids.every(id => /^[0-9a-z]{1,16}$/i.test(id)) || new Set(ids).size !== ids.length) return null
+  return ids
 }

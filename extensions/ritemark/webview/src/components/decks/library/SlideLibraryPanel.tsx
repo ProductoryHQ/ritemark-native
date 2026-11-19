@@ -14,7 +14,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { deckExpanded, deckMeta, groupByFolder, sectionsOf, type DeckSection } from './libraryGroups'
+import { deckExpanded, deckMeta, groupByFolder, sectionIds, sectionsOf, type DeckSection } from './libraryGroups'
 import { Button } from '../../ui/button'
 import '../decks.css'
 
@@ -248,11 +248,16 @@ export function SlideLibraryPanel() {
                 </DropdownMenu>
               )
     }
-    const grid = (slides: LibrarySlide[]) => <div className="deck-lib-grid">{slides.map(tile)}</div>
+    const grid = (slides: LibrarySlide[]) => (
+      <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
+        <div className="deck-lib-grid">{slides.map((slide) => tile(slide))}</div>
+      </AgendaContext.Provider>
+    )
     // Sprint 165 PR 2: an open deck shows its sections, each with Take section; a search's hits stay one grid (a
     // section would be only the slides found).
     const sectioned = (shown: LibraryDeck) => {
-      if (searching) return grid(shown.slides)
+      // The host's own query too: until it answers a cleared search, its decks hold only the hits.
+      if (searching || state.query.trim()) return grid(shown.slides)
       const { before, sections } = sectionsOf(shown.slides)
       if (sections.length === 0) return grid(before)
       return (
@@ -263,14 +268,17 @@ export function SlideLibraryPanel() {
       )
     }
     const sectionBlock = (shown: LibraryDeck, section: DeckSection<LibrarySlide>) => {
-      const ids = section.slides.map((slide) => slide.id).filter((id): id is string => !!id)
-      const ready = !!label && ids.length === section.slides.length
+      const ids = sectionIds(section.slides)
+      const ready = !!label && !!ids
       const count = section.slides.length === 1 ? '1 slide' : `${section.slides.length} slides`
+      const where = state.active && state.active.count > 0 && state.active.current >= 0
+        ? `after slide ${Math.min(state.active.current, state.active.count - 1) + 1}`
+        : 'at the start of the open deck'
       const tip = !label
         ? 'Open a deck to insert this section into it.'
         : ready
-          ? `${label.replace(/^Insert/, 'Insert all')}: ${count}, with their handout and prompts`
-          : 'A slide here has no id yet. Open its deck once to give it one.'
+          ? `Insert its ${count} ${where}, with their handout and prompts`
+          : "This section's slides need ids of their own. Open its deck once to give them."
       return (
         <div key={`${shown.path}#section-${section.slides[0].index}`} className="deck-lib-section">
           <div className="deck-lib-section-head">
@@ -317,9 +325,7 @@ export function SlideLibraryPanel() {
           />
         )}
         {expanded ? (
-          <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
-          {sectioned(deck)}
-          </AgendaContext.Provider>
+          sectioned(deck)
         ) : null}
       </div>
     )
