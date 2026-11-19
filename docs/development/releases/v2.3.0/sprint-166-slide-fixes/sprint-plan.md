@@ -126,7 +126,7 @@ None.
 
 **Not run:** a real trackpad and a real mouse (the gestures were protocol events of the same shape; real hardware stays with Jarmo), the presenter view on a real second display (it ran in the dev build's windowed mode on one display), the go-to box, and Windows.
 
-**Follow-up:** [#907](https://github.com/ProductoryHQ/ritemark-native/pull/907) closes [#902](https://github.com/ProductoryHQ/ritemark-native/issues/902), the open follow-up above: every way of choosing a slide goes through `pick`, which now starts the slide's pane at the chosen slide's top through the wheel's own `stageScrollAfter` (0 for a choice); the wheel's step (#871) is unchanged. Approved under the overnight delegation by the Development manager and the Experience lead, whose rule this is. Proof: [`proof/followup-pick-top/`](proof/followup-pick-top/README.md).
+**Follow-up:** [#907](https://github.com/ProductoryHQ/ritemark-native/pull/907) closes [#902](https://github.com/ProductoryHQ/ritemark-native/issues/902), the open follow-up above: whenever another slide is shown, one layout effect sets the slide's pane through the wheel's own `stageScrollAfter`: from its top for any choice, by the step's direction for the wheel (#871, unchanged), measured on the new slide; a split drag or a view switch on the same slide keeps the reader's place. Approved under the overnight delegation by the Development manager and the Experience lead, whose rule this is. Proof: [`proof/followup-pick-top/`](proof/followup-pick-top/README.md).
 
 ## Approval
 
