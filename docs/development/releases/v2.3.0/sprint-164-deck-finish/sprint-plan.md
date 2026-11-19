@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: three user-facing requirements, a file-format and migration change, and a view-to-renderer-to-published-page flow). Override with: "use plain full track".
 Branch: sprint-164-deck-finish
 Release tier: extension
-Status: Phase 2 (PLAN), waiting for Jarmo's approval
+Status: **Approved** by Jarmo on 19 November 2026, with the three removals by name: "kinnitan sprindi 164 koos eemaldustega" (I approve Sprint 164 with the removals). Phase 3 (DEVELOP): PR 1 and PR 2 started.
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint (the release plan is written elsewhere and is not edited here). The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`), agreed with Jarmo on 19 November in ritemark-dev commits 3eb72b7, 5bc0f70 and 7382bee.
 
@@ -22,9 +22,9 @@ Finish the Decks look after Jarmo's rundev test on 19 November: a deck opens in 
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0, which the manager creates when the sprint starts.
-- PR 1: to be created
-- PR 2: to be created
-- PR 3: to be created
+- PR 1: [#816](https://github.com/ProductoryHQ/ritemark-native/issues/816)
+- PR 2: [#817](https://github.com/ProductoryHQ/ritemark-native/issues/817)
+- PR 3: [#818](https://github.com/ProductoryHQ/ritemark-native/issues/818)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |
@@ -36,7 +36,7 @@ One GitHub issue per PR in milestone v2.3.0, which the manager creates when the 
 Order: PR 1 and PR 2 run side by side, because their files are apart. PR 3 starts after PR 2 merges, because both change the same `slide.css` lines. Each PR fills the template's Risk and How to revert, gets `REVIEW.md`'s review at its tier with every finding answered, and merges only after the Experience lead has looked at its shots.
 
 ## Removals (HARD RULE #1)
-Each of these needs Jarmo's yes by name before PR 3 starts. They are what the README says goes, and no code is deleted without it.
+Jarmo approved all three by name on 19 November 2026 ("kinnitan sprindi 164 koos eemaldustega"). They are what the README says goes, and no code is deleted without it.
 - The Label row in a slide's Settings (`webview/src/components/decks/SlideSettings.tsx`, the `LabelRow`). The Label block replaces it.
 - The rule that a new Steps block takes the deck's last label (`lastPillLabel` and its callers in the / menu and the block bar). A new Steps block comes without a Label.
 - The pill rule that uses a column's padding-top (`slide.css`, about lines 309 and 310). It goes because PR 2 removes that padding, and a Steps block's pill is migrated to a Label by PR 3.
@@ -62,4 +62,4 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 - Migration must not lose a person's pill words.
 
 ## Approval
-- [ ] Jarmo approved this sprint plan
+- [x] Jarmo approved this sprint plan (19 November 2026), with the three removals
