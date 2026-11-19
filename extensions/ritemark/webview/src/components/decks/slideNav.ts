@@ -27,6 +27,9 @@ export interface WheelGesture {
   spent: boolean
   /** When the last wheel event came, in ms; -Infinity before any. */
   last: number
+  /** Whether a box under the pointer took this gesture to scroll (`wheelRoute`): the rest of it is the box's, never the
+   *  slide's, so a flick that brings a column to its end doesn't move the slide with its momentum. */
+  held?: boolean
 }
 
 export const NO_GESTURE: WheelGesture = { sum: 0, spent: false, last: -Infinity }
@@ -42,13 +45,74 @@ export function wheelPixels(event: { deltaY: number; deltaMode: number }, pageHe
  * slide moves once and the rest of the gesture is ignored. Turning the other way before the step starts the sum again.
  */
 export function wheelStep(gesture: WheelGesture, delta: number, now: number): { gesture: WheelGesture; move: -1 | 0 | 1 } {
-  const gap = now - gesture.last
-  const fresh = gap >= WHEEL_QUIET_MS || (gap >= WHEEL_NOTCH_GAP_MS && Math.abs(delta) >= WHEEL_STEP)
-  const current = fresh ? { ...NO_GESTURE } : gesture
+  const current = gestureAt(gesture, delta, now)
   if (current.spent || !Number.isFinite(delta) || delta === 0) return { gesture: { ...current, last: now }, move: 0 }
   const sum = Math.sign(current.sum) === -Math.sign(delta) ? delta : current.sum + delta
   if (Math.abs(sum) < WHEEL_STEP) return { gesture: { sum, spent: false, last: now }, move: 0 }
   return { gesture: { sum: 0, spent: true, last: now }, move: sum > 0 ? 1 : -1 }
+}
+
+/** The gesture this event belongs to: the one going on, or a new one after `WHEEL_QUIET_MS` of stillness or at a notch. */
+function gestureAt(gesture: WheelGesture, delta: number, now: number): WheelGesture {
+  const gap = now - gesture.last
+  const fresh = gap >= WHEEL_QUIET_MS || (gap >= WHEEL_NOTCH_GAP_MS && Math.abs(delta) >= WHEEL_STEP)
+  return fresh ? { ...NO_GESTURE } : gesture
+}
+
+// ---------------------------------------------------------------------------
+// What scrolls first (Jarmo, 19 November: "Editori vaates raske navigeerida slaidide vahel"; issue #824)
+// ---------------------------------------------------------------------------
+
+/** What the wheel needs of an element under the pointer: as much of the DOM as the test fakes. */
+export interface WheelBox {
+  scrollTop: number
+  scrollHeight: number
+  clientHeight: number
+  parentElement: WheelBox | null
+  classList?: { contains(name: string): boolean }
+}
+
+/** Whether a box scrolls `delta` itself: it scrolls (overflow-y auto or scroll), holds more than its room, and has room
+ *  left that way. A box that only clips (overflow hidden, as the slide does) never takes the wheel. */
+export function boxScrolls(box: Pick<WheelBox, 'scrollTop' | 'scrollHeight' | 'clientHeight'>, overflowY: string, delta: number): boolean {
+  if (!Number.isFinite(delta) || delta === 0) return false
+  if (overflowY !== 'auto' && overflowY !== 'scroll' && overflowY !== 'overlay') return false
+  if (box.scrollHeight <= box.clientHeight + 1) return false
+  return delta > 0 ? box.scrollTop + box.clientHeight < box.scrollHeight - 1 : box.scrollTop >= 1
+}
+
+/**
+ * Who takes a wheel event over the stage in the full slide view: 'box' when something under the pointer scrolls that
+ * way first, and 'slide' when nothing does and the slide moves. A box is a pane or a column on the slide that holds more
+ * than its room (the design: it scrolls, in the editor too), or, outside the slide, the stage itself when it is taller
+ * than its room. Over the slide the stage never counts, so the slide always moves there, as before; over the empty bands
+ * the stage scrolls to its end first and the next gesture moves the slide (before, the bands did nothing once the
+ * stage could scroll at all).
+ */
+export function wheelTaker<T extends WheelBox>(target: T | null, stage: T, delta: number, overflowOf: (box: T) => string): 'box' | 'slide' {
+  let overSlide = false
+  for (let box: T | null = target; box && box !== stage; box = box.parentElement as T | null) {
+    if (box.classList?.contains('deck-big')) overSlide = true
+    // The cheap reads first: only a box that holds more than its room is asked for its style.
+    if (box.scrollHeight > box.clientHeight + 1 && boxScrolls(box, overflowOf(box), delta)) return 'box'
+  }
+  return !overSlide && boxScrolls(stage, overflowOf(stage), delta) ? 'box' : 'slide'
+}
+
+/**
+ * One wheel event over the stage, with `wheelTaker`'s answer: the gesture after it, the slide's move, and whether the
+ * browser scrolls the box (`scroll`; otherwise the event's default is prevented). A gesture is decided by its first
+ * event with a delta: a box that scrolls that way keeps the whole gesture, a trackpad's momentum included, and the
+ * slide never moves in it; otherwise it is the slide's, one slide per gesture (`wheelStep`). Once the box has reached
+ * its end the rest of its gesture is ignored, and the next gesture moves the slide.
+ */
+export function wheelRoute(gesture: WheelGesture, delta: number, now: number, taker: 'box' | 'slide'): { gesture: WheelGesture; move: -1 | 0 | 1; scroll: boolean } {
+  const current = gestureAt(gesture, delta, now)
+  const undecided = !current.held && !current.spent && current.sum === 0
+  if (current.held || (undecided && taker === 'box' && Number.isFinite(delta) && delta !== 0)) {
+    return { gesture: { sum: 0, spent: false, last: now, held: true }, move: 0, scroll: taker === 'box' }
+  }
+  return { ...wheelStep(current, delta, now), scroll: false }
 }
 
 // ---------------------------------------------------------------------------

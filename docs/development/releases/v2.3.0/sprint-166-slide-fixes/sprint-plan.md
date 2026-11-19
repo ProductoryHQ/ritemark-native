@@ -32,9 +32,9 @@ As designed (his own 16 November ask, built for the full-slide view): in Slide o
 
 Seen on main: the full-slide wheel effect in `extensions/ritemark/webview/src/components/decks/DeckView.tsx` (about lines 961–985) is attached only to the stage and only while the full-slide view is on, and returns early when the stage can scroll and the pointer isn't over the slide, so the empty bands may do nothing. Other suspects: the effect running before the stage exists after the view switch, the slide editor taking the wheel, the trackpad threshold. The empty bands should step whenever the stage itself has nothing to scroll.
 
-- [ ] A test that fails before the fix.
-- [ ] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
-- [ ] Typing, selecting and scrolling inside the words still behave as before.
+- [x] A test that fails before the fix.
+- [x] Proof: the slide index after each gesture, with mouse-wheel and trackpad-style events, over the slide and over the bands, at 1440×900, and after each key.
+- [x] Typing, selecting and scrolling inside the words still behave as before.
 
 **Order:** PR 1, PR 3 and PR 4 can start at once; PR 4 changes `SlideBlockBar.tsx`, so it waits if Sprint 164 PR 3 (the Label block) is changing the same lines. PR 2 starts after Sprint 164 PR 1 (#819) merges, because both change `DeckView.tsx`.
 
