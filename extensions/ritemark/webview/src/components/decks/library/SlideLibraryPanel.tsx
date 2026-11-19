@@ -14,7 +14,8 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { SlideCanvas } from '../slide/SlideCanvas'
 import { AgendaContext, agendaEntriesFrom } from '../slide/agendaContext'
 import type { AgendaDrawing } from '../../../../../src/decks/blocks/agenda'
-import { deckExpanded, deckMeta, groupByFolder } from './libraryGroups'
+import { deckExpanded, deckMeta, groupByFolder, sectionIds, sectionsOf, takeSectionTip, type DeckSection } from './libraryGroups'
+import { Button } from '../../ui/button'
 import '../decks.css'
 
 interface LibrarySlide {
@@ -211,32 +212,7 @@ export function SlideLibraryPanel() {
   const deckRows = (deck: LibraryDeck, numbered: boolean) => {
     // "From another deck…" opens the newest other deck; the others stay one click away.
     const expanded = deckExpanded(deck.path, { searching, open, openNewest: openOthers, newest: newestOther })
-    return (
-      <div key={deck.path}>
-        {deck.topic ? (
-        <button
-          type="button"
-          className="deck-lib-row"
-          aria-expanded={expanded}
-          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
-        >
-          <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
-          <Icon name="presentation" size={16} tone="inherit" />
-          <span className="deck-lib-name">{deck.name}</span>
-          <span className="deck-lib-count">{deck.slides.length}</span>
-        </button>
-        ) : (
-          <DeckRow
-            name={deck.name}
-            meta={deckMeta(deck.modified, deck.slides.length)}
-            expanded={expanded}
-            onToggle={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
-          />
-        )}
-        {expanded ? (
-          <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
-          <div className="deck-lib-grid">
-            {deck.slides.map((slide) => {
+    const tile = (slide: LibrarySlide) => {
               const key = `${deck.path}#${slide.id ?? slide.index}`
               const title = titleOf(slide)
               return (
@@ -271,9 +247,81 @@ export function SlideLibraryPanel() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )
-            })}
+    }
+    const grid = (slides: LibrarySlide[]) => (
+      <AgendaContext.Provider value={agendaOfDeck.get(deck.path) ?? null}>
+        <div className="deck-lib-grid">{slides.map((slide) => tile(slide))}</div>
+      </AgendaContext.Provider>
+    )
+    // Sprint 165 PR 2: an open deck shows its sections, each with Take section; a search's hits stay one grid (a
+    // section would be only the slides found).
+    const sectioned = (shown: LibraryDeck) => {
+      // The host's own query too: until it answers a cleared search, its decks hold only the hits.
+      if (searching || state.query.trim()) return grid(shown.slides)
+      const { before, sections } = sectionsOf(shown.slides)
+      if (sections.length === 0) return grid(before)
+      return (
+        <>
+          {before.length ? grid(before) : null}
+          {sections.map((section) => sectionBlock(shown, section))}
+        </>
+      )
+    }
+    const sectionBlock = (shown: LibraryDeck, section: DeckSection<LibrarySlide>) => {
+      const ids = sectionIds(section.slides)
+      const ready = !!label && !!ids
+      const tip = takeSectionTip(label, ids, section.slides.length)
+      return (
+        <div key={`${shown.path}#section-${section.slides[0].index}`} className="deck-lib-section">
+          <div className="deck-lib-section-head">
+            {section.number ? <span className="deck-lib-section-number">{section.number}</span> : null}
+            <span className="deck-lib-section-title">{section.title}</span>
+            {/* #861: shown only while the pointer is over the section or the heading holds the keyboard (CSS). */}
+            <span className="deck-lib-take-slot">
+              <Tooltip label={tip} side="bottom">
+                {/* Not `disabled` when it can't be taken: it stays in the Tab order, so the keyboard shows it and its reason. */}
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  className="deck-lib-take"
+                  aria-disabled={!ready}
+                  aria-label={`Take section ${section.title}`}
+                  onClick={() => { if (ready) sendToExtension('library/insert-section', { path: shown.path, ids }) }}
+                >
+                  <Icon name="plus" size={12} tone="inherit" />
+                  Take section
+                </Button>
+              </Tooltip>
+            </span>
           </div>
-          </AgendaContext.Provider>
+          {grid(section.slides)}
+        </div>
+      )
+    }
+    return (
+      <div key={deck.path}>
+        {deck.topic ? (
+        <button
+          type="button"
+          className="deck-lib-row"
+          aria-expanded={expanded}
+          onClick={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+        >
+          <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
+          <Icon name="presentation" size={16} tone="inherit" />
+          <span className="deck-lib-name">{deck.name}</span>
+          <span className="deck-lib-count">{deck.slides.length}</span>
+        </button>
+        ) : (
+          <DeckRow
+            name={deck.name}
+            meta={deckMeta(deck.modified, deck.slides.length)}
+            expanded={expanded}
+            onToggle={() => setOpen((value) => ({ ...value, [deck.path]: !expanded }))}
+          />
+        )}
+        {expanded ? (
+          sectioned(deck)
         ) : null}
       </div>
     )
