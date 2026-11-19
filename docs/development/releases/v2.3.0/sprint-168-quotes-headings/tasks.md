@@ -31,7 +31,7 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-168-qu
 - [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review (High, two rounds; #889)
 
 ## Sprint end
-- [ ] Full test chain once per final head
-- [ ] `qa-validator` sign-off
-- [ ] `docs/development/architecture.md` updated if structure changed
-- [ ] Worktree hygiene report after merge (`node ./scripts/worktree-hygiene.mjs --check`)
+- [x] Full test chain once per final head: EXIT 0 on #880's `8310e024`, #872's `ad14293f` and #889's `b92b8c31`, each named in that PR's Review record
+- [ ] `qa-validator` sign-off: not yet. On 20 November it passed every PR check and blocked only on these records and the Paper shot, which the close-out PR adds; its sign-off on that PR is still to come
+- [x] `docs/development/architecture.md` updated if structure changed: PR 1's row came with #880; PRs 2 and 3 get one row in the close-out PR
+- [x] Worktree hygiene report after merge: `node ./scripts/worktree-hygiene.mjs --report` from the main checkout, report dated 2026-11-19 (run on 20 November, 00:2x Tallinn). PR 3's worktree is listed safe to remove; PR 1's and PR 2's are held back for uncommitted files (their review files). Nothing deleted
