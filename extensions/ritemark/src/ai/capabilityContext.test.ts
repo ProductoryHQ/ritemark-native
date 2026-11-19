@@ -17,6 +17,7 @@ import {
   CODEX_DESCRIPTOR,
   ACP_DESCRIPTOR,
 } from './capabilityContext';
+import { SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES } from '../../webview/src/components/decks/slide/iconSet';
 
 let passed = 0;
 function test(name: string, fn: () => void) {
@@ -170,9 +171,24 @@ test('deck guidance appears exactly when a runtime has the deck tools', () => {
     assert.ok(withDecks.includes('DECKS'), `${runtime} with decks gets the section`);
     assert.ok(!withoutDecks.includes('DECKS'), `${runtime} without decks omits it`);
     // Sprint 161 (PR 2): block slides, written like text; comments for anything private (no speaker-notes field).
-    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', '```` ```slide ```` (the word `slide` alone)', ':::: columns', '::: column', ':::: boxes', '::: steps', 'tag=""', '`deck: 2`', 'a Ritemark comment, `<!-- … -->`', 'There is no speaker-notes field', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', "changing a slide\'s title never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`', 'never put a list number in front of a heading']) {
+    for (const needle of ['ritemark_decks', 'insert_slides', 'from:', 'Never change anything in `Slide library/` unless the user asks', 'update_library_slide', '```slide <kind>', '```` ```slide ```` (the word `slide` alone)', ':::: columns', '::: column', ':::: boxes', '::: steps', '`deck: 2`', 'a Ritemark comment, `<!-- … -->`', 'There is no speaker-notes field', 'made from the deck when it is published: to change the page, change the deck', 'The handout is a Text document', "changing a slide\'s title never changes its heading", 'A new slide is always a new slide block', 'never put `***` or `---` between slides', '`handout: text`', 'never put a list number in front of a heading']) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
     }
+  }
+});
+
+// ── #850 (Sprint 166 PR 9): the icon names a box may carry, for every AI with the deck tools ──────────────────────────
+test('deck guidance lists every icon name a box can draw, and says an unknown one draws a dashed circle', () => {
+  // The names the slide draws (iconSet.ts): every one, and every other name for one, must be in the line.
+  const names = [...SLIDE_ICON_NAMES];
+  const aliases = [...SLIDE_ICON_ALIASES];
+  assert.ok(names.length > 0 && aliases.length > 0);
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const text = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    const line = text.split('\n').find((entry) => entry.startsWith("- A box's `icon` is one of these names:"));
+    assert.ok(line, `${runtime}: the icon line`);
+    for (const name of [...names, ...aliases]) assert.ok(line.includes(`\`${name}\``), `${runtime}: ${name}`);
+    assert.ok(line.includes("a name Ritemark doesn't know draws a dashed circle"), `${runtime}: what an unknown name does`);
   }
 });
 
@@ -185,9 +201,26 @@ test('deck guidance teaches prompts, Tabs, Button and the exercise layout', () =
       '`::: {.panel-tabset}` with a `## ` heading per tab', '"put these four prompts in tabs" means one Tabs block',
       'Never put Tabs inside Tabs, a box, a step or a table cell',
       '`[Open the sample](https://…){.button}`', 'Only a full https address', 'never copy a file into the project',
-      'An exercise slide is one Columns block, with no title above it', '`{.column width="35%"}`', 'holds `# ` the title and right under it its `::: steps`', 'opens and closes with four backticks, ```` ````slide ````', 'the material\'s Button right under it',
+      'An exercise slide is one Columns block, with no title above it', '`{.column width="35%"}`', 'holds its Label (`[Exercise · 1 / 2]{.label}`), then `# ` the title and right under it its `::: steps`', 'opens and closes with four backticks, ```` ````slide ````', 'the material\'s Button right under it',
     ]) {
       assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
+// ── Sprint 164 PR 3: the DECKS instructions teach the Label block, never the Steps pill, for every AI with the deck tools ──
+test('deck guidance teaches the Label block in place of the Steps pill', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const withDecks = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    for (const needle of [
+      'A Label is a short line drawn as a pill', '`[Exercise · 1 / 2]{.label}`, with a blank line after it',
+      'over the title, in a column, in a box or in a tab\'s pane', 'nothing counts for them', 'a `::: steps` block has none unless you write it',
+      'write it as a Label over the heading above the steps', 'take `tag` off the line',
+    ]) {
+      assert.ok(withDecks.includes(needle), `${runtime}: ${needle}`);
+    }
+    for (const gone of ['the pill above it saying "Exercise"', '`::: {.steps tag="Harjutus"}` for other words', 'Write `tag` only when', 'the pill draws above the title']) {
+      assert.ok(!withDecks.includes(gone), `${runtime}: no longer "${gone}"`);
     }
   }
 });

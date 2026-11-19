@@ -299,22 +299,26 @@
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
 .deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks .blk-mark { border-radius: 8px; width: 34px; height: 34px; }
+/* #850: a box whose icon Ritemark doesn't know keeps its badge, with a dashed circle in the theme's placeholder colour. */
+.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-sl.is-blocks .blk-boxes[data-look="steps"] > .blk-box::before { content: counter(blk-box); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
 .deck-sl.is-blocks .blk-boxes[data-look="line"] > .blk-box::before { content: ''; display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
-/* Steps: the pill, then numbered steps in circles (frame 26). */
-.deck-sl.is-blocks .blk-pill { display: inline-block; max-width: 100%; margin: 0 0 .5em; padding: 3px 12px; border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 14px/22px var(--s-fb, 'Sofia Sans'); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
-/* Sprint 163 PR 5, an exercise's layout (the decks README: "the left column holds the title as its heading"): a column
-   that opens with its heading and then its Steps draws the pill above the heading, as an Exercise slide has it. The
-   pill leaves the flow for the column's top (its left stays where it stands, the column's own); the column makes room
-   for it: the pill's 28 px and a 10 px gap. A hidden pill (the stage's, emptied) or none takes no room.
-   A Columns block aligned Middle or Bottom keeps the pill in its flow, under the heading: its column's words move down
-   and a pill pinned to the top would be left behind. The pill's width and top still allow for the column padding removed in Sprint 164 PR 2; PR 3 replaces this rule. */
-.deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column:has(> :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden])) { position: relative; padding-top: calc(4.8px * var(--fit, 1) + 38px); }
-.deck-sl.is-blocks .blk-columns:not([data-valign="middle"], [data-valign="bottom"]) > .blk-column > :is(h1, h3):first-child + .blk-steps > .blk-pill:not([hidden]) { position: absolute; top: calc(4.8px * var(--fit, 1)); max-width: calc(100% - 26.4px * var(--fit, 1)); margin: 0; }
-/* The slide's title in such a column, and its steps, at the prototype's sizes (workbook.html: 38 and 18 slide units),
-   so the title, the pill and four steps fit a third of the slide and the tabs keep the rest. */
-.deck-sl.is-blocks .blk-column > h1:first-child:has(+ .blk-steps) { font-size: 1.58em; }
-.deck-sl.is-blocks .blk-column > h1:first-child + .blk-steps { font-size: .75em; }
+/* Sprint 164 PR 3 (the decks README, "Label, a block of its own"): a short line in the theme's accent, as a pill, in
+   capitals with a little letter spacing (the old Exercise pill's look), a block of its own anywhere on the slide: above
+   a title, in a column, in a box or in a tab's pane. The block space under it like every block, and 8 px right before a
+   heading, as a heading sits close to its own text. Canvas pixels times the fit. An empty one is never drawn. */
+.deck-sl.is-blocks .blk-label { display: block; width: fit-content; max-width: 100%; align-self: flex-start; margin: 0 0 calc(12px * var(--fit, 1)); padding: calc(3px * var(--fit, 1)) calc(12px * var(--fit, 1)); border-radius: var(--s-rt, 20px); background: var(--s-acc, #F2B544); color: var(--s-tagfg, #1C1F4A); font: 700 calc(14px * var(--fit, 1))/calc(22px * var(--fit, 1)) var(--s-fb, 'Sofia Sans'), sans-serif; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
+.deck-sl.is-blocks .blk-label:has(+ :is(h1, h2, h3, h4, h5, h6)) { margin-bottom: calc(8px * var(--fit, 1)); }
+/* In a box its blocks are parted by the box's own 4 px gap, a Label's too; over a heading it keeps 8 px, 4 of its own. */
+.deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > .blk-label { margin-bottom: 0; }
+.deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > .blk-label:has(+ :is(h1, h2, h3, h4, h5, h6)) { margin-bottom: calc(4px * var(--fit, 1)); }
+/* Sprint 163 PR 5, an exercise's layout (the decks README: "the left column holds the title as its heading"): the
+   slide's title in such a column, and its steps, at the prototype's sizes (workbook.html: 38 and 18 slide units), so
+   the title, its Label and four steps fit a third of the slide and the tabs keep the rest. Sprint 164 PR 3: the pill
+   that drew above the heading is a Label over it now, in the column's flow. */
+.deck-sl.is-blocks .blk-column > :is(h1:first-child, .blk-label:first-child + h1):has(+ .blk-steps) { font-size: 1.58em; }
+.deck-sl.is-blocks .blk-column > :is(h1:first-child, .blk-label:first-child + h1) + .blk-steps { font-size: .75em; }
+/* Steps: numbered steps in circles (frame 26). */
 .deck-sl.is-blocks .blk-steps ol { list-style: none; padding: 0; counter-reset: blk-step; }
 .deck-sl.is-blocks .blk-steps ol > li { position: relative; counter-increment: blk-step; padding-left: 2.1em; margin-bottom: .55em; font-weight: 600; color: var(--s-hd, #fff); }
 .deck-sl.is-blocks .blk-steps ol > li::before { content: counter(blk-step); position: absolute; left: 0; top: .05em; width: 1.45em; height: 1.45em; border-radius: 50%; display: grid; place-items: center; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); font-weight: 700; font-size: .8em; }
@@ -385,6 +389,7 @@
 .deck-slide.is-borderless .deck-sl.is-blocks li::marker { color: var(--s-acct, #C98A10); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-box, .deck-slide.is-borderless .deck-sl.is-blocks pre { background: var(--s-box, #EFF0F8); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); }
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-icon, .deck-slide.is-borderless .deck-sl.is-blocks .blk-mark, .deck-slide.is-borderless .deck-sl.is-blocks .blk-steps ol > li::before { background: var(--s-accs, rgba(242,181,68,.22)); color: var(--s-acct, #B07A12); }
+.deck-slide.is-borderless .deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(28,31,74,.3)); }
 .deck-slide.is-borderless .deck-sl.is-blocks table { box-shadow: inset 0 0 0 1.5px var(--s-boxl, #E7E8F2); }
 .deck-slide.is-borderless .deck-sl.is-blocks th { background: var(--s-thbg, #FFF4D6); color: var(--s-thfg, #8A5A00); }
 .deck-slide.is-borderless .deck-sl.is-blocks td { border-top-color: var(--s-row, #ECEDF5); }

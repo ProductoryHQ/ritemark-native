@@ -12,14 +12,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const core = path.join(root, 'node_modules', '@phosphor-icons', 'core');
 const out = path.join(root, 'webview', 'src', 'components', 'decks', 'slide', 'pageIcons.ts');
 
-/** The Phosphor names in iconSet.ts's SLIDE_ICONS, read from its text so the list can't drift. */
+/**
+ * The Phosphor names in iconSet.ts's SLIDE_ICONS, and its `UNKNOWN_ICON` (#850: the dashed circle a box draws for a name
+ * Ritemark doesn't know), read from its text so the list can't drift.
+ */
 function slideIconNames() {
   const text = fs.readFileSync(path.join(root, 'webview', 'src', 'components', 'decks', 'slide', 'iconSet.ts'), 'utf8');
-  return [...text.matchAll(/phosphor: '([a-z0-9-]+)'/g)].map((match) => match[1]);
+  const unknown = /export const UNKNOWN_ICON = '([a-z0-9-]+)'/.exec(text);
+  if (!unknown) throw new Error('iconSet.ts has no UNKNOWN_ICON');
+  return [...[...text.matchAll(/phosphor: '([a-z0-9-]+)'/g)].map((match) => match[1]), unknown[1]];
 }
 
-/** The page's own icons, and the arrow the Arrows look draws. */
-export const PAGE_ONLY = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'folder', 'file-text', 'arrow-up-right'];
+/**
+ * The page's own icons, and the arrow the Arrows look draws: Copy and its tick, Contents, the arrows under the slide and
+ * Contents' carets, a folder and a document, ↗ Open in, the text's More and the close ×.
+ */
+export const PAGE_ONLY = ['arrow-right', 'copy', 'check', 'list', 'caret-up', 'caret-down', 'caret-left', 'caret-right', 'folder', 'file-text', 'arrow-up-right', 'notebook', 'x'];
 
 export function iconNames() {
   return [...new Set([...slideIconNames(), ...PAGE_ONLY])].sort();

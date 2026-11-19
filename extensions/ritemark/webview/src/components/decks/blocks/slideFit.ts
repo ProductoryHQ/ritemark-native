@@ -10,6 +10,7 @@
  * `nextFitStep` and `isFullAt` decide, and are pure.
  */
 import { BLOCK_FIT_STEPS, BLOCK_MAX_STEP } from '../../../../../src/decks/blocks/slideRenderer'
+import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 
 /** The words' height at a step, and the room they have. */
 export interface FitMeasure {
@@ -156,9 +157,12 @@ export function fitFlow(flow: HTMLElement, current = 0): { step: number; full: b
 let stageFit: { key: string; step: number; owner?: object } | null = null
 const stageFitListeners = new Set<() => void>()
 
-/** What a fit belongs to: the slide's Markdown, its picture and place, and the look. */
+/**
+ * What a fit belongs to: the slide's Markdown, its picture and place, and the look. The Markdown as it is drawn: a Steps
+ * block's old pill as its Label (Sprint 164 PR 3), so the stage, which opens the slide so, and the strip agree.
+ */
 export function fitKeyOf(markdown: string, image: string | undefined, picture: string | undefined, look: string): string {
-  return [markdown, image ?? '', picture ?? '', look].join('\u0000')
+  return [withStepsLabels(markdown), image ?? '', picture ?? '', look].join('\u0000')
 }
 
 /** The look part of a fit's key: Card or Borderless, and the theme. */

@@ -14,7 +14,7 @@ import {
 } from './deckLibraryFormat';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
 import { convertedPart, saysBlockDeck, withDeckVersion } from './blocks/convertDeck';
-import { agendaOf, blockStepsTagOf } from './blocks/slideRenderer';
+import { agendaOf } from './blocks/slideRenderer';
 import type { AgendaEntry } from './blocks/agenda';
 
 export const LIBRARY_FOLDER = 'Slide library';
@@ -107,8 +107,6 @@ function sourceOf(from: string | undefined): { path: string; id: string; stamp: 
 /** What search looks through on a slide: its words and its handout, lower case (the place's search and the AI's). */
 export const slideSearchText = (slide: DeckSlideText) => [
   slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? exerciseTagOf(slide.data) : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
-  // A block slide's Steps pill, as it draws it ("Exercise" for one with no label).
-  ...(slide.data.markdown !== undefined ? [blockStepsTagOf(slide.data.markdown) ?? undefined] : []),
   ...(slide.data.rows ?? []).flat(), slide.data.markdown, slide.handout,
 ].filter(Boolean).join(' ').toLowerCase();
 

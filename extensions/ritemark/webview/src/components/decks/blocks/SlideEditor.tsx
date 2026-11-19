@@ -20,10 +20,13 @@
  * The words fit the slide in steps (`slideFit.ts`), measured again as they change.
  *
  * PR 3 (frames 22, 24 and 26; `slideCommands.ts`): the slide's own / menu with its blocks and its Slides items, a box's
- * icon from the grid, the Steps pill edited in place, Enter moving down a table, and "This slide is full" told to the
+ * icon from the grid, Enter moving down a table, and "This slide is full" told to the
  * deck's bar (`onFull`) with Split at the cursor. While the / menu is open the words typed after the / are not written
  * to the deck (they are the menu's query), so a block chosen from it is one undo step that leaves the file as it was
  * before the /. A block, an icon, a row or a column is written as an undo step of its own (`SLIDE_COMMAND`).
+ *
+ * Sprint 164 PR 3: the Label (`slideLabel.ts`), typed in place like every word on the slide. A slide whose Steps block
+ * still has its old pill opens with it as a Label (`stageMarkdownOf`), so the first edit writes what the stage shows.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { EditorContent, useEditor, type Editor as TipTapEditor } from '@tiptap/react'
@@ -35,8 +38,8 @@ import { PluginKey, TextSelection, type EditorState, type Transaction } from '@t
 import { closeHistory, undoDepth } from '@tiptap/pm/history'
 import { blockTitleOf, isBlockSlide, slideDataOf, withBlockMarkdown, writeSlideData, type SlideData } from '../../../../../src/decks/deckFormat'
 import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
-import { OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
-import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, stepsTagOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
+import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
+import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
@@ -54,13 +57,14 @@ import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
 import { onDocChanged } from '../../../lib/docChange'
 import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { ensureSlideCommentPipeline, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { SlideLabel, labelNode } from './slideLabel'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
-import { PILL_PLACEHOLDER, SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, lastPillLabel, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, setStepsTag, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
-import { PillField, SlideIconPicker, WebPageDialog, type IconPick, type PillEdit } from './SlideBlockTools'
+import { SLIDE_COMMAND, slideItemsAt, agendaNode, isOwnStep, withoutEmptyLineAt, cellBelow, insertSlideBlock, pictureNode, setBlockValue, slideBlockNode, splitSlideHalves, webPageNode, type SlideBlockKind } from './slideCommands'
+import { SlideIconPicker, UnknownIconHint, WebPageDialog, type IconHint, type IconPick } from './SlideBlockTools'
 import { SlideBlockBar } from './SlideBlockBar'
 import { tabsWithViews } from '../../../extensions/tabs/TabsView'
 import { canHoldTabs, pastedWithoutTabs, setPendingRename, tabsBlockNode, tabsPosAtSelection } from '../../../extensions/tabs/tabsCommands'
@@ -143,7 +147,7 @@ interface SlideTools {
   splitLine: () => boolean
   tab: (direction: 1 | -1) => boolean
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
-  editPill: (pos: number, anchor: HTMLElement) => void
+  hintIcon: (pos: number, anchor: HTMLElement, name: string) => void
 }
 
 /** A paragraph that holds only `***`, the caret at its end: Split slide here's shortcut (frame 22). */
@@ -158,9 +162,12 @@ const KEYS = isMac
   ? { cut: '⌘X', copy: '⌘C', paste: '⌘V', comment: '⌘/' }
   : { cut: 'Ctrl+X', copy: 'Ctrl+C', paste: 'Ctrl+V', comment: 'Ctrl+/' }
 
-/** The slide's Markdown as the stage edits it: a block slide's, or a v1 slide's as blocks (converted in memory). */
+/**
+ * The slide's Markdown as the stage edits it: a block slide's, or a v1 slide's as blocks (converted in memory). A Steps
+ * block's old pill is the Label it becomes (Sprint 164 PR 3, `withStepsLabels`): the deck's first edit writes it so.
+ */
 export function stageMarkdownOf(kind: string, data: SlideData): string {
-  return (isBlockSlide(kind) ? data.markdown : blockDataOf(kind, data).markdown) ?? ''
+  return isBlockSlide(kind) ? withStepsLabels(data.markdown ?? '') : blockDataOf(kind, data).markdown ?? ''
 }
 
 /** An empty slide opens with an empty title, so the first words typed are its title (frame 21). */
@@ -318,7 +325,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const toolsRef = useRef<SlideTools | null>(null)
   const divHandlers = useMemo<SlideDivHandlers>(() => ({
     pickIcon: (pos, anchor, current) => toolsRef.current?.pickIcon(pos, anchor, current),
-    editPill: (pos, anchor) => toolsRef.current?.editPill(pos, anchor),
+    hintIcon: (pos, anchor, name) => toolsRef.current?.hintIcon(pos, anchor, name),
   }), [])
   // Small details 14: the Agenda reads the deck's sections from the handout's editor, and draws again as they change.
   const agendaSource = useMemo<AgendaSource>(() => ({
@@ -360,8 +367,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // The handout's comment node, with the slide's own storage and ⌘/ (`SlideCommentNode`).
   const extensions = useMemo(() => createEditorSchemaExtensions({
     beforeLink: [Placeholder.configure({
-      // The title's, and an empty column's "Heading" over "Text" (PR 3), nested ones included.
-      placeholder: ({ editor: current, node, pos }) => slidePlaceholderOf(node, pos > 0 ? current.state.doc.resolve(pos).parent : null, pos === 0 && node.type.name === 'heading'),
+      // The title's, and an empty column's "Heading" over "Text" (PR 3), nested ones included; an empty Label's while
+      // the caret is in it (Sprint 164 PR 3).
+      placeholder: ({ editor: current, node, pos, hasAnchor }) => slidePlaceholderOf(node, pos > 0 ? current.state.doc.resolve(pos).parent : null, isTitlePlace(current.state.doc, node, pos), hasAnchor),
       showOnlyCurrent: false,
       includeChildren: true,
     })],
@@ -372,7 +380,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
-    deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource)],
+    deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource), SlideLabel],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
     tabs: tabsWithViews('slide'),
   }).map(extension => {
@@ -636,7 +644,17 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   // ---- PR 3: the slide's / menu, its blocks' own tools, and the bar's and Settings' requests
 
   const [iconPick, setIconPick] = useState<IconPick | null>(null)
-  const [pillEdit, setPillEdit] = useState<PillEdit | null>(null)
+  /** #850: the box's unknown icon being pointed at (its tooltip). */
+  const [iconHint, setIconHint] = useState<IconHint | null>(null)
+  const endIconHint = useCallback(() => setIconHint(null), [])
+  // Any change to the slide's words ends it (yours, an undo, or an AI's edit of the file): the box's place it holds may
+  // be another block's now.
+  useEffect(() => {
+    if (!editor || !iconHint) return
+    const changed = ({ transaction }: { transaction: Transaction }) => { if (transaction.docChanged) setIconHint(null) }
+    editor.on('transaction', changed)
+    return () => { editor.off('transaction', changed) }
+  }, [editor, iconHint])
   const [webPageAt, setWebPageAt] = useState<number | null>(null)
   /** Where the / menu's Picture goes once the host has saved it. */
   const pictureAt = useRef<number | null>(null)
@@ -737,15 +755,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     choosePicture(true, true)
   }
 
-  /** The deck's last pill label up to this slide, for a new Steps block (`lastPillLabel`). */
-  const pillLabelSoFar = (): string | null => {
-    const deck = outerRef.current
-    if (deck.isDestroyed) return null
-    const here = freshEntry(deck, slideRef.current)
-    const slides = slidesOf(deck.state.doc).slice(0, here ? here.index + 1 : undefined)
-    return lastPillLabel(slides.map(entry => ({ kind: entry.kind, markdown: entry.data.markdown, tag: entry.data.tag })))
-  }
-
   toolsRef.current = {
     runItem: (range, item) => {
       if (!editor || editor.isDestroyed) return
@@ -770,12 +779,15 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         case 'boxes':
         case 'steps':
         case 'table': {
+          // A new Steps block comes without a Label (Sprint 164 PR 3: the decks README, "Label, a block of its own").
           const kind = item.nodeType as SlideBlockKind
-          // A new Steps block carries the deck's last pill label (the lead on #769).
-          const tag = kind === 'steps' ? pillLabelSoFar() : null
-          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind, tag)); return true }).run()
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, slideBlockNode(editor.schema, kind)); return true }).run()
           return
         }
+        case 'label':
+          // Sprint 164 PR 3: an empty Label where the / was, the caret in it ("Label" faint), an undo step of its own.
+          chain().command(({ tr }) => { insertSlideBlock(tr, range.from, labelNode(editor.schema)); return true }).run()
+          return
         case 'tabs':
           // Sprint 163: "Tab 1" and "Tab 2", the first name chosen so typing names it (its band reads the pending name).
           chain().command(({ tr }) => {
@@ -838,36 +850,12 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     pickIcon: (pos, anchor, current) => {
       const rect = anchor.getBoundingClientRect()
       setIconPick({ pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current })
+      setIconHint(null)
     },
-    editPill: (pos, anchor) => {
-      const rect = anchor.getBoundingClientRect()
-      const style = getComputedStyle(anchor)
-      const node = editor && !editor.isDestroyed ? editor.state.doc.nodeAt(pos) : null
-      const open = node ? OPEN_FENCE.exec(String(node.attrs.open ?? '')) : null
-      const attrs = open ? parseFenceAttributes(open[2]) : null
-      setPillEdit({
-        pos,
-        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-        scale: width / BLOCK_CANVAS_WIDTH,
-        words: attrs ? stepsTagOf(attrs) : '',
-        serial: Date.now(),
-        look: { background: style.backgroundColor, color: style.color, font: style.font, radius: style.borderRadius },
-      })
+    // #850: never while the icon menu is open for it (the badge is under the menu's own place).
+    hintIcon: (pos, anchor, name) => {
+      if (!iconPick) setIconHint({ pos, anchor, name })
     },
-  }
-
-  /** The pill's words typed in its field (#752's rule: words it shows already write nothing). */
-  const setPillWords = (pos: number, words: string) => {
-    if (editor && !editor.isDestroyed) apply(setStepsTag(editor.state, pos, words))
-  }
-  /** The field closed: with Enter or Esc, the caret back on the slide at the start of the block's first step. */
-  const endPill = (refocus: boolean) => {
-    const edit = pillEdit
-    setPillEdit(null)
-    if (!refocus || !edit || !editor || editor.isDestroyed) return
-    const at = Math.min(edit.pos + 1, editor.state.doc.content.size)
-    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.near(editor.state.doc.resolve(at))))
-    editor.view.focus()
   }
 
   // The deck bar's Split at the cursor: split at the caret the slide still has (the bar took the focus).
@@ -1181,7 +1169,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             </Tooltip>
           ))}
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
-          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} stepsLabel={pillLabelSoFar} pickIcon={divHandlers.pickIcon} />
+          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
           {editor ? <FormattingBubbleMenu editor={editor} appendToBody /> : null}
@@ -1285,14 +1273,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       insideOf={place => place.kind === 'side'}
       boundsOf={() => (frameRef.current ? stageBounds(frameRef.current) : undefined)}
     />
-    {/* PR 3: a box's icon from the grid, the Steps pill's words typed in place, and the / menu's Web page. */}
-    <PillField
-      edit={pillEdit}
-      placeholder={PILL_PLACEHOLDER}
-      onWords={setPillWords}
-      onDone={endPill}
-      onUndo={redo => { if (redo) outerRef.current.commands.redo(); else outerRef.current.commands.undo() }}
-    />
+    {/* PR 3: a box's icon from the grid, and the / menu's Web page. */}
     <SlideIconPicker
       pick={iconPick}
       onPick={(pos, name) => {
@@ -1302,6 +1283,16 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
         editor.view.focus()
       }}
       onClose={() => setIconPick(null)}
+    />
+    <UnknownIconHint
+      frame={frame}
+      hint={iconHint}
+      onChoose={(hint, rect) => {
+        setIconHint(null)
+        // The menu as it is (its search, with the name in it, is Sprint 169's); No icon takes the name out of the file.
+        setIconPick({ pos: hint.pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current: hint.name })
+      }}
+      onDone={endIconHint}
     />
     <WebPageDialog
       open={webPageAt !== null}

@@ -74,11 +74,12 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 8: a Button's own words (PR 8, issue #848)
 [#848](https://github.com/ProductoryHQ/ritemark-native/issues/848): the button's words can't be typed into, or nothing shows they can. The design (decks README, Button, Editing) says a click chooses the block and then its words and the words beside it are typed in place. Likely cause, not proven: with no words the pill's editable span has no width (the placeholder is a CSS `::before` with `pointer-events: none` beside a `contenteditable=false` icon), so the caret can't get in; or the open Address sheet keeps the focus. A live check first; if it works and is only undiscoverable, it goes back to the Experience lead as UX.
-- [ ] A test that fails before; shots of an empty and a filled button being typed into.
+- [x] A test that fails before; shots of an empty and a filled button being typed into (`proof/pr8-button-words/`). The live check found the bug: a click on the button's icon put the caret at the start of the slide's title (or a document's first line), and the words typed went there; and with a new button's address sheet open, a click on the button took the new button away. Now a click anywhere on the button puts the caret in its words, the sheet stays open while you type them, and while a new button's sheet asks for its address, Enter in them goes on to it. A new button left without an address after words were typed on it goes as an undo step, so ⌘Z brings it back.
 
 ### Fix 9: an unknown icon name (PR 9, issue #850)
 [#850](https://github.com/ProductoryHQ/ritemark-native/issues/850): when an agent writes an icon name Ritemark doesn't know, the icon's place stays empty. On the slide, wall, strip and page a neutral fallback icon (its look is the Experience lead's call); in the editor a quiet hint on the icon ("Unknown icon: <name>, choose another"); the DECKS rules for agents list the allowed icon names.
-- [ ] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+- [x] Tests for the fallback and the hint; shots of the fallback on a slide and the hint in the editor.
+- Done (PR 9): the Experience lead's look (issue #850, decks README c6f8477): the badge keeps its place, size and soft accent ground with Phosphor's `circle-dashed` in the placeholder colour, drawn by one helper for the renderer and the stage (`boxIconBadge`). The hint is a tooltip, No icon named “xyz”, with Choose an icon, which opens the icon menu as it is (the search with the name in it waits for Sprint 169). The DECKS rules list the 24 names and the aliases; the name stays in the file as written. Tests: `blocks.test.ts`, `pageHtml.test.ts`, `slideRenderer.parity.test.ts`, `capabilityContext.test.ts`, `layoutSlide.test.ts`, `slideMarkup.test.ts`, `slideBlocks.roundtrip.test.ts`. Shots: `proof/pr9-unknown-icon/`.
 
 ## Added on 19 November, third time (Jarmo: "jah kõigile kolmele")
 
@@ -88,7 +89,8 @@ Both found in the Experience lead's review of Sprint 164 PR 2 (#821) on 19 Novem
 
 ### Fix 11: a thumbnail takes no click or wheel inside it (PR 11, issue #856)
 [#856](https://github.com/ProductoryHQ/ritemark-native/issues/856): a click anywhere on a thumbnail chooses that slide, and a thumbnail's columns and panes never show or catch a scrollbar.
-- [ ] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- [x] A test; one shot of a thumbnail with a long column chosen by a centre click.
+- Built (PR 11): nothing in a thumbnail's slide takes the pointer (`decks.css`), so every click and wheel there is the thumbnail's own, and no block in it draws a scrollbar (each keeps its room and fade). One rule for every thumbnail: the strip and a drag's lifted copy, the wall's grid, and the presenter view's row and Next (widened in review). Proof: `proof/pr11-thumbnail-clicks/`.
 
 ## For every PR
 

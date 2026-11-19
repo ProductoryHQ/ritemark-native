@@ -62,9 +62,34 @@ const ALIASES: Record<string, string> = {
 
 const BY_NAME = new Map<string, SlideIcon>(SLIDE_ICONS.map(icon => [icon.name, icon]))
 
-/** The icon for a name a slide carries, or null when it is none of the grid's (the box draws no icon). */
+/** The icon for a name a slide carries, or null when it is none of the grid's (a box then draws `UNKNOWN_ICON`). */
 export function slideIcon(name: string | undefined): SlideIcon | null {
   if (!name) return null
   const key = name.trim().toLowerCase()
   return BY_NAME.get(key) ?? BY_NAME.get(ALIASES[key] ?? '') ?? null
 }
+
+/**
+ * #850 (the Experience lead, 19 November; decks README, "Every Phosphor icon"): what a box draws when its `icon` names
+ * one Ritemark doesn't know, so its badge never stays empty: Phosphor's regular `circle-dashed`, in the theme's
+ * placeholder colour on the badge's usual soft accent (`blk-icon is-unknown`, slide.css). The name stays in the file as
+ * written. `scripts/generate-page-icons.mjs` reads this line, so the page carries the drawing.
+ */
+export const UNKNOWN_ICON = 'circle-dashed'
+
+/** What a box's `icon` draws: a known icon (`name` the grid's), or the fallback for a name it doesn't know (as written). */
+export type BoxIcon =
+  | { known: true; name: string; phosphor: SlideIcon['phosphor'] }
+  | { known: false; name: string; phosphor: typeof UNKNOWN_ICON }
+
+/** A box's icon by the name it carries; null when it names none (no `icon`, or an empty one). */
+export function boxIconOf(name: string | undefined): BoxIcon | null {
+  const written = name?.trim()
+  if (!written) return null
+  const icon = slideIcon(written)
+  return icon ? { known: true, name: icon.name, phosphor: icon.phosphor } : { known: false, name: written, phosphor: UNKNOWN_ICON }
+}
+
+/** The names a box's `icon` may carry, for the DECKS rules: the grid's 24, and the other names drawn as them. */
+export const SLIDE_ICON_NAMES: readonly string[] = SLIDE_ICONS.map(icon => icon.name)
+export const SLIDE_ICON_ALIASES: readonly string[] = Object.keys(ALIASES)

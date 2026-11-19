@@ -172,6 +172,7 @@ import {
   Article,
   Columns,
   Tabs,
+  Tag,
   CopySimple,
   PlusSquare,
   Scissors,
@@ -395,6 +396,8 @@ const iconMap = {
   'square-half': SquareHalf,
   // Sprint 163: the Tabs block (the / menu, its bar) and a tab's Duplicate.
   'tabs': Tabs,
+  // Sprint 164 PR 3: the Label block's / item (the decks README, "Label, a block of its own").
+  'tag': Tag,
   'copy-simple': CopySimple,
 } as const satisfies Record<string, PhosphorIconComponent>
 
