@@ -37,6 +37,8 @@ export const TABS_KEYWORDS = ['tab', 'tabs', 'tabset', 'sakid', 'sakk', 'vaheleh
 export const CODE_BLOCK_KEYWORDS = ['code', 'snippet', 'kood']
 /** Sprint 163 PR 3: the Button block's hidden words (the decks README), the same in both / menus. */
 export const BUTTON_KEYWORDS = ['link', 'file', 'material', 'download', 'nupp', 'fail', 'materjal']
+/** Sprint 164 PR 3: the Label block's hidden words (the decks README). The slide's / menu only: a Text document has no Label. */
+export const LABEL_KEYWORDS = ['tag', 'badge', 'pill', 'eyebrow', 'silt', 'märgis']
 
 export const blockItems: BlockItemDef[] = [
   { title: 'Text', description: 'Plain text paragraph', icon: 'paragraph', nodeType: 'paragraph', keywords: ['paragraph', 'tekst'] },

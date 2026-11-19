@@ -17,7 +17,7 @@
  * three times, with no sound; with reduced motion it doesn't pulse (`timerLook`).
  */
 import type { WallPoint, WallTimer } from '../../../../../src/decks/present/presentProtocol'
-import { blockStepsTagOf } from '../../../../../src/decks/blocks/slideRenderer'
+import { blockStepsLabelOf } from '../../../../../src/decks/blocks/slideRenderer'
 import { exerciseTagOf, isBlockSlide } from '../../../../../src/decks/deckFormat'
 import type { KeyInput } from './wallKeys'
 
@@ -116,14 +116,14 @@ export interface TimerSlide {
 }
 
 /**
- * The Steps label of a slide that has a Steps block ('' for a Steps block without one), or null when it has none: only
- * such a slide offers the timer. The wall's slides are block slides (every v1 kind goes out as one, `publicSlide`); a
+ * The Steps label of a slide that has a Steps block (its Label's words since Sprint 164 PR 3; '' for none), or null
+ * when it has none: only such a slide offers the timer. The wall's slides are block slides (every v1 kind goes out as one, `publicSlide`); a
  * v1 Exercise read as it is counts too.
  */
 export function stepsLabelOf(slide: TimerSlide): string | null {
   if (slide.kind === 'exercise') return exerciseTagOf(slide.data)
   if (!isBlockSlide(slide.kind) || typeof slide.data.markdown !== 'string') return null
-  return blockStepsTagOf(slide.data.markdown)
+  return blockStepsLabelOf(slide.data.markdown)
 }
 
 /** The words on a slide, for a time named outside the label. */
