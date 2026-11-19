@@ -13,12 +13,12 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-168-qu
 
 ## PR 2: a prompt out of a quote, R2 (High), branch `sprint-168-quotes-headings-pr2`, can start now
 - [x] Issue created in milestone v2.3.0 (manager): #864: to be created
-- [ ] Check Sprint 166 PR 8 and Sprint 167 PR 5 for overlap before the first edit
-- [ ] Code block inside a quote lifts the paragraphs out, then makes one code block with Copy and ↗
-- [ ] An emptied quote goes; the whole change is one undo step
-- [ ] Bubble and / menu both; outside a quote unchanged
-- [ ] Tests: each scenario in `scenarios.md`, including Undo
-- [ ] Shots: the code block taken out of a quote, before and after; the Experience lead's look
+- [x] Check Sprint 166 PR 8 and Sprint 167 PR 5 for overlap before the first edit
+- [x] Code block inside a quote lifts the paragraphs out, then makes one code block with Copy and ↗
+- [x] An emptied quote goes; the whole change is one undo step
+- [x] Bubble and / menu both; outside a quote unchanged
+- [x] Tests: each scenario in `scenarios.md`, including Undo
+- [x] Shots: the code block taken out of a quote, before and after (`proof/pr2-prompt-out-of-quote/`); the Experience lead's look follows
 - [ ] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## PR 3: heading levels, R3 (High), branch `sprint-168-quotes-headings-pr3`, after Sprint 164 PR 3 merges
