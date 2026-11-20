@@ -71,10 +71,14 @@ function matchOf(entry: Entry, query: string, asName: string): Match | null {
   return best
 }
 
+const byName = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+
 /**
  * The icons a query finds, best first: a name it is, then names it starts, then names with a word it starts, then
  * tags it is, then tags it starts, then names holding it. Among equals the grid's 24 come first, then by name. An empty
- * query finds nothing (the menu then shows the deck's icons and the 24).
+ * query finds nothing (the menu then shows the deck's icons and the 24). A query that finds nothing this way, a
+ * misspelt name above all ("trukc", the unknown name a box carries: Sprint 169 PR 4), finds the names nearest it
+ * (`nearIcons`).
  */
 export function searchIcons(query: string): SlideIcon[] {
   const text = query.trim().toLowerCase().replace(/\s+/g, ' ')
@@ -85,9 +89,78 @@ export function searchIcons(query: string): SlideIcon[] {
     const match = matchOf(entry, text, asName)
     if (match !== null) found.push({ entry, match })
   }
-  const byName = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+  if (!found.length) return nearIcons(asName)
   found.sort((a, b) => a.match - b.match || Number(b.entry.grid) - Number(a.entry.grid) || byName(a.entry.icon.phosphor, b.entry.icon.phosphor))
   return found.map(({ entry }) => entry.icon)
+}
+
+/**
+ * How many edits a word may be from a query and still be near it: one for a query of up to four letters, two up to
+ * eight, three beyond. A query shorter than three letters has no near words (every short name would be one).
+ */
+export function nearLimit(length: number): number {
+  return length < 3 ? -1 : length <= 4 ? 1 : length <= 8 ? 2 : 3
+}
+
+/**
+ * The edits between two words, letters added, taken out, changed, or two side by side swapped ("trukc" is one from
+ * "truck"); `limit + 1` as soon as it is surely more than `limit`.
+ */
+export function editsBetween(a: string, b: string, limit: number): number {
+  if (Math.abs(a.length - b.length) > limit) return limit + 1
+  let before: number[] = []
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i]
+    let least = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      let value = Math.min(previous[j] + 1, row[j - 1] + 1, previous[j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) value = Math.min(value, before[j - 2] + 1)
+      row.push(value)
+      if (value < least) least = value
+    }
+    if (least > limit) return limit + 1
+    before = previous
+    previous = row
+  }
+  return previous[b.length]
+}
+
+/**
+ * Sprint 169 PR 4 (#869): the icons whose names or words are nearest a query that found none, nearest first: a whole
+ * name, a word of one ("truck" in `fire-truck`) or one of Phosphor's tags within `nearLimit` edits. Among equals, a
+ * whole name before a word of one before a tag's, then the grid's 24, then by name. None when nothing is that near, so "No icons match" still shows for nonsense.
+ */
+export function nearIcons(asName: string): SlideIcon[] {
+  const limit = nearLimit(asName.length)
+  if (limit < 0) return []
+  // Each entry's nearest word, and what kind it is: a whole name (0) before a word of one (1) before a tag's word (2).
+  const found: { entry: Entry; edits: number; kind: number }[] = []
+  for (const entry of index()) {
+    let best = { edits: limit + 1, kind: 3 }
+    const consider = (word: string, kind: number) => {
+      const edits = editsBetween(asName, word, Math.min(limit, best.edits))
+      if (edits < best.edits || (edits === best.edits && kind < best.kind)) best = { edits, kind }
+    }
+    for (const name of entry.names) {
+      consider(name, 0)
+      if (name.includes('-')) for (const word of name.split('-')) consider(word, 1)
+    }
+    for (const tag of entry.tags) for (const word of tag.split(' ')) consider(word, 2)
+    if (best.edits <= limit) found.push({ entry, ...best })
+  }
+  found.sort((a, b) => a.edits - b.edits || a.kind - b.kind || Number(b.entry.grid) - Number(a.entry.grid) || byName(a.entry.icon.phosphor, b.entry.icon.phosphor))
+  return found.map(({ entry }) => entry.icon)
+}
+
+/**
+ * Sprint 169 PR 4 (#869; decks README, "Every Phosphor icon"): the words the icon menu's search starts with. For a box
+ * whose icon names one Ritemark doesn't know, that name as written, so the nearest icons show at once; else none.
+ */
+export function iconMenuStartQuery(current: string | null): string {
+  const written = current?.trim()
+  return written && !slideIcon(written) ? written : ''
 }
 
 /**
