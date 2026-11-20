@@ -22,9 +22,11 @@ Nothing starts until the plan is approved (Development manager with the Experien
 - [x] Tests and shots; the menu's item for Slide only works
 - [ ] Issue, Review record, the lead's look, release-notes line
 
-## PR 3: Handout
-- [ ] A4 portrait, the text alone, each part under its number and heading, no slide pictures
-- [ ] Tests and shots; the menu's item for Handout only works
+## PR 3: Handout (#886)
+- [x] A4 portrait, the text alone, each part under its number and heading, no slide pictures
+- [x] Tests and shots; the menu's item for Handout only works
+- [x] PR 2's stand-in removed: each view's item saves its own kind
+- [x] #931: the bar's "Saved as" note takes the room the bar has; a name too long is cut in its middle, ".pdf" kept
 - [ ] Issue, Review record, the lead's look, release-notes line
 
 ## Sprint end

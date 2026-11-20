@@ -81,7 +81,8 @@ interface DeckPublishProps {
   text: () => string
   /** The view as drawn (Slide only under 600 px): what Save as PDF's item names. */
   view: DeckViewMode
-  onNotice: (text: string, action?: { label: string; tip: string; run: () => void }) => void
+  /** `name`: the file the words end with (#931: cut in its middle when the bar is short of room). */
+  onNotice: (text: string, action?: { label: string; tip: string; run: () => void }, name?: string) => void
 }
 
 export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice }: DeckPublishProps) {
@@ -95,7 +96,7 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
       if (message.type === 'deck/page-state' && isState(message.state)) setState(message.state)
       if (message.type === 'deck/page-notice' && typeof message.text === 'string') onNotice(message.text)
       if (message.type === 'deck/pdf-saved' && typeof message.name === 'string') {
-        onNotice(savedNotice(message.name), { label: 'Show in folder', tip: 'Show the PDF in its folder', run: () => sendToExtension('deck/pdf-show') })
+        onNotice(savedNotice(message.name), { label: 'Show in folder', tip: 'Show the PDF in its folder', run: () => sendToExtension('deck/pdf-show') }, message.name)
       }
     })
     sendToExtension('deck/page-state')

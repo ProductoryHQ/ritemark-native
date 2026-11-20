@@ -1,5 +1,5 @@
 /**
- * Sprint 170 PR 1 (#881) and PR 2 (#885): Save as PDF from Publish's menu. The item's words for each view (R2), the file names (R7),
+ * Sprint 170 PR 1 (#881), PR 2 (#885) and PR 3 (#886): Save as PDF from Publish's menu. The item's words for each view (R2), the file names (R7),
  * the dialog in the deck's folder, cancel writes nothing, Replace writes over in one step, the printed page holds
  * nothing private (R6) and reads only its own folder, and Show in folder.
  *
@@ -10,10 +10,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type * as vscode from 'vscode';
 import { BUILT_IN_THEME } from './deckTheme';
-import type { DeckHostMessage } from './deckProtocol';
-import { DeckPdfSaver, PDF_NOT_SAVED, PDF_NO_SLIDES, SAVED_KINDS, pdfFileName, pdfItemLabel, pdfKindFor, writeOver, type PdfDeps, type PrintInput } from './deckPdf';
+import type { DeckHostMessage, DeckPdfKind } from './deckProtocol';
+import { DeckPdfSaver, PDF_NOT_SAVED, PDF_NO_HANDOUT, PDF_NO_SLIDES, SAVED_KINDS, pdfFileName, pdfItemLabel, pdfKindFor, writeOver, type PdfDeps, type PrintInput } from './deckPdf';
 import { PAGE_FONTS, buildPrintPage } from './page/pageFile';
-import { PRINT_CSS, SLIDES_PRINT_CSS, type PageAssets } from './page/pageHtml';
+import { HANDOUT_PRINT_CSS, PRINT_CSS, SLIDES_PRINT_CSS, type PageAssets } from './page/pageHtml';
 import { PRIVATE_DECK, PRIVATE_WORDS } from './page/testing/privateDeck';
 import { makeTempDir } from '../testing/tempDir';
 
@@ -49,16 +49,13 @@ function saverFor(deckPath: string, target: string | undefined, options: { print
 }
 
 async function main(): Promise<void> {
-  // R2: the item names the view's kind; until Slides and Handout exist, the one there is, in every view.
-  assert.deepEqual(['slide', 'both', 'handout'].map(view => pdfItemLabel(pdfKindFor(view as 'slide', ['slides', 'slides-and-handout', 'handout'])!)), ['Save slides as PDF…', 'Save slides and handout as PDF…', 'Save handout as PDF…']);
-  // PR 2 (#885): Slide only saves the slides; until Handout exists (PR 3), the Handout view offers slides and handout,
-  // which holds it, and never an item that does nothing.
-  assert.deepEqual(SAVED_KINDS, ['slides-and-handout', 'slides']);
-  assert.deepEqual(['slide', 'both', 'handout'].map(view => pdfItemLabel(pdfKindFor(view as 'slide', SAVED_KINDS)!)), ['Save slides as PDF…', 'Save slides and handout as PDF…', 'Save slides and handout as PDF…']);
+  // R2: the item names the view's kind, and saves it: PR 3 (#886) makes Handout, so every view's item is its own.
+  assert.deepEqual(SAVED_KINDS, ['slides-and-handout', 'slides', 'handout']);
+  assert.deepEqual(['slide', 'both', 'handout'].map(view => pdfItemLabel(pdfKindFor(view as 'slide', SAVED_KINDS)!)), ['Save slides as PDF…', 'Save slides and handout as PDF…', 'Save handout as PDF…']);
+  assert.deepEqual(['slide', 'both', 'handout'].map(view => pdfKindFor(view as 'slide', SAVED_KINDS)), ['slides', 'slides-and-handout', 'handout']);
+  // No print, no item; and never an item that saves another kind than the view's.
   assert.equal(pdfKindFor('both', []), null);
-  // The Handout view's stand-in is slides and handout by rule, whatever order the kinds come in.
-  assert.equal(pdfKindFor('handout', ['slides', 'slides-and-handout']), 'slides-and-handout');
-  assert.equal(pdfKindFor('handout', ['slides']), 'slides');
+  assert.equal(pdfKindFor('handout', ['slides', 'slides-and-handout']), null);
 
   // R7: the file names.
   assert.deepEqual([pdfFileName('Day one', 'slides'), pdfFileName('Day one', 'slides-and-handout'), pdfFileName('Day one', 'handout')], ['Day one.pdf', 'Day one – slides and handout.pdf', 'Day one – handout.pdf']);
@@ -86,8 +83,8 @@ async function main(): Promise<void> {
     await saver.save(docOf(deckPath), 'slides-and-handout', '', 'card', [], message => said.push(message));
     assert.deepEqual(seen.asked, [path.join(project, 'decks', 'Day one – slides and handout.pdf')]);
     assert.deepEqual({ said, printed: seen.printed, files: fs.readdirSync(path.join(project, 'decks')) }, { said: [], printed: [], files: ['Day one.deck.md'] });
-    // A kind this app doesn't make yet is never saved.
-    await saver.save(docOf(deckPath), 'handout', '', 'card', [], message => said.push(message));
+    // A kind this app doesn't make is never saved.
+    await saver.save(docOf(deckPath), 'notes' as DeckPdfKind, '', 'card', [], message => said.push(message));
     assert.deepEqual({ said, asked: seen.asked.length }, { said: [], asked: 1 });
   }
 
@@ -142,6 +139,34 @@ async function main(): Promise<void> {
     assert.match(SLIDES_PRINT_CSS, /\[data-reveal-hidden\] \{ visibility: visible; \}/);
     assert.match(SLIDES_PRINT_CSS, /background: var\(--ground\)/);
     fs.unlinkSync(slidesTarget);
+  }
+
+  // PR 3 (#886), R5, R6, R7: Handout is "Day one – handout.pdf", the page's A4 print with the text alone: no slide drawn,
+  // each part under its number, nothing private; written where the dialog said.
+  {
+    const handoutTarget = path.join(project, 'decks', 'Day one – handout.pdf');
+    const { saver, seen } = saverFor(deckPath, handoutTarget);
+    const said: DeckHostMessage[] = [];
+    await saver.save(docOf(deckPath), 'handout', '', 'card', [], message => said.push(message));
+    assert.deepEqual(seen.asked, [handoutTarget]);
+    assert.deepEqual(said, [
+      { type: 'deck/page-notice', text: 'Saving Day one – handout.pdf…' },
+      { type: 'deck/pdf-saved', name: 'Day one – handout.pdf' },
+    ]);
+    assert.equal(fs.readFileSync(handoutTarget, 'utf8'), '%PDF-1.7 printed from page.html');
+    const page = seen.pages[0];
+    assert.ok(page.includes(PRINT_CSS) && page.includes(HANDOUT_PRINT_CSS), 'the A4 print, with the handout\'s rules after it');
+    assert.ok(!page.includes(SLIDES_PRINT_CSS));
+    assert.ok(page.indexOf(HANDOUT_PRINT_CSS) > page.indexOf('@media print{.pre{order:0}'), 'after the print order, so its rules win');
+    assert.match(HANDOUT_PRINT_CSS, /\.layer, \.prefetch \{ display: none !important; \}/);
+    assert.match(page, /#t1:not\(\.sect\)::before\{content:"1"\}#t2:not\(\.sect\)::before\{content:"2"\}/);
+    for (const [place, word] of Object.entries(PRIVATE_WORDS)) assert.ok(!page.includes(word), `${place} is not in the printed handout`);
+    // R8: saved again over it (the system asked Replace; yes): replaced in one step, no hidden copy left.
+    fs.writeFileSync(handoutTarget, 'an older handout');
+    await saverFor(deckPath, handoutTarget).saver.save(docOf(deckPath), 'handout', '', 'card', [], () => {});
+    assert.equal(fs.readFileSync(handoutTarget, 'utf8'), '%PDF-1.7 printed from page.html');
+    assert.deepEqual(fs.readdirSync(path.join(project, 'decks')).filter(name => name.endsWith('.part')), []);
+    fs.unlinkSync(handoutTarget);
   }
 
   // R8: a file already there (the system's dialog asked Replace, and the person said yes) is replaced in one step.
@@ -205,6 +230,25 @@ async function main(): Promise<void> {
     const text = '---\ndeck: 2\n---\n\n```slide\n---\nid: p1\npicture: right\nimage: ../pictures/harbour.png\n---\n# Harbour\n```\n\nThe crane: ![Crane](images/crane.jpg)\n';
     const built = await buildPrintPage({ deckPath, text, theme: BUILT_IN_THEME, print: 'slides' }, assets);
     assert.deepEqual(built.pictures, [{ address: 'pictures/1.png', file: path.join(project, 'pictures', 'harbour.png') }]);
+  }
+
+  // Save handout as PDF copies only the text's pictures: no slide is drawn, so its pictures aren't copied or waited for.
+  {
+    const text = '---\ndeck: 2\n---\n\n```slide\n---\nid: p1\npicture: right\nimage: ../pictures/harbour.png\n---\n# Harbour\n```\n\nThe crane: ![Crane](images/crane.jpg)\n';
+    const built = await buildPrintPage({ deckPath, text, theme: BUILT_IN_THEME, print: 'handout' }, assets);
+    assert.deepEqual(built.pictures, [{ address: 'pictures/1.jpg', file: path.join(project, 'decks', 'images', 'crane.jpg') }]);
+    assert.ok(!built.html.includes('harbour'), 'the slide\'s picture is not named');
+  }
+
+  // A handout with no text (every part emptied): Save handout as PDF says so and writes nothing, rather than a blank page.
+  {
+    const text = '---\ndeck: 2\nhandout: text\n---\n\n```slide\n---\nid: q1\n---\n# Only a slide\n```\n';
+    const empty = path.join(project, 'decks', 'Empty – handout.pdf');
+    const { saver, seen } = saverFor(deckPath, empty, { text });
+    const said: DeckHostMessage[] = [];
+    await saver.save(docOf(deckPath), 'handout', '', 'card', [], message => said.push(message));
+    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+    assert.deepEqual({ printed: seen.printed, there: fs.existsSync(empty) }, { printed: [], there: false });
   }
 
   // A deck whose slides are all skipped: Save slides as PDF says so and writes nothing, rather than a blank page.

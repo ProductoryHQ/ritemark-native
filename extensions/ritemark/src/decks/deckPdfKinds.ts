@@ -10,14 +10,12 @@ export function pdfKindOfView(view: 'slide' | 'both' | 'handout'): DeckPdfKind {
 }
 
 /**
- * The kind Publish's menu offers for the view: the view's own when this app makes it, else the nearest it makes (the
- * Experience lead, 19 November: until all three exist, the item names truthfully what it saves): for the Handout view,
- * slides and handout, which holds the handout (Sprint 170 PR 2); else the first it makes; null for none.
+ * The kind Publish's menu offers for the view: the view's own (Jarmo: the PDF saves what the view shows), when this app
+ * makes it; null when it doesn't (no item, never one that saves another kind).
  */
 export function pdfKindFor(view: 'slide' | 'both' | 'handout', kinds: readonly DeckPdfKind[]): DeckPdfKind | null {
   const wanted = pdfKindOfView(view);
-  const nearest: DeckPdfKind[] = wanted === 'handout' ? ['handout', 'slides-and-handout'] : [wanted];
-  return nearest.find(kind => kinds.includes(kind)) ?? kinds[0] ?? null;
+  return kinds.includes(wanted) ? wanted : null;
 }
 
 /** The menu item's words for a kind (R2). */

@@ -24,6 +24,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
+import { fitNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -143,6 +144,44 @@ interface Notice {
   valid?: () => boolean
   /** A join's line: the full slide's line stays beside it (the joined slide may be full). */
   withFull?: boolean
+  /** #931: the file name the words end with ("Saved as <name>"): too long for the room, it is cut in its middle. */
+  name?: string
+}
+
+/**
+ * #931: a notice ending with a file name takes the room the bar has: the whole words in it while they fit, else the name
+ * cut in its middle, keeping its end and extension (`fitNotice`); its tooltip holds the whole words. The words, hidden,
+ * keep the notice's width as the bar would give it; the words shown are fitted to that width whenever it changes.
+ */
+function NoticeWords({ text, name }: { text: string; name?: string }) {
+  const boxRef = useRef<HTMLSpanElement>(null)
+  const shownRef = useRef<HTMLSpanElement>(null)
+  const cut = !!name && text.endsWith(name)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const shown = shownRef.current
+    if (!cut || !box || !shown || !name) return
+    const prefix = text.slice(0, text.length - name.length)
+    const fit = () => {
+      shown.textContent = fitNotice(prefix, name, words => {
+        shown.textContent = words
+        return shown.scrollWidth <= box.clientWidth
+      })
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(box)
+    void document.fonts?.ready?.then(fit)
+    return () => observer.disconnect()
+  }, [cut, text, name])
+  if (!cut) return <span className="deck-notice-text">{text}</span>
+  return (
+    <span ref={boxRef} className="deck-notice-text deck-notice-cut">
+      <span className="deck-notice-sizer" aria-hidden="true">{text}</span>
+      <span ref={shownRef} className="deck-notice-shown" aria-hidden="true" />
+      <span className="sr-only">{text}</span>
+    </span>
+  )
 }
 
 const NO_SLOTS: PartMenuSlot[] = []
@@ -397,7 +436,7 @@ export function DeckView({
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
-  const publishNotice = useCallback((text: string, action?: Notice['action']) => setNotice({ text, action }), [])
+  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => setNotice({ text, action, name }), [])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -1893,7 +1932,7 @@ export function DeckView({
           {notice ? (
             <>
               <Tooltip label={notice.text} className="deck-notice-words">
-                <span className="deck-notice-text">{notice.text}</span>
+                <NoticeWords text={notice.text} name={notice.name} />
               </Tooltip>
               {notice.action ? (
                 <Tooltip label={notice.action.tip} className="deck-notice-act">

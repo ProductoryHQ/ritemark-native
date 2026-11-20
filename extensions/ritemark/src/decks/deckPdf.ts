@@ -7,8 +7,8 @@
  *    drawn, links and Buttons stay links.
  *  - **Slides** (PR 2, #885) is the same page with the slides' print rules (`SLIDES_PRINT_CSS`): one 16:9 page a
  *    slide, drawn by the wall's renderer on the theme's ground, every reveal shown, each tab as the slide holds it.
- *  - **Handout** (PR 3) comes with its own PR; until then this app offers only the kinds it makes (`SAVED_KINDS`), and
- *    the Handout view's menu names the first of them (`pdfKindFor`), truthfully.
+ *  - **Handout** (PR 3, #886) is the same A4 print with the text alone (`HANDOUT_PRINT_CSS`): no slide drawn, each
+ *    part under its number and heading. Each view's item saves its own kind (`pdfKindFor`).
  *  - **The print** is the app's own, in the main process (patch 021, `_ritemark.printHtmlToPdf`): the page is written
  *    to a temporary folder of its own with its fonts, logo and pictures, printed there offline (nothing else loads),
  *    and the folder goes again. A shell without the patch has no command, and then no kind is offered.
@@ -27,7 +27,7 @@ import type * as vscode from 'vscode';
 import type { DeckTheme } from './deckTheme';
 import type { DeckHostMessage, DeckPdfKind } from './deckProtocol';
 import { buildPrintPage, deckNameOf, type PageFile, type PageFontFile } from './page/pageFile';
-import type { PageAssets } from './page/pageHtml';
+import { handoutHasText, type PageAssets } from './page/pageHtml';
 import { normalizeForCompare } from '../utils/pathIdentity';
 import { pdfFileName } from './deckPdfKinds';
 
@@ -36,14 +36,17 @@ export { pdfFileName, pdfItemLabel, pdfKindFor, pdfKindOfView } from './deckPdfK
 /** Patch 021's command: a page's path in, its PDF's path out. */
 export const PRINT_COMMAND = '_ritemark.printHtmlToPdf';
 
-/** The kinds this app makes; until PR 3 adds 'handout', the Handout view offers slides and handout (`pdfKindFor`). */
-export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout', 'slides'];
+/** The kinds this app makes: each view's own (`pdfKindFor`). */
+export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout', 'slides', 'handout'];
 
 /** Why nothing was saved after the dialog: the PDF couldn't be made or written. */
 export const PDF_NOT_SAVED = "The PDF couldn't be made, so nothing was saved.";
 
 /** Why Save slides as PDF saved nothing: every slide is skipped, or there are none. */
 export const PDF_NO_SLIDES = 'This deck has no slides to save, so nothing was saved.';
+
+/** Why Save handout as PDF saved nothing: no part of the handout has text. */
+export const PDF_NO_HANDOUT = 'This handout has no text to save, so nothing was saved.';
 
 /** What Save as PDF prints (`DeckPublisher.pageInput`). */
 export interface PrintInput {
@@ -145,12 +148,17 @@ export class DeckPdfSaver {
         const input = await this.source.pageInput(document, body, look, steps);
         const assets = await this.deps.assets();
         const built = await buildPrintPage(
-          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, print: kind === 'slides' ? 'slides' : undefined },
+          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, print: kind === 'slides-and-handout' ? undefined : kind },
           { ...assets, themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
         );
         // A deck whose slides are all skipped has nothing to print as slides: say so rather than save a blank page.
         if (kind === 'slides' && built.deck.slides.length === 0) {
           post({ type: 'deck/page-notice', text: PDF_NO_SLIDES });
+          return;
+        }
+        // Likewise a handout with no text: nothing to print but its footer.
+        if (kind === 'handout' && !handoutHasText(built.deck)) {
+          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT });
           return;
         }
         folder = await fs.promises.mkdtemp(path.join(this.deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));

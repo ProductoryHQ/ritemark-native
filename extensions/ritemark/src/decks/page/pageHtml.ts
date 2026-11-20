@@ -95,9 +95,11 @@ export interface PageOptions {
   /**
    * Sprint 170 PR 2 (#885): what the page prints. Left out, the page's own print (`PRINT_CSS`, A4 portrait, each slide
    * with its text: Save slides and handout as PDF). `'slides'`: Save slides as PDF's page (`SLIDES_PRINT_CSS`), one
-   * 16:9 page a slide on the theme's ground, as on the wall. Only these rules differ from the page's.
+   * 16:9 page a slide on the theme's ground, as on the wall. `'handout'` (PR 3, #886): Save handout as PDF's page, the
+   * A4 print with the slides left out and each part under its number (`HANDOUT_PRINT_CSS`). Only these rules differ
+   * from the page's.
    */
-  print?: 'slides';
+  print?: 'slides' | 'handout';
 }
 
 /** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
@@ -803,6 +805,39 @@ html, body { width: 960px; height: auto; margin: 0; overflow: visible; backgroun
 `;
 
 /**
+ * Sprint 170 PR 3 (#886; the decks README, "Save as PDF, from Publish"): Save handout as PDF's page. The page's own A4
+ * print (`PRINT_CSS` and its order, after which these come, so they win), with the text alone: no slide is drawn, so no
+ * slide picture either, and each part starts under its number and heading. The number is the slide's, as the handout's
+ * rail shows it, in the left margin beside the part's first line, muted and bold (`handoutNumbersCss` gives each part its
+ * own). A section keeps its band ("SECTION 2" over its title) and starts a page, as in the page's print. A slide whose
+ * part has no text has nothing here.
+ */
+export const HANDOUT_PRINT_CSS = `
+@media print {
+  .layer, .prefetch { display: none !important; }
+  .part:not(.sect):not(.only) { position: relative; padding-left: 10mm; }
+  .part:not(.sect):not(.only)::before { position: absolute; left: 0; top: 0; width: 8mm; font: 700 10pt/18.75pt 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sect { margin-left: 10mm; }
+}
+`;
+
+/** Each printed part's number in Save handout as PDF (`HANDOUT_PRINT_CSS`): part n (`#t<n>`) shows n; a section shows its band instead. Only numbers reach it. */
+export function handoutNumbersCss(count: number): string {
+  const rules: string[] = [];
+  for (let number = 1; number <= count; number++) rules.push(`#t${number}:not(.sect)::before{content:"${number}"}`);
+  return rules.length ? `@media print{${rules.join('')}}` : '';
+}
+
+/**
+ * Whether Save handout as PDF has anything to print: the text before the first slide, or a part with text (a slide whose
+ * part is empty prints nothing there, `isSlideOnly`).
+ */
+export function handoutHasText(deck: Pick<PublicDeck, 'preamble' | 'slides' | 'textHandout'>): boolean {
+  if (showsAnything(handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: () => 'picture' }))) return true;
+  return deck.slides.some(slide => !isSlideOnly(slide, deck.textHandout === true));
+}
+
+/**
  * Each slide and part's place in the printed column (`PRINT_CSS`): slide n (`#s<n>`) before part n (`#t<n>`), after the
  * preamble. A section (its place in `sections`) prints as its band alone: its slide is left out and its part starts a
  * page. Only numbers reach it.
@@ -1075,7 +1110,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title || deck.client || 'Slides')}</title>`,
-    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}`}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}${options.print === 'handout' ? `\n${HANDOUT_PRINT_CSS}\n${handoutNumbersCss(count)}` : ''}`}\n</style>`,
     '</head>',
     // The ticks' and the reader's place in this browser's storage: the same for every version of the page that keeps its
     // client and title. The deck's transition, as the wall plays it.
