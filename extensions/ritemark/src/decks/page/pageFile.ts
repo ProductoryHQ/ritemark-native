@@ -238,35 +238,25 @@ export async function buildDeckPage(
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
-  const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
-  const urls = await foundPictures(deck, input.deckPath, pageFs);
-  // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
-  // by an app without them, reads as changed once they can go.
-  // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
-  const digest = pageDigest(deck, [...urls.values(), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
-  return { deck, digest, html };
+  return buildPage(input, assets, pageFs, null);
 }
 
 /** Sprint 170: the folder Save as PDF prints from holds each picture under this name, `pictures/<n><.ext>`. */
 export const PRINT_PICTURE_FOLDER = 'pictures';
 
 /**
- * Sprint 170 (#881), Save as PDF's Slides and handout: the page exactly as `buildDeckPage` makes it, printed from a
- * folder of its own, so each picture the page names is that folder's `pictures/<n><.ext>` (a copy of the file beside the
- * deck, `file`) instead of its address beside the deck, which may lead out of it (`../`). Nothing else differs.
+ * Sprint 170 (#881), Save as PDF's Slides and handout: the page exactly as `buildDeckPage` makes it (the same making,
+ * `buildPage`), printed from a folder of its own, so each picture the page names is that folder's `pictures/<n><.ext>`
+ * (a copy of the file beside the deck, `file`) instead of its address beside the deck, which may lead out of it (`../`).
  */
 export async function buildPrintPage(
   input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
-): Promise<{ deck: PublicDeck; html: string; pictures: Array<{ address: string; file: string }> }> {
-  const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
-  const found = await foundPictureFiles(deck, input.deckPath, pageFs);
-  const byFile = new Map<string, string>();
+): Promise<BuiltPage & { pictures: Array<{ address: string; file: string }> }> {
   const pictures: Array<{ address: string; file: string }> = [];
-  const addresses = new Map<string, string>();
-  for (const [key, picture] of found) {
+  const byFile = new Map<string, string>();
+  const built = await buildPage(input, assets, pageFs, picture => {
     let address = byFile.get(picture.file);
     if (!address) {
       const ext = path.extname(picture.file).toLowerCase().replace(/[^.a-z0-9]/g, '');
@@ -274,11 +264,27 @@ export async function buildPrintPage(
       byFile.set(picture.file, address);
       pictures.push({ address, file: picture.file });
     }
-    addresses.set(key, address);
-  }
-  const digest = pageDigest(deck, [...found.values()].map(picture => picture.address));
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => addresses.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
-  return { deck, html, pictures };
+    return address;
+  });
+  return { ...built, pictures };
+}
+
+/** Both pages' one making: the digest of what the page carries, and the page, each picture at its address (or `placed`). */
+async function buildPage(
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  assets: PageAssets,
+  pageFs: Pick<PageFs, 'stat'>,
+  placed: ((picture: { address: string; file: string }) => string) | null,
+): Promise<BuiltPage> {
+  const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
+  const found = await foundPictureFiles(deck, input.deckPath, pageFs);
+  // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
+  // by an app without them, reads as changed once they can go.
+  // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
+  const digest = pageDigest(deck, [...[...found.values()].map(picture => picture.address), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
+  const urls = new Map([...found].map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
+  return { deck, digest, html };
 }
 
 /**

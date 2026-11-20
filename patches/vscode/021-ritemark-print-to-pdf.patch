@@ -126,21 +126,20 @@ index 00000000000..300ba3fdfa3
 +}
 diff --git a/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts b/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts
 new file mode 100644
-index 00000000000..180b998776c
+index 00000000000..a76df40fd6e
 --- /dev/null
 +++ b/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,128 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
 + *--------------------------------------------------------------------------------------------*/
 +
-+import { BrowserWindow } from 'electron';
++import { BrowserWindow, session as electronSession, type Session } from 'electron';
 +import { promises as fs } from 'fs';
 +import { tmpdir } from 'os';
 +import { dirname } from 'path';
 +import { Limiter, raceTimeout } from '../../../base/common/async.js';
-+import { generateUuid } from '../../../base/common/uuid.js';
 +import { ILogService } from '../../log/common/log.js';
 +import { IRitemarkPrintService, isRitemarkPrintablePath, ritemarkPdfPathFor, ritemarkPrintAllows, ritemarkPrintFolderAllowed } from '../common/ritemarkPrint.js';
 +
@@ -149,18 +148,28 @@ index 00000000000..180b998776c
 +const READY_MS = 10_000;
 +const PRINT_MS = 60_000;
 +
-+/** Waits in the page for its fonts and every picture, so the PDF never holds a fallback font or an empty place. */
++/**
++ * Waits in the page for its fonts and every picture (at most `READY_MS`; a picture that can't be decoded is let go at
++ * once), so the PDF holds the page's own fonts and pictures. A page still not ready then is printed as it is.
++ */
 +const READY_SCRIPT = '(async () => { await document.fonts.ready; await Promise.all(Array.from(document.images, image => image.decode().catch(() => undefined))); return true; })()';
++
++/** The print's one session: in memory (no `persist:`), shared with nothing else, cleared after each print. */
++const PARTITION = 'ritemark-print';
 +
 +/**
 + * Ritemark (Sprint 170, #881): Save as PDF's print, in the main process. One page at a time, in a hidden, sandboxed
-+ * window with its own in-memory session that loads nothing but the page's own folder, refuses every permission,
-+ * download, navigation and new window, and is closed when the print is done or has failed.
++ * window on the print's own in-memory session that loads nothing but the page's own folder, refuses every permission,
++ * download, navigation and new window, and is closed when the print is done or has failed. The session is the same
++ * for every print (Electron keeps a session until the app quits), its filter set for each page and its data cleared.
 + */
 +export class RitemarkPrintMainService implements IRitemarkPrintService {
 +	declare readonly _serviceBrand: undefined;
 +
 +	private readonly limiter = new Limiter<string>(1);
++	/** The page's folder the session's filter lets through now: one print at a time, so one folder. */
++	private allowedFolder: string | null = null;
++	private printSession: Session | null = null;
 +
 +	constructor(private readonly logService: ILogService) { }
 +
@@ -172,8 +181,8 @@ index 00000000000..180b998776c
 +		if (!isRitemarkPrintablePath(htmlPath)) {
 +			throw new Error('Ritemark print: not a page it can print');
 +		}
-+		const info = await fs.lstat(htmlPath);
-+		if (!info.isFile() || info.isSymbolicLink()) {
++		// lstat: a link is never a file here
++		if (!(await fs.lstat(htmlPath)).isFile()) {
 +			throw new Error('Ritemark print: the page is not a plain file');
 +		}
 +		const page = await fs.realpath(htmlPath);
@@ -183,12 +192,14 @@ index 00000000000..180b998776c
 +		}
 +		const pdfPath = ritemarkPdfPathFor(page);
 +
++		const printSession = this.session();
++		this.allowedFolder = folder;
 +		const window = new BrowserWindow({
 +			show: false,
 +			width: 1280,
 +			height: 900,
 +			webPreferences: {
-+				partition: `ritemark-print-${generateUuid()}`, // in memory, shared with nothing
++				partition: PARTITION,
 +				sandbox: true,
 +				nodeIntegration: false,
 +				contextIsolation: true,
@@ -201,17 +212,6 @@ index 00000000000..180b998776c
 +		});
 +		try {
 +			const contents = window.webContents;
-+			const session = contents.session;
-+			session.webRequest.onBeforeRequest((details, callback) => {
-+				const allowed = ritemarkPrintAllows(details.url, folder);
-+				if (!allowed) {
-+					this.logService.trace('[Ritemark print] refused a load');
-+				}
-+				callback({ cancel: !allowed });
-+			});
-+			session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-+			session.setPermissionCheckHandler(() => false);
-+			session.on('will-download', event => event.preventDefault());
 +			contents.setWindowOpenHandler(() => ({ action: 'deny' }));
 +			contents.on('will-navigate', event => event.preventDefault());
 +			contents.on('will-redirect', event => event.preventDefault());
@@ -233,7 +233,29 @@ index 00000000000..180b998776c
 +			if (!window.isDestroyed()) {
 +				window.destroy();
 +			}
++			this.allowedFolder = null;
++			await printSession.clearStorageData().catch(() => undefined);
++			await printSession.clearCache().catch(() => undefined);
 +		}
++	}
++
++	/** The print's session, its rules set once: only the current page's folder loads; no permission, no download. */
++	private session(): Session {
++		if (!this.printSession) {
++			const printSession = electronSession.fromPartition(PARTITION);
++			printSession.webRequest.onBeforeRequest((details, callback) => {
++				const allowed = this.allowedFolder !== null && ritemarkPrintAllows(details.url, this.allowedFolder);
++				if (!allowed) {
++					this.logService.trace('[Ritemark print] refused a load');
++				}
++				callback({ cancel: !allowed });
++			});
++			printSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
++			printSession.setPermissionCheckHandler(() => false);
++			printSession.on('will-download', event => event.preventDefault());
++			this.printSession = printSession;
++		}
++		return this.printSession;
 +	}
 +}
 diff --git a/src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts b/src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts

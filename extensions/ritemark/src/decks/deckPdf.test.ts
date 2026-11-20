@@ -44,7 +44,7 @@ function saverFor(deckPath: string, target: string | undefined, options: { print
     reveal: async file => { seen.revealed.push(file); },
     tempRoot: makeTempDir('rm-pdf-tmp-'),
   };
-  const saver = new DeckPdfSaver({ printInput: async () => input }, deps, () => true);
+  const saver = new DeckPdfSaver({ pageInput: async () => input }, deps, () => true);
   return { saver, seen, deps };
 }
 
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
     assert.deepEqual(await saver.kinds(), []);
     await saver.save(docOf(deckPath), 'slides-and-handout', '', 'card', [], () => assert.fail('nothing is said'));
     assert.deepEqual(seen.asked, []);
-    const off = new DeckPdfSaver({ printInput: async () => assert.fail('not read') }, saverFor(deckPath, undefined).deps, () => false);
+    const off = new DeckPdfSaver({ pageInput: async () => assert.fail('not read') }, saverFor(deckPath, undefined).deps, () => false);
     assert.deepEqual(await off.kinds(), []);
   }
 

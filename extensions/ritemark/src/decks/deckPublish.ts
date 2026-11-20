@@ -258,12 +258,8 @@ export class DeckPublisher implements vscode.Disposable {
     try {
       const pagePath = pagePathFor(deckPath);
       const pageKey = await pageKeyOf(pagePath);
-      const documentText = document.getText();
-      // The view's words and look, with the document's front matter, where the editor read that front matter as
-      // parseDeck does; else the document as saved (publishText), whose slides take the view's fit only while they are
-      // as many
-      const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content, look);
-      const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
+      // The view's words and look (`pageInput`, which Save as PDF reads too)
+      const { text } = this.textAndFit(document, body, look, steps);
       let built: Awaited<ReturnType<typeof buildDeckPage>>;
       let theme: DeckTheme;
       // Sprint 162 PR 3: the theme's fonts beyond Sofia Sans go beside the page as files, written just before it; and
@@ -271,11 +267,11 @@ export class DeckPublisher implements vscode.Disposable {
       let fontFiles: PageFontFile[];
       let logoFiles: PageFile[];
       try {
-        const look = await this.lookFor(deckPath, text);
-        theme = look.theme;
-        logoFiles = look.logo ? [look.logo] : [];
-        fontFiles = await this.fontFilesFor(theme);
-        built = await buildDeckPage({ deckPath, text, theme, steps: fit }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: look.logo ? { address: look.logo.address, aspect: look.logo.aspect } : null });
+        const input = await this.pageInput(document, body, look, steps);
+        theme = input.theme;
+        logoFiles = input.logo ? [input.logo] : [];
+        fontFiles = input.fonts;
+        built = await buildDeckPage({ deckPath, text: input.text, theme, steps: input.steps }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null });
       } catch (error) {
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);
@@ -363,15 +359,22 @@ export class DeckPublisher implements vscode.Disposable {
   // ------------------------------------------------------------------ Save as PDF (Sprint 170)
 
   /**
-   * What Save as PDF prints, read as Publish reads it: the view's words and look with the document's front matter, each
-   * slide's fit while the slides are as many, the theme as its file on disk has it, its font files and its logo. Never
-   * writes anything.
+   * The view's words and look, with the document's front matter, where the editor read that front matter as parseDeck
+   * does; else the document as saved (publishText), whose slides take the view's fit only while they are as many.
    */
-  async printInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
-    const deckPath = document.uri.fsPath;
+  private textAndFit(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): { text: string; steps: readonly number[] } {
     const documentText = document.getText();
     const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content, look);
-    const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
+    return { text, steps: fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [] };
+  }
+
+  /**
+   * What the page is made from, for Publish and for Save as PDF alike (Sprint 170), so the PDF is the page: the view's
+   * words and fit (`textAndFit`), the theme as its file on disk has it, its font files and its logo. Writes nothing.
+   */
+  async pageInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
+    const deckPath = document.uri.fsPath;
+    const { text, steps: fit } = this.textAndFit(document, body, look, steps);
     const read = await this.lookFor(deckPath, text);
     return { deckPath, text, theme: read.theme, steps: fit, fonts: await this.fontFilesFor(read.theme), logo: read.logo };
   }

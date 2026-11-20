@@ -39,7 +39,7 @@ export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout'];
 /** Why nothing was saved after the dialog: the PDF couldn't be made or written. */
 export const PDF_NOT_SAVED = "The PDF couldn't be made, so nothing was saved.";
 
-/** What Save as PDF prints (`DeckPublisher.printInput`). */
+/** What Save as PDF prints (`DeckPublisher.pageInput`). */
 export interface PrintInput {
   deckPath: string;
   text: string;
@@ -83,16 +83,18 @@ async function writePrintFolder(folder: string, html: string, files: readonly Pa
     if (path.relative(folder, target).startsWith('..') || path.isAbsolute(path.relative(folder, target))) throw new Error('An address outside the print folder');
     return target;
   };
-  for (const file of files) {
-    const target = placed(file.address);
-    await fs.promises.mkdir(path.dirname(target), { recursive: true });
-    await fs.promises.writeFile(target, file.bytes, { flag: 'wx' });
-  }
-  for (const picture of pictures) {
-    const target = placed(picture.address);
-    await fs.promises.mkdir(path.dirname(target), { recursive: true });
-    await fs.promises.copyFile(picture.file, target, fs.constants.COPYFILE_EXCL);
-  }
+  await Promise.all([
+    ...files.map(async file => {
+      const target = placed(file.address);
+      await fs.promises.mkdir(path.dirname(target), { recursive: true });
+      await fs.promises.writeFile(target, file.bytes, { flag: 'wx' });
+    }),
+    ...pictures.map(async picture => {
+      const target = placed(picture.address);
+      await fs.promises.mkdir(path.dirname(target), { recursive: true });
+      await fs.promises.copyFile(picture.file, target, fs.constants.COPYFILE_EXCL);
+    }),
+  ]);
   const page = path.join(folder, 'page.html');
   await fs.promises.writeFile(page, html, { encoding: 'utf8', flag: 'wx' });
   return page;
@@ -103,10 +105,11 @@ export class DeckPdfSaver {
   private readonly running = new Set<string>();
   /** The PDF each deck's view saved last, for the bar's Show in folder. */
   private readonly saved = new Map<string, string>();
-  private printThere: Promise<boolean> | null = null;
+  /** The print was found: it stays for the window (registered as the window starts, before any extension). */
+  private printFound = false;
 
   constructor(
-    private readonly source: { printInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<PrintInput> },
+    private readonly source: { pageInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<PrintInput> },
     private readonly deps: PdfDeps,
     private readonly enabled: () => boolean,
   ) { }
@@ -114,9 +117,9 @@ export class DeckPdfSaver {
   /** The kinds Publish's menu may offer: none with Decks off or without the app's print. */
   async kinds(): Promise<DeckPdfKind[]> {
     if (!this.enabled()) return [];
-    // The command is registered as the window starts, before any extension, so one answer holds for the window.
-    this.printThere ??= this.deps.hasPrint().catch(() => false);
-    return (await this.printThere) ? [...SAVED_KINDS] : [];
+    // Only a yes is kept: a no (an older shell, or a lookup that failed) is asked again at the next state
+    this.printFound ||= await this.deps.hasPrint().catch(() => false);
+    return this.printFound ? [...SAVED_KINDS] : [];
   }
 
   /** Save as PDF: the dialog, then the print, then the file and the bar's note. */
@@ -133,7 +136,7 @@ export class DeckPdfSaver {
       const name = path.basename(target);
       post({ type: 'deck/page-notice', text: `Saving ${name}…` });
       try {
-        const input = await this.source.printInput(document, body, look, steps);
+        const input = await this.source.pageInput(document, body, look, steps);
         const assets = await this.deps.assets();
         const built = await buildPrintPage(
           { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps },
