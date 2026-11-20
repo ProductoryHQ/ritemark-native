@@ -509,8 +509,8 @@
           },
           "ritemark.features.decks": {
             "type": "boolean",
-            "default": false,
-            "description": "Decks (experimental): open a .deck.md file as a deck, with its slides beside their handout. Off, a .deck.md opens as an ordinary document. Applies to decks opened afterwards.",
+            "default": true,
+            "description": "Decks: open a .deck.md file as a deck, with its slides beside their handout. Off, a .deck.md opens as an ordinary document. Applies to decks opened afterwards.",
             "scope": "application"
           }
         }
