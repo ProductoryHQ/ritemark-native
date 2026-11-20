@@ -42,7 +42,7 @@ import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welco
 import { countsLine, listFileNames } from './folderCounts';
 import { isEnabled } from '../features/featureGate';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
-import { GuidanceStore, noteLastReadyAi, readLastReadyAi, seedLastReadyAiForTest } from './guidanceStore';
+import { GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
 import { AI_NAMES, AI_ORDER, canSignInHere, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind, type ReadyRecord } from './readyRequest';
 import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
@@ -50,6 +50,8 @@ import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
 const KEY_NAMES: readonly HomeKeyName[] = ['google-ai-key', 'openai-api-key', 'anthropic-api-key', 'openrouter-api-key'];
 const AI_CACHE_MS = 15_000;
+/** #926: a ready card shown while an AI's check runs waits this long for the check's answer, then counts anyway. */
+const SHOWN_CHECK_WAIT_MS = 4_000;
 const SKIP_DIRS = /[\\/](\.git|node_modules|\.ritemark)[\\/]/;
 
 /** How Home's sign-in ended: ready, stopped by the person (no line), or one of the welcome's reasons. */
@@ -145,6 +147,10 @@ export class GuidanceHost implements vscode.Disposable {
    * lead, ritemark-dev f85e188).
    */
   private signInFailure: { ai: AgentId; line: string } | null = null;
+  /** #926: the projects whose `ready_card_shown` is being sent or was sent from this window, so redraws send it once. */
+  private readonly shownCounting = new Set<string>();
+  /** #926: a card shown while an AI's check still ran, by project: its latest show, counted when the wait ends. */
+  private readonly shownPending = new Map<string, HomeGuidance & { card: 'ready-request' }>();
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
@@ -276,6 +282,53 @@ export class GuidanceHost implements vscode.Disposable {
         : signing ? (signing.phase === 'waiting' ? this.reopenProblem : null)
         : this.signInFailure?.ai === chosen.ai ? this.signInFailure.line : null,
     };
+  }
+
+  /**
+   * #926: Home put this ready-request card on screen (its panel visible). The first time for a project, `ready_card_shown`
+   * with the card's kind, whether its AI is ready and the AI it names. "Once" is a list in this computer's global state
+   * (`ritemark.guidance.readyCardCounted`, by the folder's normalized URI), written after the count was sent, so a later
+   * show, a Reload Window or a relaunch sends nothing more. A show while nothing may be sent (before the welcome's yes,
+   * usage data off, the kill switch) sends nothing and isn't remembered: the gate decides, as for every count.
+   */
+  async readyCardShown(folderUri: string, guidance: HomeGuidance | null): Promise<void> {
+    if (guidance?.card !== 'ready-request') return;
+    const key = normalizeProjectUri(folderUri);
+    if (this.shownCounting.has(key) || readyCardCounted(this.deps.context.globalState, key)) return;
+    // The show is the impression, so it is always counted. While an AI's check still runs, `ai_ready` and the AI named
+    // could still change: Home reads the AIs again, a settled show in the wait counts at once, and when the wait ends
+    // the latest show is counted even if Home was hidden or closed meanwhile (review; Codex P1)
+    if (guidance.ais.some((ai) => ai.state === 'checking')) {
+      const waiting = this.shownPending.has(key);
+      this.shownPending.set(key, guidance);
+      if (!waiting) {
+        setTimeout(() => {
+          this.aiCache = null;
+          this.changed.fire();
+          setTimeout(() => {
+            const latest = this.shownPending.get(key);
+            if (latest) void this.countReadyCard(key, latest);
+          }, 1_000);
+        }, SHOWN_CHECK_WAIT_MS);
+      }
+      return;
+    }
+    await this.countReadyCard(key, guidance);
+  }
+
+  /** #926: send `ready_card_shown` and, once sent, remember it in its own key (`noteReadyCardCounted`). */
+  private async countReadyCard(key: string, guidance: HomeGuidance & { card: 'ready-request' }): Promise<void> {
+    this.shownPending.delete(key);
+    if (this.shownCounting.has(key) || readyCardCounted(this.deps.context.globalState, key)) return;
+    this.shownCounting.add(key);
+    let sent = false;
+    try {
+      sent = await trackEvent('ready_card_shown', { kind: guidance.kind, ai_ready: guidance.aiReady, provider: PROVIDER[guidance.ai] });
+      if (sent) await noteReadyCardCounted(this.deps.context.globalState, key);
+    } finally {
+      // Sent: kept, so this window never reads the store for it again; refused: the next show asks the gate again
+      if (!sent) this.shownCounting.delete(key);
+    }
   }
 
   /**

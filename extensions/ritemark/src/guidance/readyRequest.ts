@@ -5,9 +5,10 @@
  */
 
 import type { AgentId } from '../agent/types';
+import type { ReadyCardKind } from '../analytics/events';
 
-/** A folder with files (not empty, not the sample), an empty project, or the sample. */
-export type ReadyKind = 'files' | 'empty' | 'sample';
+/** A folder with files (not empty, not the sample), an empty project, or the sample (`READY_CARD_KIND`, #926). */
+export type ReadyKind = ReadyCardKind;
 
 /** The `ready_request_used` event's `kind` (R15). */
 export type ReadyEventKind = 'what_is_here' | 'what_for' | 'module_4';

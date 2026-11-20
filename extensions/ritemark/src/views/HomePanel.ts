@@ -557,6 +557,11 @@ export class HomeHost implements vscode.Disposable {
     if (!this.panel || !this.ready) return;
     const state = await this.state();
     await this.panel.webview.postMessage({ type: 'home/state', state });
+    // #926: the ready-request card is on screen; its count goes once per project (GuidanceHost.readyCardShown)
+    // (not under a not-found box, which Home draws instead of the card)
+    if (this.panel?.visible && !state.missing && state.guidance?.card === 'ready-request') {
+      void this.deps.guidance?.readyCardShown(this.deps.folder.uri.toString(), state.guidance).catch((error) => console.warn('[Home] The ready card count failed:', error));
+    }
     if (state.switchedFrom && this.switchedShownAt === null && this.panel?.visible) this.switchedShownAt = Date.now();
   }
 

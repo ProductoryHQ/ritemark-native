@@ -23,7 +23,8 @@ export type EventName =
   | 'voice_note_edited'
   | 'welcome_ai_skipped'
   | 'ai_signin_started'
-  | 'ai_signin_finished';
+  | 'ai_signin_finished'
+  | 'ready_card_shown';
 
 /**
  * Sprint 139 (R8): how a turn ended, from the one classifier's kinds. No text,
@@ -57,6 +58,10 @@ export type SignInFrom = (typeof SIGN_IN_FROM)[number];
 /** Sprint 156 (PR B): how the welcome's AI step was skipped: Skip for now, or Start a new project while on it (S25). */
 export const WELCOME_SKIP_HOW = ['button', 'new_project'] as const;
 export type WelcomeSkipHow = (typeof WELCOME_SKIP_HOW)[number];
+
+/** #926: which ready-request card Home showed: a folder with files, an empty folder, or the sample. */
+export const READY_CARD_KIND = ['files', 'empty', 'sample'] as const;
+export type ReadyCardKind = (typeof READY_CARD_KIND)[number];
 
 /**
  * Sprint 133 (R8): the welcome's four events. They carry no path, folder or
@@ -161,10 +166,20 @@ export interface EventPayloads {
     provider: WelcomeProvider;
     from: SignInFrom;
   };
+  /**
+   * #926: Home showed its ready-request card for a project, the first time only (once per project on this profile,
+   * remembered in the guidance store). Which card it was, whether an AI was ready, and the AI the card names: no
+   * words, name, path, folder, file count or model. Like Home's sign-in counts, sent only after a yes.
+   */
+  ready_card_shown: {
+    kind: ReadyCardKind;
+    ai_ready: boolean;
+    provider: WelcomeProvider;
+  };
 }
 
 /** The only types a field of the no-AI card's counts may have: a yes/no, or one of these fixed choices. */
-type ClosedField = boolean | WelcomeProvider | SignInFrom | WelcomeSkipHow;
+type ClosedField = boolean | WelcomeProvider | SignInFrom | WelcomeSkipHow | ReadyCardKind;
 /** The fields of `T` whose type isn't one of those (a string, number, array, object, template literal…); `never` when none. */
 type OpenFields<T> = { [K in keyof T]-?: T[K] extends ClosedField ? never : K }[keyof T];
 type Closed<T extends true> = T;
@@ -177,6 +192,8 @@ export type SignInCountsAreClosed = Closed<
     ? true
     : false
 >;
+/** #926: the same allow-list for `ready_card_shown`: a boolean, a `ReadyCardKind` or a `WelcomeProvider`, nothing open. */
+export type ReadyCardCountIsClosed = Closed<OpenFields<EventPayloads['ready_card_shown']> extends never ? true : false>;
 
 /**
  * Type-safe event helper — ensures payload matches event name.

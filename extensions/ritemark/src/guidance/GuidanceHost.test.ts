@@ -20,6 +20,10 @@
  *   sign-in settles ready (OpenCode: when it reads ready after the save), whatever a later read says. A failure, a
  *   timeout and a Cancel send no finished; a declined "open the website?" and a login that can't start aren't starts;
  *   an AI already ready sends neither, and a sign-in made elsewhere isn't Home's. Only provider and from.
+ * - #926: `ready_card_shown` once per project, the first time the card shows and the gate sends it; a show the gate
+ *   refuses isn't remembered; a later show, a new host (a reload or relaunch) or two quick redraws send no second one;
+ *   another project counts on its own; no card, no count; while an AI's check runs it waits for the answer, and
+ *   the wait end counts a card seen and left; its own key survives a rewrite of the guidance record. Only kind, ai_ready and provider.
  *
  * Run: npx tsx src/guidance/GuidanceHost.test.ts
  */
@@ -78,6 +82,8 @@ const vscodeStub = {
 };
 // The usage counts the host hands to the consent gate, recorded (the gate's yes, no and holding: consent.test.ts)
 const counts: Array<{ event: string; held: boolean } & Record<string, unknown>> = [];
+/** What the gate answers a count: false while nothing may be sent (no yes, usage data off, the kill switch). */
+let gateSends = false;
 const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
 (Module as unknown as { _load: unknown })._load = (request: string, ...rest: unknown[]) => {
   if (request === 'vscode') return vscodeStub;
@@ -86,7 +92,7 @@ const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]
   return {
     ...(loaded as object),
     __esModule: true,
-    trackEvent: async (event: string, properties: Record<string, unknown>) => { counts.push({ ...properties, event, held: false }); return false; },
+    trackEvent: async (event: string, properties: Record<string, unknown>) => { counts.push({ ...properties, event, held: false }); return gateSends; },
     trackWelcomeEvent: async (event: string, properties: Record<string, unknown>) => { counts.push({ ...properties, event, held: true }); },
   };
 };
@@ -493,6 +499,67 @@ async function main(): Promise<void> {
   assert.ok(counts.every((count) => !count.held), 'Home\'s counts are never held: they go only after a yes');
 
   assert.deepEqual(chats, [], 'no sign-in ever sent a message');
+
+  // ── #926: the ready card's count, once per project ──
+  const cardCounts = () => counts.splice(0).filter((count) => count.event === 'ready_card_shown');
+  counts.splice(0);
+  shown = await card();
+  gateSends = false; // usage data off, or before the welcome's yes
+  await host.readyCardShown(input.folderUri, shown);
+  assert.deepEqual(cardCounts(), [{ event: 'ready_card_shown', kind: 'files', ai_ready: shown.aiReady, provider: 'opencode', held: false }], 'handed to the gate, which sends nothing');
+  gateSends = true;
+  await host.readyCardShown(input.folderUri, shown);
+  const sent = cardCounts();
+  assert.equal(sent.length, 1, 'a refused show is not remembered: the first show the gate sends is counted');
+  assert.deepEqual(Object.keys(sent[0]).filter((key) => key !== 'event' && key !== 'held').sort(), ['ai_ready', 'kind', 'provider'], 'only kind, ai_ready and provider');
+  await host.readyCardShown(input.folderUri, shown);
+  await host.readyCardShown(`${input.folderUri}/`, shown);
+  assert.deepEqual(cardCounts(), [], 'a later show of the same project sends nothing, by any spelling of its folder');
+  // A new host on the same global state: what a Reload Window or a relaunch gives
+  // Another window's stale rewrite of the guidance record can't undo it (Codex P2): the marker has its own key
+  await globalState.update('ritemark.guidance.v1', { v: 1, projects: {} });
+  await host.readyCardShown(input.folderUri, shown);
+  assert.deepEqual(cardCounts(), [], 'the guidance record rewritten whole: still no second count');
+  const reloaded = new GuidanceHost({
+    context: { extension: { packageJSON: { version: '2.3.0' } }, globalState, secrets: { onDidChange: none, get: async () => undefined } } as never,
+    folder: undefined, runtimeAvailability: availability as never, startChat: async () => {}, startCodexSignIn, stopCodexSignIn,
+    give: async () => null, hasWorkingTurn: () => false, setStartingPlace: () => {}, onTurnAccepted: none, onChatOrigin: none, claudeSignIn,
+  });
+  await reloaded.readyCardShown(input.folderUri, shown);
+  assert.deepEqual(cardCounts(), [], 'nor after a reload or relaunch: it is remembered in global state');
+  reloaded.dispose();
+  const other = makeTempDir('rm-guidance-other-');
+  const otherUri = `file://${other}`;
+  await Promise.all([host.readyCardShown(otherUri, { ...shown, kind: 'empty' }), host.readyCardShown(otherUri, { ...shown, kind: 'empty' })]);
+  assert.deepEqual(cardCounts().map((count) => count.kind), ['empty'], 'another project counts on its own, once though two redraws came at once');
+  // While an AI's check runs, the count waits for the answer; the wait's end counts the latest show, Home seen or not
+  const checking = { ...shown, ais: [{ id: 'claude-code' as const, name: 'Claude' as const, state: 'checking' as const }] };
+  const third = `${otherUri}-third`;
+  let redraws = 0;
+  const redrawing = host.onDidChange(() => { redraws++; });
+  await host.readyCardShown(third, checking);
+  assert.deepEqual(cardCounts(), [], 'an AI still checking: not counted yet');
+  mock.timers.tick(4_000);
+  assert.equal(redraws, 1, 'Home is asked to read the AIs again');
+  await host.readyCardShown(third, { ...checking, ais: [{ id: 'claude-code', name: 'Claude', state: 'ready' }], aiReady: true, ai: 'claude-code' });
+  assert.deepEqual(cardCounts().map((count) => [count.ai_ready, count.provider]), [[true, 'claude']], 'counted once the check answered, with its answer');
+  mock.timers.tick(1_000);
+  await flush();
+  assert.deepEqual(cardCounts(), [], 'and the wait end sends no second one');
+  const fourth = `${otherUri}-fourth`;
+  await host.readyCardShown(fourth, checking);
+  await host.readyCardShown(fourth, checking);
+  mock.timers.tick(4_000);
+  mock.timers.tick(1_000);
+  await flush();
+  assert.deepEqual(cardCounts().map((count) => count.kind), ['files'], 'a card seen and left while checking is still counted, once, when the wait ends');
+  assert.ok(Array.isArray(state.get('ritemark.guidance.readyCardCounted')), 'remembered in its own key, apart from the guidance record');
+  redrawing.dispose();
+  await host.readyCardShown(input.folderUri, { card: 'what-moved' });
+  await host.readyCardShown(input.folderUri, null);
+  assert.deepEqual(cardCounts(), [], 'no ready card, no count');
+  fs.rmSync(other, { recursive: true, force: true });
+  gateSends = false;
 
   // Sprint 159: the decks flag turning redraws Home's card (its counts line names decks); another setting doesn't
   let cardChanges = 0;
