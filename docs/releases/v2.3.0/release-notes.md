@@ -1,44 +1,11 @@
-<!-- DECKS: the section "Make slides, present them and share them", between DECKS START and DECKS END, ships only if Decks (the ritemark.features.decks setting) is on in 2.3. If it is off, delete the section. If it ships, the headline and the opening lines should lead with it, and the presenter view on two displays still needs its Windows check (else add "On the Mac"). -->
-
 <!-- Draft, started 19 November 2026 with the `release-notes` skill. Sources: docs/CHANGELOG.md ([Unreleased] — v2.3.0) and every change merged since 2.2.0. Work still to come adds its lines here. -->
 
 # Ritemark 2.3.0
 
-You can now edit an Excel file in Ritemark, and everything you didn't change stays as it was.
+You can now make slides in Ritemark, present them and share them.
 
-Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and change pictures, yourself or with ChatGPT, and change tables with the mouse.
+Write a deck as you write a document, with a handout beside the slides. 2.3 also lets you edit Excel files and keep their look, change pictures yourself or with ChatGPT, and change tables with the mouse.
 
-## Edit Excel files without losing their look
-
-- **Saving changes only what you typed.** Colours, bold text, borders, frozen rows, charts, pictures, drop-down lists and colour rules all stay. Before, one save removed them.
-- **A workbook looks as it does in Excel.** Column widths, colours, fonts, borders, merged cells and frozen rows show as the author made them.
-- **Charts and pictures stay in the file.** Ritemark shows a card where each one sits. Open the file in Excel to see them.
-- **Dates and money show as written.** A date written 03.01.2026 no longer shows as 1/3/26. Money, percentages and durations follow each cell's format.
-- **Hidden rows, columns and sheets stay hidden.**
-- **Type below your data to add a row.** Type in any empty cell below or beside the data, and the sheet grows, as in Excel. CSV files keep **Add row**.
-- **Sorting doesn't change the file.** Sorting by a column changes only what you see.
-- **Totals catch up in Excel.** Totals that use a cell you changed update when you next open the file in Excel.
-- **Ritemark says what it can't change.** A few cells, such as a table's column names, stay as they are, and Ritemark says why. If a save isn't safe, nothing is written and your changes stay, unsaved.
-- **Large workbooks open and save faster.**
-
-## Pictures: change them yourself or with ChatGPT
-
-- **Resize a picture by its corner.** Click the picture and drag a corner. Or choose S, M, L or Full on its bar.
-- **Crop a picture.** Choose **Crop** on its bar, frame the part you want and press **Done**. The picture file itself stays whole.
-- **Swap a picture, keep its place.** Double-click it, or choose **Replace picture…** under ⋯. The new one gets the old one's size and place.
-- **Make or change a picture with ChatGPT.** Click a picture and open **ChatGPT** on its bar. Choose **Change this picture…** or **Make a new picture…**, then say what you want.
-- **The old picture stays.** ChatGPT's picture is saved beside the old one, in the images folder next to your document. **Undo** puts the old one back, and **Try another** makes a new version.
-- **ChatGPT needs your account.** Sign in to ChatGPT in Ritemark first. Pictures need a ChatGPT account, not an API key.
-
-## Change tables with the mouse
-
-- **Drag rows and columns.** In a document, each row and column of a table has a grip. Drag it to move the row or column.
-- **Each column has its own menu.** Click a column's grip to insert, move, align, sort or delete columns.
-- **Add a row or column with +.** The + bars sit at the table's right and bottom edges. Tab in the last cell adds a row too.
-- **Set column widths.** Drag the line between two columns. Double-click it to make the widths automatic again.
-- **Right-click a cell for its menu.** It has Cut, Copy and Paste, and the actions for its row and column.
-
-<!-- DECKS START -->
 ## Make slides, present them and share them
 
 ### Make slides
@@ -100,7 +67,36 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Comments and skipped slides stay with you.** Before you publish, Ritemark lists what goes on the page and what stays with you.
 - **The page changes only when you update it.** Change the theme, and the page online keeps its old look until you choose **Update the page**.
 - **Save the deck as a PDF.** Open the arrow next to **Publish** and choose **Save slides and handout as PDF**. Each slide comes with its text, and the links still work.
-<!-- DECKS END -->
+
+## Edit Excel files without losing their look
+
+- **Saving changes only what you typed.** Colours, bold text, borders, frozen rows, charts, pictures, drop-down lists and colour rules all stay. Before, one save removed them.
+- **A workbook looks as it does in Excel.** Column widths, colours, fonts, borders, merged cells and frozen rows show as the author made them.
+- **Charts and pictures stay in the file.** Ritemark shows a card where each one sits. Open the file in Excel to see them.
+- **Dates and money show as written.** A date written 03.01.2026 no longer shows as 1/3/26. Money, percentages and durations follow each cell's format.
+- **Hidden rows, columns and sheets stay hidden.**
+- **Type below your data to add a row.** Type in any empty cell below or beside the data, and the sheet grows, as in Excel. CSV files keep **Add row**.
+- **Sorting doesn't change the file.** Sorting by a column changes only what you see.
+- **Totals catch up in Excel.** Totals that use a cell you changed update when you next open the file in Excel.
+- **Ritemark says what it can't change.** A few cells, such as a table's column names, stay as they are, and Ritemark says why. If a save isn't safe, nothing is written and your changes stay, unsaved.
+- **Large workbooks open and save faster.**
+
+## Pictures: change them yourself or with ChatGPT
+
+- **Resize a picture by its corner.** Click the picture and drag a corner. Or choose S, M, L or Full on its bar.
+- **Crop a picture.** Choose **Crop** on its bar, frame the part you want and press **Done**. The picture file itself stays whole.
+- **Swap a picture, keep its place.** Double-click it, or choose **Replace picture…** under ⋯. The new one gets the old one's size and place.
+- **Make or change a picture with ChatGPT.** Click a picture and open **ChatGPT** on its bar. Choose **Change this picture…** or **Make a new picture…**, then say what you want.
+- **The old picture stays.** ChatGPT's picture is saved beside the old one, in the images folder next to your document. **Undo** puts the old one back, and **Try another** makes a new version.
+- **ChatGPT needs your account.** Sign in to ChatGPT in Ritemark first. Pictures need a ChatGPT account, not an API key.
+
+## Change tables with the mouse
+
+- **Drag rows and columns.** In a document, each row and column of a table has a grip. Drag it to move the row or column.
+- **Each column has its own menu.** Click a column's grip to insert, move, align, sort or delete columns.
+- **Add a row or column with +.** The + bars sit at the table's right and bottom edges. Tab in the last cell adds a row too.
+- **Set column widths.** Drag the line between two columns. Double-click it to make the widths automatic again.
+- **Right-click a cell for its menu.** It has Cut, Copy and Paste, and the actions for its row and column.
 
 ## Smaller changes
 
