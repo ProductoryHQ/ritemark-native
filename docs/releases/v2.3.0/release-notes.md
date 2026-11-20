@@ -72,7 +72,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Give a box any of 1,500 icons.** Ask the AI for one, or write an icon's name from the Phosphor set, such as truck. It looks the same while you edit, present and share.
 - **Search for a box's icon by what it is.** Click a box's icon and type, such as "truck", "people" or "mail". The icons your deck already uses come first.
 - **A button that stands alone stays put when you click it.** The button no longer jumps away from your pointer, on a slide or in a document.
-- **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide to choose another.
+- **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide and choose another: the search opens with the name you wrote, so a misspelt "trukc" already shows the truck.
 - **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
 - **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
 - **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
