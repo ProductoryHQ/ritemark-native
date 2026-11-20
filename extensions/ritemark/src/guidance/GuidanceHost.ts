@@ -145,6 +145,8 @@ export class GuidanceHost implements vscode.Disposable {
    * lead, ritemark-dev f85e188).
    */
   private signInFailure: { ai: AgentId; line: string } | null = null;
+  /** #926: the projects whose `ready_card_shown` is being sent, so two quick redraws send it once. */
+  private readonly shownCounting = new Set<string>();
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
@@ -276,6 +278,26 @@ export class GuidanceHost implements vscode.Disposable {
         : signing ? (signing.phase === 'waiting' ? this.reopenProblem : null)
         : this.signInFailure?.ai === chosen.ai ? this.signInFailure.line : null,
     };
+  }
+
+  /**
+   * #926: Home put this ready-request card on screen (its panel visible). The first time for a project, `ready_card_shown`
+   * with the card's kind, whether its AI is ready and the AI it names. "Once" is the project's record in this computer's
+   * global state (`ritemark.guidance.v1`, by the folder's normalized URI), written after the count was sent, so a later
+   * show, a Reload Window or a relaunch sends nothing more. A show while nothing may be sent (before the welcome's yes,
+   * usage data off, the kill switch) sends nothing and isn't remembered: the gate decides, as for every count.
+   */
+  async readyCardShown(folderUri: string, guidance: HomeGuidance | null): Promise<void> {
+    if (guidance?.card !== 'ready-request') return;
+    const key = normalizeProjectUri(folderUri);
+    if (this.store.project(key).shownCounted || this.shownCounting.has(key)) return;
+    this.shownCounting.add(key);
+    try {
+      const sent = await trackEvent('ready_card_shown', { kind: guidance.kind, ai_ready: guidance.aiReady, provider: PROVIDER[guidance.ai] });
+      if (sent) await this.store.updateProject(key, (current) => ({ ...current, shownCounted: true }));
+    } finally {
+      this.shownCounting.delete(key);
+    }
   }
 
   /**

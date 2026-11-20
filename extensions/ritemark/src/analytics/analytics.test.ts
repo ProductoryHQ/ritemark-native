@@ -8,7 +8,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { SIGN_IN_FROM, WELCOME_SKIP_HOW, type EventName, type EventPayloads } from './events';
+import { READY_CARD_KIND, SIGN_IN_FROM, WELCOME_SKIP_HOW, type EventName, type EventPayloads } from './events';
 
 // ── 1. Event type coverage ──────────────────────────────────
 
@@ -31,6 +31,7 @@ const ALL_EVENT_NAMES: EventName[] = [
   'welcome_ai_skipped',
   'ai_signin_started',
   'ai_signin_finished',
+  'ready_card_shown',
 ];
 
 // Verify every event name is a valid string (compile-time + runtime)
@@ -60,6 +61,7 @@ const _payloadCheck: {
   welcome_ai_skipped: { how: 'button', ai_ready: false },
   ai_signin_started: { provider: 'chatgpt', from: 'home_card' },
   ai_signin_finished: { provider: 'claude', from: 'home_menu' },
+  ready_card_shown: { kind: 'files', ai_ready: true, provider: 'chatgpt' },
 };
 
 assert.ok(_payloadCheck, 'All payload shapes should be valid');
@@ -135,6 +137,25 @@ for (const [field, values] of Object.entries(CLOSED_VALUES)) {
   const [event, key] = field.split('.');
   const sample = (_payloadCheck[event as EventName] as unknown as Record<string, unknown>)[key];
   assert.ok((values as ReadonlyArray<unknown>).includes(sample), `${field}: the sample is one of its values`);
+}
+
+// #926: Home's ready card's count. Exactly kind, ai_ready and provider, each a fixed choice or a yes/no, so it can't
+// carry a person, a document, a folder, words or a path. The type side is `events.ts`'s `ReadyCardCountIsClosed`.
+assert.deepEqual(Object.keys(_payloadCheck.ready_card_shown).sort(), ['ai_ready', 'kind', 'provider'], 'ready_card_shown has only kind, ai_ready and provider');
+for (const key of Object.keys(_payloadCheck.ready_card_shown)) {
+  assert.doesNotMatch(key, /path|name|file|message|account|email|folder|model|text|project|document|word|person|user|error|url|count/i, `ready_card_shown.${key} names nothing personal`);
+}
+assert.deepEqual([...READY_CARD_KIND], ['files', 'empty', 'sample'], 'the card is a folder with files, an empty one or the sample, nothing else');
+const READY_CARD_VALUES: Record<string, ReadonlyArray<string | boolean>> = {
+  kind: READY_CARD_KIND,
+  ai_ready: [true, false],
+  provider: ['claude', 'chatgpt', 'opencode'],
+};
+for (const [key, values] of Object.entries(READY_CARD_VALUES)) {
+  for (const value of values) {
+    assert.ok(typeof value === 'boolean' || /^[a-z]+$/.test(value), `ready_card_shown.${key}: ${String(value)} is a fixed word, never text`);
+  }
+  assert.ok(values.includes((_payloadCheck.ready_card_shown as unknown as Record<string, string | boolean>)[key]), `ready_card_shown.${key}: the sample is one of its values`);
 }
 
 // ── 2. Setting and kill switch (the gate itself is tested in consent.test.ts) ──

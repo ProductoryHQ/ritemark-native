@@ -3,7 +3,8 @@
  * computer's global state, `ritemark.guidance.v1`. Nothing is ever written in a
  * project's folder, so "Nothing in this folder was moved or changed" stays true.
  *
- * Per project (by its folder's normalized URI): the ready request's record.
+ * Per project (by its folder's normalized URI): the ready request's record, and (#926) whether its card's
+ * `ready_card_shown` was sent.
  * Per release (major.minor): the days a document was saved, and the feedback
  * card's answer. And the last day the ready request showed on Home (D1).
  *
@@ -51,6 +52,7 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
         ...(GONE.includes(record.gone as ReadyGone) ? { gone: record.gone as ReadyGone } : {}),
         ...(typeof record.chatId === 'string' && record.chatId.length <= 128 ? { chatId: record.chatId } : {}),
         ...(AGENTS.includes(record.ai as AgentId) ? { ai: record.ai as AgentId } : {}),
+        ...(record.shownCounted === true ? { shownCounted: true as const } : {}),
       };
     }
   }
