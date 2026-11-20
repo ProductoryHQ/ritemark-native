@@ -9,7 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.3.0
 
-### Sprint 162: deck themes (Decks, behind its flag)
+### Decks is on (#916)
+
+#### Changed
+- **Decks is on by default.** A `.deck.md` file opens as a deck, with its slides beside their handout; New → Deck, the Deck card on Home and the Slide library are there from the first start. The setting `ritemark.features.decks` stays as an off switch: off, a `.deck.md` opens as an ordinary document, New and Home lose Deck, and the Slide library goes. Until now Decks was on `main` behind that setting, off by default (since Sprint 159 PR 2, #735), and these lines were left out while it was (Jarmo, 20 November 2026: "Decks läheb 2.3 sisse").
+
+### Decks: Sprints 159, 161 and 164–171
+
+#### Added
+- **Make a deck.** New → Deck or the Deck card on Home opens an Untitled deck with a start card: draft it with the AI, or start from a copy of an earlier deck (Sprint 159).
+- **Write slides like text.** Titles, text and lists go straight on the slide; / adds columns, boxes, steps, tabs, a button, a picture, a table or a label. The handout sits beside the slides as a Text document, and speaker comments stay private (Sprints 159, 161, 166–168, 171).
+- **Icons and numbers on boxes.** Any of about 1,500 Phosphor icons, searchable by what they show, or numbers, dots and arrows; a wrong icon name shows a dashed circle with Choose an icon (Sprint 169).
+- **Move through a deck.** It opens on its slides; one scroll, the arrow keys, Page Up/Down, Home and End move one slide; Backspace deletes the selected slide in the strip.
+- **The Slide library.** Other decks listed by folder, sections taken whole with one undo, search that shows each slide once, and an offer for the slides you repeat (Sprint 165).
+- **Present.** The wall shows only the slide; with a second display the laptop shows this slide, the next, the comments and the clock. Clicker, blank screen, spotlight, timer and QR code (Sprint 159 and the Present PRs).
+- **Share.** Publish puts the deck online as one page with Copy on each prompt and exercises to tick; Save slides and handout as PDF is under Publish's arrow (Sprints 159, 170).
+
+### Sprint 162: deck themes
 
 #### Added
 - **A deck's look is one button on its bar.** The Theme button shows the deck's theme as a small swatch and its name ("Evening ▾"). Its menu has Card | Borderless and the project's themes, each with how many decks use it. Pick one and the deck changes at once; the bar says so, with Undo, and Cmd+Z takes it back too. Card | Borderless is no longer in a slide's settings.
