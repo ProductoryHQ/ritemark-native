@@ -221,4 +221,33 @@ for (const url of ['javascript:alert(1)', 'data:text/html,hi', 'file:///etc/host
   assert.equal(word, '- one\n- two\n\n1. first\n2. second\n\n| a | b |\n| --- | --- |\n| 1 | |', 'S36: tight `- item` and `1. item`, a `| --- |` table, no trailing spaces')
 }
 
+// ---- #923: a line break inside a heading ----
+{
+  const h = (level: number, ...content: PMNode[]) => n.heading.create({ level }, content)
+  const shape = (markdown: string) => JSON.stringify(openDocument(markdown).doc.toJSON().content)
+  const typed = doc(h(2, schema.text('First line'), n.hardBreak.create(), schema.text('second line')))
+  const written = editorMarkdown(typed)
+  // `\` and a newline would end an ATX heading: a literal `\` and a paragraph on reopen.
+  assert.equal(written, '## First line<br>second line', 'a break typed in a heading is `<br>`, on the heading\'s one line')
+  assert.ok(openDocument(written).doc.eq(typed), 'it reads back as one heading with its break')
+  assert.equal(roundTrip('## First line<br>second line'), '## First line<br>second line\n', 'a heading\'s `<br>` stays as written')
+  assert.equal(roundTrip('# One<br/>two\n\nText'), '# One<br>two\n\nText\n', '`<br/>` reads as the same break (written `<br>` when saved)')
+  const bold = schema.marks.bold.create()
+  const marked = editorMarkdown(doc(h(1, schema.text('First', [bold]), n.hardBreak.create().mark([bold]), schema.text('second'))))
+  assert.equal(marked, '# **First**<br>second', 'a break at a bold run\'s edge goes outside its `**`')
+  assert.match(shape(marked), /"marks":\[\{"type":"bold"\}\],"text":"First"\},\{"type":"hardBreak"/, 'and the run is still bold on reopen')
+  const escaped = editorMarkdown(doc(h(1, schema.text('a\\', [bold]), n.hardBreak.create().mark([bold]), schema.text('second'))))
+  assert.equal(escaped, '# **a\\\\**<br>second', 'a break after an escaped backslash also goes outside the `**`')
+  assert.match(shape(escaped), /"marks":\[\{"type":"bold"\}\],"text":"a\\\\"\},\{"type":"hardBreak"/, 'and stays bold')
+  assert.equal(editorMarkdown(doc(h(2, schema.text('end'), n.hardBreak.create()))), '## end', 'a break with nothing after it in a heading writes nothing')
+  assert.equal(editorMarkdown(doc(h(2, schema.text('a <br> b')))), '## a \\<br> b', 'typed `<br>` words in a heading stay words')
+  // A paragraph's typed break is unchanged.
+  assert.equal(editorMarkdown(doc(n.paragraph.create(null, [schema.text('a'), n.hardBreak.create(), schema.text('b')]))), 'a\\\nb', 'a paragraph\'s break is still a backslash')
+  // Files saved before #923: `## First line\` over a paragraph is what every Markdown reader shows (a heading with a
+  // literal `\`, then a paragraph), so Ritemark opens it the same, never guessing it into one heading; nothing is
+  // written until the person edits, and then the literal `\` is kept escaped.
+  assert.match(shape('## First line\\\nsecond line'), /"text":"First line\\\\"\}\]\},\{"type":"paragraph".*"text":"second line"/, 'a heading saved the old way opens as every reader shows it')
+  assert.equal(roundTrip('## First line\\\nsecond line'), '## First line\\\\\nsecond line\n', 'and keeps its meaning when saved')
+}
+
 console.log('markdownAsWritten.test.ts — all assertions passed')

@@ -279,4 +279,12 @@ const before = [slide('aaaa', 'One'), heading(2, 'One'), paragraph('First words.
   assert.equal(dataOf(slides(state.doc)[1]).markdown, '# Plan\n\n:::: boxes\n::: box\n:::\n::::')
 }
 
+// #923: a two-line heading after the line gives the slide its words with a space between its lines, never glued.
+{
+  const twoLines = schema.nodes.heading.create({ level: 2 }, [schema.text('First line'), schema.nodes.hardBreak.create(), schema.text('second line')])
+  const state = stateOf([slide('aaaa', 'One'), heading(2, 'One'), paragraph('Words.'), paragraph('***'), twoLines, paragraph('More.')])
+  const made = slides(typeLine(state, 3).doc)
+  assert.equal(dataOf(made[1]).title, 'First line second line', 'a heading\'s break is a space in the title it gives')
+}
+
 console.log('deckLines: passed')
