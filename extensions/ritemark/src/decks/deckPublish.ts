@@ -37,7 +37,7 @@ import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { frontMatterLook, parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
 import { deckThemeAndLogo } from './deckPages';
-import type { DeckHostMessage, DeckPageState } from './deckProtocol';
+import type { DeckHostMessage, DeckPageState, DeckPdfKind } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
@@ -101,6 +101,8 @@ export class DeckPublisher implements vscode.Disposable {
   /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
   private readonly fontsHeld = new Map<string, number>();
   private feature: PublishFeature | null = null;
+  /** Sprint 170: the PDF kinds Save as PDF can make here (`DeckPdfSaver.kinds`), set at activation; none until then. */
+  pdfKinds: () => Promise<DeckPdfKind[]> = async () => [];
 
   constructor(private readonly extensionPath: string) {
     this.disposables.push(
@@ -150,7 +152,7 @@ export class DeckPublisher implements vscode.Disposable {
    * never the page file 2.2 compares.
    */
   private async readState(document: vscode.TextDocument, ask: boolean, last?: PageBarState): Promise<{ state: DeckPageState; bar?: PageBarState }> {
-    if (!this.ready()) return { state: { ready: false, kind: 'unpublished', changed: false } };
+    if (!this.ready()) return { state: { ready: false, kind: 'unpublished', changed: false, pdf: [] } };
     const pagePath = pagePathFor(document.uri.fsPath);
     let bar = last;
     if (ask || !bar) {
@@ -163,7 +165,7 @@ export class DeckPublisher implements vscode.Disposable {
     const kind = bar?.kind ?? 'unpublished';
     let changed = bar?.changed === true;
     if (kind === 'published' && !changed) changed = await this.deckChanged(document, pagePath);
-    return { state: { ready: true, kind, changed }, bar };
+    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds() }, bar };
   }
 
   /**
@@ -356,6 +358,22 @@ export class DeckPublisher implements vscode.Disposable {
       this.running.delete(key);
       this.refreshDocument(document);
     }
+  }
+
+  // ------------------------------------------------------------------ Save as PDF (Sprint 170)
+
+  /**
+   * What Save as PDF prints, read as Publish reads it: the view's words and look with the document's front matter, each
+   * slide's fit while the slides are as many, the theme as its file on disk has it, its font files and its logo. Never
+   * writes anything.
+   */
+  async printInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
+    const deckPath = document.uri.fsPath;
+    const documentText = document.getText();
+    const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content, look);
+    const fit = fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [];
+    const read = await this.lookFor(deckPath, text);
+    return { deckPath, text, theme: read.theme, steps: fit, fonts: await this.fontFilesFor(read.theme), logo: read.logo };
   }
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish

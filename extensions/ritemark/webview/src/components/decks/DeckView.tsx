@@ -14,7 +14,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
-import { Button } from '../ui/button'
+import { Button, roomChanged } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { SyncActionButton } from '../header'
@@ -397,7 +397,7 @@ export function DeckView({
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
-  const publishNotice = useCallback((text: string) => setNotice({ text }), [])
+  const publishNotice = useCallback((text: string, action?: Notice['action']) => setNotice({ text, action }), [])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -1385,6 +1385,10 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [flash])
 
+  // Sprint 170: a notice that comes or goes changes the bar's room: Publish and Present, folded to their icons for a
+  // long one, show their words again once it has gone (ui/button.tsx, `roomChanged`).
+  useLayoutEffect(() => { roomChanged() }, [notice])
+
   // A notice in the bar fades after a while.
   useEffect(() => {
     if (!notice) return
@@ -1923,7 +1927,7 @@ export function DeckView({
         ) : (
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
-        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} onNotice={publishNotice} />
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} />
         <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 

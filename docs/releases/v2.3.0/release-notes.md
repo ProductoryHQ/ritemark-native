@@ -99,6 +99,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Share the deck as a page.** Choose **Publish** to put it online as one page. People open it on a phone or a computer. Each prompt has **Copy**, and people can tick an exercise's steps.
 - **Comments and skipped slides stay with you.** Before you publish, Ritemark lists what goes on the page and what stays with you.
 - **The page changes only when you update it.** Change the theme, and the page online keeps its old look until you choose **Update the page**.
+- **Save the deck as a PDF.** Open the arrow next to **Publish** and choose **Save slides and handout as PDF**. Each slide comes with its text, and the links still work.
 <!-- DECKS END -->
 
 ## Smaller changes

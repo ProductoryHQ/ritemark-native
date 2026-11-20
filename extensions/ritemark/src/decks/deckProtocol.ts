@@ -82,6 +82,13 @@ export type DeckRequest =
   | { type: 'deck/publish'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
   | { type: 'deck/page-action'; action: DeckPageAction }
+  /**
+   * Sprint 170 (#881): Save as PDF from Publish's menu: the kind the item named (from the view at the press), and the
+   * deck's text, look and fit as `deck/publish` sends them.
+   */
+  | { type: 'deck/save-pdf'; kind: DeckPdfKind; text: string; look: 'card' | 'borderless'; steps: number[] }
+  /** The bar's "Saved as <name>.pdf": Show in folder, on the PDF this view saved last. */
+  | { type: 'deck/pdf-show' }
   /** The start card (16 November, frame 20): is this deck New's, which AI drafts it, and the project's earlier decks. */
   | { type: 'deck/start-card' }
   /** The card went (× or the deck was started): it never comes back to this deck. */
@@ -93,12 +100,21 @@ export type DeckRequest =
 
 export type DeckPageAction = 'copy-link' | 'see-online' | 'unpublish';
 
+/**
+ * Sprint 170: the three kinds of PDF, one for each view (the decks README, "Save as PDF, from Publish"): Slide only
+ * saves the slides, Slide and handout the slides with the handout (the page's print), Handout only the handout.
+ */
+export type DeckPdfKind = 'slides' | 'slides-and-handout' | 'handout';
+export const DECK_PDF_KINDS: readonly DeckPdfKind[] = ['slides', 'slides-and-handout', 'handout'];
+
 /** The bar's Publish control: hidden until Publish can be reached; then the page's state, as 2.2 keeps it. */
 export interface DeckPageState {
   ready: boolean;
   kind: 'unpublished' | 'publishing' | 'published' | 'unpublishing';
   /** "Published · changed": 2.2 finds a change, or the deck's public content is no longer the page's. */
   changed: boolean;
+  /** Sprint 170: the PDF kinds this app can save, in Publish's menu; none in a shell without the print (patch 021). */
+  pdf?: DeckPdfKind[];
 }
 
 /** The host's answers. */
@@ -150,6 +166,8 @@ export type DeckHostMessage =
   | { type: 'deck/page-state'; state: DeckPageState }
   /** A line for the deck's bar from Publish: why a page wasn't written, or that the link is copied. */
   | { type: 'deck/page-notice'; text: string }
+  /** Sprint 170: the PDF is saved, under this file name: the bar says "Saved as <name>" with Show in folder. */
+  | { type: 'deck/pdf-saved'; name: string }
   /** The start card's state for this deck (`startCard.ts`). */
   | { type: 'deck/start-card'; state: StartCardState }
   /** A line for the deck's bar from the start card: "This deck is now a copy of <name>.", or why it couldn't be. */
@@ -304,16 +322,17 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     }
     case 'deck/publish': {
       exactKeys(input, ['type', 'text', 'look', 'steps']);
-      const text = stringOf(input.text, MAX_DECK_TEXT, true);
-      if (input.look !== 'card' && input.look !== 'borderless') throw new DeckProtocolError('look must be card or borderless');
-      const look = input.look;
-      if (!Array.isArray(input.steps) || input.steps.length > MAX_DECK_SLIDES) throw new DeckProtocolError('steps must be a short list');
-      const steps = input.steps.map(step => {
-        // A block slide's fit has six steps (Sprint 161); `publicDeck` holds a v1 slide to its own three.
-        if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > BLOCK_MAX_STEP) throw new DeckProtocolError(`Each step must be 0 to ${BLOCK_MAX_STEP}`);
-        return step;
-      });
-      return { type: 'deck/publish', text, look, steps };
+      return { type: 'deck/publish', ...publishFields(input) };
+    }
+    case 'deck/save-pdf': {
+      exactKeys(input, ['type', 'kind', 'text', 'look', 'steps']);
+      if (typeof input.kind !== 'string' || !(DECK_PDF_KINDS as readonly string[]).includes(input.kind)) throw new DeckProtocolError('Unknown PDF kind');
+      const { text, look, steps } = publishFields(input);
+      return { type: 'deck/save-pdf', kind: input.kind as DeckPdfKind, text, look, steps };
+    }
+    case 'deck/pdf-show': {
+      exactKeys(input, ['type']);
+      return { type: 'deck/pdf-show' };
     }
     case 'deck/page-action': {
       exactKeys(input, ['type', 'action']);
@@ -349,6 +368,20 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
 
 function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < 100_000;
+}
+
+/** Publish's and Save as PDF's shared fields: the view's text, its look and each slide's fit. */
+function publishFields(input: Record<string, unknown>): { text: string; look: 'card' | 'borderless'; steps: number[] } {
+  const text = stringOf(input.text, MAX_DECK_TEXT, true);
+  if (input.look !== 'card' && input.look !== 'borderless') throw new DeckProtocolError('look must be card or borderless');
+  const look = input.look;
+  if (!Array.isArray(input.steps) || input.steps.length > MAX_DECK_SLIDES) throw new DeckProtocolError('steps must be a short list');
+  const steps = input.steps.map(step => {
+    // A block slide's fit has six steps (Sprint 161); `publicDeck` holds a v1 slide to its own three.
+    if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > BLOCK_MAX_STEP) throw new DeckProtocolError(`Each step must be 0 to ${BLOCK_MAX_STEP}`);
+    return step;
+  });
+  return { text, look, steps };
 }
 
 function stringOf(value: unknown, max: number, empty = false): string {

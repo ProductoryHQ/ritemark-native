@@ -12,6 +12,8 @@ import { ThemePages } from './themePages';
 import { ThemeAi } from './themeAi';
 import { SlideLibraryViewProvider } from './SlideLibraryViewProvider';
 import { DeckPublisher } from './deckPublish';
+import { DeckPdfSaver, PRINT_COMMAND } from './deckPdf';
+import { loadPageAssets } from './page/pageAssets';
 import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
 import { copyEarlierDeck, earlierDecks, makeEmptyDeck } from './newDeck';
@@ -64,6 +66,17 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   };
   const publisher = new DeckPublisher(context.extensionPath);
   const pages = new DeckPages(library, publisher);
+  // Sprint 170 (#881): Save as PDF from Publish's menu, printed by the app's own print (patch 021)
+  const pdf = new DeckPdfSaver(publisher, {
+    // Unfiltered: the print is an internal command (its name starts with `_`), which `getCommands(true)` leaves out.
+    hasPrint: async () => (await vscode.commands.getCommands(false)).includes(PRINT_COMMAND),
+    assets: () => loadPageAssets(context.extensionPath),
+    askTarget: async defaultPath => (await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(defaultPath), filters: { PDF: ['pdf'] }, title: 'Save as PDF', saveLabel: 'Save' }))?.fsPath,
+    print: async htmlPath => await vscode.commands.executeCommand<string>(PRINT_COMMAND, htmlPath),
+    reveal: async file => { await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(file)); },
+  }, () => isEnabled('decks'));
+  publisher.pdfKinds = () => pdf.kinds();
+  pages.pdf = pdf;
   // Sprint 162 PR 2: the theme's tab, and the Theme menu's Edit <Name> and New theme… that open it
   const themes = new ThemePages(library, pages);
   pages.themeEditor = { open: (deck, themePath) => themes.open(deck, themePath), make: (deck, request) => themes.make(deck, request) };

@@ -15,6 +15,12 @@
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
+/* Sprint 170 (#881, the decks README "Save as PDF, from Publish"): Publish as a split button whose ▾ is a part of its
+   own, with its own hover: one fill at rest (ui/split-button.tsx), but the pointer lights only the part it is on, and
+   the ▾ stays lit while its menu is open. */
+.deck-bar .rm-split.deck-publish-split[data-tone="outline"]:not([data-disabled]):hover { background-color: var(--r-surface); }
+.deck-bar .rm-split.deck-publish-split[data-tone="outline"]:not([data-disabled]) .rm-split-part:hover,
+.deck-bar .rm-split.deck-publish-split[data-tone="outline"] .rm-split-more[data-state="open"] { background-color: var(--r-surface-soft); background-clip: padding-box; }
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
 .deck-theme-swatch { position: relative; display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .14); overflow: hidden; }
@@ -290,6 +296,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > .deck-publish-slot { flex-shrink: 10000; min-width: 0; }
 .deck-bar > .deck-notice { flex-shrink: 100; }
 .deck-bar > .deck-present { flex-shrink: 1; }
+/* Sprint 170: each gives way only down to its folded size, so a long notice ("Saved as <deck> – slides and
+   handout.pdf" with Show in folder) shortens its own words instead of drawing the bar's controls over each other:
+   the Theme button to its swatch and ▾, Publish's split button to its globe and ▾ (both measured at the bar's 30). */
+.deck-bar > .deck-theme-slot { min-width: 65px; }
+.deck-bar > .rm-split.deck-publish-split { min-width: 64px; }
 .deck-bar .deck-theme-slot > .deck-theme-button { min-width: 0; flex-shrink: 1; }
 .deck-bar .deck-theme-button > .deck-theme-swatch, .deck-bar .deck-theme-button > svg { flex: none; }
 .deck-bar .deck-theme-button > .deck-theme-name { flex: 0 1 auto; min-width: 0; }
