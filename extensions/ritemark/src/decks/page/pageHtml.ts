@@ -807,17 +807,18 @@ html, body { width: 960px; height: auto; margin: 0; overflow: visible; backgroun
 /**
  * Sprint 170 PR 3 (#886; the decks README, "Save as PDF, from Publish"): Save handout as PDF's page. The page's own A4
  * print (`PRINT_CSS` and its order, after which these come, so they win), with the text alone: no slide is drawn, so no
- * slide picture either, and each part starts under its number and heading. The number is the slide's, as the handout's
- * rail shows it, in the left margin beside the part's first line, muted and bold (`handoutNumbersCss` gives each part its
- * own). A section keeps its band ("SECTION 2" over its title) and starts a page, as in the page's print. A slide whose
- * part has no text has nothing here.
+ * slide picture either, and each part starts under its number and heading. The number counts the shown slides, as the
+ * page and Present do (a skipped slide is never on the page, so after one it differs from the editor's rail), in the
+ * left margin beside the part's first line, muted and bold (`handoutNumbersCss` gives each part its own). A section keeps
+ * its band ("SECTION 2" over its title) and starts a page, as in the page's print, even with no text of its own
+ * (`partHtml`). Any other slide whose part has no text has nothing here.
  */
 export const HANDOUT_PRINT_CSS = `
 @media print {
   .layer, .prefetch { display: none !important; }
   .part:not(.sect):not(.only) { position: relative; padding-left: 10mm; }
   .part:not(.sect):not(.only)::before { position: absolute; left: 0; top: 0; width: 8mm; font: 700 10pt/18.75pt 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .sect { margin-left: 10mm; }
+  .sect { width: calc(100% - 10mm); margin-left: 10mm; }
 }
 `;
 
@@ -969,12 +970,15 @@ export function isSlideOnly(slide: Pick<PublicSlide, 'handout' | 'data'>, textHa
 function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean, openIn: boolean): string {
   const number = index + 1;
   // A slide with no handout: its place only, with nothing in it (More isn't offered on it).
-  if (slideOnly) return `<div class="part only" data-i="${index}" id="t${number}" aria-hidden="true"></div>`;
+  // Save handout as PDF (Sprint 170 PR 3) draws no slide, so a section prints as its band there even with no text, its
+  // slide's title as its heading when the part has none: the handout keeps its sections.
+  const handoutSection = options.print === 'handout' && sectionNumberOf(slide) !== null;
+  if (slideOnly && !handoutSection) return `<div class="part only" data-i="${index}" id="t${number}" aria-hidden="true"></div>`;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const exerciseSlide = isExercise(slide);
   const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true, openIn });
-  const title = ownHeading || textHandout ? '' : titleOf(slide);
+  const title = ownHeading || (textHandout && !handoutSection) ? '' : titleOf(slide);
   const section = sectionNumberOf(slide);
   if (section !== null) {
     const label = `Section${section ? ` ${section}` : ''}`;
@@ -1089,7 +1093,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // Which slides have no handout: read once, for More and for print.
   const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));
   // Small details 13 (18 November): the sections printed as their bands (a section whose part shows nothing keeps its slide).
-  const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && !slideOnly[index] ? [index] : [])));
+  const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && (!slideOnly[index] || options.print === 'handout') ? [index] : [])));
   const parts = deck.slides.map((slide, index) => partHtml(slide, index, options, keys[index], deck.textHandout === true, slideOnly[index], openIn));
   // The reader's storage is the page's own: its client and session, or, for a deck with no title of its own, its file's
   // name, hashed (never on the page), so two such decks in one folder keep their ticks and places apart. It is the key

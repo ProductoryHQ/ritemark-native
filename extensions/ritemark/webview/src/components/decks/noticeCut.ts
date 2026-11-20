@@ -9,7 +9,7 @@
 export const CUT = '…'
 
 /** `name` kept to `keep` characters (and the ellipsis), its start and end kept, the end never shorter than its extension. */
-export function middleCut(name: string, keep: number): string {
+export function cutName(name: string, keep: number): string {
   if (keep >= name.length) return name
   const keepAt = Math.max(2, Math.floor(keep))
   const extension = /\.[^.\s]{1,6}$/.exec(name)?.[0] ?? ''
@@ -30,12 +30,12 @@ export function fitNotice(prefix: string, name: string, fits: (words: string) =>
   let best = 2
   while (low <= high) {
     const keep = Math.floor((low + high) / 2)
-    if (fits(prefix + middleCut(name, keep))) {
+    if (fits(prefix + cutName(name, keep))) {
       best = keep
       low = keep + 1
     } else {
       high = keep - 1
     }
   }
-  return prefix + middleCut(name, best)
+  return prefix + cutName(name, best)
 }

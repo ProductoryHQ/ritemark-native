@@ -162,7 +162,9 @@ function NoticeWords({ text, name }: { text: string; name?: string }) {
     const shown = shownRef.current
     if (!cut || !box || !shown || !name) return
     const prefix = text.slice(0, text.length - name.length)
+    let live = true
     const fit = () => {
+      if (!live) return // a fonts' answer that comes after this notice was replaced
       shown.textContent = fitNotice(prefix, name, words => {
         shown.textContent = words
         return shown.scrollWidth <= box.clientWidth
@@ -172,7 +174,10 @@ function NoticeWords({ text, name }: { text: string; name?: string }) {
     const observer = new ResizeObserver(fit)
     observer.observe(box)
     void document.fonts?.ready?.then(fit)
-    return () => observer.disconnect()
+    return () => {
+      live = false
+      observer.disconnect()
+    }
   }, [cut, text, name])
   if (!cut) return <span className="deck-notice-text">{text}</span>
   return (

@@ -240,6 +240,17 @@ async function main(): Promise<void> {
     assert.ok(!built.html.includes('harbour'), 'the slide\'s picture is not named');
   }
 
+  // A section with no text of its own still prints as its band in the handout (its slide isn't drawn there), with its
+  // slide's title, and starts a page; on the page itself it stays its slide, as before.
+  {
+    const text = '---\ndeck: 2\nhandout: text\n---\n\n```slide\n---\nid: a1\n---\n# Opening\n```\n\n## Opening\n\nWords.\n\n```slide\n---\nid: a2\n---\n2\n\n# Results\n```\n';
+    const handout = (await buildPrintPage({ deckPath, text, theme: BUILT_IN_THEME, print: 'handout' }, assets)).html;
+    assert.match(handout, /<section class="part sect" data-i="1" id="t2"><div class="eyebrow">Section 2<\/div><h2>Results<\/h2>/);
+    assert.match(handout, /#s2\{display:none!important\}#t2\{order:4;break-before:page/);
+    const page = (await buildPrintPage({ deckPath, text, theme: BUILT_IN_THEME }, assets)).html;
+    assert.match(page, /<div class="part only" data-i="1" id="t2"/);
+  }
+
   // A handout with no text (every part emptied): Save handout as PDF says so and writes nothing, rather than a blank page.
   {
     const text = '---\ndeck: 2\nhandout: text\n---\n\n```slide\n---\nid: q1\n---\n# Only a slide\n```\n';

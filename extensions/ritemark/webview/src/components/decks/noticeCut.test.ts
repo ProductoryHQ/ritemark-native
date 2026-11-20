@@ -6,20 +6,20 @@
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { CUT, fitNotice, middleCut } from './noticeCut'
+import { CUT, fitNotice, cutName } from './noticeCut'
 
 const long = 'Day one – slides and handout.pdf'
 // The middle cut keeps the start, the end and the extension.
-assert.equal(middleCut(long, 23), 'Day one – sl…handout.pdf')
-assert.equal(middleCut(long, long.length), long)
+assert.equal(cutName(long, 23), 'Day one – sl…handout.pdf')
+assert.equal(cutName(long, long.length), long)
 for (let keep = 2; keep < long.length; keep++) {
-  const cut = middleCut(long, keep)
+  const cut = cutName(long, keep)
   assert.ok(cut.endsWith('.pdf'), `${keep}: keeps ".pdf"`)
   assert.equal(cut.split(CUT).length, 2, `${keep}: one cut`)
   assert.ok(cut.length <= Math.max(keep, '.pdf'.length + 1) + 1, `${keep}: no longer than asked, but for ".pdf"`)
 }
 // A name without an extension is cut in its middle too.
-assert.equal(middleCut('Quarterly review notes', 10), 'Quart…notes')
+assert.equal(cutName('Quarterly review notes', 10), 'Quart…notes')
 
 // Fitting: a stand-in measure of one unit a character. The whole words while they fit, never cut then.
 const room = (width: number) => (words: string) => words.length <= width

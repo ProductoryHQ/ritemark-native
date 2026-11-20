@@ -313,7 +313,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice-cut { position: relative; display: block; text-overflow: clip; }
 .deck-notice-sizer { visibility: hidden; }
 .deck-notice-shown { position: absolute; inset: 0; overflow: hidden; white-space: nowrap; }
-.deck-notice .deck-line-action { height: auto; padding: 0 2px; }
+.deck-notice:has(> .deck-notice-words .deck-notice-cut) .deck-line-action { height: auto; padding: 0 2px; }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
    thumbnail, the part number or the point it came from (DeckView); the bar has no gear. */
