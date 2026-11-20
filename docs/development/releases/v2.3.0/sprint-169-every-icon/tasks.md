@@ -15,9 +15,9 @@ Phase 3 starts only after Jarmo's approval, #850 merged, and the sprint branch e
 - [ ] Shots of `icon: truck` on all four, and the page offline, for the Experience lead: the editor, strip, wall and page taken (PR 2's proof); the presenter view's own window not yet
 
 ## PR 3: Search icons (Standard)
-- [ ] Field, in-use first, then the 24, then results by name, tag and alias
-- [ ] "No icons match"; "No icon" at the foot; Esc and outside click close as every popup does
-- [ ] Shots before and after typing "truck", "people" and "mail"
+- [x] Field, in-use first, then the 24, then results by name, tag and alias
+- [x] "No icons match"; "No icon" at the foot; Esc and outside click close as every popup does
+- [x] Shots before and after typing "truck", "people" and "mail" (`proof/pr3-search/`)
 
 ## PR 4: the unknown name's tooltip (Standard, after #850 and PR 3)
 - [ ] "No icon named “xyz”" and Choose an icon, opening the menu with the name in the search

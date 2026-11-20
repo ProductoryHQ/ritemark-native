@@ -265,7 +265,7 @@ function Box({ box, editing, assets }: { box: SlideBox; editing?: SlideEditing; 
 }
 
 /**
- * A box's icon on the stage: a click opens the grid of 24 (prototype frame 4), with No icon under it. The current icon
+ * A box's icon on the stage: a click opens the icon menu (prototype frame 4; its search, Sprint 169 PR 3), with No icon under it. The current icon
  * is the one the box carries, as `layoutMarkOf` read it (an unknown one as written, so No icon can take it out, and
  * named as unknown, as on a block slide); none for the empty place.
  */

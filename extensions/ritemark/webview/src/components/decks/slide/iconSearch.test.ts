@@ -11,7 +11,7 @@ import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
 import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
-import { searchIcons } from './iconSearch'
+import { ICON_MENU_PAGE, deckIconsInUse, iconMenuChoices, iconMenuMoreLine, iconMenuMove, searchIcons } from './iconSearch'
 
 let passed = 0
 function test(name: string, run: () => void) {
@@ -166,6 +166,86 @@ test('the search finds nothing for nonsense or nothing, and offers only names th
   assert.equal(seen.size, PAGE_ICON_NAMES.length)
   // A query is text, never a pattern.
   for (const query of ['.*', '(', '[', '\\', '?', '+']) assert.doesNotThrow(() => searchIcons(query), query)
+})
+
+test("PR 3 (#868): the deck's icons in use, in the order it first uses them, each once, known ones only", () => {
+  const slides = [
+    { kind: 'boxes', data: { title: 'One', items: [{ icon: 'truck' }, { icon: 'Mail' }, { icon: 'not-a-real-icon' }, {}] } },
+    // A layout that draws no item's icon: its items' icons are in use nowhere.
+    { kind: 'title', data: { title: 'Cover', items: [{ icon: 'acorn' }] } },
+    { kind: 'blocks', data: { markdown: '# Two\n\n:::: boxes\n::: {.box icon="brain"}\n### A\n:::\n::: {.box icon="truck"}\n:::\n::: box\n:::\n::::\n::: {.column icon="rocket"}\n:::' } },
+    // A `:::` line inside a code block is code, not a box; `envelope-simple` is the grid's mail, already in.
+    { kind: 'blocks', data: { markdown: '```\n::: {.box icon="rocket"}\n```\n::: {.box icon=envelope-simple}\n:::\n~~~~\n::: {.box icon="acorn"}\n~~~\n~~~~\n::: {.box icon=\'users\'}\n:::' } },
+    { kind: 'boxes', data: {} },
+  ]
+  assert.deepEqual(deckIconsInUse(slides).map(icon => icon.name), ['truck', 'mail', 'brain', 'users'])
+  assert.deepEqual(deckIconsInUse([]), [])
+  // A Boxes block set to Number, Dot or Arrow draws its own mark: its boxes' icons are in use nowhere, and count again
+  // once it is Icon. A box after the block closes counts as before.
+  const boxes = (look: string) => [{ kind: 'blocks', data: { markdown: `:::: {.boxes${look}}\n::: {.box icon="truck"}\n### A\n:::\n::::\n\n::: {.box icon="brain"}\n:::` } }]
+  for (const look of [' look="steps"', ' look="line"', ' look="arrows"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['brain'], look)
+  for (const look of ['', ' look="boxes"', ' look="something-new"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['truck', 'brain'], look || 'Icon')
+})
+
+test('PR 3: before typing, the icons in use, then the 24, each once; then results, a page at a time', () => {
+  const inUse = deckIconsInUse([{ kind: 'boxes', data: { items: [{ icon: 'truck' }, { icon: 'brain' }, { icon: 'users' }] } }])
+  const before = iconMenuChoices('', inUse)
+  assert.equal(before.searching, false)
+  // In use first (users among them), then the 24 without users: 3 + 23.
+  assert.deepEqual(before.icons.slice(0, 3).map(icon => icon.name), ['truck', 'brain', 'users'])
+  assert.deepEqual(before.icons.slice(3).map(icon => icon.name), SLIDE_ICON_NAMES.filter(name => name !== 'users'))
+  assert.equal(before.total, 26)
+  assert.deepEqual(iconMenuChoices('   ', []).icons.map(icon => icon.name), [...SLIDE_ICON_NAMES], 'no deck icons: the 24')
+  // Typing: the search's results, best first, whatever is in use.
+  const truck = iconMenuChoices('truck', inUse)
+  assert.equal(truck.searching, true)
+  assert.equal(truck.icons[0].name, 'truck')
+  assert.deepEqual(truck.icons, searchIcons('truck').slice(0, ICON_MENU_PAGE))
+  // A short query finds many: a page of them, and how many there are.
+  const many = iconMenuChoices('a', [])
+  assert.equal(many.icons.length, ICON_MENU_PAGE)
+  assert.ok(many.total > ICON_MENU_PAGE)
+  // The quiet line under them (the Experience lead on #908); none when all are shown.
+  assert.equal(iconMenuMoreLine(many.icons.length, many.total), `60 of ${many.total} · type more to narrow`)
+  assert.equal(iconMenuMoreLine(4, 4), null)
+  assert.equal(iconMenuMoreLine(0, 0), null)
+  assert.equal(iconMenuChoices('people', []).icons[0].name, 'users')
+  assert.equal(iconMenuChoices('mail', []).icons[0].phosphor, 'envelope-simple')
+  // Nothing matches: no icons (the menu says "No icons match"; No icon stays at its foot).
+  assert.deepEqual(iconMenuChoices('zzzz', inUse), { icons: [], total: 0, searching: true })
+})
+
+test('PR 3: a Phosphor name beats an alias and a tag', () => {
+  // `folder` and `check` were aliases of the grid's; Phosphor's own icon comes first.
+  assert.equal(iconMenuChoices('folder', []).icons[0].phosphor, 'folder')
+  assert.equal(iconMenuChoices('check', []).icons[0].phosphor, 'check')
+  // `search` is an alias (Phosphor has no `search`): the grid's magnifying glass first.
+  assert.equal(iconMenuChoices('search', []).icons[0].phosphor, 'magnifying-glass')
+  // A name it is beats a tag it is: `calendar` the icon, before icons tagged calendar.
+  assert.equal(iconMenuChoices('calendar', []).icons[0].phosphor, 'calendar')
+})
+
+test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the foot and back to the field', () => {
+  const move = (at: number, step: 1 | -1, count = 26, withNoIcon = true) => iconMenuMove(at, step === 1 ? 'down' : 'up', count, withNoIcon, 6)
+  // From the field to the first icon, a row down each time, then No icon (place 26), where it stays.
+  assert.deepEqual([-1, 0, 6, 12, 18, 24].map(at => move(at, 1)), [0, 6, 12, 18, 24, 26])
+  assert.equal(move(20, 1), 26, 'the last full row: on to No icon')
+  assert.equal(move(26, 1), 26)
+  // Without No icon (a box with none), the last row goes to the last icon and stays there.
+  assert.equal(move(20, 1, 26, false), 25)
+  assert.equal(move(25, 1, 26, false), 25)
+  // Up: a row back, from No icon to the last row's first, from the first row to the field.
+  assert.deepEqual([26, 24, 6, 3, 0].map(at => move(at, -1)), [24, 18, 0, -1, -1])
+  // Nothing found: ↓ reaches No icon alone; with none, nothing moves.
+  assert.equal(move(-1, 1, 0, true), 0)
+  assert.equal(move(0, -1, 0, true), -1)
+  assert.equal(move(-1, 1, 0, false), -1)
+  // ← and → walk the list one icon at a time, stopping at its ends; No icon and none stay.
+  const side = (at: number, way: 'left' | 'right') => iconMenuMove(at, way, 26, true, 6)
+  assert.deepEqual([0, 5, 24, 25].map(at => side(at, 'right')), [1, 6, 25, 25])
+  assert.deepEqual([0, 1, 6].map(at => side(at, 'left')), [0, 0, 5])
+  assert.equal(side(26, 'left'), 26)
+  assert.equal(side(-1, 'right'), -1)
 })
 
 console.log(`iconSearch: ${passed} passed`)

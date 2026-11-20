@@ -25,6 +25,8 @@ import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
+import { DeckIconsContext } from './slide/IconGrid'
+import { deckIconsInUse } from './slide/iconSearch'
 import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
@@ -559,6 +561,8 @@ export function DeckView({
   countRef.current = count
   const slidesRef = useRef(slides)
   slidesRef.current = slides
+  // Sprint 169 PR 3 (#868): the icon menu's first view, the deck's icons in use, read when a menu opens.
+  const iconsInUse = useCallback(() => deckIconsInUse(slidesRef.current), [])
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
 
@@ -1861,6 +1865,7 @@ export function DeckView({
 
   return (
     <AgendaContext.Provider value={agendaDrawing}>
+    <DeckIconsContext.Provider value={iconsInUse}>
     <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
       <header className="deck-bar">
@@ -2143,6 +2148,7 @@ export function DeckView({
       {dialogs}
     </div>
     </DeckOpenInContext.Provider>
+    </DeckIconsContext.Provider>
     </AgendaContext.Provider>
   )
 }
