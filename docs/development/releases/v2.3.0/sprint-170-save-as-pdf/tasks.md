@@ -26,7 +26,7 @@ Nothing starts until the plan is approved (Development manager with the Experien
 - [x] A4 portrait, the text alone, each part under its number and heading, no slide pictures
 - [x] Tests and shots; the menu's item for Handout only works
 - [x] PR 2's stand-in removed: each view's item saves its own kind
-- [x] #931: the bar's "Saved as" note takes the room the bar has; a name too long is cut in its middle, ".pdf" kept
+- [x] #931: the bar's "Saved as" note takes the room the bar has; a name too long is cut in its middle, ".pdf" kept; Show in folder is an icon after the name, the bar's controls keep their room and Saved steps aside (the Experience lead)
 - [ ] Issue, Review record, the lead's look, release-notes line
 
 ## Sprint end

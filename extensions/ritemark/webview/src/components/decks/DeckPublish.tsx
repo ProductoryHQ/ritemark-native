@@ -61,6 +61,11 @@ export function pdfRequest(kind: DeckPdfKind, pressed: { text: string; borderles
   return { kind, ...publishRequest(pressed, steps) }
 }
 
+/** The note's action after a save (#931, the Experience lead): an icon button right after the name. */
+export function showInFolder(name: string): { label: string; tip: string; run: () => void; icon: 'folder-open'; ariaLabel: string } {
+  return { label: 'Show in folder', tip: 'Show in folder', icon: 'folder-open', ariaLabel: `Show ${name} in its folder`, run: () => sendToExtension('deck/pdf-show') }
+}
+
 /** The bar's note after a save. */
 export function savedNotice(name: string): string {
   return `Saved as ${name}`
@@ -82,7 +87,7 @@ interface DeckPublishProps {
   /** The view as drawn (Slide only under 600 px): what Save as PDF's item names. */
   view: DeckViewMode
   /** `name`: the file the words end with (#931: cut in its middle when the bar is short of room). */
-  onNotice: (text: string, action?: { label: string; tip: string; run: () => void }, name?: string) => void
+  onNotice: (text: string, action?: { label: string; tip: string; run: () => void; icon?: 'folder-open'; ariaLabel?: string }, name?: string) => void
 }
 
 export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice }: DeckPublishProps) {
@@ -96,7 +101,7 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
       if (message.type === 'deck/page-state' && isState(message.state)) setState(message.state)
       if (message.type === 'deck/page-notice' && typeof message.text === 'string') onNotice(message.text)
       if (message.type === 'deck/pdf-saved' && typeof message.name === 'string') {
-        onNotice(savedNotice(message.name), { label: 'Show in folder', tip: 'Show the PDF in its folder', run: () => sendToExtension('deck/pdf-show') }, message.name)
+        onNotice(savedNotice(message.name), showInFolder(message.name), message.name)
       }
     })
     sendToExtension('deck/page-state')

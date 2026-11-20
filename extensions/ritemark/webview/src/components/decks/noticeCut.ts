@@ -8,15 +8,28 @@
 /** The cut's mark: one ellipsis character. */
 export const CUT = '…'
 
+type GraphemeSegmenter = new (locale?: string, options?: { granularity: 'grapheme' }) => { segment(text: string): Iterable<{ segment: string }> }
+
+/**
+ * A name's characters as a person sees them (grapheme clusters: an emoji, a joined emoji, a flag or an accented letter
+ * is one), so a cut never splits one into a lone half (Codex on #932). Code points where the runtime has no
+ * `Intl.Segmenter`.
+ */
+export function charactersOf(name: string): string[] {
+  const Segmenter = (Intl as { Segmenter?: GraphemeSegmenter }).Segmenter
+  return Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(name), part => part.segment) : Array.from(name)
+}
+
 /** `name` kept to `keep` characters (and the ellipsis), its start and end kept, the end never shorter than its extension. */
 export function cutName(name: string, keep: number): string {
-  if (keep >= name.length) return name
+  const characters = charactersOf(name)
+  if (keep >= characters.length) return name
   const keepAt = Math.max(2, Math.floor(keep))
-  const extension = /\.[^.\s]{1,6}$/.exec(name)?.[0] ?? ''
+  const extension = charactersOf(/\.[^.\s]{1,6}$/.exec(name)?.[0] ?? '').length
   // The end holds the extension whatever the room; the start at least one character.
-  const tail = Math.max(extension.length, Math.min(keepAt - 1, Math.max(extension.length + 1, Math.floor(keepAt / 2))))
+  const tail = Math.max(extension, Math.min(keepAt - 1, Math.max(extension + 1, Math.floor(keepAt / 2))))
   const head = Math.max(1, keepAt - tail)
-  return `${name.slice(0, head).trimEnd()}${CUT}${name.slice(name.length - tail)}`
+  return `${characters.slice(0, head).join('').trimEnd()}${CUT}${characters.slice(characters.length - tail).join('')}`
 }
 
 /**
@@ -26,7 +39,7 @@ export function cutName(name: string, keep: number): string {
 export function fitNotice(prefix: string, name: string, fits: (words: string) => boolean): string {
   if (fits(prefix + name)) return prefix + name
   let low = 2
-  let high = name.length - 1
+  let high = charactersOf(name).length - 1
   let best = 2
   while (low <= high) {
     const keep = Math.floor((low + high) / 2)

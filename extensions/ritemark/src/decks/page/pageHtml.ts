@@ -721,7 +721,9 @@ export const PRINT_CSS = `
   html, body { height: auto; overflow: visible; background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; color: #33365A; --ink: #1C1F4A; --text: #33365A; --muted: #6B6F94; --label: #8A5A00; --line: #DADCE4; --soft: #F4F4FA; --link: #1C1F4A; }
   .ground, .line, .prog, .toc, .toast, .zoom, .restart, .sclose, .copy, .prompt .open, .cb-tools, .empty { display: none !important; }
-  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0; gap: 0; }
+  /* 1 px inside the paper's right margin (Sprint 170 PR 3): a box as wide as the column (a Button's row, a prompt) had
+     its right line at the page's clip edge, and the print drew it half or not at all. */
+  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0 1px 0 0; gap: 0; }
   .view, .frame, .side { display: contents !important; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
   .layer { position: relative; inset: auto; display: block; width: 576px; height: 324px; margin: 0 0 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--slidebg); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: auto; }
@@ -751,6 +753,10 @@ export const PRINT_CSS = `
   .prompt pre, .prompt.ai pre { padding: 3mm 4mm; border: 1px solid #C9CBD6; border-radius: 8px; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .steps label { background: none; box-shadow: none; border: 1px solid #DADCE4; break-inside: avoid; page-break-inside: avoid; }
   .steps input { box-shadow: none; border: 1.5px solid #8A8DA3; }
+  /* A Button on paper keeps its own width beside its words, as on a wide page, not the phone's full-width row (the
+     printed column is under the page's 860 px; the Experience lead on Sprint 170 PR 3). */
+  .pbutton:not(.is-solo) { flex-direction: row; align-items: center; gap: 16px; padding: 10px 12px 10px 18px; }
+  .pbutton:not(.is-solo) .blk-btn { justify-content: flex-start; }
   .foot { display: block; order: 2147483647; margin-top: 0; padding-top: 3mm; border-top: 1px solid #DADCE4; font: 400 9pt/1.4 'Sofia Sans', sans-serif; color: #6B6F94; break-before: avoid; page-break-before: avoid; break-inside: avoid; page-break-inside: avoid; }
   .foot.addr-only { display: block; border-top: 0; }
   .foot.addr-only:has(> .paddr:empty) { display: none; }
@@ -817,6 +823,7 @@ export const HANDOUT_PRINT_CSS = `
 @media print {
   .layer, .prefetch { display: none !important; }
   .part:not(.sect):not(.only) { position: relative; padding-left: 10mm; }
+  .pre { padding-left: 10mm; }
   .part:not(.sect):not(.only)::before { position: absolute; left: 0; top: 0; width: 8mm; font: 700 10pt/18.75pt 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; }
   .sect { width: calc(100% - 10mm); margin-left: 10mm; }
 }
