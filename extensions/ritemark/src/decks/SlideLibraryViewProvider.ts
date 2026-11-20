@@ -24,6 +24,7 @@ import { decodeLibraryRequest } from './deckProtocol';
 import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks, searchLibrary, type IndexedDeck } from './librarySearch';
 import { EVERY_TRAINING, NOT_NOW_PATH, NOT_NOW_UNREADABLE, hideFromOffer, notNowSlides, offerOf, readNotNow, type NotNow, type OfferedSlide } from './libraryOffer';
 import type { SameSlides } from './sameSlide';
+import { LIBRARY_SEARCH_COMMAND, SHELL_FIELD_COMMAND, librarySearchRow } from './librarySearchRow';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -44,6 +45,11 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
   private ready = false;
   private held: Array<Record<string, unknown>> = [];
   private query = '';
+  /**
+   * #887: the words in the shell's field (the place's Search row, patch 018), once it has sent any. The page shows
+   * their search and draws no field of its own; a page loaded again (the place hidden and shown) gets them back.
+   */
+  private shellText: string | undefined;
   /** Each refresh's number: a slower, older one (a broader search) never posts over a newer one. */
   private generation = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -80,9 +86,16 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         // Another deck in front (Sprint 165 PR 3): which slides it already has, the ticks, change with it.
         if ((active?.path ?? null) !== this.stateActive) this.refreshSoon();
       }),
-      pages.onDidRevealInLibrary(target => void this.post('section' in target
-        ? { type: 'library/show', section: target.section }
-        : { type: 'library/reveal', path: target.path, id: target.id })),
+      pages.onDidRevealInLibrary(target => {
+        // The page clears its search to show the place; the shell's field lets go of its words too (#887).
+        if (this.shellText) {
+          this.shellText = '';
+          void Promise.resolve(vscode.commands.executeCommand(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { text: '' })).catch(() => undefined);
+        }
+        void this.post('section' in target
+          ? { type: 'library/show', section: target.section }
+          : { type: 'library/reveal', path: target.path, id: target.id });
+      }),
     );
   }
 
@@ -169,7 +182,51 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     });
   }
 
-  /** The head row's Search: the place shows, and its search field takes the keyboard. */
+  /**
+   * The head row's Search (`ritemark.slideLibrary.search`, #887): the shell's field sends its words and its ↓ and
+   * Enter; with nothing (⌘F in the place), the caret goes to the shell's field, or, on an older shell without one, to
+   * the place's own.
+   */
+  async searchRow(arg?: unknown): Promise<void> {
+    const action = librarySearchRow(arg);
+    if (action.kind === 'text') {
+      this.shellText = action.text;
+      // Words past the cap: the shell's field shows the words searched (Codex on #933)
+      if (action.cut) void Promise.resolve(vscode.commands.executeCommand(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { text: action.text })).catch(() => undefined);
+      if (this.ready) await this.post({ type: 'library/query', query: action.text });
+      return;
+    }
+    if (action.kind === 'results') {
+      await vscode.commands.executeCommand('ritemark.slideLibraryView.focus');
+      await this.post({ type: 'library/focus-results' });
+      return;
+    }
+    const focusShellField = async (): Promise<boolean | undefined> => {
+      try {
+        return await vscode.commands.executeCommand<boolean>(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { focus: true }) === true;
+      } catch {
+        return undefined; // An older shell: no field of its own in the row
+      }
+    };
+    let shellField = await focusShellField();
+    if (shellField === false) {
+      // The shell's field isn't drawn yet (the place still opening): once more after the place shows
+      await vscode.commands.executeCommand('ritemark.slideLibraryView.focus');
+      shellField = await focusShellField();
+    }
+    if (!shellField) await this.focusSearch();
+  }
+
+  /**
+   * Decks turned off (#933, Codex): the shell's field drops its words without a search, so the place forgets them too,
+   * and a page loaded after Decks is on again shows the library, not the old search.
+   */
+  forgetSearch(): void {
+    this.shellText = undefined;
+    this.query = '';
+  }
+
+  /** The place shows, and its own search field takes the keyboard (a shell without the row's field, #887). */
   async focusSearch(): Promise<void> {
     await vscode.commands.executeCommand('ritemark.slideLibraryView.focus');
     await this.post({ type: 'library/focus-search' });
@@ -195,8 +252,13 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
         const held = this.held;
         this.held = [];
         for (const message of held) await this.post(message);
+        // #887: the shell's field's words, for a page loaded again while they stay
+        if (this.shellText !== undefined) await this.post({ type: 'library/query', query: this.shellText });
         return;
       }
+      case 'library/find':
+        await this.searchRow();
+        return;
       case 'library/search':
         this.query = request.query;
         // Only the words changed: the index lists no file again unless a deck changed meanwhile.

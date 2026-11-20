@@ -77,6 +77,8 @@ assert.throws(() => decodeDeckRequest({ type: 'deck/unknown' }), DeckProtocolErr
 // The Slide library place's requests.
 assert.deepEqual(decodeLibraryRequest({ type: 'library/ready' }), { type: 'library/ready' });
 assert.deepEqual(decodeLibraryRequest({ type: 'library/search', query: 'agents' }), { type: 'library/search', query: 'agents' });
+assert.deepEqual(decodeLibraryRequest({ type: 'library/find' }), { type: 'library/find' });
+assert.equal(decodeLibraryRequest({ type: 'library/find', query: 'x' }), null);
 assert.deepEqual(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1' }), { type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1' });
 assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: 'g1', extra: 1 }), null);
 assert.equal(decodeLibraryRequest({ type: 'library/insert', path: 'Slide library/Agents.deck.md', id: '../g1' }), null);
