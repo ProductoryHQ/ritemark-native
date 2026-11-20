@@ -185,7 +185,8 @@ test('the renderer draws no raw HTML, no comment, no link and no web picture', (
   const html = blockSlideHtml('Hi <!-- secret --> <mark data-comment="note">words</mark> [l](javascript:alert(1)) ![x](https://e.com/a.png) <img src=x onerror=alert(1)>\n\n<script>alert(1)</script>\n\n<div onclick="x">block</div>');
   for (const banned of ['secret', 'note', '<mark', 'href', 'javascript', 'https://e.com', '<img src=x', '<script', 'onclick', 'onerror']) assert.ok(!html.includes(banned), `${banned} in ${html}`);
   assert.ok(html.includes('words'), 'an anchored comment keeps its words');
-  assert.ok(html.includes('<span class="blk-link">l</span>'));
+  // #938: a link that can't open is the words around it, with no underline (`wordLinks.test.ts`).
+  assert.ok(html.includes(' l ') && !html.includes('blk-link'), html);
   // An attribute value never breaks out of its attribute.
   const boxes = blockSlideHtml(':::: {.boxes look=\'x" onload="alert(1)\'}\n::: {.box icon="lightbulb"}\nA\n:::\n::::');
   assert.ok(boxes.includes('data-look="x&quot; onload=&quot;alert(1)"'), boxes);

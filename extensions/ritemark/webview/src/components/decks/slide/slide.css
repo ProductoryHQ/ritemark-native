@@ -271,7 +271,8 @@
 /* A button with no full https address yet opens nothing: drawn quieter, so the room sees it isn't ready. */
 .deck-sl.is-blocks .blk-btn.is-unset { opacity: .6; }
 /* A thumbnail's button is drawn, never pressed: a click there is the thumbnail's (as the code block's controls). */
-.deck-thumb .blk-btn, .wall-grid .blk-btn, .pv-row .blk-btn, .pv-side .blk-btn { pointer-events: none; }
+.deck-thumb .blk-btn, .wall-grid .blk-btn, .pv-row .blk-btn, .pv-side .blk-btn,
+.deck-thumb .blk-link, .wall-grid .blk-link, .pv-row .blk-link, .pv-side .blk-link { pointer-events: none; }
 /* The slide editor: the chosen button's two places to type while they are empty. Its ring is the one every chosen
    block has (`.deck-block-ring`, drawn by ButtonBlockTools in the frame); amber stays the words' focus (--s-foc). */
 .deck-sl.is-blocks .blk-button [data-empty]::before { content: attr(data-button-placeholder); font: inherit; color: inherit; opacity: .55; pointer-events: none; }
@@ -288,7 +289,12 @@
 /* A bold name in the attribution stays in its quiet colour (the slide's `strong` is the heading colour). */
 .deck-sl.is-blocks blockquote > p.blk-by strong, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by strong { color: inherit; }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
-.deck-sl.is-blocks .blk-link { text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
+/* #930: a word link is a real link on the page and in Present; it keeps the words' own colour, as drawn everywhere. */
+/* The slide editor's link (TipTap's `a.tiptap-link`) is underlined the same way when it can open (http, https, mailto:
+   `isWordLinkAddress`); one that can't is the words around it, with the text cursor (the lead on #938). */
+.deck-sl.is-blocks a.tiptap-link { color: inherit; text-decoration: none; cursor: text; }
+.deck-sl.is-blocks a.tiptap-link:is([href^="http://" i], [href^="https://" i], [href^="mailto:" i]) { cursor: pointer; }
+.deck-sl.is-blocks .blk-link, .deck-sl.is-blocks a.tiptap-link:is([href^="http://" i], [href^="https://" i], [href^="mailto:" i]) { color: inherit; text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
 .deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: calc(9px * var(--fit, 1)) calc(18px * var(--fit, 1)); text-align: left; vertical-align: top; }
 /* A column's alignment as the file writes it (`:---:`, `---:`), on the stage (the editor's `data-md-align`) and in the

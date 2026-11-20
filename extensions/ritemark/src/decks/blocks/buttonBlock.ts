@@ -52,9 +52,18 @@ export const BUTTON_MAX_ADDRESS = 2048;
  * relative path, `https:example.com`) is refused.
  */
 export function isButtonAddress(value: unknown): value is string {
+  return isWordLinkAddress(value) && /^https:\/\//i.test(value);
+}
+
+/**
+ * #930: a link in a slide's words that is a real link (Present, the published page, every PDF kind): a full `http:` or
+ * `https:` address that names a host and carries no user name or password, or a `mailto:` one. No space or control
+ * character in it. Anything else (`javascript:`, `data:`, `file:`, a relative path, `https:example.com`) stays plain
+ * words wherever the slide is drawn: the page is public.
+ */
+export function isWordLinkAddress(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > BUTTON_MAX_ADDRESS) return false;
-  if (!/^https:\/\//i.test(value)) return false;
-  // A space, a control character or a line break never belongs in an address (and would split it in the file).
+  if (!/^(?:https?:\/\/|mailto:)/i.test(value)) return false;
   if (/[\s\u0000-\u001f\u007f]/.test(value)) return false;
   let url: URL;
   try {
@@ -62,7 +71,8 @@ export function isButtonAddress(value: unknown): value is string {
   } catch {
     return false;
   }
-  return url.protocol === 'https:' && url.hostname.length > 0 && !url.username && !url.password;
+  if (url.protocol === 'mailto:') return url.pathname.length > 0;
+  return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.length > 0 && !url.username && !url.password;
 }
 
 /** The address as typed into the sheet, trimmed; `null` when it isn't one a button can open. */

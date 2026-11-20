@@ -66,7 +66,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 - **Share the deck as a page.** Choose **Publish** to put it online as one page. People open it on a phone or a computer. Each prompt has **Copy**, and people can tick an exercise's steps.
 - **Comments and skipped slides stay with you.** Before you publish, Ritemark lists what goes on the page and what stays with you.
 - **The page changes only when you update it.** Change the theme, and the page online keeps its old look until you choose **Update the page**.
-- **Save the deck as a PDF.** Open the arrow next to **Publish**: the PDF holds what you see now. In **Slide only** you get one page for each slide, in your theme's colours. In **Slide and handout** each slide comes with its text. In **Handout only** you get just the text, each part under its number and heading. Links still work, and the PDF opens on any computer.
+- **Save the deck as a PDF.** Open the arrow next to **Publish**: the PDF holds what you see now. In **Slide only** you get one page for each slide, in your theme's colours. In **Slide and handout** each slide comes with its text. In **Handout only** you get just the text, each part under its number and heading. Links still work, in a slide's words as well as on its buttons, and the PDF opens on any computer.
 
 ## Edit Excel files without losing their look
 
