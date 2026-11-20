@@ -136,10 +136,11 @@ let state: RenderState = freshState();
 /**
  * #930: a link in the slide's words, its words already drawn. The page's (`buttonLinks`): an `<a>` that opens a new tab;
  * anywhere else, its address on it for the host to open (`role="link"`, as a button's). Out of the keyboard's order, as
- * a button is: the slide is a picture to a screen reader wherever it is drawn. Not a live address: the words, underlined.
+ * a button is: the slide is a picture to a screen reader wherever it is drawn. Not a live address: the words alone.
  */
 function wordLinkHtml(href: string, wordsHtml: string): string {
-  if (!isWordLinkAddress(href)) return `<span class="blk-link">${wordsHtml}</span>`;
+  // A link that can't open is drawn as the words around it: no underline, no link colour, no hand (the lead, #938).
+  if (!isWordLinkAddress(href)) return wordsHtml;
   // A mail address opens the mail app: no empty new tab beside it.
   const tab = /^mailto:/i.test(href) ? '' : ' target="_blank"';
   if (state.buttonLinks) return `<a class="blk-link" href="${esc(href)}"${tab} rel="noopener noreferrer" tabindex="-1">${wordsHtml}</a>`;

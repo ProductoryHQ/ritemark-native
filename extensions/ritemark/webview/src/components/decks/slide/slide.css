@@ -290,7 +290,11 @@
 .deck-sl.is-blocks blockquote > p.blk-by strong, .deck-slide.is-borderless .deck-sl.is-blocks blockquote > p.blk-by strong { color: inherit; }
 .deck-sl.is-blocks hr { border: 0; height: 2px; margin: .6em 0; background: var(--s-row, rgba(255,255,255,.16)); }
 /* #930: a word link is a real link on the page and in Present; it keeps the words' own colour, as drawn everywhere. */
-.deck-sl.is-blocks .blk-link { color: inherit; text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
+/* The slide editor's link (TipTap's `a.tiptap-link`) is underlined the same way when it can open (http, https, mailto:
+   `isWordLinkAddress`); one that can't is the words around it, with the text cursor (the lead on #938). */
+.deck-sl.is-blocks a.tiptap-link { color: inherit; text-decoration: none; cursor: text; }
+.deck-sl.is-blocks a.tiptap-link:is([href^="http://" i], [href^="https://" i], [href^="mailto:" i]) { cursor: pointer; }
+.deck-sl.is-blocks .blk-link, .deck-sl.is-blocks a.tiptap-link:is([href^="http://" i], [href^="https://" i], [href^="mailto:" i]) { color: inherit; text-decoration: underline; text-decoration-color: var(--s-acc, #F2B544); text-underline-offset: 3px; overflow-wrap: anywhere; }
 .deck-sl.is-blocks table { border-collapse: separate; border-spacing: 0; margin: 0 0 calc(12px * var(--fit, 1)); border-radius: var(--s-r2, 10px); overflow: hidden; box-shadow: inset 0 0 0 1.5px var(--s-boxl, rgba(255,255,255,.14)); font-size: .82em; }
 .deck-sl.is-blocks th, .deck-sl.is-blocks td { padding: calc(9px * var(--fit, 1)) calc(18px * var(--fit, 1)); text-align: left; vertical-align: top; }
 /* A column's alignment as the file writes it (`:---:`, `---:`), on the stage (the editor's `data-md-align`) and in the

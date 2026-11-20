@@ -71,8 +71,9 @@ const SLIDE = '# Read first\n\nThe [bank report](https://example.com/report?a=1&
 for (const address of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/passwd', 'notes/plan.md', '#two', 'vbscript:x', 'https://user:pw@example.com/']) {
   for (const buttonLinks of [true, false]) {
     const html = blockSlideHtml(`Go [there](${address}) now.`, { buttonLinks });
-    assert.ok(html.includes('<span class="blk-link">there</span>'), `${address}: ${html}`);
-    for (const banned of ['href', 'data-href', 'role="link"', 'javascript', 'data:', 'file:', 'vbscript', 'pw@']) assert.ok(!html.includes(banned), `${banned} for ${address} in ${html}`);
+    // #938 (the lead): drawn as the words around it, so no underline, no link colour and no hand, on every surface.
+    assert.equal(html, '<p>Go there now.</p>\n', `${address}: ${html}`);
+    for (const banned of ['href', 'data-href', 'role="link"', 'blk-link', 'javascript', 'data:', 'file:', 'vbscript', 'pw@']) assert.ok(!html.includes(banned), `${banned} for ${address} in ${html}`);
   }
 }
 // An attribute value never breaks out of its attribute.
@@ -126,8 +127,12 @@ for (const address of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/p
   assert.deepEqual(slideLinks, ['https://example.com/report'], 'the slide\'s web link is a real link on the page');
   assert.ok(!html.includes('javascript:'), 'a javascript: link never reaches the page');
   assert.ok(root.querySelectorAll('a').some(a => a.getAttribute('href') === 'https://example.com/handout'), 'the handout\'s own link stays a link');
-  // The slide's word links keep the slide's colour (a link's default blue never shows).
-  assert.match(assets.slideCss, /\.deck-sl\.is-blocks \.blk-link \{ color: inherit;/);
+  // The slide's word links keep the slide's colour (a link's default blue never shows), and the slide editor's live
+  // links are underlined by the same rule; a link it can't open is plain words with the text cursor (#938).
+  assert.match(assets.slideCss, /\.deck-sl\.is-blocks \.blk-link, \.deck-sl\.is-blocks a\.tiptap-link:is\(\[href\^="http:\/\/" i\], \[href\^="https:\/\/" i\], \[href\^="mailto:" i\]\) \{ color: inherit; text-decoration: underline; text-decoration-color: var\(--s-acc/);
+  assert.match(assets.slideCss, /\.deck-sl\.is-blocks a\.tiptap-link \{ color: inherit; text-decoration: none; cursor: text; \}/);
+  const pageRoot = parse(html);
+  assert.ok(!pageRoot.querySelectorAll('.layer .blk-link').some(link => link.tagName !== 'A'), 'every word link drawn on the page is live');
 }
 
 // ---- Present: the wall asks, the host opens only the deck's own addresses
@@ -151,8 +156,9 @@ for (const address of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/p
   const live = root.querySelector('.blk-link[data-href]') as Element;
   assert.equal(codeToolsClick(live, root, actions), 'used');
   assert.deepEqual(linked, ['https://example.com/a']);
-  const dead = Array.from(root.querySelectorAll('.blk-link')).find(link => !link.hasAttribute('data-href')) as Element;
-  assert.equal(codeToolsClick(dead, root, actions), 'none', 'plain words are the wall\'s click');
+  assert.equal(root.querySelectorAll('.blk-link').length, 1, 'a dead link is no link on the wall');
+  const words = root.querySelector('p') as Element;
+  assert.equal(codeToolsClick(words, root, actions), 'none', 'plain words are the wall\'s click');
   assert.deepEqual(linked, ['https://example.com/a']);
 }
 
