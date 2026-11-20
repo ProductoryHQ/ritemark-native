@@ -5,7 +5,7 @@
  *
  * Its own module, apart from iconSet.ts, so the index (iconIndex.ts) reaches only the code that searches.
  */
-import { CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { CLOSE_FENCE, CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, boxesMarkOf, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { layoutSlide, type SlideBox } from './layoutSlide'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
@@ -114,7 +114,11 @@ export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: Slide
       continue
     }
     // A block slide's boxes. A `:::` line inside a code block is the code's words, not a box (fencedDiv's rule).
+    // The open divs, innermost last, each marked when it draws no box icons: a Boxes block set to Number, Dot or Arrow
+    // (`boxesMarkOf`) draws its own mark where the icon would be, so its boxes' icons are in use nowhere until it is
+    // Icon again.
     let code: { char: string; size: number } | null = null
+    const open: boolean[] = []
     for (const line of data.markdown.split('\n')) {
       if (code) {
         const close = CODE_FENCE_CLOSE.exec(line)
@@ -126,9 +130,13 @@ export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: Slide
         code = { char: fence[1][0], size: fence[1].length }
         continue
       }
-      const open = OPEN_FENCE.exec(line)
-      const attrs = open ? parseFenceAttributes(open[2]) : null
-      if (attrs?.classes.includes('box')) take(attrs.values.icon)
+      const opening = OPEN_FENCE.exec(line)
+      const attrs = opening ? parseFenceAttributes(opening[2]) : null
+      if (attrs) {
+        const ownMark = attrs.classes.includes('boxes') && boxesMarkOf(attrs) !== 'icon'
+        if (attrs.classes.includes('box') && !open.includes(true)) take(attrs.values.icon)
+        open.push(ownMark)
+      } else if (CLOSE_FENCE.test(line)) open.pop()
     }
   }
   return [...found.values()]
@@ -136,6 +144,14 @@ export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: Slide
 
 /** How many results the menu draws at once: ten rows of six. A longer list asks for more words. */
 export const ICON_MENU_PAGE = 60
+
+/**
+ * The quiet line under the results when the search found more than it draws (the Experience lead on #908): "60 of 212
+ * · type more to narrow"; null when everything found is shown.
+ */
+export function iconMenuMoreLine(shown: number, total: number): string | null {
+  return total > shown ? `${shown} of ${total} · type more to narrow` : null
+}
 
 /**
  * Sprint 169 PR 3 (#868; decks README, "Every Phosphor icon, found by searching"): what the icon menu shows. Before

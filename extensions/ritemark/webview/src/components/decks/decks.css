@@ -250,7 +250,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-icon-scroll { width: 252px; height: 204px; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; }
 .deck-icon-scroll .deck-icon-grid { justify-content: center; }
 .deck-icon-none { display: flex; align-items: center; justify-content: center; height: 100%; margin: 0; font: 400 13px/18px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
-.deck-icon-more { margin: 2px 8px 6px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
+.deck-icon-more { height: 16px; margin: 2px 8px 2px; font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); white-space: nowrap; }
 
 /* Under the slide: quiet lines that never reach the wall (prototype `.srcl`, `.notesr`, `.notes`) */
 .deck-source .deck-line-action { height: auto; padding: 0; font-size: 12px; line-height: 16px; font-weight: 500; }

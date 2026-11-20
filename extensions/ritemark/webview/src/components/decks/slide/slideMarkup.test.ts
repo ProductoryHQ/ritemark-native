@@ -222,6 +222,10 @@ for (const size of [16, 28]) assert.equal(renderToStaticMarkup(createElement(Sli
   const menuSource = readFileSync(fileURLToPath(new URL('./IconGrid.tsx', import.meta.url)), 'utf8')
   assert.ok(/<SlideIconGlyph name=\{\w+\.phosphor\}/.test(menuSource), 'the menu draws the slide glyph')
   assert.deepEqual(menuSource.match(/<Icon\b[^>]*>/g), ['<Icon name="magnifying-glass" size={14} tone="inherit" />', '<Icon name="x" size={14} tone="inherit" />'], 'the chrome icon only for the search field and No icon')
+  // Sprint 169 PR 3 (the Experience lead on #908): each icon's name in ui/tooltip.tsx's tooltip, the same words its
+  // aria-label gives a screen reader, opened for the highlight the pointer or an arrow key put there; never a `title`.
+  assert.ok(/<Tooltip key=\{icon\.phosphor\} label=\{icon\.label\} open=\{index === tip\}>\s*<DropdownMenuItem\s+aria-label=\{icon\.label\}/.test(menuSource), 'the tooltip says what the screen reader hears')
+  assert.equal(/\btitle=/.test(menuSource), false, 'no native title')
   const canvas = readFileSync(fileURLToPath(new URL('./SlideCanvas.tsx', import.meta.url)), 'utf8')
   assert.equal(/<Icon\b|ui\/Icon'/.test(canvas), false, 'SlideCanvas draws no chrome icon')
 }

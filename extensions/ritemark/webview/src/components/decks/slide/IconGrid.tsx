@@ -16,7 +16,7 @@ import { createContext, useContext, useEffect, useId, useMemo, useRef, useState,
 import { DropdownMenuItem, DropdownMenuSeparator } from '../../ui/dropdown-menu'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
-import { iconMenuChoices, iconMenuMove, type IconMenuMove } from './iconSearch'
+import { iconMenuChoices, iconMenuMoreLine, iconMenuMove, type IconMenuMove } from './iconSearch'
 import type { SlideIcon } from './iconSet'
 import { SlideIconGlyph } from './SlideIconGlyph'
 
@@ -28,6 +28,9 @@ export const DeckIconsContext = createContext<() => readonly SlideIcon[]>(() => 
 
 /** The grid's columns (decks.css `.deck-icon-grid`): ↑ and ↓ move by one row of them. */
 const COLUMNS = 6
+
+/** How long a highlighted icon waits before its name shows: the tooltips' own wait (`ui/tooltip.tsx`). */
+const TIP_WAIT_MS = 300
 
 const MOVES: Readonly<Record<string, IconMenuMove>> = { ArrowDown: 'down', ArrowUp: 'up', ArrowLeft: 'left', ArrowRight: 'right' }
 
@@ -67,6 +70,19 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
     scroller.current?.querySelector(`[data-choice="${active}"]`)?.scrollIntoView({ block: 'nearest' })
   }, [active, icons])
 
+  // The highlighted icon's name in a tooltip (the words a screen reader hears), when the pointer or an arrow key put the
+  // highlight there; not for the best result typing highlights. Shown after the tooltips' usual wait, one at a time.
+  const tipWanted = useRef(false)
+  const [tip, setTip] = useState(-1)
+  // Bumped as the pointer comes onto an icon, so coming back onto the highlighted one shows its name again.
+  const [entered, setEntered] = useState(0)
+  useEffect(() => {
+    setTip(-1)
+    if (!tipWanted.current || active < 0 || active >= icons.length) return
+    const wait = window.setTimeout(() => setTip(active), TIP_WAIT_MS)
+    return () => window.clearTimeout(wait)
+  }, [active, icons, entered])
+
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     // Esc and Tab go on to the menu (it closes; it keeps focus in). Every other key is the field's, not the menu's typeahead.
     if (event.key === 'Escape' || event.key === 'Tab') return
@@ -76,6 +92,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
     if (move && ((move !== 'left' && move !== 'right') || (active >= 0 && active < icons.length))) {
       event.preventDefault()
       byKey.current = true
+      tipWanted.current = true
       setActive(at => iconMenuMove(at, move, icons.length, !!current, COLUMNS))
       return
     }
@@ -103,7 +120,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
           autoComplete="off"
           spellCheck={false}
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={event => { tipWanted.current = false; setQuery(event.target.value) }}
           onKeyDown={onKeyDown}
         />
       </label>
@@ -111,15 +128,16 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
         {icons.length ? (
           <div className="deck-icon-grid" role="group" aria-label={searching ? 'Icons found' : 'Icons'}>
             {icons.map((icon, index) => (
-              <Tooltip key={icon.phosphor} label={icon.label} hoverOnly>
+              <Tooltip key={icon.phosphor} label={icon.label} open={index === tip}>
                 <DropdownMenuItem
                   aria-label={icon.label}
                   id={`${choicesId}-${index}`}
                   data-choice={index}
                   data-state={icon.name === current ? 'on' : undefined}
                   className={`deck-icon-choice${index === active ? ' is-active' : ''}`}
-                  onPointerMove={event => { keepFocus(event); setActive(index) }}
-                  onPointerLeave={keepFocus}
+                  onPointerEnter={() => { tipWanted.current = true; setEntered(n => n + 1) }}
+                  onPointerMove={event => { keepFocus(event); tipWanted.current = true; setActive(index) }}
+                  onPointerLeave={event => { keepFocus(event); tipWanted.current = false; setTip(-1) }}
                   onSelect={() => onPick(icon.name)}
                 >
                   <SlideIconGlyph name={icon.phosphor} size={16} />
@@ -130,10 +148,9 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
         ) : (
           <p className="deck-icon-none" role="status">No icons match</p>
         )}
-        {total > icons.length ? (
-          <p className="deck-icon-more">{`${icons.length} of ${total} icons. Type more to narrow them.`}</p>
-        ) : null}
       </div>
+      {/* Under the grid, in view whatever the scroll; its place is kept when empty, so the menu doesn't jump. */}
+      <p className="deck-icon-more" aria-live="polite">{iconMenuMoreLine(icons.length, total) ?? ''}</p>
       <DropdownMenuSeparator />
       <DropdownMenuItem
         id={`${choicesId}-none`}

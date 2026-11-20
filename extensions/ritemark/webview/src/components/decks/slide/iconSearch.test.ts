@@ -11,7 +11,7 @@ import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
 import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
-import { ICON_MENU_PAGE, deckIconsInUse, iconMenuChoices, iconMenuMove, searchIcons } from './iconSearch'
+import { ICON_MENU_PAGE, deckIconsInUse, iconMenuChoices, iconMenuMoreLine, iconMenuMove, searchIcons } from './iconSearch'
 
 let passed = 0
 function test(name: string, run: () => void) {
@@ -180,6 +180,11 @@ test("PR 3 (#868): the deck's icons in use, in the order it first uses them, eac
   ]
   assert.deepEqual(deckIconsInUse(slides).map(icon => icon.name), ['truck', 'mail', 'brain', 'users'])
   assert.deepEqual(deckIconsInUse([]), [])
+  // A Boxes block set to Number, Dot or Arrow draws its own mark: its boxes' icons are in use nowhere, and count again
+  // once it is Icon. A box after the block closes counts as before.
+  const boxes = (look: string) => [{ kind: 'blocks', data: { markdown: `:::: {.boxes${look}}\n::: {.box icon="truck"}\n### A\n:::\n::::\n\n::: {.box icon="brain"}\n:::` } }]
+  for (const look of [' look="steps"', ' look="line"', ' look="arrows"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['brain'], look)
+  for (const look of ['', ' look="boxes"', ' look="something-new"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['truck', 'brain'], look || 'Icon')
 })
 
 test('PR 3: before typing, the icons in use, then the 24, each once; then results, a page at a time', () => {
@@ -200,6 +205,10 @@ test('PR 3: before typing, the icons in use, then the 24, each once; then result
   const many = iconMenuChoices('a', [])
   assert.equal(many.icons.length, ICON_MENU_PAGE)
   assert.ok(many.total > ICON_MENU_PAGE)
+  // The quiet line under them (the Experience lead on #908); none when all are shown.
+  assert.equal(iconMenuMoreLine(many.icons.length, many.total), `60 of ${many.total} · type more to narrow`)
+  assert.equal(iconMenuMoreLine(4, 4), null)
+  assert.equal(iconMenuMoreLine(0, 0), null)
   assert.equal(iconMenuChoices('people', []).icons[0].name, 'users')
   assert.equal(iconMenuChoices('mail', []).icons[0].phosphor, 'envelope-simple')
   // Nothing matches: no icons (the menu says "No icons match"; No icon stays at its foot).

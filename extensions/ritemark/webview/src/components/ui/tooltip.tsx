@@ -69,6 +69,7 @@ export function Tooltip({
   className,
   hoverOnly = false,
   suppressed = false,
+  open,
   onOpenChange,
   children,
 }: {
@@ -79,13 +80,18 @@ export function Tooltip({
   hoverOnly?: boolean;
   /** Kept closed while true (a table's grip being pressed or dragged: the tooltip would cover where it lands). */
   suppressed?: boolean;
+  /**
+   * Open or closed by its owner instead of by hover and focus, when given (Sprint 169 PR 3: the icon menu's highlight,
+   * moved by the arrow keys while the caret stays in its search field). `suppressed` still wins.
+   */
+  open?: boolean;
   /** Told when the tooltip opens and closes (a slide's unknown icon: its trigger goes once the tooltip has closed, #850). */
   onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }) {
   return (
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
-      <TooltipPrimitive.Root open={suppressed ? false : undefined} onOpenChange={onOpenChange}>
+      <TooltipPrimitive.Root open={suppressed ? false : open} onOpenChange={onOpenChange}>
         <TooltipPrimitive.Trigger asChild onFocus={hoverOnly ? onTriggerFocusHoverOnly : onTriggerFocus}>
           <span className={cn('inline-flex', className)}>{children}</span>
         </TooltipPrimitive.Trigger>
