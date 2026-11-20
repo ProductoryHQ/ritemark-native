@@ -55,8 +55,8 @@ export interface IconHint {
 /**
  * #850 (the Experience lead, 19 November; decks README, "Every Phosphor icon"): pointing at a box's unknown icon (the
  * dashed circle) shows a tooltip, No icon named “xyz”, with Choose an icon, which opens the box's icon menu, as a click
- * on the badge does. The menu has no search yet, so the name isn't in one: that waits for Sprint 169's icon search. No
- * banner, no toast.
+ * on the badge does, with the name already in its search (Sprint 169 PR 4, #869), so the nearest icons show at once.
+ * No banner, no toast.
  *
  * The tooltip's trigger is a round place over the badge, in a layer of the slide's frame (so a wheel over it still
  * reaches the stage), put there when the pointer comes onto the badge (`SlideDivHandlers.hintIcon`). It follows the
