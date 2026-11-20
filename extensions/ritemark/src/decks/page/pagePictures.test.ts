@@ -12,7 +12,7 @@ import { parse } from 'node-html-parser';
 import { BUILT_IN_THEME } from '../deckTheme';
 import { scriptBuildsReferences } from '../../publish/references';
 import { PAGE_FONTS } from './pageFile';
-import { pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
+import { PAGE_CSS, pageHtml, pictureAddress, pictureFile, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { pictureFileInside } from '../../utils/imagePaths';
@@ -116,6 +116,51 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
   assert.equal(root.querySelectorAll('.prefetch img[loading="lazy"]').length, 1, 'never before the page\'s first paint: the script fetches them once it has loaded');
   const none = pageHtml(publicDeck('---\ndeck: 2\n---\n\n```slide\n# No picture\n```\n', { folderName: 'F', deckName: 'D', theme: BUILT_IN_THEME }), assets, { digest: 'd', pictureUrl });
   assert.ok(!none.includes('class="prefetch"'), 'no ground, no hidden pictures');
+}
+
+// #905 (the Experience lead, 20 November): in one column (a phone, half a laptop) a slide's words reflow taller than
+// 16:9, and a picture Behind runs the full height of the slide as drawn there (the box its veil covers), cover-cropped
+// round its focus. It never ends partway down the words: no top pulled up with the slide's own height, no `bottom: auto`.
+{
+  const narrow = /@media screen and \(max-width: 860px\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS)![1].replace(/\/\*[\s\S]*?\*\//g, '');
+  const declarations = (selector: string) => {
+    const found: Record<string, string> = {};
+    for (const match of narrow.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      if (!match[1].split(',').map(part => part.trim()).includes(selector)) continue;
+      for (const declaration of match[2].split(';')) {
+        const at = declaration.indexOf(':');
+        if (at > 0) found[declaration.slice(0, at).trim()] = declaration.slice(at + 1).replace('!important', '').trim();
+      }
+    }
+    return found;
+  };
+  // A box's top, right, bottom and left, from its inset shorthand (one to four values).
+  const edges = (rule: Record<string, string>) => {
+    const values = (rule.inset ?? '').match(/(?:[^\s()]+|\([^)]*\))+/g) ?? []; // a var(…) is one value
+    const [top, right = top, bottom = top, left = right] = values;
+    return { top, right, bottom, left };
+  };
+  const photo = declarations('.layer.flow .deck-sl.is-blocks.pic-behind .photo');
+  const veil = declarations('.layer.flow .deck-sl.is-blocks.pic-behind .veil');
+  assert.equal(photo.position, 'absolute');
+  assert.deepEqual(edges(photo), edges(veil), 'the picture covers what its veil covers: the slide as drawn, to every edge');
+  assert.notEqual(edges(photo).bottom, 'auto', 'its foot is the slide\'s foot, never a height counted from a raised top');
+  // Its edges are the view's padding round the slide: 16 px on three sides, and at the foot 16 px, or 8 px with More open
+  // (the review of #912: with the text open below, a 16 px foot ran 8 px under its first line).
+  const view = declarations('.view');
+  const moreView = declarations('.wrap.more-open .view');
+  assert.equal(view.padding.split(/\s+/).slice(0, 2).join(' '), '16px 16px');
+  assert.deepEqual([edges(photo).top, edges(photo).right, edges(photo).left], ['-16px', '-16px', '-16px']);
+  assert.equal(edges(photo).bottom, 'var(--behind-foot, -16px)');
+  assert.equal(moreView['--behind-foot'], `-${moreView['padding-bottom']}`, 'with More open, the foot is the view\'s own');
+  assert.ok(photo.height === undefined || photo.height === 'auto', `no height of its own (was ${photo.height})`);
+  assert.equal(photo['max-height'], 'none', 'the general one-column picture\'s 220 px cap is lifted');
+  // Cover-cropped round its focus: no narrow rule changes how the picture fills its box, and the slide sets its focus.
+  for (const rule of [photo, declarations('.layer.flow .deck-sl.is-blocks .photo')]) {
+    assert.equal(rule['background-size'], undefined);
+    assert.equal(rule['background-position'], undefined);
+  }
+  assert.ok(/\.deck-sl \.photo \{[^}]*background-size: cover;/.test(assets.slideCss), 'the slide fills its place, cropped (cover)');
 }
 
 console.log('pagePictures: passed');

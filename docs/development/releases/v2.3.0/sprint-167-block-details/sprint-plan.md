@@ -37,6 +37,8 @@ One GitHub issue per PR in milestone v2.3.0, which the manager creates when the 
 | 4 | `sprint-167-block-details-pr4` | D: a picture behind, the corner chip and the picture bar | High (file format use, the published page, picture handling) |
 | 5 | `sprint-167-block-details-pr5` | B: one item's own handle | High (editor behaviour, every block) |
 
+- **Follow-up** ([#912](https://github.com/ProductoryHQ/ritemark-native/pull/912), [#905](https://github.com/ProductoryHQ/ritemark-native/issues/905), branch `sprint-167-block-details-page-behind`, Standard): on the published page in one column, a picture behind runs the full height of the slide as drawn there, cover-cropped round its focus, and never ends partway down the words. The Experience lead's rule (20 November); approved under the overnight delegation by the Development manager and the Experience lead.
+
 ## Order and overlap
 - **Can start now: PR 1 (E).** Its files are the theme editor's logo row, the theme file, the logo drawing and the page. Its slide.css lines are the logo room rules, apart from Sprint 164 PR 2's spacing lines. If they meet, PR 1 rebases onto PR 2 once it merges.
 - **Waits for Sprint 164 PR 2 and PR 3: PR 2 (C), PR 3 (A) and PR 4 (D).** Sprint 164 PR 2 rewrites the spacing in `slide.css`, which A and D also change. Sprint 164 PR 3 adds the Label block and removes the Label row, so it changes the / menu, the block bar and Slide settings, which C (the bar) and A and D (Slide settings) change as well. Starting earlier only builds merge conflicts.
