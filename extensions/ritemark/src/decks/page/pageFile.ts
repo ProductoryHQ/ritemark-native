@@ -233,8 +233,8 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
  * The page for a deck's text: `publicDeck`, its digest, and `pageHtml`, with each picture the page names checked to
  * be a file beside the deck (a missing one draws its empty place, as in the deck view).
  */
-/** What a page is made from; `print: 'slides'` only for Save slides as PDF (`buildPrintPage`). */
-type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' };
+/** What a page is made from; `print` only for Save slides as PDF and Save handout as PDF (`buildPrintPage`). */
+type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' | 'handout' };
 
 export async function buildDeckPage(
   input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
@@ -252,7 +252,8 @@ export const PRINT_PICTURE_FOLDER = 'pictures';
  * `buildPage`), printed from a folder of its own, so each picture the page names is that folder's `pictures/<n><.ext>`
  * (a copy of the file beside the deck, `file`) instead of its address beside the deck, which may lead out of it (`../`).
  * Sprint 170 PR 2 (#885): `print: 'slides'` is Save slides as PDF's: the same page with the slides' print rules
- * (`SLIDES_PRINT_CSS`), one 16:9 page a slide.
+ * (`SLIDES_PRINT_CSS`), one 16:9 page a slide. PR 3 (#886): `print: 'handout'` is Save handout as PDF's: the A4 print
+ * with the text alone (`HANDOUT_PRINT_CSS`).
  */
 export async function buildPrintPage(
   input: PageInput,
@@ -287,10 +288,10 @@ async function buildPage(
   // by an app without them, reads as changed once they can go.
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
   const digest = pageDigest(deck, [...[...found.values()].map(picture => picture.address), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
-  // Save slides as PDF (Sprint 170 PR 2) prints the slides alone: the text's pictures aren't named, so they are neither
-  // copied to the print's folder nor waited for.
-  const slidePicture = (key: string) => input.print !== 'slides' || key.startsWith(pictureKey('', 'slide'));
-  const urls = new Map([...found].filter(([key]) => slidePicture(key)).map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
+  // Save slides as PDF (Sprint 170 PR 2) prints the slides alone, and Save handout as PDF (PR 3) the text alone: the
+  // pictures the other holds aren't named, so they are neither copied to the print's folder nor waited for.
+  const printed = (key: string) => input.print === undefined || key.startsWith(pictureKey('', 'slide')) === (input.print === 'slides');
+  const urls = new Map([...found].filter(([key]) => printed(key)).map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
   const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), print: input.print });
   return { deck, digest, html };
 }

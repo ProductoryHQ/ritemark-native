@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, PRINT_CSS, SLIDES_PRINT_CSS, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, HANDOUT_PRINT_CSS, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, PRINT_CSS, SLIDES_PRINT_CSS, handoutNumbersCss, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
@@ -563,6 +563,17 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.ok(slides.includes(SLIDES_PRINT_CSS) && !slides.includes(PRINT_CSS) && !slides.includes('@media print{.pre{order:0}'));
   const [head, tail] = html.split(PRINT_CSS);
   assert.ok(slides.startsWith(head) && slides.endsWith(tail.slice(tail.indexOf('\n</style>'))), 'only the print rules differ');
+}
+
+// Sprint 170 PR 3 (#886): Save handout as PDF's page is this page with its own print, then the handout's rules (no slide
+// drawn, each part's number) after it, and nothing else changed.
+{
+  const handout = pageHtml(deck, assets, { digest, pictureUrl, print: 'handout' });
+  assert.ok(!html.includes(HANDOUT_PRINT_CSS), 'the page prints as before');
+  const [head, tail] = html.split('\n</style>');
+  assert.equal(handout, `${head}\n${HANDOUT_PRINT_CSS}\n${handoutNumbersCss(deck.slides.length)}\n</style>${tail}`, 'only the handout\'s rules are added');
+  assert.equal(handoutNumbersCss(3), '@media print{#t1:not(.sect)::before{content:"1"}#t2:not(.sect)::before{content:"2"}#t3:not(.sect)::before{content:"3"}}');
+  assert.equal(handoutNumbersCss(0), '');
 }
 
 console.log('pageHtml: passed');

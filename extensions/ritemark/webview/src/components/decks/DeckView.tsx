@@ -24,6 +24,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
+import { fitNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -135,15 +136,80 @@ interface PictureDrop {
   paths: Map<string, string | null>
 }
 
+/**
+ * A notice's one action: a link with its word (Undo), or (#931, the Experience lead) an icon button right after the
+ * words, its word in the tooltip and its name for a screen reader in `ariaLabel` (Show in folder).
+ */
+interface NoticeAction {
+  label: string
+  tip: string
+  run: () => void
+  icon?: 'folder-open'
+  ariaLabel?: string
+}
+
 /** A notice in the deck's bar, with one action (Undo) when it has one. */
 interface Notice {
   text: string
-  action?: { label: string; tip: string; run: () => void }
+  action?: NoticeAction
   /** While this holds, the notice stands; once it doesn't (its Undo would take back something else), it goes. */
   valid?: () => boolean
   /** A join's line: the full slide's line stays beside it (the joined slide may be full). */
   withFull?: boolean
+  /** #931: the file name the words end with ("Saved as <name>"): too long for the room, it is cut in its middle. */
+  name?: string
 }
+
+/**
+ * #931: a notice ending with a file name ("Saved as <name>") takes the room the bar has, and its action (Show in folder)
+ * sits right after the name. The whole words, hidden, and the action's room keep the note's width as the bar gives it;
+ * over them, one line holds the words that fit that width (the name cut in its middle, its end and extension kept,
+ * `fitNotice`) and then the action. The note's own width is never set here, so it is watched for the bar's changes
+ * (a window or a sheet) without feeding back. The tooltip on the words holds the whole words.
+ */
+function NoticeWords({ text, name, after }: { text: string; name: string; after: ReactNode }) {
+  const boxRef = useRef<HTMLSpanElement>(null)
+  const shownRef = useRef<HTMLSpanElement>(null)
+  const afterRef = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const shown = shownRef.current
+    if (!box || !shown) return
+    const prefix = text.slice(0, text.length - name.length)
+    let live = true
+    const fit = () => {
+      if (!live) return // a fonts' answer that comes after this notice was replaced
+      const room = box.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      shown.textContent = fitNotice(prefix, name, words => {
+        shown.textContent = words
+        return shown.scrollWidth <= room
+      })
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(box)
+    void document.fonts?.ready?.then(fit)
+    return () => {
+      live = false
+      observer.disconnect()
+    }
+  }, [text, name])
+  return (
+    <span ref={boxRef} className="deck-notice-cut">
+      <span className="deck-notice-sizer" aria-hidden="true">{text}<span className="deck-notice-room" /></span>
+      <span className="deck-notice-line">
+        <Tooltip label={text} className="deck-notice-words">
+          <span ref={shownRef} className="deck-notice-shown" aria-hidden="true" />
+        </Tooltip>
+        <span ref={afterRef} className="deck-notice-after">{after}</span>
+      </span>
+      <span className="sr-only">{text}</span>
+    </span>
+  )
+}
+
+/** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
+const NOTICE_ACTION_GAP = 8
 
 const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
@@ -397,7 +463,7 @@ export function DeckView({
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
-  const publishNotice = useCallback((text: string, action?: Notice['action']) => setNotice({ text, action }), [])
+  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => setNotice({ text, action, name }), [])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -884,6 +950,8 @@ export function DeckView({
       }
       const shown = noticeRef.current
       if (transaction.docChanged && shown?.valid && !shown.valid()) setNotice(null)
+      // #931: "Saved as <name>" stands until the deck is edited; then the deck's own Saved comes back.
+      else if (transaction.docChanged && shown?.name) setNotice(null)
     }
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
@@ -1892,10 +1960,33 @@ export function DeckView({
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>
-              <Tooltip label={notice.text} className="deck-notice-words">
-                <span className="deck-notice-text">{notice.text}</span>
-              </Tooltip>
-              {notice.action ? (
+              {notice.name && notice.text.endsWith(notice.name) ? (
+                <NoticeWords
+                  text={notice.text}
+                  name={notice.name}
+                  after={notice.action?.icon ? (
+                    <Tooltip label={notice.action.tip}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="deck-notice-icon"
+                        aria-label={notice.action.ariaLabel ?? notice.action.label}
+                        onClick={() => {
+                          notice.action?.run()
+                          setNotice(null)
+                        }}
+                      >
+                        <Icon name={notice.action.icon} size={14} />
+                      </Button>
+                    </Tooltip>
+                  ) : null}
+                />
+              ) : (
+                <Tooltip label={notice.text} className="deck-notice-words">
+                  <span className="deck-notice-text">{notice.text}</span>
+                </Tooltip>
+              )}
+              {notice.name && notice.text.endsWith(notice.name) ? null : notice.action ? (
                 <Tooltip label={notice.action.tip} className="deck-notice-act">
                   <Button
                     variant="link"
@@ -1924,7 +2015,8 @@ export function DeckView({
         <ThemeMenu theme={theme} named={properties.theme} look={borderless ? 'borderless' : 'card'} onLook={setLook} transition={transition} onTransition={setTransition} onPick={pickTheme} newTheme={newTheme} />
         {status === 'action' && syncAction ? (
           <SyncActionButton action={syncAction} />
-        ) : (
+        ) : notice?.name ? null : (
+          // #931: while "Saved as <name>" shows, the deck's own Saved steps aside, so the note has its room
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
         <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} />

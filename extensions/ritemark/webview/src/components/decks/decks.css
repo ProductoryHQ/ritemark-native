@@ -307,6 +307,20 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    own controls (Present, which folds to its icon), its words first, its actions never. */
 .deck-notice:has(> .deck-notice-gap) { flex-shrink: 1000; }
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
+/* #931: a notice ending with a file name ("Saved as Day one.pdf") takes the room the bar has. The whole words, hidden,
+   keep its width; the words shown are fitted to it, the name cut in its middle only when it doesn't fit (DeckView,
+   `NoticeWords`). Its action is an icon button right after the name (Show in folder, 14 px in 24). While it shows, the
+   bar's other controls keep their room: the note gives way first, down to nothing, before any of them folds (its
+   weight is far above theirs), and the deck's own Saved steps aside (DeckView). */
+.deck-notice-cut { position: relative; display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; padding: 4px; margin: -4px 0 -4px -4px; white-space: nowrap; } /* 4 px of room for the icon's focus ring (2 px at 2 px) inside the note's clip */
+.deck-notice-sizer { display: block; visibility: hidden; line-height: 24px; } /* the icon's height, so its ring fits the padding */
+.deck-notice-room { display: inline-block; width: 32px; } /* the action's 24 and the gap's 8 */
+.deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 8px; } /* the icon's focus ring (4 px out) clears the name by 4 px */
+.deck-notice-line > .deck-notice-words { flex: none; }
+.deck-notice-shown { display: block; white-space: nowrap; }
+.deck-notice-after { display: inline-flex; flex: none; }
+.deck-bar > .deck-notice:has(.deck-notice-cut) { flex-shrink: 1000000000; overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
+.deck-notice .deck-notice-icon { width: 24px; height: 24px; min-width: 24px; padding: 0; }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
    thumbnail, the part number or the point it came from (DeckView); the bar has no gear. */

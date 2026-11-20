@@ -95,9 +95,11 @@ export interface PageOptions {
   /**
    * Sprint 170 PR 2 (#885): what the page prints. Left out, the page's own print (`PRINT_CSS`, A4 portrait, each slide
    * with its text: Save slides and handout as PDF). `'slides'`: Save slides as PDF's page (`SLIDES_PRINT_CSS`), one
-   * 16:9 page a slide on the theme's ground, as on the wall. Only these rules differ from the page's.
+   * 16:9 page a slide on the theme's ground, as on the wall. `'handout'` (PR 3, #886): Save handout as PDF's page, the
+   * A4 print with the slides left out and each part under its number (`HANDOUT_PRINT_CSS`). Only these rules differ
+   * from the page's.
    */
-  print?: 'slides';
+  print?: 'slides' | 'handout';
 }
 
 /** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
@@ -719,7 +721,9 @@ export const PRINT_CSS = `
   html, body { height: auto; overflow: visible; background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; color: #33365A; --ink: #1C1F4A; --text: #33365A; --muted: #6B6F94; --label: #8A5A00; --line: #DADCE4; --soft: #F4F4FA; --link: #1C1F4A; }
   .ground, .line, .prog, .toc, .toast, .zoom, .restart, .sclose, .copy, .prompt .open, .cb-tools, .empty { display: none !important; }
-  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0; gap: 0; }
+  /* 1 px inside the paper's right margin (Sprint 170 PR 3): a box as wide as the column (a Button's row, a prompt) had
+     its right line at the page's clip edge, and the print drew it half or not at all. */
+  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0 1px 0 0; gap: 0; }
   .view, .frame, .side { display: contents !important; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
   .layer { position: relative; inset: auto; display: block; width: 576px; height: 324px; margin: 0 0 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--slidebg); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: auto; }
@@ -749,6 +753,10 @@ export const PRINT_CSS = `
   .prompt pre, .prompt.ai pre { padding: 3mm 4mm; border: 1px solid #C9CBD6; border-radius: 8px; background: none; white-space: pre-wrap; overflow-wrap: anywhere; }
   .steps label { background: none; box-shadow: none; border: 1px solid #DADCE4; break-inside: avoid; page-break-inside: avoid; }
   .steps input { box-shadow: none; border: 1.5px solid #8A8DA3; }
+  /* A Button on paper keeps its own width beside its words, as on a wide page, not the phone's full-width row (the
+     printed column is under the page's 860 px; the Experience lead on Sprint 170 PR 3). */
+  .pbutton:not(.is-solo) { flex-direction: row; align-items: center; gap: 16px; padding: 10px 12px 10px 18px; }
+  .pbutton:not(.is-solo) .blk-btn { justify-content: flex-start; }
   .foot { display: block; order: 2147483647; margin-top: 0; padding-top: 3mm; border-top: 1px solid #DADCE4; font: 400 9pt/1.4 'Sofia Sans', sans-serif; color: #6B6F94; break-before: avoid; page-break-before: avoid; break-inside: avoid; page-break-inside: avoid; }
   .foot.addr-only { display: block; border-top: 0; }
   .foot.addr-only:has(> .paddr:empty) { display: none; }
@@ -801,6 +809,41 @@ html, body { width: 960px; height: auto; margin: 0; overflow: visible; backgroun
 .layer .deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
 .layer .deck-sl.is-blocks.pic-behind .veil { inset: 0; }
 `;
+
+/**
+ * Sprint 170 PR 3 (#886; the decks README, "Save as PDF, from Publish"): Save handout as PDF's page. The page's own A4
+ * print (`PRINT_CSS` and its order, after which these come, so they win), with the text alone: no slide is drawn, so no
+ * slide picture either, and each part starts under its number and heading. The number counts the shown slides, as the
+ * page and Present do (a skipped slide is never on the page, so after one it differs from the editor's rail), in the
+ * left margin beside the part's first line, muted and bold (`handoutNumbersCss` gives each part its own). A section keeps
+ * its band ("SECTION 2" over its title) and starts a page, as in the page's print, even with no text of its own
+ * (`partHtml`). Any other slide whose part has no text has nothing here.
+ */
+export const HANDOUT_PRINT_CSS = `
+@media print {
+  .layer, .prefetch { display: none !important; }
+  .part:not(.sect):not(.only) { position: relative; padding-left: 10mm; }
+  .pre { padding-left: 10mm; }
+  .part:not(.sect):not(.only)::before { position: absolute; left: 0; top: 0; width: 8mm; font: 700 10pt/18.75pt 'Sofia Sans', sans-serif; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .sect { width: calc(100% - 10mm); margin-left: 10mm; }
+}
+`;
+
+/** Each printed part's number in Save handout as PDF (`HANDOUT_PRINT_CSS`): part n (`#t<n>`) shows n; a section shows its band instead. Only numbers reach it. */
+export function handoutNumbersCss(count: number): string {
+  const rules: string[] = [];
+  for (let number = 1; number <= count; number++) rules.push(`#t${number}:not(.sect)::before{content:"${number}"}`);
+  return rules.length ? `@media print{${rules.join('')}}` : '';
+}
+
+/**
+ * Whether Save handout as PDF has anything to print: the text before the first slide, or a part with text (a slide whose
+ * part is empty prints nothing there, `isSlideOnly`).
+ */
+export function handoutHasText(deck: Pick<PublicDeck, 'preamble' | 'slides' | 'textHandout'>): boolean {
+  if (showsAnything(handoutHtml(deck.preamble, { partKey: 'preamble', exercise: false, pictureUrl: () => 'picture' }))) return true;
+  return deck.slides.some(slide => !isSlideOnly(slide, deck.textHandout === true));
+}
 
 /**
  * Each slide and part's place in the printed column (`PRINT_CSS`): slide n (`#s<n>`) before part n (`#t<n>`), after the
@@ -934,12 +977,15 @@ export function isSlideOnly(slide: Pick<PublicSlide, 'handout' | 'data'>, textHa
 function partHtml(slide: PublicSlide, index: number, options: PageOptions, partKey: string, textHandout: boolean, slideOnly: boolean, openIn: boolean): string {
   const number = index + 1;
   // A slide with no handout: its place only, with nothing in it (More isn't offered on it).
-  if (slideOnly) return `<div class="part only" data-i="${index}" id="t${number}" aria-hidden="true"></div>`;
+  // Save handout as PDF (Sprint 170 PR 3) draws no slide, so a section prints as its band there even with no text, its
+  // slide's title as its heading when the part has none: the handout keeps its sections.
+  const handoutSection = options.print === 'handout' && sectionNumberOf(slide) !== null;
+  if (slideOnly && !handoutSection) return `<div class="part only" data-i="${index}" id="t${number}" aria-hidden="true"></div>`;
   // A part's heading is its handout's own (16 November). A part without one shows its slide's title, as the deck view
   // draws it until the first edit writes it, unless the deck is marked `handout: text`: then it shows none.
   const exerciseSlide = isExercise(slide);
   const { html: body, ownHeading } = handoutParts(slide.handout, { partKey, exercise: exerciseSlide, pictureUrl: options.pictureUrl, partHeading: true, openIn });
-  const title = ownHeading || textHandout ? '' : titleOf(slide);
+  const title = ownHeading || (textHandout && !handoutSection) ? '' : titleOf(slide);
   const section = sectionNumberOf(slide);
   if (section !== null) {
     const label = `Section${section ? ` ${section}` : ''}`;
@@ -1054,7 +1100,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // Which slides have no handout: read once, for More and for print.
   const slideOnly = deck.slides.map(slide => isSlideOnly(slide, deck.textHandout === true));
   // Small details 13 (18 November): the sections printed as their bands (a section whose part shows nothing keeps its slide).
-  const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && !slideOnly[index] ? [index] : [])));
+  const printedSections = new Set(deck.slides.flatMap((slide, index) => (sectionNumberOf(slide) !== null && (!slideOnly[index] || options.print === 'handout') ? [index] : [])));
   const parts = deck.slides.map((slide, index) => partHtml(slide, index, options, keys[index], deck.textHandout === true, slideOnly[index], openIn));
   // The reader's storage is the page's own: its client and session, or, for a deck with no title of its own, its file's
   // name, hashed (never on the page), so two such decks in one folder keep their ticks and places apart. It is the key
@@ -1075,7 +1121,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title || deck.client || 'Slides')}</title>`,
-    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}`}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}${options.print === 'handout' ? `\n${HANDOUT_PRINT_CSS}\n${handoutNumbersCss(count)}` : ''}`}\n</style>`,
     '</head>',
     // The ticks' and the reader's place in this browser's storage: the same for every version of the page that keeps its
     // client and title. The deck's transition, as the wall plays it.
