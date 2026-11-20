@@ -17,6 +17,9 @@
  * is a split button: Publish stays its main part, and the ▾, a part of its own with its own hover and focus, opens
  * Publish… and one item that names what it saves from the view at the press (`pdfKindFor`). The Published chip's menu
  * holds the same item. The PDF takes the slides' fit the way Publish does; the host asks for the file and prints it.
+ * The split button's hover is the whole button's (ui/split-button.tsx; Jarmo, 26 October); the ▾ keeps its own click
+ * and focus. With Publish not reachable (off, or not ready yet), a plain Save as PDF button keeps the PDF's place: it
+ * is a local file (the Experience lead, 20 November).
  */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -168,9 +171,21 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
   onSavePdf?: (kind: DeckPdfKind) => void
   onAction: (action: DeckPageAction) => void
 }) {
-  if (!state?.ready) return null
+  if (!state) return null
   // The one PDF item, for the kind this view saves among those this app makes; none where it makes none.
   const pdfKind = onSavePdf ? pdfKindFor(view, state.pdf ?? []) : null
+  if (!state.ready) {
+    // Publish stays hidden; the PDF, a local file, keeps its place as a plain button.
+    if (!pdfKind) return null
+    return (
+      <Tooltip label={pdfItemLabel(pdfKind).replace(/…$/, '')} className="deck-publish-slot">
+        <Button variant="outline" size="bar" className="deck-save-pdf" iconWhenNarrow onClick={() => onSavePdf?.(pdfKind)}>
+          <Icon name="file-pdf" size={14} tone="inherit" />
+          Save as PDF
+        </Button>
+      </Tooltip>
+    )
+  }
   const pdfItem = pdfKind ? (
     <DropdownMenuItem onSelect={() => onSavePdf?.(pdfKind)}>
       <Icon name="file-pdf" size={14} tone="inherit" />
@@ -180,7 +195,7 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
 
   if (state.kind === 'unpublished' && pdfItem) {
     return (
-      // Publish stays the main part; the ▾ opens Publish… and the PDF item (decks.css gives each part its own hover).
+      // Publish stays the main part; the ▾ (its own click and focus) opens Publish… and the PDF item.
       <SplitButton
         tone="outline"
         size="bar"

@@ -152,7 +152,8 @@ export class DeckPublisher implements vscode.Disposable {
    * never the page file 2.2 compares.
    */
   private async readState(document: vscode.TextDocument, ask: boolean, last?: PageBarState): Promise<{ state: DeckPageState; bar?: PageBarState }> {
-    if (!this.ready()) return { state: { ready: false, kind: 'unpublished', changed: false, pdf: [] } };
+    // Publish not reachable: Save as PDF keeps its place, a local file (the Experience lead, 20 November)
+    if (!this.ready()) return { state: { ready: false, kind: 'unpublished', changed: false, pdf: await this.pdfKinds() } };
     const pagePath = pagePathFor(document.uri.fsPath);
     let bar = last;
     if (ask || !bar) {

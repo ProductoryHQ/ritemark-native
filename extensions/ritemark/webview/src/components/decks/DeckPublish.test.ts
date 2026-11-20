@@ -105,6 +105,15 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   assert.equal(parse(split({ ready: true, kind: 'unpublished', changed: false, pdf: [] })).querySelectorAll('button').length, 1)
   assert.equal(parse(split({ ready: true, kind: 'unpublished', changed: false })).querySelectorAll('button').length, 1)
   assert.equal(parse(draw({ ready: true, kind: 'unpublished', changed: false, pdf })).querySelectorAll('button').length, 1)
+  // Publish not reachable (off, or not ready yet): Publish stays hidden, and a plain Save as PDF keeps the PDF's place
+  // (a local file; the Experience lead, 20 November). Nothing where the app makes no PDF.
+  const off = parse(split({ ready: false, kind: 'unpublished', changed: false, pdf }))
+  assert.deepEqual(off.querySelectorAll('button').map(b => [b.text.trim(), b.classList.contains('deck-save-pdf'), b.getAttribute('aria-haspopup')]), [['Save as PDF', true, undefined]])
+  assert.ok(off.querySelector('.deck-publish-slot'), 'in Publish\'s place on the bar')
+  assert.equal(split({ ready: false, kind: 'unpublished', changed: false, pdf: [] }), '')
+  assert.equal(split({ ready: false, kind: 'unpublished', changed: false }), '')
+  // The split button's hover is the whole button's (ui/split-button.tsx): decks.css gives no part a hover of its own.
+  assert.doesNotMatch(readFileSync(new URL('./decks.css', import.meta.url), 'utf8'), /deck-publish-split[^{]*:hover/)
   // Published: the chip, its menu holding the item; busy: no PDF.
   assert.equal(words(split({ ready: true, kind: 'published', changed: false, pdf })), 'Published')
   assert.ok(button(split({ ready: true, kind: 'publishing', changed: false, pdf }))!.hasAttribute('disabled'))
