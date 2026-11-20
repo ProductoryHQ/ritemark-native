@@ -50,6 +50,9 @@ import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
 const KEY_NAMES: readonly HomeKeyName[] = ['google-ai-key', 'openai-api-key', 'anthropic-api-key', 'openrouter-api-key'];
 const AI_CACHE_MS = 15_000;
+/** #926: a ready card shown while an AI's check runs waits this long for the check, at most `SHOWN_CHECK_WAITS` times. */
+const SHOWN_CHECK_WAIT_MS = 2_000;
+const SHOWN_CHECK_WAITS = 10;
 const SKIP_DIRS = /[\\/](\.git|node_modules|\.ritemark)[\\/]/;
 
 /** How Home's sign-in ended: ready, stopped by the person (no line), or one of the welcome's reasons. */
@@ -145,8 +148,10 @@ export class GuidanceHost implements vscode.Disposable {
    * lead, ritemark-dev f85e188).
    */
   private signInFailure: { ai: AgentId; line: string } | null = null;
-  /** #926: the projects whose `ready_card_shown` is being sent, so two quick redraws send it once. */
+  /** #926: the projects whose `ready_card_shown` is being sent or was sent from this window, so redraws send it once. */
   private readonly shownCounting = new Set<string>();
+  /** #926: how many times a card was held back while an AI's check still ran, per project (at most `SHOWN_CHECK_WAITS`). */
+  private readonly shownWaits = new Map<string, number>();
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
   private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
@@ -290,13 +295,26 @@ export class GuidanceHost implements vscode.Disposable {
   async readyCardShown(folderUri: string, guidance: HomeGuidance | null): Promise<void> {
     if (guidance?.card !== 'ready-request') return;
     const key = normalizeProjectUri(folderUri);
-    if (this.store.project(key).shownCounted || this.shownCounting.has(key)) return;
+    if (this.shownCounting.has(key) || this.store.project(key).shownCounted) return;
+    // While an AI's check still runs, `ai_ready` and the AI named could still change: Home reads the AIs again shortly
+    // and the redraw counts it, up to SHOWN_CHECK_WAITS times; after that it counts what the card shows (review)
+    const waits = this.shownWaits.get(key) ?? 0;
+    if (guidance.ais.some((ai) => ai.state === 'checking') && waits < SHOWN_CHECK_WAITS) {
+      this.shownWaits.set(key, waits + 1);
+      setTimeout(() => {
+        this.aiCache = null;
+        this.changed.fire();
+      }, SHOWN_CHECK_WAIT_MS);
+      return;
+    }
     this.shownCounting.add(key);
+    let sent = false;
     try {
-      const sent = await trackEvent('ready_card_shown', { kind: guidance.kind, ai_ready: guidance.aiReady, provider: PROVIDER[guidance.ai] });
+      sent = await trackEvent('ready_card_shown', { kind: guidance.kind, ai_ready: guidance.aiReady, provider: PROVIDER[guidance.ai] });
       if (sent) await this.store.updateProject(key, (current) => ({ ...current, shownCounted: true }));
     } finally {
-      this.shownCounting.delete(key);
+      // Sent: kept, so this window never decodes the store for it again; refused: the next show asks the gate again
+      if (!sent) this.shownCounting.delete(key);
     }
   }
 

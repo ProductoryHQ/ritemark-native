@@ -9,7 +9,7 @@
  * webview imports the types.
  */
 
-import { SIGN_IN_FROM, type SignInFrom } from '../analytics/events';
+import { SIGN_IN_FROM, type ReadyCardKind, type SignInFrom } from '../analytics/events';
 
 export type HomePlatform = 'darwin' | 'win32' | 'linux';
 export type AiName = 'Claude' | 'ChatGPT' | 'OpenCode';
@@ -77,7 +77,7 @@ export type HomeGuidance =
   | { card: 'what-moved' }
   | {
       card: 'ready-request';
-      kind: 'files' | 'empty' | 'sample';
+      kind: ReadyCardKind;
       icon: 'folder-simple' | 'pencil-simple-line' | 'check-square';
       heading: string;
       body: string;

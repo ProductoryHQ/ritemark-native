@@ -22,7 +22,8 @@
  *   an AI already ready sends neither, and a sign-in made elsewhere isn't Home's. Only provider and from.
  * - #926: `ready_card_shown` once per project, the first time the card shows and the gate sends it; a show the gate
  *   refuses isn't remembered; a later show, a new host (a reload or relaunch) or two quick redraws send no second one;
- *   another project counts on its own; no card, no count. Only kind, ai_ready and provider.
+ *   another project counts on its own; no card, no count; while an AI's check runs it waits (up to ten redraws) for
+ *   the answer. Only kind, ai_ready and provider.
  *
  * Run: npx tsx src/guidance/GuidanceHost.test.ts
  */
@@ -527,6 +528,24 @@ async function main(): Promise<void> {
   const otherUri = `file://${other}`;
   await Promise.all([host.readyCardShown(otherUri, { ...shown, kind: 'empty' }), host.readyCardShown(otherUri, { ...shown, kind: 'empty' })]);
   assert.deepEqual(cardCounts().map((count) => count.kind), ['empty'], 'another project counts on its own, once though two redraws came at once');
+  // While an AI's check runs, the count waits for Home to read the AIs again (up to ten times), then counts what shows
+  const checking = { ...shown, ais: [{ id: 'claude-code' as const, name: 'Claude' as const, state: 'checking' as const }] };
+  const third = `${otherUri}-third`;
+  let redraws = 0;
+  const redrawing = host.onDidChange(() => { redraws++; });
+  await host.readyCardShown(third, checking);
+  assert.deepEqual(cardCounts(), [], 'an AI still checking: not counted yet');
+  mock.timers.tick(2_000);
+  assert.equal(redraws, 1, 'Home is asked to read the AIs again');
+  await host.readyCardShown(third, { ...checking, ais: [{ id: 'claude-code', name: 'Claude', state: 'ready' }], aiReady: true, ai: 'claude-code' });
+  assert.deepEqual(cardCounts().map((count) => [count.ai_ready, count.provider]), [[true, 'claude']], 'counted once the check answered, with its answer');
+  const fourth = `${otherUri}-fourth`;
+  for (let i = 0; i < 10; i++) await host.readyCardShown(fourth, checking);
+  assert.deepEqual(cardCounts(), [], 'ten shows while checking wait');
+  await host.readyCardShown(fourth, checking);
+  assert.equal(cardCounts().length, 1, 'the eleventh counts what the card shows');
+  mock.timers.tick(2_000);
+  redrawing.dispose();
   await host.readyCardShown(input.folderUri, { card: 'what-moved' });
   await host.readyCardShown(input.folderUri, null);
   assert.deepEqual(cardCounts(), [], 'no ready card, no count');
