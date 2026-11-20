@@ -111,8 +111,13 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     themes: themeAi,
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
-  // #887: the shell draws the place's Search row as its field (patch 018); a shell without it ignores the key.
-  void vscode.commands.executeCommand('setContext', LIBRARY_FIELD_CONTEXT_KEY, true);
+  // #887: the shell draws the place's Search row as its field (patch 018) while Decks is on; a shell without it ignores
+  // the key. With Decks off the row stays a plain row, which does nothing, as before.
+  const setFieldKey = () => void vscode.commands.executeCommand('setContext', LIBRARY_FIELD_CONTEXT_KEY, isEnabled('decks'));
+  setFieldKey();
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
+    if (event.affectsConfiguration('ritemark.features.decks')) setFieldKey();
+  }));
   context.subscriptions.push(
     publisher,
     pages,

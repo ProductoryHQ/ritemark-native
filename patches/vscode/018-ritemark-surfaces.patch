@@ -203,6 +203,7 @@ The words stay while the person goes to another place; New, the head's menus' it
 (`_ritemark.projectHead.clearSearch`), clear them first; the switch turned off, or the folder closed, takes them away
 without a search. The box is never taken out of the page while the rows are drawn again, so its caret and a word being
 composed stay. Test: workbench/test/browser/parts/ritemarkProjectHead.test.ts.
+
 #887 (the Experience lead's review of #877): a `field` row on another place than Documents (the Slide library's Search) is
 the row that turns into its field in its own place. At rest it is the row; a click, Enter or Space puts the caret in the
 field, the same 32 and x and the same .sfield as Documents' box, so nothing in the column moves. Its words and keys go to
@@ -5427,10 +5428,10 @@ index 00000000000..c6764e91723
 +registerWorkbenchContribution2(RitemarkWindowSizes.ID, RitemarkWindowSizes, WorkbenchPhase.AfterRestored);
 diff --git a/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
 new file mode 100644
-index 00000000000..35dff5cd4bc
+index 00000000000..1eaa82c07f6
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/sidebar/ritemarkProjectHead.ts
-@@ -0,0 +1,819 @@
+@@ -0,0 +1,815 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -5470,7 +5471,7 @@ index 00000000000..35dff5cd4bc
 +import { Codicon } from '../../../../base/common/codicons.js';
 +import { KeyCode } from '../../../../base/common/keyCodes.js';
 +import { Emitter } from '../../../../base/common/event.js';
-+import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
++import { Disposable, DisposableStore, IDisposable } from '../../../../base/common/lifecycle.js';
 +import { ThemeIcon } from '../../../../base/common/themables.js';
 +import { localize } from '../../../../nls.js';
 +import { IMenuService, MenuId, MenuItemAction, MenuRegistry } from '../../../../platform/actions/common/actions.js';
@@ -5947,28 +5948,41 @@ index 00000000000..35dff5cd4bc
 +		store.add(this.hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), row, () => input.value ? undefined : this.keybindingService.appendKeybinding(localize('ritemark.search.tooltip', "Search this project"), field.command)));
 +		store.add(addDisposableListener(clear, EventType.CLICK, () => this.setFieldText('', true)));
 +		store.add(addDisposableListener(input, EventType.INPUT, () => this.onFieldText(true)));
-+		store.add(addDisposableListener(input, EventType.KEY_DOWN, e => {
++		store.add(this.listenFieldKeys(field, {
++			leave: () => {
++				input.blur();
++				this.commandService.executeCommand('workbench.action.focusActiveEditorGroup');
++			},
++			clear: () => this.setFieldText('', true),
++		}));
++		return field;
++	}
++
++	/**
++	 * A field's keys (the Experience lead, answer 3): ↓ and Enter with words go to the row's command; Escape clears the
++	 * words, or with none `leave`s (Documents' box for the desk, a place's field back to its row).
++	 */
++	private listenFieldKeys(field: IRitemarkSearchField, on: { leave(): void; clear(): void }): IDisposable {
++		return addDisposableListener(field.input, EventType.KEY_DOWN, e => {
 +			if (e.isComposing) {
 +				return; // an IME's Enter, arrows and Escape pick its candidates (Codex on #641)
 +			}
 +			const event = new StandardKeyboardEvent(e);
 +			const key = event.equals(KeyCode.DownArrow) ? 'down' : event.equals(KeyCode.Enter) ? 'enter' : event.equals(KeyCode.Escape) ? 'escape' : undefined;
-+			const action = key ? ritemarkSearchFieldKey(key, input.value) : undefined;
++			const action = key ? ritemarkSearchFieldKey(key, field.input.value) : undefined;
 +			if (!action) {
 +				return;
 +			}
 +			event.preventDefault();
 +			event.stopPropagation();
 +			if (action.leave) {
-+				input.blur();
-+				this.commandService.executeCommand('workbench.action.focusActiveEditorGroup');
++				on.leave();
 +			} else if (action.run && 'text' in action.run) {
-+				this.setFieldText('', true);
++				on.clear();
 +			} else if (action.run) {
 +				this.commandService.executeCommand(field.command, action.run);
 +			}
-+		}));
-+		return field;
++		});
 +	}
 +
 +	/** Sets the box's words; `search` sends them to the row's command (a click on ×, Escape, New), else only the box changes (the extension's search turned off). */
@@ -6057,36 +6071,14 @@ index 00000000000..35dff5cd4bc
 +		box.input.setAttribute('aria-label', label);
 +		store.add(this.hoverService.setupManagedHover(getDefaultHoverDelegate('mouse'), rest, () => this.keybindingService.appendKeybinding(label, command)));
 +		store.add(addDisposableListener(rest, EventType.CLICK, () => this.openPlaceField(field)));
-+		store.add(addDisposableListener(rest, EventType.KEY_DOWN, e => {
-+			const event = new StandardKeyboardEvent(e);
-+			if (event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) {
-+				event.preventDefault();
-+				this.openPlaceField(field);
-+			}
-+		}));
++		store.add(this.listenRowKeys(rest));
 +		store.add(addDisposableListener(box.clear, EventType.CLICK, () => this.setPlaceFieldText(field, '', true)));
 +		store.add(addDisposableListener(box.input, EventType.INPUT, () => this.onPlaceFieldText(field, true)));
 +		// Away with no words, it is the row again; with words it stays the field, with its ×
 +		store.add(addDisposableListener(box.input, EventType.BLUR, () => this.closePlaceField(field, false)));
-+		store.add(addDisposableListener(box.input, EventType.KEY_DOWN, e => {
-+			if (e.isComposing) {
-+				return; // an IME's Enter, arrows and Escape pick its candidates
-+			}
-+			const event = new StandardKeyboardEvent(e);
-+			const key = event.equals(KeyCode.DownArrow) ? 'down' : event.equals(KeyCode.Enter) ? 'enter' : event.equals(KeyCode.Escape) ? 'escape' : undefined;
-+			const action = key ? ritemarkSearchFieldKey(key, box.input.value) : undefined;
-+			if (!action) {
-+				return;
-+			}
-+			event.preventDefault();
-+			event.stopPropagation();
-+			if (action.leave) {
-+				this.closePlaceField(field, true);
-+			} else if (action.run && 'text' in action.run) {
-+				this.setPlaceFieldText(field, '', true);
-+			} else if (action.run) {
-+				this.commandService.executeCommand(command, action.run);
-+			}
++		store.add(this.listenFieldKeys(box, {
++			leave: () => this.closePlaceField(field, true),
++			clear: () => this.setPlaceFieldText(field, '', true),
 +		}));
 +		this.showPlaceField(field);
 +		return field;
@@ -6174,14 +6166,19 @@ index 00000000000..35dff5cd4bc
 +		const row = $('a.ritemark-project-row', { role: 'button', tabIndex: 0 });
 +		append(row, renderIcon(icon));
 +		append(row, $('span', undefined, text));
-+		this.rowStore.add(addDisposableListener(row, EventType.KEY_DOWN, e => {
++		this.rowStore.add(this.listenRowKeys(row));
++		return row;
++	}
++
++	/** Enter and Space on a row press it. */
++	private listenRowKeys(row: HTMLElement): IDisposable {
++		return addDisposableListener(row, EventType.KEY_DOWN, e => {
 +			const event = new StandardKeyboardEvent(e);
 +			if (event.equals(KeyCode.Enter) || event.equals(KeyCode.Space)) {
 +				event.preventDefault();
 +				row.click();
 +			}
-+		}));
-+		return row;
++		});
 +	}
 +
 +	/** A flyout's rows from the extension's command; none when it answers nothing usable. */

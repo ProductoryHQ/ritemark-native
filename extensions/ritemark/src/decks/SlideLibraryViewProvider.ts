@@ -199,11 +199,18 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       await this.post({ type: 'library/focus-results' });
       return;
     }
-    let shellField = false;
-    try {
-      shellField = await vscode.commands.executeCommand<boolean>(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { focus: true }) === true;
-    } catch {
-      // An older shell: no field of its own in the row
+    const focusShellField = async (): Promise<boolean | undefined> => {
+      try {
+        return await vscode.commands.executeCommand<boolean>(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { focus: true }) === true;
+      } catch {
+        return undefined; // An older shell: no field of its own in the row
+      }
+    };
+    let shellField = await focusShellField();
+    if (shellField === false) {
+      // The shell's field isn't drawn yet (the place still opening): once more after the place shows
+      await vscode.commands.executeCommand('ritemark.slideLibraryView.focus');
+      shellField = await focusShellField();
     }
     if (!shellField) await this.focusSearch();
   }
