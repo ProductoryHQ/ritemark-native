@@ -47,7 +47,7 @@ export interface SlideItemHandleProps {
 
 export function SlideItemHandle({ editor, frame, chosen, block, items, index, hidden, menuAt, onMenu, onDrag, run }: SlideItemHandleProps) {
   const kind = itemKindOf(chosen.kind)
-  const press = useRef<{ from: number; x: number; y: number; moved: boolean; line: DropLine | null; doc: unknown } | null>(null)
+  const press = useRef<{ from: number; x: number; y: number; moved: boolean; line: DropLine | null; doc: unknown; wasOpen: boolean } | null>(null)
   const [pressing, setPressing] = useState(false)
   // The drag's Esc listener, as it was added (a render during the drag makes new functions).
   const keyRef = useRef<((key: KeyboardEvent) => void) | null>(null)
@@ -75,7 +75,9 @@ export function SlideItemHandle({ editor, frame, chosen, block, items, index, hi
   const down = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    press.current = { from: at, x: event.clientX, y: event.clientY, moved: false, line: null, doc: editor.state.doc }
+    // Whether its menu was open as the press came: the press closes it (Radix takes it for one outside), so the release
+    // must not open it again.
+    press.current = { from: at, x: event.clientX, y: event.clientY, moved: false, line: null, doc: editor.state.doc, wasOpen: menuAt === at }
     setPressing(true)
     keyRef.current = onKey
     window.addEventListener('keydown', onKey, true)
@@ -88,16 +90,19 @@ export function SlideItemHandle({ editor, frame, chosen, block, items, index, hi
     if (!current.moved && Math.hypot(event.clientX - current.x, event.clientY - current.y) < DRAG_THRESHOLD) return
     if (!current.moved) onMenu(null)
     const origin = frame.getBoundingClientRect()
+    const line = itemDropLine(items, runs, current.from, event.clientX - origin.left, event.clientY - origin.top)
+    const same = current.moved && (line === current.line || (!!line && !!current.line && line.to === current.line.to && line.left === current.line.left && line.top === current.line.top))
     current.moved = true
-    current.line = itemDropLine(items, runs, current.from, event.clientX - origin.left, event.clientY - origin.top)
-    onDrag({ from: current.from, line: current.line })
+    current.line = line
+    // The bar draws again only when the line moves to another gap.
+    if (!same) onDrag({ from: current.from, line })
   }
   const up = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const current = press.current
     if (!current) return
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     end()
-    if (!current.moved) { onMenu(menuAt === current.from ? null : current.from); return }
+    if (!current.moved) { onMenu(current.wasOpen ? null : current.from); return }
     // A drop on a document that changed meanwhile is no drop: the places were read from the one before.
     if (current.line && editor.state.doc === current.doc) run(pos => moveItem(editor.state, pos, current.from, current.line!.to))
   }

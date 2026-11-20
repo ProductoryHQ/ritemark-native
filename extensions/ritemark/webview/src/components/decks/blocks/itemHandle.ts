@@ -124,8 +124,17 @@ function withoutComments(node: PMNode): PMNode {
   try {
     return node.type.createChecked(node.attrs, Fragment.from(children), node.marks)
   } catch {
-    return node
+    // Never the original with its comments: what the schema still needs is filled in empty.
+    return node.type.createAndFill(node.attrs, Fragment.from(children), node.marks) ?? node.type.createAndFill(node.attrs, null, node.marks) ?? node
   }
+}
+
+/**
+ * An item in a new place is written the canonical way (as `moveTab` writes a tab): how it was written where it stood
+ * (`mdTight`, a box tight under the one before it) belongs to that place.
+ */
+function asPlaced(node: PMNode): PMNode {
+  return node.attrs.mdTight ? node.type.create({ ...node.attrs, mdTight: null }, node.content, node.marks) : node
 }
 
 /** Can the item at `index` be duplicated (a fifth column can't)? */
@@ -140,7 +149,7 @@ export function duplicateItem(state: EditorState, blockPos: number, index: numbe
   const item = blockItems(block)[index]
   if (!item) return null
   const end = item.pos + item.node.nodeSize
-  const tr = state.tr.insert(end, withoutComments(item.node))
+  const tr = state.tr.insert(end, asPlaced(withoutComments(item.node)))
   if (block.kind === 'columns') withoutWidths(tr, blockPos)
   caretIntoItem(tr, end)
   return tr.setMeta(SLIDE_COMMAND, true)
@@ -157,7 +166,9 @@ export function moveItem(state: EditorState, blockPos: number, from: number, to:
   const item = items[from]
   if (!item || to === from || to < 0 || to >= items.length) return null
   const end = item.pos + item.node.nodeSize
-  const moving = state.doc.slice(item.from, end).content
+  const slice = state.doc.slice(item.from, end).content
+  const moving: PMNode[] = []
+  slice.forEach(node => moving.push(node === item.node ? asPlaced(node) : node))
   const head = state.selection.head
   const offset = head > item.pos && head < end ? head - item.pos : null
   // The place it goes: before the item now at `to` (and its notes), or after it.
@@ -191,9 +202,15 @@ export function deleteItem(state: EditorState, blockPos: number, index: number):
   if (items.length === 1) return deleteBlock(state, blockPos)
   if (block.kind === 'columns') {
     if (items.length > 2) return removeColumn(state, blockPos, index)
-    // Two columns: the other one's words, and this one's comments, take the block's place.
+    // Two columns: the other one's words take the block's place, with every comment the block holds (this column's,
+    // and the notes between its children) where it stood.
     const other = items[1 - index].node
-    const kept = [...notesIn(item.node), ...filled(other)]
+    const kept: PMNode[] = []
+    block.node.forEach(child => {
+      if (child === other) kept.push(...filled(other))
+      else if (child === item.node) kept.push(...notesIn(child))
+      else if (!(child.isTextblock && child.content.size === 0)) kept.push(child)
+    })
     const tr = state.tr.replaceWith(blockPos, blockPos + block.node.nodeSize, kept.length ? kept : [state.schema.nodes.paragraph.create()])
     const $at = tr.doc.resolve(Math.min(blockPos + 1, tr.doc.content.size))
     tr.setSelection(Selection.findFrom($at, 1, true) ?? Selection.near($at))
@@ -265,8 +282,11 @@ export function itemGripSpot(kind: ItemKind, item: PlacedItem, block: Box, block
   return { left, top, width, height }
 }
 
-/** How far around the block a pointer still points at one of its items (the handles sit just outside it). */
-export const ITEM_REACH = 24
+/**
+ * How far around the block a pointer still points at one of its items: the handles sit just outside it, the first
+ * step's or list item's left of the block's ⋮ (about 42 px out), so the pointer on its way there keeps that item.
+ */
+export const ITEM_REACH = 48
 
 /**
  * The item a pointer at (x, y) in the frame points at: within the block (and `ITEM_REACH` around it, where the handles

@@ -250,6 +250,35 @@ for (const [markdown, label] of [[STEPS, 'Steps'], [LIST, 'List'], [NUMBERED, 'N
   assert.equal(notes(deleteItem(firstNote, block(firstNote).pos, 0)!), 1, 'Delete the first item: the others keep the comment')
 }
 
+// ---- Review round 1: the fixes, each failing before.
+{
+  // Delete column of two keeps a comment that sits in the block between the columns.
+  const doc = loadSlideWithComments(TWO_COLUMNS)
+  const note = doc.type.schema.nodes.commentNode
+  let second = -1
+  doc.descendants((node, pos) => { if (second < 0 && node.type.name === 'slideDiv' && node.textContent.startsWith('After')) second = pos })
+  const withNote = EditorState.create({ doc }).tr.insert(second, note.create({ note: 'Name the plan' }))
+  const state = EditorState.create({ doc: withNote.doc, selection: caretAt(withNote.doc, 'Before') })
+  const notes = (tr: Transaction) => { let count = 0; tr.doc.descendants(node => { if (node.type.name === 'commentNode') count++ }); return count }
+  assert.equal(notes(deleteItem(state, block(state).pos, 0)!), 1, 'two columns: a note between them stays')
+  assert.equal(notes(deleteItem(state, block(state).pos, 1)!), 1, 'the other column: the note before it stays too')
+  // Every move and copy saves byte-stable on the next open (a box written tight keeps its place's spacing nowhere else).
+  const tight = ['# T', '', ':::: boxes', '::: box', 'One', ':::', '::: box', 'Two', ':::', '::: box', 'Three', ':::', '::::'].join('\n')
+  for (const [markdown, word] of [[tight, 'Two'], [BOXES, 'Draft'], [COLUMNS, 'Cursor'], [STEPS, 'Ask'], [LIST, 'Ask']] as const) {
+    const at = stateWith(markdown, word)
+    const pos = block(at).pos
+    for (const tr of [moveItem(at, pos, 1, 0), moveItem(at, pos, 1, 2), duplicateItem(at, pos, 1), deleteItem(at, pos, 1)]) {
+      const written = saved(tr)
+      assert.equal(saveSlide(loadSlide(written)), written, `${word}: byte-stable after the change: ${written}`)
+    }
+  }
+  // The pointer on the first item's handle, left of the ⋮, still points at that item.
+  const blockBox: Box = { left: 100, top: 200, width: 600, height: 120 }
+  const items = [{ left: 100, top: 200, width: 600, height: 30, padTop: 0 }, { left: 100, top: 240, width: 600, height: 30, padTop: 0 }]
+  const spot = itemGripSpot('item', items[0], blockBox, 'list')
+  assert.equal(itemAtPoint(items, blockBox, spot.left + 2, spot.top + spot.height / 2), 0, 'on the first item\'s handle: still the first item')
+}
+
 // ---- Each action is one Undo, and the file is as it was.
 for (const [body, word, actions] of [
   [BOXES, 'Draft', ['duplicate', 'left', 'right', 'delete']],
