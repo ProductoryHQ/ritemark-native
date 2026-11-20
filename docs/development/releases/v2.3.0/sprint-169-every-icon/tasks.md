@@ -20,7 +20,7 @@ Phase 3 starts only after Jarmo's approval, #850 merged, and the sprint branch e
 - [x] Shots before and after typing "truck", "people" and "mail" (`proof/pr3-search/`)
 
 ## PR 4: the unknown name's tooltip (Standard, after #850 and PR 3)
-- [ ] "No icon named “xyz”" and Choose an icon, opening the menu with the name in the search
+- [x] "No icon named “xyz”" and Choose an icon, opening the menu with the name in the search (and the names nearest a misspelt one; `proof/pr4-unknown-name/`)
 
 ## Sprint end
 - [ ] Full chain once on each final head, output to a file
