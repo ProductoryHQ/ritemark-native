@@ -104,6 +104,8 @@ interface Notice {
 /** A notice stays this long; one with an Undo longer, so there is time to press it. */
 const NOTICE_MS = 5000
 const UNDO_NOTICE_MS = 10000
+/** #887: a search pending longer than this says "Searching…". */
+const SLOW_SEARCH_MS = 500
 
 /** An offered slide's key in Choose…'s ticks. */
 const offerKey = (slide: { path: string; id: string }) => `${slide.path}#${slide.id}`
@@ -183,6 +185,10 @@ export function SlideLibraryPanel() {
   // The field shows once the place's Search is pressed (as Tasks' does), and stays while it holds words.
   const [searchOpen, setSearchOpen] = useState(false)
   const [focusSearch, setFocusSearch] = useState(0)
+  // #887: the shell's Search row is the field (patch 018) and sends its words: the place draws no field of its own.
+  const [shellField, setShellField] = useState(false)
+  // #887: a search slower than about half a second says so where its results go.
+  const [slow, setSlow] = useState(false)
 
   useEffect(() => {
     const stop = onMessage((message) => {
@@ -191,6 +197,12 @@ export function SlideLibraryPanel() {
       else if (message.type === 'library/focus-search') {
         setSearchOpen(true)
         setFocusSearch((count) => count + 1)
+      } else if (message.type === 'library/query' && typeof message.query === 'string') {
+        setShellField(true)
+        setQuery(message.query)
+      } else if (message.type === 'library/focus-results') {
+        // ↓ or Enter in the shell's field: the keyboard goes to the first result (a deck's row, then the slides).
+        requestAnimationFrame(() => document.querySelector<HTMLElement>('.deck-lib .deck-lib-row, .deck-lib [data-library-slide]')?.focus())
       } else if (message.type === 'library/notice' && typeof message.text === 'string') {
         setNotice({ text: message.text, ...(typeof message.undo === 'string' ? { undo: message.undo } : {}) })
         // The host's answer to an offer press, whatever it was (every press gets one): the buttons work again.
@@ -222,6 +234,30 @@ export function SlideLibraryPanel() {
     const timer = setTimeout(() => sendToExtension('library/search', { query }), query.trim() ? 150 : 0)
     return () => clearTimeout(timer)
   }, [query])
+
+  // #887 (the Experience lead): until the host has answered the words typed, the search is pending; after about half a
+  // second of that, "Searching…" shows where the results go, and gives way to them.
+  const pending = query.trim().length > 0 && state?.query !== query
+  useEffect(() => {
+    if (!pending) {
+      setSlow(false)
+      return
+    }
+    const timer = setTimeout(() => setSlow(true), SLOW_SEARCH_MS)
+    return () => clearTimeout(timer)
+  }, [pending, query])
+
+  // #887: ⌘F (Ctrl+F) in the place puts the caret in its search field: the host says where (the Search row's, or this one).
+  useEffect(() => {
+    const mac = /Mac/.test(navigator.platform)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'f' || event.shiftKey || event.altKey || !(mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)) return
+      event.preventDefault()
+      sendToExtension('library/find')
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   // A new search's Decks group starts closed.
   useEffect(() => setOpenNamed({}), [state?.query])
@@ -621,7 +657,7 @@ export function SlideLibraryPanel() {
 
   return (
     <div className="deck-lib font-ui">
-      {searchOpen || query ? (
+      {!shellField && (searchOpen || query) ? (
       <label className="deck-lib-search">
         <Icon name="magnifying-glass" size={14} tone="inherit" />
         <input
@@ -642,7 +678,7 @@ export function SlideLibraryPanel() {
       </label>
       ) : null}
       {/* Just cleared: until the host answers, its decks hold only the hits, so nothing is drawn as the library. */}
-      {searching ? searchResults() : state.search ? null : (
+      {searching ? (pending && slow ? <p className="deck-lib-none" role="status">Searching…</p> : searchResults()) : state.search ? null : (
         <>
           <div className="deck-lib-group">Library</div>
           {offerBlock()}

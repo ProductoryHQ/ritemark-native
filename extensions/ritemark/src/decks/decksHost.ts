@@ -24,6 +24,7 @@ import { sheetAi } from '../guidance/GuidanceHost';
 import type { AgentId } from '../agent/types';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
+import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -110,6 +111,8 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     themes: themeAi,
   } : null));
   const view = new SlideLibraryViewProvider(context.extensionUri, pages, library);
+  // #887: the shell draws the place's Search row as its field (patch 018); a shell without it ignores the key.
+  void vscode.commands.executeCommand('setContext', LIBRARY_FIELD_CONTEXT_KEY, true);
   context.subscriptions.push(
     publisher,
     pages,
@@ -119,8 +122,9 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     presenter,
     view,
     vscode.window.registerWebviewViewProvider(SLIDE_LIBRARY_VIEW, view, { webviewOptions: { retainContextWhenHidden: false } }),
-    // The place's head row (Search), from the frame's manifest.
-    vscode.commands.registerCommand('ritemark.slideLibrary.search', () => (isEnabled('decks') ? view.focusSearch() : undefined)),
+    // The place's head row (Search), from the frame's manifest: since #887 the shell's field in the row's place, whose
+    // words and keys come here.
+    vscode.commands.registerCommand(LIBRARY_SEARCH_COMMAND, (arg?: unknown) => (isEnabled('decks') ? view.searchRow(arg) : undefined)),
     // Sprint 159 (PR 7; since 16 November it opens the deck at once): New → Deck, only with the flag on
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options, fresh) : undefined)),
     // A deck deleted or renamed in Ritemark takes its card's mark with it

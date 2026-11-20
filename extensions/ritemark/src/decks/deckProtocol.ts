@@ -399,6 +399,8 @@ function slideIdOf(value: unknown): string {
 export type LibraryRequest =
   | { type: 'library/ready' }
   | { type: 'library/search'; query: string }
+  /** #887: ⌘F (Ctrl+F) in the place's page: the caret goes to the Search row's field. */
+  | { type: 'library/find' }
   | { type: 'library/insert'; path: string; id: string }
   /** Sprint 165 PR 2: Take section, the section's slides in their order, inserted as one step. */
   | { type: 'library/insert-section'; path: string; ids: string[] }
@@ -430,6 +432,8 @@ export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
   switch (input.type) {
     case 'library/ready':
       return only('type') ? { type: 'library/ready' } : null;
+    case 'library/find':
+      return only('type') ? { type: 'library/find' } : null;
     case 'library/search':
       return only('type', 'query') && text(input.query, 200) ? { type: 'library/search', query: input.query as string } : null;
     case 'library/insert':
