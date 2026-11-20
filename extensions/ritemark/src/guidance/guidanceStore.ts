@@ -3,15 +3,15 @@
  * computer's global state, `ritemark.guidance.v1`. Nothing is ever written in a
  * project's folder, so "Nothing in this folder was moved or changed" stays true.
  *
- * Per project (by its folder's normalized URI): the ready request's record, and (#926) whether its card's
- * `ready_card_shown` was sent.
+ * Per project (by its folder's normalized URI): the ready request's record.
  * Per release (major.minor): the days a document was saved, and the feedback
  * card's answer. And the last day the ready request showed on Home (D1).
  *
  * Sprint 156: the AI last seen ready on this profile, in a key of its own,
  * `ritemark.guidance.lastReadyAi`, holding only the AI's id. It is kept apart
  * from `ritemark.guidance.v1`, which a window rewrites whole, so one window's
- * write can't undo another's record.
+ * write can't undo another's record. #926: the projects whose `ready_card_shown` was sent, in a key of their own,
+ * `ritemark.guidance.readyCardCounted`, for the same reason.
  * No `vscode` import: it takes a Memento-shaped store.
  */
 
@@ -52,7 +52,6 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
         ...(GONE.includes(record.gone as ReadyGone) ? { gone: record.gone as ReadyGone } : {}),
         ...(typeof record.chatId === 'string' && record.chatId.length <= 128 ? { chatId: record.chatId } : {}),
         ...(AGENTS.includes(record.ai as AgentId) ? { ai: record.ai as AgentId } : {}),
-        ...(record.shownCounted === true ? { shownCounted: true as const } : {}),
       };
     }
   }
@@ -159,4 +158,27 @@ export async function seedLastReadyAiForTest(memento: MementoLike, env: Record<s
   if (!isAgentId(value)) return false;
   await memento.update(LAST_READY_AI_KEY, value);
   return true;
+}
+
+// ── #926: the projects whose ready card was counted ──
+
+export const READY_CARD_COUNTED_KEY = 'ritemark.guidance.readyCardCounted';
+/** The most projects remembered; the oldest go first (a profile meets far fewer). */
+const READY_CARD_COUNTED_MAX = 500;
+
+function readyCardCountedList(memento: MementoLike): string[] {
+  const value = memento.get<unknown>(READY_CARD_COUNTED_KEY);
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
+}
+
+/** `ready_card_shown` was sent for this project (its folder's normalized URI). */
+export function readyCardCounted(memento: MementoLike, folderUri: string): boolean {
+  return readyCardCountedList(memento).includes(folderUri);
+}
+
+/** Remember that `ready_card_shown` was sent for this project, in its own key, never rewritten by the guidance record. */
+export async function noteReadyCardCounted(memento: MementoLike, folderUri: string): Promise<void> {
+  const list = readyCardCountedList(memento);
+  if (list.includes(folderUri)) return;
+  await memento.update(READY_CARD_COUNTED_KEY, [...list, folderUri].slice(-READY_CARD_COUNTED_MAX));
 }

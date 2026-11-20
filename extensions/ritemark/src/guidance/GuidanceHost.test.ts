@@ -22,8 +22,8 @@
  *   an AI already ready sends neither, and a sign-in made elsewhere isn't Home's. Only provider and from.
  * - #926: `ready_card_shown` once per project, the first time the card shows and the gate sends it; a show the gate
  *   refuses isn't remembered; a later show, a new host (a reload or relaunch) or two quick redraws send no second one;
- *   another project counts on its own; no card, no count; while an AI's check runs it waits (up to ten redraws) for
- *   the answer. Only kind, ai_ready and provider.
+ *   another project counts on its own; no card, no count; while an AI's check runs it waits for the answer, and
+ *   the wait end counts a card seen and left; its own key survives a rewrite of the guidance record. Only kind, ai_ready and provider.
  *
  * Run: npx tsx src/guidance/GuidanceHost.test.ts
  */
@@ -516,6 +516,10 @@ async function main(): Promise<void> {
   await host.readyCardShown(`${input.folderUri}/`, shown);
   assert.deepEqual(cardCounts(), [], 'a later show of the same project sends nothing, by any spelling of its folder');
   // A new host on the same global state: what a Reload Window or a relaunch gives
+  // Another window's stale rewrite of the guidance record can't undo it (Codex P2): the marker has its own key
+  await globalState.update('ritemark.guidance.v1', { v: 1, projects: {} });
+  await host.readyCardShown(input.folderUri, shown);
+  assert.deepEqual(cardCounts(), [], 'the guidance record rewritten whole: still no second count');
   const reloaded = new GuidanceHost({
     context: { extension: { packageJSON: { version: '2.3.0' } }, globalState, secrets: { onDidChange: none, get: async () => undefined } } as never,
     folder: undefined, runtimeAvailability: availability as never, startChat: async () => {}, startCodexSignIn, stopCodexSignIn,
@@ -528,23 +532,28 @@ async function main(): Promise<void> {
   const otherUri = `file://${other}`;
   await Promise.all([host.readyCardShown(otherUri, { ...shown, kind: 'empty' }), host.readyCardShown(otherUri, { ...shown, kind: 'empty' })]);
   assert.deepEqual(cardCounts().map((count) => count.kind), ['empty'], 'another project counts on its own, once though two redraws came at once');
-  // While an AI's check runs, the count waits for Home to read the AIs again (up to ten times), then counts what shows
+  // While an AI's check runs, the count waits for the answer; the wait's end counts the latest show, Home seen or not
   const checking = { ...shown, ais: [{ id: 'claude-code' as const, name: 'Claude' as const, state: 'checking' as const }] };
   const third = `${otherUri}-third`;
   let redraws = 0;
   const redrawing = host.onDidChange(() => { redraws++; });
   await host.readyCardShown(third, checking);
   assert.deepEqual(cardCounts(), [], 'an AI still checking: not counted yet');
-  mock.timers.tick(2_000);
+  mock.timers.tick(4_000);
   assert.equal(redraws, 1, 'Home is asked to read the AIs again');
   await host.readyCardShown(third, { ...checking, ais: [{ id: 'claude-code', name: 'Claude', state: 'ready' }], aiReady: true, ai: 'claude-code' });
   assert.deepEqual(cardCounts().map((count) => [count.ai_ready, count.provider]), [[true, 'claude']], 'counted once the check answered, with its answer');
+  mock.timers.tick(1_000);
+  await flush();
+  assert.deepEqual(cardCounts(), [], 'and the wait end sends no second one');
   const fourth = `${otherUri}-fourth`;
-  for (let i = 0; i < 10; i++) await host.readyCardShown(fourth, checking);
-  assert.deepEqual(cardCounts(), [], 'ten shows while checking wait');
   await host.readyCardShown(fourth, checking);
-  assert.equal(cardCounts().length, 1, 'the eleventh counts what the card shows');
-  mock.timers.tick(2_000);
+  await host.readyCardShown(fourth, checking);
+  mock.timers.tick(4_000);
+  mock.timers.tick(1_000);
+  await flush();
+  assert.deepEqual(cardCounts().map((count) => count.kind), ['files'], 'a card seen and left while checking is still counted, once, when the wait ends');
+  assert.ok(Array.isArray(state.get('ritemark.guidance.readyCardCounted')), 'remembered in its own key, apart from the guidance record');
   redrawing.dispose();
   await host.readyCardShown(input.folderUri, { card: 'what-moved' });
   await host.readyCardShown(input.folderUri, null);

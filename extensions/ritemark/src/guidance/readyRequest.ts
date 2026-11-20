@@ -143,8 +143,6 @@ export interface ReadyRecord {
   chatId?: string;
   /** The AI chosen on the card. */
   ai?: AgentId;
-  /** #926: `ready_card_shown` was sent for this project; it is never sent for it again. */
-  shownCounted?: true;
 }
 
 export interface ReadyDueInput {
