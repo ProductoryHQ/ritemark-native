@@ -92,7 +92,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
-  // Sprint 157 (experience 46, README decision 10): Decks. Off by default through 2.2 on Jarmo's word (14 November
+  // Sprint 157 (experience 46, README decision 10): Decks. Off by default until 2.3 on Jarmo's word (14 November
   // 2026: "behind a feature flag, in dev runs, not on main at first"). ON from 2.3 (#916; Jarmo, 20 November 2026:
   // "Decks läheb 2.3 sisse"): `ritemark.features.decks` defaults to true (HARD RULE #2) and stays as the off switch,
   // as `project-search` keeps its own, so Decks can be stopped without a release. Off, a `.deck.md` opens as an
