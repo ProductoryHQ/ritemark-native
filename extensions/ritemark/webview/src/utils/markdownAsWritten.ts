@@ -852,6 +852,13 @@ function hasContentAfter(node: Element): boolean {
   return false
 }
 
+function insideHeading(node: Node): boolean {
+  for (let parent = node.parentNode; parent; parent = parent.parentNode) {
+    if (/^H[1-6]$/.test(parent.nodeName)) return true
+  }
+  return false
+}
+
 function insideTableCell(node: Node): boolean {
   for (let parent = node.parentNode; parent; parent = parent.parentNode) {
     if (parent.nodeName === 'TD' || parent.nodeName === 'TH') return true
@@ -862,11 +869,12 @@ function insideTableCell(node: Node): boolean {
 /**
  * Wrap a run of inline Markdown in a mark's delimiters, with the line breaks at
  * its edges outside them: `**` cannot close after a `\` break, so a bold run
- * that starts or ends with a break would not be bold on reopen. A run that is
- * only breaks gets no delimiters.
+ * that starts or ends with a break would not be bold on reopen, nor after a
+ * `<br>` (a break in a heading or a cell, #923). A run that is only breaks gets
+ * no delimiters.
  */
 export function wrapMarked(content: string, delimiter: string): string {
-  const match = /^((?:\\?\n| +\n)*)([\s\S]*?)((?:\\?\n| +\n)*)$/.exec(content)
+  const match = /^((?:\\?\n| +\n|<br>)*)([\s\S]*?)((?:\\?\n| +\n|(?<!\\)<br>)*)$/.exec(content)
   const [lead, middle, trail] = match ? [match[1], match[2], match[3]] : ['', content, '']
   if (!middle.trim()) return lead + trail
   return lead + delimiter + middle + delimiter + trail
@@ -924,8 +932,11 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       // A break with nothing after it in its block has no Markdown form; it
       // would be a literal backslash or trailing spaces.
       if (!hasContentAfter(element)) return ''
-      // A line break inside a table cell would end the row.
-      if (insideTableCell(element)) return '<br>'
+      // A line break inside a table cell would end the row, and one inside a
+      // heading would end the heading: an ATX heading is one line, so `\\` and a
+      // newline there read back as a literal `\\` and a paragraph (#923).
+      // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
+      if (insideTableCell(element) || insideHeading(element)) return '<br>'
       const form = element.getAttribute('data-md-break')
       if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')

@@ -190,6 +190,8 @@ class HandoutRenderer extends marked.Renderer {
   }
 
   html(html: string): string {
+    // A line break in a heading is written `<br>` (#923: `\` and a newline would end it): drawn as a break.
+    if (/^<br\s*\/?>$/i.test(html.trim())) return '<br>';
     return sanitizeHtml(html);
   }
 

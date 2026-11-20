@@ -555,7 +555,9 @@ function createSlideMarked(): Marked {
     }],
     renderer: {
       // The slide draws no raw HTML: a comment, an anchored comment's `<mark>`, any tag. Their words are text tokens.
-      html: () => '',
+      // One exception, inline: `<br>`, the line break the editor writes inside a title or a heading, where `\` and a
+      // newline would end the heading (#923); drawn as the editor's hard break is.
+      html: (html: string, block?: boolean) => (!block && /^<br\s*\/?>$/i.test(html.trim()) ? '<br>' : ''),
       // A second guard: a `<` that still came through raw never opens a tag. Entities stay as they are.
       text: (text: string) => text.replace(/</g, '&lt;'),
       link: (_href: string, _title: string | null | undefined, text: string) => `<span class="blk-link">${text}</span>`,

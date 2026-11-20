@@ -776,6 +776,8 @@ export function splitBlockSlide(body: string): BlockSlideParts {
 /** A heading's words as plain text: its emphasis, code marks, escapes and link targets taken out. */
 function plainHeading(text: string): string {
   return text
+    // A line break in a title (`<br>`, #923) is a space between its lines in the strip, the go-to box and the Contents.
+    .replace(/(^|[^\\])<br\s*\/?>/gi, '$1 ')
     .replace(/<\/?[A-Za-z][^>]*>/g, '')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!>~|<&$])/g, '$1')

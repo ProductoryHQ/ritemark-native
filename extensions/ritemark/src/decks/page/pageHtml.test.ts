@@ -205,6 +205,9 @@ assert.deepEqual(scanText(html), []);
   assert.equal(sanitizeHtml('<!-- x --><mark data-comment="n">w</mark><b>'), 'w&lt;b&gt;');
   // Headings sit under the part's own title.
   assert.equal(render('## Welcome'), '<h3>Welcome</h3>\n');
+  // #923: a heading's line break is written `<br>`, and drawn as a break; any other tag stays text.
+  assert.equal(render('## First line<br>second line'), '<h3>First line<br>second line</h3>\n');
+  assert.equal(render('a<br/>b <br onclick=x>'), '<p>a<br>b &lt;br onclick=x&gt;</p>\n');
   // Ticks: a task list anywhere, and an exercise's numbered steps; a list elsewhere stays a list.
   assert.equal(parse(render('- [ ] one\n- [x] two')).querySelectorAll('ul.steps input[data-tick]').length, 2);
   assert.ok(parse(render('- [x] two')).querySelector('input')!.hasAttribute('checked'));
