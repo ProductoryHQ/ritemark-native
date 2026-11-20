@@ -114,18 +114,25 @@ function caretIntoItem(tr: Transaction, pos: number): void {
 }
 
 /** A copy without its comments: a comment is on the words it was written on, once. */
-function withoutComments(node: PMNode): PMNode {
+function withoutComments(node: PMNode): PMNode | null {
   if (node.isText) return node.marks.some(mark => mark.type.name === 'commentMark') ? node.mark(node.marks.filter(mark => mark.type.name !== 'commentMark')) : node
   if (node.isLeaf) return node
   const children: PMNode[] = []
-  node.forEach(child => { if (!isNote(child)) children.push(withoutComments(child)) })
+  let lost = false
+  node.forEach(child => {
+    if (isNote(child)) return
+    const copy = withoutComments(child)
+    if (copy) children.push(copy)
+    else lost = true
+  })
+  if (lost) return null
   // A box that held a comment only keeps an empty line.
   if (!children.length && !node.isTextblock && node.type.contentMatch.defaultType) children.push(node.type.contentMatch.defaultType.create())
   try {
     return node.type.createChecked(node.attrs, Fragment.from(children), node.marks)
   } catch {
-    // Never the original with its comments: what the schema still needs is filled in empty.
-    return node.type.createAndFill(node.attrs, Fragment.from(children), node.marks) ?? node.type.createAndFill(node.attrs, null, node.marks) ?? node
+    // What the schema still needs, filled in; never an empty copy and never the original with its comments: no copy.
+    return node.type.createAndFill(node.attrs, Fragment.from(children), node.marks)
   }
 }
 
@@ -149,7 +156,9 @@ export function duplicateItem(state: EditorState, blockPos: number, index: numbe
   const item = blockItems(block)[index]
   if (!item) return null
   const end = item.pos + item.node.nodeSize
-  const tr = state.tr.insert(end, asPlaced(withoutComments(item.node)))
+  const copy = withoutComments(item.node)
+  if (!copy) return null
+  const tr = state.tr.insert(end, asPlaced(copy))
   if (block.kind === 'columns') withoutWidths(tr, blockPos)
   caretIntoItem(tr, end)
   return tr.setMeta(SLIDE_COMMAND, true)
@@ -283,17 +292,19 @@ export function itemGripSpot(kind: ItemKind, item: PlacedItem, block: Box, block
 }
 
 /**
- * How far around the block a pointer still points at one of its items: the handles sit just outside it, the first
- * step's or list item's left of the block's ⋮ (about 42 px out), so the pointer on its way there keeps that item.
+ * How far around the block a pointer still points at one of its items: the handles sit just outside it. On the left
+ * the first step's or list item's sits beyond the block's ⋮ (about 42 px out), so the pointer on its way there keeps
+ * that item; above, right and below, the title and the next block stay their own.
  */
-export const ITEM_REACH = 48
+export const ITEM_REACH = 24
+export const ITEM_REACH_LEFT = 48
 
 /**
  * The item a pointer at (x, y) in the frame points at: within the block (and `ITEM_REACH` around it, where the handles
  * are), the nearest item, so crossing the gap between two items, or onto a handle, keeps one; null outside.
  */
 export function itemAtPoint(items: readonly Box[], block: Box, x: number, y: number): number | null {
-  if (x < block.left - ITEM_REACH || x > block.left + block.width + ITEM_REACH || y < block.top - ITEM_REACH || y > block.top + block.height + ITEM_REACH) return null
+  if (x < block.left - ITEM_REACH_LEFT || x > block.left + block.width + ITEM_REACH || y < block.top - ITEM_REACH || y > block.top + block.height + ITEM_REACH) return null
   let best: number | null = null
   let distance = Infinity
   items.forEach((item, index) => {

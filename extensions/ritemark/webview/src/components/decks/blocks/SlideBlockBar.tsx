@@ -257,14 +257,15 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     // README item B: each item's place, and its top padding (a box's handle sits in it, never over its words).
     // Every item or none: one not drawn yet would put the handles' indexes out of step with the document's items.
     let items: PlacedItem[] = []
+    // A box's padding is the look's, the same for every box: read once (this runs at every keystroke).
+    let padTop: number | null = null
     if (itemKindOf(block.kind)) {
       for (const item of blockItems(block)) {
         const element = editor.view.nodeDOM(item.pos) as HTMLElement | null
         if (!element || typeof element.getBoundingClientRect !== 'function') { items = []; break }
         const rect = element.getBoundingClientRect()
-        // Only a box's handle sits in its padding: the style is read for boxes alone (this runs at every keystroke).
-        const scale = block.kind === 'boxes' && element.offsetWidth ? rect.width / element.offsetWidth : 1
-        const padTop = block.kind === 'boxes' ? (parseFloat(getComputedStyle(element).paddingTop) || 0) * scale : 0
+        // Only a box's handle sits in its padding: the style is read for boxes alone.
+        if (padTop === null) padTop = block.kind === 'boxes' ? (parseFloat(getComputedStyle(element).paddingTop) || 0) * (element.offsetWidth ? rect.width / element.offsetWidth : 1) : 0
         items.push({ ...boxIn(rect, origin), padTop })
       }
     }

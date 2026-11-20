@@ -91,7 +91,7 @@ export function SlideItemHandle({ editor, frame, chosen, block, items, index, hi
     if (!current.moved) onMenu(null)
     const origin = frame.getBoundingClientRect()
     const line = itemDropLine(items, runs, current.from, event.clientX - origin.left, event.clientY - origin.top)
-    const same = current.moved && (line === current.line || (!!line && !!current.line && line.to === current.line.to && line.left === current.line.left && line.top === current.line.top))
+    const same = current.moved && (line === current.line || (!!line && !!current.line && line.to === current.line.to && line.left === current.line.left && line.top === current.line.top && line.width === current.line.width && line.height === current.line.height))
     current.moved = true
     current.line = line
     // The bar draws again only when the line moves to another gap.

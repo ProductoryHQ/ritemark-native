@@ -277,6 +277,9 @@ for (const [markdown, label] of [[STEPS, 'Steps'], [LIST, 'List'], [NUMBERED, 'N
   const items = [{ left: 100, top: 200, width: 600, height: 30, padTop: 0 }, { left: 100, top: 240, width: 600, height: 30, padTop: 0 }]
   const spot = itemGripSpot('item', items[0], blockBox, 'list')
   assert.equal(itemAtPoint(items, blockBox, spot.left + 2, spot.top + spot.height / 2), 0, 'on the first item\'s handle: still the first item')
+  // Review round 2: the wider reach is the left side's only; 30 px over the block is the title's, not an item's.
+  assert.equal(itemAtPoint(items, blockBox, 300, blockBox.top - 30), null, 'over the title: no item')
+  assert.equal(itemAtPoint(items, blockBox, blockBox.left + blockBox.width + 30, 215), null, 'right of the block: no item')
 }
 
 // ---- Each action is one Undo, and the file is as it was.
