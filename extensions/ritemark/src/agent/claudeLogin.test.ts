@@ -10,10 +10,16 @@ import {
   isClaudeLoginActive,
 } from './claudeLogin';
 
-async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+/**
+ * #922: polls until the fake login binary has done its part. The deadline is generous on purpose: the fixtures are
+ * scripts written a moment before, and while the machine launches many new executables (another test chain running)
+ * their first launch took about 5 s here, against about 0.3 s on an idle machine. A fast run still returns in a few
+ * hundred milliseconds; only a broken login waits the full deadline.
+ */
+async function waitFor(what: string, predicate: () => boolean, timeoutMs = 30_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!predicate()) {
-    if (Date.now() >= deadline) throw new Error('Timed out waiting for Claude login test state');
+    if (Date.now() >= deadline) throw new Error(`Timed out after ${timeoutMs} ms waiting for Claude login test state: ${what}`);
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
@@ -76,7 +82,7 @@ async function run(): Promise<void> {
     let completedB = 0;
     assert.equal(beginClaudeLogin(quickBinary, { onComplete: () => { completedA += 1; } }), 'started');
     assert.equal(beginClaudeLogin(quickBinary, { onComplete: () => { completedB += 1; } }), 'already-running');
-    await waitFor(() => completedA === 1 && completedB === 1);
+    await waitFor('both surfaces hear the quick login complete', () => completedA === 1 && completedB === 1);
     assert.equal(isClaudeLoginActive(), false);
 
     let cancelledA = 0;
@@ -92,7 +98,7 @@ async function run(): Promise<void> {
     const PAGE = 'https://claude.com/cai/oauth/authorize?code=abc';
     const urls: Record<'first' | 'asks' | 'ordinary', string[]> = { first: [], asks: [], ordinary: [] };
     assert.equal(beginClaudeLogin(urlBinary, { onUrl: (url) => urls.first.push(url) }), 'started');
-    await waitFor(() => urls.first.length === 1);
+    await waitFor('the login that started hears its page', () => urls.first.length === 1);
     assert.deepEqual(urls.first, [PAGE], 'the login that started hears its page');
     assert.equal(beginClaudeLogin(urlBinary, { onUrl: (url) => urls.asks.push(url), replayUrl: true }), 'already-running');
     assert.deepEqual(urls.asks, [PAGE], 'a joiner that asks (Home\'s card) gets the page it missed, at once');
@@ -115,7 +121,7 @@ async function run(): Promise<void> {
     assert.equal(claudeLoginPage(), null, 'and there is no page');
     assert.equal(beginClaudeLogin(urlBinary, {}), 'started');
     assert.equal(followClaudeLogin(follower), true, 'a running login is followed');
-    await waitFor(() => heard.length === 1);
+    await waitFor('the follower hears the page', () => heard.length === 1);
     assert.deepEqual(heard, [`url:${PAGE}`], 'the follower hears the page when the CLI prints it');
     assert.equal(claudeLoginPage(), PAGE, 'and the page is kept for "Open the page again"');
     const late: string[] = [];
