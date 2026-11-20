@@ -36,14 +36,14 @@ export { pdfFileName, pdfItemLabel, pdfKindFor, pdfKindOfView } from './deckPdfK
 /** Patch 021's command: a page's path in, its PDF's path out. */
 export const PRINT_COMMAND = '_ritemark.printHtmlToPdf';
 
-/**
- * The kinds this app makes, the one a view without its own kind is offered first: Slides and handout holds the handout,
- * so the Handout view offers it until PR 3 adds 'handout'.
- */
+/** The kinds this app makes; until PR 3 adds 'handout', the Handout view offers slides and handout (`pdfKindFor`). */
 export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout', 'slides'];
 
 /** Why nothing was saved after the dialog: the PDF couldn't be made or written. */
 export const PDF_NOT_SAVED = "The PDF couldn't be made, so nothing was saved.";
+
+/** Why Save slides as PDF saved nothing: every slide is skipped, or there are none. */
+export const PDF_NO_SLIDES = 'This deck has no slides to save, so nothing was saved.';
 
 /** What Save as PDF prints (`DeckPublisher.pageInput`). */
 export interface PrintInput {
@@ -145,9 +145,14 @@ export class DeckPdfSaver {
         const input = await this.source.pageInput(document, body, look, steps);
         const assets = await this.deps.assets();
         const built = await buildPrintPage(
-          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, ...(kind === 'slides' ? { print: 'slides' as const } : {}) },
+          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, print: kind === 'slides' ? 'slides' : undefined },
           { ...assets, themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
         );
+        // A deck whose slides are all skipped has nothing to print as slides: say so rather than save a blank page.
+        if (kind === 'slides' && built.deck.slides.length === 0) {
+          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES });
+          return;
+        }
         folder = await fs.promises.mkdtemp(path.join(this.deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));
         const page = await writePrintFolder(folder, built.html, [...input.fonts, ...(input.logo ? [input.logo] : [])], built.pictures);
         const pdf = await this.deps.print(page);

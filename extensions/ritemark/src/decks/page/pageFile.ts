@@ -233,6 +233,9 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
  * The page for a deck's text: `publicDeck`, its digest, and `pageHtml`, with each picture the page names checked to
  * be a file beside the deck (a missing one draws its empty place, as in the deck view).
  */
+/** What a page is made from; `print: 'slides'` only for Save slides as PDF (`buildPrintPage`). */
+type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' };
+
 export async function buildDeckPage(
   input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
   assets: PageAssets,
@@ -252,7 +255,7 @@ export const PRINT_PICTURE_FOLDER = 'pictures';
  * (`SLIDES_PRINT_CSS`), one 16:9 page a slide.
  */
 export async function buildPrintPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' },
+  input: PageInput,
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage & { pictures: Array<{ address: string; file: string }> }> {
@@ -273,7 +276,7 @@ export async function buildPrintPage(
 
 /** Both pages' one making: the digest of what the page carries, and the page, each picture at its address (or `placed`). */
 async function buildPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' },
+  input: PageInput,
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'>,
   placed: ((picture: { address: string; file: string }) => string) | null,
@@ -284,8 +287,11 @@ async function buildPage(
   // by an app without them, reads as changed once they can go.
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
   const digest = pageDigest(deck, [...[...found.values()].map(picture => picture.address), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
-  const urls = new Map([...found].map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), ...(input.print ? { print: input.print } : {}) });
+  // Save slides as PDF (Sprint 170 PR 2) prints the slides alone: the text's pictures aren't named, so they are neither
+  // copied to the print's folder nor waited for.
+  const slidePicture = (key: string) => input.print !== 'slides' || key.startsWith(pictureKey('', 'slide'));
+  const urls = new Map([...found].filter(([key]) => slidePicture(key)).map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), print: input.print });
   return { deck, digest, html };
 }
 
