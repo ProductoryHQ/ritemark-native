@@ -103,6 +103,8 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 
 Other sprints' merges between these PRs changed the file too; they are not counted.
 
+**The final shot:** `proof/pr4-unknown-name/2-menu-trukc-final-1440x900.png`, taken by this close-out on `main` at `851ae6eb` in one isolated test window, for the Experience lead's sprint-end set: Choose an icon on the unknown name "trukc" opens the menu with "trukc" searched, and only the three trucks are offered. It replaces the look of #909's shot 2, taken before that PR's review fixes.
+
 **Not run:** the presenter view's own window (it needs a second launch; it draws through the same path as the strip and the wall, which are shot, and the tests cover it); a screen reader; Windows.
 
 **Follow-up:** [#910](https://github.com/ProductoryHQ/ritemark-native/issues/910), an Icon button on the block bar so a box's icon can be chosen from the keyboard. Filed, not built.
