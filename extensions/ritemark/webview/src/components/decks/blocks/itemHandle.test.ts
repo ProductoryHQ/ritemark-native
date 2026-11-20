@@ -337,7 +337,11 @@ for (const [body, word, actions] of [
   const first = { left: 100, top: 200, width: 600, height: 30, padTop: 0 }
   const top = itemGripSpot('item', first, blockBox, 'list')
   const grip = gripSpot(blockBox)
-  assert.ok(top.top >= grip.top + HANDLE_SIZE, 'the first item\'s handle sits under the block\'s ⋮, never on it')
+  assert.ok(top.left + top.width <= grip.left, 'the first item\'s handle sits left of the block\'s ⋮, never on it')
+  assert.equal(top.top + top.height / 2, first.top + first.height / 2, 'on its own item\'s line')
+  const edge = itemGripSpot('item', first, { ...blockBox, left: 30 }, 'list')
+  const edgeGrip = gripSpot({ ...blockBox, left: 30 })
+  assert.ok(edge.left >= 0 && edge.top >= edgeGrip.top + HANDLE_SIZE, 'at the slide\'s edge: under the ⋮ instead')
 }
 
 // ---- The item under the pointer, near the block; none away from it.

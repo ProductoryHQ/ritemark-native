@@ -42,11 +42,12 @@ Gate: no code until Jarmo approves the plan, and each PR's branch `sprint-167-bl
 
 ## PR 5: item handle, B (High), branch `sprint-167-block-details-pr5`, after Sprint 166 merges
 - [x] Issue created in milestone v2.3.0 (manager): #839: to be created
-- [ ] Handle on the item under the pointer of the chosen block only, with its menu and drag (R2)
-- [ ] Column handle; Steps and list item handle on the left edge
-- [ ] Backspace in an empty item still removes it; the handle covers no words
-- [ ] Tests: each menu action with undo; the drop line
-- [ ] Shots of the box, column and item handles; the Experience lead's look
+- [x] Handle on the item under the pointer of the chosen block only, with its menu and drag (R2) (`blocks/itemHandle.ts`, `blocks/SlideItemHandle.tsx`)
+- [x] Column handle; Steps and list item handle on the left edge
+- [x] Backspace in an empty item still removes it; the handle covers no words
+- [x] Tests: each menu action with undo; the drop line (`blocks/itemHandle.test.ts`)
+- [x] Shots of the box, column and item handles (`proof/pr5-item-handle/`)
+- [ ] The Experience lead's look (before the merge)
 - [x] Release-notes line; PR Risk and How to revert; `REVIEW.md` review
 
 ## Sprint end

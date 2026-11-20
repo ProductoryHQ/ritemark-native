@@ -228,6 +228,8 @@ export function deleteItem(state: EditorState, blockPos: number, index: number):
 /** The Text editor's table grips (`TableHandlesLayer`): a column's pill on the top edge, a row's on the left edge. */
 export const ITEM_GRIP = { width: 28, height: 14 } as const
 export const ITEM_ROW_GRIP = { width: 14, height: 26 } as const
+/** How far a row grip stands off the block's left edge (the table grip's `GRIP_GAP`). */
+export const ITEM_GRIP_GAP = 4
 
 /** An item on the screen, in the frame: its box, and its top padding (where a box's handle may sit). */
 export interface PlacedItem extends Box {
@@ -237,8 +239,8 @@ export interface PlacedItem extends Box {
 /**
  * The handle's place and size: a box's on its top edge, in the middle, never lower than its padding (so it covers no
  * words at any fit); a column's in the middle over it, on the ring's top line (a column has no padding: its words start
- * at its edge); a step's or a list item's on the ring's left line, in the middle of the item, and under the block's ⋮
- * when it would meet it.
+ * at its edge); a step's or a list item's 4 px left of the block (over the ring's left line), in the middle of the item; the first item's, which would meet the block's ⋮ there, just
+ * left of the ⋮ on the same line (under it, it read as the second item's: the app run).
  */
 export function itemGripSpot(kind: ItemKind, item: PlacedItem, block: Box, blockKind: BarKind): Box {
   if (kind === 'box' || kind === 'column') {
@@ -250,11 +252,16 @@ export function itemGripSpot(kind: ItemKind, item: PlacedItem, block: Box, block
     return { left, top, width, height }
   }
   const { width, height } = ITEM_ROW_GRIP
-  const left = block.left - ringGap(blockKind) - RING_LINE / 2 - width / 2
+  // The table row grip's gap from its table: 4 px clear of the numbers or bullets, on the ring's line.
+  let left = block.left - ITEM_GRIP_GAP - width
   let top = item.top + item.height / 2 - height / 2
   const grip = gripSpot(block)
-  const meets = left < grip.left + HANDLE_SIZE && left + width > grip.left && top < grip.top + HANDLE_SIZE && top + height > grip.top
-  if (meets) top = grip.top + HANDLE_SIZE + 4
+  const meets = (x: number, y: number) => x < grip.left + HANDLE_SIZE && x + width > grip.left && y < grip.top + HANDLE_SIZE && y + height > grip.top
+  if (meets(left, top)) {
+    left = grip.left - ITEM_GRIP_GAP - width
+    // No room left of the ⋮ (the slide's edge): under it instead.
+    if (left < 0) { left = block.left - ITEM_GRIP_GAP - width; top = grip.top + HANDLE_SIZE + ITEM_GRIP_GAP }
+  }
   return { left, top, width, height }
 }
 
