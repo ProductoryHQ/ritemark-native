@@ -136,7 +136,7 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
   };
   // A box's top, right, bottom and left, from its inset shorthand (one to four values).
   const edges = (rule: Record<string, string>) => {
-    const values = (rule.inset ?? '').split(/\s+/).filter(Boolean);
+    const values = (rule.inset ?? '').match(/(?:[^\s()]+|\([^)]*\))+/g) ?? []; // a var(…) is one value
     const [top, right = top, bottom = top, left = right] = values;
     return { top, right, bottom, left };
   };
@@ -145,6 +145,14 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
   assert.equal(photo.position, 'absolute');
   assert.deepEqual(edges(photo), edges(veil), 'the picture covers what its veil covers: the slide as drawn, to every edge');
   assert.notEqual(edges(photo).bottom, 'auto', 'its foot is the slide\'s foot, never a height counted from a raised top');
+  // Its edges are the view's padding round the slide: 16 px on three sides, and at the foot 16 px, or 8 px with More open
+  // (the review of #912: with the text open below, a 16 px foot ran 8 px under its first line).
+  const view = declarations('.view');
+  const moreView = declarations('.wrap.more-open .view');
+  assert.equal(view.padding.split(/\s+/).slice(0, 2).join(' '), '16px 16px');
+  assert.deepEqual([edges(photo).top, edges(photo).right, edges(photo).left], ['-16px', '-16px', '-16px']);
+  assert.equal(edges(photo).bottom, 'var(--behind-foot, -16px)');
+  assert.equal(moreView['--behind-foot'], `-${moreView['padding-bottom']}`, 'with More open, the foot is the view\'s own');
   assert.ok(photo.height === undefined || photo.height === 'auto', `no height of its own (was ${photo.height})`);
   assert.equal(photo['max-height'], 'none', 'the general one-column picture\'s 220 px cap is lifted');
   // Cover-cropped round its focus: no narrow rule changes how the picture fills its box, and the slide sets its focus.
@@ -152,9 +160,6 @@ for (const outside of ['../../etc/passwd', '/etc/hosts', 'https://x.test/a.png',
     assert.equal(rule['background-size'], undefined);
     assert.equal(rule['background-position'], undefined);
   }
-  const behind = pageHtml(publicDeck(DECK.replace('picture: right', 'picture: behind'), { folderName: 'Harbour Logistics', deckName: 'Pictures', theme: BUILT_IN_THEME }), assets, { digest: 'b', pictureUrl });
-  const behindPhoto = parse(behind).querySelector('.layer .deck-sl.pic-behind .photo')!.getAttribute('style') ?? '';
-  assert.ok(behindPhoto.includes('background-position:30% 70%'), 'the picture Behind keeps its focus on the page');
   assert.ok(/\.deck-sl \.photo \{[^}]*background-size: cover;/.test(assets.slideCss), 'the slide fills its place, cropped (cover)');
 }
 

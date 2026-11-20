@@ -611,7 +611,7 @@ svg { flex: none; }
   body { overflow: auto; }
   .ground { position: fixed; }
   .view { position: relative; inset: auto; padding: 16px 16px calc(var(--line-h) + 12px); min-height: 100vh; }
-  .wrap.more-open .view { min-height: 0; padding-bottom: 8px; }
+  .wrap.more-open .view { min-height: 0; padding-bottom: 8px; --behind-foot: -8px; }
   .frame { position: relative; left: auto !important; top: auto !important; width: auto !important; height: auto !important; }
   .layer { position: relative; inset: auto; display: none; }
   .layer.on { display: block; }
@@ -633,9 +633,10 @@ svg { flex: none; }
   .layer.flow .deck-sl.is-blocks .photo { position: relative; inset: auto !important; width: auto !important; height: 34vw; max-height: 220px; margin: 0 0 16px; border-radius: 10px; }
   /* #905 (the Experience lead, 20 November): a picture Behind runs the full height of the slide as drawn here, words and
      the view's 16 px edge round them, as its veil does, cover-cropped round its focus (the slide's background-position);
-     it never ends partway down the words. A top pulled up by 16 px with the slide's own height ended 16 px short. */
-  .layer.flow .deck-sl.is-blocks.pic-behind .photo { position: absolute; inset: -16px !important; height: auto; max-height: none; margin: 0; border-radius: 0; }
-  .layer.flow .deck-sl.is-blocks.pic-behind .veil { position: absolute; inset: -16px !important; }
+     it never ends partway down the words. A top pulled up by 16 px with the slide's own height ended 16 px short. With
+     More open the view keeps 8 px under the slide (--behind-foot), so neither the picture nor its veil runs under the text. */
+  .layer.flow .deck-sl.is-blocks.pic-behind .photo { position: absolute; inset: -16px -16px var(--behind-foot, -16px) !important; height: auto; max-height: none; margin: 0; border-radius: 0; }
+  .layer.flow .deck-sl.is-blocks.pic-behind .veil { position: absolute; inset: -16px -16px var(--behind-foot, -16px) !important; }
   .layer.flow .deck-sl.is-blocks.pic-behind .blk-flow { z-index: 1; }
   .layer.flow .deck-sl.is-blocks .blk-columns { display: block; }
   .layer.flow .deck-sl.is-blocks .blk-column { padding: 0 0 .8em; }
