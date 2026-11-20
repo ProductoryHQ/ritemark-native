@@ -7,6 +7,7 @@
  * comment's words, both a standalone `<!-- note -->` (without its `{id:…}`) and an
  * anchored `<mark data-comment="note">…</mark>`'s note, as a passage after its block.
  */
+import { isLineBreakTag } from '../../../decks/blocks/lineBreakTag';
 import { marked } from 'marked';
 import { PassageSink, decodeEntities, type ReadOutcome } from './types';
 
@@ -50,6 +51,8 @@ function inlineText(tokens: Token[] | undefined, fallback: string | undefined, n
         break; // the path is not the person's words, and the picture isn't text
       case 'html':
       case 'tag':
+        // A heading's line break is written `<br>` (#923): a space, as a `br` token's.
+        if (isLineBreakTag(token.raw ?? token.text ?? '')) { text += ' '; break; }
         text += decodeEntities(stripTags(token.raw ?? token.text ?? '', notes));
         break;
       default:

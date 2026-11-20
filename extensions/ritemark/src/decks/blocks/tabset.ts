@@ -27,6 +27,7 @@
  * Pure and dependency-free apart from the `:::` scanner, so the slide renderer, the page, the slide editor's and the
  * Text editor's own `marked` read the same lines with it, and the save writes them back byte for byte.
  */
+import { headingWordsWithoutTags } from './lineBreakTag';
 import { CLOSE_FENCE, OPEN_FENCE, parseFenceAttributes, scanFencedDiv, type FenceAttributes, type FenceScan } from './fencedDiv';
 
 /** The class that makes a `:::` block a Tabs block (Quarto's). */
@@ -76,9 +77,8 @@ const HEADING_ATTRIBUTES = /[ \t]+\{[^{}]*\}[ \t]*$/;
 
 /** A heading's words as plain text: its emphasis, code marks, escapes and link targets taken out. */
 export function plainTabName(words: string): string {
-  return words
-    .replace(HEADING_ATTRIBUTES, '')
-    .replace(/<\/?[A-Za-z][^>]*>/g, '')
+  // A tab heading's line break (`<br>`, #923) is a space; an escaped `\<br>` is words.
+  return headingWordsWithoutTags(words.replace(HEADING_ATTRIBUTES, ''))
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     // The marks that wrap words first (`*plan*`, `**plan**`, `` `code` ``, `~~old~~`, `_plan_` never inside a word, so
     // `app_config.py` and `~/setup` keep theirs), then the escapes: an escaped `\*` is a star of the name.

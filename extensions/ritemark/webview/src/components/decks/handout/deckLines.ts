@@ -87,7 +87,8 @@ export function slidesFromLines(before: PMNode, state: EditorState, random: () =
     next = tr.doc.nodeAt(at + 1)
   }
   const heading = isPartHeading(next) ? next : null
-  const title = heading ? heading.textContent.trim() : ''
+  // A two-line heading's break (#923) is a space in the title it gives.
+  const title = heading ? heading.textBetween(0, heading.content.size, ' ', ' ').replace(/\s+/g, ' ').trim() : ''
   const id = newId(taken, random)
   const body = blockSlideBody({ id }, title ? `# ${headingMarkdown(title)}` : '')
   tr.replaceWith(at, at + 1, slideType.create({ kind: LINE_SLIDE_KIND, body, notes: null }))
@@ -137,7 +138,7 @@ export const firstHeadingTitleKey = new PluginKey<TitleWaiting>('deckFirstHeadin
 function writtenHeadingOf(doc: PMNode, slidePos: number): { text: string; from: number; to: number } | null {
   const heading = partHeadingAt(doc, slidePos)
   if (!heading || heading.node.attrs.deckDrawn === true) return null
-  const text = heading.node.textContent.trim()
+  const text = heading.node.textBetween(0, heading.node.content.size, ' ', ' ').replace(/\s+/g, ' ').trim()
   return text ? { text, from: heading.pos, to: heading.pos + heading.node.nodeSize } : null
 }
 

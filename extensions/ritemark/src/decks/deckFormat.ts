@@ -31,6 +31,7 @@
  */
 
 import { tabsetDepthTracker } from './blocks/tabset';
+import { headingWordsWithoutTags } from './blocks/lineBreakTag';
 
 /** The nine kinds a slide can have (README decision 8). A slide of any other kind is kept as written. */
 export const SLIDE_KINDS = ['title', 'section', 'points', 'boxes', 'columns', 'statement', 'exercise', 'picture', 'table'] as const;
@@ -775,10 +776,9 @@ export function splitBlockSlide(body: string): BlockSlideParts {
 
 /** A heading's words as plain text: its emphasis, code marks, escapes and link targets taken out. */
 function plainHeading(text: string): string {
-  return text
-    // A line break in a title (`<br>`, #923) is a space between its lines in the strip, the go-to box and the Contents.
-    .replace(/(^|[^\\])<br\s*\/?>/gi, '$1 ')
-    .replace(/<\/?[A-Za-z][^>]*>/g, '')
+  // A line break in a title (`<br>`, #923) is a space between its lines in the strip, the go-to box and the Contents;
+  // an escaped `\<br>` is words, kept.
+  return headingWordsWithoutTags(text)
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\\([\\`*_{}[\]()#+\-.!>~|<&$])/g, '$1')
     .replace(/(^|[^\\])[*_`~]+/g, '$1')

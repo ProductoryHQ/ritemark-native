@@ -852,16 +852,10 @@ function hasContentAfter(node: Element): boolean {
   return false
 }
 
-function insideHeading(node: Node): boolean {
+/** Is `node` inside a table cell or a heading: a block a newline would end? */
+function insideOneLineBlock(node: Node): boolean {
   for (let parent = node.parentNode; parent; parent = parent.parentNode) {
-    if (/^H[1-6]$/.test(parent.nodeName)) return true
-  }
-  return false
-}
-
-function insideTableCell(node: Node): boolean {
-  for (let parent = node.parentNode; parent; parent = parent.parentNode) {
-    if (parent.nodeName === 'TD' || parent.nodeName === 'TH') return true
+    if (/^(TD|TH|H[1-6])$/.test(parent.nodeName)) return true
   }
   return false
 }
@@ -874,7 +868,7 @@ function insideTableCell(node: Node): boolean {
  * no delimiters.
  */
 export function wrapMarked(content: string, delimiter: string): string {
-  const match = /^((?:\\?\n| +\n|<br>)*)([\s\S]*?)((?:\\?\n| +\n|(?<!\\)<br>)*)$/.exec(content)
+  const match = /^((?:\\?\n| +\n|<br>)*)([\s\S]*?)((?:\\?\n| +\n|(?<=(?:^|[^\\])(?:\\\\)*)<br>)*)$/.exec(content)
   const [lead, middle, trail] = match ? [match[1], match[2], match[3]] : ['', content, '']
   if (!middle.trim()) return lead + trail
   return lead + delimiter + middle + delimiter + trail
@@ -936,7 +930,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       // heading would end the heading: an ATX heading is one line, so `\\` and a
       // newline there read back as a literal `\\` and a paragraph (#923).
       // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
-      if (insideTableCell(element) || insideHeading(element)) return '<br>'
+      if (insideOneLineBlock(element)) return '<br>'
       const form = element.getAttribute('data-md-break')
       if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')

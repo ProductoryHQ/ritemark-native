@@ -236,6 +236,9 @@ for (const url of ['javascript:alert(1)', 'data:text/html,hi', 'file:///etc/host
   const marked = editorMarkdown(doc(h(1, schema.text('First', [bold]), n.hardBreak.create().mark([bold]), schema.text('second'))))
   assert.equal(marked, '# **First**<br>second', 'a break at a bold run\'s edge goes outside its `**`')
   assert.match(shape(marked), /"marks":\[\{"type":"bold"\}\],"text":"First"\},\{"type":"hardBreak"/, 'and the run is still bold on reopen')
+  const escaped = editorMarkdown(doc(h(1, schema.text('a\\', [bold]), n.hardBreak.create().mark([bold]), schema.text('second'))))
+  assert.equal(escaped, '# **a\\\\**<br>second', 'a break after an escaped backslash also goes outside the `**`')
+  assert.match(shape(escaped), /"marks":\[\{"type":"bold"\}\],"text":"a\\\\"\},\{"type":"hardBreak"/, 'and stays bold')
   assert.equal(editorMarkdown(doc(h(2, schema.text('end'), n.hardBreak.create()))), '## end', 'a break with nothing after it in a heading writes nothing')
   assert.equal(editorMarkdown(doc(h(2, schema.text('a <br> b')))), '## a \\<br> b', 'typed `<br>` words in a heading stay words')
   // A paragraph's typed break is unchanged.

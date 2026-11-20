@@ -34,6 +34,7 @@ import { Marked, marked, type Tokens } from 'marked';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { columnFloors, floorCss } from '../../markdown/tableColumns';
 import { exerciseTagOf, isBlockSlide, type SlideData } from '../deckFormat';
+import { isLineBreakTag } from '../blocks/lineBreakTag';
 import { agendaOf, blockRevealCount, blockSectionNumberOf, blockSlideMarkup, blockStepsLabelOf } from '../blocks/slideRenderer';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { slideMarkup, escapeHtml } from '../../../webview/src/components/decks/slide/slideMarkup';
@@ -189,9 +190,10 @@ class HandoutRenderer extends marked.Renderer {
       + `<button class="copy" type="button" aria-label="Copy the prompt"><span class="c1">${iconSvg('copy', 14)}Copy</span><span class="c2">${iconSvg('check', 14)}Copied</span></button>${open}</div>\n`;
   }
 
-  html(html: string): string {
-    // A line break in a heading is written `<br>` (#923: `\` and a newline would end it): drawn as a break.
-    if (/^<br\s*\/?>$/i.test(html.trim())) return '<br>';
+  html(html: string, block?: boolean): string {
+    // An inline line break is written `<br>` in a heading (#923: `\` and a newline would end it): drawn as a break, as
+    // the slide renderer draws it. One on a line of its own is a block of raw HTML, shown as its words like any other.
+    if (!block && isLineBreakTag(html)) return '<br>';
     return sanitizeHtml(html);
   }
 

@@ -8,6 +8,7 @@
 import { strict as assert } from 'node:assert'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { blockTitleOf } from '../../../../../src/decks/deckFormat'
+import { tabHeadingOf } from '../../../../../src/decks/blocks/tabset'
 import { loadSlide, saveSlide, slideSchema } from './slideEditorHarness'
 
 const n = slideSchema.nodes
@@ -36,6 +37,9 @@ assert.equal(blockSlideHtml('# a \\<br> b').trim(), '<h1>a &lt;br&gt; b</h1>', '
 
 // ---- the slide's name (strip, go-to box, Contents, Agenda) joins its lines with a space ----
 assert.equal(blockTitleOf(written), 'First line second line')
+assert.equal(blockTitleOf('# a \\<br> b'), 'a <br> b', 'typed `<br>` words stay in the name, without a stray backslash')
+assert.equal(blockTitleOf('# a\\\\<br>b'), 'a\\ b', 'a break after an escaped backslash is still a break')
+assert.equal(tabHeadingOf('### Left<br>side')?.name, 'Left side', 'a tab\'s two-line heading names it with a space')
 
 // ---- a title saved the old way opens as every Markdown reader shows it, never guessed into one title ----
 const old = '# First line\\\nsecond line'

@@ -208,6 +208,7 @@ assert.deepEqual(scanText(html), []);
   // #923: a heading's line break is written `<br>`, and drawn as a break; any other tag stays text.
   assert.equal(render('## First line<br>second line'), '<h3>First line<br>second line</h3>\n');
   assert.equal(render('a<br/>b <br onclick=x>'), '<p>a<br>b &lt;br onclick=x&gt;</p>\n');
+  assert.equal(render('One\n\n<br>\n\nTwo'), '<p>One</p>\n<p>&lt;br&gt;</p>\n<p>Two</p>\n', 'a `<br>` on a line of its own is a block of raw HTML: its words, as any other');
   // Ticks: a task list anywhere, and an exercise's numbered steps; a list elsewhere stays a list.
   assert.equal(parse(render('- [ ] one\n- [x] two')).querySelectorAll('ul.steps input[data-tick]').length, 2);
   assert.ok(parse(render('- [x] two')).querySelector('input')!.hasAttribute('checked'));

@@ -94,6 +94,9 @@ async function main() {
     // A comment's words are marked as a comment's, so R9 doesn't count them in the document's text.
     const comments = outcome.ok ? outcome.passages.filter((p) => p.at.comment).map((p) => p.text) : [];
     assert.deepEqual(comments, ['@claude: check the figures', 'verify with finance']);
+    // #923: a heading's line break is written `<br>`: a space between its words, never glued.
+    const twoLines = readMarkdown('## First line<br>second line', BUDGET);
+    assert.deepEqual(twoLines.ok && twoLines.passages.map((p) => p.text), ['First line second line']);
     // The budget per document.
     const capped = readMarkdown('word '.repeat(1000), 100);
     assert.ok(capped.ok && capped.truncated && capped.passages[0].text.length <= 100);
