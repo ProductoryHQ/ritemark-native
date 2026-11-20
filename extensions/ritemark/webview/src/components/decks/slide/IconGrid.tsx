@@ -44,7 +44,9 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   const inUseOf = useContext(DeckIconsContext)
   // The deck's icons as the menu opens; they don't change while it is open.
   const [inUse] = useState(inUseOf)
-  const [query, setQuery] = useState(() => iconMenuStartQuery(current))
+  // An unknown name as written starts the search (Sprint 169 PR 4); the menu opens once per pick, so it is read once.
+  const [startQuery] = useState(() => iconMenuStartQuery(current))
+  const [query, setQuery] = useState(startQuery)
   const { icons, total, searching } = useMemo(() => iconMenuChoices(query, inUse), [query, inUse])
   // The highlighted choice: an icon's place, `icons.length` for No icon, -1 for none. Typing highlights the best result.
   const [active, setActive] = useState(-1)
@@ -57,12 +59,13 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   const field = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
-      field.current?.focus({ preventScroll: true })
-      // An unknown name searched for is selected, so the first key typed replaces it.
-      field.current?.select()
+      const input = field.current
+      input?.focus({ preventScroll: true })
+      // An unknown name searched for is selected, so the first key typed replaces it; never what one already typed.
+      if (input && startQuery && input.value === startQuery) input.select()
     })
     return () => cancelAnimationFrame(frame)
-  }, [])
+  }, [startQuery])
 
   const scroller = useRef<HTMLDivElement>(null)
   // Only a key scrolls the list to the highlight; the pointer highlights what it is over, and the list stays put.

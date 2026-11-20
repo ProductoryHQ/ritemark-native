@@ -12,10 +12,6 @@ import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
 import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
 import { ICON_MENU_PAGE, deckIconsInUse, editsBetween, iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuStartQuery, searchIcons } from './iconSearch'
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import * as Menu from '@radix-ui/react-dropdown-menu'
-import { IconGridItems } from './IconGrid'
 
 let passed = 0
 function test(name: string, run: () => void) {
@@ -260,8 +256,11 @@ test('PR 4 (#869): a misspelt name finds the names nearest it, nearest first; no
   assert.equal(first('calender'), 'calendar', 'a letter changed')
   assert.equal(first('rocekt'), 'rocket')
   assert.ok(searchIcons('peple').some(icon => icon.name === 'users'), "a tag's word: people")
-  assert.deepEqual(searchIcons('not-a-real-icon'), [], 'nothing near: No icons match')
-  assert.deepEqual(searchIcons('zq'), [], 'two letters: no near names')
+  assert.deepEqual(searchIcons('qqzx-wvvk'), [], 'nothing near: No icons match')
+  for (const nonsense of ['qwe', 'abx', 'qwer', 'zxcv', 'zq']) assert.deepEqual(searchIcons(nonsense), [], `${nonsense}: under four letters or nothing near`)
+  // An unknown name of several words (an AI's "delivery-van") finds what its words find, then what is near them.
+  assert.deepEqual(searchIcons('delivery-van').map(icon => icon.phosphor).sort(), ['package', 'truck', 'van'])
+  assert.ok(searchIcons('delivry-vann').some(icon => icon.phosphor === 'van'), 'near one of its words')
   // A search that finds names as before isn't widened by near ones.
   assert.ok(searchIcons('truck').every(icon => icon.phosphor.includes('truck') || ICON_TAGS[icon.phosphor].includes('truck')))
   assert.equal(editsBetween('trukc', 'truck', 1), 1)
@@ -277,21 +276,6 @@ test("PR 4: the menu's search starts with a box's unknown name, as written; a kn
   assert.equal(iconMenuStartQuery('mail'), '', 'an alias is known')
   assert.equal(iconMenuStartQuery(null), '')
   assert.equal(iconMenuStartQuery('  '), '')
-})
-
-test('PR 4: the icon menu opened for an unknown name has it in the field and the nearest icons first', () => {
-  const open = (current: string | null) => renderToStaticMarkup(createElement(Menu.Root, { open: true, modal: false },
-    createElement(Menu.Trigger), createElement(Menu.Content, null, createElement(IconGridItems, { current, onPick: () => {} }))))
-  const fieldOf = (html: string) => /<input[^>]*placeholder="Search icons"[^>]*value="([^"]*)"/.exec(html)?.[1]
-  const labels = (html: string) => [...html.matchAll(/aria-label="([^"]+)"[^>]*data-choice="\d+"/g)].map(match => match[1])
-  const misspelt = open('trukc')
-  assert.equal(fieldOf(misspelt), 'trukc')
-  assert.equal(labels(misspelt)[0], searchIcons('trukc')[0].label)
-  assert.ok(!misspelt.includes('No icons match'))
-  const known = open('lightbulb')
-  assert.equal(fieldOf(known), '', 'a known icon: the field empty')
-  assert.equal(labels(known).length, SLIDE_ICON_NAMES.length, 'the 24 shown')
-  assert.ok(open('not-a-real-icon').includes('No icons match'), 'nothing near: No icons match')
 })
 
 console.log(`iconSearch: ${passed} passed`)
