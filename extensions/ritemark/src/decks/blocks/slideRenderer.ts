@@ -140,8 +140,20 @@ let state: RenderState = freshState();
  */
 function wordLinkHtml(href: string, wordsHtml: string): string {
   if (!isWordLinkAddress(href)) return `<span class="blk-link">${wordsHtml}</span>`;
-  if (state.buttonLinks) return `<a class="blk-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer" tabindex="-1">${wordsHtml}</a>`;
+  // A mail address opens the mail app: no empty new tab beside it.
+  const tab = /^mailto:/i.test(href) ? '' : ' target="_blank"';
+  if (state.buttonLinks) return `<a class="blk-link" href="${esc(href)}"${tab} rel="noopener noreferrer" tabindex="-1">${wordsHtml}</a>`;
   return `<span class="blk-link" role="link" data-href="${esc(href)}" tabindex="-1">${wordsHtml}</span>`;
+}
+
+/**
+ * #930: a link token's address as the slide opens it. A `[words](address)` link's is marked's own (its escapes read);
+ * an autolink's (`<https://…>`, a bare `https://…`) keeps the backslash escapes a serializer may have written
+ * (`a\\_b`), which a browser would read as `/`: they are read here too.
+ */
+export function wordLinkHref(link: Pick<Tokens.Link, 'href' | 'raw'>): string {
+  const href = link.href ?? '';
+  return link.raw.startsWith('[') ? href : href.replace(/\\([!-/:-@[-`{-~])/g, '$1');
 }
 
 /** A picture's file name, from the path the slide names. */
@@ -503,7 +515,7 @@ function createSlideMarked(): Marked {
       name: 'link',
       renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
         const link = token as Tokens.Link;
-        return wordLinkHtml(link.href, this.parser.parseInline(link.tokens ?? []));
+        return wordLinkHtml(wordLinkHref(link), this.parser.parseInline(link.tokens ?? []));
       },
     }, {
       // Experience 49: a picture alone in its paragraph (its attribute block beside it) is a block of its own, decided
@@ -652,27 +664,48 @@ export function blockPicturePaths(markdown: string): string[] {
  * opens only these for the wall: an address that isn't on a button of the deck is never opened.
  */
 export function blockButtonAddresses(markdown: string): string[] {
-  if (!markdown.includes('{')) return [];
-  const found = new Set<string>();
-  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
-    if (token.type !== 'paragraph') return;
-    const button = buttonParagraphOf((token as Tokens.Paragraph).tokens);
-    if (button && isButtonAddress(button.href)) found.add(button.href);
-  });
-  return [...found];
+  return blockLinkAddresses(markdown).buttons;
 }
 
 /**
- * #930: the addresses a block slide's word links open (`isWordLinkAddress`), read as the renderer reads them. Present's
- * host opens a word link for the wall only when it is one of these, as it does a button's.
+ * #930: the addresses a block slide's word links open (`isWordLinkAddress`), read as the renderer reads them: inline,
+ * reference and autolinks alike, but not a button's own link. Present's host opens a word link for the wall only when
+ * it is one of these, as it does a button's.
  */
 export function blockWordLinkAddresses(markdown: string): string[] {
-  if (!markdown.includes('](')) return [];
-  const found = new Set<string>();
-  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
-    if (token.type === 'link' && isWordLinkAddress((token as Tokens.Link).href)) found.add((token as Tokens.Link).href);
-  });
-  return [...found];
+  return blockLinkAddresses(markdown).words;
+}
+
+const linkAddressCache = new Map<string, { buttons: string[]; words: string[] }>();
+
+/** A block slide's buttons' and word links' addresses, in one reading of its Markdown (cached by the Markdown). */
+function blockLinkAddresses(markdown: string): { buttons: string[]; words: string[] } {
+  const cached = linkAddressCache.get(markdown);
+  if (cached) return cached;
+  const buttons = new Set<string>();
+  const words = new Set<string>();
+  if (/[:@\[<]/.test(markdown)) {
+    // A button's own link token: never a word link (an http one draws an inert button, so it opens nothing).
+    const buttonLinks = new Set<Token>();
+    slideMarked.walkTokens(lexBlockSlide(markdown), token => {
+      if (token.type === 'paragraph') {
+        const tokens = (token as Tokens.Paragraph).tokens ?? [];
+        const button = buttonParagraphOf(tokens);
+        if (!button) return;
+        const own = [...tokens].reverse().find(child => child.type === 'link');
+        if (own) buttonLinks.add(own);
+        if (isButtonAddress(button.href)) buttons.add(button.href);
+        return;
+      }
+      if (token.type !== 'link' || buttonLinks.has(token)) return;
+      const href = wordLinkHref(token as Tokens.Link);
+      if (isWordLinkAddress(href)) words.add(href);
+    });
+  }
+  const found = { buttons: [...buttons], words: [...words] };
+  if (linkAddressCache.size > 500) linkAddressCache.clear();
+  linkAddressCache.set(markdown, found);
+  return found;
 }
 
 /** Every picture a slide names: its `image:` line and, for a block slide, the pictures in its Markdown. */

@@ -5,15 +5,16 @@
  *
  * Pure: no `vscode`, so the test reads the same set the host does.
  */
-import { isBlockSlide, parseDeck, slideDataOf } from './deckFormat';
+import { parseDeck, slideDataOf } from './deckFormat';
+import { blockDataOf, drawsAsBlocks } from './blocks/convertDeck';
 import { blockButtonAddresses, blockWordLinkAddresses } from './blocks/slideRenderer';
 
 /** The full https addresses (`isButtonAddress`) the buttons on the deck's block slides open. */
 export function deckButtonAddresses(text: string): Set<string> {
   const found = new Set<string>();
   for (const slide of parseDeck(text).slides) {
-    if (!isBlockSlide(slide.kind)) continue;
-    for (const address of blockButtonAddresses(slideDataOf(slide.kind, slide.body).markdown ?? '')) found.add(address);
+    if (!drawsAsBlocks(slide.kind)) continue;
+    for (const address of blockButtonAddresses(drawnMarkdown(slide.kind, slide.body))) found.add(address);
   }
   return found;
 }
@@ -25,8 +26,13 @@ export function deckButtonAddresses(text: string): Set<string> {
 export function deckWordLinkAddresses(text: string): Set<string> {
   const found = new Set<string>();
   for (const slide of parseDeck(text).slides) {
-    if (!isBlockSlide(slide.kind)) continue;
-    for (const address of blockWordLinkAddresses(slideDataOf(slide.kind, slide.body).markdown ?? '')) found.add(address);
+    if (!drawsAsBlocks(slide.kind)) continue;
+    for (const address of blockWordLinkAddresses(drawnMarkdown(slide.kind, slide.body))) found.add(address);
   }
   return found;
+}
+
+/** A slide's Markdown as the wall draws it: a block slide's own, a v1 slide of the nine kinds' as converted (`blockDataOf`). */
+function drawnMarkdown(kind: string, body: string): string {
+  return blockDataOf(kind, slideDataOf(kind, body)).markdown ?? '';
 }

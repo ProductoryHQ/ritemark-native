@@ -482,8 +482,11 @@ export class DeckPresenter implements vscode.Disposable {
         // Sprint 163 PR 3: a Button block's button, in the person's own browser; not a move. Only an address a button
         // of the deck carries now: the wall asks for nothing else.
         // #930: or a link in a slide's words, only one the deck's words carry.
-        if (openButtonLink(request.url, address => deckButtonAddresses(running.origin.document.getText()).has(address))) return;
-        openWordLink(request.url, address => deckWordLinkAddresses(running.origin.document.getText()).has(address));
+        {
+          const text = running.origin.document.getText();
+          if (openButtonLink(request.url, address => deckButtonAddresses(text).has(address))) return;
+          openWordLink(request.url, address => deckWordLinkAddresses(text).has(address));
+        }
         return;
       case 'present/presenter':
         await this.setPresenter(!running.presenter);

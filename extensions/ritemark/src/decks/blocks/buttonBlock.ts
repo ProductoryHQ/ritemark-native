@@ -52,17 +52,7 @@ export const BUTTON_MAX_ADDRESS = 2048;
  * relative path, `https:example.com`) is refused.
  */
 export function isButtonAddress(value: unknown): value is string {
-  if (typeof value !== 'string' || value.length > BUTTON_MAX_ADDRESS) return false;
-  if (!/^https:\/\//i.test(value)) return false;
-  // A space, a control character or a line break never belongs in an address (and would split it in the file).
-  if (/[\s\u0000-\u001f\u007f]/.test(value)) return false;
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return false;
-  }
-  return url.protocol === 'https:' && url.hostname.length > 0 && !url.username && !url.password;
+  return isWordLinkAddress(value) && /^https:\/\//i.test(value);
 }
 
 /**

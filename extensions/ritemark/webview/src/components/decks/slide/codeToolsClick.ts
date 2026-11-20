@@ -75,20 +75,13 @@ export function codeToolsClick(target: EventTarget | null, root: ParentNode, act
   const element = target && typeof (target as Element).closest === 'function' ? target as Element : null
   // Sprint 163 PR 3: a button on the slide opens its address in the person's own browser (the host checks it again);
   // a button with no full https address does nothing, and neither moves the wall on.
-  const button = element?.closest('.blk-btn') ?? null
-  if (button && actions.link) {
-    closeCodeMenus(root)
-    const href = button.getAttribute('data-href')
-    if (isButtonAddress(href)) actions.link(href)
-    return 'used'
-  }
   // #930: a link in the slide's words opens the same way (the renderer puts only a full http(s) or mailto address on
   // it, `isWordLinkAddress`; the host checks it against the deck again). Words with no address stay words.
-  const wordLink = element?.closest('.blk-link[data-href]') ?? null
-  if (wordLink && actions.link) {
+  const link = element?.closest('.blk-btn, .blk-link[data-href]') ?? null
+  if (link && actions.link) {
     closeCodeMenus(root)
-    const href = wordLink.getAttribute('data-href')
-    if (isWordLinkAddress(href)) actions.link(href)
+    const href = link.getAttribute('data-href')
+    if (link.classList.contains('blk-btn') ? isButtonAddress(href) : isWordLinkAddress(href)) actions.link(href!)
     return 'used'
   }
   const tools = element?.closest('.cb-tools') ?? null

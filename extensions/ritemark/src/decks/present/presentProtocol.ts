@@ -18,7 +18,7 @@ import { slideArrivalOf, type SlideArrival } from './slideArrival';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
 import { isTab, tabsOf, type WallTabs } from './wallTabs';
 import { COPY_MAX_TEXT, isOpenInAddress } from '../blocks/codeTools';
-import { isButtonAddress, isWordLinkAddress } from '../blocks/buttonBlock';
+import { isWordLinkAddress } from '../blocks/buttonBlock';
 
 export type { WallReveal };
 
@@ -503,7 +503,7 @@ export function decodeWallRequest(value: unknown): WallRequest | null {
     case 'present/open-in':
       return exactKeys(input, ['type', 'url']) && isOpenInAddress(input.url) ? { type: 'present/open-in', url: input.url } : null;
     case 'present/open-link':
-      return exactKeys(input, ['type', 'url']) && (isButtonAddress(input.url) || isWordLinkAddress(input.url)) ? { type: 'present/open-link', url: input.url } : null;
+      return exactKeys(input, ['type', 'url']) && isWordLinkAddress(input.url) ? { type: 'present/open-link', url: input.url } : null;
     case 'present/pointer': {
       if (!exactKeys(input, ['type', 'at'])) return null;
       if (input.at === null) return { type: 'present/pointer', at: null };

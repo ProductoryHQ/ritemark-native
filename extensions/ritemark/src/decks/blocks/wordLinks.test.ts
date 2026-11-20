@@ -12,7 +12,8 @@ import * as path from 'node:path';
 import { createDocument } from '@mixmark-io/domino';
 import { parse } from 'node-html-parser';
 import { isWordLinkAddress } from './buttonBlock';
-import { blockSlideHtml, blockSlideMarkup, blockWordLinkAddresses } from './slideRenderer';
+import { blockButtonAddresses, blockSlideHtml, blockSlideMarkup, blockWordLinkAddresses } from './slideRenderer';
+import { deckButtonAddresses } from '../deckButtons';
 import { deckWordLinkAddresses } from '../deckButtons';
 import { decodeWallRequest } from '../present/presentProtocol';
 import { BUILT_IN_THEME } from '../deckTheme';
@@ -55,7 +56,7 @@ const SLIDE = '# Read first\n\nThe [bank report](https://example.com/report?a=1&
 {
   const page = blockSlideHtml(SLIDE, { buttonLinks: true });
   assert.ok(page.includes('<a class="blk-link" href="https://example.com/report?a=1&amp;b=2" target="_blank" rel="noopener noreferrer" tabindex="-1">bank report</a>'), page);
-  assert.ok(page.includes('<a class="blk-link" href="mailto:trainer@example.com" target="_blank" rel="noopener noreferrer" tabindex="-1">mail me</a>'), page);
+  assert.ok(page.includes('<a class="blk-link" href="mailto:trainer@example.com" rel="noopener noreferrer" tabindex="-1">mail me</a>'), page);
   const wall = blockSlideHtml(SLIDE);
   assert.ok(!wall.includes('<a '), 'the wall, the strip and the stage draw no <a>');
   assert.ok(wall.includes('<span class="blk-link" role="link" data-href="https://example.com/report?a=1&amp;b=2" tabindex="-1">bank report</span>'), wall);
@@ -78,6 +79,36 @@ for (const address of ['javascript:alert(1)', 'data:text/html,x', 'file:///etc/p
 {
   const html = blockSlideHtml('[x](<https://example.com/a"onmouseover="alert(1)>)', { buttonLinks: true });
   assert.ok(!/"\s*onmouseover=/.test(html), html);
+}
+
+// ---- Review round 1: autolinks and reference links are links too, read the same way everywhere
+{
+  const md = 'See https://example.com/report and <https://example.com/angle> and [ref][r].\n\n[r]: https://example.com/ref';
+  const page = blockSlideHtml(md, { buttonLinks: true });
+  for (const address of ['report', 'angle', 'ref']) assert.ok(page.includes(`<a class="blk-link" href="https://example.com/${address}"`), `${address}: ${page}`);
+  assert.deepEqual(blockWordLinkAddresses(md).sort(), ['https://example.com/angle', 'https://example.com/ref', 'https://example.com/report']);
+  // A serializer's escapes in a bare address are read, so the link opens the address written (not `a/_b`).
+  const escaped = 'Go to https://example.com/a\\_b\\&c=1 now.';
+  assert.ok(blockSlideHtml(escaped, { buttonLinks: true }).includes('href="https://example.com/a_b&amp;c=1"'), blockSlideHtml(escaped, { buttonLinks: true }));
+  assert.deepEqual(blockWordLinkAddresses(escaped), ['https://example.com/a_b&c=1']);
+  // A button's own link is a button's, never a word link: an http one draws an inert button and opens nothing.
+  const buttons = 'Words [inside](https://example.com/w). [Open](http://example.com/x){.button}\n\n[Get](https://example.com/y){.button}';
+  assert.deepEqual(blockWordLinkAddresses(buttons), ['https://example.com/w']);
+  assert.deepEqual(blockButtonAddresses(buttons), ['https://example.com/y']);
+}
+
+// ---- Review round 1: a v1 slide the wall draws as blocks has its links on the deck's list too
+{
+  const deck = '```slide points\nid: p1\ntitle: Read\nitems:\n- text: See https://example.com/v1 first\n```\n';
+  assert.ok(deckWordLinkAddresses(deck).has('https://example.com/v1'), [...deckWordLinkAddresses(deck)].join(','));
+  assert.equal(deckButtonAddresses(deck).size, 0);
+}
+
+// ---- Review round 1: a thumbnail's link is the thumbnail's click (All slides, the strip, the presenter's rows)
+{
+  const css = fs.readFileSync(path.resolve(__dirname, '..', '..', '..', 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8');
+  assert.match(css, /\.wall-grid \.blk-link[^{]*\{ pointer-events: none; \}/);
+  assert.match(css, /\.deck-thumb \.blk-link,/);
 }
 
 // ---- The published page (and so every PDF kind, which prints it)
