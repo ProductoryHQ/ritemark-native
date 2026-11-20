@@ -477,7 +477,7 @@ export function addItem(state: EditorState, pos: number): Transaction | null {
 }
 
 /** Every comment note inside a node, in order. */
-function notesIn(node: PMNode): PMNode[] {
+export function notesIn(node: PMNode): PMNode[] {
   const notes: PMNode[] = []
   node.descendants(child => {
     if (isNote(child)) notes.push(child)
@@ -515,7 +515,7 @@ export function columnCount(node: PMNode): number {
 }
 
 /** Each column's `width` taken out (an even split again), in `tr` as it is now. */
-function withoutWidths(tr: Transaction, pos: number): void {
+export function withoutWidths(tr: Transaction, pos: number): void {
   const block = tr.doc.nodeAt(pos)
   if (!block) return
   for (const column of columnsOf(block, pos)) {

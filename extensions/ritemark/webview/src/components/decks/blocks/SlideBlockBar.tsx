@@ -31,6 +31,8 @@ import {
   type ChosenBlock,
 } from './blockBar'
 import { caretBoxPos, markableBox } from './slideDivView'
+import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
+import { SlideItemHandle } from './SlideItemHandle'
 import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
 
@@ -66,13 +68,16 @@ interface Placed {
   pane: { left: number; right: number }
   /** The icon handle: on the caret's box while it has no icon (its empty place is drawn), at its spot in the frame. */
   icon: { pos: number; left: number; top: number } | null
+  /** Sprint 167 PR 5 (README item B): the block's boxes, columns, steps or list items in the frame, and the caret's. */
+  items: PlacedItem[]
+  caretItem: number | null
 }
 
 function samePlace(a: Placed, b: Placed): boolean {
   const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
   return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
     && a.markerX === b.markerX && a.pane.left === b.pane.left && a.pane.right === b.pane.right && JSON.stringify(a.lines) === JSON.stringify(b.lines)
-    && JSON.stringify(a.icon) === JSON.stringify(b.icon)
+    && JSON.stringify(a.icon) === JSON.stringify(b.icon) && a.caretItem === b.caretItem && JSON.stringify(a.items) === JSON.stringify(b.items)
 }
 
 function boxIn(rect: DOMRect, origin: DOMRect): Box {
@@ -183,7 +188,12 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [barAt, setBarAt] = useState<{ left: number; top: number } | null>(null)
-  const [drag, setDrag] = useState<{ kind: 'move'; y: number; width: number; left: number } | { kind: 'split'; x: number; top: number; height: number } | null>(null)
+  const [drag, setDrag] = useState<{ kind: 'move'; y: number; width: number; left: number } | { kind: 'split'; x: number; top: number; height: number } | { kind: 'item'; from: number; line: DropLine | null } | null>(null)
+  // Sprint 167 PR 5: the item the pointer is at (the handle follows it), and the item whose menu is open.
+  const [hoverItem, setHoverItem] = useState<number | null>(null)
+  const [itemMenu, setItemMenu] = useState<number | null>(null)
+  const placedRef = useRef<Placed | null>(null)
+  const dragRef = useRef(false)
   const barRef = useRef<HTMLDivElement | null>(null)
   const chosenKey = useRef<string | null>(null)
   // The handles' layer, the frame's last child while the frame is there.
@@ -244,7 +254,19 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       const scale = box.offsetWidth ? rect.width / box.offsetWidth : 1
       icon = { pos: boxPos, ...iconSpot(boxIn(rect, origin), scale) }
     }
-    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, icon }
+    // README item B: each item's place, and its top padding (a box's handle sits in it, never over its words).
+    const items: PlacedItem[] = []
+    if (itemKindOf(block.kind)) {
+      for (const item of blockItems(block)) {
+        const element = editor.view.nodeDOM(item.pos) as HTMLElement | null
+        if (!element || typeof element.getBoundingClientRect !== 'function') continue
+        const rect = element.getBoundingClientRect()
+        const scale = element.offsetWidth ? rect.width / element.offsetWidth : 1
+        items.push({ ...boxIn(rect, origin), padTop: (parseFloat(getComputedStyle(element).paddingTop) || 0) * scale })
+      }
+    }
+    const caretItem = caretItemIndex(editor.state, block)
+    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, icon, items, caretItem }
     // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
     setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
@@ -278,6 +300,30 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [editor, frame, measure])
 
   const showing = open && !!chosen && !!placed
+  placedRef.current = placed
+  dragRef.current = !!drag
+  // Another block (or none) chosen: no item of the last one is pointed at or has its menu open.
+  const itemsKey = chosen ? `${chosen.pos}:${chosen.kind}` : ''
+  useEffect(() => { setHoverItem(null); setItemMenu(null) }, [itemsKey])
+  // The item under the pointer, while it is over the chosen block or near it (`itemAtPoint`); none when it leaves the
+  // slide's frame (the caret's item then has the handle). It holds still while a handle drags.
+  useEffect(() => {
+    if (!frame) return
+    const pointer = (event: PointerEvent) => {
+      const now = placedRef.current
+      if (dragRef.current || !now) return
+      const origin = frame.getBoundingClientRect()
+      const next = itemAtPoint(now.items, now.block, event.clientX - origin.left, event.clientY - origin.top)
+      setHoverItem(current => (current === next ? current : next))
+    }
+    const leave = () => { if (!dragRef.current) setHoverItem(null) }
+    frame.addEventListener('pointermove', pointer)
+    frame.addEventListener('pointerleave', leave)
+    return () => {
+      frame.removeEventListener('pointermove', pointer)
+      frame.removeEventListener('pointerleave', leave)
+    }
+  }, [frame])
   // Esc or a press outside the bar and the slide closes it (the slide's frame is its trigger: a press there is the
   // block's own, and opens it again).
   useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, enabled: showing })
@@ -507,6 +553,25 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
           ))}
           {drag?.kind === 'move' ? <div className="deck-block-drop" style={{ left: drag.left, top: drag.y - 1, width: drag.width }} aria-hidden="true" /> : null}
           {drag?.kind === 'split' ? <div className="deck-block-guide" style={{ left: drag.x - 1, top: drag.top, height: drag.height }} aria-hidden="true" /> : null}
+          {/* README item B: the item's own handle, on the pointer's item, else the caret's; its drop line while it drags. */}
+          {frame ? <SlideItemHandle
+            editor={editor}
+            frame={frame}
+            chosen={chosen}
+            block={block}
+            items={placed.items}
+            index={drag?.kind === 'item' ? drag.from : hoverItem !== null && hoverItem < placed.items.length ? hoverItem : placed.caretItem}
+            hidden={!!drag}
+            menuAt={itemMenu !== null && itemMenu < placed.items.length ? itemMenu : null}
+            onMenu={setItemMenu}
+            onDrag={state => setDrag(state ? { kind: 'item', ...state } : null)}
+            run={make => run(act(make))}
+          /> : null}
+          {drag?.kind === 'item' && drag.line ? (
+            drag.line.width > 0
+              ? <div className="deck-block-drop" style={{ left: drag.line.left, top: drag.line.top - 1, width: drag.line.width }} aria-hidden="true" />
+              : <div className="deck-block-guide" style={{ left: drag.line.left - 1, top: drag.line.top, height: drag.line.height }} aria-hidden="true" />
+          ) : null}
         </>
       ) : null, layer)}
       {/* Hidden while a handle drags, so it never covers where the block lands (the app run's drag shot). */}
