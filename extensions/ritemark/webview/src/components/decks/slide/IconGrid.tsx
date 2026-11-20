@@ -11,12 +11,15 @@
  * highlighted, Enter chooses (through the item, so the menu closes), Esc and a click outside close the menu as every
  * popup does. The field names the highlight to a screen reader (`aria-activedescendant`). The choices' place keeps its
  * size, so the menu never jumps.
+ *
+ * Sprint 169 PR 4 (#869): for a box whose icon names one Ritemark doesn't know, the field opens with that name in it,
+ * selected, so the nearest icons show at once and typing replaces it (`iconMenuStartQuery`).
  */
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import { DropdownMenuItem, DropdownMenuSeparator } from '../../ui/dropdown-menu'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
-import { iconMenuChoices, iconMenuMoreLine, iconMenuMove, type IconMenuMove } from './iconSearch'
+import { iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuStartQuery, type IconMenuMove } from './iconSearch'
 import type { SlideIcon } from './iconSet'
 import { SlideIconGlyph } from './SlideIconGlyph'
 
@@ -41,7 +44,9 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   const inUseOf = useContext(DeckIconsContext)
   // The deck's icons as the menu opens; they don't change while it is open.
   const [inUse] = useState(inUseOf)
-  const [query, setQuery] = useState('')
+  // An unknown name as written starts the search (Sprint 169 PR 4); the menu opens once per pick, so it is read once.
+  const [startQuery] = useState(() => iconMenuStartQuery(current))
+  const [query, setQuery] = useState(startQuery)
   const { icons, total, searching } = useMemo(() => iconMenuChoices(query, inUse), [query, inUse])
   // The highlighted choice: an icon's place, `icons.length` for No icon, -1 for none. Typing highlights the best result.
   const [active, setActive] = useState(-1)
@@ -53,9 +58,14 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   // mount, and an item for a menu opened by keyboard), which runs after this component's own effects.
   const field = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => field.current?.focus({ preventScroll: true }))
+    const frame = requestAnimationFrame(() => {
+      const input = field.current
+      input?.focus({ preventScroll: true })
+      // An unknown name searched for is selected, so the first key typed replaces it; never what one already typed.
+      if (input && startQuery && input.value === startQuery) input.select()
+    })
     return () => cancelAnimationFrame(frame)
-  }, [])
+  }, [startQuery])
 
   const scroller = useRef<HTMLDivElement>(null)
   // Only a key scrolls the list to the highlight; the pointer highlights what it is over, and the list stays put.

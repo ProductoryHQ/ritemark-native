@@ -1394,7 +1394,8 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       hint={iconHint}
       onChoose={(hint, rect) => {
         setIconHint(null)
-        // The menu as it is (its search, with the name in it, is Sprint 169's); No icon takes the name out of the file.
+        // The box's icon menu, its search opening with the unknown name in it (Sprint 169 PR 4, `iconMenuStartQuery`);
+        // No icon takes the name out of the file.
         setIconPick({ pos: hint.pos, rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, current: hint.name })
       }}
       onDone={endIconHint}

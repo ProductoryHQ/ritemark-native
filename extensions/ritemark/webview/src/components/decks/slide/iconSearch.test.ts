@@ -11,7 +11,7 @@ import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
 import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
-import { ICON_MENU_PAGE, deckIconsInUse, iconMenuChoices, iconMenuMoreLine, iconMenuMove, searchIcons } from './iconSearch'
+import { ICON_MENU_PAGE, deckIconsInUse, editsBetween, iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuStartQuery, searchIcons } from './iconSearch'
 
 let passed = 0
 function test(name: string, run: () => void) {
@@ -246,6 +246,36 @@ test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the fo
   assert.deepEqual([0, 1, 6].map(at => side(at, 'left')), [0, 0, 5])
   assert.equal(side(26, 'left'), 26)
   assert.equal(side(-1, 'right'), -1)
+})
+
+test('PR 4 (#869): a misspelt name finds the names nearest it, nearest first; nonsense still finds none', () => {
+  const first = (query: string) => searchIcons(query)[0]?.phosphor
+  assert.equal(first('trukc'), 'truck', 'two letters swapped')
+  assert.equal(first('Trukc '), 'truck', 'any case and spacing')
+  assert.ok(first('envelop')?.startsWith('envelope'), "a name it starts, as before (the grid's envelope first)")
+  assert.equal(first('calender'), 'calendar', 'a letter changed')
+  assert.equal(first('rocekt'), 'rocket')
+  assert.ok(searchIcons('peple').some(icon => icon.name === 'users'), "a tag's word: people")
+  assert.deepEqual(searchIcons('qqzx-wvvk'), [], 'nothing near: No icons match')
+  for (const nonsense of ['qwe', 'abx', 'qwer', 'zxcv', 'zq']) assert.deepEqual(searchIcons(nonsense), [], `${nonsense}: under four letters or nothing near`)
+  // An unknown name of several words (an AI's "delivery-van") finds what its words find, then what is near them.
+  assert.deepEqual(searchIcons('delivery-van').map(icon => icon.phosphor).sort(), ['package', 'truck', 'van'])
+  assert.ok(searchIcons('delivry-vann').some(icon => icon.phosphor === 'van'), 'near one of its words')
+  // A search that finds names as before isn't widened by near ones.
+  assert.ok(searchIcons('truck').every(icon => icon.phosphor.includes('truck') || ICON_TAGS[icon.phosphor].includes('truck')))
+  assert.equal(editsBetween('trukc', 'truck', 1), 1)
+  assert.equal(editsBetween('abc', 'abc', 1), 0)
+  assert.equal(editsBetween('kitten', 'sitting', 2), 3, 'more than the limit: limit + 1')
+  assert.equal(editsBetween('a', 'abcd', 1), 2)
+})
+
+test("PR 4: the menu's search starts with a box's unknown name, as written; a known icon or none starts it empty", () => {
+  assert.equal(iconMenuStartQuery('trukc'), 'trukc')
+  assert.equal(iconMenuStartQuery(' Not-A-Real-Icon '), 'Not-A-Real-Icon')
+  assert.equal(iconMenuStartQuery('truck'), '')
+  assert.equal(iconMenuStartQuery('mail'), '', 'an alias is known')
+  assert.equal(iconMenuStartQuery(null), '')
+  assert.equal(iconMenuStartQuery('  '), '')
 })
 
 console.log(`iconSearch: ${passed} passed`)
