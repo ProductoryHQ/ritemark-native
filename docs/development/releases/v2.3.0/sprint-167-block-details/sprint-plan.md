@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: five user-facing requirements, a file-format change, and a view-to-editor-to-renderer-to-published-page flow). Override with: "use plain full track".
 Branch: sprint-167-block-details
 Release tier: extension
-Status: **Approved** by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167). Phase 3 (DEVELOP).
+Status: **Done** (20 November 2026). Approved by Jarmo on 19 November 2026: "kinnitan sprindid 165, 166 ja 167" (I approve Sprints 165, 166 and 167).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Five small things from Jarmo's rundev test", ritemark-dev commit 9f05294), with the sketches in `block-details.html` beside it. Jarmo agreed the sketches with the Experience lead on 19 November ("muu on PERFECT!" for A, B, C and E, and "SOBIB D", with three refinements to D's corner chip). That sent them to planning. It is not his approval of this sprint.
 
@@ -51,14 +51,14 @@ One GitHub issue per PR in milestone v2.3.0, which the manager creates when the 
 None. A narrow look at the code found nothing that goes. D's centred prompt over the title was a gap in the design, and the corner chip keeps its function (choose, ChatGPT), so it is a move, not a removal. If a PR's author finds something that really goes, it is listed here and waits for Jarmo's yes by name before any code is deleted.
 
 ## Success Criteria
-- [ ] The logo can take any of four corners, and words never run under it.
-- [ ] Boxes take a Mark (Icon, Number, Dot, Arrow); Number follows moves, adds and deletes.
-- [ ] A slide's content sits Top, Middle or Bottom on the editor, strip, wall, page and presenter view; the setting is written only when it isn't the default.
-- [ ] A picture goes behind without the centred prompt, from the chip, Slide settings, a paste or a drop, and a placed one can be chosen, replaced and removed.
-- [ ] One box, column or item can be duplicated, moved or deleted from its own handle.
-- [ ] The Experience lead has seen each PR's shots before it merges.
-- [ ] The full test chain ran once on each final head.
-- [ ] `qa-validator` has signed off at the sprint's end.
+- [x] The logo can take any of four corners, and words never run under it.
+- [x] Boxes take a Mark (Icon, Number, Dot, Arrow); Number follows moves, adds and deletes.
+- [x] A slide's content sits Top, Middle or Bottom on the editor, strip, wall, page and presenter view; the setting is written only when it isn't the default.
+- [x] A picture goes behind without the centred prompt, from the chip, Slide settings, a paste or a drop, and a placed one can be chosen, replaced and removed.
+- [x] One box, column or item can be duplicated, moved or deleted from its own handle.
+- [x] The Experience lead has seen each PR's shots before it merges.
+- [x] The full test chain ran once on each final head.
+- [x] `qa-validator` has signed off at the sprint's end.
 
 ## Release notes
 One line per PR, in plain words for people, written with the `release-notes` skill:
@@ -80,3 +80,10 @@ One line per PR, in plain words for people, written with the `release-notes` ski
 
 ## Approval
 - [x] Jarmo approved this sprint plan (19 November 2026)
+
+## Close-out (20 November 2026)
+- PR 1 [#844](https://github.com/ProductoryHQ/ritemark-native/pull/844) (the logo in any of four corners; closes #835), PR 2 [#878](https://github.com/ProductoryHQ/ritemark-native/pull/878) (Mark for Boxes; #836), PR 3 [#891](https://github.com/ProductoryHQ/ritemark-native/pull/891) (content Top, Middle or Bottom; #837), PR 4 [#900](https://github.com/ProductoryHQ/ritemark-native/pull/900) (a picture behind, from the corner chip; #838), PR 5 [#911](https://github.com/ProductoryHQ/ritemark-native/pull/911) (one item's own handle; #839), and the follow-up [#912](https://github.com/ProductoryHQ/ritemark-native/pull/912) (a picture behind runs the full height of the slide on a phone's page; #905): all merged after the Experience lead's look at their shots, on synthetic decks.
+- #900 also fixed a blank-deck crash that was on main (a picture going missing while its slide is on screen), with a test.
+- Tests: the full chain gave EXIT 0 on each final head (see `tasks.md`). #911 and #912 each merged while main had moved only in files the other didn't touch; both records say so.
+- Not run: ChatGPT making a picture end to end (no sign-in in isolated windows), a real ⌘V and Finder drag, the native file picker (stubbed), a real phone browser for #912, Windows.
+- Follow-up still open: [#910](https://github.com/ProductoryHQ/ritemark-native/issues/910), a box's icon from the keyboard (an Icon button on the block bar), filed under Sprint 169.
