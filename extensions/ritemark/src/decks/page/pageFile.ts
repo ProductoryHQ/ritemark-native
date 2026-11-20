@@ -248,9 +248,11 @@ export const PRINT_PICTURE_FOLDER = 'pictures';
  * Sprint 170 (#881), Save as PDF's Slides and handout: the page exactly as `buildDeckPage` makes it (the same making,
  * `buildPage`), printed from a folder of its own, so each picture the page names is that folder's `pictures/<n><.ext>`
  * (a copy of the file beside the deck, `file`) instead of its address beside the deck, which may lead out of it (`../`).
+ * Sprint 170 PR 2 (#885): `print: 'slides'` is Save slides as PDF's: the same page with the slides' print rules
+ * (`SLIDES_PRINT_CSS`), one 16:9 page a slide.
  */
 export async function buildPrintPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage & { pictures: Array<{ address: string; file: string }> }> {
@@ -271,7 +273,7 @@ export async function buildPrintPage(
 
 /** Both pages' one making: the digest of what the page carries, and the page, each picture at its address (or `placed`). */
 async function buildPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'>,
   placed: ((picture: { address: string; file: string }) => string) | null,
@@ -283,7 +285,7 @@ async function buildPage(
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
   const digest = pageDigest(deck, [...[...found.values()].map(picture => picture.address), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
   const urls = new Map([...found].map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), ...(input.print ? { print: input.print } : {}) });
   return { deck, digest, html };
 }
 

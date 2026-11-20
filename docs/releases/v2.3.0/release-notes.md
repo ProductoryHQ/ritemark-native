@@ -67,6 +67,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 - **Comments and skipped slides stay with you.** Before you publish, Ritemark lists what goes on the page and what stays with you.
 - **The page changes only when you update it.** Change the theme, and the page online keeps its old look until you choose **Update the page**.
 - **Save the deck as a PDF.** Open the arrow next to **Publish** and choose **Save slides and handout as PDF**. Each slide comes with its text, and the links still work.
+- **Save just the slides as a PDF.** In the **Slide only** view, the same menu says **Save slides as PDF**: one page for each slide, in your theme's colours, ready to share or show from another computer.
 
 ## Edit Excel files without losing their look
 

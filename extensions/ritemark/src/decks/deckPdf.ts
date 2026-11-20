@@ -4,8 +4,11 @@
  *
  *  - **Slides and handout** (PR 1) is the published page's print, exactly: the page `buildDeckPage` makes, with its
  *    `PRINT_CSS` (A4 portrait), so skipped slides, comments and notes are never in it (`publicDeck`), Copy and ↗ aren't
- *    drawn, links and Buttons stay links. Slides (PR 2) and Handout (PR 3) come with their own PRs; until then this
- *    app offers only the kinds it makes (`SAVED_KINDS`), and the menu names the one there is.
+ *    drawn, links and Buttons stay links.
+ *  - **Slides** (PR 2, #885) is the same page with the slides' print rules (`SLIDES_PRINT_CSS`): one 16:9 page a
+ *    slide, drawn by the wall's renderer on the theme's ground, every reveal shown, each tab as the slide holds it.
+ *  - **Handout** (PR 3) comes with its own PR; until then this app offers only the kinds it makes (`SAVED_KINDS`), and
+ *    the Handout view's menu names the first of them (`pdfKindFor`), truthfully.
  *  - **The print** is the app's own, in the main process (patch 021, `_ritemark.printHtmlToPdf`): the page is written
  *    to a temporary folder of its own with its fonts, logo and pictures, printed there offline (nothing else loads),
  *    and the folder goes again. A shell without the patch has no command, and then no kind is offered.
@@ -33,8 +36,11 @@ export { pdfFileName, pdfItemLabel, pdfKindFor, pdfKindOfView } from './deckPdfK
 /** Patch 021's command: a page's path in, its PDF's path out. */
 export const PRINT_COMMAND = '_ritemark.printHtmlToPdf';
 
-/** The kinds this app makes. PR 2 adds 'slides' and PR 3 'handout', each with the PR that makes it. */
-export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout'];
+/**
+ * The kinds this app makes, the one a view without its own kind is offered first: Slides and handout holds the handout,
+ * so the Handout view offers it until PR 3 adds 'handout'.
+ */
+export const SAVED_KINDS: readonly DeckPdfKind[] = ['slides-and-handout', 'slides'];
 
 /** Why nothing was saved after the dialog: the PDF couldn't be made or written. */
 export const PDF_NOT_SAVED = "The PDF couldn't be made, so nothing was saved.";
@@ -139,7 +145,7 @@ export class DeckPdfSaver {
         const input = await this.source.pageInput(document, body, look, steps);
         const assets = await this.deps.assets();
         const built = await buildPrintPage(
-          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps },
+          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, ...(kind === 'slides' ? { print: 'slides' as const } : {}) },
           { ...assets, themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
         );
         folder = await fs.promises.mkdtemp(path.join(this.deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));
