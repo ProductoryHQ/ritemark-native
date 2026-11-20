@@ -244,6 +244,19 @@ async function main(): Promise<void> {
   } finally {
     publisher.dispose();
   }
+
+  // Sprint 170 (the Experience lead, 20 November): with Publish not reachable, the state still names the PDF kinds,
+  // so the bar keeps a plain Save as PDF (a local file); Publish stays hidden (`ready: false`).
+  {
+    const off = new DeckPublisher(extension);
+    off.connect({ ...feature, isReady: () => false } as unknown as Parameters<InstanceType<typeof DeckPublisher>['connect']>[0]);
+    off.pdfKinds = async () => ['slides-and-handout'];
+    try {
+      assert.deepEqual(await off.stateOf(document as never), { ready: false, kind: 'unpublished', changed: false, pdf: ['slides-and-handout'] });
+    } finally {
+      off.dispose();
+    }
+  }
   console.log('deckPublish: all passed');
 }
 

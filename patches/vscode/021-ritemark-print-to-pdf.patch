@@ -1,0 +1,347 @@
+# RiteMark Patch: ritemark-print-to-pdf
+#
+# Purpose: Save as PDF: a main-process print of a page in the temporary folder to a PDF beside it (_ritemark.printHtmlToPdf), offline, in a hidden sandboxed window
+#
+# Why: Sprint 170 (#881): Decks' Save as PDF prints the published page with Chromium (fonts embedded, links live); no extension API prints silently (research/print-path.md)
+#
+# File(s): src/vs/code/electron-main/app.ts,src/vs/platform/ritemarkPrint/common/ritemarkPrint.ts,src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts,src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts,src/vs/workbench/contrib/ritemarkPrint/electron-browser/ritemarkPrint.contribution.ts,src/vs/workbench/workbench.desktop.main.ts
+# Created: 2026-11-20
+#
+diff --git a/src/vs/code/electron-main/app.ts b/src/vs/code/electron-main/app.ts
+index 1a7a0922364..ad34a005f32 100644
+--- a/src/vs/code/electron-main/app.ts
++++ b/src/vs/code/electron-main/app.ts
+@@ -156,6 +156,8 @@ import ErrorTelemetry from '../../platform/telemetry/electron-main/errorTelemetr
+ import { IProtocolMainService } from '../../platform/protocol/electron-main/protocol.js';
+ import { createRemoteResourceRequestHandler } from '../../platform/protocol/electron-main/remoteResourceProtocol.js';
+ import { logNodeCompileCacheStatus, markNodeCompileCacheReady, waitForNodeCompileCacheReady } from '../../base/node/nodeCompileCache.js';
++import { RITEMARK_PRINT_CHANNEL } from '../../platform/ritemarkPrint/common/ritemarkPrint.js';
++import { RitemarkPrintMainService } from '../../platform/ritemarkPrint/electron-main/ritemarkPrintMainService.js';
+ 
+ type OSProxyConfigEvent = {
+ 	readonly success: boolean;
+@@ -1487,6 +1489,9 @@ export class CodeApplication extends Disposable {
+ 		const menubarChannel = ProxyChannel.fromService(accessor.get(IMenubarMainService), disposables);
+ 		mainProcessElectronServer.registerChannel('menubar', menubarChannel);
+ 
++		// Ritemark: Save as PDF's print (Sprint 170, #881)
++		mainProcessElectronServer.registerChannel(RITEMARK_PRINT_CHANNEL, ProxyChannel.fromService(new RitemarkPrintMainService(this.logService), disposables));
++
+ 		// URL handling
+ 		const urlChannel = ProxyChannel.fromService(accessor.get(IURLService), disposables);
+ 		mainProcessElectronServer.registerChannel('url', urlChannel);
+diff --git a/src/vs/platform/ritemarkPrint/common/ritemarkPrint.ts b/src/vs/platform/ritemarkPrint/common/ritemarkPrint.ts
+new file mode 100644
+index 00000000000..300ba3fdfa3
+--- /dev/null
++++ b/src/vs/platform/ritemarkPrint/common/ritemarkPrint.ts
+@@ -0,0 +1,88 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { isAbsolute, normalize, relative } from '../../../base/common/path.js';
++import { URI } from '../../../base/common/uri.js';
++import { createDecorator } from '../../instantiation/common/instantiation.js';
++
++/**
++ * Ritemark (Sprint 170, #881): Save as PDF. The extension builds a page as a file in a temporary folder of its own,
++ * beside the fonts and pictures it names, and the main process prints it with Electron's `printToPDF` in a hidden
++ * window, offline: nothing but `file:` addresses inside that folder loads. The PDF is written beside the page, with
++ * its name, and its path comes back; the extension then writes it where the person chose.
++ */
++export const RITEMARK_PRINT_CHANNEL = 'ritemarkPrint';
++
++/** The command the extension calls: one argument, the page's path; it answers the PDF's path. */
++export const RITEMARK_PRINT_COMMAND = '_ritemark.printHtmlToPdf';
++
++export const IRitemarkPrintService = createDecorator<IRitemarkPrintService>('ritemarkPrintService');
++
++export interface IRitemarkPrintService {
++	readonly _serviceBrand: undefined;
++	/** Print the page at `htmlPath` (an absolute `.html` path) to `<same folder>/<same name>.pdf`; that path is the answer. */
++	printHtmlToPdf(htmlPath: string): Promise<string>;
++}
++
++/** The PDF's path for a page: the same folder and name, `.pdf` for `.html`. */
++export function ritemarkPdfPathFor(htmlPath: string): string {
++	return htmlPath.replace(/\.html$/i, '.pdf');
++}
++
++/**
++ * Whether a request to print names a page the print may read: an absolute path (`/` on the Mac, a drive or `\\` on
++ * Windows) ending in `.html`, with no `.` or `..` part and no NUL. Whether the file is there and inside the system's
++ * temporary folder is the main process's own check.
++ */
++export function isRitemarkPrintablePath(htmlPath: unknown): htmlPath is string {
++	if (typeof htmlPath !== 'string' || htmlPath.length > 4096 || htmlPath.includes('\0')) {
++		return false;
++	}
++	if (!/\.html$/i.test(htmlPath)) {
++		return false;
++	}
++	const absolute = htmlPath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(htmlPath) || htmlPath.startsWith('\\\\');
++	if (!absolute) {
++		return false;
++	}
++	return !htmlPath.split(/[\\/]/).some(part => part === '.' || part === '..');
++}
++
++/** Whether `file` is inside `folder` (both absolute), never `folder` itself. */
++function isInside(file: string, folder: string): boolean {
++	const inside = relative(folder, file);
++	return inside !== '' && inside !== '..' && !inside.startsWith('..\\') && !inside.startsWith('../') && !isAbsolute(inside);
++}
++
++/**
++ * Whether the print's page may load `url`: a `file:` address inside `folder` (the page's own, a real path), or `data:`
++ * and `blob:`, which carry their bytes with them. Nothing else: no network, no other file on the computer.
++ */
++export function ritemarkPrintAllows(url: string, folder: string): boolean {
++	let parsed: URL;
++	try {
++		parsed = new URL(url);
++	} catch {
++		return false;
++	}
++	if (parsed.protocol === 'data:' || parsed.protocol === 'blob:') {
++		return true;
++	}
++	if (parsed.protocol !== 'file:' || parsed.host !== '') {
++		return false;
++	}
++	let file: string;
++	try {
++		file = normalize(URI.parse(parsed.href).fsPath);
++	} catch {
++		return false;
++	}
++	return isInside(file, normalize(folder));
++}
++
++/** Whether `folder` (a real path) is inside the system's temporary folder `temp` (a real path too). */
++export function ritemarkPrintFolderAllowed(folder: string, temp: string): boolean {
++	return isInside(normalize(folder), normalize(temp));
++}
+diff --git a/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts b/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts
+new file mode 100644
+index 00000000000..a76df40fd6e
+--- /dev/null
++++ b/src/vs/platform/ritemarkPrint/electron-main/ritemarkPrintMainService.ts
+@@ -0,0 +1,128 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { BrowserWindow, session as electronSession, type Session } from 'electron';
++import { promises as fs } from 'fs';
++import { tmpdir } from 'os';
++import { dirname } from 'path';
++import { Limiter, raceTimeout } from '../../../base/common/async.js';
++import { ILogService } from '../../log/common/log.js';
++import { IRitemarkPrintService, isRitemarkPrintablePath, ritemarkPdfPathFor, ritemarkPrintAllows, ritemarkPrintFolderAllowed } from '../common/ritemarkPrint.js';
++
++/** How long a page may take to load, its fonts and pictures included, and to print. */
++const LOAD_MS = 30_000;
++const READY_MS = 10_000;
++const PRINT_MS = 60_000;
++
++/**
++ * Waits in the page for its fonts and every picture (at most `READY_MS`; a picture that can't be decoded is let go at
++ * once), so the PDF holds the page's own fonts and pictures. A page still not ready then is printed as it is.
++ */
++const READY_SCRIPT = '(async () => { await document.fonts.ready; await Promise.all(Array.from(document.images, image => image.decode().catch(() => undefined))); return true; })()';
++
++/** The print's one session: in memory (no `persist:`), shared with nothing else, cleared after each print. */
++const PARTITION = 'ritemark-print';
++
++/**
++ * Ritemark (Sprint 170, #881): Save as PDF's print, in the main process. One page at a time, in a hidden, sandboxed
++ * window on the print's own in-memory session that loads nothing but the page's own folder, refuses every permission,
++ * download, navigation and new window, and is closed when the print is done or has failed. The session is the same
++ * for every print (Electron keeps a session until the app quits), its filter set for each page and its data cleared.
++ */
++export class RitemarkPrintMainService implements IRitemarkPrintService {
++	declare readonly _serviceBrand: undefined;
++
++	private readonly limiter = new Limiter<string>(1);
++	/** The page's folder the session's filter lets through now: one print at a time, so one folder. */
++	private allowedFolder: string | null = null;
++	private printSession: Session | null = null;
++
++	constructor(private readonly logService: ILogService) { }
++
++	printHtmlToPdf(htmlPath: string): Promise<string> {
++		return this.limiter.queue(() => this.print(htmlPath));
++	}
++
++	private async print(htmlPath: unknown): Promise<string> {
++		if (!isRitemarkPrintablePath(htmlPath)) {
++			throw new Error('Ritemark print: not a page it can print');
++		}
++		// lstat: a link is never a file here
++		if (!(await fs.lstat(htmlPath)).isFile()) {
++			throw new Error('Ritemark print: the page is not a plain file');
++		}
++		const page = await fs.realpath(htmlPath);
++		const folder = dirname(page);
++		if (!ritemarkPrintFolderAllowed(folder, await fs.realpath(tmpdir()))) {
++			throw new Error('Ritemark print: the page is not in the temporary folder');
++		}
++		const pdfPath = ritemarkPdfPathFor(page);
++
++		const printSession = this.session();
++		this.allowedFolder = folder;
++		const window = new BrowserWindow({
++			show: false,
++			width: 1280,
++			height: 900,
++			webPreferences: {
++				partition: PARTITION,
++				sandbox: true,
++				nodeIntegration: false,
++				contextIsolation: true,
++				javascript: true,
++				webSecurity: true,
++				webgl: false,
++				spellcheck: false,
++				images: true,
++			}
++		});
++		try {
++			const contents = window.webContents;
++			contents.setWindowOpenHandler(() => ({ action: 'deny' }));
++			contents.on('will-navigate', event => event.preventDefault());
++			contents.on('will-redirect', event => event.preventDefault());
++			contents.on('will-attach-webview', event => event.preventDefault());
++
++			const loaded = await raceTimeout(window.loadFile(page).then(() => true), LOAD_MS);
++			if (!loaded) {
++				throw new Error('Ritemark print: the page did not load in time');
++			}
++			await raceTimeout(contents.executeJavaScript(READY_SCRIPT, true).catch(() => false), READY_MS);
++			const data = await raceTimeout(contents.printToPDF({ pageSize: 'A4', landscape: false, preferCSSPageSize: true, printBackground: true }), PRINT_MS);
++			if (!data) {
++				throw new Error('Ritemark print: the print did not finish in time');
++			}
++			// A new file beside the page, never over one that is there.
++			await fs.writeFile(pdfPath, data, { flag: 'wx' });
++			return pdfPath;
++		} finally {
++			if (!window.isDestroyed()) {
++				window.destroy();
++			}
++			this.allowedFolder = null;
++			await printSession.clearStorageData().catch(() => undefined);
++			await printSession.clearCache().catch(() => undefined);
++		}
++	}
++
++	/** The print's session, its rules set once: only the current page's folder loads; no permission, no download. */
++	private session(): Session {
++		if (!this.printSession) {
++			const printSession = electronSession.fromPartition(PARTITION);
++			printSession.webRequest.onBeforeRequest((details, callback) => {
++				const allowed = this.allowedFolder !== null && ritemarkPrintAllows(details.url, this.allowedFolder);
++				if (!allowed) {
++					this.logService.trace('[Ritemark print] refused a load');
++				}
++				callback({ cancel: !allowed });
++			});
++			printSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
++			printSession.setPermissionCheckHandler(() => false);
++			printSession.on('will-download', event => event.preventDefault());
++			this.printSession = printSession;
++		}
++		return this.printSession;
++	}
++}
+diff --git a/src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts b/src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts
+new file mode 100644
+index 00000000000..56aa2c6aba5
+--- /dev/null
++++ b/src/vs/platform/ritemarkPrint/test/common/ritemarkPrint.test.ts
+@@ -0,0 +1,40 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import assert from 'assert';
++import { join } from '../../../../base/common/path.js';
++import { isWindows } from '../../../../base/common/platform.js';
++import { URI } from '../../../../base/common/uri.js';
++import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
++import { isRitemarkPrintablePath, ritemarkPdfPathFor, ritemarkPrintAllows, ritemarkPrintFolderAllowed } from '../../common/ritemarkPrint.js';
++
++/** Ritemark (Sprint 170, #881): Save as PDF's print reads only its own page's folder and writes only beside it. */
++suite('Ritemark print', () => {
++	ensureNoDisposablesAreLeakedInTestSuite();
++
++	test('it prints only an absolute .html path with no dot parts', () => {
++		const paths = ['/tmp/rm-print-1/page.html', '/tmp/rm-print-1/page.HTML', 'C:\\Temp\\rm\\page.html', 'page.html', '/tmp/rm/../etc/page.html', '/tmp/rm/./page.html', '/tmp/rm/page.htm', '/tmp/rm/page.html\0.txt', 42];
++		assert.deepStrictEqual(paths.map(path => isRitemarkPrintablePath(path)), [true, true, true, false, false, false, false, false, false]);
++	});
++
++	test('the PDF goes beside the page, with its name', () => {
++		assert.strictEqual(ritemarkPdfPathFor('/tmp/rm-print-1/page.html'), '/tmp/rm-print-1/page.pdf');
++	});
++
++	test('the page loads its own folder\'s files, data and blobs, and nothing else', () => {
++		const folder = isWindows ? 'C:\\Temp\\rm-print-1' : '/tmp/rm-print-1';
++		const inside = URI.file(join(folder, 'fonts', 'Inter-4.001-latin.woff2')).toString(true);
++		const beside = URI.file(join(folder + '-other', 'secret.png')).toString(true);
++		const above = `${URI.file(folder).toString(true)}/../secret.png`;
++		const dotted = URI.file(join(folder, '..notes', 'a.png')).toString(true);
++		const urls = [inside, beside, above, dotted, URI.file(folder).toString(true), 'data:font/woff2;base64,AAAA', 'blob:file:///1234', 'https://ritemark.app/', 'http://localhost:9224/', 'file://server/share/page.png', 'not a url'];
++		assert.deepStrictEqual(urls.map(url => ritemarkPrintAllows(url, folder)), [true, false, false, true, false, true, true, false, false, false, false]);
++	});
++
++	test('the page must be in the system\'s temporary folder', () => {
++		const temp = isWindows ? 'C:\\Temp' : '/private/var/folders/xy/T';
++		assert.deepStrictEqual([join(temp, 'rm-print-1'), temp, join(temp, '..', 'Documents'), isWindows ? 'C:\\Users\\me' : '/Users/me'].map(folder => ritemarkPrintFolderAllowed(folder, temp)), [true, false, false, false]);
++	});
++});
+diff --git a/src/vs/workbench/contrib/ritemarkPrint/electron-browser/ritemarkPrint.contribution.ts b/src/vs/workbench/contrib/ritemarkPrint/electron-browser/ritemarkPrint.contribution.ts
+new file mode 100644
+index 00000000000..2f1021ed42e
+--- /dev/null
++++ b/src/vs/workbench/contrib/ritemarkPrint/electron-browser/ritemarkPrint.contribution.ts
+@@ -0,0 +1,21 @@
++/*---------------------------------------------------------------------------------------------
++ *  Copyright (c) Microsoft Corporation. All rights reserved.
++ *  Licensed under the MIT License. See License.txt in the project root for license information.
++ *--------------------------------------------------------------------------------------------*/
++
++import { CommandsRegistry } from '../../../../platform/commands/common/commands.js';
++import { registerMainProcessRemoteService } from '../../../../platform/ipc/electron-browser/services.js';
++import { IRitemarkPrintService, isRitemarkPrintablePath, RITEMARK_PRINT_CHANNEL, RITEMARK_PRINT_COMMAND } from '../../../../platform/ritemarkPrint/common/ritemarkPrint.js';
++
++/**
++ * Ritemark (Sprint 170, #881): Save as PDF. The extension's way to the main process's print
++ * (`platform/ritemarkPrint`): one page's path in, its PDF's path out.
++ */
++registerMainProcessRemoteService(IRitemarkPrintService, RITEMARK_PRINT_CHANNEL);
++
++CommandsRegistry.registerCommand(RITEMARK_PRINT_COMMAND, (accessor, htmlPath: unknown): Promise<string> => {
++	if (!isRitemarkPrintablePath(htmlPath)) {
++		throw new Error('Ritemark print: not a page it can print');
++	}
++	return accessor.get(IRitemarkPrintService).printHtmlToPdf(htmlPath);
++});
+diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
+index 7bd1e2168f5..517d80df62f 100644
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -177,6 +177,9 @@ import './contrib/webview/electron-browser/webview.contribution.js';
+ import './contrib/browserView/electron-browser/browserView.contribution.js';
+ import './contrib/canvases/electron-browser/editorCanvases.contribution.js';
+ 
++// Ritemark: Save as PDF (Sprint 170, #881)
++import './contrib/ritemarkPrint/electron-browser/ritemarkPrint.contribution.js';
++
+ // Splash
+ import './contrib/splash/electron-browser/splash.contribution.js';
+ 

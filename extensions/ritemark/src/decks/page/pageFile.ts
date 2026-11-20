@@ -190,17 +190,23 @@ export function picturePaths(deck: PublicDeck): Array<{ path: string; from: Pict
 
 /** The pictures the page names that are files beside the deck, by where they are named: their addresses on the page. */
 async function foundPictures(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, string>> {
+  return new Map([...(await foundPictureFiles(deck, deckPath, pageFs))].map(([key, found]) => [key, found.address]));
+}
+
+/** The same, with each picture's file on disk. */
+async function foundPictureFiles(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, { address: string; file: string }>> {
   const folder = path.dirname(deckPath);
   const checked = await Promise.all(picturePaths(deck).map(async picture => {
     const file = pictureFile(picture.path, picture.from);
+    const onDisk = path.resolve(folder, ...file.split('/'));
     try {
-      return (await pageFs.stat(path.resolve(folder, ...file.split('/')))).isFile() ? [pictureKey(picture.path, picture.from), pictureAddress(file)] as const : null;
+      return (await pageFs.stat(onDisk)).isFile() ? [pictureKey(picture.path, picture.from), { address: pictureAddress(file), file: onDisk }] as const : null;
     } catch {
       // Not there: the slide draws its empty picture place, the handout the picture's words.
       return null;
     }
   }));
-  return new Map(checked.filter((entry): entry is readonly [string, string] => entry !== null));
+  return new Map(checked.filter((entry): entry is readonly [string, { address: string; file: string }] => entry !== null));
 }
 
 /**
@@ -232,12 +238,51 @@ export async function buildDeckPage(
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
+  return buildPage(input, assets, pageFs, null);
+}
+
+/** Sprint 170: the folder Save as PDF prints from holds each picture under this name, `pictures/<n><.ext>`. */
+export const PRINT_PICTURE_FOLDER = 'pictures';
+
+/**
+ * Sprint 170 (#881), Save as PDF's Slides and handout: the page exactly as `buildDeckPage` makes it (the same making,
+ * `buildPage`), printed from a folder of its own, so each picture the page names is that folder's `pictures/<n><.ext>`
+ * (a copy of the file beside the deck, `file`) instead of its address beside the deck, which may lead out of it (`../`).
+ */
+export async function buildPrintPage(
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  assets: PageAssets,
+  pageFs: Pick<PageFs, 'stat'> = nodePageFs,
+): Promise<BuiltPage & { pictures: Array<{ address: string; file: string }> }> {
+  const pictures: Array<{ address: string; file: string }> = [];
+  const byFile = new Map<string, string>();
+  const built = await buildPage(input, assets, pageFs, picture => {
+    let address = byFile.get(picture.file);
+    if (!address) {
+      const ext = path.extname(picture.file).toLowerCase().replace(/[^.a-z0-9]/g, '');
+      address = `${PRINT_PICTURE_FOLDER}/${pictures.length + 1}${ext}`;
+      byFile.set(picture.file, address);
+      pictures.push({ address, file: picture.file });
+    }
+    return address;
+  });
+  return { ...built, pictures };
+}
+
+/** Both pages' one making: the digest of what the page carries, and the page, each picture at its address (or `placed`). */
+async function buildPage(
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  assets: PageAssets,
+  pageFs: Pick<PageFs, 'stat'>,
+  placed: ((picture: { address: string; file: string }) => string) | null,
+): Promise<BuiltPage> {
   const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
-  const urls = await foundPictures(deck, input.deckPath, pageFs);
+  const found = await foundPictureFiles(deck, input.deckPath, pageFs);
   // The theme's font files the page names count too (Sprint 162 PR 3): a page made before its fonts were there, or
   // by an app without them, reads as changed once they can go.
   // The logo's file too (Sprint 162 PR 4): its name holds its bytes' hash, so another logo reads as changed.
-  const digest = pageDigest(deck, [...urls.values(), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
+  const digest = pageDigest(deck, [...[...found.values()].map(picture => picture.address), ...pageLookAddresses(deck.theme, assets.themeFonts ?? [], assets.logo ?? null)]);
+  const urls = new Map([...found].map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
   const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath) });
   return { deck, digest, html };
 }

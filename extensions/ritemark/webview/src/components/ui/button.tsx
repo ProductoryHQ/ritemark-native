@@ -105,6 +105,15 @@ export function wholeWordsTip(words: string, tip: React.ReactNode): React.ReactN
   )
 }
 
+/**
+ * Sprint 170: a folded button watches only the page's width, so room a neighbour gives back (a bar's notice that went)
+ * is seen at the next change. A row that knows its room changed calls this, and every folding button looks again.
+ */
+const ROOM_CHANGED = "ritemark-room-changed"
+export function roomChanged(): void {
+  if (typeof document !== "undefined") document.dispatchEvent(new Event(ROOM_CHANGED))
+}
+
 const LABEL = '[data-slot="button-label"]'
 const FIRST_WORD = '[data-slot="first-word"]'
 // Measured before the first paint in a page; a markup render (the tests) has no layout and runs no effect
@@ -151,10 +160,13 @@ function useIconWhenNarrow(on: boolean, words: string) {
     const fonts = document.fonts
     let live = true
     fonts?.addEventListener?.("loadingdone", check)
+    // A row whose neighbour gave its room back (a bar's notice gone) says so (`roomChanged`), and the button looks again
+    document.addEventListener(ROOM_CHANGED, check)
     void fonts?.ready?.then(() => { if (live) check() })
     return () => {
       live = false
       fonts?.removeEventListener?.("loadingdone", check)
+      document.removeEventListener(ROOM_CHANGED, check)
       observer.disconnect()
       button.removeAttribute("data-icon-only")
     }

@@ -290,6 +290,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > .deck-publish-slot { flex-shrink: 10000; min-width: 0; }
 .deck-bar > .deck-notice { flex-shrink: 100; }
 .deck-bar > .deck-present { flex-shrink: 1; }
+/* Sprint 170: each gives way only down to its folded size, so a long notice ("Saved as <deck> – slides and
+   handout.pdf" with Show in folder) shortens its own words instead of drawing the bar's controls over each other:
+   the Theme button to its swatch and ▾, Publish's split button to its globe and ▾ (both measured at the bar's 30). */
+.deck-bar > .deck-theme-slot { min-width: 65px; }
+.deck-bar > .rm-split.deck-publish-split { min-width: 64px; }
 .deck-bar .deck-theme-slot > .deck-theme-button { min-width: 0; flex-shrink: 1; }
 .deck-bar .deck-theme-button > .deck-theme-swatch, .deck-bar .deck-theme-button > svg { flex: none; }
 .deck-bar .deck-theme-button > .deck-theme-name { flex: 0 1 auto; min-width: 0; }

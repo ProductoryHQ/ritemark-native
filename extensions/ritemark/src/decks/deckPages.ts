@@ -29,6 +29,7 @@ import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
 import { projectRelative, projectRoot } from './deckDocuments';
 import type { DeckPublisher } from './deckPublish';
+import type { DeckPdfSaver } from './deckPdf';
 import type { StartCardState } from './startCard';
 import type { ThemeChangeView } from './themeChange';
 
@@ -98,6 +99,8 @@ export class DeckPages implements vscode.Disposable {
     draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
     copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
   } | null = null;
+  /** Sprint 170 (#881): Save as PDF from Publish's menu (`deckPdf.ts`), set once at activation. */
+  pdf: Pick<DeckPdfSaver, 'save' | 'show'> | null = null;
   /** Sprint 162 PR 2: the theme's tab, for the Theme menu's Edit <Name> and New theme… (set once at activation). */
   themeEditor: {
     open: (deck: vscode.TextDocument, themePath: string) => Promise<void>;
@@ -448,6 +451,13 @@ export class DeckPages implements vscode.Disposable {
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        return;
+      // Sprint 170 (#881): Save as PDF from Publish's menu, and the bar's Show in folder after it
+      case 'deck/save-pdf':
+        await this.pdf?.save(document, request.kind, request.text, request.look, request.steps, message => void this.post(webview, message));
+        return;
+      case 'deck/pdf-show':
+        await this.pdf?.show(document);
         return;
       // The AI's chip and line (17 November): the slide the person is on, as the view last told it
       case 'deck/current-slide':

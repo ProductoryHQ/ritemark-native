@@ -2,7 +2,7 @@
 
 Track: SDD (auto-detected: three kinds of output with numbered requirements, a new export path, files the person keeps, and a webview to host to filesystem flow). Override with: "use plain full track".
 Branch: sprint-170-save-as-pdf
-Release tier: extension (provisional: shell if PR 0 finds the print path needs a patch; see the Tier section)
+Release tier: **shell** (PR 0 found the print needs a patch: PR 1 adds patch 021, Electron's `printToPDF` in the main process; Jarmo said yes to the patch on 20 November, "1yes"; see the Tier section)
 Status: **Approved** by Jarmo on 19 November 2026: "1 jah", "kinnitatud" (Jarmo) and "jah sa tee ise otsuseid" (Jarmo to the Experience lead): the Development manager and the Experience lead approve small plans tonight. Phase 3 (DEVELOP).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`, section "Save as PDF, from Publish (19 November)"). It comes from Jarmo's rule that "save sõltub kas kasutaja sel hetkel Slides (only) või Slides+Handouts või Handout" (the save depends on the view the person is in).

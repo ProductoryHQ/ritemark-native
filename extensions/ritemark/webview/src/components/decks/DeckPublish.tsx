@@ -12,17 +12,28 @@
  *    them, so it is there with the strip hidden or the desk narrow too.
  *
  * The host keeps the state (`deck/page-state`); this only draws it and asks.
+ *
+ * Sprint 170 (#881, the decks README "Save as PDF, from Publish"): where this app can save a PDF (`state.pdf`), Publish
+ * is a split button: Publish stays its main part, and the ▾, a part of its own with its own hover and focus, opens
+ * Publish… and one item that names what it saves from the view at the press (`pdfKindFor`). The Published chip's menu
+ * holds the same item. The PDF takes the slides' fit the way Publish does; the host asks for the file and prints it.
+ * The split button's hover is the whole button's (ui/split-button.tsx; Jarmo, 26 October); the ▾ keeps its own click
+ * and focus. With Publish not reachable (off, or not ready yet), a plain Save as PDF button keeps the PDF's place: it
+ * is a local file (the Experience lead, 20 November).
  */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { DeckPageAction, DeckPageState } from '../../../../src/decks/deckProtocol'
+import type { DeckPageAction, DeckPageState, DeckPdfKind } from '../../../../src/decks/deckProtocol'
+import { pdfItemLabel, pdfKindFor } from '../../../../src/decks/deckPdfKinds'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { onMessage, sendToExtension } from '../../bridge'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { SplitButton } from '../ui/split-button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import type { DeckSlideEntry } from './deckDocument'
+import type { DeckViewMode } from './DeckFolds'
 import { SlideCanvas } from './slide/SlideCanvas'
 import { BLOCK_MAX_STEP } from '../../../../src/decks/blocks/slideRenderer'
 
@@ -45,6 +56,16 @@ export function publishRequest(pressed: { text: string; borderless: boolean }, s
   return { text: pressed.text, look: pressed.borderless ? 'borderless' : 'card', steps }
 }
 
+/** What Save as PDF sends: the kind the item named, and the same text, look and fit as Publish. */
+export function pdfRequest(kind: DeckPdfKind, pressed: { text: string; borderless: boolean }, steps: number[]): { kind: DeckPdfKind; text: string; look: 'card' | 'borderless'; steps: number[] } {
+  return { kind, ...publishRequest(pressed, steps) }
+}
+
+/** The bar's note after a save. */
+export function savedNotice(name: string): string {
+  return `Saved as ${name}`
+}
+
 function isState(value: unknown): value is DeckPageState {
   const state = value as DeckPageState | null
   return !!state && typeof state.ready === 'boolean' && typeof state.changed === 'boolean'
@@ -58,18 +79,24 @@ interface DeckPublishProps {
   assets: Record<string, string>
   /** The deck's text as this view holds it now, front matter left out. */
   text: () => string
-  onNotice: (text: string) => void
+  /** The view as drawn (Slide only under 600 px): what Save as PDF's item names. */
+  view: DeckViewMode
+  onNotice: (text: string, action?: { label: string; tip: string; run: () => void }) => void
 }
 
-export function DeckPublish({ slides, theme, borderless, assets, text, onNotice }: DeckPublishProps) {
+export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice }: DeckPublishProps) {
   const [state, setState] = useState<DeckPageState | null>(null)
-  // A Publish waiting for its slides' fit: the slides, the text and the look as they were at the press.
-  const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string; borderless: boolean } | null>(null)
+  // A Publish or a Save as PDF waiting for its slides' fit: the slides, the text and the look as they were at the
+  // press, and which it was (the PDF's kind named at the press, never read again later).
+  const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string; borderless: boolean; pdf: DeckPdfKind | null } | null>(null)
 
   useEffect(() => {
     const stop = onMessage(message => {
       if (message.type === 'deck/page-state' && isState(message.state)) setState(message.state)
       if (message.type === 'deck/page-notice' && typeof message.text === 'string') onNotice(message.text)
+      if (message.type === 'deck/pdf-saved' && typeof message.name === 'string') {
+        onNotice(savedNotice(message.name), { label: 'Show in folder', tip: 'Show the PDF in its folder', run: () => sendToExtension('deck/pdf-show') })
+      }
     })
     sendToExtension('deck/page-state')
     return stop
@@ -79,7 +106,9 @@ export function DeckPublish({ slides, theme, borderless, assets, text, onNotice 
     <>
       <DeckPublishControl
         state={state}
-        onPublish={() => setMeasuring(current => current ?? { slides, text: text(), borderless })}
+        view={view}
+        onPublish={() => setMeasuring(current => current ?? { slides, text: text(), borderless, pdf: null })}
+        onSavePdf={kind => setMeasuring(current => current ?? { slides, text: text(), borderless, pdf: kind })}
         onAction={action => sendToExtension('deck/page-action', { action })}
       />
       {measuring ? createPortal(
@@ -89,7 +118,8 @@ export function DeckPublish({ slides, theme, borderless, assets, text, onNotice 
           borderless={measuring.borderless}
           assets={assets}
           onMeasured={steps => {
-            sendToExtension('deck/publish', publishRequest(measuring, steps))
+            if (measuring.pdf) sendToExtension('deck/save-pdf', pdfRequest(measuring.pdf, measuring, steps))
+            else sendToExtension('deck/publish', publishRequest(measuring, steps))
             setMeasuring(null)
           }}
         />,
@@ -133,12 +163,60 @@ function MeasureSlides({ slides, theme, borderless, assets, onMeasured }: {
 }
 
 /** The control for a state: drawn by itself, so each state can be rendered and checked. */
-export function DeckPublishControl({ state, onPublish: publish, onAction: act }: {
+export function DeckPublishControl({ state, view = 'both', onPublish: publish, onSavePdf, onAction: act }: {
   state: DeckPageState | null
+  /** The view as drawn: Save as PDF's item names its kind. */
+  view?: DeckViewMode
   onPublish: () => void
+  onSavePdf?: (kind: DeckPdfKind) => void
   onAction: (action: DeckPageAction) => void
 }) {
-  if (!state?.ready) return null
+  if (!state) return null
+  // The one PDF item, for the kind this view saves among those this app makes; none where it makes none.
+  const pdfKind = onSavePdf ? pdfKindFor(view, state.pdf ?? []) : null
+  if (!state.ready) {
+    // Publish stays hidden; the PDF, a local file, keeps its place as a plain button.
+    if (!pdfKind) return null
+    return (
+      <Tooltip label={pdfItemLabel(pdfKind).replace(/…$/, '')} className="deck-publish-slot">
+        <Button variant="outline" size="bar" className="deck-save-pdf" iconWhenNarrow onClick={() => onSavePdf?.(pdfKind)}>
+          <Icon name="file-pdf" size={14} tone="inherit" />
+          Save as PDF
+        </Button>
+      </Tooltip>
+    )
+  }
+  const pdfItem = pdfKind ? (
+    <DropdownMenuItem onSelect={() => onSavePdf?.(pdfKind)}>
+      <Icon name="file-pdf" size={14} tone="inherit" />
+      {pdfItemLabel(pdfKind)}
+    </DropdownMenuItem>
+  ) : null
+
+  if (state.kind === 'unpublished' && pdfItem) {
+    return (
+      // Publish stays the main part; the ▾ (its own click and focus) opens Publish… and the PDF item.
+      <SplitButton
+        tone="outline"
+        size="bar"
+        className="deck-publish-slot deck-publish-split"
+        main={{ label: 'Publish', icon: <Icon name="globe" size={14} tone="inherit" />, tooltip: 'Publish the slides and their handout as a web page', onClick: publish, className: 'deck-publish' }}
+        menu={{
+          label: 'Publish or save as PDF',
+          tooltip: 'Publish, or save the deck as a PDF',
+          content: (
+            <>
+              <DropdownMenuItem onSelect={publish}>
+                <Icon name="globe" size={14} tone="inherit" />
+                Publish…
+              </DropdownMenuItem>
+              {pdfItem}
+            </>
+          ),
+        }}
+      />
+    )
+  }
 
   if (state.kind === 'unpublished') {
     return (
@@ -189,6 +267,8 @@ export function DeckPublishControl({ state, onPublish: publish, onAction: act }:
           Update the page
           {state.changed ? null : <span className="ml-auto pl-3 text-[12px] text-ink-muted">No changes</span>}
         </DropdownMenuItem>
+        {pdfItem ? <DropdownMenuSeparator /> : null}
+        {pdfItem}
         <DropdownMenuSeparator />
         <DropdownMenuItem tone="danger" onSelect={() => act('unpublish')}>
           <Icon name="x-circle" size={14} tone="inherit" />

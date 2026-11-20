@@ -19,7 +19,7 @@ const React = await import('react')
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckPublishControl, measuredSteps, publishRequest } = await import('./DeckPublish')
+const { DeckPublishControl, measuredSteps, pdfRequest, publishRequest, savedNotice } = await import('./DeckPublish')
 
 const draw = (state: DeckPageState | null) => renderToStaticMarkup(createElement(DeckPublishControl, { state, onPublish: () => {}, onAction: () => {} }))
 const words = (html: string) => parse(html).text.trim()
@@ -87,6 +87,47 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   const sent = (borderless: boolean) => decodeDeckRequest({ type: 'deck/publish', ...publishRequest({ text, borderless }, [0, 2]) })
   assert.deepEqual(sent(true), { type: 'deck/publish', text, look: 'borderless', steps: [0, 2] })
   assert.deepEqual(sent(false), { type: 'deck/publish', text, look: 'card', steps: [0, 2] })
+}
+
+// Sprint 170 (#881): where the app can save a PDF, Publish is a split button: Publish stays the main part, and the ▾
+// is a part of its own (its own button, so its own hover and focus) that opens the menu. Without the print (an older
+// shell) or without a way to save, Publish is as before: never a menu with nothing in it.
+{
+  const split = (state: DeckPageState, view: 'slide' | 'both' | 'handout' = 'both') => renderToStaticMarkup(createElement(DeckPublishControl, { state, view, onPublish: () => {}, onSavePdf: () => {}, onAction: () => {} }))
+  const pdf = ['slides-and-handout' as const]
+  const html = split({ ready: true, kind: 'unpublished', changed: false, pdf })
+  const buttons = parse(html).querySelectorAll('button')
+  assert.equal(buttons.length, 2)
+  assert.deepEqual([buttons[0].text.trim(), buttons[0].classList.contains('deck-publish'), buttons[0].getAttribute('aria-haspopup')], ['Publish', true, undefined])
+  assert.deepEqual([buttons[1].getAttribute('aria-label'), buttons[1].getAttribute('aria-haspopup')], ['Publish or save as PDF', 'menu'])
+  assert.ok(parse(html).querySelector('.rm-split.deck-publish-split.deck-publish-slot'), 'one split button, in the bar\'s Publish slot')
+  // No kind this app makes, or no way to save: the plain Publish.
+  assert.equal(parse(split({ ready: true, kind: 'unpublished', changed: false, pdf: [] })).querySelectorAll('button').length, 1)
+  assert.equal(parse(split({ ready: true, kind: 'unpublished', changed: false })).querySelectorAll('button').length, 1)
+  assert.equal(parse(draw({ ready: true, kind: 'unpublished', changed: false, pdf })).querySelectorAll('button').length, 1)
+  // Publish not reachable (off, or not ready yet): Publish stays hidden, and a plain Save as PDF keeps the PDF's place
+  // (a local file; the Experience lead, 20 November). Nothing where the app makes no PDF.
+  const off = parse(split({ ready: false, kind: 'unpublished', changed: false, pdf }))
+  assert.deepEqual(off.querySelectorAll('button').map(b => [b.text.trim(), b.classList.contains('deck-save-pdf'), b.getAttribute('aria-haspopup')]), [['Save as PDF', true, undefined]])
+  assert.ok(off.querySelector('.deck-publish-slot'), 'in Publish\'s place on the bar')
+  assert.equal(split({ ready: false, kind: 'unpublished', changed: false, pdf: [] }), '')
+  assert.equal(split({ ready: false, kind: 'unpublished', changed: false }), '')
+  // The split button's hover is the whole button's (ui/split-button.tsx): decks.css gives no part a hover of its own.
+  assert.doesNotMatch(readFileSync(new URL('./decks.css', import.meta.url), 'utf8'), /deck-publish-split[^{]*:hover/)
+  // Published: the chip, its menu holding the item; busy: no PDF.
+  assert.equal(words(split({ ready: true, kind: 'published', changed: false, pdf })), 'Published')
+  assert.ok(button(split({ ready: true, kind: 'publishing', changed: false, pdf }))!.hasAttribute('disabled'))
+  // What Save as PDF sends: the kind, and the same fields as Publish.
+  const { decodeDeckRequest } = await import('../../../../src/decks/deckProtocol')
+  const text = '```slide title\ntitle: A\n```\n'
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/save-pdf', ...pdfRequest('slides-and-handout', { text, borderless: true }, [1]) }), { type: 'deck/save-pdf', kind: 'slides-and-handout', text, look: 'borderless', steps: [1] })
+  assert.throws(() => decodeDeckRequest({ type: 'deck/save-pdf', ...pdfRequest('poster' as 'slides', { text, borderless: true }, [1]) }))
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/pdf-show' }), { type: 'deck/pdf-show' })
+  assert.throws(() => decodeDeckRequest({ type: 'deck/pdf-show', path: '/etc/passwd' }))
+  assert.equal(savedNotice('Day one – slides and handout.pdf'), 'Saved as Day one – slides and handout.pdf')
+  // The view reaches Publish, so the item names its kind (R2).
+  const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
+  assert.ok(/<DeckPublish [^\n]*view=\{viewShown\}/.test(view), 'the view as drawn reaches Publish')
 }
 
 console.log('DeckPublish: passed')
