@@ -18,14 +18,18 @@ export const LIBRARY_FIELD_CONTEXT_KEY = `${LIBRARY_SEARCH_COMMAND}.field`;
 export const MAX_LIBRARY_SEARCH_CHARS = 200;
 
 export type LibrarySearchRow =
-  | { kind: 'text'; text: string }
+  | { kind: 'text'; text: string; cut?: true }
   | { kind: 'results' }
   | { kind: 'focus' };
 
 /** What the row's command was asked: the field's words, a key that goes to the results, or the caret in the field. */
 export function librarySearchRow(arg: unknown): LibrarySearchRow {
   const value = arg && typeof arg === 'object' ? (arg as Record<string, unknown>) : {};
-  if (typeof value.text === 'string') return { kind: 'text', text: value.text.slice(0, MAX_LIBRARY_SEARCH_CHARS) };
+  if (typeof value.text === 'string') {
+    // Words past the cap are cut; `cut` says so, so the shell's field can be given the words searched
+    const text = value.text.slice(0, MAX_LIBRARY_SEARCH_CHARS);
+    return text.length < value.text.length ? { kind: 'text', text, cut: true } : { kind: 'text', text };
+  }
   if (value.key === 'down' || value.key === 'enter') return { kind: 'results' };
   return { kind: 'focus' };
 }

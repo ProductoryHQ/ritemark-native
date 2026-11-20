@@ -23,7 +23,7 @@ assert.deepEqual(
   {
     words: { kind: 'text', text: 'agenda' },
     cleared: { kind: 'text', text: '' },
-    long: { kind: 'text', text: 'x'.repeat(MAX_LIBRARY_SEARCH_CHARS) },
+    long: { kind: 'text', text: 'x'.repeat(MAX_LIBRARY_SEARCH_CHARS), cut: true },
     down: { kind: 'results' },
     enter: { kind: 'results' },
     nothing: { kind: 'focus' },

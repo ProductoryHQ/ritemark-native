@@ -191,6 +191,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
     const action = librarySearchRow(arg);
     if (action.kind === 'text') {
       this.shellText = action.text;
+      // Words past the cap: the shell's field shows the words searched (Codex on #933)
+      if (action.cut) void Promise.resolve(vscode.commands.executeCommand(SHELL_FIELD_COMMAND, LIBRARY_SEARCH_COMMAND, { text: action.text })).catch(() => undefined);
       if (this.ready) await this.post({ type: 'library/query', query: action.text });
       return;
     }
@@ -213,6 +215,15 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
       shellField = await focusShellField();
     }
     if (!shellField) await this.focusSearch();
+  }
+
+  /**
+   * Decks turned off (#933, Codex): the shell's field drops its words without a search, so the place forgets them too,
+   * and a page loaded after Decks is on again shows the library, not the old search.
+   */
+  forgetSearch(): void {
+    this.shellText = undefined;
+    this.query = '';
   }
 
   /** The place shows, and its own search field takes the keyboard (a shell without the row's field, #887). */

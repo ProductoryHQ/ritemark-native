@@ -116,7 +116,9 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   const setFieldKey = () => void vscode.commands.executeCommand('setContext', LIBRARY_FIELD_CONTEXT_KEY, isEnabled('decks'));
   setFieldKey();
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
-    if (event.affectsConfiguration('ritemark.features.decks')) setFieldKey();
+    if (!event.affectsConfiguration('ritemark.features.decks')) return;
+    if (!isEnabled('decks')) view.forgetSearch();
+    setFieldKey();
   }));
   context.subscriptions.push(
     publisher,
