@@ -552,10 +552,11 @@ async function main(): Promise<void> {
         const named = new Set([...built.html.matchAll(/logos\/logo-[0-9a-f]{16}\.svg/g)].map(match => match[0]));
         assert.deepEqual([...named], [logo.address], borderless ? 'Borderless' : 'Card');
       }
-      // The publisher picks it by the deck's look, and writes only it (`logoFiles = look.logo ? [look.logo] : []`).
+      // The publisher picks it by the deck's look, and writes only it (`logoFiles = input.logo ? [input.logo] : []`;
+      // Sprint 170: the page's input is read once, `pageInput`, for Publish and Save as PDF alike).
       const publish = fs.readFileSync(path.join(extension, 'src/decks/deckPublish.ts'), 'utf8');
       assert.match(publish, /pageLogoOf\(theme, frontMatterLook\(text\) === 'borderless', read\.logo, read\.secondLogo\)/);
-      assert.match(publish, /logoFiles = look\.logo \? \[look\.logo\] : \[\];/);
+      assert.match(publish, /logoFiles = input\.logo \? \[input\.logo\] : \[\];/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
