@@ -191,8 +191,8 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   const flow = /\.deck-sl\.is-blocks \.blk-flow \{[^}]*\}/.exec(css)?.[0] ?? ''
   assert.ok(flow.includes('overflow-wrap: normal; word-break: normal;') && !flow.includes('anywhere'), 'whole words')
-  assert.ok(/\.blk-link \{[^}]*overflow-wrap: anywhere;/.test(css), 'a link (a web address) may break')
-  assert.ok(!/\.deck-sl\.is-blocks[^{]*\{[^}]*(?:word-break: break-all|overflow-wrap: anywhere)[^}]*\}/.test(css.replace(/\.deck-sl\.is-blocks \.blk-link \{[^}]*\}/, '').replace(/\.deck-sl \.blk-missing-name \{[^}]*\}/, '')), 'nothing else splits words')
+  assert.ok(/\.blk-link(?:, [^{]*)? \{[^}]*overflow-wrap: anywhere;/.test(css), 'a link (a web address) may break (#938: the slide editor\'s live link shares the rule)')
+  assert.ok(!/\.deck-sl\.is-blocks[^{]*\{[^}]*(?:word-break: break-all|overflow-wrap: anywhere)[^}]*\}/.test(css.replace(/\.deck-sl\.is-blocks \.blk-link[^{]*\{[^}]*\}/, '').replace(/\.deck-sl \.blk-missing-name \{[^}]*\}/, '')), 'nothing else splits words')
   assert.ok(/\.is-cover \.blk-flow \{[^}]*justify-content: safe flex-end;/.test(css), "a cover's title is never pushed past the top")
   assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/.test(css) && /\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{ flex: 0 1 auto; min-height: 96px;/.test(css), 'the picture shrinks first, down to 96 px')
   assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) > \* \{ flex: none; \}/.test(css), 'the title and the words never shrink')
