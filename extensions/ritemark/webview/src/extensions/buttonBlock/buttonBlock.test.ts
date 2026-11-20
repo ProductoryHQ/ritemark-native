@@ -450,7 +450,8 @@ for (const form of FORMS) {
 // ---------------------------------------------------------------------------
 
 assert.deepEqual(decodeWallRequest({ type: 'present/open-link', url: 'https://example.com/a.pdf' }), { type: 'present/open-link', url: 'https://example.com/a.pdf' })
-for (const bad of DANGEROUS) assert.equal(decodeWallRequest({ type: 'present/open-link', url: bad }), null, `the wall can't ask for ${JSON.stringify(bad)}`)
+// #930: a plain http address is a word link's (the host opens it only when a link in the deck's words holds it).
+for (const bad of DANGEROUS.filter(address => !/^http:\/\//i.test(address))) assert.equal(decodeWallRequest({ type: 'present/open-link', url: bad }), null, `the wall can't ask for ${JSON.stringify(bad)}`)
 assert.equal(decodeWallRequest({ type: 'present/open-link', url: 'https://example.com', extra: 1 }), null)
 assert.equal(decodeWallRequest({ type: 'present/open-link', url: 42 }), null)
 {

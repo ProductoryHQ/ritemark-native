@@ -9,13 +9,16 @@
  */
 import { createContext, useEffect, type RefObject } from 'react'
 import { isOpenInAddress } from '../../../../../src/decks/blocks/codeTools'
-import { isButtonAddress } from '../../../../../src/decks/blocks/buttonBlock'
+import { isButtonAddress, isWordLinkAddress } from '../../../../../src/decks/blocks/buttonBlock'
 import { sendToExtension } from '../../../bridge'
 
 export interface CodeToolsActions {
   copy: (text: string) => void
   open: (url: string) => void
-  /** Sprint 163 PR 3: a Button block's button, its full https address (`buttonBlock.buttonHtml` puts no other on it). */
+  /**
+   * Sprint 163 PR 3: a Button block's button, its full https address (`buttonBlock.buttonHtml` puts no other on it);
+   * #930: a link in the slide's words, its full http(s) or mailto address.
+   */
   link?: (url: string) => void
 }
 
@@ -77,6 +80,15 @@ export function codeToolsClick(target: EventTarget | null, root: ParentNode, act
     closeCodeMenus(root)
     const href = button.getAttribute('data-href')
     if (isButtonAddress(href)) actions.link(href)
+    return 'used'
+  }
+  // #930: a link in the slide's words opens the same way (the renderer puts only a full http(s) or mailto address on
+  // it, `isWordLinkAddress`; the host checks it against the deck again). Words with no address stay words.
+  const wordLink = element?.closest('.blk-link[data-href]') ?? null
+  if (wordLink && actions.link) {
+    closeCodeMenus(root)
+    const href = wordLink.getAttribute('data-href')
+    if (isWordLinkAddress(href)) actions.link(href)
     return 'used'
   }
   const tools = element?.closest('.cb-tools') ?? null

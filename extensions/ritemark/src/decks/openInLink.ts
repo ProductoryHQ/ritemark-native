@@ -9,7 +9,7 @@
  */
 import * as vscode from 'vscode';
 import { openInTarget } from './blocks/codeTools';
-import { isButtonAddress } from './blocks/buttonBlock';
+import { isButtonAddress, isWordLinkAddress } from './blocks/buttonBlock';
 
 /** Open a slide's Open in address in the person's browser; false (and nothing opened) for any other value. */
 export function openInBrowser(url: unknown): boolean {
@@ -28,6 +28,17 @@ export function openInBrowser(url: unknown): boolean {
 export function openButtonLink(url: unknown, onDeck?: (address: string) => boolean): boolean {
   if (!isButtonAddress(url)) return false;
   if (onDeck && !onDeck(url)) return false;
+  void Promise.resolve(vscode.env.openExternal(url as unknown as vscode.Uri)).catch(() => false);
+  return true;
+}
+
+/**
+ * #930: a link in a slide's words, from Present's wall or presenter view, in the person's own browser (or mail app), as
+ * the string it is. Only a full http(s) or mailto address (`isWordLinkAddress`) that a link of the deck carries
+ * (`onDeck`). False, and nothing opened, for anything else.
+ */
+export function openWordLink(url: unknown, onDeck: (address: string) => boolean): boolean {
+  if (!isWordLinkAddress(url) || !onDeck(url)) return false;
   void Promise.resolve(vscode.env.openExternal(url as unknown as vscode.Uri)).catch(() => false);
   return true;
 }

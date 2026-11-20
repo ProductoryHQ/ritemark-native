@@ -6,7 +6,7 @@
  * Pure: no `vscode`, so the test reads the same set the host does.
  */
 import { isBlockSlide, parseDeck, slideDataOf } from './deckFormat';
-import { blockButtonAddresses } from './blocks/slideRenderer';
+import { blockButtonAddresses, blockWordLinkAddresses } from './blocks/slideRenderer';
 
 /** The full https addresses (`isButtonAddress`) the buttons on the deck's block slides open. */
 export function deckButtonAddresses(text: string): Set<string> {
@@ -14,6 +14,19 @@ export function deckButtonAddresses(text: string): Set<string> {
   for (const slide of parseDeck(text).slides) {
     if (!isBlockSlide(slide.kind)) continue;
     for (const address of blockButtonAddresses(slideDataOf(slide.kind, slide.body).markdown ?? '')) found.add(address);
+  }
+  return found;
+}
+
+/**
+ * #930: the addresses the links in the deck's block slides' words open (`isWordLinkAddress`), read the way the wall
+ * draws them. Present opens a word link for the wall only when it is one of these.
+ */
+export function deckWordLinkAddresses(text: string): Set<string> {
+  const found = new Set<string>();
+  for (const slide of parseDeck(text).slides) {
+    if (!isBlockSlide(slide.kind)) continue;
+    for (const address of blockWordLinkAddresses(slideDataOf(slide.kind, slide.body).markdown ?? '')) found.add(address);
   }
   return found;
 }

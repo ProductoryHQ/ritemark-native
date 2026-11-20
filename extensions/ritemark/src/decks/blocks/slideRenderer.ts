@@ -30,7 +30,7 @@ import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type Image
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
 import { tabsetOf, type Tabset } from './tabset';
 import { codeBlockHtml } from './codeTools';
-import { buttonHtml, buttonParagraphOf, isButtonAddress } from './buttonBlock';
+import { buttonHtml, buttonParagraphOf, isButtonAddress, isWordLinkAddress } from './buttonBlock';
 import { isEmptyLabel, labelParagraphOf, withStepsLabels } from './labelBlock';
 
 export { sidePictureOf };
@@ -132,6 +132,17 @@ interface RenderState {
 const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
 
 let state: RenderState = freshState();
+
+/**
+ * #930: a link in the slide's words, its words already drawn. The page's (`buttonLinks`): an `<a>` that opens a new tab;
+ * anywhere else, its address on it for the host to open (`role="link"`, as a button's). Out of the keyboard's order, as
+ * a button is: the slide is a picture to a screen reader wherever it is drawn. Not a live address: the words, underlined.
+ */
+function wordLinkHtml(href: string, wordsHtml: string): string {
+  if (!isWordLinkAddress(href)) return `<span class="blk-link">${wordsHtml}</span>`;
+  if (state.buttonLinks) return `<a class="blk-link" href="${esc(href)}" target="_blank" rel="noopener noreferrer" tabindex="-1">${wordsHtml}</a>`;
+  return `<span class="blk-link" role="link" data-href="${esc(href)}" tabindex="-1">${wordsHtml}</span>`;
+}
 
 /** A picture's file name, from the path the slide names. */
 export function pictureFileName(path: string): string {
@@ -486,6 +497,15 @@ function createSlideMarked(): Marked {
         return pictureHtml(image.href, image.text, image.picture);
       },
     }, {
+      // #930: a link in the slide's words is a real link: on the page (and so in every PDF kind) an `<a>` to a new tab,
+      // on the wall and the presenter view its address for the host to open (`codeToolsClick`; the strip and the stage
+      // never open it). Only a full http(s) or mailto address (`isWordLinkAddress`); any other stays underlined words.
+      name: 'link',
+      renderer(this: { parser: { parseInline: (tokens: Token[]) => string } }, token) {
+        const link = token as Tokens.Link;
+        return wordLinkHtml(link.href, this.parser.parseInline(link.tokens ?? []));
+      },
+    }, {
       // Experience 49: a picture alone in its paragraph (its attribute block beside it) is a block of its own, decided
       // from the tokens, so a look's markup never has to be read back (review of #774). Any other paragraph: as before.
       name: 'paragraph',
@@ -561,7 +581,6 @@ function createSlideMarked(): Marked {
       html: (html: string, block?: boolean) => (!block && isLineBreakTag(html) ? '<br>' : ''),
       // A second guard: a `<` that still came through raw never opens a tag. Entities stay as they are.
       text: (text: string) => text.replace(/</g, '&lt;'),
-      link: (_href: string, _title: string | null | undefined, text: string) => `<span class="blk-link">${text}</span>`,
       // Sprint 163 PR 1: a code block carries its Copy and its ↗ Open in…, and its places to fill in are marked.
       code: (code: string, infostring: string | undefined) => codeBlockHtml(code, infostring, { openIn: state.openIn, icons: CODE_ICONS }),
       image: (href: string, _title: string | null, text: string) => pictureHtml(href, text),
@@ -639,6 +658,19 @@ export function blockButtonAddresses(markdown: string): string[] {
     if (token.type !== 'paragraph') return;
     const button = buttonParagraphOf((token as Tokens.Paragraph).tokens);
     if (button && isButtonAddress(button.href)) found.add(button.href);
+  });
+  return [...found];
+}
+
+/**
+ * #930: the addresses a block slide's word links open (`isWordLinkAddress`), read as the renderer reads them. Present's
+ * host opens a word link for the wall only when it is one of these, as it does a button's.
+ */
+export function blockWordLinkAddresses(markdown: string): string[] {
+  if (!markdown.includes('](')) return [];
+  const found = new Set<string>();
+  slideMarked.walkTokens(lexBlockSlide(markdown), token => {
+    if (token.type === 'link' && isWordLinkAddress((token as Tokens.Link).href)) found.add((token as Tokens.Link).href);
   });
   return [...found];
 }
