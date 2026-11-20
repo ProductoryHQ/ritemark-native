@@ -41,44 +41,64 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 <!-- DECKS START -->
 ## Make slides, present them and share them
 
+### Make slides
+
 - **Make a deck of slides.** Choose **New → Deck**, or the Deck card on Home. Start empty or from a copy of an earlier deck.
 - **Write on the slide as in a document.** Type a title, text and lists, with no layout to choose. Type / for columns, boxes, steps, tabs, a button, a picture or a table.
-- **Write the handout beside the slides.** Participants read it. A comment stays with you and never goes out.
+- **Write the handout beside the slides.** Participants read it. A comment stays with you and is never shared.
+- **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
+- **Format words on a slide from the toolbar.** Select words on a slide, in columns too. The toolbar's bold, italic, headings, lists, quote, code and link change them.
+- **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
+- **The toolbar steps aside for a link.** On a slide, the toolbar hides while you type the link's address, so it covers nothing. It comes back when you're done.
+
+### What you can put on a slide
+
+- **Duplicate, move or delete one box or column.** Click the boxes, columns, steps or list, then point at one item. A small handle shows on its edge. Click it to duplicate, move or delete just that item, or drag it to a new place.
+- **Give a box any of 1,500 icons.** Ask the AI for one, or write the name of a Phosphor icon, such as truck. It looks the same while you edit, present and share.
+- **Search for an icon by what it shows.** Click a box's icon and type, such as "truck", "people" or "mail". The icons your deck already uses come first.
+- **Number your boxes.** Click the boxes, open the menu that says **Icon** on their bar, and choose **Number**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
+- **A wrong icon name is easy to fix.** When you or the AI name an icon Ritemark doesn't have, the box shows a dashed circle where the icon goes. Point at it on the slide and click **Choose an icon**. The search opens with the name you wrote, so a misspelt "trukc" already shows the truck.
+- **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
+- **Show who said a quote.** On a slide, end a quote with a line that starts with a long dash (— or –), such as "— Team lead". That line shows smaller, under the quote's words.
+- **A quote looks right on every slide.** It has no box behind it, just a bar in your theme's colour. It looks the same on light and dark slides, while you edit, present and share.
+- **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
+- **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
+- **A button stays put when you click it.** A button with no words beside it doesn't jump away from your pointer, on a slide or in a document.
+- **A table looks the same everywhere.** On a slide, a table is as tall while you edit as on the projector. The text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
+
+### Choose the look
+
+- **Set the deck's look, yourself or with AI.** Choose **Theme** on the deck's bar to pick a theme and change its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
+- **Put a picture behind a slide's words.** In **Slide settings…**, choose **Behind** and pick a picture. You can also paste or drop one anywhere on the slide, or point at the slide and press **Choose…** in its corner. Click where there are no words to choose the picture. Then you can replace or remove it.
+- **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
+- **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
+- **Even spacing on every slide.** Columns reach both edges of the slide, with the same gap between them. Boxes, tabs, tables and code have the same room inside.
+
+### Move through a deck
+
 - **A deck opens on its slides.** Every deck opens showing only the slide. The switch on the deck's bar shows the handout beside it, or the handout alone.
 - **Scroll to the next slide.** With only the slide shown, one scroll over the slide or the space around it moves one slide. The arrow keys, Page Up, Page Down, Home and End do the same when you're not typing. A long column on the slide scrolls first.
-- **Scroll the slide beside the handout too.** With the handout shown, one scroll over the slide or the space around it moves one slide, and the handout goes to its part. Scrolling the handout still moves the slide along as you read.
+- **Scroll the slide beside the handout too.** With the handout shown, one scroll over the slide or the space around it moves one slide. The handout goes to that slide's part. Scrolling the handout still moves the slide along as you read.
 - **Click anywhere on a thumbnail to choose it.** This works in the list of slides, in **All slides** while you present, and on your laptop's screen. Nothing inside a thumbnail scrolls.
-- **Give the deck a look, yourself or with AI.** **Theme** on the deck's bar picks a theme and changes its colours, fonts and logo. Or ask the AI to match your brand guide or logo.
-- **Ask the AI about this slide.** It knows which slide you're on. A comment on a slide can be a task for Claude.
-- **Present from Ritemark.** **Present** shows only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
-- **Lead the room.** Use a clicker, blank the screen or light up one item. Show a timer for an exercise, or a QR code for the page.
-- **Share the deck as a page.** **Publish** puts it online as one page that people open on a phone or a computer. Each prompt has **Copy**, and exercise steps can be ticked.
-- **Comments and skipped slides stay with you.** Before anything goes, Ritemark lists what goes and what stays.
-- **The page keeps its look until you update it.** Change the theme, and the page online changes only with **Update the page**.
-- **Even spacing on every slide.** Columns now reach both edges of the slide, with the same gap between them, and boxes, tabs, tables and code have the same room inside.
-- **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first, with each deck's date and number of slides.
-- **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides, with their handout and prompts, after the slide you're on, and one undo takes them out again.
-- **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it, and a tick marks the slides already in your deck.
-- **The library offers the slides you repeat.** When a few slides are in most of your decks, the Slide library offers them at its top. **Add all** puts them in a topic called Every training, **Choose…** lets you pick, and **Not now** hides them for good. Nothing is added until you choose.
-- **Format words on a slide from the toolbar.** Select words on a slide and the toolbar's bold, italic, headings, lists, quote, code and link now change them, in columns too.
-- **The toolbar steps aside while you add a link.** On a slide, the toolbar hides while you type the link's address, so it covers nothing. It comes back when you're done.
+
+### Reuse slides from the Slide library
+
+- **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first. Each deck shows its date and number of slides.
+- **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides after the slide you're on, with their handout and prompts. One undo takes them out again.
+- **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it. A tick marks the slides already in your deck.
+- **The library offers the slides you repeat.** When a few slides are in most of your decks, the Slide library offers them at its top. **Add all** puts them in a topic called Every training. **Choose…** lets you pick, and **Not now** hides them for good. Nothing is added until you choose.
+
+### Present
+
+- **Present from Ritemark.** Choose **Present** to show only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
+- **Lead the room while you present.** Use a clicker, blank the screen or light up one item. Show a timer for an exercise, or a QR code for the page.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
-- **A table looks the same everywhere.** A table on a slide you edit is as tall as on the projector, so the text under it stays in view. On the page, its frame is as wide as the table, and a wide one scrolls sideways.
-- **Put your logo in any corner.** In the theme, choose top or bottom and left or right. Words always keep clear of it, so a title slide can carry the logo bottom left.
-- **A quote looks right on every slide.** On a dark slide a quote no longer shows as a pale box: it looks the same while you edit, present and share.
-- **Show who said a quote.** End a quote on a slide with a line that starts with a long dash (— or –), such as "— Team lead". That line shows smaller, under the quote's words, and the quote gets a bar in your theme's colour.
-- **Put a label anywhere on a slide.** Type / and choose **Label**, then write its words, such as "Exercise · 1 / 2". It can sit over a title, in a column or in a box.
-- **Type a button's words right on it.** Click anywhere on the button, its icon too, and type. It works on a slide and in a document, before or after you give its address.
-- **Give a box any of 1,500 icons.** Ask the AI for one, or write an icon's name from the Phosphor set, such as truck. It looks the same while you edit, present and share.
-- **Search for a box's icon by what it is.** Click a box's icon and type, such as "truck", "people" or "mail". The icons your deck already uses come first.
-- **A button that stands alone stays put when you click it.** The button no longer jumps away from your pointer, on a slide or in a document.
-- **An unknown icon shows as a dashed circle.** When you or the AI name an icon Ritemark doesn't have, the box keeps its place. Point at the circle on the slide and choose another: the search opens with the name you wrote, so a misspelt "trukc" already shows the truck.
-- **Take a prompt out of a quote.** On a slide, select the prompt's words in a quote and choose **Code block** on the toolbar. They become one block with **Copy**, and the rest of the quote stays a quote.
-- **Number your boxes.** Click the boxes and choose **Number** on their bar, where it says **Icon**. The numbers follow when you move, add or delete a box. A dot or an arrow works too.
-- **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
-- **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
-- **Put a picture behind a slide's words.** In **Slide settings…**, choose **Behind** and pick a picture, or paste or drop one anywhere on the slide. Point at the slide to find **Choose…** in its corner. Click where there are no words to choose the picture, then replace or remove it.
-- **Duplicate, move or delete one box.** Click a block of boxes, columns, steps or a list, and point at one of its items. A small handle shows on its edge. Click it to duplicate, move or delete just that item, or drag it to a new place.
+
+### Share the deck
+
+- **Share the deck as a page.** Choose **Publish** to put it online as one page. People open it on a phone or a computer. Each prompt has **Copy**, and people can tick an exercise's steps.
+- **Comments and skipped slides stay with you.** Before you publish, Ritemark lists what goes on the page and what stays with you.
+- **The page changes only when you update it.** Change the theme, and the page online keeps its old look until you choose **Update the page**.
 <!-- DECKS END -->
 
 ## Smaller changes
