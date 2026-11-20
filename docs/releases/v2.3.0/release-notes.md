@@ -78,6 +78,7 @@ Workbooks now look as they do in Excel, too. 2.3 also lets you size, crop and ch
 - **Choose where a slide's words sit.** Right-click a slide, choose **Slide settings…** and pick **Top**, **Middle** or **Bottom**. The title moves with them, and a title slide stays low until you pick another.
 - **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
 - **Put a picture behind a slide's words.** In **Slide settings…**, choose **Behind** and pick a picture, or paste or drop one anywhere on the slide. Point at the slide to find **Choose…** in its corner. Click where there are no words to choose the picture, then replace or remove it.
+- **Duplicate, move or delete one box.** Click a block of boxes, columns, steps or a list, and point at one of its items. A small handle shows on its edge. Click it to duplicate, move or delete just that item, or drag it to a new place.
 <!-- DECKS END -->
 
 ## Smaller changes

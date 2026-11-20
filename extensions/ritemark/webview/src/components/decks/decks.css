@@ -549,6 +549,13 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide .deck-block-split { position: relative; width: 12px; min-width: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: col-resize; touch-action: none; }
 .deck-slide .deck-block-split::after { content: ''; position: absolute; left: 5px; top: 20%; bottom: 20%; width: 2px; border-radius: 1px; background: var(--r-accent); opacity: 0; } /* no line at rest (17 November): pointed at, or the guide while it drags */
 .deck-slide .deck-block-split:is(:hover, :focus-visible)::after { opacity: 1; }
+/* Sprint 167 PR 5 (decks README item B): one item's own handle, the shape of the Text editor's table grips (a column's
+   pill on a box's or a column's top edge, a row's on a step's or a list item's left edge), white like the block's
+   other handles; pointed at or with its menu open, the accent. */
+.deck-slide .deck-item-grip { position: relative; width: 100%; height: 100%; min-width: 0; padding: 0; border-radius: 5px; background: var(--r-surface); color: var(--r-ink-body); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 2px 6px -2px rgba(30, 27, 75, .3); cursor: grab; touch-action: none; }
+.deck-slide .deck-item-grip:hover, .deck-slide .deck-item-grip.is-on { background: var(--r-accent); color: #fff; box-shadow: 0 0 0 1px var(--r-accent); }
+.deck-slide .deck-item-grip:active { transform: none; cursor: grabbing; }
+.deck-slide .deck-item-grip svg { width: 12px !important; height: 12px !important; }
 .deck-block-drop { position: absolute; z-index: 6; height: 2px; border-radius: 1px; background: var(--r-accent); pointer-events: none; }
 .deck-block-guide { position: absolute; z-index: 6; width: 2px; background: var(--r-accent); pointer-events: none; }
 /* Sprint 167 PR 4 (decks README item D): the picture Behind's corner chip (`blocks/BehindChip.tsx`), in the slide's
