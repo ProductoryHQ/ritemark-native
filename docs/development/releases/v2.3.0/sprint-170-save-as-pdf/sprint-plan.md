@@ -22,10 +22,10 @@ From a deck, Save as PDF writes the kind of PDF that matches the view the person
 
 ## Linked Issues
 One GitHub issue per PR in milestone v2.3.0.
-- PR 0 (spike): to be created
+- PR 0 (spike): [#884](https://github.com/ProductoryHQ/ritemark-native/issues/884)
 - PR 1: [#881](https://github.com/ProductoryHQ/ritemark-native/issues/881)
-- PR 2: [#884](https://github.com/ProductoryHQ/ritemark-native/issues/884)
-- PR 3: [#881](https://github.com/ProductoryHQ/ritemark-native/issues/881)
+- PR 2: [#885](https://github.com/ProductoryHQ/ritemark-native/issues/885)
+- PR 3: [#886](https://github.com/ProductoryHQ/ritemark-native/issues/886)
 
 ## Pull requests
 | PR | Branch | Content | Review tier |

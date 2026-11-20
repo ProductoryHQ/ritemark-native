@@ -17,9 +17,9 @@ Nothing starts until the plan is approved (Development manager with the Experien
 - [x] Tests for each scenario they can cover; shots of the button, the menu and the PDF's first pages
 - [ ] Risk and How to revert in the PR; Review record; the lead's look at the shots; release-notes line
 
-## PR 2: Slides
-- [ ] One 16:9 page a slide from the wall's renderer; chosen tab and every reveal shown
-- [ ] Tests and shots; the menu's item for Slide only works
+## PR 2: Slides (#885)
+- [x] One 16:9 page a slide from the wall's renderer; chosen tab and every reveal shown
+- [x] Tests and shots; the menu's item for Slide only works
 - [ ] Issue, Review record, the lead's look, release-notes line
 
 ## PR 3: Handout

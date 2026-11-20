@@ -92,6 +92,12 @@ export interface PageOptions {
    * no title of its own (`pageHtml`). Never on the page.
    */
   name?: string;
+  /**
+   * Sprint 170 PR 2 (#885): what the page prints. Left out, the page's own print (`PRINT_CSS`, A4 portrait, each slide
+   * with its text: Save slides and handout as PDF). `'slides'`: Save slides as PDF's page (`SLIDES_PRINT_CSS`), one
+   * 16:9 page a slide on the theme's ground, as on the wall. Only these rules differ from the page's.
+   */
+  print?: 'slides';
 }
 
 /** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
@@ -767,6 +773,36 @@ export const PRINT_CSS = `
 `;
 
 /**
+ * Sprint 170 PR 2 (#885; the decks README, "Save as PDF, from Publish"): Save slides as PDF's page. One 16:9 page a
+ * slide, drawn as on the wall: the wall's renderer at its own 960 × 540 layout, unscaled, on the theme's ground and glow
+ * (`--ground`, the wall's `wallGround`; white on Borderless), with every reveal shown and each tab as the slide holds it
+ * (the chosen tab). A section is drawn as its slide, as on the wall. The text, the page's line and its controls are not
+ * drawn; Copy and ↗ aren't drawn, and Buttons stay links. Skipped slides, comments and notes are never on the page
+ * (`publicDeck`).
+ *
+ * These rules hold on screen too, not only in print: this page is only ever printed (patch 021's hidden window), and
+ * with every slide laid out on screen the page's script fits every slide's Tabs band (`PAGE_TABS_FIT` measures only a
+ * band that has a width), not only the first slide's. The page's own position and scale, set by its script for the
+ * window, give way to the paper's. Each slide after the first starts a page, so the last leaves no blank one.
+ */
+export const SLIDES_PRINT_CSS = `
+@page { size: 960px 540px; margin: 0; }
+html, body { width: 960px; height: auto; margin: 0; overflow: visible; background: var(--ground); }
+.ground, .line, .prog, .toc, .toast, .zoom, .restart, .side, .foot, .empty, .prefetch, .copy, .prompt .open, .cb-tools { display: none !important; }
+.wrap, .view, .frame { position: static !important; display: block !important; inset: auto !important; width: 960px !important; height: auto !important; margin: 0; padding: 0; transform: none !important; }
+.layer, .layer:not(.on):not(.leaving) { position: relative !important; inset: auto !important; display: block !important; width: 960px; height: 540px; margin: 0; overflow: hidden; visibility: visible; opacity: 1 !important; animation: none !important; background: var(--ground); break-inside: avoid; page-break-inside: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.layer + .layer { break-before: page; page-break-before: always; }
+.layer > .deck-slide { position: absolute; inset: 0; width: 960px; height: 540px; overflow: hidden; }
+.layer .deck-sl { transform: none !important; width: 960px; height: 540px; }
+.layer .deck-sl [data-reveal-hidden] { visibility: visible; }
+.layer .deck-sl.is-blocks .photo { top: 0; bottom: 0; }
+.layer .deck-sl.is-blocks.pic-left .photo { left: 0; width: 384px; }
+.layer .deck-sl.is-blocks.pic-right .photo { right: 0; width: 384px; }
+.layer .deck-sl.is-blocks.pic-behind .photo { left: 0; right: 0; }
+.layer .deck-sl.is-blocks.pic-behind .veil { inset: 0; }
+`;
+
+/**
  * Each slide and part's place in the printed column (`PRINT_CSS`): slide n (`#s<n>`) before part n (`#t<n>`), after the
  * preamble. A section (its place in `sections`) prints as its band alone: its slide is left out and its part starts a
  * page. Only numbers reach it.
@@ -1039,7 +1075,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
     `<title>${esc(deck.title || deck.client || 'Slides')}</title>`,
-    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${PRINT_CSS}\n${printOrderCss(count, printedSections)}\n</style>`,
+    `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}`}\n</style>`,
     '</head>',
     // The ticks' and the reader's place in this browser's storage: the same for every version of the page that keeps its
     // client and title. The deck's transition, as the wall plays it.

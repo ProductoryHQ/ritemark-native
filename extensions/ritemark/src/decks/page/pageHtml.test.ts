@@ -15,7 +15,7 @@ import { BUILT_IN_THEME } from '../deckTheme';
 import { cssReferences, pageReferences, scriptBuildsReferences } from '../../publish/references';
 import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
-import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
+import { DIGEST_META, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, PRINT_CSS, SLIDES_PRINT_CSS, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
 import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
@@ -555,5 +555,14 @@ assert.equal(pictureAddress(pictureFile('images/a%2523.png', 'handout')), 'image
   assert.equal(page.split(PAGE_ICON_PATHS.truck).length - 1, 2, "truck's drawing once for each of its two boxes");
 }
 
+// Sprint 170 PR 2 (#885): Save slides as PDF's page is this page with the slides' print rules in place of the A4 page's
+// (the print order's too), and nothing else changed; the page itself keeps its own print.
+{
+  const slides = pageHtml(deck, assets, { digest, pictureUrl, print: 'slides' });
+  assert.ok(html.includes(PRINT_CSS) && !html.includes(SLIDES_PRINT_CSS), 'the page prints as before');
+  assert.ok(slides.includes(SLIDES_PRINT_CSS) && !slides.includes(PRINT_CSS) && !slides.includes('@media print{.pre{order:0}'));
+  const [head, tail] = html.split(PRINT_CSS);
+  assert.ok(slides.startsWith(head) && slides.endsWith(tail.slice(tail.indexOf('\n</style>'))), 'only the print rules differ');
+}
 
 console.log('pageHtml: passed');
