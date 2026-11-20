@@ -209,7 +209,7 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 }
 
 /** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
-const NOTICE_ACTION_GAP = 6
+const NOTICE_ACTION_GAP = 8
 
 const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */

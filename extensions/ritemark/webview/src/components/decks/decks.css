@@ -314,8 +314,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
    weight is far above theirs), and the deck's own Saved steps aside (DeckView). */
 .deck-notice-cut { position: relative; display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; padding: 4px; margin: -4px 0 -4px -4px; white-space: nowrap; } /* 4 px of room for the icon's focus ring (2 px at 2 px) inside the note's clip */
 .deck-notice-sizer { display: block; visibility: hidden; line-height: 24px; } /* the icon's height, so its ring fits the padding */
-.deck-notice-room { display: inline-block; width: 30px; } /* the action's 24 and the gap's 6 */
-.deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 6px; }
+.deck-notice-room { display: inline-block; width: 32px; } /* the action's 24 and the gap's 8 */
+.deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 8px; } /* the icon's focus ring (4 px out) clears the name by 4 px */
 .deck-notice-line > .deck-notice-words { flex: none; }
 .deck-notice-shown { display: block; white-space: nowrap; }
 .deck-notice-after { display: inline-flex; flex: none; }
