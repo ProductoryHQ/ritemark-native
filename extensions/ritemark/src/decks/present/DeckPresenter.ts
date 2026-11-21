@@ -37,6 +37,7 @@ import * as vscode from 'vscode';
 import { isShellPageSignal } from '../../shellPageSignals';
 import { resolveDocumentResourceRoots } from '../../webviewResourceRoots';
 import { isOpenInOff, parseDeck } from '../deckFormat';
+import { deckNameOf } from '../deckFileName';
 import { openButtonLink, openInBrowser, openWordLink } from '../openInLink';
 import { deckButtonAddresses, deckWordLinkAddresses } from '../deckButtons';
 import { BUILT_IN_THEME, parseTheme, themePathOf, themeWithLogoAddresses, type DeckTheme } from '../deckTheme';
@@ -806,9 +807,9 @@ function workspaceFolderOf(document: vscode.TextDocument): string | null {
   return folder?.uri.scheme === 'file' ? folder.uri.fsPath : null;
 }
 
-/** The deck's name: its file name without `.deck.md`. */
+/** The deck's name: its file name without `.rtms` (or an older deck's `.deck.md`). */
 function deckTitle(document: vscode.TextDocument): string {
-  return path.basename(document.uri.fsPath).replace(/\.deck\.md$/i, '');
+  return deckNameOf(path.basename(document.uri.fsPath));
 }
 
 type DeckPresentMessage = { type: 'deck/present-ended'; index: number } | { type: 'deck/present-failed'; message: string };

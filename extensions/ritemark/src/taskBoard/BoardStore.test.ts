@@ -197,6 +197,7 @@ async function main(): Promise<void> {
     assert.equal(await store.invalidate('q1w2e3-from-git.md'), true);
     assert.equal(await store.get('q1w2e3'), null, 'a deleted file disappears');
     assert.equal(await store.invalidate('notes.txt'), false, 'other files are ignored');
+    assert.equal(await store.invalidate('notes.rtms'), false, 'Sprint 172 (scenario 15): a deck in the cards folder is no card');
     await assert.rejects(
       () => store.mutate('q1w2e3', null, (current) => current),
       (error: BoardStoreError) => error.code === 'not-found',

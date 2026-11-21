@@ -22,12 +22,13 @@ const minutes = (n: number) => T - n * 60_000;
 
 // ── Which files Ritemark lists: the kinds it opens (HomePanel's search pattern) ──
 
-assert.deepEqual([...RECENT_EXTENSIONS], ['.md', '.markdown', '.txt', '.pdf', '.docx', '.doc', '.csv', '.xlsx', '.xls', '.pptx', '.ppt', '.drawio', '.flow']);
+assert.deepEqual([...RECENT_EXTENSIONS], ['.md', '.markdown', '.txt', '.rtms', '.pdf', '.docx', '.doc', '.csv', '.xlsx', '.xls', '.pptx', '.ppt', '.drawio', '.flow']);
 assert.equal(RECENT_LIMIT, 5);
 assert.deepEqual(
-  ['Plan.md', 'NOTES.MD', 'a.markdown', 'log.txt', 'Brief.pdf', 'Offer.docx', 'old.doc', 'data.csv', 'Budget.xlsx', 'b.xls', 'Deck.pptx', 'd.ppt', 'Map.drawio', 'Weekly.flow', 'Weekly.flow.json', 'WEEKLY.FLOW.JSON', 'data.json', 'photo.png', 'Makefile', '.md', 'Talk.deck.md', 'TALK.DECK.MD', 'Slide library/Teams.deck.md'].map(kindOf),
-  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other', 'deck', 'deck', 'deck'],
+  ['Plan.md', 'NOTES.MD', 'a.markdown', 'log.txt', 'Brief.pdf', 'Offer.docx', 'old.doc', 'data.csv', 'Budget.xlsx', 'b.xls', 'Deck.pptx', 'd.ppt', 'Map.drawio', 'Weekly.flow', 'Weekly.flow.json', 'WEEKLY.FLOW.JSON', 'data.json', 'photo.png', 'Makefile', '.md', 'Talk.deck.md', 'TALK.DECK.MD', 'Slide library/Teams.deck.md', 'Day one.rtms', 'DAY.RTMS'].map(kindOf),
+  ['markdown', 'markdown', 'markdown', 'markdown', 'pdf', 'word', 'word', 'sheet', 'sheet', 'sheet', 'slides', 'slides', 'drawing', 'flow', 'flow', 'flow', 'other', 'other', 'other', 'other', 'deck', 'deck', 'deck', 'deck', 'deck'],
 );
+// Sprint 172: Last changed's file search (its pattern is RECENT_EXTENSIONS) takes `.rtms`, so a new deck shows there (line 25)
 
 // ── The AI's name: ChatGPT, never Codex (R22) ──
 

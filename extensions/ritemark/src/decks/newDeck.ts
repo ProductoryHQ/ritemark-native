@@ -3,7 +3,7 @@
  * deck holds and is called, the steps that make it, and the start card's copy of an earlier deck. Pure: no `vscode`,
  * so the test runs the same rules and steps the command uses (decksHost.ts).
  *
- *  - New → Deck makes "Untitled.deck.md" ("Untitled 2.deck.md" and on), a title slide reading "The deck's title" in
+ *  - New → Deck makes "Untitled.rtms" ("Untitled 2.rtms" and on; Sprint 172), a title slide reading "The deck's title" in
  *    the built-in theme, in the folder New was opened from, and opens it at once, as New → Text and Table do.
  *  - The deck's start card offers a copy of an earlier deck: this deck becomes that deck as written, notes included (it
  *    is the person's own deck), named "<deck name> (copy)" ("(copy 2)" and on when that is taken). Only its relative
@@ -16,6 +16,7 @@ import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
 import { folderOf, newTopicText, partText, rebasePath, rebaseSlide, rewriteMarkdownTargets } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
+import { deckFileName, deckNameOf } from './deckFileName';
 
 /** The words an empty deck's title slide starts with, selected so they are typed over (its part shows no heading of them). */
 export { EMPTY_DECK_TITLE };
@@ -26,24 +27,24 @@ export function emptyDeckText(random: () => number = Math.random): string {
   return newTopicText(BUILT_IN_THEME_PATH, partText('title', `id: ${id}\ntitle: ${writeScalar(EMPTY_DECK_TITLE)}`, ''));
 }
 
-/** A deck's name: its file name without `.deck.md`. */
-export function deckFileName(path: string): string {
-  const base = path.slice(path.lastIndexOf('/') + 1);
-  return base.replace(/\.deck\.md$/i, '');
-}
+/** A deck's name: its file name without `.rtms` (or an older deck's `.deck.md`), through the one rule. */
+export { deckNameOf };
 
-/** The copy's file name: "<name> (copy).deck.md", then "<name> (copy 2).deck.md" and on, the first that is free. */
+/**
+ * The copy's file name: "<name> (copy).rtms", then "<name> (copy 2).rtms" and on, the first that is free. A copy is a
+ * new file, so a copy of an old `.deck.md` is `.rtms` too (Sprint 172, the Experience lead's answer).
+ */
 export function copyFileName(name: string, taken: (fileName: string) => boolean): string {
   for (let index = 1; ; index++) {
-    const fileName = `${name} (${index === 1 ? 'copy' : `copy ${index}`}).deck.md`;
+    const fileName = deckFileName(`${name} (${index === 1 ? 'copy' : `copy ${index}`})`);
     if (!taken(fileName)) return fileName;
   }
 }
 
-/** An empty deck's file name: "Untitled.deck.md", then "Untitled 2.deck.md" and on, the first that is free. */
+/** An empty deck's file name: "Untitled.rtms", then "Untitled 2.rtms" and on, the first that is free. */
 export function emptyFileName(taken: (fileName: string) => boolean): string {
   for (let index = 1; ; index++) {
-    const fileName = index === 1 ? 'Untitled.deck.md' : `Untitled ${index}.deck.md`;
+    const fileName = deckFileName(index === 1 ? 'Untitled' : `Untitled ${index}`);
     if (!taken(fileName)) return fileName;
   }
 }
@@ -91,7 +92,7 @@ export function earlierDecks(decks: ReadonlyArray<{ path: string; modified: numb
     .filter(deck => !isTopicPath(deck.path) && deck.path !== self)
     .slice()
     .sort((a, b) => b.modified - a.modified || a.path.localeCompare(b.path))
-    .map(deck => ({ path: deck.path, name: deckFileName(deck.path), folder: folderOf(deck.path) || projectName, date: day(deck.modified) }));
+    .map(deck => ({ path: deck.path, name: deckNameOf(deck.path), folder: folderOf(deck.path) || projectName, date: day(deck.modified) }));
 }
 
 /** What New → Deck needs from VS Code, passed in so the test runs the command's own steps (`decksHost.ts`). */
@@ -109,7 +110,7 @@ export interface NewDeckSteps {
 
 /**
  * Sprint 159 (Jarmo, 16 November: New → Deck "should open the Deck tab straight away, the same pattern as Text and
- * Table"): an empty deck, "Untitled.deck.md" or the next free "Untitled N.deck.md", made in the folder New was opened
+ * Table"): an empty deck, "Untitled.rtms" or the next free "Untitled N.rtms", made in the folder New was opened
  * from and opened at once. Nothing is asked first; a copy of an earlier deck is the start card's, in the deck. A file is
  * never written over: the create fails if the name was taken meanwhile, and the next free one is tried.
  */
@@ -161,7 +162,7 @@ export function copiedNotice(sourceName: string): string {
  * renamed "<name> (copy)" as New → Deck's copies were (PR 7). Returns the new file name, or null when nothing changed.
  */
 export async function copyEarlierDeck(source: string, steps: CopyDeckSteps): Promise<string | null> {
-  const sourceName = deckFileName(source);
+  const sourceName = deckNameOf(source);
   const written = await steps.read(source);
   if (written === null) {
     steps.notice(`${sourceName} is no longer there.`);

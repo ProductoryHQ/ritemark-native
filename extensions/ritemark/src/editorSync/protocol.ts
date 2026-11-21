@@ -26,7 +26,7 @@ export type DocumentRenderPayload =
       agentSkills?: unknown[];
       /** A task card shown as a page (Sprint 130): the view shows the card strip, not properties. */
       cardMode?: { cardId: string };
-      /** A `.deck.md` shown as a deck (Sprint 157): the view draws the slides beside their handout. */
+      /** A deck (`.rtms`, or an older `.deck.md`) shown as a deck (Sprint 157): the view draws the slides beside their handout. */
       deckMode?: true;
       /** A theme in the project's Slide library shown as the theme's own tab (Sprint 162 PR 2). */
       themeMode?: true;

@@ -15,6 +15,7 @@ import { compareDecks, deckSummaryOf, searchTerms, slideSearchText, type DeckFil
 
 export { searchTerms };
 import { slidesOfText } from './deckLibraryFormat';
+import { deckNameOf } from './deckFileName';
 import { sameSlides, slideWords, type SameSlides } from './sameSlide';
 
 /** Search shows at most this many slides; the count says how many more there are. */
@@ -232,7 +233,7 @@ export const MAX_NAMED_DECKS = 8;
  * alone: "Slide library" is the library, so "slide" or "library" doesn't list every topic.
  */
 function placeWords(deck: DeckSummary): string[] {
-  const place = deck.topic ? deck.name : deck.path.replace(/\.deck\.md$/i, '');
+  const place = deck.topic ? deck.name : `${deck.path.slice(0, deck.path.lastIndexOf('/') + 1)}${deckNameOf(deck.path)}`;
   return place.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
 

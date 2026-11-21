@@ -32,6 +32,7 @@
 import type { ReactNode } from 'react'
 import { isBlockSlide, parseFrom, sidePictureOf, type ContentPlace, type SlideData } from '../../../../src/decks/deckFormat'
 import { contentPlaceDefault, contentPlaceOf } from '../../../../src/decks/blocks/slideRenderer'
+import { deckNameOf } from '../../../../src/decks/deckFileName'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { SegmentedControl } from '../ui/segmented-control'
@@ -143,7 +144,7 @@ interface SlideSettingsProps {
 function sourceLine(from: string | undefined): { library: boolean; name: string } | null {
   const source = parseFrom(from)
   if (!source) return null
-  const name = source.path.split('/').pop()?.replace(/\.deck\.md$/i, '') ?? source.path
+  const name = deckNameOf(source.path) || source.path
   return { library: /^Slide library\//.test(source.path), name }
 }
 

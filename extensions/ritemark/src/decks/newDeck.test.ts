@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parseDeck, parseSlideBody } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
-import { copiedDeckText, copiedNotice, copyEarlierDeck, copyFileName, deckFileName, earlierDecks, EMPTY_DECK_TITLE, emptyDeckText, emptyFileName, makeEmptyDeck } from './newDeck';
+import { copiedDeckText, copiedNotice, copyEarlierDeck, copyFileName, deckNameOf, earlierDecks, EMPTY_DECK_TITLE, emptyDeckText, emptyFileName, makeEmptyDeck } from './newDeck';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
 
 async function main(): Promise<void> {
@@ -24,19 +24,24 @@ async function main(): Promise<void> {
 
 // Names: the copy's "(copy)", then "(copy 2)"; an empty deck's "Untitled"; a deck's name from its path.
 {
-  const taken = new Set(['Training (copy).deck.md', 'Untitled.deck.md', 'Untitled 2.deck.md']);
+  // Sprint 172: new names end `.rtms`; a copy of an old `.deck.md` is a new file, so `.rtms` too
+  const taken = new Set(['Training (copy).rtms', 'Untitled.rtms', 'Untitled 2.rtms', 'Old (copy).deck.md']);
   assert.deepEqual({
     copy: copyFileName('Workshop', name => taken.has(name)),
     copyTaken: copyFileName('Training', name => taken.has(name)),
     empty: emptyFileName(name => taken.has(name)),
-    name: deckFileName('Clients/Harbour/AI assistants and agents.deck.md'),
-    nameUpper: deckFileName('Top.DECK.md'),
+    copyOld: copyFileName('Old', name => taken.has(name)),
+    name: deckNameOf('Clients/Harbour/AI assistants and agents.deck.md'),
+    nameUpper: deckNameOf('Top.DECK.md'),
+    nameNew: deckNameOf('Clients/Harbour/Day one.rtms'),
   }, {
-    copy: 'Workshop (copy).deck.md',
-    copyTaken: 'Training (copy 2).deck.md',
-    empty: 'Untitled 3.deck.md',
+    copy: 'Workshop (copy).rtms',
+    copyTaken: 'Training (copy 2).rtms',
+    empty: 'Untitled 3.rtms',
+    copyOld: 'Old (copy).rtms',
     name: 'AI assistants and agents',
     nameUpper: 'Top',
+    nameNew: 'Day one',
   });
 }
 
@@ -125,10 +130,10 @@ async function main(): Promise<void> {
   assert.match(host, /'vscode\.openWith', vscode\.Uri\.file\(target\), 'ritemark\.editor'/, 'and opens it as a deck');
 }
 
-// New → Deck's steps: "Untitled.deck.md", then "Untitled 2.deck.md" and on, in the folder New was opened from; made by
+// New → Deck's steps: "Untitled.rtms", then "Untitled 2.rtms" and on, in the folder New was opened from; made by
 // exclusive create, then opened; a name taken meanwhile is skipped, any other failure said once.
 {
-  const disk = new Set(['Courses/Untitled.deck.md']);
+  const disk = new Set(['Courses/Untitled.rtms']);
   const made: string[] = [];
   const log: string[] = [];
   const steps = (toFolder: string) => ({
@@ -142,27 +147,27 @@ async function main(): Promise<void> {
     made: async (fileName: string) => { made.push(fileName); log.push(`open ${fileName}`); },
     failed: (message: string) => { log.push(`failed ${message}`); },
   });
-  assert.equal(await makeEmptyDeck(steps('')), 'Untitled.deck.md');
-  assert.equal(await makeEmptyDeck(steps('')), 'Untitled 2.deck.md');
-  assert.equal(await makeEmptyDeck(steps('Courses')), 'Untitled 2.deck.md');
+  assert.equal(await makeEmptyDeck(steps('')), 'Untitled.rtms');
+  assert.equal(await makeEmptyDeck(steps('')), 'Untitled 2.rtms');
+  assert.equal(await makeEmptyDeck(steps('Courses')), 'Untitled 2.rtms');
   assert.deepEqual(log, [
-    'create Untitled.deck.md 1 slide', 'open Untitled.deck.md',
-    'create Untitled 2.deck.md 1 slide', 'open Untitled 2.deck.md',
-    'create Courses/Untitled 2.deck.md 1 slide', 'open Untitled 2.deck.md',
+    'create Untitled.rtms 1 slide', 'open Untitled.rtms',
+    'create Untitled 2.rtms 1 slide', 'open Untitled 2.rtms',
+    'create Courses/Untitled 2.rtms 1 slide', 'open Untitled 2.rtms',
   ]);
   // Taken meanwhile (another program made it after the name was chosen): the next free one
   const racing = { ...steps(''), create: async (relative: string) => {
-    if (relative === 'Untitled 3.deck.md') { disk.add(relative); throw new Error('EEXIST'); }
+    if (relative === 'Untitled 3.rtms') { disk.add(relative); throw new Error('EEXIST'); }
     disk.add(relative);
   } };
-  assert.equal(await makeEmptyDeck(racing), 'Untitled 4.deck.md');
+  assert.equal(await makeEmptyDeck(racing), 'Untitled 4.rtms');
   // Another failure: said once, nothing opened
   log.length = 0;
   assert.equal(await makeEmptyDeck({ ...steps('Locked'), create: async () => { throw new Error('read-only'); } }), null);
   assert.deepEqual(log, ['failed The deck could not be made: read-only']);
 }
 
-// The start card's copy: this deck becomes the earlier deck, the same slides, theme and look, its relative paths rebased
+// The start card's copy (Sprint 172: of an old `.deck.md` too, as a new `.rtms`): this deck becomes the earlier deck, the same slides, theme and look, its relative paths rebased
 // to this deck's folder, renamed "<name> (copy)" (the tab follows the rename), and the bar says so in the renamed tab.
 {
   const source = [
@@ -189,15 +194,15 @@ async function main(): Promise<void> {
   const steps: string[] = [];
   let deckText = emptyDeckText(() => 0.5);
   const result = await copyEarlierDeck('Clients/Harbour/AI assistants.deck.md', {
-    deck: 'Courses/Untitled.deck.md',
+    deck: 'Courses/Untitled.rtms',
     read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source : null),
-    taken: fileName => fileName === 'AI assistants (copy).deck.md',
+    taken: fileName => fileName === 'AI assistants (copy).rtms',
     replace: async text => { deckText = text; steps.push('replace and save'); return true; },
     rename: async (fileName, line) => { steps.push(`rename ${fileName}, then: ${line}`); return true; },
     notice: text => { steps.push(`notice ${text}`); },
   });
-  assert.equal(result, 'AI assistants (copy 2).deck.md');
-  assert.deepEqual(steps, ['replace and save', `rename AI assistants (copy 2).deck.md, then: ${copiedNotice('AI assistants')}`]);
+  assert.equal(result, 'AI assistants (copy 2).rtms');
+  assert.deepEqual(steps, ['replace and save', `rename AI assistants (copy 2).rtms, then: ${copiedNotice('AI assistants')}`]);
   assert.equal(copiedNotice('AI assistants'), 'This deck is now a copy of AI assistants.');
   const copied = parseDeck(deckText);
   assert.deepEqual({ theme: copied.theme, look: /^look: borderless$/m.test(deckText), slides: copied.slides.length }, { theme: 'Slide library/Themes/Evening.theme.md', look: true, slides: 2 });
@@ -206,7 +211,7 @@ async function main(): Promise<void> {
   // Gone meanwhile: nothing changes, and the bar says why
   const gone: string[] = [];
   assert.equal(await copyEarlierDeck('Old.deck.md', {
-    deck: 'Untitled.deck.md',
+    deck: 'Untitled.rtms',
     read: async () => null,
     taken: () => false,
     replace: async () => { gone.push('replace'); return true; },
@@ -217,13 +222,13 @@ async function main(): Promise<void> {
   // A rename refused: the deck is the copy under its own name, and the bar says so in this tab
   const kept: string[] = [];
   assert.equal(await copyEarlierDeck('Kickoff.deck.md', {
-    deck: 'Untitled.deck.md',
+    deck: 'Untitled.rtms',
     read: async () => source,
     taken: () => false,
     replace: async () => true,
     rename: async () => false,
     notice: text => { kept.push(`notice ${text}`); },
-  }), 'Untitled.deck.md');
+  }), 'Untitled.rtms');
   assert.deepEqual(kept, ['notice This deck is now a copy of Kickoff.']);
 }
 

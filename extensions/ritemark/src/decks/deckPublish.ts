@@ -41,6 +41,7 @@ import type { DeckHostMessage, DeckPageState, DeckPdfKind } from './deckProtocol
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
+import { deckFileName, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
 const CHANGED_MS = 800;
@@ -410,11 +411,13 @@ export class DeckPublisher implements vscode.Disposable {
    * describe other words than the ones going up. 2.2's own rows show then.
    */
   async pageRows(pagePath: string): Promise<DeckSheetRows | undefined> {
-    // Only `<deck name>.html` beside its `<deck name>.deck.md`, holding Ritemark's marks, is a deck's page.
+    // Only `<deck name>.html` beside its `<deck name>.rtms` (or, for a deck made before, `<deck name>.deck.md`),
+    // holding Ritemark's marks, is a deck's page.
     if (!isEnabled('decks') || !/\.html$/.test(pagePath)) return undefined;
-    const besidePath = path.join(path.dirname(pagePath), `${path.basename(pagePath, '.html')}.deck.md`);
-    if (deckNameOf(besidePath) === '') return undefined;
+    const name = path.basename(pagePath, '.html');
+    if (name === '') return undefined;
     try {
+      const besidePath = await this.deckBeside(path.join(path.dirname(pagePath), name));
       const meta = readPageMeta(await readHead(pagePath));
       if (!meta.ritemark || !meta.digest) return undefined;
       const registered = this.written.get(normalizeForCompare(pagePath));
@@ -428,6 +431,15 @@ export class DeckPublisher implements vscode.Disposable {
     } catch {
       return undefined;
     }
+  }
+
+  /** Sprint 172: the deck a page at `<base>.html` is beside: `<base>.rtms`, else an older `<base>.deck.md`, open or on disk. */
+  private async deckBeside(base: string): Promise<string> {
+    const candidates = [`${path.dirname(base)}${path.sep}${deckFileName(path.basename(base))}`, `${base}${LEGACY_DECK_EXTENSION}`];
+    for (const candidate of candidates) {
+      if ((await this.openDocumentAt(candidate)) || (await fs.promises.stat(candidate).then(stat => stat.isFile(), () => false))) return candidate;
+    }
+    return candidates[0];
   }
 
   /** The deck at `deckPath` if it is open (by real path, so a link or another spelling of its folder finds it). */

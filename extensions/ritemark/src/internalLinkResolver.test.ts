@@ -66,6 +66,9 @@ assert.equal(isMarkdownFile('plan.md'), true);
 assert.equal(isMarkdownFile('plan.MD'), true);
 assert.equal(isMarkdownFile('readme.markdown'), true);
 assert.equal(isMarkdownFile('story.mdx'), true);
+// Sprint 172 (scenario 11): a link to a deck opens it in Ritemark
+assert.equal(isMarkdownFile('Day one.rtms'), true);
+assert.equal(isMarkdownFile('Talk.deck.md'), true);
 assert.equal(isMarkdownFile('diagram.png'), false);
 assert.equal(isMarkdownFile('script.ts'), false);
 

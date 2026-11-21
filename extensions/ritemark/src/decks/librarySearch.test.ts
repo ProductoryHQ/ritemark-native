@@ -13,7 +13,7 @@ function project(files: Record<string, string>, times: Record<string, number>) {
   const reads: string[] = [];
   const lists = { count: 0 };
   const deckFiles: DeckFiles = {
-    async list() { lists.count++; return Object.keys(files).filter(path => path.endsWith('.deck.md')).map(path => ({ path, modified: times[path] ?? 1 })); },
+    async list() { lists.count++; return Object.keys(files).filter(path => /\.(rtms|deck\.md)$/i.test(path)).map(path => ({ path, modified: times[path] ?? 1 })); },
     async read(path) { reads.push(path); return files[path] ?? null; },
     async write(path, text) { files[path] = text; },
   };

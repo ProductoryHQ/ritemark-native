@@ -11,5 +11,7 @@ assert.deepEqual(
   ['/p/Harbour Logistics/AI assistants and agents.deck.md', 'C:\\p\\TEAMS.DECK.MD', '/p/Notes.md', '/p/deck.md', '/p/.deck.md', '/p/Pitch.pptx', null, undefined, ''].map((path) => fileIconOf(path, 'file-text')),
   ['presentation', 'presentation', 'file-text', 'file-text', 'presentation', 'file-text', 'file-text', 'file-text', 'file-text'],
 )
+// Sprint 172 (R5): a `.rtms` deck shows the deck icon, in any case
+assert.deepEqual(['/p/Day one.rtms', 'C:\\p\\DAY.RTMS', '/p/Day one.rtms.md'].map((path) => fileIconOf(path, 'file-text')), ['presentation', 'presentation', 'file-text'])
 assert.equal(fileIconOf('/p/data.csv', 'table'), 'table', "another file keeps its surface's icon")
 console.log('fileIcon: all assertions passed')

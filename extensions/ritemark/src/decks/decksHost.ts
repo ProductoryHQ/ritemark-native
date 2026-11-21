@@ -25,6 +25,7 @@ import type { AgentId } from '../agent/types';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
 import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
+import { DECK_GLOB, isDeckPath } from './deckFileName';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -157,7 +158,7 @@ function rootless(fsPath: string): string {
 }
 
 /**
- * The decks a rename moved: a `.deck.md` file renamed or moved, or each deck inside a folder that was. With where each
+ * The decks a rename moved: a deck file (`.rtms` or `.deck.md`) renamed or moved, or each deck inside a folder that was. With where each
  * one was before. Only files Ritemark's rename named (or that are inside a folder it named) are read.
  */
 async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<Array<{ uri: vscode.Uri; before: string; inFolder: boolean }>> {
@@ -171,11 +172,11 @@ async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vsc
       continue;
     }
     if (stat.isFile()) {
-      if (/\.deck\.md$/i.test(newUri.fsPath)) decks.push({ uri: newUri, before: oldUri.fsPath, inFolder: false });
+      if (isDeckPath(newUri.fsPath)) decks.push({ uri: newUri, before: oldUri.fsPath, inFolder: false });
       continue;
     }
     if (!stat.isDirectory()) continue;
-    const inside = await vscode.workspace.findFiles(new vscode.RelativePattern(newUri, '**/*.deck.md'), null, 500);
+    const inside = await vscode.workspace.findFiles(new vscode.RelativePattern(newUri, DECK_GLOB), null, 500);
     for (const uri of inside) decks.push({ uri, before: path.join(oldUri.fsPath, path.relative(newUri.fsPath, uri.fsPath)), inFolder: true });
   }
   return decks;
@@ -256,7 +257,7 @@ type FreshMarks = ReturnType<typeof freshDeckMarks>;
 
 /**
  * Sprint 159 (16 November, frame 20; Jarmo: "should open the Deck tab straight away, the same pattern as Text and
- * Table"): New → Deck makes "Untitled.deck.md" (or the next free "Untitled N") in the folder New was opened from and
+ * Table"): New → Deck makes "Untitled.rtms" (or the next free "Untitled N") in the folder New was opened from and
  * opens it at once, its title slide's title selected and the handout's start card under its first part.
  */
 async function newDeck(pages: DeckPages, options: DecksHostOptions, fresh: FreshMarks): Promise<void> {

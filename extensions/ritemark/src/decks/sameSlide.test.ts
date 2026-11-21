@@ -11,7 +11,7 @@ import { jaccard, normalizedWords, sameSlides, slideWords, WORDS_GUARD, type Lin
 
 function project(files: Record<string, string>): DeckFiles {
   return {
-    async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map((path, index) => ({ path, modified: index })); },
+    async list() { return Object.keys(files).filter(path => /\.(rtms|deck\.md)$/i.test(path)).map((path, index) => ({ path, modified: index })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text) { files[path] = text; },
   };

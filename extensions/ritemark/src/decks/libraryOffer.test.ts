@@ -29,7 +29,7 @@ function project(files: Record<string, string>, times: Record<string, number>, e
       if (holds(folder)) throw new Error('not empty');
       emptyFolders.delete(folder);
     },
-    async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map(path => ({ path, modified: times[path] ?? 1 })); },
+    async list() { return Object.keys(files).filter(path => /\.(rtms|deck\.md)$/i.test(path)).map(path => ({ path, modified: times[path] ?? 1 })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text, options) {
       if (options?.create && path in files) throw new Error('exists');
@@ -234,14 +234,14 @@ async function run() {
     assert.deepEqual(third.titles, ["Today's plan"]);
   }
 
-  // ---- Add all: the topic Every training, made with copies the way the library's insert makes them, the decks never
+  // ---- Add all: the topic Every training (a new topic is a `.rtms`, Sprint 172), made with copies the way the library's insert makes them, the decks never
   // written; one Undo takes the topic (and the theme file made for it) away again.
   {
     const { files, deckFiles, library } = await balanced();
     const decksBefore = Object.fromEntries(Object.entries(files));
     const { offer } = await offerNow(deckFiles);
     const write = await library.addCopiesToTopic(offer.slides.map(entry => ({ path: entry.path, id: entry.id })), EVERY_TRAINING);
-    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`;
+    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`;
     assert.equal(write.path, topic);
     assert.equal(write.previous, null, 'made');
     assert.equal(write.count, 5);
@@ -281,7 +281,7 @@ async function run() {
   // slides byte for byte); its Undo puts the topic back exactly; a topic changed since is left alone.
   {
     const { files, deckFiles, library } = await balanced();
-    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`;
+    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`;
     const existing = deck(slide('ev01', '# Welcome\n\nCoffee is in the kitchen', '## Welcome\n\nSay hello.'));
     files[topic] = existing;
     const { offer } = await offerNow(deckFiles);
@@ -385,12 +385,12 @@ async function run() {
     assert.deepEqual(titles, ["Today's plan"], 'the hand-written ids\' slide is not offered');
     assert.equal(offer.withheld, 1, 'counted, so Claude says why');
     await library.addCopiesToTopic([offer.slides[0], offer.slides[0]].map(entry => ({ path: entry.path, id: entry.id })), EVERY_TRAINING);
-    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`]).length, 1, 'named twice, added once');
+    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`]).length, 1, 'named twice, added once');
     const after = (await offerNow(deckFiles)).offer;
     assert.deepEqual([after.slides.length, after.withheld], [0, 2], 'withheld: the library has it (and the hand-written ids)');
     // Round two: a second press that crossed the first adds nothing again.
     await assert.rejects(library.addCopiesToTopic([{ path: offer.slides[0].path, id: offer.slides[0].id }], EVERY_TRAINING), /already has this slide/);
-    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`]).length, 1);
+    assert.equal(slidesOfText(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`]).length, 1);
 
     // Not now over a file that isn't JSON (edited by hand): refused, the file as it was, nothing it hid comes back.
     const broken = '{ "slides": [ { "places": ["A.deck.md#ab12"] }, ] }';
@@ -405,7 +405,7 @@ async function run() {
       assert.equal(files[NOT_NOW_PATH], other);
       assert.equal(await readNotNow(deckFiles), null);
     }
-    delete files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`];
+    delete files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`];
     const unreadable = await projectOffer(library);
     assert.deepEqual([unreadable.unreadable, unreadable.offer.slides.length], [true, 0]);
     delete files[NOT_NOW_PATH];
@@ -424,13 +424,13 @@ async function run() {
     // A topic made meanwhile names the theme file: Undo leaves it.
     files['Slide library/Openings.deck.md'] = `---\ndeck: 2\ntheme: ${BUILT_IN_THEME_PATH}\n---\n\n${slide('op01', '# Welcome')}`;
     assert.equal(await library.undoTopicWrite(write), true);
-    assert.equal(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`], undefined);
+    assert.equal(files[`${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`], undefined);
     assert.ok(files[BUILT_IN_THEME_PATH], 'the theme file a topic names stays');
     assert.ok(await deckFiles.folderExists!('Slide library'), 'the person\'s own folder stays');
 
     // Round two: an open topic holds its text in its own line endings (CRLF on Windows): Undo still takes it back.
     const again = await library.addCopiesToTopic([{ path: 'A/One.deck.md', id: 'ap01' }], EVERY_TRAINING);
-    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.deck.md`;
+    const topic = `${LIBRARY_FOLDER}/${EVERY_TRAINING}.rtms`;
     files[topic] = files[topic].replace(/\n/g, '\r\n');
     assert.equal(await library.undoTopicWrite(again), true);
     assert.equal(files[topic], undefined);

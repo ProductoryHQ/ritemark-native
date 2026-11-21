@@ -419,7 +419,7 @@ async function main(): Promise<void> {
       'notes.md': 'not a deck',
     };
     const library = new DeckLibrary({
-      async list() { return Object.keys(files).filter((path) => path.endsWith('.deck.md')).map((path) => ({ path, modified: 0 })); },
+      async list() { return Object.keys(files).filter((path) => /\.(rtms|deck\.md)$/i.test(path)).map((path) => ({ path, modified: 0 })); },
       async read(path) { return files[path] ?? null; },
       async write(path, text) { files[path] = text; },
     });
@@ -441,6 +441,15 @@ async function main(): Promise<void> {
 
     const listed = await runTool(tool('list_decks'), { where: 'library' }, context);
     assert.match(listed.text, /^Slide library\/Agents\.deck\.md · library topic · 1 slide/);
+    // Sprint 172 (R8, scenario 21): a `.rtms` is a deck to the tools, as an older `.deck.md` is; a `.md` is not
+    files['Talks/Day one.rtms'] = '---\ndeck: 2\n---\n\n```slide\n---\nid: d1\n---\n# Day one\n```\n\nWelcome.\n';
+    assert.match((await runTool(tool('list_decks'), {}, context)).text, /Talks\/Day one\.rtms · deck · 1 slide/);
+    assert.match((await runTool(tool('read_deck'), { deck: 'Talks/Day one.rtms' }, context)).text, /Slide 1 · id d1 · block slide\n# Day one/);
+    const notDeck = await runTool(tool('read_deck'), { deck: 'notes.md' }, context);
+    assert.equal(notDeck.isError, true);
+    assert.match(notDeck.text, /^notes\.md is not a deck in this project/);
+    assert.match(tool('read_deck').description + JSON.stringify(tool('list_decks')), /\.rtms/);
+    delete files['Talks/Day one.rtms'];
     // A closed deck: the copy is written into its file, with its from: line.
     const inserted = await runTool(tool('insert_slides'), { deck: 'Clients/Harbour.deck.md', source: 'Slide library/Agents.deck.md', slide_ids: ['g1'], after: 1 }, context);
     assert.equal(inserted.text, 'Inserted 1 slide into Harbour: slide 2.');
@@ -474,7 +483,7 @@ async function main(): Promise<void> {
     // Add to library: a new topic, and the slide becomes a copy of it.
     const added = await runTool(tool('add_to_library'), { deck: 'Clients/Harbour.deck.md', slide_id: 't1', topic: 'Openings' }, context);
     assert.equal(added.text, 'Added the slide to the library under Openings (a new topic).');
-    assert.match(slidesOfText(files['Clients/Harbour.deck.md'])[0].data.from ?? '', /^Slide library\/Openings\.deck\.md#/);
+    assert.match(slidesOfText(files['Clients/Harbour.deck.md'])[0].data.from ?? '', /^Slide library\/Openings\.rtms#/, 'Sprint 172: a new topic is a .rtms');
     // An open deck gets the copy's new from: through its view, not as a whole-file write.
     const setThroughView: Array<[string, string]> = [];
     const viaView = tools.createDeckToolGroup(() => ({
@@ -556,7 +565,7 @@ async function main(): Promise<void> {
       'Clients/Beta.deck.md': ['---\ndeck: 2\n---\n', ...own('Beta')].join('\n'),
     };
     const library = new DeckLibrary({
-      async list() { return Object.keys(files).filter((path) => path.endsWith('.deck.md')).map((path, index) => ({ path, modified: index + 1 })); },
+      async list() { return Object.keys(files).filter((path) => /\.(rtms|deck\.md)$/i.test(path)).map((path, index) => ({ path, modified: index + 1 })); },
       async read(path) { return files[path] ?? null; },
       async write(path, text) { files[path] = text; },
     });
@@ -581,7 +590,7 @@ async function main(): Promise<void> {
     // Add: by the slide named, into Every training; then nothing is left to offer.
     const added = await runTool(tool('add_repeated_slides'), { slides: ['Talks/Gamma.deck.md#gp01', 'Talks/Gamma.deck.md#gp01'] }, context);
     assert.equal(added.text, 'Added 1 slide to the library under Every training (a new topic).');
-    const topic = slidesOfText(files['Slide library/Every training.deck.md']);
+    const topic = slidesOfText(files['Slide library/Every training.rtms']);
     assert.equal(topic.length, 1);
     assert.match(topic[0].data.from ?? '', /^Talks\/Gamma\.deck\.md#gp01 @/);
     assert.match((await runTool(tool('list_repeated_slides'), {}, context)).text, /library already has/);

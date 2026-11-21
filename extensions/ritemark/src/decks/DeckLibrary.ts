@@ -3,7 +3,7 @@
  * through `DeckFiles`, so the tests drive the same code with a map, and the editor writes through an open document
  * (the user's unsaved changes kept) where there is one.
  *
- * The library is the folder `Slide library` at the project's top, one `.deck.md` per topic. A slide taken from it, or
+ * The library is the folder `Slide library` at the project's top, one deck (`.rtms`, or an older `.deck.md`) per topic. A slide taken from it, or
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
@@ -16,12 +16,13 @@ import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
 import { convertedPart, saysBlockDeck, withDeckVersion } from './blocks/convertDeck';
 import { agendaOf } from './blocks/slideRenderer';
 import type { AgendaEntry } from './blocks/agenda';
+import { deckFileName, deckNameOf, isDeckPath, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 export const LIBRARY_FOLDER = 'Slide library';
 
 /** The project's deck files, by project-relative path (`/` separated). */
 export interface DeckFiles {
-  /** Every `.deck.md` in the project. */
+  /** Every deck in the project (`.rtms`, and older `.deck.md`). */
   list(): Promise<Array<{ path: string; modified: number }>>;
   /** A file's text (an open document's, unsaved changes included), or null. */
   read(path: string): Promise<string | null>;
@@ -39,12 +40,26 @@ export interface DeckFiles {
 
 /** A topic is a deck directly in the Slide library folder. */
 export function isTopicPath(path: string): boolean {
-  return path.startsWith(`${LIBRARY_FOLDER}/`) && !path.slice(LIBRARY_FOLDER.length + 1).includes('/') && /\.deck\.md$/i.test(path);
+  return path.startsWith(`${LIBRARY_FOLDER}/`) && !path.slice(LIBRARY_FOLDER.length + 1).includes('/') && isDeckPath(path);
 }
 
-/** A deck's name: its file name without `.deck.md`. */
+/** A deck's name: its file name without `.rtms` (or an older deck's `.deck.md`). */
 export function deckName(path: string): string {
-  return (path.split('/').pop() ?? path).replace(/\.deck\.md$/i, '');
+  return deckNameOf(path);
+}
+
+/**
+ * Sprint 172: the topic a name means. A new topic is `Slide library/<name>.rtms`; a topic made before, named so but
+ * ending `.deck.md`, keeps its own file (nothing is renamed), so a second one is never made beside it.
+ */
+async function topicPathFor(files: DeckFiles, topic: string): Promise<string> {
+  const name = topic.replace(/[\\/:*?"<>|]+/g, ' ').trim();
+  const path = `${LIBRARY_FOLDER}/${deckFileName(name)}`;
+  // No name is no topic (a file named only `.rtms` would be a dotfile): the callers say "A topic needs a name."
+  if (!name) return `${LIBRARY_FOLDER}/`;
+  const legacy = `${LIBRARY_FOLDER}/${name}${LEGACY_DECK_EXTENSION}`;
+  if ((await files.read(path)) === null && (await files.read(legacy)) !== null) return legacy;
+  return path;
 }
 
 export interface SlideSummary {
@@ -120,11 +135,11 @@ export interface TopicWrite {
 
 /**
  * Where a copy came from, when its `from:` names a deck inside the project. A deck from someone else can carry any
- * `from:`, so a source that isn't a `.deck.md` is no source: nothing reads or writes it.
+ * `from:`, so a source that isn't a deck (`.rtms` or `.deck.md`) is no source: nothing reads or writes it.
  */
 function sourceOf(from: string | undefined): { path: string; id: string; stamp: string | null } | null {
   const source = parseFrom(from);
-  if (!source || !/\.deck\.md$/i.test(source.path) || normalizePath(source.path) !== source.path) return null;
+  if (!source || !isDeckPath(source.path) || normalizePath(source.path) !== source.path) return null;
   return source;
 }
 
@@ -293,7 +308,7 @@ export class DeckLibrary {
     after: number | undefined,
     intoView?: (parts: CopiedPart[], afterIndex: number) => Promise<boolean>,
   ): Promise<{ first: number; count: number }> {
-    if (!/\.deck\.md$/i.test(targetPath) || normalizePath(targetPath) !== targetPath) throw new Error(`${targetPath} is no deck in this project.`);
+    if (!isDeckPath(targetPath) || normalizePath(targetPath) !== targetPath) throw new Error(`${targetPath} is no deck in this project.`);
     const read = await this.files.read(targetPath);
     if (read === null) throw new Error(`No deck at ${targetPath}.`);
     const text = writableDeckText(targetPath, read);
@@ -385,7 +400,7 @@ export class DeckLibrary {
   async addToLibrary(deckPath: string, topic: string, given: CopiedPart): Promise<LibraryWrite> {
     // Sprint 161 (PR 2): the library gets the slide as a block slide.
     const copy = convertedPart(given, folderOf(deckPath));
-    const path = isTopicPath(topic) ? topic : `${LIBRARY_FOLDER}/${topic.replace(/[\\/:*?"<>|]+/g, ' ').trim()}.deck.md`;
+    const path = isTopicPath(topic) ? topic : await topicPathFor(this.files, topic);
     if (!isTopicPath(path)) throw new Error('A topic needs a name.');
     const previous = await this.files.read(path);
     if (previous !== null) writableDeckText(path, previous);
@@ -408,7 +423,7 @@ export class DeckLibrary {
    */
   async addCopiesToTopic(slides: ReadonlyArray<{ path: string; id: string }>, topic: string): Promise<TopicWrite> {
     if (!slides.length) throw new Error('No slide to add.');
-    const path = `${LIBRARY_FOLDER}/${topic.replace(/[\\/:*?"<>|]+/g, ' ').trim()}.deck.md`;
+    const path = await topicPathFor(this.files, topic);
     if (!isTopicPath(path)) throw new Error('A topic needs a name.');
     const previous = await this.files.read(path);
     if (previous !== null) writableDeckText(path, previous);
@@ -424,7 +439,7 @@ export class DeckLibrary {
       if (named.has(`${slide.path}#${slide.id}`)) continue;
       named.add(`${slide.path}#${slide.id}`);
       const source = normalizePath(slide.path);
-      if (!source || source !== slide.path || !/\.deck\.md$/i.test(source)) throw new Error(`${slide.path} is no deck in this project.`);
+      if (!source || source !== slide.path || !isDeckPath(source)) throw new Error(`${slide.path} is no deck in this project.`);
       if (isTopicPath(source)) throw new Error(`${deckName(source)} is already in the library.`);
       const [part] = await this.copies(source, [slide.id], path, taken);
       const id = slideDataOf(part.kind, part.body).id;

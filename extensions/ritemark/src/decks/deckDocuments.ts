@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { DeckFiles } from './DeckLibrary';
+import { DECK_GLOB } from './deckFileName';
 
 /** Folders a deck is never looked for in. */
 const SKIPPED = '**/{node_modules,.git,.ritemark}/**';
@@ -55,7 +56,7 @@ export function workspaceDeckFiles(root: string): DeckFiles {
   };
   return {
     async list() {
-      const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/*.deck.md'), SKIPPED, MAX_DECKS);
+      const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, DECK_GLOB), SKIPPED, MAX_DECKS);
       const found: Array<{ path: string; modified: number }> = [];
       for (const uri of uris) {
         const relative = projectRelative(root, uri.fsPath);

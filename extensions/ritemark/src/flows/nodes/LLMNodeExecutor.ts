@@ -22,7 +22,7 @@ import { readProviderKey, redactTestKeys } from '../../ai/providerKeys';
  * Text file extensions that can be read and included in prompts
  */
 const TEXT_FILE_EXTENSIONS = new Set([
-  '.md', '.markdown', '.txt', '.text',
+  '.md', '.markdown', '.rtms', '.txt', '.text',
   '.json', '.xml', '.yaml', '.yml',
   '.csv', '.tsv',
   '.html', '.htm', '.css',
