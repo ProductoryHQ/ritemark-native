@@ -102,6 +102,118 @@ async function main() {
     assert.ok(capped.ok && capped.truncated && capped.passages[0].text.length <= 100);
   }
 
+  // ── #936: a deck's slides are read as their words, never as the file's markup ──
+  {
+    const deck = [
+      '---',
+      'deck: 2',
+      'theme: Slide library/Themes/Harbour.theme.md',
+      '---',
+      '',
+      '```slide title',
+      'id: s0',
+      'title: Kickoff',
+      'subtitle: "Harbour, 2027"',
+      '```',
+      '',
+      '```notes',
+      'Say hello first.',
+      '```',
+      '',
+      '# Kickoff',
+      '',
+      'The handout text.',
+      '',
+      '```slide boxes',
+      'id: s1',
+      'title: Three steps',
+      'look: arrows',
+      'items:',
+      '  - heading: Plan',
+      '    text: Pick the route',
+      '    icon: map',
+      'rows:',
+      '  - [Data, In the chat]',
+      '```',
+      '',
+      '````slide',
+      '---',
+      'id: s2',
+      'picture: right',
+      'image: images/hidden-side.png',
+      '---',
+      '[Exercise · 1]{.label}',
+      '',
+      '# Our team {#team}',
+      '',
+      ':::: columns',
+      '::: {.column width=40%}',
+      '### Copilot',
+      'Documents and mail',
+      ':::',
+      '::: column',
+      '![Team](images/hidden-team.jpg){align=center}',
+      '',
+      'Read the [sample](https://example.com/hidden-link){.button}',
+      ':::',
+      '::::',
+      '',
+      '```js',
+      '::: kept {.x} in code',
+      '```',
+      '',
+      'Use `{.x}` as code; set {width=3} here.',
+      '````',
+      '',
+      '```slide exercise',
+      'title: Do it',
+      '```',
+      '',
+      '```slide section',
+      'title: Part',
+      'number: "2"',
+      '```',
+      '',
+      '> ```slide',
+      '> # Quoted example',
+      '> ```',
+    ].join('\n');
+    const outcome = await readDocument('markdown', new TextEncoder().encode(deck), BUDGET, pause, 'Talks/Kickoff.deck.md');
+    assert.ok(outcome.ok);
+    assert.deepEqual(texts(outcome), [
+      'Kickoff', 'Harbour, 2027',
+      'Say hello first.',
+      'Kickoff', 'The handout text.',
+      // A v1 slide reads as the deck converts it: its boxes' words, not the rows a Boxes slide never draws.
+      'Three steps', 'Plan', 'Pick the route',
+      'Exercise · 1', 'Our team', 'Copilot', 'Documents and mail', 'Read the sample',
+      // Code (a block, a span) keeps its braces and colons; braces that aren't an attribute's place stay words.
+      '::: kept {.x} in code', 'Use {.x} as code; set {width=3} here.',
+      // What the slide draws: the default Exercise pill, a section's number.
+      'Exercise', 'Do it', '2', 'Part',
+      // A slide block inside a quote is no slide (`parseDeck` reads top-level blocks only): it stays code.
+      '# Quoted example',
+    ]);
+    const joined = texts(outcome).join(' ');
+    for (const hidden of ['id:', 'title:', 's0', 's2', 'picture', 'hidden', 'arrows', 'map', 'columns', 'Data', '{#team}', 'width=40', 'align', '.label', '.button']) {
+      assert.ok(!joined.includes(hidden), `a deck's passages hold no "${hidden}": ${joined}`);
+    }
+    // Each slide's words are at its own block, so a match opens at its slide.
+    const blocks = outcome.ok ? outcome.passages.map((p) => p.at.block) : [];
+    assert.equal(blocks[0], blocks[1], "a slide's title and subtitle are one block");
+    assert.equal(new Set(blocks.slice(8, 15)).size, 1, "a block slide's words are its block's");
+    // An unclosed slide block is no slide (`parseDeck`): it stays the code it is.
+    const unclosed = readMarkdown('```slide\n---\nid: s9\n---\n# Open end', BUDGET, { deck: true });
+    assert.deepEqual(texts(unclosed), ['--- id: s9 --- # Open end']);
+    // A ```slide block in any other document stays the code it is: an ordinary document's passages don't change.
+    const ordinary = await readDocument('markdown', new TextEncoder().encode(deck), BUDGET, pause, 'Notes/About decks.md');
+    assert.deepEqual(texts(ordinary), texts(readMarkdown(deck, BUDGET)));
+    assert.ok(texts(ordinary).includes('id: s0 title: Kickoff subtitle: "Harbour, 2027"'), 'an ordinary document keeps a slide block as code');
+    // Words written in braces that no attribute reader reads stay words.
+    const braces = readMarkdown('```slide\n# Sets {a, b}\n\nUse {x} here\n```\n', BUDGET, { deck: true });
+    assert.deepEqual(texts(braces), ['Sets {a, b}', 'Use {x} here']);
+  }
+
   // ── CSV: rows, quotes, line breaks inside quotes ───────────────────────────
   {
     const outcome = readCsv('Name,Contact\n"Harbour Logistics","Mari Tamm"\n"Line ""one""\nand two",x\n\n', BUDGET);
