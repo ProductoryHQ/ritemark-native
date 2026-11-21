@@ -1,0 +1,10 @@
+CASE good: passed. The deck file type is registered: .rtms -> Ritemark.rtms 'Ritemark Deck', icon <t>/good/app\resources\deck.ico, open "<t>/good/app\Ritemark.exe" "%1"
+CASE no-icon-file: threw: Ritemark.rtms DefaultIcon is '<t>/no-icon-file/app\resources\deck.ico' (file present: False), expected the installed '<t>/no-icon-file/app\resources\deck.ico'.
+CASE wrong-command: threw: Ritemark.rtms opens with '"<t>/wrong-command/app\Code.exe" "%1"', expected '"<t>/wrong-command/app\Ritemark.exe" "%1"'.
+CASE no-open-with: threw: HKCU .rtms\OpenWithProgids does not list Ritemark.rtms.
+CASE missing-2.3: threw: HKCU .rtms names '', expected 'Ritemark.rtms'.
+CASE old-2.2-none: passed. The deck file type is not checked: this 2.2.0 installer predates it (2.3.0) and wrote no .rtms keys.
+CASE old-2.2-written: passed. The deck file type is registered: .rtms -> Ritemark.rtms 'Ritemark Deck', icon <t>/old-2.2-written/app\resources\deck.ico, open "<t>/old-2.2-written/app\Ritemark.exe" "%1"
+CASE old-2.2-broken: threw: Ritemark.rtms opens with '"<t>/old-2.2-broken/app\Code.exe" "%1"', expected '"<t>/old-2.2-broken/app\Ritemark.exe" "%1"'.
+CASE gone: passed. The deck file type is gone: no .rtms or Ritemark.rtms key for the current user.
+CASE leftover: threw: Uninstall left the deck file type behind (.rtms key: True, Ritemark.rtms key: True).
