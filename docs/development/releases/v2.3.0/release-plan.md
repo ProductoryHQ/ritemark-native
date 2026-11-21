@@ -1,6 +1,6 @@
 # Release Plan — v2.3.0
 
-**Status:** **Scope settled, 21 November 2026; feature complete when Sprint 172's three PRs merge.** Jarmo cut the scope that day so the release candidate can be built: 2.3 is what is on `main`, #917 (merged) and Sprint 172 (`.rtms`, put back the same day: "i cannot release deck.md / it will comfuse in future / rtms must be incl"). *Separated from 2.3*, below, lists what moved to 2.4. The platforms are still his to agree. The plan's history: Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
+**Status:** **Scope settled, 21 November 2026; feature complete when Sprint 172's three PRs merge.** Jarmo cut the scope that day so the release candidate can be built: 2.3 is what is on `main`, #917 (merged) and Sprint 172 (`.rtms`, put back the same day: "i cannot release deck.md / it will comfuse in future / rtms must be incl"). *Separated from 2.3*, below, lists what moved to 2.4. The plan's history: Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
 **Release candidate:** from `main` after Sprint 172's three PRs and the version bump.<br>
 **Target:** v2.3.0<br>
 **GitHub milestone:** v2.3.0. It held no issues until 19 November, when the sweep of v2.2.0's open issues began moving them here (at the time of writing: #591, #582, #501 and #497). From Sprint 164 on, each PR gets an issue on it.<br>
@@ -11,7 +11,7 @@
 - since #720, `release-extension-preflight.sh` refuses an extension release from `main` against v2.2.0 (Sprints 159 and 160's close-outs), so 2.3's extension-tier sprints reach people with this release too.
 
 It is built and gated as 2.2 was: a clean-room release worktree, Gate 1 and Gate 2, notarization after the hardening window.<br>
-**Platforms:** proposed as 2.2's (darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store), waiting for Jarmo's word.<br>
+**Platforms:** darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store, as every release: the platforms stay the same until Jarmo decides to add Linux.<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-11-19<br>
 **Source:**
