@@ -1,7 +1,7 @@
 # Release Plan — v2.3.0
 
-**Status:** **Draft, not approved.** Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
-**Release candidate:** no date set.<br>
+**Status:** **Feature complete, 21 November 2026.** Jarmo cut the scope that day so the release candidate is built tonight: 2.3 is what is on `main` plus #917 (*Separated from 2.3*, below). The thesis and the platforms are still his to agree. The plan's history: Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
+**Release candidate:** 21 November 2026, from `main` after #917 and the version bump.<br>
 **Target:** v2.3.0<br>
 **GitHub milestone:** v2.3.0. It held no issues until 19 November, when the sweep of v2.2.0's open issues began moving them here (at the time of writing: #591, #582, #501 and #497). From Sprint 164 on, each PR gets an issue on it.<br>
 **Release type:** **Shell-tier**, checked against each PR's files:
@@ -11,7 +11,7 @@
 - since #720, `release-extension-preflight.sh` refuses an extension release from `main` against v2.2.0 (Sprints 159 and 160's close-outs), so 2.3's extension-tier sprints reach people with this release too.
 
 It is built and gated as 2.2 was: a clean-room release worktree, Gate 1 and Gate 2, notarization after the hardening window.<br>
-**Platforms:** not decided yet. 2.2 shipped for darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store.<br>
+**Platforms:** proposed as 2.2's (darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store), waiting for Jarmo's word.<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-11-19<br>
 **Source:**
@@ -167,6 +167,17 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 - **Paste from Gamma and other HTML** (Sprint 161 PR 4).
 - **See what changed and Undo on a finished comment task's card** ([#767](https://github.com/ProductoryHQ/ritemark-native/issues/767)).
 
+Jarmo, 21 November: "kuule midagi tuleb 2.3 skoobist kärpida - peaks ikka täna õhtul juba Rc tegema" (something has to be cut from 2.3's scope, the RC should be made tonight), then "approved" to the cut. Moved to v2.4.0:
+
+- **Decks get their own extension, `.rtms`** (Sprint 172, [#940](https://github.com/ProductoryHQ/ritemark-native/issues/940)). Jarmo approved its plan the same day ("kinnitan"); the approval holds for 2.4, and the plan ([#941](https://github.com/ProductoryHQ/ritemark-native/pull/941)) moves to 2.4's folder. In 2.3 a deck stays `.deck.md`: Finder names it Markdown, and 2.3 opens it as a deck.
+- **A deck opens from its row in the Slide library** ([#920](https://github.com/ProductoryHQ/ritemark-native/issues/920)).
+- **The printed page and the PDF: the slide spans the column** ([#919](https://github.com/ProductoryHQ/ritemark-native/issues/919)).
+- **A box's icon from the keyboard** ([#910](https://github.com/ProductoryHQ/ritemark-native/issues/910)).
+- **A deck's "0 words" in the status bar** ([#927](https://github.com/ProductoryHQ/ritemark-native/issues/927)).
+- **The frame-screenshot harness stops at Transcribe** ([#934](https://github.com/ProductoryHQ/ritemark-native/issues/934)); the release candidate's frame check is done by hand.
+
+The release notes, the test checklist and Sprint 170's close-out are finished beside the candidate and merge after publication, since `main` is frozen from the candidate on.
+
 ## Open for the release
 
 - **Decks is on in 2.3: decided.** Jarmo, 20 November 2026: "Decks läheb 2.3 sisse" (the row in `ritemark-dev/decisions/log.md`). Decks had been on `main` since Sprint 159 PR 2 (#735), behind `ritemark.features.decks` and off by default; [#916](https://github.com/ProductoryHQ/ritemark-native/issues/916) turns the setting's default to true and keeps it as an off switch. The Slide library's place in `branding/product.json` loses its `setting` in the same PR (a shell-tier line: the shell seeds a place with a setting from the person's settings.json only, so an on-by-default one would miss a fresh profile's first frame). The fresh-profile launch proof is in that PR (`proof/decks-on/`): a deck opens as a deck, New and Home have Deck, the Slide library is in the row, and the setting off brings back the ordinary document. Whatever the flag, 2.3 changes every Text document: tables you can change (#772), the picture editor with the old resize gone (#774), pictures from ChatGPT (#800), Tabs (#805), Button (#806), the code block's Copy (#804), the / menu's hidden words (#802) and sentence case (#811), and popups that close on an outside click (#759).
@@ -177,7 +188,7 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 - **The test checklist,** `docs/releases/v2.3.0/TEST-CHECKLIST.md`, started on 16 November, has rows from Sprints 159, 160 and 162 and from some of the work outside sprints (filed under 159). Sprint 158's Not run rows are added with the candidate, as its header says. Sprints 161 and 163 and most of the work of 17 to 19 November have no rows yet. The candidate's table, the Gate 1 and Gate 2 rows and the sign-off come when the candidate is built.
 - **`qa-validator` on Sprint 163** ran on 19 November as part of the repair: **PASS**, with one documentation gap (the code block's row in `architecture.md`), added in the same PR as this plan. Sprints 158–162 got no `qa-validator` run either; from Sprint 164 on it runs at every sprint's end.
 - **Sprint 164** approved on 19 November and done the same day: PRs #819, #821 and #858 merged, the leftovers' removal is #892, and `qa-validator` signed off (see the Sprints table).
-- **The release candidate's date** is not set.
+- **The release candidate** is built on 21 November 2026, after #917 merges and the version is raised.
 
 ## Risks
 
@@ -211,3 +222,5 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 | 2026-11-18 | The night runs as the last one: the Development manager decides, Jarmo reviews in the morning | Jarmo ("jah. nagu eile öösel - sina oled boss. ma hommikul vaatan yle") |
 | 2026-11-19 | The older deck tools don't ask for approval in Ask mode | Jarmo ("ei, vanemad tööriistad ei pea Küsi-režiimis luba küsima") |
 | 2026-11-19 | The process drift is repaired before Sprint 164 starts: this release plan and Sprint 163's plan in this repo, Sprint 164's plan through `sprint-manager`, `qa-validator` on Sprint 163, the release notes, the v2.2.0 sweep, branches and issues per sprint, the process model fixed | Jarmo ("enne ma tahan et sa jälgiks juba korra kehtestatud reeglistikku... kas on veel drifte?"; "jah, tee need parandused enne sprinti 164") |
+| 2026-11-21 | Sprint 172 approved: decks get their own extension, `.rtms` (then moved to 2.4 with the scope cut) | Jarmo ("kinnitan") |
+| 2026-11-21 | 2.3's scope is cut to `main` plus #917 so the release candidate is built tonight; #940, #920, #919, #910, #927 and #934 move to v2.4.0 | Jarmo ("kuule midagi tuleb 2.3 skoobist kärpida - peaks ikka täna õhtul juba Rc tegema"; "approved") |
