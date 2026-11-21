@@ -184,10 +184,11 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(/\.deck-handout\.is-above::before \{[^}]*top: 0; height: 8px; z-index: 1; background: var\(--r-surface\); pointer-events: none; \}/.test(css), 'the handout top masked above')
   // Slide only fills the room and sits in its middle (Jarmo, 17 November: "align slide to center... and fill the
   // space"): the whole-room size (`fullSlideWidthFor`, deckLayout.test.ts), the group the slide's own width, centred.
-  assert.ok(view.includes('const slideAlone = slideShown && !handoutShown') && view.includes('slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, startUnderSlide ? slideCardRoom : 0) :'), 'the whole room in Slide only')
+  assert.ok(view.includes('const slideAlone = slideShown && !handoutShown') && view.includes('slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) :'), 'the whole room in Slide only')
   // #917: a new deck's start card under the slide keeps its room (its rows don't wrap), so both fit without scrolling;
   // with no card the slide has the whole room again.
   assert.ok(view.includes("const startUnderSlide = startPlace === 'slide'") && view.includes('card.offsetHeight + START_CARD_SLIDE_GAP'), "the card's room under the slide")
+  assert.ok(view.includes('Math.min(slideCardRoom, Math.max(0, Math.floor(stageHeight / 2)))'), 'at most half the stage, so a tall card never shrinks the slide to nothing')
   assert.ok(view.includes("${slideAlone ? ' is-alone' : ''}") && view.includes('above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 }'), 'its group the slide\'s width')
   // A row under the slide scrolls with the stage; it never sizes the slide (review: it shrank as the row wrapped).
   assert.ok(view.includes('if (!above || slideAlone) return'), 'rows measured only above, beside the handout')

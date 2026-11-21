@@ -718,7 +718,10 @@ export function DeckView({
     observer.observe(card)
     return () => observer.disconnect()
   }, [startUnderSlide, startEl])
-  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, startUnderSlide ? slideCardRoom : 0) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  // At most half the stage: a card taller than that (All decks… in a project of many decks) scrolls with the stage
+  // instead, so the slide never shrinks to nothing and the card is never unmounted by its own size (review).
+  const slideCardUnder = startUnderSlide ? Math.min(slideCardRoom, Math.max(0, Math.floor(stageHeight / 2))) : 0
+  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
@@ -2155,7 +2158,7 @@ export function DeckView({
                 />
               ) : null}
               {/* #917: in Slide only the same card sits under the slide, at the slide's own width (decks.css). */}
-              {startPlace === 'slide' && slide && bigWidth > 0 ? startCard({ width: bigWidth }) : null}
+              {startPlace === 'slide' && slide ? startCard({ width: bigWidth }) : null}
               {slide && bigWidth > 0 ? (
                 <TransitionPreview
                   request={transitionPreview}
