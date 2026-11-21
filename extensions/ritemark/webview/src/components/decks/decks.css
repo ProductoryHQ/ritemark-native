@@ -94,6 +94,9 @@
    it are the 32 `fullSlideWidthFor` keeps, as above. */
 .deck-stage.is-alone { align-items: center; }
 .deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
+/* #917: in Slide only the start card sits under the slide, in the stage's flow at the slide's width (DeckView sets it)
+   and edges, 16 px under it. */
+.deck-stage .deck-start { position: relative; z-index: auto; margin: 16px 24px 0; }
 /* On the stage a long column or pane takes the wheel first (slideNav.ts, #824), in Slide only and beside the handout
    (#855); at its end the rest of a turn stays with it and never scrolls the stage under the slide. */
 .deck-stage .deck-big :is(.blk-column, .blk-tabpane) { overscroll-behavior-y: contain; }
