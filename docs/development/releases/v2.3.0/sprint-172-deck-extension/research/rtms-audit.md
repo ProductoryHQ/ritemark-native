@@ -65,6 +65,7 @@ This is the pattern Chrome uses (read from the installed Chrome's `Info.plist`: 
 | File | The check | Must `.rtms` pass? | Change |
 | --- | --- | --- | --- |
 | `src/editorSync/DocumentSyncCoordinator.ts` `isEditable` | Only `.csv`, `.md`, `.markdown`, `.mdown`, `.mkd` or no extension get a sync record | **Yes**: without it a `.rtms` opens with no sync record, so an edit, an AI's write and a save go unhandled | Add `.rtms` |
+| `webview/src/components/ai-sidebar/ChatInput.tsx` `TEXT_EXTENSIONS` and `classifyFile` | The chat's file picker accepts `.md` and classifies it as text | **Yes**: without it a `.rtms` deck is hidden by the picker and refused when its type is empty or generic, while an old `.deck.md` attaches (Codex on #941) | Add `.rtms` to both, with a test (PR 1) |
 | `package.json` `customEditors` `ritemark.editor` | `*.md`, `*.markdown`, `*.csv` | Yes, flag on or off (off, it opens as a document) | Add `*.rtms` |
 | `package.json` `languages` | `.rtms` has no language, so VS Code calls it plain text | Yes: it is Markdown, for Open With → Text Editor and the language fallbacks | `{ "id": "markdown", "extensions": [".rtms"] }` |
 | `branding/product.json` `workbench.editorAssociations` | `*.md` → Ritemark | Yes (shell PR) | `"*.rtms": "ritemark.editor"` |
