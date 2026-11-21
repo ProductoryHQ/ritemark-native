@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
@@ -32,7 +32,7 @@ import { onDocChanged } from '../../lib/docChange'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
-import { deckStarted, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
+import { deckStarted, startCardPlace, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
 import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTMLToMarkdown, markdownToEditorHTML } from '../../utils/editorMarkdown'
 import { SourceLines, type CopySource } from './library/SourceLines'
@@ -623,6 +623,19 @@ export function DeckView({
     setStartBusy(true)
     sendToExtension(type, fields)
   }, [])
+  // The one card, wherever `startCardPlace` puts it: the same component, rows and rules in the handout and under the slide.
+  const startCard = (style: CSSProperties) => startRows && startState ? (
+    <StartCard
+      ref={startRef}
+      style={style}
+      aiName={startRows.ask ? startState.ai?.name ?? null : null}
+      earlier={startRows.copy ? startState.earlier : []}
+      busy={startBusy}
+      onDraft={words => startWith('deck/start-draft', { text: words })}
+      onCopy={deck => startWith('deck/start-copy', { source: deck.path })}
+      onHide={hideStart}
+    />
+  ) : null
   const countRef = useRef(count)
   countRef.current = count
   const slidesRef = useRef(slides)
@@ -684,6 +697,9 @@ export function DeckView({
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth
   /** What the view switch shows chosen: the view as drawn (under 600 px the handout has no room, so Slide only). */
   const viewShown: DeckViewMode = !handoutShown ? 'slide' : !slideShown ? 'handout' : 'both'
+  // The one start card (#917): at the handout's top while the handout shows, under the slide in Slide only.
+  const startPlace = startShown ? startCardPlace(slideShown, handoutShown) : null
+  const startInHandout = startPlace === 'handout'
 
   const scrollContainer = useCallback((): HTMLElement | null => {
     return (editor?.view.dom.closest('.wysiwyg-editor') as HTMLElement | null) ?? null
@@ -748,16 +764,16 @@ export function DeckView({
     const textEnd = dom.getBoundingClientRect().bottom - origin - padding
     const lastHeight = textEnd - tops[tops.length - 1]
     // The start card sits in that room, under the text: the room is never shorter than the card
-    const card = startShown ? (startRef.current?.offsetHeight ?? 0) + START_CARD_GAP * 2 : 0
+    const card = startInHandout ? (startRef.current?.offsetHeight ?? 0) + START_CARD_GAP * 2 : 0
     const room = Math.round(Math.max(40, card, container.clientHeight - lastHeight - PART_TOP_GAP))
     if (Math.abs(room - padding) > 1) dom.style.setProperty('padding-bottom', `${room}px`, 'important')
     // The card's sides are the text's own edges (frame 20: 48 left, 32 right), never the column's.
     const box = dom.getBoundingClientRect()
     const left = Math.round(box.left - container.getBoundingClientRect().left + (parseFloat(style.paddingLeft) || 0))
     const width = Math.round(box.width - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0))
-    const next = startShown ? { left, width, top: Math.round(textEnd + START_CARD_GAP) } : null
+    const next = startInHandout ? { left, width, top: Math.round(textEnd + START_CARD_GAP) } : null
     setStartAt(at => (at && next && at.left === next.left && at.width === next.width && at.top === next.top) || at === next ? at : next)
-  }, [partTops, scrollContainer, editor, startShown])
+  }, [partTops, scrollContainer, editor, startInHandout])
 
   useEffect(() => {
     measureBar()
@@ -771,7 +787,7 @@ export function DeckView({
     return () => observer.disconnect()
   }, [editor, measureBar, slides])
   // The start card's own height (All decks… shows the rest) changes the room under the text.
-  const startPlaced = startShown && !!startAt
+  const startPlaced = startInHandout && !!startAt
   useEffect(() => {
     const card = startRef.current
     if (!startPlaced || !card) return
@@ -2106,6 +2122,8 @@ export function DeckView({
                   picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
                 />
               ) : null}
+              {/* #917: in Slide only the same card sits under the slide, at the slide's own width (decks.css). */}
+              {startPlace === 'slide' && slide && bigWidth > 0 ? startCard({ width: bigWidth }) : null}
               {slide && bigWidth > 0 ? (
                 <TransitionPreview
                   request={transitionPreview}
@@ -2172,19 +2190,7 @@ export function DeckView({
             extensions={DECK_EXTENSIONS}
             viewOfIncoming={textHandout ? undefined : withDrawnHeadings}
           />
-          {handoutContainer && startRows && startState && startAt ? createPortal(
-            <StartCard
-              ref={startRef}
-              style={startAt}
-              aiName={startRows.ask ? startState.ai?.name ?? null : null}
-              earlier={startRows.copy ? startState.earlier : []}
-              busy={startBusy}
-              onDraft={words => startWith('deck/start-draft', { text: words })}
-              onCopy={deck => startWith('deck/start-copy', { source: deck.path })}
-              onHide={hideStart}
-            />,
-            handoutContainer,
-          ) : null}
+          {startInHandout && handoutContainer && startAt ? createPortal(startCard(startAt), handoutContainer) : null}
         </div>
       </div>
       {/* 17 November (Jarmo: "slaidi settings peaks olema siin: mitte kuskil ülal tööriistaribas"; the Experience lead,
