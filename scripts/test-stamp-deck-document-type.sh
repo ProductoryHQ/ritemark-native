@@ -96,6 +96,18 @@ else
 fi
 cmp -s "$P" "$WORK/before.plist" && ok "the refused stamp changed nothing" || not_ok "the refused stamp changed the plist"
 
+# 4b. A plist far larger than a pipe's buffer is still recognised as stamped.
+B7="$WORK/fixture-large"
+make_bundle "$B7"
+plutil -insert ZZLargeValue -string "$(head -c 200000 /dev/zero | tr '\0' 'x')" "$B7/Contents/Info.plist"
+"$STAMP" "$B7" >/dev/null 2>&1 || not_ok "stamps a large plist"
+rm "$B7/Contents/Resources/Assets.car"
+if "$STAMP" "$B7" >/dev/null 2>"$WORK/err7"; then
+  not_ok "a second stamp of a large plist refuses"
+else
+  grep -q "refusing to stamp it twice" "$WORK/err7" && ok "a second stamp of a large plist refuses for the right reason" || not_ok "large plist second stamp: $(cat "$WORK/err7")"
+fi
+
 # 5. An existing UTExportedTypeDeclarations array is appended to, not replaced.
 B2="$WORK/fixture-two"
 make_bundle "$B2" with-exported-type

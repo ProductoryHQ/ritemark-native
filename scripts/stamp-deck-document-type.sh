@@ -86,7 +86,11 @@ count_of() {
 }
 
 names_deck_type() {
-  plutil -convert xml1 -o - "$INFO_PLIST" | grep -qF "<string>$DECK_UTI</string>"
+  # Read the whole plist first: `plutil | grep -q` under pipefail can report
+  # "not found" when grep stops early and plutil dies of SIGPIPE.
+  local xml
+  xml="$(plutil -convert xml1 -o - "$INFO_PLIST")" || fail "plutil cannot read $INFO_PLIST"
+  [[ "$xml" == *"<string>$DECK_UTI</string>"* ]]
 }
 
 # -----------------------------------------------------------------------------

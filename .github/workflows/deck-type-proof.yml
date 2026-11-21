@@ -43,6 +43,7 @@ jobs:
     timeout-minutes: 20
     env:
       APP: /Applications/Ritemark.app
+      TWIN: /Applications/RitemarkTwin.app
       WORK: ${{ github.workspace }}/deck-proof-files
       PROOF: ${{ github.workspace }}/deck-proof
       LSREGISTER: /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
@@ -62,7 +63,8 @@ jobs:
           cp /usr/bin/true "$APP/Contents/MacOS/Ritemark"
           cp branding/icons/icon.icns "$APP/Contents/Resources/Ritemark.icns"
           # Shaped like the release build's plist: the bundle id from
-          # branding/product.json, the app icon file and upstream's Markdown
+          # branding/product.json, the app icon as gulp names it (both
+          # CFBundleIconName and CFBundleIconFile) and upstream's Markdown
           # document type.
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +77,7 @@ jobs:
             <key>CFBundleExecutable</key><string>Ritemark</string>
             <key>CFBundlePackageType</key><string>APPL</string>
             <key>CFBundleIconFile</key><string>Ritemark.icns</string>
+            <key>CFBundleIconName</key><string>Ritemark</string>
             <key>CFBundleShortVersionString</key><string>2.3.0</string>
             <key>CFBundleVersion</key><string>2.3.0</string>
             <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
@@ -91,6 +94,13 @@ jobs:
           </plist>
           PLIST
           plutil -lint "$APP/Contents/Info.plist"
+          # An unstamped twin under another bundle id: the stamped app's own
+          # icon must look the same as the twin's.
+          sudo rm -rf "$TWIN"
+          sudo cp -R "$APP" "$TWIN"
+          sudo chown -R "$(id -un)" "$TWIN"
+          plutil -replace CFBundleIdentifier -string ai.productory.ritemark.twin "$TWIN/Contents/Info.plist"
+          plutil -replace CFBundleName -string RitemarkTwin "$TWIN/Contents/Info.plist"
 
       - name: Stamp it with the release script
         run: ./scripts/stamp-deck-document-type.sh "$APP"
@@ -102,11 +112,14 @@ jobs:
 
       - name: Sign it ad hoc (the stamped plist must sign)
         run: |
+          set -o pipefail
           codesign --force --sign - "$APP"
+          codesign --force --sign - "$TWIN"
           codesign --verify --strict --verbose=2 "$APP" 2>&1 | tee "$PROOF/codesign-verify.txt"
 
       - name: Register it with LaunchServices (this runner only)
         run: |
+          "$LSREGISTER" -f "$TWIN"
           "$LSREGISTER" -f "$APP"
           sleep 3
           { "$LSREGISTER" -dump 2>/dev/null || true; } > "$WORK/lsregister-dump.txt"
@@ -136,7 +149,7 @@ jobs:
       - name: Ask macOS about the type, the opener and the icon
         run: |
           set -o pipefail
-          swift scripts/qa/deck-type-proof.swift "$WORK/Day one.rtms" "$WORK/notes.md" "$PROOF" | tee "$PROOF/report.txt"
+          swift scripts/qa/deck-type-proof.swift "$WORK/Day one.rtms" "$WORK/notes.md" "$PROOF" "$TWIN" | tee "$PROOF/report.txt"
 
       - name: Quick Look thumbnail
         if: always()
@@ -144,12 +157,15 @@ jobs:
           qlmanage -t -s 512 -o "$PROOF" "$WORK/Day one.rtms" > "$PROOF/qlmanage.txt" 2>&1 || true
           cat "$PROOF/qlmanage.txt"
           ls -la "$PROOF"
+          test -s "$PROOF/Day one.rtms.png" || { echo "FAIL: Quick Look made no thumbnail"; exit 1; }
 
       - name: Spotlight's importer
         if: always()
         run: |
           mdimport -t -d3 "$WORK/Day one.rtms" > "$PROOF/mdimport.txt" 2>&1 || true
           grep -nE 'Imported|importer|kMDItemContentType|kMDItemKind|journey|customer|workshop' "$PROOF/mdimport.txt" | head -40 || true
+          grep -qF "of type 'ai.productory.ritemark.deck'" "$PROOF/mdimport.txt" || { echo "FAIL: Spotlight did not import the file as a deck"; exit 1; }
+          grep -qF 'the journey map' "$PROOF/mdimport.txt" || { echo "FAIL: Spotlight did not read the deck's words"; exit 1; }
 
       - name: Finder window (best effort)
         if: always()

@@ -699,9 +699,10 @@ echo ""
 #
 # scripts/stamp-deck-document-type.sh stamps `.rtms` into the release build's
 # Info.plist: the exported type ai.productory.ritemark.deck with the deck badge
-# and DECK, Ritemark as its owner, and Resources/deck-badge.icns. Its --check
-# reads every key back, runs `plutil -lint`, and finds the badge. Windows
-# declares the type in its installer instead.
+# and DECK, Ritemark as its owner, and the badge's asset catalog as
+# Resources/Assets.car. Its --check reads every key back, runs `plutil -lint`,
+# and finds the icon set deck-badge in the catalog. Windows declares the type
+# in its installer instead.
 # -----------------------------------------------------------------------------
 case "$TARGET" in
   darwin-arm64|darwin-x64)
