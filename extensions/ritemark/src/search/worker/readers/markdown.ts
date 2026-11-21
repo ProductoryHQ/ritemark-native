@@ -6,8 +6,15 @@
  * Left out: front matter, link targets, image paths, HTML tags. Kept: a
  * comment's words, both a standalone `<!-- note -->` (without its `{id:…}`) and an
  * anchored `<mark data-comment="note">…</mark>`'s note, as a passage after its block.
+ *
+ * #936: in a deck, a slide's block is read as the slide's words, never as its file's markup: a v1 slide's title,
+ * subtitle, boxes and rows (read with `slideDataOf`, the decks' own reader), a block slide's Markdown without its header
+ * (`id:`, `picture:`), its `:::` lines and its `{…}` attributes. Each is a passage at the slide's block. A ```slide
+ * block in any other document stays a code block.
  */
 import { isLineBreakTag } from '../../../decks/blocks/lineBreakTag';
+import { CLOSE_FENCE, CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, parseFenceAttributes } from '../../../decks/blocks/fencedDiv';
+import { isBlockSlide, slideDataOf, slideKindOfInfo, type SlideData } from '../../../decks/deckFormat';
 import { marked } from 'marked';
 import { PassageSink, decodeEntities, type ReadOutcome } from './types';
 
@@ -15,6 +22,7 @@ interface Token {
   type: string;
   raw?: string;
   text?: string;
+  lang?: string;
   tokens?: Token[];
   items?: Token[];
   header?: Array<{ text: string; tokens?: Token[] }>;
@@ -63,11 +71,51 @@ function inlineText(tokens: Token[] | undefined, fallback: string | undefined, n
   return text;
 }
 
-export function readMarkdown(source: string, budget: number): ReadOutcome {
+/** A Pandoc attribute block, `{.label}`, `{align=center width=50%}`, a link's or a span's brackets before it. */
+const ATTRIBUTES = /(\[((?:\\.|[^\]\\])*)\](?!\())?(\{[^}\n]*\})/g;
+
+/**
+ * A block slide's Markdown as words: its `:::` lines blank, and each `{…}` attribute block the fenced-div reader reads
+ * taken out, a bracketed span's words kept (`[Exercise]{.label}` → `Exercise`). Code blocks inside stay as written.
+ */
+export function slideMarkdownWords(markdown: string): string {
+  let fence: { char: string; size: number } | null = null;
+  return markdown.split('\n').map((line) => {
+    if (fence) {
+      const close = CODE_FENCE_CLOSE.exec(line.replace(/\r$/, ''));
+      if (close && close[1][0] === fence.char && close[1].length >= fence.size) fence = null;
+      return line;
+    }
+    const open = CODE_FENCE.exec(line);
+    if (open) { fence = { char: open[1][0], size: open[1].length }; return line; }
+    const bare = line.replace(/\r$/, '');
+    if (OPEN_FENCE.test(bare) || CLOSE_FENCE.test(bare)) return '';
+    return line.replace(ATTRIBUTES, (whole, span: string | undefined, words: string | undefined, attrs: string) => {
+      if (!parseFenceAttributes(attrs)) return whole;
+      return span !== undefined ? (words ?? '') : '';
+    });
+  }).join('\n');
+}
+
+/** A v1 slide's words, in the order the slide draws them: its title, subtitle, pill, each box's heading and text, each row. */
+function v1SlideWords(data: SlideData): string[] {
+  return [
+    data.title, data.subtitle, data.tag,
+    ...(data.items ?? []).map((item) => [item.heading, item.text].filter(Boolean).join(' ')),
+    ...(data.rows ?? []).map((row) => row.map((cell) => cell.trim()).join(' · ')),
+  ].filter((words): words is string => !!words);
+}
+
+function lex(text: string): Token[] {
+  return marked.lexer(text, { gfm: true }) as unknown as Token[];
+}
+
+/** `deck`: the document is a deck (`.deck.md`), whose ```slide blocks are its slides. */
+export function readMarkdown(source: string, budget: number, options: { deck?: boolean } = {}): ReadOutcome {
   const text = source.replace(FRONT_MATTER, '');
   let tokens: Token[];
   try {
-    tokens = marked.lexer(text, { gfm: true }) as unknown as Token[];
+    tokens = lex(text);
   } catch {
     return { ok: false, reason: 'unreadable' };
   }
@@ -83,9 +131,26 @@ export function readMarkdown(source: string, budget: number): ReadOutcome {
         case 'text':
           sink.add(inlineText(token.tokens, token.text, notes), at);
           break;
-        case 'code':
-          sink.add(token.text ?? '', at);
+        case 'code': {
+          const kind = options.deck ? slideKindOfInfo(token.lang ?? '') : null;
+          if (kind === null) {
+            sink.add(token.text ?? '', at);
+            break;
+          }
+          const data = slideDataOf(kind, token.text ?? '');
+          if (!isBlockSlide(kind)) {
+            for (const words of v1SlideWords(data)) sink.add(words, at);
+            break;
+          }
+          let inner: Token[];
+          try {
+            inner = lex(slideMarkdownWords(data.markdown ?? ''));
+          } catch {
+            break;
+          }
+          walk(inner, () => at.block);
           break;
+        }
         case 'blockquote':
           walk(token.tokens ?? [], () => at.block);
           break;

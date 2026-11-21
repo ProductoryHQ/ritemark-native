@@ -19,8 +19,8 @@ export type ReadOutcome =
     }
   | { ok: false; reason: 'protected' | 'scanned' | 'unreadable' | 'too-large' };
 
-/** Bump when a reader's output changes: decision 3's copies of older text are dropped. */
-export const READER_VERSION = 1;
+/** Bump when a reader's output changes: decision 3's copies of older text are dropped. 2: a deck's slides as words (#936). */
+export const READER_VERSION = 2;
 
 /** Collects passages up to a budget of characters. */
 export class PassageSink {
