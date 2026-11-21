@@ -209,6 +209,82 @@ test('an update clears the previous version\'s app code before installing (Sprin
   }
 });
 
+test('every install registers the deck file type, .rtms, with its icon (Sprint 172, #940)', async () => {
+  const installerScript = await readFile(installerScriptPath, 'utf8');
+  const section = (name) => {
+    const start = installerScript.indexOf(`\n[${name}]\n`);
+    assert.ok(start >= 0, `[${name}] exists`);
+    const next = installerScript.indexOf('\n[', start + 1);
+    return installerScript.slice(start, next < 0 ? undefined : next);
+  };
+
+  assert.match(installerScript, /^#ifndef DeckIconPath\n\s+#define DeckIconPath "\.\.\\\.\.\\branding\\win32\\deck\.ico"\n#endif$/m);
+  assert.match(section('Setup'), /^ChangesAssociations=yes$/m, 'Explorer redraws file icons after install and uninstall');
+  assert.match(
+    section('Files'),
+    /^Source: "\{#DeckIconPath\}"; DestDir: "\{app\}\\resources"; DestName: "deck\.ico"; Flags: ignoreversion$/m,
+  );
+
+  const registry = section('Registry');
+  const deckLines = registry.split('\n').filter((line) => /rtms/.test(line) && line.startsWith('Root:'));
+  assert.deepEqual(deckLines, [
+    'Root: HKCU; Subkey: "Software\\Classes\\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty',
+    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey',
+    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\resources\\deck.ico"',
+    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms\\shell\\open\\command"; ValueType: string; ValueName: ""; ValueData: """{app}\\{#AppExeName}"" ""%1"""',
+  ]);
+  for (const line of deckLines) {
+    assert.doesNotMatch(line, /Tasks:|Check:/, 'Ritemark owns .rtms: it is never behind the unchecked .md task');
+  }
+  // The .md association stays behind its task, as before.
+  for (const line of registry.split('\n').filter((entry) => /Ritemark\.md|\\\.md"|\\\.markdown"/.test(entry))) {
+    assert.match(line, /Tasks: associatewithfiles$/, line);
+  }
+
+  // One icon with the Experience lead's six drawn sizes; 256 px as PNG, the rest as 32-bit bitmaps.
+  const icon = await readFile(path.join(projectRoot, 'branding', 'win32', 'deck.ico'));
+  assert.equal(icon.readUInt16LE(0), 0);
+  assert.equal(icon.readUInt16LE(2), 1, 'an icon resource');
+  const frames = [];
+  for (let index = 0; index < icon.readUInt16LE(4); index++) {
+    const entry = 6 + 16 * index;
+    const size = icon[entry] || 256;
+    const offset = icon.readUInt32LE(entry + 12);
+    assert.equal(icon[entry + 1] || 256, size, 'square frames');
+    assert.equal(icon.readUInt16LE(entry + 6), 32, 'every frame is 32-bit');
+    assert.ok(offset + icon.readUInt32LE(entry + 8) <= icon.length, 'the frame lies inside the file');
+    const png = icon.subarray(offset, offset + 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    assert.equal(png, size === 256, `${size} px is ${size === 256 ? 'PNG' : 'a bitmap'}`);
+    frames.push(size);
+  }
+  assert.deepEqual(frames, [16, 24, 32, 48, 64, 256]);
+});
+
+test('the install round trip checks the deck file type both ways (Sprint 172, #940)', async () => {
+  const [registryProbe, roundtrip, canaryWorkflow] = await Promise.all([
+    readFile(registryProbePath, 'utf8'),
+    readFile(roundtripPath, 'utf8'),
+    readFile(canaryWorkflowPath, 'utf8'),
+  ]);
+
+  assert.match(roundtrip, /RITEMARK_CI_INSTALL_ROOT = \$installRoot/, 'the round trip names the install folder');
+  assert.doesNotMatch(canaryWorkflow, /RITEMARK_CI_INSTALL_ROOT/, 'the canary\'s synthetic registration has no install to check');
+  assert.match(registryProbe, /\$installRoot = \$env:RITEMARK_CI_INSTALL_ROOT/);
+  assert.match(registryProbe, /'HKCU:\\Software\\Classes\\\.rtms'/);
+  assert.match(registryProbe, /'HKCU:\\Software\\Classes\\Ritemark\.rtms'/);
+  assert.match(registryProbe, /\$deckFileType\.ProgId -ne 'Ritemark\.rtms'/);
+  assert.match(registryProbe, /\$deckFileType\.Name -ne 'Ritemark Deck'/);
+  assert.match(registryProbe, /\$expectedIcon = "\$root\\resources\\deck\.ico"/);
+  assert.match(registryProbe, /-not \$deckFileType\.IconFileExists/, 'the icon file itself is installed');
+  assert.match(registryProbe, /\$expectedCommand = '"' \+ "\$root\\Ritemark\.exe" \+ '" "%1"'/);
+  assert.match(
+    registryProbe,
+    /\$mode -eq 'verify-uninstalled'\) \{\n\s+if \(\$deckFileType\.ExtensionKey -or \$deckFileType\.ProgIdKey\)/,
+    'after uninstall neither key is left',
+  );
+  assert.match(registryProbe, /DeckFileType = \$deckFileType/, 'the evidence JSON records what was found');
+});
+
 test('the standard-user check also updates from the previous release and starts the app', async () => {
   const [workflow, canaryWorkflow, roundtrip, appStarts] = await Promise.all([
     readFile(workflowPath, 'utf8'),

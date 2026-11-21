@@ -31,11 +31,11 @@ Nothing starts until Jarmo approves the plan in his own words (shell-tier, and i
 - [ ] Risk and How to revert; Review record (High)
 
 ## PR 3: Windows (shell-tier)
-- [ ] Issue created in milestone v2.3.0, linked to #940; closes #940 with the last merge
-- [ ] `branding/win32/deck.ico` to the Experience lead's design
-- [ ] `ritemark.iss`: the icon file, `ChangesAssociations=yes`, the `.rtms` registry block with no task (R10)
-- [ ] The CI round trip's registry probe checks `.rtms` after install and after uninstall (scenario 29)
-- [ ] TEST-CHECKLIST row for Windows (audit §4)
+- [ ] Issue created in milestone v2.3.0, linked to #940; closes #940 with the last merge (PR 3 refers to #940 itself; the manager sets Closes at merge time if it merges last)
+- [x] `branding/win32/deck.ico` to the Experience lead's design: her six drawn sizes (16, 24, 32, 48, 64, 256), pixel for pixel, made with `branding/win32/make-deck-ico.py`; Windows scales 20 and 40 from them
+- [x] `ritemark.iss`: the icon file, `ChangesAssociations=yes`, the `.rtms` registry block with no task (R10)
+- [x] The CI round trip's registry probe checks `.rtms` after install and after uninstall (scenario 29)
+- [x] TEST-CHECKLIST rows for Windows (audit §4): 24w, the CI round trip; 24x, Explorer's icon and a double-click
 - [ ] Risk and How to revert; Review record (High)
 
 ## Sprint end

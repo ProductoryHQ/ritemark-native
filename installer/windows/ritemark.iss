@@ -16,6 +16,13 @@
   #define IconPath "..\..\branding\icons\icon.ico"
 #endif
 
+; The deck file's icon (Sprint 172): Explorer draws a .rtms with it. Installed
+; beside the app's resources, the way IconPath reaches the installer, so no
+; VS Code packaging patch is needed.
+#ifndef DeckIconPath
+  #define DeckIconPath "..\..\branding\win32\deck.ico"
+#endif
+
 #define AppName "Ritemark"
 ; Keep in sync with extensions/ritemark/package.json version.
 ; Overridable from the command line: ISCC.exe /DAppVersion="1.8.2" ...
@@ -60,6 +67,9 @@ AppMutex={#AppMutex}
 ; Don't require admin by default (user install)
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+; The .rtms association is written on every install (Sprint 172): tell
+; Explorer to redraw file icons at once, after install and after uninstall.
+ChangesAssociations=yes
 
 ; --- Code signing (Azure Trusted Signing) — #130 Smart App Control fix ---
 ; Active when CI passes /DSign and registers an "azuresign" sign tool via
@@ -120,6 +130,8 @@ Type: filesandordirs; Name: "{app}\resources\app\node-compile-cache"
 ; add an exclude that filters them out. The pre-flight in
 ; scripts\create-windows-installer.sh asserts they exist before ISCC runs.
 Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "*\node_modules\*\node_modules\*\node_modules\*"
+; The deck file's icon, named by the .rtms association's DefaultIcon below.
+Source: "{#DeckIconPath}"; DestDir: "{app}\resources"; DestName: "deck.ico"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -138,6 +150,16 @@ Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType
 
 ; Also associate .markdown files
 Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+
+; A deck, <name>.rtms, is Ritemark's own file type (Sprint 172, #940), so it is
+; registered on every install, not behind the unchecked .md task above, and
+; removed on uninstall. Explorer names it "Ritemark Deck", draws the deck icon
+; and opens it in Ritemark. scripts\windows-standard-user-registry-probe.ps1
+; checks these keys after install and their absence after uninstall.
+Root: HKCU; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\deck.ico"
+Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
 
 ; Add to PATH
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')
