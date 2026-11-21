@@ -148,11 +148,12 @@ export function deckPlace(path: string, name: string, projectName: string): stri
 }
 
 /**
- * A hit's second line, never cut: the copy's date and how many other decks have it ("12 Nov · also in 3 older
- * decks"), so a long folder or deck name never hides the date (the Experience lead: AI topics age in months).
+ * A hit's lines under its place, each on its own and never cut (#935): the copy's date, then how many other decks have
+ * it ("12 Nov", "also in 3 older decks"), so a long folder or deck name never hides the date (the Experience lead: AI
+ * topics age in months) and "also in N older decks" never breaks inside, in a narrow card or a wide one.
  */
-export function hitMeta(modified: number, count: number, library: boolean, now: number = Date.now()): string {
-  return [deckDate(modified, now), alsoLine(count, library)].filter(Boolean).join(' · ')
+export function hitMeta(modified: number, count: number, library: boolean, now: number = Date.now()): string[] {
+  return [deckDate(modified, now), alsoLine(count, library)].filter((line): line is string => Boolean(line))
 }
 
 /**
