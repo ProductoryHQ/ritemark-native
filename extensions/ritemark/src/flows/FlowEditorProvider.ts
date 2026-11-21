@@ -836,7 +836,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       // Sprint 143 (#510): a folder that exists, never the operating system's guess.
       defaultUri: vscode.Uri.file(pickerFolder([workspacePath])),
       filters: {
-        'Documents': ['md', 'txt', 'json', 'csv', 'xml', 'html', 'pdf'],
+        'Documents': ['md', 'rtms', 'txt', 'json', 'csv', 'xml', 'html', 'pdf'],
         'Images': ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'],
         'Code': ['ts', 'js', 'py', 'java', 'c', 'cpp', 'go', 'rs', 'rb'],
         'All Files': ['*']

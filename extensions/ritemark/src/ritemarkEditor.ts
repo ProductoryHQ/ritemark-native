@@ -301,7 +301,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
   }
 
   /**
-   * Sprint 157 (experience 46): a `.deck.md` opens here as a deck while the flag is on, a mode of this one editor,
+   * Sprint 157 (experience 46): a deck (`.rtms`, or an older `.deck.md`) opens here as a deck while the flag is on, a mode of this one editor,
    * so saving, conflicts, the writer's-copy merge and undo stay a document's. Lazy, as for the card pages.
    */
   private static deckPages(): DeckPages | null {
@@ -821,8 +821,8 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
       : null;
 
     // Sprint 157: a deck's panel, while it is open, so the Slide library and the AI's tools can insert into it.
-    // Sprint 159 (PR 2): only a `.deck.md`'s panel that opened with the flag on: the same flag every payload of this
-    // panel uses. With the flag off a `.deck.md` is an ordinary document: nothing may treat its panel as a deck view,
+    // Sprint 159 (PR 2): only a deck's panel (`.rtms` or `.deck.md`) that opened with the flag on: the same flag every
+    // payload of this panel uses. With the flag off a deck file is an ordinary document: nothing may treat its panel as a deck view,
     // even once the flag is turned on. The deck pages answer a connected panel while its file reads as a deck this build
     // writes and isn't shown as a card (a card page's webview sends no `deck/` request).
     const deckPages = RitemarkEditorProvider.deckPages();

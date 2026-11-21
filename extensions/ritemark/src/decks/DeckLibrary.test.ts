@@ -5,11 +5,12 @@ import { strict as assert } from 'node:assert';
 import { isTextHandout, parseFrom, slideDataOf } from './deckFormat';
 import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
+import { isDeckPath } from './deckFileName';
 
 function project(files: Record<string, string>): DeckFiles & { files: Record<string, string> } {
   return {
     files,
-    async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map((path, index) => ({ path, modified: index })); },
+    async list() { return Object.keys(files).filter(path => isDeckPath(path)).map((path, index) => ({ path, modified: index })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text, options) {
       if (options?.create && path in files) throw new Error('exists');
@@ -83,9 +84,27 @@ async function run() {
   const own = { kind: 'statement', body: 'id: t9\ntitle: Our own\nskip: true', handout: 'Mine, with [brief](Brief.md).' };
   const added = await library.addToLibrary('Clients/Harbour/Harbour.deck.md', 'Working with data', own);
   assert.ok(files.files['Slide library/Themes/Evening.theme.md'].startsWith('---\nname: Evening'));
-  const topic = files.files['Slide library/Working with data.deck.md'];
+  // Sprint 172: a new topic is a `.rtms`
+  const topic = files.files['Slide library/Working with data.rtms'];
   assert.ok(topic.startsWith('---\ndeck: 2\ntheme: Slide library/Themes/Evening.theme.md\n---\n\n```slide\n---\nid: '), topic);
   assert.ok(topic.includes('# Our own'), 'the library gets it as a block slide');
+  // Sprint 172: a topic named as one made before (`AI assistants.deck.md`) is that file, never a new `.rtms` beside it
+  {
+    const legacy = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Talks/Day one.rtms': DECK });
+    const legacyLibrary = new DeckLibrary(legacy);
+    const write = await legacyLibrary.addToLibrary('Talks/Day one.rtms', 'AI assistants', { kind: 'statement', body: 'id: t8\ntitle: One more', handout: '' });
+    assert.equal(write.path, 'Slide library/AI assistants.deck.md');
+    assert.equal('Slide library/AI assistants.rtms' in legacy.files, false, 'no second topic');
+    assert.ok(legacy.files['Slide library/AI assistants.deck.md'].includes('# One more'));
+    // A `.rtms` deck is listed, and its slides are copied from and into as an old deck's are
+    assert.deepEqual((await legacyLibrary.listDecks()).map(deck => [deck.path, deck.name]), [['Slide library/AI assistants.deck.md', 'AI assistants'], ['Talks/Day one.rtms', 'Day one']]);
+    const [fromNew] = await legacyLibrary.copies('Talks/Day one.rtms', ['t1'], 'Slide library/AI assistants.deck.md', []);
+    assert.equal(parseFrom(slideDataOf(fromNew.kind, fromNew.body).from)?.path, 'Talks/Day one.rtms');
+    // No name is no topic, as before
+    await assert.rejects(() => legacyLibrary.addCopiesToTopic([{ path: 'Talks/Day one.rtms', id: 't1' }], '  '), /A topic needs a name/);
+    const copiesWrite = await legacyLibrary.addCopiesToTopic([{ path: 'Talks/Day one.rtms', id: 't1' }], 'Safety');
+    assert.equal(copiesWrite.path, 'Slide library/Safety.rtms', 'scenario 8: a new topic is a .rtms');
+  }
   const addedSlide = slidesOfText(topic)[0];
   assert.equal(addedSlide.data.skip, undefined, 'the library keeps no skip');
   assert.equal(addedSlide.handout, 'Mine, with [brief](../Clients/Harbour/Brief.md).');

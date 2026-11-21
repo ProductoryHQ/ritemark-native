@@ -51,7 +51,8 @@ let pathChipIdCounter = 0;
 /** File extensions we accept, grouped by kind */
 const IMAGE_EXTENSIONS = '.png,.jpg,.jpeg,.gif,.webp';
 const PDF_EXTENSIONS = '.pdf';
-const TEXT_EXTENSIONS = '.md,.txt,.csv,.json,.xml,.yaml,.yml,.toml,.html,.css,.js,.ts,.tsx,.jsx,.py,.sh,.sql,.log';
+// Sprint 172: `.rtms` (a deck, Markdown inside) is text, as an older `.deck.md` already is by its `.md`
+export const TEXT_EXTENSIONS = '.md,.rtms,.txt,.csv,.json,.xml,.yaml,.yml,.toml,.html,.css,.js,.ts,.tsx,.jsx,.py,.sh,.sql,.log';
 
 const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',');
 
@@ -75,7 +76,7 @@ interface PathChip {
   isFolder: boolean;
 }
 
-function classifyFile(file: File): AttachmentKind | null {
+export function classifyFile(file: Pick<File, 'type' | 'name'>): AttachmentKind | null {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type === 'application/pdf') return 'pdf';
   // Treat anything text-ish as text
@@ -84,7 +85,7 @@ function classifyFile(file: File): AttachmentKind | null {
     file.type === 'application/json' ||
     file.type === 'application/xml' ||
     file.type === 'application/yaml' ||
-    file.name.match(/\.(md|txt|csv|json|xml|yaml|yml|toml|html|css|js|ts|tsx|jsx|py|sh|sql|log)$/i)
+    file.name.match(/\.(md|rtms|txt|csv|json|xml|yaml|yml|toml|html|css|js|ts|tsx|jsx|py|sh|sql|log)$/i)
   ) {
     return 'text';
   }

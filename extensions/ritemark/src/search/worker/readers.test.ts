@@ -35,6 +35,10 @@ async function main() {
   // ── Names and kinds ─────────────────────────────────────────────────────────
   assert.equal(formatOf('Report.MD'), 'markdown');
   assert.equal(formatOf('notes.markdown'), 'markdown');
+  // Sprint 172 (scenario 10): a deck's words are found, and its name is the deck's name
+  assert.equal(formatOf('Day one.rtms'), 'markdown');
+  assert.equal(formatOf('TALK.RTMS'), 'markdown');
+  assert.equal(documentName('Day one.rtms'), 'Day one');
   assert.equal(formatOf('a.docx'), 'docx');
   assert.equal(formatOf('a.doc'), null, 'a legacy .doc is not a kind search reads');
   assert.equal(formatOf('.md'), null);

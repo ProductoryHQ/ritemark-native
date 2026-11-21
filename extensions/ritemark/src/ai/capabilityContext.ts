@@ -207,7 +207,7 @@ const SECTIONS: CapabilitySection[] = [
     render: (d) =>
       d.hasDeckTools
         ? [
-            'DECKS: a `.deck.md` file is a slide deck. The `Slide library` folder holds one deck per topic: the slides to reuse.',
+            'DECKS: a `.rtms` file is a slide deck (one made before may end `.deck.md`). Name a new deck `<name>.rtms`. The `Slide library` folder holds one deck per topic: the slides to reuse.',
             '- Find and read slides with the `ritemark_decks` tools (list_decks, read_deck). Put a slide from the library or another deck into a deck only with insert_slides, so the copy gets its `from:` line; never paste a library slide in by hand.',
             '- Never change anything in `Slide library/` unless the user asks for it; then use update_library_slide or add_to_library.',
             // Sprint 165 PR 4 (#834): the library's offer, the same slides the Slide library place offers

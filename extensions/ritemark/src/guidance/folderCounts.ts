@@ -25,7 +25,8 @@ const EXTENSIONS: Record<string, FileKind> = {
   '.pdf': 'pdf',
   '.xlsx': 'spreadsheet', '.xls': 'spreadsheet', '.xlsm': 'spreadsheet', '.csv': 'spreadsheet', '.tsv': 'spreadsheet', '.ods': 'spreadsheet', '.numbers': 'spreadsheet',
   '.pptx': 'presentation', '.ppt': 'presentation', '.odp': 'presentation', '.key': 'presentation',
-  '.md': 'text', '.markdown': 'text', '.txt': 'text',
+  // Sprint 172: a `.rtms` is Markdown inside; with decks off it is a text document, as a `.deck.md` is
+  '.md': 'text', '.markdown': 'text', '.txt': 'text', '.rtms': 'text',
   '.png': 'picture', '.jpg': 'picture', '.jpeg': 'picture', '.gif': 'picture', '.webp': 'picture', '.heic': 'picture', '.svg': 'picture', '.tif': 'picture', '.tiff': 'picture', '.bmp': 'picture',
 };
 
@@ -43,7 +44,7 @@ const WORDS: Record<FileKind, [one: string, many: string]> = {
   other: ['other', 'others'],
 };
 
-/** How the line names files: `decks` (Sprint 159, the `decks` flag on) counts a `.deck.md` as a deck, not a text document. */
+/** How the line names files: `decks` (Sprint 159, the `decks` flag on) counts a `.rtms` or `.deck.md` as a deck, not a text document. */
 export interface CountOptions {
   decks?: boolean;
 }
@@ -65,7 +66,7 @@ function joinWords(parts: readonly string[]): string {
 /**
  * The line for a list of file names: the total, then at most four kinds, the
  * most numerous first, and the rest as "others", last. `more` says the walk
- * stopped past the limit. With `decks`, a `.deck.md` is a deck ("1 file: 1 deck.").
+ * stopped past the limit. With `decks`, a `.rtms` or `.deck.md` is a deck ("1 file: 1 deck.").
  * Ends with a full stop.
  */
 export function countsLine(names: readonly string[], more = false, options: CountOptions = {}): string {

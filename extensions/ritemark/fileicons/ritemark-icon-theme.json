@@ -133,6 +133,7 @@
   "fileExtensions": {
     "flow.json": "_file_flow_dark",
     "deck.md": "_file_deck_dark",
+    "rtms": "_file_deck_dark",
     "theme.md": "_file_theme_dark",
     "md": "_file_markdown_dark",
     "mdx": "_file_markdown_dark",
@@ -210,6 +211,7 @@
     "fileExtensions": {
       "flow.json": "_file_flow",
       "deck.md": "_file_deck",
+      "rtms": "_file_deck",
       "theme.md": "_file_theme",
       "md": "_file_markdown",
       "mdx": "_file_markdown",

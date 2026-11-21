@@ -1,5 +1,5 @@
 /**
- * The deck file (Sprint 157, experience 46): `<name>.deck.md`.
+ * The deck file (Sprint 157, experience 46): `<name>.rtms` (Sprint 172; a deck made before may be `<name>.deck.md`).
  *
  * A deck is a Markdown file. Its front matter has `deck: 1` and names its theme. Each slide is one fenced block,
  * ```` ```slide <kind> ````, whose body is a strict subset of YAML, so any AI can read and write it:

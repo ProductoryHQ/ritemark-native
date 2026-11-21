@@ -219,7 +219,7 @@ const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'rm-stale-write-'));
 interface Message { type: string; [key: string]: unknown }
 
 async function main(): Promise<void> {
-  const { DocumentSyncCoordinator } = await import('./DocumentSyncCoordinator');
+  const { DocumentSyncCoordinator, isEditablePath } = await import('./DocumentSyncCoordinator');
 
   let fileCount = 0;
   async function open(name: string, content: string, options: { visible?: boolean } = {}) {
@@ -415,6 +415,25 @@ async function main(): Promise<void> {
     assert.equal(env.conflicts().length, 0);
     assert.equal(merged(env), env.disk());
     assert.equal(env.document.isDirty, false, 'VS Code\'s own reload');
+    env.dispose();
+  });
+
+  // Sprint 172 (R7): a deck is `<name>.rtms`. Without a sync record a `.rtms` would open with its edits, an AI's writes
+  // and its saves unhandled (`prepareView` gives none), so the rule names it, and the whole path runs here.
+  await scenario('Sprint 172: a .rtms deck gets a sync record: the person\'s edit is saved, and a writer\'s change is merged in', async () => {
+    assert.equal(isEditablePath('/p/Day one.rtms'), true);
+    assert.equal(isEditablePath('C:\\Work\\DAY ONE.RTMS'), true, 'any case');
+    assert.equal(isEditablePath('/p/Talk.deck.md'), true, 'an old deck, by its .md');
+    assert.equal(isEditablePath('/p/notes.md'), true);
+    assert.equal(isEditablePath('/p/notes.txt'), false, 'the rule is a list: a kind not on it gets no record');
+    const env = await open('Day one.rtms', md('Stale write'));
+    await env.type(addToEnd(env.document.getText(), A));
+    assert.equal(await env.autoSave(), 'saved');
+    assert.ok(env.disk().includes(A.trim()), 'the person\'s words are on disk');
+    fs.writeFileSync(env.document.file, editTitle(env.disk()));
+    await env.fileChanged('reload-first');
+    assert.equal(env.conflicts().length, 0);
+    assert.ok(has(merged(env), 'edited by the writer', A), 'the writer\'s change reaches the view, with the person\'s words');
     env.dispose();
   });
 

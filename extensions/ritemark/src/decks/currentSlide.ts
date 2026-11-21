@@ -25,7 +25,7 @@ export interface CurrentSlideEntry {
 
 /** The deck in front and the slide (or slides) the person is on there. */
 export interface CurrentSlide {
-  /** The deck's name, as the library names it (its file name without `.deck.md`). */
+  /** The deck's name, as the library names it (its file name without `.rtms`, or an older deck's `.deck.md`). */
   deck: string;
   /** How many slides the deck has. */
   count: number;

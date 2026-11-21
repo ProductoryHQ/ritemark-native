@@ -123,7 +123,7 @@ function lex(text: string): Token[] {
   return marked.lexer(text, { gfm: true }) as unknown as Token[];
 }
 
-/** `deck`: the document is a deck (`.deck.md`), whose ```slide blocks are its slides. */
+/** `deck`: the document is a deck (`.rtms`, or an older `.deck.md`), whose ```slide blocks are its slides. */
 export function readMarkdown(source: string, budget: number, options: { deck?: boolean } = {}): ReadOutcome {
   const text = source.replace(FRONT_MATTER, '');
   let tokens: Token[];

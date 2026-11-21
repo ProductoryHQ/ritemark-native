@@ -10,6 +10,7 @@ import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
 import type { ThemeChangeView } from './themeChange';
+import { isDeckPath } from './deckFileName';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
 export const MAX_ASSET_PATHS = 500;
@@ -353,7 +354,7 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/start-copy': {
       exactKeys(input, ['type', 'source']);
       const source = stringOf(input.source, MAX_PATH_LENGTH);
-      if (!/\.deck\.md$/i.test(source)) throw new DeckProtocolError('source must be a deck');
+      if (!isDeckPath(source)) throw new DeckProtocolError('source must be a deck');
       return { type: 'deck/start-copy', source };
     }
     case 'deck/applied': {
@@ -428,7 +429,7 @@ export function decodeLibraryRequest(value: unknown): LibraryRequest | null {
   const keys = Object.keys(input);
   const only = (...allowed: string[]) => keys.length === allowed.length && keys.every(key => allowed.includes(key));
   const text = (field: unknown, max: number) => typeof field === 'string' && field.length <= max;
-  const deckPath = (field: unknown) => text(field, MAX_PATH_LENGTH) && (field as string).length > 0 && /\.deck\.md$/i.test(field as string);
+  const deckPath = (field: unknown) => text(field, MAX_PATH_LENGTH) && (field as string).length > 0 && isDeckPath(field as string);
   switch (input.type) {
     case 'library/ready':
       return only('type') ? { type: 'library/ready' } : null;

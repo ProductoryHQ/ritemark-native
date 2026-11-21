@@ -35,6 +35,9 @@ assert.equal(countsLine(['Talk.deck.md'], false, { decks: true }), '1 file: 1 de
 assert.equal(countsLine(['Talk.deck.md'], false, { decks: false }), '1 file: 1 text document.', 'flag off: a text document, as before');
 assert.equal(countsLine(['Talk.deck.md']), '1 file: 1 text document.', 'no options: as before');
 assert.equal(countsLine(['a.deck.md', 'B.DECK.MD'], false, { decks: true }), '2 files: 2 decks.', 'plural, any case');
+// Sprint 172 (scenarios 16 and 17): a `.rtms` is a deck with decks on, and a text document with them off
+assert.equal(countsLine(['Day one.rtms', 'Day two.RTMS', 'notes.md'], false, { decks: true }), '3 files: 2 decks and 1 text document.', 'flag on');
+assert.equal(countsLine(['Day one.rtms', 'Day two.RTMS', 'notes.md'], false, { decks: false }), '3 files: 3 text documents.', 'flag off');
 assert.equal(countsLine(['a.deck.md', 'b.deck.md', 'notes.md', 'Brief.docx', 'Brief.pdf', 'Plan.pdf'], false, { decks: true }), '6 files: 2 PDFs, 2 decks, 1 Word document and 1 text document.', 'a mixed folder: decks counted apart from the text documents');
 assert.equal(countsLine(['a.deck.md', 'b.deck.md', 'notes.md', 'Brief.docx', 'Brief.pdf', 'Plan.pdf'], false, { decks: false }), '6 files: 3 text documents, 2 PDFs and 1 Word document.', 'the same folder, flag off');
 assert.equal(countsLine(['deck.md'], false, { decks: true }), '1 file: 1 text document.', 'a file named just deck.md is a document');

@@ -88,7 +88,7 @@ export interface PageOptions {
    */
   pictureUrl: PictureUrl;
   /**
-   * Sprint 163 PR 4: the deck's file name without `.deck.md`, used only hashed, in the reader's storage key for a deck with
+   * Sprint 163 PR 4: the deck's file name without `.rtms` (or `.deck.md`), used only hashed, in the reader's storage key for a deck with
    * no title of its own (`pageHtml`). Never on the page.
    */
   name?: string;

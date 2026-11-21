@@ -25,6 +25,7 @@ import { DeckIndex, hitDecks, inOpenDeck, MAX_HITS, MAX_NAMED_DECKS, namedDecks,
 import { EVERY_TRAINING, NOT_NOW_PATH, NOT_NOW_UNREADABLE, hideFromOffer, notNowSlides, offerOf, readNotNow, type NotNow, type OfferedSlide } from './libraryOffer';
 import type { SameSlides } from './sameSlide';
 import { LIBRARY_SEARCH_COMMAND, SHELL_FIELD_COMMAND, librarySearchRow } from './librarySearchRow';
+import { DECK_GLOB, isDeckPath } from './deckFileName';
 
 /** Sprint 165 PR 1: the project folder's name, the heading of the decks at its top level in Other decks. */
 function projectName(): string {
@@ -107,8 +108,8 @@ export class SlideLibraryViewProvider implements vscode.WebviewViewProvider, vsc
 
   private watchDecks(): void {
     if (this.watching.length) return;
-    const watcher = vscode.workspace.createFileSystemWatcher('**/*.deck.md');
-    const isDeck = (uri: vscode.Uri) => /\.deck\.md$/i.test(uri.fsPath);
+    const watcher = vscode.workspace.createFileSystemWatcher(DECK_GLOB);
+    const isDeck = (uri: vscode.Uri) => isDeckPath(uri.fsPath);
     // Sprint 165 PR 4: a folder of decks deleted at once (the Slide library folder, say) is reported as the folder
     // alone, which the deck watcher never matches. A delete of a folder that held indexed decks reads them again, so
     // the place never keeps showing decks that are gone (and the offer comes back); any other delete does nothing.

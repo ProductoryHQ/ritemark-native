@@ -41,6 +41,7 @@ import type { DeckHostMessage, DeckPageState, DeckPdfKind } from './deckProtocol
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
+import { DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
 const CHANGED_MS = 800;
@@ -410,21 +411,27 @@ export class DeckPublisher implements vscode.Disposable {
    * describe other words than the ones going up. 2.2's own rows show then.
    */
   async pageRows(pagePath: string): Promise<DeckSheetRows | undefined> {
-    // Only `<deck name>.html` beside its `<deck name>.deck.md`, holding Ritemark's marks, is a deck's page.
+    // Only `<deck name>.html` beside its `<deck name>.rtms` (or, for a deck made before, `<deck name>.deck.md`),
+    // holding Ritemark's marks, is a deck's page.
     if (!isEnabled('decks') || !/\.html$/.test(pagePath)) return undefined;
-    const besidePath = path.join(path.dirname(pagePath), `${path.basename(pagePath, '.html')}.deck.md`);
-    if (deckNameOf(besidePath) === '') return undefined;
+    const name = path.basename(pagePath, '.html');
+    if (name === '') return undefined;
     try {
       const meta = readPageMeta(await readHead(pagePath));
       if (!meta.ritemark || !meta.digest) return undefined;
       const registered = this.written.get(normalizeForCompare(pagePath));
       if (registered?.digest === meta.digest) return registered.rows;
-      const open = await this.openDocumentAt(besidePath);
-      const deckPath = open ? open.uri.fsPath : besidePath;
-      const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
-      const now = await this.pageNow(deckPath, text);
-      if (await pageReadsChanged(meta.digest, now)) return undefined;
-      return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
+      // Sprint 172: the deck beside is `<name>.rtms` or an older `<name>.deck.md`; should both be there, the one this
+      // page reads as made from (review of #949).
+      const base = path.join(path.dirname(pagePath), name);
+      for (const besidePath of [`${base}${DECK_EXTENSION}`, `${base}${LEGACY_DECK_EXTENSION}`]) {
+        const open = await this.openDocumentAt(besidePath);
+        const text = open ? open.getText() : await fs.promises.readFile(besidePath, 'utf8').catch(() => null);
+        if (text === null) continue;
+        const now = await this.pageNow(open ? open.uri.fsPath : besidePath, text);
+        if (!(await pageReadsChanged(meta.digest, now))) return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
+      }
+      return undefined;
     } catch {
       return undefined;
     }
