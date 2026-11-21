@@ -4,9 +4,26 @@
  * Run: npx tsx src/decks/deckFileName.test.ts
  */
 import assert from 'node:assert/strict';
-import { DECK_EXTENSION, isDeckPath, splitFileName } from './deckFileName';
+import { DECK_EXTENSION, DECK_GLOB, deckFileName, deckNameOf, isDeckPath, LEGACY_DECK_EXTENSION, splitFileName } from './deckFileName';
 
-assert.equal(DECK_EXTENSION, '.deck.md');
+// Sprint 172: a new deck ends `.rtms`; one made before may end `.deck.md`, and both are decks
+assert.equal(DECK_EXTENSION, '.rtms');
+assert.equal(LEGACY_DECK_EXTENSION, '.deck.md');
+assert.equal(DECK_GLOB, '**/*.{rtms,deck.md}');
+assert.equal(deckFileName('Untitled'), 'Untitled.rtms');
+assert.equal(deckFileName('Training (copy)'), 'Training (copy).rtms');
+assert.deepEqual(
+  ['/p/Talk.rtms', 'Slide library/TEAMS.RTMS', 'C:\\Work\\Talk.rtms', '.rtms', 'rtms', 'Talk.rtms.md', 'Talk.rtm', 'Talk.xrtms'].map(isDeckPath),
+  [true, true, true, true, false, false, false, false],
+);
+assert.deepEqual(
+  ['Talk.rtms', 'Clients/Harbour/AI assistants and agents.rtms', 'C:\\Work\\Top.RTMS', 'Old.deck.md', 'Slide library/Top.DECK.md', 'notes.md', 'report.final.rtms'].map(deckNameOf),
+  ['Talk', 'AI assistants and agents', 'Top', 'Old', 'Top', 'notes.md', 'report.final'],
+);
+assert.deepEqual(
+  ['Talk.rtms', 'Day one.RTMS', '.rtms', 'Talk.rtms.'].map(splitFileName),
+  [{ name: 'Talk', extension: '.rtms' }, { name: 'Day one', extension: '.RTMS' }, { name: '.rtms', extension: '' }, { name: 'Talk.rtms.', extension: '' }],
+);
 assert.deepEqual(
   ['/p/Talk.deck.md', 'Slide library/TEAMS.DECK.MD', 'C:\\Work\\Talk.deck.md', 'deck.md', '.deck.md', '/p/.deck.md', 'C:\\p\\.deck.md', 'Talk.deck.markdown', 'Talk.md'].map(isDeckPath),
   // A bare `.deck.md` stays a deck, as deck mode, the library and the file icon theme have it; only its name reads as a dotfile's

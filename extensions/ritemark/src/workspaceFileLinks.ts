@@ -55,7 +55,8 @@ export function shouldSkipWorkspacePath(filePath: string): boolean {
 
 export function classifyWorkspaceFileKind(filePath: string): WorkspaceFileKind {
   const ext = path.extname(filePath).toLowerCase();
-  if (ext === '.md' || ext === '.markdown') return 'markdown';
+  // Sprint 172: a deck (`.rtms`) is a Markdown file to the chat's links
+  if (ext === '.md' || ext === '.markdown' || ext === '.rtms') return 'markdown';
   if (ext === '.pdf' || ext === '.docx' || ext === '.txt') return 'document';
   if (ext === '.xlsx' || ext === '.xls' || ext === '.csv') return 'data';
   if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext)) return 'image';

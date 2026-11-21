@@ -25,6 +25,7 @@ import { BUILT_IN_THEME, BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT, isThemePath, 
 import { frontMatterField } from './deckFormat';
 import { themeModeOf } from './deckMode';
 import { deckName, type DeckLibrary } from './DeckLibrary';
+import { isDeckPath } from './deckFileName';
 import { projectRelative, projectRoot } from './deckDocuments';
 import { logoWebviewUri, projectThemeFiles, readThemeOrEvening, resolveAssetsIn, themeLogoFile, type DeckPages, type ThemeLogoFile } from './deckPages';
 import { logoNames, logoProblem, logoKindOfName, MAX_LOGO_BYTES, LOGO_TOO_LARGE } from './themeLogo';
@@ -115,7 +116,7 @@ export class ThemePages implements vscode.Disposable {
       vscode.workspace.onDidSaveTextDocument(document => {
         this.saving.delete(document.uri.toString());
         // A deck saved (its `theme:` line, New theme…'s pick): the open themes' "Used by" and preview follow.
-        if (document.uri.scheme === 'file' && /\.deck\.md$/i.test(document.uri.fsPath)) this.decksChanged();
+        if (document.uri.scheme === 'file' && isDeckPath(document.uri.fsPath)) this.decksChanged();
         const views = [...this.views].filter(view => view.document === document);
         if (views.length > 0) void this.saved(document, views);
       }),

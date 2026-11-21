@@ -48,7 +48,7 @@ title: Why agents?
 ```slide points
 id: g001
 title: Why talk about agents?
-from: Slide library/Agents.deck.md#g1 @ssvkiv
+from: Slide library/Agents.rtms#g1 @ssvkiv
 items:
 - heading: They work on a goal, not a question
 - heading: They use tools and files
@@ -60,7 +60,7 @@ Agents change who does the steps. You still decide what good looks like.
 ```slide boxes
 id: a001
 title: An assistant's four parts
-from: Slide library/AI assistants.deck.md#a1 @j4kptu
+from: Slide library/AI assistants.rtms#a1 @j4kptu
 items:
 - heading: Instructions
   text: What it does, in what order, and what it never does
@@ -87,7 +87,7 @@ You are an assistant for the customer service team. Answer only from the files i
 ```slide columns
 id: a002
 title: Assistant or agent: which one?
-from: Slide library/AI assistants.deck.md#a2 @62g062
+from: Slide library/AI assistants.rtms#a2 @62g062
 items:
 - heading: Assistant
   text: "Answers when you ask\nWorks in the chat\nYou check every step"
@@ -128,7 +128,7 @@ title: Scheduled prompts
 id: g002
 title: A scheduled prompt, step by step
 look: line
-from: Slide library/Agents.deck.md#g2 @3flaj0
+from: Slide library/Agents.rtms#g2 @3flaj0
 items:
 - heading: When
   text: Every Monday at 8:00
@@ -145,7 +145,7 @@ The first agent most people use is a prompt that runs on a schedule.
 ```slide table
 id: d006
 title: Which tool for which data
-from: Northwind/Data in Excel.deck.md#n1 @8wkbxg
+from: Northwind/Data in Excel.rtms#n1 @8wkbxg
 rows:
 - [Data, In the chat, In Excel]
 - [Public, "Yes", "Yes"]

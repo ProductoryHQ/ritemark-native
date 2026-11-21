@@ -67,7 +67,7 @@ export type FlagId =
   | 'control-catalogue'
   // Sprint 148 (#591): Ritemark's own search, the words layer (its index reads the project in a worker)
   | 'project-search'
-  // Sprint 157 (experience 46): a `.deck.md` opens as a deck, with the Slide library and the AI's deck tools
+  // Sprint 157 (experience 46): a deck (`.rtms` since Sprint 172, or an older `.deck.md`) opens as a deck, with the Slide library and the AI's deck tools
   | 'decks'
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
   | 'excel-editing'
@@ -95,12 +95,12 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   // Sprint 157 (experience 46, README decision 10): Decks. Off by default until 2.3 on Jarmo's word (14 November
   // 2026: "behind a feature flag, in dev runs, not on main at first"). ON from 2.3 (#916; Jarmo, 20 November 2026:
   // "Decks läheb 2.3 sisse"): `ritemark.features.decks` defaults to true (HARD RULE #2) and stays as the off switch,
-  // as `project-search` keeps its own, so Decks can be stopped without a release. Off, a `.deck.md` opens as an
+  // as `project-search` keeps its own, so Decks can be stopped without a release. Off, a `.rtms` or `.deck.md` opens as an
   // ordinary document and nothing else changes; on, it opens as a deck.
   decks: {
     id: 'decks',
     label: 'Decks',
-    description: 'Open a .deck.md file as a deck: slides beside their handout, with a Slide library to take copies from.',
+    description: 'Open a .rtms file (or an older .deck.md) as a deck: slides beside their handout, with a Slide library to take copies from.',
     status: 'experimental',
     platforms: ['darwin', 'win32', 'linux'],
   },

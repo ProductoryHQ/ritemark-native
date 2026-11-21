@@ -8,10 +8,11 @@ import { slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, type DeckFiles } from './DeckLibrary';
 import { copiedDeckText } from './newDeck';
 import { jaccard, normalizedWords, sameSlides, slideWords, WORDS_GUARD, type LineageSlide } from './sameSlide';
+import { isDeckPath } from './deckFileName';
 
 function project(files: Record<string, string>): DeckFiles {
   return {
-    async list() { return Object.keys(files).filter(path => path.endsWith('.deck.md')).map((path, index) => ({ path, modified: index })); },
+    async list() { return Object.keys(files).filter(path => isDeckPath(path)).map((path, index) => ({ path, modified: index })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text) { files[path] = text; },
   };

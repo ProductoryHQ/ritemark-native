@@ -17,7 +17,7 @@
 import type { Token, Tokens } from 'marked';
 import { isBlockSlide, parseDeck, slideDataOf } from '../deckFormat';
 import { quotedForAI, slideTitleLine, type CurrentSlideEntry, type SlideAtSend } from '../currentSlide';
-import { isDeckPath, splitFileName } from '../deckFileName';
+import { deckNameOf, isDeckPath } from '../deckFileName';
 import { isCurrentSlideId } from '../deckProtocol';
 import { slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { isCommentBlock, isRevealListToken, lexBlockSlide } from './slideRenderer';
@@ -321,11 +321,6 @@ export function slideCommentPlaces(displayPath: string, deckText: string, commen
     if (found) places.set(id, commentPlaceLine(found));
   }
   return places;
-}
-
-/** A deck's name from its path, as the library names it: the file's name without `.deck.md`, on any platform. */
-function deckNameOf(path: string): string {
-  return splitFileName(path.split(/[\\/]/).pop() ?? path).name;
 }
 
 /**

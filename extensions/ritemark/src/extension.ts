@@ -530,7 +530,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   // ── Decks (Sprint 157, experience 46) ───────────────────────────────────────
-  // A `.deck.md` opens as a deck in the Ritemark editor while the flag `decks` is on.
+  // A deck (`.rtms`, or an older `.deck.md`) opens as a deck in the Ritemark editor while the flag `decks` is on.
   decks = registerDecks(context, {
     newFileFolder: getNewDocumentFolder,
     noteNewFile: filePath => madeSomething.noteDraft(filePath),

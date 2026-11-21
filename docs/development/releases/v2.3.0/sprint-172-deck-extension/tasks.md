@@ -3,18 +3,18 @@
 Nothing starts until Jarmo approves the plan in his own words (shell-tier, and it changes his decisions 1 and 10). Then the sprint branch, before the first edit.
 
 ## PR 1: the one rule, every deck place, the agents (extension-tier)
-- [ ] Issue created in milestone v2.3.0, linked to #940
-- [ ] `deckFileName.ts`: `DECK_EXTENSION` `.rtms`, `LEGACY_DECK_EXTENSION`, `isDeckPath` for both, `deckNameOf`, `deckFileName`, `DECK_GLOB`, `splitFileName` (R1, R4, R5)
-- [ ] Every file in the audit's first table moved to the rule; the grep in `technical-plan.md` Workstream 1 finds only `deckFileName.ts` and comments
-- [ ] New → Deck, Home's Deck card, Make a copy and a new library topic make `.rtms` (R3)
-- [ ] `deckPublish.ts`: the deck beside a page may be `.rtms` or `.deck.md` (R4)
-- [ ] `package.json`: `*.rtms` in `ritemark.editor`'s selector, `.rtms` in the `markdown` language, the flag's words (R2, R6)
-- [ ] The icon theme: `rtms` → the deck icon, light and dark (R5)
-- [ ] The Markdown checks marked Yes in the audit's second table take `.rtms`; those marked No get a row that keeps it out (R7)
-- [ ] DECKS instructions, the deck tools' path check and words, `themeAi.ts`, `themeProtocol.ts` (R8)
-- [ ] Unit rows for each change; the old `.deck.md` tests unchanged and green
-- [ ] The demo project: seven decks renamed with their `from:` lines; `Copilot at work.deck.md` kept
-- [ ] Live proof in an isolated test window: scenarios 1–3, 5, 9–13 and 18–20; Claude and Codex with test keys only; shots under `proof/pr1/`
+- [ ] Issue created in milestone v2.3.0, linked to #940 (PR 1 refers to #940 itself, as the brief asked; no issue of its own)
+- [x] `deckFileName.ts`: `DECK_EXTENSION` `.rtms`, `LEGACY_DECK_EXTENSION`, `isDeckPath` for both, `deckNameOf`, `deckFileName`, `DECK_GLOB`, `splitFileName` (R1, R4, R5)
+- [x] Every file in the audit's first table moved to the rule; the grep in `technical-plan.md` Workstream 1 finds only `deckFileName.ts` and comments
+- [x] New → Deck, Home's Deck card, Make a copy and a new library topic make `.rtms` (R3)
+- [x] `deckPublish.ts`: the deck beside a page may be `.rtms` or `.deck.md` (R4)
+- [x] `package.json`: `*.rtms` in `ritemark.editor`'s selector, `.rtms` in the `markdown` language, the flag's words (R2, R6)
+- [x] The icon theme: `rtms` → the deck icon, light and dark (R5)
+- [x] The Markdown checks marked Yes in the audit's second table take `.rtms` (and Home's Last changed, which the audit missed: its file search is `RECENT_EXTENSIONS`); of those marked No, the task board has a row that keeps it out (R7)
+- [x] DECKS instructions, the deck tools' path check and words, `themeAi.ts`, `themeProtocol.ts` (R8)
+- [x] Unit rows for each change; the old `.deck.md` tests green, changed only where a new name is now `.rtms`
+- [x] The demo project: its decks renamed with their `from:` lines (six: the folder held seven decks, not eight); `Copilot at work.deck.md` kept
+- [ ] Live proof in an isolated test window: scenarios 1, 4, 5, 9, 12 and 14 (a writer's change to an open `.rtms`, the sync path an AI's write takes) done, shots under `proof/pr1/`; 18–20 (Claude and Codex) not run: the vault has no Anthropic or OpenAI test key (`governance/test-keys.md`: "Not made"), and a test window is never signed in
 - [ ] Risk and How to revert in the PR; Review record; the Experience lead's look at the shots; release-notes line; architecture.md row
 
 ## PR 2: the Mac's file type (shell-tier)

@@ -57,7 +57,7 @@ id: c004
 ```slide
 ---
 id: g001
-from: Slide library/Agents.deck.md#g1 @ssvkiv
+from: Slide library/Agents.rtms#g1 @ssvkiv
 ---
 # Why talk about agents?
 
@@ -71,7 +71,7 @@ Agents change who does the steps. You still decide what good looks like.
 ```slide
 ---
 id: a001
-from: Slide library/AI assistants.deck.md#a1 @j4kptu
+from: Slide library/AI assistants.rtms#a1 @j4kptu
 ---
 # An assistant's four parts
 
@@ -106,7 +106,7 @@ You are an assistant for the customer service team. Answer only from the files i
 ```slide
 ---
 id: a002
-from: Slide library/AI assistants.deck.md#a2 @62g062
+from: Slide library/AI assistants.rtms#a2 @62g062
 ---
 # Assistant or agent: which one?
 
@@ -165,7 +165,7 @@ id: c009
 ```slide
 ---
 id: g002
-from: Slide library/Agents.deck.md#g2 @3flaj0
+from: Slide library/Agents.rtms#g2 @3flaj0
 ---
 # A scheduled prompt, step by step
 
@@ -194,7 +194,7 @@ The first agent most people use is a prompt that runs on a schedule.
 ```slide
 ---
 id: d006
-from: Northwind/Data in Excel.deck.md#n1 @8wkbxg
+from: Northwind/Data in Excel.rtms#n1 @8wkbxg
 ---
 # Which tool for which data
 

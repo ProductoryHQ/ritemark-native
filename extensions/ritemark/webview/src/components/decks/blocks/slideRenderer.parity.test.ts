@@ -138,7 +138,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../../../../../../..')
 const deckFiles = [
   ...fs.readdirSync(path.join(root, 'docs/development/sprints/sprint-157-decks/demo-project'), { recursive: true, encoding: 'utf8' })
-    .filter(name => name.endsWith('.deck.md'))
+    .filter(name => /\.(rtms|deck\.md)$/.test(name)) // Sprint 172: the demo's decks are .rtms, but for one older .deck.md
     .map(name => path.join(root, 'docs/development/sprints/sprint-157-decks/demo-project', name)),
   ...['deck.md', 'deck-blocks.md', 'deck-mixed.md'].map(name => path.join(root, 'extensions/ritemark/webview/src/utils/fidelity-corpus/kept', name)),
 ]

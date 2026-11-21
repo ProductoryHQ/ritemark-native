@@ -1,5 +1,5 @@
 /**
- * Sprint 157 (experience 46): a `.deck.md` opened as a deck, as Jarmo sketched it on 14 November and the Experience
+ * Sprint 157 (experience 46): a deck (`.rtms`, or an older `.deck.md`) opened as a deck, as Jarmo sketched it on 14 November and the Experience
  * lead drew it: the deck's bar; numbered thumbnails on the left; one slide large in the middle; and on the right the
  * handout, the text of every slide in one column, a part per slide.
  *
@@ -49,6 +49,7 @@ import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from 
 import { transitionOf, transitionValue } from './present/wallMotion'
 import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
 import type { ThemeChangeView } from '../../../../src/decks/themeChange'
+import { deckNameOf } from '../../../../src/decks/deckFileName'
 import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
@@ -1923,7 +1924,7 @@ export function DeckView({
   const newTheme = useMemo(() => {
     const slide = slides.find(entry => entry.kind === 'boxes') ?? slides[1] ?? slides[0] ?? null
     return {
-      deckName: (filename ?? '').replace(/\.deck\.md$/i, '') || 'this deck',
+      deckName: deckNameOf(filename ?? '') || 'this deck',
       slide: slide ? { kind: slide.kind, data: slide.data } : null,
       assets,
     }

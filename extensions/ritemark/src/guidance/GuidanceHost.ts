@@ -807,7 +807,7 @@ export class GuidanceHost implements vscode.Disposable {
       listed.catch(() => this.counts.delete(key));
       this.counts.set(key, listed);
     }
-    // Sprint 159: with the `decks` flag on, a .deck.md counts as a deck. The flag is read at each draw from the
+    // Sprint 159: with the `decks` flag on, a .rtms (or older .deck.md) counts as a deck. The flag is read at each draw from the
     // names already listed, so turning it over never walks the folder again.
     const decks = isEnabled('decks');
     return listed.then((names) => countsLine(names.names, names.more, { decks }));
