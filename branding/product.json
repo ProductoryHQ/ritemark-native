@@ -227,6 +227,7 @@
     "git.ignoreMissingGitWarning": true,
     "workbench.editorAssociations": {
       "*.md": "ritemark.editor",
+      "*.rtms": "ritemark.editor",
       "*.markdown": "ritemark.editor",
       "*.csv": "ritemark.editor",
       "*.xlsx": "ritemark.excelViewer",
