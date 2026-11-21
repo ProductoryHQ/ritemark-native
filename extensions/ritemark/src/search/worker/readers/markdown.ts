@@ -7,14 +7,16 @@
  * comment's words, both a standalone `<!-- note -->` (without its `{id:…}`) and an
  * anchored `<mark data-comment="note">…</mark>`'s note, as a passage after its block.
  *
- * #936: in a deck, a slide's block is read as the slide's words, never as its file's markup: a v1 slide's title,
- * subtitle, boxes and rows (read with `slideDataOf`, the decks' own reader), a block slide's Markdown without its header
- * (`id:`, `picture:`), its `:::` lines and its `{…}` attributes. Each is a passage at the slide's block. A ```slide
- * block in any other document stays a code block.
+ * #936: in a deck, a slide's block (a top-level, closed ```slide block, as `parseDeck` reads one) is read as the
+ * slide's words, never as its file's markup. One reading for both kinds: a v1 slide becomes the Markdown its block
+ * slide would be (`legacyDataToBlocks`, how the deck converts it: its title, pill, number, boxes and rows), and a block
+ * slide's Markdown is read without its header (`id:`, `picture:`, `image:`), its `:::` lines and its `{…}`
+ * attributes. Each is a passage at the slide's block. A ```slide block in any other document stays a code block.
  */
 import { isLineBreakTag } from '../../../decks/blocks/lineBreakTag';
 import { CLOSE_FENCE, CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, parseFenceAttributes } from '../../../decks/blocks/fencedDiv';
-import { isBlockSlide, slideDataOf, slideKindOfInfo, type SlideData } from '../../../decks/deckFormat';
+import { isBlockSlide, isSlideKind, slideDataOf, slideKindOfInfo, type SlideData } from '../../../decks/deckFormat';
+import { legacyDataToBlocks } from '../../../decks/blocks/legacyToBlocks';
 import { marked } from 'marked';
 import { PassageSink, decodeEntities, type ReadOutcome } from './types';
 
@@ -71,12 +73,17 @@ function inlineText(tokens: Token[] | undefined, fallback: string | undefined, n
   return text;
 }
 
-/** A Pandoc attribute block, `{.label}`, `{align=center width=50%}`, a link's or a span's brackets before it. */
-const ATTRIBUTES = /(\[((?:\\.|[^\]\\])*)\](?!\())?(\{[^}\n]*\})/g;
+/**
+ * A Pandoc attribute block where Pandoc reads one: right after a bracketed span, a link or a picture (`[Exercise]{.label}`,
+ * `[Open](https://…){.button}`, `![Team](team.jpg){align=center}`), or ending a line (a heading's `{#id}`). A span's
+ * words are kept. An inline code span is skipped whole, so `{.x}` written as code stays.
+ */
+const HEADING_LINE = /^ {0,3}#{1,6}[ \t]/;
+const ATTRIBUTES = /(`+)[^`][\s\S]*?\1|(\[((?:\\.|[^\]\\])*)\](?!\())?(\{[^}\n]*\})/g;
 
 /**
  * A block slide's Markdown as words: its `:::` lines blank, and each `{…}` attribute block the fenced-div reader reads
- * taken out, a bracketed span's words kept (`[Exercise]{.label}` → `Exercise`). Code blocks inside stay as written.
+ * taken out (`ATTRIBUTES`). Code blocks inside stay as written.
  */
 export function slideMarkdownWords(markdown: string): string {
   let fence: { char: string; size: number } | null = null;
@@ -90,21 +97,27 @@ export function slideMarkdownWords(markdown: string): string {
     if (open) { fence = { char: open[1][0], size: open[1].length }; return line; }
     const bare = line.replace(/\r$/, '');
     if (OPEN_FENCE.test(bare) || CLOSE_FENCE.test(bare)) return '';
-    return line.replace(ATTRIBUTES, (whole, span: string | undefined, words: string | undefined, attrs: string) => {
-      if (!parseFenceAttributes(attrs)) return whole;
-      return span !== undefined ? (words ?? '') : '';
+    return line.replace(ATTRIBUTES, (whole: string, ticks: string | undefined, span: string | undefined, words: string | undefined, attrs: string | undefined, at: number) => {
+      if (ticks !== undefined || attrs === undefined || !parseFenceAttributes(attrs)) return whole;
+      if (span !== undefined) return words ?? '';
+      // After a link or a picture, or ending a heading's line; anywhere else braces are words.
+      const before = line[at - 1];
+      const headingEnd = HEADING_LINE.test(line) && !line.slice(at + whole.length).trim();
+      return before === ')' || before === ']' || headingEnd ? '' : whole;
     });
   }).join('\n');
 }
 
-/** A v1 slide's words, in the order the slide draws them: its title, subtitle, pill, each box's heading and text, each row. */
-function v1SlideWords(data: SlideData): string[] {
-  return [
-    data.title, data.subtitle, data.tag,
-    ...(data.items ?? []).map((item) => [item.heading, item.text].filter(Boolean).join(' ')),
-    ...(data.rows ?? []).map((row) => row.map((cell) => cell.trim()).join(' · ')),
-  ].filter((words): words is string => !!words);
+/** A slide block's Markdown: a block slide's own, a v1 slide's as the deck converts it; null for a kind this build doesn't know. */
+function slideMarkdown(kind: string, body: string): string | null {
+  const data: SlideData = slideDataOf(kind, body);
+  if (isBlockSlide(kind)) return data.markdown ?? '';
+  if (isSlideKind(kind)) return legacyDataToBlocks(kind, data).markdown;
+  return null;
 }
+
+/** A closed fence: its raw text ends with a fence line (an unclosed one runs to the end and is no slide, as `parseDeck` says). */
+const CLOSED_FENCE = /\n {0,3}(`{3,}|~{3,})[ \t]*\n*$/;
 
 function lex(text: string): Token[] {
   return marked.lexer(text, { gfm: true }) as unknown as Token[];
@@ -120,7 +133,7 @@ export function readMarkdown(source: string, budget: number, options: { deck?: b
     return { ok: false, reason: 'unreadable' };
   }
   const sink = new PassageSink(budget);
-  const walk = (list: Token[], block: () => number) => {
+  const walk = (list: Token[], block: () => number, top = false) => {
     for (const token of list) {
       if (sink.full) return;
       const at = { block: block() };
@@ -132,19 +145,16 @@ export function readMarkdown(source: string, budget: number, options: { deck?: b
           sink.add(inlineText(token.tokens, token.text, notes), at);
           break;
         case 'code': {
-          const kind = options.deck ? slideKindOfInfo(token.lang ?? '') : null;
-          if (kind === null) {
+          // Only a top-level, closed ```slide block in a deck is a slide (`parseDeck`'s rule).
+          const kind = options.deck && top && CLOSED_FENCE.test(token.raw ?? '') ? slideKindOfInfo(token.lang ?? '') : null;
+          const markdown = kind === null ? null : slideMarkdown(kind, token.text ?? '');
+          if (markdown === null) {
             sink.add(token.text ?? '', at);
-            break;
-          }
-          const data = slideDataOf(kind, token.text ?? '');
-          if (!isBlockSlide(kind)) {
-            for (const words of v1SlideWords(data)) sink.add(words, at);
             break;
           }
           let inner: Token[];
           try {
-            inner = lex(slideMarkdownWords(data.markdown ?? ''));
+            inner = lex(slideMarkdownWords(markdown));
           } catch {
             break;
           }
@@ -181,6 +191,6 @@ export function readMarkdown(source: string, budget: number, options: { deck?: b
     }
   };
   let next = 0;
-  walk(tokens, () => next++);
+  walk(tokens, () => next++, true);
   return { ok: true, passages: sink.passages, truncated: sink.truncated };
 }

@@ -136,7 +136,7 @@ async function main() {
       '  - [Data, In the chat]',
       '```',
       '',
-      '```slide',
+      '````slide',
       '---',
       'id: s2',
       'picture: right',
@@ -159,9 +159,24 @@ async function main() {
       '::::',
       '',
       '```js',
-      '::: kept in code',
+      '::: kept {.x} in code',
       '```',
+      '',
+      'Use `{.x}` as code; set {width=3} here.',
+      '````',
+      '',
+      '```slide exercise',
+      'title: Do it',
       '```',
+      '',
+      '```slide section',
+      'title: Part',
+      'number: "2"',
+      '```',
+      '',
+      '> ```slide',
+      '> # Quoted example',
+      '> ```',
     ].join('\n');
     const outcome = await readDocument('markdown', new TextEncoder().encode(deck), BUDGET, pause, 'Talks/Kickoff.deck.md');
     assert.ok(outcome.ok);
@@ -169,18 +184,27 @@ async function main() {
       'Kickoff', 'Harbour, 2027',
       'Say hello first.',
       'Kickoff', 'The handout text.',
-      'Three steps', 'Plan Pick the route', 'Data · In the chat',
+      // A v1 slide reads as the deck converts it: its boxes' words, not the rows a Boxes slide never draws.
+      'Three steps', 'Plan', 'Pick the route',
       'Exercise · 1', 'Our team', 'Copilot', 'Documents and mail', 'Read the sample',
-      '::: kept in code',
+      // Code (a block, a span) keeps its braces and colons; braces that aren't an attribute's place stay words.
+      '::: kept {.x} in code', 'Use {.x} as code; set {width=3} here.',
+      // What the slide draws: the default Exercise pill, a section's number.
+      'Exercise', 'Do it', '2', 'Part',
+      // A slide block inside a quote is no slide (`parseDeck` reads top-level blocks only): it stays code.
+      '# Quoted example',
     ]);
     const joined = texts(outcome).join(' ');
-    for (const hidden of ['id:', 'title:', 's0', 's2', 'picture', 'hidden', 'arrows', 'map', 'columns', '{', '}', 'width', 'align', '.label', '.button']) {
+    for (const hidden of ['id:', 'title:', 's0', 's2', 'picture', 'hidden', 'arrows', 'map', 'columns', 'Data', '{#team}', 'width=40', 'align', '.label', '.button']) {
       assert.ok(!joined.includes(hidden), `a deck's passages hold no "${hidden}": ${joined}`);
     }
     // Each slide's words are at its own block, so a match opens at its slide.
     const blocks = outcome.ok ? outcome.passages.map((p) => p.at.block) : [];
     assert.equal(blocks[0], blocks[1], "a slide's title and subtitle are one block");
-    assert.equal(new Set(blocks.slice(8, 13)).size, 1, "a block slide's words are its block's");
+    assert.equal(new Set(blocks.slice(8, 15)).size, 1, "a block slide's words are its block's");
+    // An unclosed slide block is no slide (`parseDeck`): it stays the code it is.
+    const unclosed = readMarkdown('```slide\n---\nid: s9\n---\n# Open end', BUDGET, { deck: true });
+    assert.deepEqual(texts(unclosed), ['--- id: s9 --- # Open end']);
     // A ```slide block in any other document stays the code it is: an ordinary document's passages don't change.
     const ordinary = await readDocument('markdown', new TextEncoder().encode(deck), BUDGET, pause, 'Notes/About decks.md');
     assert.deepEqual(texts(ordinary), texts(readMarkdown(deck, BUDGET)));
