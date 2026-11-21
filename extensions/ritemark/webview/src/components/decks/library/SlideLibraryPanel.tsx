@@ -354,7 +354,7 @@ export function SlideLibraryPanel() {
    * A slide's tile: its thumbnail, title and menu. In a search (Sprint 165 PR 3) also its place and "also in N older
    * decks"; anywhere, the tick when its copy is already in the open deck.
    */
-  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string; also: string | null }; note?: string }) => {
+  const tile = (deck: LibraryDeck, slide: LibrarySlide, options: { numbered: boolean; named?: boolean; hit?: { place: string; where: string; meta: string[]; also: string | null }; note?: string }) => {
     // A Decks group's tile (#877) and an offered one (PR 4) are keyed apart: the same slide can be under its deck too.
     const key = `${options.named ? 'decks:' : options.note ? 'offer:' : ''}${deck.path}#${slide.id ?? slide.index}`
     const title = titleOf(slide)
@@ -381,9 +381,9 @@ export function SlideLibraryPanel() {
                 ) : null}
               </span>
               <span className="deck-lib-title">{number}{title}</span>
-              {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks" never are. */}
+              {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks", each a line of its own (#935), never are. */}
               {hit ? <span className="deck-lib-place">{hit.where}</span> : null}
-              {hit?.meta ? <span className="deck-lib-also">{hit.meta}</span> : null}
+              {hit?.meta.map((line) => <span key={line} className="deck-lib-also deck-lib-meta">{line}</span>)}
               {options.note ? <span className="deck-lib-also">{options.note}</span> : null}
             </button>
           </DropdownMenuTrigger>
@@ -557,7 +557,6 @@ export function SlideLibraryPanel() {
           ))}
         </div>
         {total > shown.length ? <p className="deck-lib-none">More words find fewer slides.</p> : null}
-        <p className="deck-lib-hint">A slide that is in several decks shows once, at its newest. A tick says it's already in the open deck.</p>
       </>
     )
   }
