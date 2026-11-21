@@ -210,7 +210,7 @@ test('an update clears the previous version\'s app code before installing (Sprin
 });
 
 test('every install registers the deck file type, .rtms, with its icon (Sprint 172, #940)', async () => {
-  const installerScript = await readFile(installerScriptPath, 'utf8');
+  const installerScript = (await readFile(installerScriptPath, 'utf8')).replace(/\r\n/g, '\n');
   const section = (name) => {
     const start = installerScript.indexOf(`\n[${name}]\n`);
     assert.ok(start >= 0, `[${name}] exists`);
@@ -227,11 +227,13 @@ test('every install registers the deck file type, .rtms, with its icon (Sprint 1
 
   const registry = section('Registry');
   const deckLines = registry.split('\n').filter((line) => /rtms/.test(line) && line.startsWith('Root:'));
+  // HKA: the current user's classes, or every user's in an "Install for all users" install.
   assert.deepEqual(deckLines, [
-    'Root: HKCU; Subkey: "Software\\Classes\\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty',
-    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey',
-    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\resources\\deck.ico"',
-    'Root: HKCU; Subkey: "Software\\Classes\\Ritemark.rtms\\shell\\open\\command"; ValueType: string; ValueName: ""; ValueData: """{app}\\{#AppExeName}"" ""%1"""',
+    'Root: HKA; Subkey: "Software\\Classes\\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty',
+    'Root: HKA; Subkey: "Software\\Classes\\.rtms\\OpenWithProgids"; ValueType: string; ValueName: "Ritemark.rtms"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty',
+    'Root: HKA; Subkey: "Software\\Classes\\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey',
+    'Root: HKA; Subkey: "Software\\Classes\\Ritemark.rtms\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\resources\\deck.ico"',
+    'Root: HKA; Subkey: "Software\\Classes\\Ritemark.rtms\\shell\\open\\command"; ValueType: string; ValueName: ""; ValueData: """{app}\\{#AppExeName}"" ""%1"""',
   ]);
   for (const line of deckLines) {
     assert.doesNotMatch(line, /Tasks:|Check:/, 'Ritemark owns .rtms: it is never behind the unchecked .md task');
@@ -261,26 +263,41 @@ test('every install registers the deck file type, .rtms, with its icon (Sprint 1
 });
 
 test('the install round trip checks the deck file type both ways (Sprint 172, #940)', async () => {
-  const [registryProbe, roundtrip, canaryWorkflow] = await Promise.all([
+  const normalized = (text) => text.replace(/\r\n/g, '\n');
+  const [registryProbe, roundtrip, canaryWorkflow] = (await Promise.all([
     readFile(registryProbePath, 'utf8'),
     readFile(roundtripPath, 'utf8'),
     readFile(canaryWorkflowPath, 'utf8'),
-  ]);
+  ])).map(normalized);
 
   assert.match(roundtrip, /RITEMARK_CI_INSTALL_ROOT = \$installRoot/, 'the round trip names the install folder');
   assert.doesNotMatch(canaryWorkflow, /RITEMARK_CI_INSTALL_ROOT/, 'the canary\'s synthetic registration has no install to check');
   assert.match(registryProbe, /\$installRoot = \$env:RITEMARK_CI_INSTALL_ROOT/);
+  assert.match(registryProbe, /\$deckFileType = if \(\[string\]::IsNullOrWhiteSpace\(\$installRoot\)\) \{ \$null \}/);
   assert.match(registryProbe, /'HKCU:\\Software\\Classes\\\.rtms'/);
   assert.match(registryProbe, /'HKCU:\\Software\\Classes\\Ritemark\.rtms'/);
+
+  // D1: the harness may move ahead of a product source. Every installer from
+  // 2.3.0 on must register the type; an earlier one (a canary replay of a
+  // preserved installer) is checked only if it wrote the keys.
+  assert.match(registryProbe, /\$deckFileTypeSince = \[version\]'2\.3\.0'/);
+  assert.match(registryProbe, /\$deckFileTypeRequired = \[version\][^\n]+-ge \$deckFileTypeSince/);
+  assert.match(
+    registryProbe,
+    /if \(\$mode -eq 'verify-installed' -and -not \$deckFileTypeRequired -and -not \$written\) \{\n\s+Write-Host "The deck file type is not checked/,
+  );
+
   assert.match(registryProbe, /\$deckFileType\.ProgId -ne 'Ritemark\.rtms'/);
+  assert.match(registryProbe, /-not \$deckFileType\.InOpenWith/);
   assert.match(registryProbe, /\$deckFileType\.Name -ne 'Ritemark Deck'/);
   assert.match(registryProbe, /\$expectedIcon = "\$root\\resources\\deck\.ico"/);
   assert.match(registryProbe, /-not \$deckFileType\.IconFileExists/, 'the icon file itself is installed');
   assert.match(registryProbe, /\$expectedCommand = '"' \+ "\$root\\Ritemark\.exe" \+ '" "%1"'/);
+  assert.match(registryProbe, /\$written = \$deckFileType\.ExtensionKey -or \$deckFileType\.ProgIdKey/);
   assert.match(
     registryProbe,
-    /\$mode -eq 'verify-uninstalled'\) \{\n\s+if \(\$deckFileType\.ExtensionKey -or \$deckFileType\.ProgIdKey\)/,
-    'after uninstall neither key is left',
+    /if \(\$mode -eq 'verify-uninstalled'\) \{\n\s+if \(\$written\) \{\n\s+throw "Uninstall left the deck file type behind/,
+    'after any uninstall neither key is left, whatever the version',
   );
   assert.match(registryProbe, /DeckFileType = \$deckFileType/, 'the evidence JSON records what was found');
 });

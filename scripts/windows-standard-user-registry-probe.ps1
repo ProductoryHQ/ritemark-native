@@ -16,6 +16,15 @@ $canaryKey = Join-Path $uninstallRoot 'RitemarkCiCanary'
 $installRoot = $env:RITEMARK_CI_INSTALL_ROOT
 $deckExtensionKey = 'HKCU:\Software\Classes\.rtms'
 $deckProgIdKey = 'HKCU:\Software\Classes\Ritemark.rtms'
+# Every installer from 2.3.0 on must register it. An earlier one (a preserved
+# installer replayed by the canary, or a build before the release's version
+# bump) is checked only if it wrote the keys; the harness may move ahead of a
+# product source without failing it (D1). After any uninstall, nothing is left.
+$deckFileTypeSince = [version]'2.3.0'
+$deckFileTypeRequired = $false
+if ($expectedVersion -match '^(\d+)\.(\d+)\.(\d+)') {
+  $deckFileTypeRequired = [version]"$($Matches[1]).$($Matches[2]).$($Matches[3])" -ge $deckFileTypeSince
+}
 
 if ([string]::IsNullOrWhiteSpace($resultPath)) {
   throw 'RITEMARK_CI_REGISTRY_RESULT is required.'
@@ -45,10 +54,13 @@ function Get-DefaultRegistryValue([string]$path) {
 
 function Get-DeckFileType {
   $icon = Get-DefaultRegistryValue "$deckProgIdKey\DefaultIcon"
+  $openWith = "$deckExtensionKey\OpenWithProgids"
   return [ordered]@{
     ExtensionKey = Test-Path -LiteralPath $deckExtensionKey
     ProgIdKey = Test-Path -LiteralPath $deckProgIdKey
     ProgId = Get-DefaultRegistryValue $deckExtensionKey
+    InOpenWith = (Test-Path -LiteralPath $openWith) -and
+      (@((Get-Item -LiteralPath $openWith -ErrorAction Stop).GetValueNames()) -contains 'Ritemark.rtms')
     Name = Get-DefaultRegistryValue $deckProgIdKey
     Icon = $icon
     IconFileExists = (-not [string]::IsNullOrWhiteSpace($icon)) -and (Test-Path -LiteralPath $icon -PathType Leaf)
@@ -108,11 +120,17 @@ if ($mode -eq 'verify-uninstalled' -and $registrations.Count -ne 0) {
 
 if ($null -ne $deckFileType) {
   $root = $installRoot.TrimEnd('\')
-  if ($mode -eq 'verify-installed') {
+  $written = $deckFileType.ExtensionKey -or $deckFileType.ProgIdKey
+  if ($mode -eq 'verify-installed' -and -not $deckFileTypeRequired -and -not $written) {
+    Write-Host "The deck file type is not checked: this $expectedVersion installer predates it ($deckFileTypeSince) and wrote no .rtms keys."
+  } elseif ($mode -eq 'verify-installed') {
     $expectedIcon = "$root\resources\deck.ico"
     $expectedCommand = '"' + "$root\Ritemark.exe" + '" "%1"'
     if ($deckFileType.ProgId -ne 'Ritemark.rtms') {
       throw "HKCU .rtms names '$($deckFileType.ProgId)', expected 'Ritemark.rtms'."
+    }
+    if (-not $deckFileType.InOpenWith) {
+      throw "HKCU .rtms\OpenWithProgids does not list Ritemark.rtms."
     }
     if ($deckFileType.Name -ne 'Ritemark Deck') {
       throw "Ritemark.rtms is named '$($deckFileType.Name)', expected 'Ritemark Deck'."
@@ -126,7 +144,7 @@ if ($null -ne $deckFileType) {
     Write-Host "The deck file type is registered: .rtms -> Ritemark.rtms 'Ritemark Deck', icon $expectedIcon, open $expectedCommand"
   }
   if ($mode -eq 'verify-uninstalled') {
-    if ($deckFileType.ExtensionKey -or $deckFileType.ProgIdKey) {
+    if ($written) {
       throw "Uninstall left the deck file type behind (.rtms key: $($deckFileType.ExtensionKey), Ritemark.rtms key: $($deckFileType.ProgIdKey))."
     }
     Write-Host 'The deck file type is gone: no .rtms or Ritemark.rtms key for the current user.'

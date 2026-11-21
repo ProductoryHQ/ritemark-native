@@ -154,12 +154,16 @@ Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: 
 ; A deck, <name>.rtms, is Ritemark's own file type (Sprint 172, #940), so it is
 ; registered on every install, not behind the unchecked .md task above, and
 ; removed on uninstall. Explorer names it "Ritemark Deck", draws the deck icon
-; and opens it in Ritemark. scripts\windows-standard-user-registry-probe.ps1
-; checks these keys after install and their absence after uninstall.
-Root: HKCU; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty
-Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey
-Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\deck.ico"
-Root: HKCU; Subkey: "Software\Classes\Ritemark.rtms\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+; and opens it in Ritemark; OpenWithProgids keeps Ritemark in Open with if
+; another app takes the type later. HKA follows the install mode: the current
+; user's classes, or every user's when "Install for all users" is chosen.
+; scripts\windows-standard-user-registry-probe.ps1 checks these keys after
+; install and their absence after uninstall.
+Root: HKA; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKA; Subkey: "Software\Classes\.rtms\OpenWithProgids"; ValueType: string; ValueName: "Ritemark.rtms"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty
+Root: HKA; Subkey: "Software\Classes\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\Ritemark.rtms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\deck.ico"
+Root: HKA; Subkey: "Software\Classes\Ritemark.rtms\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
 
 ; Add to PATH
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')
