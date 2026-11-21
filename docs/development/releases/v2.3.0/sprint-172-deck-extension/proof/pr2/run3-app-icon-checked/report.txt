@@ -1,0 +1,39 @@
+macOS Version 26.7.2 (Build 25G332)
+
+== The type for the extension rtms
+  identifier: ai.productory.ritemark.deck
+  description: Ritemark Deck
+  declared: true, dynamic: false
+  conforms to public.plain-text: true
+  [PASS] UTType for rtms is ai.productory.ritemark.deck
+  [PASS] its description is "Ritemark Deck"
+  [PASS] it conforms to public.plain-text
+
+== The file Day one.rtms
+  Finder's kind (localizedTypeDescription): Ritemark Deck
+  content type: ai.productory.ritemark.deck
+  [PASS] the file's kind is "Ritemark Deck"
+  opens with: /Applications/Ritemark.app (ai.productory.ritemark)
+  [PASS] a double-click opens Ritemark (ai.productory.ritemark)
+
+== The drawn icons
+  wrote rtms-icon-512.png (512 px)
+  wrote rtms-icon-128.png (128 px)
+  wrote rtms-icon-64.png (64 px)
+  wrote rtms-icon-32.png (32 px)
+  wrote uti-icon-512.png (512 px)
+  wrote md-icon-512.png (512 px)
+  wrote plain-text-icon-512.png (512 px)
+  badge-coloured (#4338ca) pixels: 11268 at 512 px, 22 at 32 px
+  [PASS] the deck's page carries the badge at 512 px
+  [PASS] the deck's page carries the badge at 32 px
+
+== The app's own icon (the badge's Assets.car must not change it)
+  wrote app-icon-256.png (256 px)
+  wrote app-icon-unstamped-256.png (256 px)
+  wrote app-icon-generic-256.png (256 px)
+  mean difference from the unstamped twin: 0.00; from the generic app icon: 74.86
+  [PASS] the stamped app shows its own icon, not the generic one
+  [PASS] the stamped app's icon looks as the unstamped twin's
+
+RESULT: all checks passed

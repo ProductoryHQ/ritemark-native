@@ -1,0 +1,46 @@
+Imported '/Users/runner/work/ritemark-native/ritemark-native/deck-proof-files/Day one.rtms' of type 'ai.productory.ritemark.deck' with plugIn /System/Library/Spotlight/RichText.mdimporter.
+29 attributes returned
+{
+    ":MD:DeviceId" = 16777231;
+    ":MD:kMDItemPath" = "/Users/runner/work/ritemark-native/ritemark-native/deck-proof-files/Day one.rtms";
+    "_kMDItemContentChangeDate" = "2026-11-21 14:39:45 +0000";
+    "_kMDItemCreationDate" = "2026-11-21 14:39:45 +0000";
+    "_kMDItemCreatorCode" = 0;
+    "_kMDItemDisplayNameWithExtensions" =     {
+        "" = "Day one.rtms";
+    };
+    "_kMDItemFileName" = "Day one.rtms";
+    "_kMDItemFinderFlags" = 0;
+    "_kMDItemFinderLabel" = 0;
+    "_kMDItemFromImporter" = 1;
+    "_kMDItemIsEvictedFile" = "<null>";
+    "_kMDItemIsExtensionHidden" = 0;
+    "_kMDItemIsFromImporter" = 1;
+    "_kMDItemOwnerGroupID" = 20;
+    "_kMDItemOwnerUserID" = 501;
+    "_kMDItemTextEncodingHint" = 134217984;
+    "_kMDItemTypeCode" = 0;
+    "com_apple_metadata_modtime" = "816964785.5508711";
+    kMDItemContentCreationDate = "2026-11-21 14:39:45 +0000";
+    kMDItemContentModificationDate = "2026-11-21 14:39:45 +0000";
+    kMDItemContentType = "ai.productory.ritemark.deck";
+    kMDItemContentTypeTree =     (
+        "ai.productory.ritemark.deck",
+        "public.plain-text",
+        "public.text",
+        "public.data",
+        "public.item",
+        "public.content"
+    );
+    kMDItemDateAdded = "2026-11-21 14:39:45 +0000";
+    kMDItemDisplayName =     {
+        "" = "Day one.rtms";
+    };
+    kMDItemDocumentIdentifier = 0;
+    kMDItemKind =     {
+        "" = "Ritemark Deck";
+    };
+    kMDItemLogicalSize = 167;
+    kMDItemPhysicalSize = 4096;
+    kMDItemTextContent = "---\ntitle: Day one\n---\n\n# Welcome to the workshop\n\nBring a question you care about.\n\n---\n\n# The agenda\n\n- Morning: the customer interview\n- Afternoon: the journey map\n";
+}

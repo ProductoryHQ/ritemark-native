@@ -19,16 +19,6 @@ name: Deck file type proof (macOS)
 
 on:
   workflow_dispatch:
-  # Sprint 172 PR 2 only: a workflow_dispatch workflow can be dispatched only
-  # once it is on the default branch, so the first proof runs on pushes to the
-  # PR's branch. Removed before the PR merges.
-  push:
-    branches: [sprint-172-deck-extension-pr2]
-    paths:
-      - .github/workflows/deck-type-proof.yml
-      - scripts/qa/deck-type-proof.swift
-      - scripts/stamp-deck-document-type.sh
-      - branding/icons/deck-badge.car
 
 permissions:
   contents: read
