@@ -41,7 +41,7 @@ import type { DeckHostMessage, DeckPageState, DeckPdfKind } from './deckProtocol
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
-import { deckFileName, LEGACY_DECK_EXTENSION } from './deckFileName';
+import { DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
 const CHANGED_MS = 800;
@@ -417,29 +417,24 @@ export class DeckPublisher implements vscode.Disposable {
     const name = path.basename(pagePath, '.html');
     if (name === '') return undefined;
     try {
-      const besidePath = await this.deckBeside(path.join(path.dirname(pagePath), name));
       const meta = readPageMeta(await readHead(pagePath));
       if (!meta.ritemark || !meta.digest) return undefined;
       const registered = this.written.get(normalizeForCompare(pagePath));
       if (registered?.digest === meta.digest) return registered.rows;
-      const open = await this.openDocumentAt(besidePath);
-      const deckPath = open ? open.uri.fsPath : besidePath;
-      const text = open ? open.getText() : await fs.promises.readFile(deckPath, 'utf8');
-      const now = await this.pageNow(deckPath, text);
-      if (await pageReadsChanged(meta.digest, now)) return undefined;
-      return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
+      // Sprint 172: the deck beside is `<name>.rtms` or an older `<name>.deck.md`; should both be there, the one this
+      // page reads as made from (review of #949).
+      const base = path.join(path.dirname(pagePath), name);
+      for (const besidePath of [`${base}${DECK_EXTENSION}`, `${base}${LEGACY_DECK_EXTENSION}`]) {
+        const open = await this.openDocumentAt(besidePath);
+        const text = open ? open.getText() : await fs.promises.readFile(besidePath, 'utf8').catch(() => null);
+        if (text === null) continue;
+        const now = await this.pageNow(open ? open.uri.fsPath : besidePath, text);
+        if (!(await pageReadsChanged(meta.digest, now))) return deckSheetRows(deckCounts(text, now.theme, now.fonts, !!now.logo));
+      }
+      return undefined;
     } catch {
       return undefined;
     }
-  }
-
-  /** Sprint 172: the deck a page at `<base>.html` is beside: `<base>.rtms`, else an older `<base>.deck.md`, open or on disk. */
-  private async deckBeside(base: string): Promise<string> {
-    const candidates = [`${path.dirname(base)}${path.sep}${deckFileName(path.basename(base))}`, `${base}${LEGACY_DECK_EXTENSION}`];
-    for (const candidate of candidates) {
-      if ((await this.openDocumentAt(candidate)) || (await fs.promises.stat(candidate).then(stat => stat.isFile(), () => false))) return candidate;
-    }
-    return candidates[0];
   }
 
   /** The deck at `deckPath` if it is open (by real path, so a link or another spelling of its folder finds it). */

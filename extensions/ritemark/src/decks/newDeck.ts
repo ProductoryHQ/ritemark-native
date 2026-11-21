@@ -16,7 +16,7 @@ import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
 import { folderOf, newTopicText, partText, rebasePath, rebaseSlide, rewriteMarkdownTargets } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
-import { deckFileName, deckNameOf } from './deckFileName';
+import { deckFileName, deckNameOf, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 /** The words an empty deck's title slide starts with, selected so they are typed over (its part shows no heading of them). */
 export { EMPTY_DECK_TITLE };
@@ -31,21 +31,29 @@ export function emptyDeckText(random: () => number = Math.random): string {
 export { deckNameOf };
 
 /**
+ * Review of #949: a deck's name is taken when a deck of either ending has it, so a new `Untitled.rtms` is never made
+ * beside a 2.2 `Untitled.deck.md`: both would be "Untitled" in every list, and both would publish to `Untitled.html`.
+ */
+function nameTaken(name: string, taken: (fileName: string) => boolean): boolean {
+  return taken(deckFileName(name)) || taken(`${name}${LEGACY_DECK_EXTENSION}`);
+}
+
+/**
  * The copy's file name: "<name> (copy).rtms", then "<name> (copy 2).rtms" and on, the first that is free. A copy is a
  * new file, so a copy of an old `.deck.md` is `.rtms` too (Sprint 172, the Experience lead's answer).
  */
 export function copyFileName(name: string, taken: (fileName: string) => boolean): string {
   for (let index = 1; ; index++) {
-    const fileName = deckFileName(`${name} (${index === 1 ? 'copy' : `copy ${index}`})`);
-    if (!taken(fileName)) return fileName;
+    const copyName = `${name} (${index === 1 ? 'copy' : `copy ${index}`})`;
+    if (!nameTaken(copyName, taken)) return deckFileName(copyName);
   }
 }
 
 /** An empty deck's file name: "Untitled.rtms", then "Untitled 2.rtms" and on, the first that is free. */
 export function emptyFileName(taken: (fileName: string) => boolean): string {
   for (let index = 1; ; index++) {
-    const fileName = deckFileName(index === 1 ? 'Untitled' : `Untitled ${index}`);
-    if (!taken(fileName)) return fileName;
+    const emptyName = index === 1 ? 'Untitled' : `Untitled ${index}`;
+    if (!nameTaken(emptyName, taken)) return deckFileName(emptyName);
   }
 }
 

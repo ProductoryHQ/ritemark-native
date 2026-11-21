@@ -21,6 +21,7 @@ const tools = require('./ritemarkTools') as typeof import('./ritemarkTools');
 const { RitemarkToolsInjector } = require('./RitemarkToolsInjector') as typeof import('./RitemarkToolsInjector');
 import type { BoardController } from '../taskBoard/BoardController';
 import type { BoardAnswer, BoardCardView, BoardSnapshot } from '../taskBoard/protocol';
+import { isDeckPath } from '../decks/deckFileName';
 
 const {
   BOARD_TOOL_GROUP,
@@ -419,7 +420,7 @@ async function main(): Promise<void> {
       'notes.md': 'not a deck',
     };
     const library = new DeckLibrary({
-      async list() { return Object.keys(files).filter((path) => /\.(rtms|deck\.md)$/i.test(path)).map((path) => ({ path, modified: 0 })); },
+      async list() { return Object.keys(files).filter((path) => isDeckPath(path)).map((path) => ({ path, modified: 0 })); },
       async read(path) { return files[path] ?? null; },
       async write(path, text) { files[path] = text; },
     });
@@ -565,7 +566,7 @@ async function main(): Promise<void> {
       'Clients/Beta.deck.md': ['---\ndeck: 2\n---\n', ...own('Beta')].join('\n'),
     };
     const library = new DeckLibrary({
-      async list() { return Object.keys(files).filter((path) => /\.(rtms|deck\.md)$/i.test(path)).map((path, index) => ({ path, modified: index + 1 })); },
+      async list() { return Object.keys(files).filter((path) => isDeckPath(path)).map((path, index) => ({ path, modified: index + 1 })); },
       async read(path) { return files[path] ?? null; },
       async write(path, text) { files[path] = text; },
     });

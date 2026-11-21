@@ -25,7 +25,8 @@ async function main(): Promise<void> {
 // Names: the copy's "(copy)", then "(copy 2)"; an empty deck's "Untitled"; a deck's name from its path.
 {
   // Sprint 172: new names end `.rtms`; a copy of an old `.deck.md` is a new file, so `.rtms` too
-  const taken = new Set(['Training (copy).rtms', 'Untitled.rtms', 'Untitled 2.rtms', 'Old (copy).deck.md']);
+  // A name an older `.deck.md` has is taken too (review of #949): never two decks of one name, one page
+  const taken = new Set(['Training (copy).rtms', 'Untitled.rtms', 'Untitled 2.rtms', 'Old (copy).deck.md', 'Untitled 3.deck.md']);
   assert.deepEqual({
     copy: copyFileName('Workshop', name => taken.has(name)),
     copyTaken: copyFileName('Training', name => taken.has(name)),
@@ -37,8 +38,8 @@ async function main(): Promise<void> {
   }, {
     copy: 'Workshop (copy).rtms',
     copyTaken: 'Training (copy 2).rtms',
-    empty: 'Untitled 3.rtms',
-    copyOld: 'Old (copy).rtms',
+    empty: 'Untitled 4.rtms',
+    copyOld: 'Old (copy 2).rtms',
     name: 'AI assistants and agents',
     nameUpper: 'Top',
     nameNew: 'Day one',

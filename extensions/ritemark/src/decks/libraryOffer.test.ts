@@ -15,6 +15,7 @@ import {
   type LibraryOffer,
 } from './libraryOffer';
 import { copiedDeckText } from './newDeck';
+import { isDeckPath } from './deckFileName';
 
 /**
  * An in-memory project whose files' times the test sets. `remove` as the Trash does; a folder is there while a file is
@@ -29,7 +30,7 @@ function project(files: Record<string, string>, times: Record<string, number>, e
       if (holds(folder)) throw new Error('not empty');
       emptyFolders.delete(folder);
     },
-    async list() { return Object.keys(files).filter(path => /\.(rtms|deck\.md)$/i.test(path)).map(path => ({ path, modified: times[path] ?? 1 })); },
+    async list() { return Object.keys(files).filter(path => isDeckPath(path)).map(path => ({ path, modified: times[path] ?? 1 })); },
     async read(path) { return files[path] ?? null; },
     async write(path, text, options) {
       if (options?.create && path in files) throw new Error('exists');
