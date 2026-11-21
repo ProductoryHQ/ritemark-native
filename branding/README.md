@@ -32,3 +32,28 @@ cp icon.png icon.iconset/icon_512x512@2x.png
 iconutil -c icns icon.iconset
 rm -rf icon.iconset
 ```
+
+## The deck badge (`.rtms` in Finder)
+
+A deck file (`.rtms`) is drawn by macOS as its own document page with a badge and the word DECK. The release build's `Info.plist` names the badge (`UTTypeIconBadgeName` `deck-badge`), and `scripts/stamp-deck-document-type.sh` copies its asset catalog into the app as `Contents/Resources/Assets.car`. macOS finds the badge only in an asset catalog, not in an `.icns` file (Sprint 172's runner proof, `.github/workflows/deck-type-proof.yml`).
+
+- `icons/deck-badge.svg` - the source: Phosphor's `presentation` glyph, bold, in #4338ca, on a transparent ground
+- `icons/deck-badge.car` - the compiled asset catalog, with one icon set named `deck-badge`
+
+To regenerate `deck-badge.car` from the SVG (needs `rsvg-convert` from librsvg and Xcode's `actool`):
+
+```bash
+cd branding/icons
+BUILD="$(mktemp -d)"
+mkdir -p "$BUILD/deck-badge.xcassets/deck-badge.iconset" "$BUILD/out"
+printf '{"info":{"version":1,"author":"xcode"}}\n' > "$BUILD/deck-badge.xcassets/Contents.json"
+for s in 16 32 128 256 512; do
+  rsvg-convert -w $s -h $s deck-badge.svg -o "$BUILD/deck-badge.xcassets/deck-badge.iconset/icon_${s}x${s}.png"
+  rsvg-convert -w $((s*2)) -h $((s*2)) deck-badge.svg -o "$BUILD/deck-badge.xcassets/deck-badge.iconset/icon_${s}x${s}@2x.png"
+done
+xcrun actool "$BUILD/deck-badge.xcassets" --compile "$BUILD/out" --platform macosx --minimum-deployment-target 12.0
+cp "$BUILD/out/Assets.car" deck-badge.car
+rm -rf "$BUILD"
+```
+
+Then run `scripts/test-stamp-deck-document-type.sh`, and dispatch the proof workflow to see the badge on a real page.
