@@ -122,6 +122,8 @@ const SOURCES_MS = 700
 const UPDATED_MS = 4000
 /** The start card's distance below the first part's text, and above the room's end (frame 20). */
 const START_CARD_GAP = 8
+/** The start card's distance under the slide in Slide only (decks.css `.deck-stage .deck-start`). */
+const START_CARD_SLIDE_GAP = 16
 
 /**
  * Item 8: one drop of pictures on the strip, before part `at` when it was dropped: before the slide with id `before`
@@ -577,6 +579,15 @@ export function DeckView({
   const [startGone, setStartGone] = useState(false)
   const [startAt, setStartAt] = useState<{ left: number; top: number; width: number } | null>(null)
   const startRef = useRef<HTMLDivElement | null>(null)
+  const [startWords, setStartWords] = useState('')
+  const [startAll, setStartAll] = useState(false)
+  const showAllEarlier = useCallback(() => setStartAll(true), [])
+  // The card as drawn, wherever it is: the handout's room and the slide's size are measured from it.
+  const [startEl, setStartEl] = useState<HTMLDivElement | null>(null)
+  const startRefSet = useCallback((element: HTMLDivElement | null) => {
+    startRef.current = element
+    setStartEl(element)
+  }, [])
   const startRows = startState ? startCardRows({
     fresh: startState.fresh,
     dismissed: startGone,
@@ -626,7 +637,7 @@ export function DeckView({
   // The one card, wherever `startCardPlace` puts it: the same component, rows and rules in the handout and under the slide.
   const startCard = (style: CSSProperties) => startRows && startState ? (
     <StartCard
-      ref={startRef}
+      ref={startRefSet}
       style={style}
       aiName={startRows.ask ? startState.ai?.name ?? null : null}
       earlier={startRows.copy ? startState.earlier : []}
@@ -634,6 +645,10 @@ export function DeckView({
       onDraft={words => startWith('deck/start-draft', { text: words })}
       onCopy={deck => startWith('deck/start-copy', { source: deck.path })}
       onHide={hideStart}
+      words={startWords}
+      onWords={setStartWords}
+      all={startAll}
+      onAll={showAllEarlier}
     />
   ) : null
   const countRef = useRef(count)
@@ -683,7 +698,27 @@ export function DeckView({
   // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap. A
   // row under it, if any, scrolls with the stage as beside: sizing by it would shrink the slide as the row wraps (review).
   const slideAlone = slideShown && !handoutShown
-  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  // The one start card (#917): at the handout's top while the handout shows, under the slide in Slide only.
+  const startPlace = startShown ? startCardPlace(slideShown, handoutShown) : null
+  const startInHandout = startPlace === 'handout'
+  // Under the slide, the card's room (its height and the 16 above it) is kept free, so the slide and the card both fit
+  // the stage without scrolling: the wheel over a slide in Slide only moves slides, never the stage (slideNav.ts). The
+  // card's rows don't wrap, so its height doesn't change with the slide's width and the size can't swing.
+  const [slideCardRoom, setSlideCardRoom] = useState(0)
+  const startUnderSlide = startPlace === 'slide'
+  useLayoutEffect(() => {
+    const card = startUnderSlide ? startEl : null
+    if (!card) { setSlideCardRoom(0); return }
+    const measure = () => {
+      const room = Math.ceil(card.offsetHeight + START_CARD_SLIDE_GAP)
+      setSlideCardRoom(before => (Math.abs(before - room) > 1 ? room : before))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(card)
+    return () => observer.disconnect()
+  }, [startUnderSlide, startEl])
+  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, startUnderSlide ? slideCardRoom : 0) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
@@ -697,9 +732,6 @@ export function DeckView({
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth
   /** What the view switch shows chosen: the view as drawn (under 600 px the handout has no room, so Slide only). */
   const viewShown: DeckViewMode = !handoutShown ? 'slide' : !slideShown ? 'handout' : 'both'
-  // The one start card (#917): at the handout's top while the handout shows, under the slide in Slide only.
-  const startPlace = startShown ? startCardPlace(slideShown, handoutShown) : null
-  const startInHandout = startPlace === 'handout'
 
   const scrollContainer = useCallback((): HTMLElement | null => {
     return (editor?.view.dom.closest('.wysiwyg-editor') as HTMLElement | null) ?? null

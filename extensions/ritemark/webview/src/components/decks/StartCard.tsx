@@ -22,11 +22,17 @@ interface StartCardProps {
   onDraft: (words: string) => void
   onCopy: (deck: EarlierDeck) => void
   onHide: () => void
+  /**
+   * What is typed in "What is it for?" and whether All decks… was pressed, kept by the deck view (#917): the card under
+   * the slide and the card in the handout are one card, so a switch of view keeps both.
+   */
+  words: string
+  onWords: (words: string) => void
+  all: boolean
+  onAll: () => void
 }
 
-export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function StartCard({ style, aiName, earlier, busy, onDraft, onCopy, onHide }, ref) {
-  const [words, setWords] = useState('')
-  const [all, setAll] = useState(false)
+export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function StartCard({ style, aiName, earlier, busy, onDraft, onCopy, onHide, words, onWords, all, onAll }, ref) {
   const [field, setField] = useState<HTMLInputElement | null>(null)
   const shown = all ? earlier : earlier.slice(0, START_CARD_SHOWN)
   // Draft with no words asks for them: the field takes the caret, and nothing is sent.
@@ -56,7 +62,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
               aria-label={`What the deck is for: ${aiName} drafts it`}
               maxLength={MAX_DRAFT_WORDS}
               value={words}
-              onChange={event => setWords(event.target.value)}
+              onChange={event => onWords(event.target.value)}
               onKeyDown={event => {
                 if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
                   event.preventDefault()
@@ -84,7 +90,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
             ))}
             {!all && earlier.length > shown.length ? (
               <Tooltip label={`Show the other ${earlier.length - shown.length} deck${earlier.length - shown.length === 1 ? '' : 's'} here`}>
-                <Button variant="ghost" className="deck-start-deck deck-start-more" onClick={() => setAll(true)}>All decks…</Button>
+                <Button variant="ghost" className="deck-start-deck deck-start-more" onClick={onAll}>All decks…</Button>
               </Tooltip>
             ) : null}
           </div>
