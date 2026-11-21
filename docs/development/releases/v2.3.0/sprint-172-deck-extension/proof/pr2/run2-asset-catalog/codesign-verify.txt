@@ -1,0 +1,2 @@
+/Applications/Ritemark.app: valid on disk
+/Applications/Ritemark.app: satisfies its Designated Requirement

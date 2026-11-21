@@ -19,15 +19,15 @@ Nothing starts until Jarmo approves the plan in his own words (shell-tier, and i
 
 ## PR 2: the Mac's file type (shell-tier)
 - [ ] Issue created in milestone v2.3.0, linked to #940
-- [ ] `branding/icons/deck-badge.icns`, its source and the command in `branding/README.md` (after the Experience lead's answer on the glyph)
-- [ ] `scripts/stamp-deck-document-type.sh` and its test on a bare plist
-- [ ] First commit: `.github/workflows/deck-type-proof.yml` and `scripts/qa/deck-type-proof.swift`; one run; its artifact (UTType, the opening app, the drawn icon, Quick Look, Spotlight) under `proof/pr2/`; the badge's form decided (`.icns` or an asset catalog)
-- [ ] The script called in `build-prod.sh` and `build-macos-x64.yml` after the version stamp
-- [ ] The script added to CLAUDE.md's shell-tier list and to `release-extension-preflight.sh`'s `SHELL_TIER_PATHS`, in one commit
-- [ ] `validate-build-output.sh` checks the type and the badge (scenario 23)
-- [ ] `branding/product.json`: `*.rtms` → `ritemark.editor`
-- [ ] A dev build's plist has no deck type (scenario 24)
-- [ ] TEST-CHECKLIST rows for the Mac (audit §4)
+- [x] The badge: `branding/icons/deck-badge.svg` (Phosphor `presentation`, bold, #4338ca), compiled into the asset catalog `branding/icons/deck-badge.car` (the runner showed `.icns` gets no badge), and the command in `branding/README.md`
+- [x] `scripts/stamp-deck-document-type.sh` and its test on a bare plist (`scripts/test-stamp-deck-document-type.sh`, in `validate-qa.sh`)
+- [x] First commit: `.github/workflows/deck-type-proof.yml` and `scripts/qa/deck-type-proof.swift`; two runs; their artifacts (UTType, the opening app, the drawn icon, Quick Look, Spotlight) under `proof/pr2/`; the badge's form decided: an asset catalog
+- [x] The script called in `build-prod.sh` and `build-macos-x64.yml` after the version stamp
+- [x] The script added to CLAUDE.md's shell-tier list and to `release-extension-preflight.sh`'s `SHELL_TIER_PATHS`, in one commit
+- [x] `validate-build-output.sh` checks the type and the badge (scenario 23), and so does the Intel workflow's Validate build
+- [x] `branding/product.json`: `*.rtms` → `ritemark.editor`
+- [x] A dev build's plist has no deck type (scenario 24): read from the rundev tree's `.build/electron` app, no `ai.productory.ritemark.deck`, no exported types, no `Assets.car`
+- [x] TEST-CHECKLIST rows for the Mac (audit §4): 24t–24x
 - [ ] Risk and How to revert; Review record (High)
 
 ## PR 3: Windows (shell-tier)

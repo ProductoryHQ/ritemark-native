@@ -1,0 +1,30 @@
+macOS Version 26.7.2 (Build 25G332)
+
+== The type for the extension rtms
+  identifier: ai.productory.ritemark.deck
+  description: Ritemark Deck
+  declared: true, dynamic: false
+  conforms to public.plain-text: true
+  [PASS] UTType for rtms is ai.productory.ritemark.deck
+  [PASS] its description is "Ritemark Deck"
+  [PASS] it conforms to public.plain-text
+
+== The file Day one.rtms
+  Finder's kind (localizedTypeDescription): Ritemark Deck
+  content type: ai.productory.ritemark.deck
+  [PASS] the file's kind is "Ritemark Deck"
+  opens with: /Applications/Ritemark.app (ai.productory.ritemark)
+  [PASS] a double-click opens Ritemark (ai.productory.ritemark)
+  wrote app-icon-256.png (256 px)
+
+== The drawn icons
+  wrote rtms-icon-512.png (512 px)
+  wrote rtms-icon-128.png (128 px)
+  wrote rtms-icon-64.png (64 px)
+  wrote rtms-icon-32.png (32 px)
+  wrote uti-icon-512.png (512 px)
+  wrote md-icon-512.png (512 px)
+  wrote plain-text-icon-512.png (512 px)
+  (rtms-icon-*.png should be the system's page with the deck badge and DECK; compare plain-text-icon-512.png)
+
+RESULT: all checks passed
