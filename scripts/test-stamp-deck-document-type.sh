@@ -74,7 +74,7 @@ if $PB -c 'Print :CFBundleDocumentTypes:1:CFBundleTypeIconFile' "$P" >/dev/null 
 [[ "$($PB -c 'Print :UTExportedTypeDeclarations:0:UTTypeTagSpecification:public.filename-extension:0' "$P")" == "rtms" ]] && ok "the extension is rtms" || not_ok "filename extension"
 [[ "$($PB -c 'Print :UTExportedTypeDeclarations:0:UTTypeIcons:UTTypeIconBadgeName' "$P")" == "deck-badge" ]] && ok "the badge is deck-badge" || not_ok "badge name"
 [[ "$($PB -c 'Print :UTExportedTypeDeclarations:0:UTTypeIcons:UTTypeIconText' "$P")" == "DECK" ]] && ok "the page says DECK" || not_ok "icon text"
-[[ -s "$B/Contents/Resources/deck-badge.icns" ]] && ok "the badge is copied into Resources" || not_ok "badge copy"
+cmp -s "$B/Contents/Resources/Assets.car" "$SCRIPT_DIR/../branding/icons/deck-badge.car" && ok "the badge's asset catalog is Resources/Assets.car" || not_ok "badge catalog copy"
 plutil -lint -s "$P" && ok "plutil -lint passes" || not_ok "plutil -lint"
 
 # 2. Markdown's entry is left exactly as it was (R11).
@@ -110,7 +110,9 @@ check_fails() { # <description> <PlistBuddy command or "rm-badge">
   rm -rf "$B3"
   cp -R "$B" "$B3"
   if [[ "$2" == "rm-badge" ]]; then
-    rm "$B3/Contents/Resources/deck-badge.icns"
+    rm "$B3/Contents/Resources/Assets.car"
+  elif [[ "$2" == "other-car" ]]; then
+    printf 'not a catalog' > "$B3/Contents/Resources/Assets.car"
   else
     $PB -c "$2" "$B3/Contents/Info.plist"
   fi
@@ -125,7 +127,21 @@ check_fails "Ritemark is not the owner" "Set :CFBundleDocumentTypes:1:LSHandlerR
 check_fails "the document type is missing" "Delete :CFBundleDocumentTypes:1"
 check_fails "the exported type is missing" "Delete :UTExportedTypeDeclarations:0"
 check_fails "an icon file would hide the system's page" "Add :CFBundleDocumentTypes:1:CFBundleTypeIconFile string deck.icns"
-check_fails "the badge file is missing" "rm-badge"
+check_fails "the badge's asset catalog is missing" "rm-badge"
+check_fails "the catalog has no deck-badge icon set" "other-car"
+
+# 6b. An app that already has an asset catalog is refused, untouched.
+B6="$WORK/fixture-has-catalog"
+make_bundle "$B6"
+printf 'upstream catalog' > "$B6/Contents/Resources/Assets.car"
+cp "$B6/Contents/Info.plist" "$WORK/before6.plist"
+if "$STAMP" "$B6" >/dev/null 2>"$WORK/err6"; then
+  not_ok "an app with an Assets.car is refused"
+else
+  grep -q "cannot be merged" "$WORK/err6" && ok "an app with an Assets.car is refused" || not_ok "Assets.car message: $(cat "$WORK/err6")"
+fi
+cmp -s "$B6/Contents/Info.plist" "$WORK/before6.plist" && [[ "$(cat "$B6/Contents/Resources/Assets.car")" == "upstream catalog" ]] \
+  && ok "the refused app's plist and catalog are untouched" || not_ok "the refused app was changed"
 
 # 7. A plist that was never stamped (a dev build's) fails the check.
 B4="$WORK/fixture-unstamped"

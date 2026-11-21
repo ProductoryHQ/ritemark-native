@@ -73,6 +73,8 @@ if let app = NSWorkspace.shared.urlForApplication(toOpen: deckFile) {
     let id = Bundle(url: app)?.bundleIdentifier ?? "(unknown)"
     line("  opens with: \(app.path) (\(id))")
     expect(id == "ai.productory.ritemark", "a double-click opens Ritemark (ai.productory.ritemark)")
+    // The badge's Assets.car must not change the app's own icon.
+    writePNG(NSWorkspace.shared.icon(forFile: app.path), pixels: 256, to: outDir.appendingPathComponent("app-icon-256.png"))
 } else {
     expect(false, "some app opens the file")
 }

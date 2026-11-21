@@ -28,7 +28,7 @@ on:
       - .github/workflows/deck-type-proof.yml
       - scripts/qa/deck-type-proof.swift
       - scripts/stamp-deck-document-type.sh
-      - branding/icons/deck-badge.icns
+      - branding/icons/deck-badge.car
 
 permissions:
   contents: read
@@ -60,8 +60,10 @@ jobs:
           sudo mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
           sudo chown -R "$(id -un)" "$APP"
           cp /usr/bin/true "$APP/Contents/MacOS/Ritemark"
+          cp branding/icons/icon.icns "$APP/Contents/Resources/Ritemark.icns"
           # Shaped like the release build's plist: the bundle id from
-          # branding/product.json and upstream's Markdown document type.
+          # branding/product.json, the app icon file and upstream's Markdown
+          # document type.
           cat > "$APP/Contents/Info.plist" <<'PLIST'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -72,6 +74,7 @@ jobs:
             <key>CFBundleDisplayName</key><string>Ritemark</string>
             <key>CFBundleExecutable</key><string>Ritemark</string>
             <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleIconFile</key><string>Ritemark.icns</string>
             <key>CFBundleShortVersionString</key><string>2.3.0</string>
             <key>CFBundleVersion</key><string>2.3.0</string>
             <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>

@@ -24,7 +24,8 @@
 # Contents/Resources/. The stamp refuses a plist that already names the type,
 # so a rerun fails loudly instead of adding a second entry. The check fails on
 # any missing or wrong key, a duplicate entry, a plist `plutil -lint` rejects,
-# or a missing badge file.
+# or an asset catalog without the badge. It refuses an app that already has an
+# Assets.car, since a compiled catalog cannot be merged into another.
 # =============================================================================
 
 set -euo pipefail
@@ -37,7 +38,11 @@ DECK_KIND="Ritemark Deck"
 DECK_EXTENSION="rtms"
 DECK_BADGE_NAME="deck-badge"
 DECK_ICON_TEXT="DECK"
-DECK_BADGE_SOURCE="$PROJECT_DIR/branding/icons/$DECK_BADGE_NAME.icns"
+# The badge is an icon set named deck-badge in an asset catalog: macOS finds a
+# UTTypeIconBadgeName in the app's Contents/Resources/Assets.car, not in an
+# .icns file (the runner proof, deck-type-proof.yml). The compiled catalog is
+# committed; branding/README.md has the command that makes it from the SVG.
+DECK_BADGE_SOURCE="$PROJECT_DIR/branding/icons/$DECK_BADGE_NAME.car"
 
 PLIST_BUDDY=/usr/libexec/PlistBuddy
 
@@ -64,6 +69,7 @@ fail() {
 [[ -f "$INFO_PLIST" ]] || fail "no Info.plist at $INFO_PLIST"
 [[ -d "$RESOURCES_DIR" ]] || fail "no Resources folder at $RESOURCES_DIR"
 command -v plutil >/dev/null 2>&1 || fail "plutil not found (macOS only)"
+command -v assetutil >/dev/null 2>&1 || fail "assetutil not found (macOS only)"
 [[ -x "$PLIST_BUDDY" ]] || fail "PlistBuddy not found (macOS only)"
 
 # Print one value, or nothing when the key path does not exist.
@@ -155,15 +161,19 @@ check() {
     expect "$u:UTTypeIcons:UTTypeIconText" "$DECK_ICON_TEXT"
   fi
 
-  if [[ ! -s "$RESOURCES_DIR/$DECK_BADGE_NAME.icns" ]]; then
-    echo "  FAIL: the badge $RESOURCES_DIR/$DECK_BADGE_NAME.icns is missing or empty" >&2
+  if [[ ! -s "$RESOURCES_DIR/Assets.car" ]]; then
+    echo "  FAIL: no asset catalog at $RESOURCES_DIR/Assets.car (the badge lives there)" >&2
+    errors=$((errors + 1))
+  elif ! assetutil --info "$RESOURCES_DIR/Assets.car" 2>/dev/null | awk -v name="\"Name\" : \"$DECK_BADGE_NAME\"" \
+      'BEGIN { RS = "}" } /"AssetType" : "Icon Image"/ && index($0, name) { found = 1 } END { exit !found }'; then
+    echo "  FAIL: $RESOURCES_DIR/Assets.car has no icon set named $DECK_BADGE_NAME" >&2
     errors=$((errors + 1))
   fi
 
   if [[ $errors -gt 0 ]]; then
     fail "$errors problem(s) in $INFO_PLIST"
   fi
-  echo "Deck file type OK: $DECK_UTI \"$DECK_KIND\" (.${DECK_EXTENSION}), Ritemark its owner, badge $DECK_BADGE_NAME + $DECK_ICON_TEXT"
+  echo "Deck file type OK: $DECK_UTI \"$DECK_KIND\" (.${DECK_EXTENSION}), Ritemark its owner, badge $DECK_BADGE_NAME in Assets.car + $DECK_ICON_TEXT"
 }
 
 if [[ "$MODE" == "check" ]]; then
@@ -177,6 +187,9 @@ fi
 [[ -s "$DECK_BADGE_SOURCE" ]] || fail "the badge source $DECK_BADGE_SOURCE is missing"
 if names_deck_type; then
   fail "$INFO_PLIST already names $DECK_UTI; refusing to stamp it twice"
+fi
+if [[ -e "$RESOURCES_DIR/Assets.car" ]]; then
+  fail "$RESOURCES_DIR/Assets.car already exists; the deck badge's catalog cannot be merged into it"
 fi
 
 DOC_TYPE_XML="<dict>
@@ -209,7 +222,7 @@ if [[ -z "$(read_key UTExportedTypeDeclarations)" ]]; then
 fi
 plutil -insert UTExportedTypeDeclarations -xml "$EXPORTED_TYPE_XML" -append "$INFO_PLIST"
 
-cp "$DECK_BADGE_SOURCE" "$RESOURCES_DIR/$DECK_BADGE_NAME.icns"
+cp "$DECK_BADGE_SOURCE" "$RESOURCES_DIR/Assets.car"
 
 echo "Stamped the deck file type into $INFO_PLIST"
 check
