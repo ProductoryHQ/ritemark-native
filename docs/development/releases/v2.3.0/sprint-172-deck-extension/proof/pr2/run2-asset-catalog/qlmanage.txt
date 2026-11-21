@@ -1,0 +1,4 @@
+Testing Quick Look thumbnails with files:
+	/Users/runner/work/ritemark-native/ritemark-native/deck-proof-files/Day one.rtms
+* /Users/runner/work/ritemark-native/ritemark-native/deck-proof-files/Day one.rtms produced one thumbnail
+Done producing thumbnails

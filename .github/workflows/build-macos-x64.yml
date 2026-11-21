@@ -277,6 +277,17 @@ jobs:
           fi
           echo "Info.plist stamped: CFBundleShortVersionString=$STAMPED"
 
+      # =========================================================================
+      # Step 9d: Stamp the deck file type (Sprint 172, #940)
+      # A deck is its own kind of file, `.rtms`: the exported type with its
+      # badge and the document type that makes Ritemark its owner. Same script
+      # as build-prod.sh, before provenance and signing; it fails the build if
+      # a key or the badge is missing afterwards.
+      # =========================================================================
+      - name: Stamp the deck file type
+        working-directory: r
+        run: ./scripts/stamp-deck-document-type.sh "VSCode-darwin-x64/Ritemark.app"
+
       - name: Embed and verify build provenance
         working-directory: r
         run: |
@@ -368,6 +379,15 @@ jobs:
             echo "OK: Info.plist CFBundleShortVersionString = $PLIST_VERSION"
           else
             echo "FAIL: Info.plist says '$PLIST_VERSION', expected '$EXPECTED_VERSION' (Finder would show the wrong version)"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Check the deck file type and its badge (Sprint 172, #940); the same
+          # check as validate-build-output.sh Check 5g
+          if ./scripts/stamp-deck-document-type.sh --check "$APP_PATH"; then
+            echo "OK: Info.plist declares the deck file type"
+          else
+            echo "FAIL: the deck file type is missing or wrong in Info.plist"
             ERRORS=$((ERRORS + 1))
           fi
 

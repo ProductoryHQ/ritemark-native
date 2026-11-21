@@ -695,6 +695,30 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
+# Check 5g: the Mac app declares the deck file type (Sprint 172, #940)
+#
+# scripts/stamp-deck-document-type.sh stamps `.rtms` into the release build's
+# Info.plist: the exported type ai.productory.ritemark.deck with the deck badge
+# and DECK, Ritemark as its owner, and the badge's asset catalog as
+# Resources/Assets.car. Its --check reads every key back, runs `plutil -lint`,
+# and finds the icon set deck-badge in the catalog. Windows declares the type
+# in its installer instead.
+# -----------------------------------------------------------------------------
+case "$TARGET" in
+  darwin-arm64|darwin-x64)
+    echo -n "Checking the deck file type in Info.plist... "
+    if DECK_TYPE_OUTPUT="$("$SCRIPT_DIR/stamp-deck-document-type.sh" --check "$APP_PATH" 2>&1)"; then
+      echo -e "${GREEN}OK${NC} (ai.productory.ritemark.deck, \"Ritemark Deck\", .rtms, badge + DECK)"
+    else
+      echo -e "${RED}FAIL${NC}"
+      echo "$DECK_TYPE_OUTPUT" | sed 's/^/    /'
+      ERRORS=$((ERRORS + 1))
+    fi
+    echo ""
+    ;;
+esac
+
+# -----------------------------------------------------------------------------
 # Check 6: App Launches (optional manual verification)
 # -----------------------------------------------------------------------------
 echo ""

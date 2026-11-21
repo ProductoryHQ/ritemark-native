@@ -26,6 +26,7 @@ bash "$PROJECT_ROOT/scripts/test-stage-extension-for-shell-build.sh"
 "$PROJECT_ROOT/scripts/test-dev-extension-link.sh"
 "$PROJECT_ROOT/scripts/test-release-source-integrity.sh"
 "$PROJECT_ROOT/scripts/test-worktree-hygiene.sh"
+"$PROJECT_ROOT/scripts/test-stamp-deck-document-type.sh"
 "$PROJECT_ROOT/.claude/hooks/pre-commit-validator.sh"
 "$PROJECT_ROOT/scripts/validate-chrome-fast.sh"
 
