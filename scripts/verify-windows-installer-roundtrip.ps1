@@ -145,6 +145,8 @@ try {
     RITEMARK_CI_PROBE = $environmentProbeResult
     RITEMARK_CI_PUBLISHER = $ExpectedPublisher
     RITEMARK_CI_VERSION = $ExpectedVersion
+    # The registry probe checks the deck file type (.rtms) against this folder.
+    RITEMARK_CI_INSTALL_ROOT = $installRoot
   }
 
   function Write-ChildProcessDiagnostics([string]$label, [string]$stdoutPath, [string]$stderrPath) {
