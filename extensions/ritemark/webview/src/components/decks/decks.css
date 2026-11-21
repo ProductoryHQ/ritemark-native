@@ -367,10 +367,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-row > svg.deck-lib-caret { color: var(--r-ink-muted); }
 .deck-lib-name { overflow: hidden; text-overflow: ellipsis; }
 .deck-lib-count { margin-left: auto; font-size: 12px; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; }
-.deck-lib-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 8px; padding: 4px 8px 10px; }
-/* #935: two 104 px thumbnails need 232 px; a narrower panel (a narrow window caps the column at 200) shows one column
-   rather than cutting the second at the edge. */
-@media (max-width: 231px) { .deck-lib-grid { grid-template-columns: 1fr; } }
+/* #935: two columns, or one when half the grid is narrower than a 104 px thumbnail (a narrow window caps the column at
+   200 px), rather than cutting the second column at the edge. */
+.deck-lib-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(max(104px, calc((100% - 8px) / 2)), 1fr)); gap: 10px 8px; padding: 4px 8px 10px; }
 .deck-lib-tile { display: grid; gap: 4px; align-content: start; padding: 0; border: 0; border-radius: 6px; background: none; text-align: left; font: 400 11.5px/15px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
 .deck-lib-thumb { position: relative; display: block; width: 104px; height: 58.5px; border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline); pointer-events: none; }
 /* Sprint 159 (PR 2): a hand-written ring shows only in the keyboard's mode (inputMode.test.ts), as every ring here does. */

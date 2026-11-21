@@ -383,7 +383,7 @@ export function SlideLibraryPanel() {
               <span className="deck-lib-title">{number}{title}</span>
               {/* "Folder › Deck" may wrap and be cut; under it the date and "also in N older decks", each a line of its own (#935), never are. */}
               {hit ? <span className="deck-lib-place">{hit.where}</span> : null}
-              {hit?.meta.map((line) => <span key={line} className="deck-lib-also deck-lib-meta">{line}</span>)}
+              {hit?.meta.map((line, index) => <span key={index} className="deck-lib-also deck-lib-meta">{line}</span>)}
               {options.note ? <span className="deck-lib-also">{options.note}</span> : null}
             </button>
           </DropdownMenuTrigger>
