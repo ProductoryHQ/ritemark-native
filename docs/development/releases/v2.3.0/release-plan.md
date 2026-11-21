@@ -34,7 +34,7 @@ The evidence, in Jarmo's words:
 - 17 November: "Hoopis olulisem on teemad" (themes matter much more).
 - 18 November, on the published page: "see minu jaoks on nagu töövihik kaasategijale" (to me it's like a workbook for the participant).
 
-Two things the thesis has to settle with him:
+Two things the thesis settled with him (21 November: Decks leads; the AI on day one and Excel are in the notes under it):
 - Sprint 160's plan records another direction for 2.3, "agreed with Jarmo: the AI works from day one, on Mac and Windows", and Excel (Sprint 158) is in 2.3 too. No decision-log row names either one, or Decks, as the release's story.
 - Decks is on in 2.3 (Jarmo, 20 November: "Decks läheb 2.3 sisse"; #916), so the public notes lead with Decks. Until then it was behind its flag and the notes said nothing about it (Sprint 159's plan).
 
