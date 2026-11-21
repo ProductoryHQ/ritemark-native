@@ -18,7 +18,7 @@ export interface FileLinkSuggestionListHandle {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean
 }
 
-/** A deck (`*.deck.md`) shows the deck's own icon, as everywhere a file shows (Sprint 159, deck icons). */
+/** A deck (`*.rtms`, or an older `*.deck.md`) shows the deck's own icon, as everywhere a file shows (Sprint 159, deck icons). */
 const KIND_ICONS: Partial<Record<WorkspaceFileLinkResult['kind'], PhosphorIconName>> = { markdown: 'file-text', document: 'file-text', data: 'table', image: 'file-image' }
 
 export function iconForFile(kind: WorkspaceFileLinkResult['kind'] | undefined, relativePath = '') {

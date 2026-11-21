@@ -125,6 +125,14 @@ assert.ok(!deckModeOf({ ...deck, scheme: 'untitled' }), 'not on disk: a document
 assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Training.md' }), 'not .deck.md: a document');
 assert.ok(!deckModeOf({ ...deck, text: '---\ndeck: 3\n---\n' }), 'a later format: a document');
 assert.ok(deckModeOf({ ...deck, text: '---\ndeck: 2\n---\n' }), 'Sprint 161: format 2 (block slides) is a deck');
+// Sprint 172: a `.rtms` opens as a deck, as an old `.deck.md` does; with the flag off it is a document (R2, R6)
+assert.ok(deckModeOf({ ...deck, fsPath: '/p/Day one.rtms' }));
+assert.ok(deckModeOf({ ...deck, fsPath: 'C:\\Work\\DAY ONE.RTMS' }));
+assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Day one.rtms', flagOn: false }), 'flag off: a document');
+assert.ok(!deckModeOf({ ...deck, fsPath: '/p/Day one.rtms.md' }), 'a .md named after a deck is a document');
+// The webview's requests name a `.rtms` deck as they name a `.deck.md`
+assert.deepEqual(decodeDeckRequest({ type: 'deck/start-copy', source: 'Talks/Day one.rtms' }), { type: 'deck/start-copy', source: 'Talks/Day one.rtms' });
+assert.throws(() => decodeDeckRequest({ type: 'deck/start-copy', source: 'Talks/notes.md' }), DeckProtocolError);
 
 // Sprint 159 (PR 2): a view keeps the flag it opened with (recorded as it opens, as ritemarkEditor.ts does); the flag
 // turned on or off meanwhile reaches only views opened afterwards: the flag never turns a document view into a deck

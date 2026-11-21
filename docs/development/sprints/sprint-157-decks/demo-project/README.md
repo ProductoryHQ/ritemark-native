@@ -2,13 +2,13 @@
 
 A small project to try Decks with, in a dev window (`/rundev`) of the `sprint-157-decks` branch. Copy the folder somewhere else first, so your trying leaves this copy as it is, and open the copy as the project.
 
-- `Harbour Logistics/AI assistants and agents.deck.md`: a 13-slide training deck in all nine kinds. Five of its slides are copies: four from the Slide library, one from another deck.
-- `Slide library/AI assistants.deck.md` and `Slide library/Agents.deck.md`: the library's two topics.
-- `Northwind/Data in Excel.deck.md`: another earlier deck, shown under Other decks.
+- `Harbour Logistics/AI assistants and agents.rtms`: a 13-slide training deck in all nine kinds. Five of its slides are copies: four from the Slide library, one from another deck.
+- `Slide library/AI assistants.rtms` and `Slide library/Agents.rtms`: the library's two topics.
+- `Northwind/Data in Excel.rtms`: another earlier deck, shown under Other decks.
 - Sprint 161, block slides (`deck: 2`, a bare `slide` fence whose body is Markdown):
-  - `Harbour Logistics/Copilot at work.deck.md`: six block slides, with Columns, Boxes, Steps, a table, a picture beside the words and a skipped slide;
-  - `Harbour Logistics/AI assistants and agents, as blocks.deck.md`: the 13-slide deck above as `legacyToBlocks` draws it, written out (what its first edit will write); its old notes and hidden words are comments at the end of their parts;
-  - `Northwind/Working with data.deck.md`: a mixed deck, older slides and block slides side by side.
+  - `Harbour Logistics/Copilot at work.deck.md`: six block slides, with Columns, Boxes, Steps, a table, a picture beside the words and a skipped slide. It keeps the name decks had before 2.3 (Sprint 172), so an older deck can be tried: it opens as a deck and is never renamed;
+  - `Harbour Logistics/AI assistants and agents, as blocks.rtms`: the 13-slide deck above as `legacyToBlocks` draws it, written out (what its first edit will write); its old notes and hidden words are comments at the end of their parts;
+  - `Northwind/Working with data.rtms`: a mixed deck, older slides and block slides side by side.
 
 The copies start in four different states, so each line under a slide can be seen at once:
 

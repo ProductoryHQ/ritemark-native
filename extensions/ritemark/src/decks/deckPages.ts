@@ -1,5 +1,5 @@
 /**
- * deckPages — a `.deck.md` opened as a deck in the Ritemark editor (Sprint 157, experience 46).
+ * deckPages — a deck (`.rtms`, or an older `.deck.md`) opened as a deck in the Ritemark editor (Sprint 157, experience 46).
  *
  * The deck is a path-based mode of the one Markdown editor, as card pages and agent files are, not a second editor:
  * VS Code's save-conflict and reload-merge hand-off (patch 014) covers only `ritemark.editor`, so a deck keeps saving,
@@ -7,7 +7,7 @@
  *   - which documents open as decks (the flag, a file on disk, the name, and a deck version this build reads);
  *   - the deck view's `deck/*` requests, decoded with exact fields and answered to that one webview.
  *
- * With the flag off nothing here applies: a `.deck.md` opens as an ordinary document, its slide blocks as code.
+ * With the flag off nothing here applies: a `.rtms` or `.deck.md` opens as an ordinary document, its slide blocks as code.
  */
 
 import { openInBrowser } from './openInLink';

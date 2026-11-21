@@ -1,0 +1,1 @@
+Deck file type OK: ai.productory.ritemark.deck "Ritemark Deck" (.rtms), Ritemark its owner, badge deck-badge in Assets.car + DECK

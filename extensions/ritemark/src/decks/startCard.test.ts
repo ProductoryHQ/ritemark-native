@@ -3,7 +3,7 @@
  * Draft's one message, and the marks kept in the window's workspace state. Run with `npx tsx src/decks/startCard.test.ts`.
  */
 import { strict as assert } from 'node:assert';
-import { deckStarted, draftRequest, freshDeckMarks, sendDraft, startCardRows, type DraftSteps } from './startCard';
+import { deckStarted, draftRequest, freshDeckMarks, sendDraft, startCardPlace, startCardRows, type DraftSteps } from './startCard';
 import { decodeDeckRequest, DeckProtocolError } from './deckProtocol';
 
 async function main(): Promise<void> {
@@ -22,6 +22,13 @@ async function main(): Promise<void> {
   assert.equal(deckStarted(0, false), false);
   assert.equal(deckStarted(2, false), true);
   assert.equal(deckStarted(1, true), true);
+
+  // Where the one card is drawn (#917): under the slide in Slide only (a new deck's view), at the handout's top whenever
+  // the handout shows; never in a folded handout.
+  assert.equal(startCardPlace(true, false), 'slide', 'Slide only: under the slide');
+  assert.equal(startCardPlace(true, true), 'handout', 'Slide and handout: in the handout, one card');
+  assert.equal(startCardPlace(false, true), 'handout', 'the handout alone: in the handout');
+  assert.equal(startCardPlace(false, false), null);
 
   // Draft: one message, the person's words as a request to draft this deck, sent at once through the AI's sheet's own
   // path (which opens a folded AI column, with the deck in front attached); the deck is saved first, and the card goes

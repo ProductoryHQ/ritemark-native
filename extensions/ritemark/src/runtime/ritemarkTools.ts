@@ -41,6 +41,7 @@ import type { BoardAnswer } from '../taskBoard/protocol';
 import { CARD_STAGES } from '../taskBoard/cardTypes';
 import { deckName, type CopiedPart, type DeckLibrary } from '../decks/DeckLibrary';
 import { normalizePath } from '../decks/deckLibraryFormat';
+import { isDeckPath } from '../decks/deckFileName';
 import { EVERY_TRAINING, MAX_OFFER, NOT_NOW_UNREADABLE, OFFER_MIN_FAMILIES, projectOffer } from '../decks/libraryOffer';
 import { SENDABLE_SLIDE_ID } from '../decks/deckProtocol';
 import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from '../decks/deckFormat';
@@ -466,14 +467,14 @@ const fontInput = (what: string) => z.enum(DECK_FONT_LIST.map(font => font.name)
 const themeFileInput = z.string().min(1).max(1024).describe("The theme file's path from the project's top: `Slide library/Themes/<Name>.theme.md`.");
 
 const deckPathInput = (what: string) =>
-  z.string().min(1).max(1024).describe(`${what}: its path from the project's top, as list_decks gives it, ending in .deck.md.`);
+  z.string().min(1).max(1024).describe(`${what}: its path from the project's top, as list_decks gives it, ending in .rtms (a deck made before may end .deck.md).`);
 const slideIdInput = z.string().regex(/^[0-9a-z]{1,16}$/i).describe("A slide's id, as read_deck gives it.");
 
-/** A deck path the tools accept: a `.deck.md` inside the project, written with `/`. */
+/** A deck path the tools accept: a `.rtms` (or older `.deck.md`) inside the project, written with `/`. */
 function deckPathOf(value: unknown): string {
   const text = String(value ?? '').trim().replace(/\\/g, '/');
   const path = normalizePath(text);
-  if (!path || !/\.deck\.md$/i.test(path)) throw new Error(`${text} is not a deck in this project. Use list_decks to find one.`);
+  if (!path || !isDeckPath(path)) throw new Error(`${text} is not a deck in this project. Use list_decks to find one.`);
   return path;
 }
 
@@ -514,7 +515,7 @@ export function createDeckToolGroup(host: () => DeckToolHost | null): RitemarkTo
       {
         name: 'list_decks',
         description:
-          "List the project's decks (.deck.md files): the Slide library's topics (one deck per topic, in the folder `Slide library`) and every other deck. With a query, only decks and slides whose words or handout match. Returns each deck's path, slide count, theme and when it changed.",
+          "List the project's decks (.rtms files, and older .deck.md ones): the Slide library's topics (one deck per topic, in the folder `Slide library`) and every other deck. With a query, only decks and slides whose words or handout match. Returns each deck's path, slide count, theme and when it changed.",
         input: {
           where: z.enum(['library', 'other', 'all']).optional().describe('library: only the Slide library\'s topics; other: only the other decks; all (the default): both.'),
           query: z.string().max(200).optional().describe('Words to look for in slide titles, words and handouts.'),

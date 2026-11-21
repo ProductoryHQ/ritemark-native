@@ -349,6 +349,16 @@ INFO_PLIST="$APP_PATH/Contents/Info.plist"
 echo -e "${GREEN}Info.plist stamped: CFBundleShortVersionString=$RITEMARK_VERSION${NC}"
 echo ""
 
+# Sprint 172 (#940): a deck is its own kind of file, `.rtms`. Only a release
+# build declares the type (a dev build never claims it), so it is stamped here,
+# before provenance and codesign-app.sh, like the version above. The script
+# fails the build if any key or the badge is missing afterwards.
+if ! "$PROJECT_DIR/scripts/stamp-deck-document-type.sh" "$APP_PATH"; then
+  echo -e "${RED}ERROR: Failed to stamp the deck file type into Info.plist${NC}"
+  exit 1
+fi
+echo ""
+
 # Floor the BUNDLED extension's version to X.Y.Z-0 so over-the-air X.Y.Z-ext.N
 # patches win VS Code's extension scanner (GH #142). Shared with the CI release
 # workflows via scripts/floor-bundled-extension.sh.

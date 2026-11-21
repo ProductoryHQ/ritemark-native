@@ -198,7 +198,8 @@ export async function resolveInternalLinkTarget(
   };
 }
 
-const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdx']);
+// Sprint 172: a deck (`.rtms`) is Markdown inside, and a link to it opens it in Ritemark, as a deck when decks are on
+const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdx', '.rtms']);
 
 /**
  * Whether to open the resolved target with Ritemark's custom Markdown

@@ -1,7 +1,7 @@
 # Release Plan — v2.3.0
 
-**Status:** **Draft, not approved.** Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
-**Release candidate:** no date set.<br>
+**Status:** **Feature complete, 21 November 2026** (Sprint 172's three PRs merged: #949, #951, #952). Jarmo cut the scope that day so the release candidate can be built: 2.3 is what is on `main`, #917 (merged) and Sprint 172 (`.rtms`, put back the same day: "i cannot release deck.md / it will comfuse in future / rtms must be incl"). *Separated from 2.3*, below, lists what moved to 2.4. The plan's history: Written after the fact on 19 November 2026, to bring 2.3 back to the process rules (`.claude/agents/sprint-manager.md`: a release lives in this folder with `release-plan.md` and a GitHub milestone, and its plan tracks each sprint and its PRs). Six sprints (158–163) and 49 PRs outside any sprint were built and merged before this plan existed. 2.3's scope and thesis have no approved release plan yet: both wait for Jarmo. This plan records what was decided and built; it approves nothing. Writing it is part of the repair Jarmo asked for on 19 November: "jah, tee need parandused enne sprinti 164" (yes, make these fixes before Sprint 164).<br>
+**Release candidate:** 21 November 2026, from `main` after the version bump.<br>
 **Target:** v2.3.0<br>
 **GitHub milestone:** v2.3.0. It held no issues until 19 November, when the sweep of v2.2.0's open issues began moving them here (at the time of writing: #591, #582, #501 and #497). From Sprint 164 on, each PR gets an issue on it.<br>
 **Release type:** **Shell-tier**, checked against each PR's files:
@@ -11,7 +11,7 @@
 - since #720, `release-extension-preflight.sh` refuses an extension release from `main` against v2.2.0 (Sprints 159 and 160's close-outs), so 2.3's extension-tier sprints reach people with this release too.
 
 It is built and gated as 2.2 was: a clean-room release worktree, Gate 1 and Gate 2, notarization after the hardening window.<br>
-**Platforms:** not decided yet. 2.2 shipped for darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store.<br>
+**Platforms:** darwin-arm64, darwin-x64, win32-x64 and the Microsoft Store, as every release: the platforms stay the same until Jarmo decides to add Linux.<br>
 **Release owner:** Jarmo<br>
 **Created:** 2026-11-19<br>
 **Source:**
@@ -22,9 +22,11 @@ It is built and gated as 2.2 was: a clean-room release worktree, Gate 1 and Gate
 
 ## Release Thesis
 
-**To be agreed with Jarmo.** No thesis has been decided for 2.3.
+**Agreed with Jarmo on 21 November 2026** ("thesis A"), from three lines the Growth manager wrote when he found the first draft weak:
 
-**A draft, from the evidence:** "2.3 is Decks: slides you write like text, for a real training, and a published page that is each participant's workbook."
+> "You can now make slides in Ritemark, present them, and give every participant a page to work through. They copy the prompts and tick off the exercises on their phone or computer."
+
+It opens the release notes and the Store's What's new as written; the release post and social put "Ritemark 2.3 is out." in front of it. The first draft was "2.3 is Decks: slides you write like text, for a real training, and a published page that is each participant's workbook."
 
 The evidence, in Jarmo's words:
 - 15 November: Decks and 2.3 run as two streams, and Decks goes first when they compete: "jah, esimene versioon sobib, Decks ette, kirjuta plaanid" (yes, the first version fits, Decks first, write the plans).
@@ -32,7 +34,7 @@ The evidence, in Jarmo's words:
 - 17 November: "Hoopis olulisem on teemad" (themes matter much more).
 - 18 November, on the published page: "see minu jaoks on nagu töövihik kaasategijale" (to me it's like a workbook for the participant).
 
-Two things the thesis has to settle with him:
+Two things the thesis settled with him (21 November: Decks leads; the AI on day one and Excel are in the notes under it):
 - Sprint 160's plan records another direction for 2.3, "agreed with Jarmo: the AI works from day one, on Mac and Windows", and Excel (Sprint 158) is in 2.3 too. No decision-log row names either one, or Decks, as the release's story.
 - Decks is on in 2.3 (Jarmo, 20 November: "Decks läheb 2.3 sisse"; #916), so the public notes lead with Decks. Until then it was behind its flag and the notes said nothing about it (Sprint 159's plan).
 
@@ -71,8 +73,9 @@ Two things the thesis has to settle with him:
 | [167 — Five small block details on the slide](sprint-167-block-details/sprint-plan.md) | The logo in any corner; Mark for Boxes; the slide's content Top, Middle or Bottom; a picture behind from a corner chip; one item's own handle | Extension | PR 1 #835 ([#844](https://github.com/ProductoryHQ/ritemark-native/pull/844)), PR 2 #836 ([#878](https://github.com/ProductoryHQ/ritemark-native/pull/878)), PR 3 #837 ([#891](https://github.com/ProductoryHQ/ritemark-native/pull/891)), PR 4 #838 ([#900](https://github.com/ProductoryHQ/ritemark-native/pull/900)), PR 5 #839 ([#911](https://github.com/ProductoryHQ/ritemark-native/pull/911)); follow-up #905 ([#912](https://github.com/ProductoryHQ/ritemark-native/pull/912)) | **Done** 20 Nov (approved 19 Nov, "kinnitan sprindid 165, 166 ja 167"; qa-validator passed) |
 | [168 — Quotes, prompts and heading levels on a slide](sprint-168-quotes-headings/sprint-plan.md) | The quote's look with an attribution line; Code block takes a prompt out of a quote; H1 > H2 > H3 on the slide, with Heading 1, 2 and 3 in the / menu | Extension | PR 1 [#863](https://github.com/ProductoryHQ/ritemark-native/issues/863) ([#880](https://github.com/ProductoryHQ/ritemark-native/pull/880), c656d9c5), PR 2 [#864](https://github.com/ProductoryHQ/ritemark-native/issues/864) ([#872](https://github.com/ProductoryHQ/ritemark-native/pull/872), 4a135b4c), PR 3 [#865](https://github.com/ProductoryHQ/ritemark-native/issues/865) ([#889](https://github.com/ProductoryHQ/ritemark-native/pull/889), 795adcfd); close-out [#898](https://github.com/ProductoryHQ/ritemark-native/pull/898) | **Done** 20 Nov (approved 19 Nov, "jah kõigile kolmele"; the Experience lead looked at each PR before it merged; qa-validator passed every PR check on 20 Nov) |
 | [169 — Every Phosphor icon for boxes, found by searching](sprint-169-every-icon/sprint-plan.md) | The full set of 1,512 regular icons for a box, with a "Search icons" field; every surface draws them; the page carries the ones a deck uses; an unknown name gets a tooltip and Choose an icon | Extension | PR 1 [#866](https://github.com/ProductoryHQ/ritemark-native/issues/866) ([#879](https://github.com/ProductoryHQ/ritemark-native/pull/879), 72fc88d6), PR 2 [#867](https://github.com/ProductoryHQ/ritemark-native/issues/867) ([#904](https://github.com/ProductoryHQ/ritemark-native/pull/904), 6a4e7f16), PR 3 [#868](https://github.com/ProductoryHQ/ritemark-native/issues/868) ([#908](https://github.com/ProductoryHQ/ritemark-native/pull/908), 35a41424), PR 4 [#869](https://github.com/ProductoryHQ/ritemark-native/issues/869) ([#909](https://github.com/ProductoryHQ/ritemark-native/pull/909), 851ae6eb); follow-up [#910](https://github.com/ProductoryHQ/ritemark-native/issues/910) (an Icon button on the block bar, the keyboard path), filed, not built; close-out [#913](https://github.com/ProductoryHQ/ritemark-native/pull/913) | **Done** 20 Nov (approved 19 Nov, "jah kõigile kolmele"; the Experience lead looked at each PR before it merged; the webview bundle grew 742,731 bytes, 71% of the 1 MiB budget) |
-| [170 — Publish becomes a split button with Save as PDF](sprint-170-save-as-pdf/sprint-plan.md) | A ▾ beside Publish with one item that names what the view saves: slides, slides and handout, or handout; PR 0 is a spike on the print path | Extension, provisional: shell if the spike finds a patch is needed | PR 0 to be created; PR 1 [#881](https://github.com/ProductoryHQ/ritemark-native/issues/881); PR 2 and PR 3 to be created | **Approved** 19 Nov ("1 jah", "kinnitatud") |
+| [170 — Publish becomes a split button with Save as PDF](sprint-170-save-as-pdf/sprint-plan.md) | A ▾ beside Publish with one item that names what the view saves: slides, slides and handout, or handout; PR 0 is a spike on the print path | Extension, provisional: shell if the spike finds a patch is needed | PR 0 to be created; PR 1 [#918](https://github.com/ProductoryHQ/ritemark-native/pull/918), PR 2 [#929](https://github.com/ProductoryHQ/ritemark-native/pull/929), PR 3 [#932](https://github.com/ProductoryHQ/ritemark-native/pull/932), all merged (#881, #885, #886, #931 closed) | **Built**; the close-out (records, TEST-CHECKLIST rows) is finished beside the candidate |
 | [171 — A solo Button stays where it is when chosen](sprint-171-solo-button/sprint-plan.md) | A button with no words beside it keeps its pill in place when chosen and when not ([#876](https://github.com/ProductoryHQ/ritemark-native/issues/876)); one PR | Extension | PR 1 [#876](https://github.com/ProductoryHQ/ritemark-native/issues/876) ([#890](https://github.com/ProductoryHQ/ritemark-native/pull/890)) | **Done** 19 Nov (approved "1 jah", "kinnitatud"; qa-validator passed) |
+| [172 — Decks get their own extension, .rtms](sprint-172-deck-extension/sprint-plan.md) | A deck is `<name>.rtms`, "Ritemark Deck" with the deck badge in Finder and the deck icon in Explorer, always opening in Ritemark; a `.deck.md` made before keeps working under its name ([#940](https://github.com/ProductoryHQ/ritemark-native/issues/940)); three PRs, no patch changes | Shell | PR 1 to PR 3 to be created | **Done** 21 November 2026: [#949](https://github.com/ProductoryHQ/ritemark-native/pull/949), [#951](https://github.com/ProductoryHQ/ritemark-native/pull/951), [#952](https://github.com/ProductoryHQ/ritemark-native/pull/952) merged, #940 closed |
 | The release — 2.3 as one release | The done list, the runtime review, version 2.3.0, the release notes, the gates and publication | Shell | — | Not started |
 
 **Sprint 157** (Decks, first cut) isn't release-bound, so its plan stays at [`docs/development/sprints/sprint-157-decks/`](../../sprints/sprint-157-decks/sprint-plan.md). Its code reached `main` with Sprint 159 PR 2 (#735), so it ships with 2.3.
@@ -167,17 +170,27 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 - **Paste from Gamma and other HTML** (Sprint 161 PR 4).
 - **See what changed and Undo on a finished comment task's card** ([#767](https://github.com/ProductoryHQ/ritemark-native/issues/767)).
 
+Jarmo, 21 November: "kuule midagi tuleb 2.3 skoobist kärpida - peaks ikka täna õhtul juba Rc tegema" (something has to be cut from 2.3's scope, the RC should be made tonight), then "approved" to the cut. Moved to v2.4.0 (Sprint 172, `.rtms`, was moved too, then put back into 2.3 the same day: "i cannot release deck.md / it will comfuse in future / rtms must be incl"):
+
+- **A deck opens from its row in the Slide library** ([#920](https://github.com/ProductoryHQ/ritemark-native/issues/920)).
+- **The printed page and the PDF: the slide spans the column** ([#919](https://github.com/ProductoryHQ/ritemark-native/issues/919)).
+- **A box's icon from the keyboard** ([#910](https://github.com/ProductoryHQ/ritemark-native/issues/910)).
+- **A deck's "0 words" in the status bar** ([#927](https://github.com/ProductoryHQ/ritemark-native/issues/927)).
+- **The frame-screenshot harness stops at Transcribe** ([#934](https://github.com/ProductoryHQ/ritemark-native/issues/934)); the release candidate's frame check is done by hand.
+
+The release notes, the test checklist and Sprint 170's close-out are finished beside the candidate and merge after publication, since `main` is frozen from the candidate on.
+
 ## Open for the release
 
 - **Decks is on in 2.3: decided.** Jarmo, 20 November 2026: "Decks läheb 2.3 sisse" (the row in `ritemark-dev/decisions/log.md`). Decks had been on `main` since Sprint 159 PR 2 (#735), behind `ritemark.features.decks` and off by default; [#916](https://github.com/ProductoryHQ/ritemark-native/issues/916) turns the setting's default to true and keeps it as an off switch. The Slide library's place in `branding/product.json` loses its `setting` in the same PR (a shell-tier line: the shell seeds a place with a setting from the person's settings.json only, so an on-by-default one would miss a fresh profile's first frame). The fresh-profile launch proof is in that PR (`proof/decks-on/`): a deck opens as a deck, New and Home have Deck, the Slide library is in the row, and the setting off brings back the ordinary document. Whatever the flag, 2.3 changes every Text document: tables you can change (#772), the picture editor with the old resize gone (#774), pictures from ChatGPT (#800), Tabs (#805), Button (#806), the code block's Copy (#804), the / menu's hidden words (#802) and sentence case (#811), and popups that close on an outside click (#759).
-- **The thesis and the scope,** above: which of *Moved in from 2.2* and *Not yet in a sprint* go into 2.3, and whether Sprint 161's PR 5 does.
+- **The scope is settled** (21 November): what is on `main`, #917 and Sprint 172; everything else listed open in this plan waits for 2.4 (*Separated from 2.3*). **The thesis** is agreed (*Release Thesis*, above).
 - **#507** (⌘⇧P sometimes does nothing on Home), never reproduced, was closed as not planned on 19 November (Jarmo: "#507 sulge"); it reopens on a sighting.
 - **The release notes** are being started (`docs/releases/v2.3.0/release-notes.md`), with the `release-notes` skill. The CHANGELOG's `[Unreleased] — v2.3.0` has sections for Sprints 158, 160 and 162 only; Sprints 159, 161 and 163 and most of the work outside sprints have no lines yet. With Decks on (#916), the notes lead with Decks and the CHANGELOG has a Decks section for Sprints 159, 161 and 164–171; Sprint 162's section no longer says "behind its flag".
 - **The milestone:** it gained its first issues from the v2.2.0 sweep on 19 November (see the header). From Sprint 164 on, each PR gets an issue on it.
 - **The test checklist,** `docs/releases/v2.3.0/TEST-CHECKLIST.md`, started on 16 November, has rows from Sprints 159, 160 and 162 and from some of the work outside sprints (filed under 159). Sprint 158's Not run rows are added with the candidate, as its header says. Sprints 161 and 163 and most of the work of 17 to 19 November have no rows yet. The candidate's table, the Gate 1 and Gate 2 rows and the sign-off come when the candidate is built.
 - **`qa-validator` on Sprint 163** ran on 19 November as part of the repair: **PASS**, with one documentation gap (the code block's row in `architecture.md`), added in the same PR as this plan. Sprints 158–162 got no `qa-validator` run either; from Sprint 164 on it runs at every sprint's end.
 - **Sprint 164** approved on 19 November and done the same day: PRs #819, #821 and #858 merged, the leftovers' removal is #892, and `qa-validator` signed off (see the Sprints table).
-- **The release candidate's date** is not set.
+- **The release candidate** is built on 21 November 2026, once the version is raised.
 
 ## Risks
 
@@ -211,3 +224,6 @@ Jarmo, 17 November: "Gamma kleepimise võid reliisist eraldada. samuti 7. (What 
 | 2026-11-18 | The night runs as the last one: the Development manager decides, Jarmo reviews in the morning | Jarmo ("jah. nagu eile öösel - sina oled boss. ma hommikul vaatan yle") |
 | 2026-11-19 | The older deck tools don't ask for approval in Ask mode | Jarmo ("ei, vanemad tööriistad ei pea Küsi-režiimis luba küsima") |
 | 2026-11-19 | The process drift is repaired before Sprint 164 starts: this release plan and Sprint 163's plan in this repo, Sprint 164's plan through `sprint-manager`, `qa-validator` on Sprint 163, the release notes, the v2.2.0 sweep, branches and issues per sprint, the process model fixed | Jarmo ("enne ma tahan et sa jälgiks juba korra kehtestatud reeglistikku... kas on veel drifte?"; "jah, tee need parandused enne sprinti 164") |
+| 2026-11-21 | Sprint 172 approved: decks get their own extension, `.rtms`; moved to 2.4 with the scope cut, then put back into 2.3 | Jarmo ("kinnitan"; "i cannot release deck.md / it will comfuse in future / rtms must be incl") |
+| 2026-11-21 | 2.3's scope is cut to `main` plus #917 so the release candidate is built tonight; #920, #919, #910, #927 and #934 move to v2.4.0 | Jarmo ("kuule midagi tuleb 2.3 skoobist kärpida - peaks ikka täna õhtul juba Rc tegema"; "approved") |
+| 2026-11-21 | The thesis: "You can now make slides in Ritemark, present them, and give every participant a page to work through. They copy the prompts and tick off the exercises on their phone or computer." (Growth's option A) | Jarmo ("thesis A") |

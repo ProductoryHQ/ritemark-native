@@ -48,6 +48,8 @@ assert.equal(found[0].tab, groups[0].tabs[0], 'the candidate carries its own tab
 
 // Zero stuck tabs → empty, no throw (healer must be inert).
 assert.deepEqual(findStuckMarkdownTabs([], resolve), []);
+// Sprint 172: a deck (`.rtms`) stuck in the text editor is healed back into Ritemark too
+assert.equal(findStuckMarkdownTabs([{ viewColumn: 1, tabs: [{ input: TEXT('/ws/Day one.rtms'), isActive: true, isPinned: false }] }], resolve).length, 1);
 assert.deepEqual(findStuckMarkdownTabs([{ viewColumn: 1, tabs: [{ input: CUSTOM('/a.md'), isActive: false, isPinned: false }] }], resolve), []);
 
 // Sprint 133 (#429): after the Ritemark editor opened, the text tab is found again, in its own group only.

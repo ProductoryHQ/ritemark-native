@@ -19,6 +19,7 @@ import {
 import { DocumentDeliverySchedule } from './delivery';
 import { readRitemarkSavedLogicalHash } from './saveReceipt';
 import { isEnabled } from '../features';
+import { DECK_EXTENSION } from '../decks/deckFileName';
 import { alignBlocks, findBase, mergeBlocks, replaceBlocks, sameBlocks, splitBlocks, trackRange, type BlockConflict, type BlockKind } from './merge';
 import {
   canCompleteViewResolution,
@@ -244,6 +245,16 @@ interface DocumentRecord {
   queue: Promise<void>;
   disposed: boolean;
   lastLogSignature?: string;
+}
+
+/**
+ * The files the editor's sync takes: CSV and Markdown, and a deck (Sprint 172: a `.rtms` is Markdown inside; an older
+ * `.deck.md` passes by its `.md`). A file not named here opens with no sync record, so its edits, an AI's writes and its
+ * saves would go unhandled.
+ */
+export function isEditablePath(fsPath: string): boolean {
+  const extension = path.extname(fsPath).toLowerCase();
+  return extension === '.csv' || extension === '.md' || extension === '.markdown' || extension === '.mdown' || extension === '.mkd' || extension === DECK_EXTENSION || extension === '';
 }
 
 export class DocumentSyncCoordinator implements vscode.Disposable {
@@ -1812,8 +1823,7 @@ export class DocumentSyncCoordinator implements vscode.Disposable {
   }
 
   private isEditable(document: vscode.TextDocument): boolean {
-    const extension = path.extname(document.uri.fsPath).toLowerCase();
-    return extension === '.csv' || extension === '.md' || extension === '.markdown' || extension === '.mdown' || extension === '.mkd' || extension === '';
+    return isEditablePath(document.uri.fsPath);
   }
 
   private isDiskBacked(document: vscode.TextDocument): boolean {

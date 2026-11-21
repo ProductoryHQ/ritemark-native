@@ -1,6 +1,6 @@
 /**
  * Sprint 159 (technical plan §2.5, decision 1): the handout page is a real file beside the deck, `<deck name>.html`
- * next to `<deck name>.deck.md`, so 2.2's Publish publishes it as it publishes any page (its gather reads the page from
+ * next to `<deck name>.rtms` (or an older `<deck name>.deck.md`), so 2.2's Publish publishes it as it publishes any page (its gather reads the page from
  * disk, its upload reads it again and checks every hash, and its records are keyed by the page's path).
  *
  *  - The page carries `<meta name="generator" content="Ritemark">` and `<meta name="ritemark-deck" content="<digest>">`,
@@ -26,6 +26,7 @@ import { DECK_FONT_SUBSETS, DEFAULT_DECK_FONT, deckFont, deckFontFile, drawsSeco
 import { DIGEST_META, GENERATOR_META, lexHandout, pageHtml, pictureAddress, pictureFile, pictureKey, type PageAssets, type PageThemeFont, type PictureFrom } from './pageHtml';
 import { deckDigest, publicDeck, type PublicDeck } from './publicDeck';
 import { logoAspectOf } from '../themeLogo';
+import { deckNameOf as deckNameOfFile } from '../deckFileName';
 
 export interface PageFs {
   /** Throws (ENOENT) when there is nothing at the path. */
@@ -62,9 +63,9 @@ export const PAGE_FONTS = [
   },
 ] as const;
 
-/** A deck's name: its file name without `.deck.md`. */
+/** A deck's name: its file name without `.rtms` (or an older deck's `.deck.md`), through the one rule. */
 export function deckNameOf(deckPath: string): string {
-  return path.basename(deckPath).replace(/\.deck\.md$/i, '');
+  return deckNameOfFile(path.basename(deckPath));
 }
 
 /** Where a deck's page goes: `<deck name>.html` beside it. */

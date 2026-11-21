@@ -30,6 +30,8 @@ export const RECENT_LIMIT = 5;
 
 const KINDS: Record<string, RecentKind> = {
   '.md': 'markdown', '.markdown': 'markdown', '.txt': 'markdown',
+  // Sprint 172: a deck (`kindOf` names it `deck` first); listed here so Last changed finds `.rtms` files at all
+  '.rtms': 'markdown',
   '.pdf': 'pdf',
   '.docx': 'word', '.doc': 'word',
   '.csv': 'sheet', '.xlsx': 'sheet', '.xls': 'sheet',
@@ -82,7 +84,7 @@ export function recentItems(
     .map((file, index) => {
       const about = isAboutFile(folder, file.path);
       const base = path.basename(file.path);
-      // A deck's extension is the whole ".deck.md", as Documents splits it (patch 018's ritemarkSplitExtension)
+      // An old deck's extension is the whole ".deck.md" (a ".rtms" one's is its last dot), as Documents splits it (patch 018's ritemarkSplitExtension)
       const split = splitFileName(base);
       const relativeDir = path.relative(folder, path.dirname(file.path));
       return {

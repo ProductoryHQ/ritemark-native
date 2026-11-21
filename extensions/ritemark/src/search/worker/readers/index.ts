@@ -28,6 +28,8 @@ export async function readDocument(format: DocumentFormat, bytes: Uint8Array, bu
 const EXTENSIONS: Record<string, DocumentFormat> = {
   '.md': 'markdown',
   '.markdown': 'markdown',
+  // Sprint 172: a deck is Markdown inside, so its words are found
+  '.rtms': 'markdown',
   '.csv': 'csv',
   '.docx': 'docx',
   '.pdf': 'pdf',
@@ -40,7 +42,7 @@ export function formatOf(fileName: string): DocumentFormat | null {
   return EXTENSIONS[fileName.slice(dot).toLowerCase()] ?? null;
 }
 
-/** A document's name as the tree shows it: the file name without its extension (a deck's is the whole `.deck.md`). */
+/** A document's name as the tree shows it: the file name without its extension (an old deck's is the whole `.deck.md`, a `.rtms` deck's its last dot). */
 export function documentName(fileName: string): string {
   return splitFileName(fileName).name;
 }

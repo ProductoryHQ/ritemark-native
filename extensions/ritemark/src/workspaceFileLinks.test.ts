@@ -22,6 +22,11 @@ assert.strictEqual(sibling.workspacePath, 'docs/notes/follow-up.md');
 assert.strictEqual(sibling.directory, 'docs/notes');
 assert.strictEqual(sibling.kind, 'markdown');
 
+// Sprint 172: a deck (`.rtms`) is a Markdown file to the chat's links, named by its deck name
+const deckLink = buildWorkspaceFileLinkResult(documentPath, path.join(root, 'docs', 'notes', 'Day one.rtms'), root);
+assert.strictEqual(deckLink.kind, 'markdown');
+assert.strictEqual(deckLink.label, 'Day one');
+
 const cousin = buildWorkspaceFileLinkResult(
   documentPath,
   path.join(root, 'docs', 'briefs', 'q2 plan.md'),

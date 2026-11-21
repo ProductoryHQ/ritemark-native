@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { deckName } from './DeckLibrary';
+import { isDeckPath } from './deckFileName';
 import { frontMatterField, frontMatterLook } from './deckFormat';
 import { projectRelative, projectRoot } from './deckDocuments';
 import { projectThemeFiles, readProjectTheme, readThemeOrEvening, resolveAssetsIn, type DeckPages } from './deckPages';
@@ -178,7 +179,7 @@ export class ThemeAi implements vscode.Disposable {
     const themeBefore = existing?.text ?? null;
     const themeAfter = aiThemeText(themeBefore, name, parsed.changes);
 
-    // The decks: each a `.deck.md` in the project, by its path as the project writes it (the case the AI typed may
+    // The decks: each a `.rtms` (or older `.deck.md`) in the project, by its path as the project writes it (the case the AI typed may
     // differ); its line before and after.
     const deckChanges: ThemeChangeRecord['decks'] = [];
     const deckTexts = new Map<string, { absolute: string; text: string }>();
@@ -187,7 +188,7 @@ export class ThemeAi implements vscode.Disposable {
       const given = projectPath(root, value);
       const relative = known.find(entry => entry.toLowerCase() === given.relative.toLowerCase()) ?? given.relative;
       const absolute = path.join(root, ...relative.split('/'));
-      if (!/\.deck\.md$/i.test(relative)) return { text: `${value} is not a deck. Use list_decks to find one.`, isError: true };
+      if (!isDeckPath(relative)) return { text: `${value} is not a deck. Use list_decks to find one.`, isError: true };
       const text = await deckText(absolute);
       if (text === null) return { text: `There is no deck at ${relative}. Use list_decks to find one.`, isError: true };
       const before = themeLineOf(text);

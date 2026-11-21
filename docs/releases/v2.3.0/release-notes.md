@@ -2,7 +2,7 @@
 
 # Ritemark 2.3.0
 
-You can now make slides in Ritemark, present them and share them.
+You can now make slides in Ritemark, present them, and give every participant a page to work through. They copy the prompts and tick off the exercises on their phone or computer.
 
 Write a deck as you write a document, with a handout beside the slides. 2.3 also lets you edit Excel files and keep their look, change pictures yourself or with ChatGPT, and change tables with the mouse.
 
@@ -17,6 +17,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 - **Format words on a slide from the toolbar.** Select words on a slide, in columns too. The toolbar's bold, italic, headings, lists, quote, code and link change them.
 - **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
 - **The toolbar steps aside for a link.** On a slide, the toolbar hides while you type the link's address, so it covers nothing. It comes back when you're done.
+- **Open a deck from Finder or Explorer.** A deck is its own kind of file, with its own icon. Double-click it, and it opens in Ritemark as a deck.
 
 ### What you can put on a slide
 

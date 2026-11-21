@@ -8,6 +8,7 @@ import type { WallSlide } from './present/presentProtocol';
 import type { AgendaEntry } from './blocks/agenda';
 import { isThemeChanges, type ThemeChanges } from './themeFile';
 import { logoKindOfName, MAX_LOGO_BYTES } from './themeLogo';
+import { isDeckPath } from './deckFileName';
 import type { ThemeChangeView } from './themeChange';
 
 export type ThemeRequest =
@@ -144,7 +145,7 @@ export function decodeThemeRequest(value: unknown): ThemeRequest {
     case 'theme/open-deck': {
       exactKeys(input, ['type', 'path']);
       const path = stringOf(input.path, MAX_PATH_LENGTH);
-      if (!/\.deck\.md$/i.test(path)) throw new ThemeProtocolError('path must be a deck');
+      if (!isDeckPath(path)) throw new ThemeProtocolError('path must be a deck');
       return { type: 'theme/open-deck', path };
     }
     case 'theme/undo-save':

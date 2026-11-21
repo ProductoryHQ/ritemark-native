@@ -119,7 +119,7 @@ function App() {
   // Task card page (Sprint 130, design.md §5): the card's strip and head come
   // from the board, the body is this document.
   const [cardMode, setCardMode] = useState<{ cardId: string } | null>(null)
-  // Sprint 157: a `.deck.md` shown as a deck (the host decides: the flag, the name, the deck version).
+  // Sprint 157: a deck (`.rtms`, or an older `.deck.md`) shown as a deck (the host decides: the flag, the name, the deck version).
   const [deckMode, setDeckMode] = useState(false)
   // Sprint 162 PR 2: a theme in the project's Slide library, shown as the theme's own tab (the host decides).
   const [themeMode, setThemeMode] = useState(false)

@@ -68,7 +68,8 @@ export function findStuckMarkdownTabs<T extends TabLike>(
     for (const tab of group.tabs) {
       const uri = resolveTextInput(tab.input);
       if (!uri) continue;
-      if (!/\.(md|markdown)$/i.test(uri.path)) continue;
+      // Sprint 172: a deck (`.rtms`) belongs in Ritemark's editor too
+      if (!/\.(md|markdown|rtms)$/i.test(uri.path)) continue;
       out.push({ uri, isActive: tab.isActive, isPinned: tab.isPinned, viewColumn: group.viewColumn, tab, replace: tab.isDirty !== true });
     }
   }
