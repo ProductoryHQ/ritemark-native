@@ -7,15 +7,15 @@ import { readDocx } from './docx';
 import { readMarkdown } from './markdown';
 import { readPdf } from './pdf';
 import { decodeText, type ReadOutcome } from './types';
-import { splitFileName } from '../../../decks/deckFileName';
+import { isDeckPath, splitFileName } from '../../../decks/deckFileName';
 
 export { READER_VERSION, type Passage, type ReadOutcome } from './types';
 
-/** `pause` lets the worker answer a query between a long PDF's pages. */
-export async function readDocument(format: DocumentFormat, bytes: Uint8Array, budget: number, pause: () => Promise<void>): Promise<ReadOutcome> {
+/** `pause` lets the worker answer a query between a long PDF's pages; `path` names a deck (#936: its slides read as words). */
+export async function readDocument(format: DocumentFormat, bytes: Uint8Array, budget: number, pause: () => Promise<void>, path = ''): Promise<ReadOutcome> {
   switch (format) {
     case 'markdown':
-      return readMarkdown(decodeText(bytes), budget);
+      return readMarkdown(decodeText(bytes), budget, { deck: isDeckPath(path) });
     case 'csv':
       return readCsv(decodeText(bytes), budget);
     case 'docx':

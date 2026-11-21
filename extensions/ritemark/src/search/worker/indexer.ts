@@ -54,7 +54,7 @@ export interface IndexerDependencies {
   pause: () => Promise<void>;
   onStatus: (status: IndexStatus) => void;
   log: (event: string, counts: Record<string, number>) => void;
-  read?: (format: FoundDocument['format'], bytes: Uint8Array, budget: number, pause: () => Promise<void>) => Promise<ReadOutcome>;
+  read?: (format: FoundDocument['format'], bytes: Uint8Array, budget: number, pause: () => Promise<void>, path?: string) => Promise<ReadOutcome>;
 }
 
 type FsEvent = { kind: 'created' | 'changed' | 'deleted'; path: string };
@@ -447,7 +447,7 @@ export class Indexer {
     let outcome: ReadOutcome;
     try {
       bytes = (prefetched ? await prefetched : null) ?? (await this.deps.fs.readFile(doc.path));
-      outcome = await (this.deps.read ?? readDocument)(doc.format, bytes, budget, this.deps.pause);
+      outcome = await (this.deps.read ?? readDocument)(doc.format, bytes, budget, this.deps.pause, doc.path);
     } catch {
       // A read that failed (locked, busy, too many open files) or a reader that failed to load is no verdict on
       // the file: found by name this time, kept nowhere, read again when it changes or Ritemark starts again.
