@@ -49,6 +49,17 @@ export function startCardRows(input: {
 }
 
 /**
+ * Where the one card is drawn (#917, the Experience lead, 20 November): at the handout's top whenever the handout shows
+ * (Slide and handout, or the handout alone), and under the slide in Slide only, where the handout is folded away. Never
+ * both, and never in a folded handout: a new deck opens in Slide only, so a card kept in the hidden handout left the
+ * deck's first minute an empty title slide.
+ */
+export function startCardPlace(slideShown: boolean, handoutShown: boolean): 'handout' | 'slide' | null {
+  if (handoutShown) return 'handout';
+  return slideShown ? 'slide' : null;
+}
+
+/**
  * Draft's message to the AI, as the person's own: what they wrote, as a request to draft this deck (attached to the
  * message as the document in front). The AI writes the slides and the handout with its deck tools.
  */
