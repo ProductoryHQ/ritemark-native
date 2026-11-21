@@ -3,7 +3,7 @@
 Track: SDD (eleven numbered requirements across the extension, the Mac app's file type and the Windows installer, with old files that must keep working). Override with: "use plain full track".
 Branch: `sprint-172-deck-extension` (PR branches `sprint-172-deck-extension-pr1` to `-pr3`); this plan is on `sprint-172-plan`.
 Release tier: **shell** (the Mac app's file type and the Windows installer's association; no VS Code patch changes). 2.3 is a shell release anyway.
-Status: **Plan, waiting for Jarmo's approval.** Jarmo said yes to the direction on 21 November 2026 (`.rtms` in 2.3, issue #940). The plan is his to approve, in his own words: it is shell-tier and it changes his decisions 1 and 10 in the decks README. Phase 2 (PLAN).
+Status: **Approved.** Jarmo approved this plan in his own words on 21 November 2026 ("kinnitan"), after his yes to the direction the same day (`.rtms` in 2.3, issue #940). Question 5 below is approved with the plan, as the plan assumes it (yes). Phase 3 (BUILD).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`: decision 1, decision 10, "The file", "The editor", item 20), as the Experience lead updated it in ritemark-dev 765e122.
 
@@ -79,8 +79,10 @@ For the Experience lead:
 3. **A copy of an old deck.** The plan names a copy of `Training.deck.md` `Training (copy).rtms`, since it is a new file. Agreed?
 4. **Windows registers `.rtms` always,** not behind the unchecked "Associate with .md files" box, since Ritemark owns the type. Agreed?
 
+The Experience lead answered all four in the decks spec (ritemark-dev 4b3fad1): (1) `deck.ico` is drawn by the lead in `product/design/experience/experiences/decks/file-icon/`; (2) the badge is Phosphor `presentation`, bold, in #4338ca; (3) yes, a copy is `X (copy).rtms`; (4) yes, Windows registers `.rtms` always.
+
 For Jarmo, with the approval:
-5. The Mac's type and Windows' association are not behind `ritemark.features.decks`: a `.rtms` is a deck file whatever the setting, and opens in Ritemark either way. The plan assumes yes.
+5. The Mac's type and Windows' association are not behind `ritemark.features.decks`: a `.rtms` is a deck file whatever the setting, and opens in Ritemark either way. The plan assumes yes. Approved with the plan on 21 November 2026.
 
 ## Approval
-- [ ] Jarmo approved this sprint plan in his own words (the Development manager's word does not count for this gate)
+- [x] Jarmo approved this sprint plan in his own words on 21 November 2026: "kinnitan" (in the Development manager session, answering the ask for this plan's approval).
