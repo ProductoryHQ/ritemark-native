@@ -55,3 +55,12 @@ for (const id of gpt62) {
 // Terra and Luna remain agent-only.
 for (const id of ['gpt-6.1-terra', 'gpt-6-luna']) assert.ok(!BUNDLED_CATALOG.providers.openai!.models.some(row => row.id === id), `openai: ${id} stays out`);
 console.log('lineup956: all tests passed');
+
+// Thinking effort follows Codex 0.171.0's own model list (`codex debug models`, 22 Nov 2026):
+// GPT-6 Luna stops at Max and starts at Medium; GPT-6.2 Astra starts at Low.
+const effortOf = (id: string) => bundled.codex.models.find(row => row.id === id)?.thinkingEffort;
+const allSix = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+assert.deepEqual(effortOf(CODEX_MODEL_IDS.SOL_6_2), { levels: allSix, defaultLevel: 'low' });
+assert.deepEqual(effortOf(CODEX_MODEL_IDS.ASTRA_6_2), { levels: allSix, defaultLevel: 'low' });
+assert.deepEqual(effortOf(CODEX_MODEL_IDS.TERRA_6_1), { levels: allSix, defaultLevel: 'low' });
+assert.deepEqual(effortOf(CODEX_MODEL_IDS.LUNA_6), { levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultLevel: 'medium' }, 'GPT-6 Luna offers no Ultra');
