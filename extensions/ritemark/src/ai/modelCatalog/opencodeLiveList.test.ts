@@ -9,6 +9,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
+import { OPENAI_MODEL_IDS, toOpenCodeModelId } from '../modelConfig';
 import { BUNDLED_CATALOG } from './bundledCatalog';
 import { openCodeLiveRows, type OpenCodeModelOption } from './opencodeLiveList';
 import { resolveAll, resolveStaticModels } from './resolver';
@@ -31,14 +32,20 @@ const APP = '2.1.0';
 const FIXTURE: OpenCodeModelOption[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'opencode-models.fixture.json'), 'utf8')).options;
 const CURATED = resolveStaticModels('opencode', null, null, BUNDLED_CATALOG, APP);
 const ids = (rows: ModelEntry[]): string[] => rows.map((row) => row.id);
-// #956 put GPT-6.1 Terra and GPT-6 Luna in the lineup. The two tests about a model newer than the
-// lineup keep their meaning on the lineup as it was before them.
-const NEW_IN_956 = new Set(['openai/gpt-6.1-terra', 'openai/gpt-6-luna', 'openrouter/openai/gpt-6.1-terra', 'openrouter/openai/gpt-6-luna']);
+// Reconstruct the lineup from before #956 so Terra is still a newly discovered model.
+const OPENAI_MODELS_SINCE_956 = [
+  OPENAI_MODEL_IDS.TERRA_6_1, OPENAI_MODEL_IDS.LUNA_6,
+  OPENAI_MODEL_IDS.SOL_6_2, OPENAI_MODEL_IDS.ASTRA_6_2,
+];
+const ADDED_SINCE_956 = new Set(OPENAI_MODELS_SINCE_956.flatMap(id => {
+  const openai = toOpenCodeModelId('openai', id);
+  return [openai, toOpenCodeModelId('openrouter', openai)];
+}));
 const CATALOG_BEFORE_956 = {
   ...BUNDLED_CATALOG,
   providers: {
     ...BUNDLED_CATALOG.providers,
-    opencode: { ...BUNDLED_CATALOG.providers.opencode!, models: BUNDLED_CATALOG.providers.opencode!.models.filter((row) => !NEW_IN_956.has(row.id)) },
+    opencode: { ...BUNDLED_CATALOG.providers.opencode!, models: BUNDLED_CATALOG.providers.opencode!.models.filter((row) => !ADDED_SINCE_956.has(row.id)) },
   },
 };
 const CURATED_BEFORE_956 = resolveStaticModels('opencode', null, null, CATALOG_BEFORE_956, APP);

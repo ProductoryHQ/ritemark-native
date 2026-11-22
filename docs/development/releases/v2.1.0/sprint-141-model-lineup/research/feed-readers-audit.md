@@ -42,6 +42,9 @@ The `getDefault` rule was read from each tag's `index.ts`, and `check:model-feed
 | Codex `gpt-6.1-sol` | 1.14.0 | Codex 0.161.0 made it its own default; 1.14.0 is the first release with such a Codex (0.162.1). 1.13.0's 0.160.0 is older |
 | Anthropic `claude-haiku-5-5` | 1.14.0 | Claude Code 2.1.296 (1.14.0) is the first bundled CLI whose `haiku` is Haiku 5.5 |
 | OpenCode's new rows (Argon on Google and OpenRouter, the Claude 5.5s, GPT-6.1 Sol, OpenRouter's Claude Sonnet 5.5 and GPT-6.1 Sol) | 2.0.0 | OpenCode 1.19.3 (2.0.0) is the version Argon was run on (`c4808be`). Older OpenCode builds do fetch the current registry (A3), but nothing was run on them |
+| Codex GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | 2.3.0 | First Ritemark release bundling Codex 0.171.0, which supports both models |
+| OpenCode's OpenAI and OpenRouter routes for GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | 2.3.0 | Same release floor as the new Codex rows for this lineup update |
+| OpenAI API GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | None | Flows sends model IDs directly to the OpenAI API with the user's key. These rows have no bundled CLI dependency |
 
 **No gate on a bundled row.** The plan allowed a bundled gate up to `main`'s version. The code showed otherwise: before activation, `modelCatalog` resolves with app version `0.0.0` (`index.ts`, `_appVersion`). A gate there would hide the row from the build itself until activation. So bundled rows carry none, and a unit test says so (R6, revised).
 

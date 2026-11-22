@@ -578,7 +578,7 @@ test('S127 S28: the provider remembers the notice under the accepted conversatio
   assert.deepStrictEqual(keys, ['has(conversationId)', 'add(conversationId)']);
 });
 
-// ── GH #398: GPT-6.1 Sol is the Codex default ──────────────────────────────
+// ── Codex default changes and saved selections ──────────────────────────────
 
 // The shape of `~/.codex/models_cache.json` as the bundled Codex 0.160.0 writes it.
 const CODEX_0_160_CACHE = {
@@ -606,24 +606,24 @@ const FEED_BEFORE_398: ModelCatalog = {
   },
 };
 
-test('GH #398: the bundled Codex default is GPT-6.1 Sol, and GPT-5.6 Sol stays selectable', () => {
+test('the bundled Codex default is GPT-6.2 Sol, and GPT-5.6 Sol stays selectable', () => {
   const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
-  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
-  assert.strictEqual(r.codex.models[0].id, CODEX_MODEL_IDS.SOL_6_1, 'the default is the first row');
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
+  assert.strictEqual(r.codex.models[0].id, CODEX_MODEL_IDS.SOL_6_2, 'the default is the first row');
   assert.deepStrictEqual(r.codex.models[0].thinkingEffort, {
     levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low',
-  }, 'effort levels as Codex 0.160.0 lists them');
+  });
   const previous = r.codex.models.find((model) => model.id === CODEX_MODEL_IDS.SOL);
   assert.ok(previous && !previous.deprecated, 'GPT-5.6 Sol is a selectable row');
 });
 
-test('GH #398: a Codex 0.160.0 live list keeps the default and takes the curated label', () => {
+test('GH #398: a Codex 0.160.0 live list falls back to GPT-6.1 Sol and takes the curated label', () => {
   const live = parseCodexModelsCache(CODEX_0_160_CACHE, '0.160.0');
   const r = resolveAll({ codex: live }, null, null, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.codex.source, 'live');
-  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
   assert.strictEqual(findModelEntry(r.codex.models, CODEX_MODEL_IDS.SOL_6_1)?.label, 'GPT-6.1 Sol');
-  assert.strictEqual(r.codex.models[0].id, CODEX_MODEL_IDS.SOL_6_1);
+  assert.deepStrictEqual(resolveRequestedModelIn(r.codex, undefined, 'codex'), { id: CODEX_MODEL_IDS.SOL_6_1 });
   assert.ok(r.codex.models.some((model) => model.id === CODEX_MODEL_IDS.SOL));
 });
 
@@ -632,13 +632,13 @@ test('GH #398 + #375: a cache from another Codex version leaves the bundled defa
   assert.strictEqual(live, null);
   const r = resolveAll({ codex: live }, null, null, BUNDLED_CATALOG, APP);
   assert.strictEqual(r.codex.source, 'bundled');
-  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
 });
 
 test('GH #398: the feed published before v1.14.0 cannot bring back the GPT-5.6 Sol default', () => {
   for (const discovery of [{}, { codex: parseCodexModelsCache(CODEX_0_160_CACHE, '0.160.0') }]) {
     const r = resolveAll(discovery, FEED_BEFORE_398, FEED_BEFORE_398, BUNDLED_CATALOG, APP);
-    assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+    assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
     assert.strictEqual(findModelEntry(r.codex.models, CODEX_MODEL_IDS.SOL)?.description, 'Previous agentic workhorse');
   }
 });
@@ -750,7 +750,7 @@ test('S141 R1/S2: with the feed of c4808be, Argon is listed once and the bundled
   }
   assert.strictEqual(r.gemini.models.filter((m) => m.id === GEMINI_MODEL_IDS.ARGON_4).length, 1);
   assert.strictEqual(r.gemini.defaults['flow-llm'], DEFAULT_MODELS.flowLLMGemini);
-  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
   assert.strictEqual(r.anthropic.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
 });
 
@@ -782,7 +782,7 @@ test('S141 R6: no bundled row carries minAppVersion (the catalog resolves as 0.0
     for (const row of catalog?.models ?? []) assert.strictEqual(row.minAppVersion, undefined, `${provider}/${row.id}`);
   }
   const early = resolveAll({}, null, null, BUNDLED_CATALOG, '0.0.0');
-  assert.strictEqual(early.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_1);
+  assert.strictEqual(early.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
 });
 
 test('S141 R4: the bundled flow-llm defaults are DEFAULT_MODELS', () => {

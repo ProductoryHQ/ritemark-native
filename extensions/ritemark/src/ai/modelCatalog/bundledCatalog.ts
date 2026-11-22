@@ -64,6 +64,8 @@ export const BUNDLED_CATALOG: ModelCatalog = {
     openai: {
       defaults: { 'flow-llm': DEFAULT_MODELS.flowLLM },
       models: [
+        { id: OPENAI_MODEL_IDS.SOL_6_2, label: 'GPT-6.2 Sol', description: 'Fast, go-to model for coding and everyday work', tier: 'high', deprecated: false, order: -2 },
+        { id: OPENAI_MODEL_IDS.ASTRA_6_2, label: 'GPT-6.2 Astra', description: 'Most capable for complex coding and professional work', tier: 'high', deprecated: false, order: -1 },
         { id: OPENAI_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: 'Previous generation for complex coding and professional work', tier: 'high', deprecated: false, order: 0 },
         { id: OPENAI_MODEL_IDS.SOL, label: 'GPT-5.6 Sol', description: 'Reliable agentic workhorse', tier: 'high', deprecated: false, order: 1 },
         { id: OPENAI_MODEL_IDS.TERRA, label: 'GPT-5.6 Terra', description: 'Balanced agentic model', tier: 'medium', deprecated: false, order: 2 },
@@ -89,8 +91,10 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       ],
     },
     codex: {
-      defaults: { codex: CODEX_MODEL_IDS.SOL_6_1 },
+      defaults: { codex: CODEX_MODEL_IDS.SOL_6_2 },
       models: [
+        { id: CODEX_MODEL_IDS.SOL_6_2, label: 'GPT-6.2 Sol', description: 'Fast, go-to model for coding and everyday work (recommended)', tier: 'high', deprecated: false, order: -2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
+        { id: CODEX_MODEL_IDS.ASTRA_6_2, label: 'GPT-6.2 Astra', description: 'Most capable for complex coding and professional work', tier: 'high', deprecated: false, order: -1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'medium' } },
         { id: CODEX_MODEL_IDS.SOL_6_1, label: 'GPT-6.1 Sol', description: 'Previous generation for coding and everyday work', tier: 'high', deprecated: false, order: 0, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
         { id: CODEX_MODEL_IDS.TERRA_6_1, label: 'GPT-6.1 Terra', description: 'Efficient for visual understanding and computer use', tier: 'medium', deprecated: false, order: 0.1, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
         { id: CODEX_MODEL_IDS.LUNA_6, label: 'GPT-6 Luna', description: 'Fast and affordable for easier tasks', tier: 'low', deprecated: false, order: 0.2, thinkingEffort: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'], defaultLevel: 'low' } },
@@ -119,6 +123,8 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 2 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_LITE_3_5), label: 'Gemini 3.5 Flash Lite', description: 'Google — current low-cost model', tier: 'low', deprecated: false, order: 3 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_2_5), label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_2), label: 'GPT-6.2 Sol', description: 'OpenAI — Fast, go-to model for coding and everyday work', tier: 'high', deprecated: false, order: 4.1 },
+        { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA_6_2), label: 'GPT-6.2 Astra', description: 'OpenAI — Most capable for complex coding and professional work', tier: 'high', deprecated: false, order: 4.2 },
         { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1), label: 'GPT-6.1 Sol', description: 'OpenAI — previous generation for coding and everyday work', tier: 'high', deprecated: false, order: 5 },
         { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA_6_1), label: 'GPT-6.1 Terra', description: 'OpenAI — visual understanding and computer use', tier: 'medium', deprecated: false, order: 5.1 },
         { id: toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA_6), label: 'GPT-6 Luna', description: 'OpenAI — fast and affordable for easier tasks', tier: 'low', deprecated: false, order: 5.2 },
@@ -137,6 +143,8 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)), label: 'Gemini 4 Argon', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 18 },
         { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5), label: 'Claude Sonnet 5.5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 19 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5)), label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 20 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_2)), label: 'GPT-6.2 Sol', description: 'OpenRouter — Fast, go-to model for coding and everyday work', tier: 'high', deprecated: false, order: 20.1 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA_6_2)), label: 'GPT-6.2 Astra', description: 'OpenRouter — Most capable for complex coding and professional work', tier: 'high', deprecated: false, order: 20.2 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1)), label: 'GPT-6.1 Sol', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 21 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA_6_1)), label: 'GPT-6.1 Terra', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'medium', deprecated: false, order: 21.1 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA_6)), label: 'GPT-6 Luna', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'low', deprecated: false, order: 21.2 },
