@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { CODEX_MODEL_IDS } from '../../../../src/ai/modelConfig';
 import { AGENTS, type AgentId } from '../../../../src/agent/types';
 import { RUNTIME_CAPABILITIES } from '../../../../src/runtime/capabilities';
 import { useAISidebarStore, hydrateConversations, selectActiveConversation } from './store';
@@ -658,11 +659,12 @@ function testACatalogFallbackMovesEveryComposerSurfaceTogether() {
   }
 }
 
-// GH #398: the catalog declares GPT-6.1 Sol the Codex default instead of GPT-5.6 Sol.
-const CODEX_CATALOG_398 = [
-  { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', description: 'Latest agentic workhorse (recommended)', tier: 'high' as const, deprecated: false, order: 0, isDefault: true },
-  { id: 'gpt-6-astra', label: 'GPT-6 Astra', description: 'Most capable Codex model', tier: 'high' as const, deprecated: false, order: 1 },
-  { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Previous agentic workhorse', tier: 'high' as const, deprecated: false, order: 2 },
+const CODEX_CATALOG_62 = [
+  { id: CODEX_MODEL_IDS.SOL_6_2, label: 'GPT-6.2 Sol', description: 'Fast, go-to model for coding and everyday work (recommended)', tier: 'high' as const, deprecated: false, order: 0, isDefault: true },
+  { id: CODEX_MODEL_IDS.ASTRA_6_2, label: 'GPT-6.2 Astra', description: 'Most capable for complex coding and professional work', tier: 'high' as const, deprecated: false, order: 1 },
+  { id: CODEX_MODEL_IDS.SOL_6_1, label: 'GPT-6.1 Sol', description: 'Previous generation for coding and everyday work', tier: 'high' as const, deprecated: false, order: 2 },
+  { id: CODEX_MODEL_IDS.ASTRA, label: 'GPT-6 Astra', description: 'Previous generation for complex coding and professional work', tier: 'high' as const, deprecated: false, order: 3 },
+  ...CODEX_CATALOG.map((model) => ({ ...model, order: 4 })),
 ];
 
 function codexModelSent(posted: unknown[]): string | undefined {
@@ -678,20 +680,20 @@ function testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes() {
   vscode.postMessage = (message: unknown) => { posted.push(message); };
   try {
     // A fresh start: the blank thread takes the declared default, not the first row.
-    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: [...CODEX_CATALOG_398].reverse() });
-    assert.equal(selectActiveConversation(useAISidebarStore.getState()).codexSelectedModel, 'gpt-6.1-sol');
-    assert.equal(codexModelSent(posted), 'gpt-6.1-sol');
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: [...CODEX_CATALOG_62].reverse() });
+    assert.equal(selectActiveConversation(useAISidebarStore.getState()).codexSelectedModel, CODEX_MODEL_IDS.SOL_6_2);
+    assert.equal(codexModelSent(posted), CODEX_MODEL_IDS.SOL_6_2);
     resetStore();
 
     // A thread already on the previous default keeps it when the catalog
     // switches defaults under it (a feed or live-probe refresh).
-    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: CODEX_CATALOG.map((model) => ({ ...model, isDefault: true })) });
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: [{ ...CODEX_CATALOG_62[2], isDefault: true }] });
     const openId = useAISidebarStore.getState().activeConversationId!;
-    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: CODEX_CATALOG_398 });
+    deliver({ ...hostBootstrap('codex', 'sonnet'), codexModels: CODEX_CATALOG_62 });
     const open = useAISidebarStore.getState().conversations[openId];
-    assert.equal(open.codexSelectedModel, 'gpt-5.6-sol');
-    assert.equal(open.pendingRuntime.modelId, 'gpt-5.6-sol');
-    assert.equal(codexModelSent(posted), 'gpt-5.6-sol');
+    assert.equal(open.codexSelectedModel, CODEX_MODEL_IDS.SOL_6_1);
+    assert.equal(open.pendingRuntime.modelId, CODEX_MODEL_IDS.SOL_6_1);
+    assert.equal(codexModelSent(posted), CODEX_MODEL_IDS.SOL_6_1);
   } finally {
     vscode.postMessage = originalPostMessage;
     resetStore();

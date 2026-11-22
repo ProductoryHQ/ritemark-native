@@ -9,6 +9,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
+import { OPENAI_MODEL_IDS, toOpenCodeModelId } from '../modelConfig';
 import { BUNDLED_CATALOG } from './bundledCatalog';
 import { openCodeLiveRows, type OpenCodeModelOption } from './opencodeLiveList';
 import { resolveAll, resolveStaticModels } from './resolver';
@@ -31,6 +32,23 @@ const APP = '2.1.0';
 const FIXTURE: OpenCodeModelOption[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'opencode-models.fixture.json'), 'utf8')).options;
 const CURATED = resolveStaticModels('opencode', null, null, BUNDLED_CATALOG, APP);
 const ids = (rows: ModelEntry[]): string[] => rows.map((row) => row.id);
+// Reconstruct the lineup from before #956 so Terra is still a newly discovered model.
+const OPENAI_MODELS_SINCE_956 = [
+  OPENAI_MODEL_IDS.TERRA_6_1, OPENAI_MODEL_IDS.LUNA_6,
+  OPENAI_MODEL_IDS.SOL_6_2, OPENAI_MODEL_IDS.ASTRA_6_2,
+];
+const ADDED_SINCE_956 = new Set(OPENAI_MODELS_SINCE_956.flatMap(id => {
+  const openai = toOpenCodeModelId('openai', id);
+  return [openai, toOpenCodeModelId('openrouter', openai)];
+}));
+const CATALOG_BEFORE_956 = {
+  ...BUNDLED_CATALOG,
+  providers: {
+    ...BUNDLED_CATALOG.providers,
+    opencode: { ...BUNDLED_CATALOG.providers.opencode!, models: BUNDLED_CATALOG.providers.opencode!.models.filter((row) => !ADDED_SINCE_956.has(row.id)) },
+  },
+};
+const CURATED_BEFORE_956 = resolveStaticModels('opencode', null, null, CATALOG_BEFORE_956, APP);
 const offered = (rows: ModelEntry[], vendor: string): string[] => ids(rows.filter((row) => !row.hidden && row.id.startsWith(`${vendor}/`)));
 
 function resolvedWith(live: ModelEntry[] | null): ModelEntry[] {
@@ -46,11 +64,11 @@ test('S35: a keyed provider\'s group is OpenCode\'s list, with catalog labels fo
 });
 
 test('S35/#529: a model the provider adds, newer than the lineup, is offered with OpenCode\'s name', () => {
-  const models = resolvedWith(openCodeLiveRows(FIXTURE, CURATED));
+  const models = resolveAll({ opencode: openCodeLiveRows(FIXTURE, CURATED_BEFORE_956) }, null, null, CATALOG_BEFORE_956, APP).opencode.models;
   const terra = models.find((row) => row.id === 'openai/gpt-6.1-terra');
   assert.ok(terra && !terra.hidden, 'GPT-6.1 Terra (not in the catalog) is offered');
   assert.strictEqual(terra.label, 'GPT-6.1 Terra');
-  const curatedLast = Math.max(...models.filter((row) => CURATED.some((c) => c.id === row.id)).map((row) => row.order));
+  const curatedLast = Math.max(...models.filter((row) => CURATED_BEFORE_956.some((c) => c.id === row.id)).map((row) => row.order));
   assert.ok(terra.order > curatedLast, 'new models come after the curated ones');
 });
 
@@ -122,7 +140,7 @@ test('S39: the keyless run\'s free models give Ritemark no row', () => {
 });
 
 test('S35: narrowing by the provider\'s own list drops an unknown model it doesn\'t name, never a curated one', () => {
-  const live = openCodeLiveRows(FIXTURE, CURATED, { openai: new Set(['gpt-6.1-sol']) });
+  const live = openCodeLiveRows(FIXTURE, CURATED_BEFORE_956, { openai: new Set(['gpt-6.1-sol']) });
   assert.ok(!ids(live).includes('openai/gpt-6.1-terra'), 'not in OpenAI\'s list for this key');
   assert.ok(ids(live).includes('openai/gpt-5.2'), 'curated rows stay: OpenCode runs them');
 });
