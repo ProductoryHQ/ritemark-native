@@ -2,17 +2,17 @@
 
 Ritemark ships app-owned Claude, Codex, and OpenCode runtimes. A clean install does not depend on a user-installed runtime or `PATH` tool.
 
-## Approved v1.11.0 snapshot
+## Approved v2.3.0 snapshot
 
 | Runtime | Version | Companion dependency | Source rows |
 |---|---:|---|---:|
-| Codex | 0.154.0 | Complete official app-server package; bundled ripgrep 15.2.0 and platform resources | 3 |
-| Claude Code | 2.1.270 | `@anthropic-ai/claude-agent-sdk` 0.3.270 with all eight optional platform packages | 3 |
-| OpenCode | 1.18.30 | ACP SDK 1.4.0 and runtime-owned ripgrep 15.1.0 | 6 |
+| Codex | 0.171.0 | Complete official app-server package; bundled ripgrep 15.2.0, the exec-server and platform resources | 3 |
+| Claude Code | 2.1.310 | `@anthropic-ai/claude-agent-sdk` 0.3.310 with all eight optional platform packages | 3 |
+| OpenCode | 1.19.4 | ACP SDK 1.4.0 and runtime-owned ripgrep 15.1.0 | 6 |
 
-The schema-v3 manifest contains 12 downloaded source rows. They produce 25 approved installed files: 16 Codex package members, three Claude runtimes, three OpenCode runtimes, and three OpenCode ripgrep binaries. Every archive and installed file has an exact SHA-256.
+The schema-v3 manifest contains 12 downloaded source rows. They produce 26 approved installed files: 17 Codex package members (five on each Mac, seven on Windows), three Claude runtimes, three OpenCode runtimes, and three OpenCode ripgrep binaries. Every archive and installed file has an exact SHA-256.
 
-Claude Code and its Agent SDK move in lockstep: runtime `2.1.270` pairs with SDK `0.3.270`. The validator also requires every SDK optional platform package at that exact version. Anthropic runtime redistribution remains covered by the product-owner decision recorded on 2026-05-06 and the legal URL in each manifest row.
+Claude Code and its Agent SDK move in lockstep: runtime `2.1.310` pairs with SDK `0.3.310`. The validator also requires every SDK optional platform package at that exact version. Anthropic runtime redistribution remains covered by the product-owner decision recorded on 2026-05-06 and the legal URL in each manifest row.
 
 ## Installed layout
 
@@ -25,7 +25,8 @@ binaries/agents/<platform>-<arch>/
 └── codex/
     ├── bin/
     │   ├── codex-app-server[.exe]
-    │   └── codex-code-mode-host[.exe]
+    │   ├── codex-code-mode-host[.exe]
+    │   └── codex-exec-server[.exe]             # since Codex 0.171
     ├── codex-package.json
     ├── codex-path/
     │   └── rg[.exe]
@@ -34,7 +35,7 @@ binaries/agents/<platform>-<arch>/
         └── codex-windows-sandbox-setup.exe     # Windows
 ```
 
-The Codex tree is copied without flattening because app-server resolves code-mode-host, ripgrep and the Windows sandbox helpers relative to the official package. Codex 0.163.0 no longer ships its patched `zsh` on macOS (openai/codex#52213). OpenCode receives only `opencode-path` at the front of its subprocess `PATH`; this prevents a first-use ripgrep download and does not couple OpenCode to Codex's package.
+The Codex tree is copied without flattening because app-server resolves code-mode-host, ripgrep and the Windows sandbox helpers relative to the official package. Codex 0.163.0 no longer ships its patched `zsh` on macOS (openai/codex#52213). Codex 0.171.0 adds `bin/codex-exec-server`, the standalone executor (openai/codex#57589, #57590), and names it as `execServer` in `codex-package.json`; it is signed by OpenAI under its own identifier, `codex-exec-server`, and `codesign-app.sh` (5c-agents) and `codesign-windows.sh` re-sign it with the other agent binaries, as they find every executable under `binaries/agents/`. OpenCode receives only `opencode-path` at the front of its subprocess `PATH`; this prevents a first-use ripgrep download and does not couple OpenCode to Codex's package.
 
 Payload directories and `.sha256` sidecars are generated and gitignored. The manifest, validator, fetcher, and this notice are tracked.
 
@@ -54,5 +55,7 @@ The fetcher validates the manifest before network access, caches archives by dig
 ## Update and rollback
 
 Update the manifest, validator allowlist, SDK pin, lockfile, evidence, and this notice in one sprint. Inspect the complete upstream package and first-use behavior before approving a new snapshot. Never mix Codex app-server with members from another package version.
+
+To undo the Codex 0.171.0 update (Ritemark 2.3), revert its pull request: that restores Codex 0.164.0's three manifest rows, the validator's allowlist and its tests together, then run `./scripts/fetch-agent-runtimes.sh --all-platforms`. The snapshot before it is commit `cc54f1786ca4e916966d7584264ac40a5369e734`: Codex 0.164.0, Claude Code 2.1.310 with SDK 0.3.310, OpenCode 1.19.4, and ACP SDK 1.4.0. It is a shell-tier change both ways: an extension release cannot ship it.
 
 The Sprint 116 rollback snapshot is commit `30ea2ab32d15be161991d1bb8924a4c4ca331f8c`: Codex 0.153.0, Claude Code 2.1.239 with SDK 0.3.239, OpenCode 1.18.21, and ACP SDK 1.4.0. A rollback restores the manifest, fetch/validation contract, adapters, SDK lockfile, and catalog together.

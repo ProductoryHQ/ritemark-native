@@ -22,7 +22,11 @@ export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
 
 /** Canonical Codex agent model identifiers. */
 export const CODEX_MODEL_IDS = {
+  SOL_6_2: 'gpt-6.2-sol',
+  ASTRA_6_2: 'gpt-6.2-astra',
+  TERRA_6_1: 'gpt-6.1-terra',
   SOL_6_1: 'gpt-6.1-sol',
+  LUNA_6: 'gpt-6-luna',
   ASTRA: 'gpt-6-astra',
   SOL: 'gpt-5.6-sol',
   TERRA: 'gpt-5.6-terra',
@@ -39,6 +43,7 @@ export const CLAUDE_MODEL_IDS = {
   OPUS_5_5: 'claude-opus-5-5',
   OPUS_5: 'claude-opus-5',
   OPUS_4_8: 'claude-opus-4-8',
+  FABLE_5_2: 'claude-fable-5-2',
   FABLE_5_1: 'claude-fable-5-1',
   FABLE_5: 'claude-fable-5',
   HAIKU_5_5: 'claude-haiku-5-5',
@@ -46,8 +51,12 @@ export const CLAUDE_MODEL_IDS = {
 } as const;
 
 export const OPENAI_MODEL_IDS = {
-  /** Sprint 141 R2: OpenCode's OpenAI group (the API serves Codex's default too). */
+  SOL_6_2: CODEX_MODEL_IDS.SOL_6_2,
+  ASTRA_6_2: CODEX_MODEL_IDS.ASTRA_6_2,
+  /** Shared with OpenCode's OpenAI group. */
+  TERRA_6_1: CODEX_MODEL_IDS.TERRA_6_1,
   SOL_6_1: CODEX_MODEL_IDS.SOL_6_1,
+  LUNA_6: CODEX_MODEL_IDS.LUNA_6,
   ASTRA: CODEX_MODEL_IDS.ASTRA,
   SOL: CODEX_MODEL_IDS.SOL,
   TERRA: CODEX_MODEL_IDS.TERRA,
@@ -132,11 +141,35 @@ export interface ModelConfig {
  * Run `openai.models.list()` to get current list
  */
 export const OPENAI_LLM_MODELS: ModelConfig[] = [
-  // GPT-5 Family (Responses API)
+  // GPT-6.2 (Responses API)
+  {
+    id: OPENAI_MODEL_IDS.SOL_6_2,
+    name: 'GPT-6.2 Sol',
+    description: 'Fast, go-to model for coding and everyday work',
+    api: 'responses',
+    reasoning: 'low',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
+  {
+    id: OPENAI_MODEL_IDS.ASTRA_6_2,
+    name: 'GPT-6.2 Astra',
+    description: 'Most capable for complex coding and professional work',
+    api: 'responses',
+    reasoning: 'medium',
+    contextWindow: 400000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
+
+  // Earlier Responses API models
   {
     id: OPENAI_MODEL_IDS.ASTRA,
     name: 'GPT-6 Astra',
-    description: 'Most capable model for complex, demanding work',
+    description: 'Previous generation for complex coding and professional work',
     api: 'responses',
     reasoning: 'medium',
     contextWindow: 400000,
