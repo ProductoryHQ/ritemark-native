@@ -126,6 +126,8 @@
 .deck-handout .wysiwyg-editor .ProseMirror {
   counter-reset: deck-slide;
   max-width: none !important;
+  /* not the document's 60vh floor (Editor.tsx): the handout's start card sits right under the first part (#947) */
+  min-height: 0 !important;
   /* room below to scroll the last part to the top (60vh until the deck view measures the exact room) */
   padding: 0 var(--deck-text-right) 60vh var(--deck-text-left) !important;
 }
