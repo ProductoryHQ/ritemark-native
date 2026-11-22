@@ -31,6 +31,17 @@ const APP = '2.1.0';
 const FIXTURE: OpenCodeModelOption[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'opencode-models.fixture.json'), 'utf8')).options;
 const CURATED = resolveStaticModels('opencode', null, null, BUNDLED_CATALOG, APP);
 const ids = (rows: ModelEntry[]): string[] => rows.map((row) => row.id);
+// #956 put GPT-6.1 Terra and GPT-6 Luna in the lineup. The two tests about a model newer than the
+// lineup keep their meaning on the lineup as it was before them.
+const NEW_IN_956 = new Set(['openai/gpt-6.1-terra', 'openai/gpt-6-luna', 'openrouter/openai/gpt-6.1-terra', 'openrouter/openai/gpt-6-luna']);
+const CATALOG_BEFORE_956 = {
+  ...BUNDLED_CATALOG,
+  providers: {
+    ...BUNDLED_CATALOG.providers,
+    opencode: { ...BUNDLED_CATALOG.providers.opencode!, models: BUNDLED_CATALOG.providers.opencode!.models.filter((row) => !NEW_IN_956.has(row.id)) },
+  },
+};
+const CURATED_BEFORE_956 = resolveStaticModels('opencode', null, null, CATALOG_BEFORE_956, APP);
 const offered = (rows: ModelEntry[], vendor: string): string[] => ids(rows.filter((row) => !row.hidden && row.id.startsWith(`${vendor}/`)));
 
 function resolvedWith(live: ModelEntry[] | null): ModelEntry[] {
@@ -46,11 +57,11 @@ test('S35: a keyed provider\'s group is OpenCode\'s list, with catalog labels fo
 });
 
 test('S35/#529: a model the provider adds, newer than the lineup, is offered with OpenCode\'s name', () => {
-  const models = resolvedWith(openCodeLiveRows(FIXTURE, CURATED));
+  const models = resolveAll({ opencode: openCodeLiveRows(FIXTURE, CURATED_BEFORE_956) }, null, null, CATALOG_BEFORE_956, APP).opencode.models;
   const terra = models.find((row) => row.id === 'openai/gpt-6.1-terra');
   assert.ok(terra && !terra.hidden, 'GPT-6.1 Terra (not in the catalog) is offered');
   assert.strictEqual(terra.label, 'GPT-6.1 Terra');
-  const curatedLast = Math.max(...models.filter((row) => CURATED.some((c) => c.id === row.id)).map((row) => row.order));
+  const curatedLast = Math.max(...models.filter((row) => CURATED_BEFORE_956.some((c) => c.id === row.id)).map((row) => row.order));
   assert.ok(terra.order > curatedLast, 'new models come after the curated ones');
 });
 
@@ -122,7 +133,7 @@ test('S39: the keyless run\'s free models give Ritemark no row', () => {
 });
 
 test('S35: narrowing by the provider\'s own list drops an unknown model it doesn\'t name, never a curated one', () => {
-  const live = openCodeLiveRows(FIXTURE, CURATED, { openai: new Set(['gpt-6.1-sol']) });
+  const live = openCodeLiveRows(FIXTURE, CURATED_BEFORE_956, { openai: new Set(['gpt-6.1-sol']) });
   assert.ok(!ids(live).includes('openai/gpt-6.1-terra'), 'not in OpenAI\'s list for this key');
   assert.ok(ids(live).includes('openai/gpt-5.2'), 'curated rows stay: OpenCode runs them');
 });
