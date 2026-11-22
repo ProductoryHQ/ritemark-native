@@ -3,7 +3,7 @@
 Track: SDD (eleven numbered requirements across the extension, the Mac app's file type and the Windows installer, with old files that must keep working). Override with: "use plain full track".
 Branch: `sprint-172-deck-extension` (PR branches `sprint-172-deck-extension-pr1` to `-pr3`); this plan is on `sprint-172-plan`.
 Release tier: **shell** (the Mac app's file type and the Windows installer's association; no VS Code patch changes). 2.3 is a shell release anyway.
-Status: **Approved.** Jarmo approved this plan in his own words on 21 November 2026 ("kinnitan"), after his yes to the direction the same day (`.rtms` in 2.3, issue #940). Question 5 below is approved with the plan, as the plan assumes it (yes). Phase 3 (BUILD).
+Status: **Merged, 21 November 2026.** PRs #949, #951 and #952 landed for 2.3.0. Jarmo approved this plan in his own words on 21 November 2026 ("kinnitan"), after his yes to the direction the same day (`.rtms` in 2.3, issue #940). Question 5 below is approved with the plan, as the plan assumes it (yes).
 
 The parent release is v2.3.0, and its `release-plan.md` tracks this sprint. The spec is the decks README in the governance repo (`product/design/experience/experiences/decks/README.md`: decision 1, decision 10, "The file", "The editor", item 20), as the Experience lead updated it in ritemark-dev 765e122.
 
@@ -58,15 +58,15 @@ None. `.deck.md` keeps working everywhere; nothing is renamed or turned off.
 - Windows: before Gate 2, the CI install-uninstall round trip probes the registry; at Gate 2, Explorer's icon and a double-click on a Windows PC.
 
 ## Success criteria
-- [ ] New → Deck makes `Untitled.rtms`, and the lists show ".rtms" muted with the deck's icon.
-- [ ] A `.deck.md` made before opens, saves and publishes as a deck and keeps its name.
-- [ ] Decks off opens a `.rtms` as an ordinary document that saves.
-- [ ] Claude and Codex in Ritemark read and edit a `.rtms` deck.
-- [ ] The runner proof shows the kind "Ritemark Deck", the system page with the deck badge and DECK, Ritemark as the opener, Quick Look's text and Spotlight's words.
-- [ ] The RC's plist passes Gate 1's check; a dev build declares no deck type.
-- [ ] The Windows round trip registers and removes `.rtms`.
-- [ ] The Experience lead has seen each PR's shots before it merges.
-- [ ] The full test chain ran once on each final head; `qa-validator` signed off at the sprint's end.
+- [x] New → Deck makes `Untitled.rtms`, and the lists show ".rtms" muted with the deck's icon — met in PR #949 (`newDeck.ts`, the icon theme and [the new-deck screenshot](proof/pr1/1-new-deck-untitled-rtms.png)).
+- [x] A `.deck.md` made before opens, saves and publishes as a deck and keeps its name — met in PR #949 (`deckFileName.ts`, `deckMode.ts`, `DocumentSyncCoordinator.ts` and `deckPublish.ts`; see [the older-deck screenshot](proof/pr1/2-old-deck-md-opens-as-deck.png)). The RC's live publish check is row 24q.
+- [x] Decks off opens a `.rtms` as an ordinary document that saves — met in PR #949 (`deckMode.ts` and `DocumentSyncCoordinator.ts`; see [the saved document](proof/pr1/3-decks-off-rtms-as-document-saved.png)).
+- [ ] Claude and Codex in Ritemark read and edit a `.rtms` deck — live proof was not run because the isolated profile had no test credentials. PR #949 updated the shared deck tools and write path. RC row 24s covers the live check.
+- [x] The runner proof shows the kind "Ritemark Deck", the system page with the deck badge and DECK, Ritemark as the opener, Quick Look's text and Spotlight's words — met by PR #951's [runner evidence](proof/pr2/).
+- [ ] The RC's plist passes Gate 1's check; a dev build declares no deck type — PR #951 records the dev check and adds the Gate 1 validators. The [stand-in bundle passed the stamp check](proof/pr2/run2-asset-catalog/stamp-check.txt). The RC result is unverified here and belongs to row 24t.
+- [ ] The Windows round trip registers and removes `.rtms` — PR #952 implemented the association and the CI probe. The [mock results](proof/pr3/probe-mock-results.txt) cover both states. The candidate's Windows install and uninstall result is unverified here and belongs to row 24y.
+- [ ] The Experience lead has seen each PR's shots before it merges — met for PR 1 (OK on `a711effa`) and PR 2 (OK on `9c68d421`), as their Review records say. PR 3's icon is the lead's own drawing (`deck.ico`'s frames match the lead's PNGs pixel for pixel), but its look in Explorer needs a PC: row 24z at Gate 2.
+- [ ] The full test chain ran once on each final head and `qa-validator` signed off at sprint end — the chain: EXIT 0 on each PR's final head (their Review records). `qa-validator` ran on 21 November and found the close-out gaps this paperwork closes; its sign-off follows once this lands.
 
 ## Release notes
 One line, in Make slides, written with the `release-notes` skill (decks are new in 2.3, so the file's own kind reads as news only as "it opens from Finder"):

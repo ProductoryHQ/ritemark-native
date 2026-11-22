@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.3.0
 
+### ChatGPT models and runtime
+
+#### Changed
+- **GPT-6.2 models and the bundled Codex CLI.** GPT-6.2 Sol becomes Codex’s default and GPT-6.2 Astra joins the model list (#956, PR #963). The bundled Codex CLI moves from 0.164.0 to 0.171.0, the first version that runs GPT-6.2 (PR #964).
+
 ### Decks is on (#916)
 
 #### Changed
-- **Decks is on by default.** A `.deck.md` file opens as a deck, with its slides beside their handout; New → Deck, the Deck card on Home and the Slide library are there from the first start. The setting `ritemark.features.decks` stays as an off switch: off, a `.deck.md` opens as an ordinary document, New and Home lose Deck, and the Slide library goes. Until now Decks was on `main` behind that setting, off by default (since Sprint 159 PR 2, #735), and these lines were left out while it was (Jarmo, 20 November 2026: "Decks läheb 2.3 sisse").
+- **Decks is on by default.** A `<name>.rtms` file opens as a deck, with its slides beside their handout. Older `.deck.md` files still open as decks under their original names. New → Deck, the Deck card on Home and the Slide library are there from the first start. Turn off `ritemark.features.decks` to open both kinds of file as ordinary documents and hide Deck from New and Home and the Slide library from the sidebar. Until now Decks was on `main` behind that setting, off by default (since Sprint 159 PR 2, #735), and these lines were left out while it was (Jarmo, 20 November 2026: "Decks läheb 2.3 sisse").
+- **Decks have their own file type (Sprint 172, #940, PRs #949, #951, #952).** New decks are saved as `<name>.rtms`. Finder shows “Ritemark Deck” with the deck badge, and Explorer shows “Ritemark Deck” with the deck icon. Every install registers Ritemark to open these files by default.
 
 ### Decks: Sprints 159, 161 and 164–171
 
