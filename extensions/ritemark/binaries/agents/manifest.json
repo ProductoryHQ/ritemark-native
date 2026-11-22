@@ -1,30 +1,30 @@
 {
   "schemaVersion": "3",
-  "generated": "2026-10-26",
+  "generated": "2026-11-22",
   "description": "Source-of-truth manifest for complete bundled agent runtime packages and dependencies. Payloads install under binaries/agents/<platform>-<arch> while preserving vendor package layouts.",
   "runtimes": [
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.164.0",
+      "version": "0.171.0",
       "platform": "darwin",
       "arch": "arm64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.171.0/codex-app-server-package-aarch64-apple-darwin.tar.gz",
       "archiveFilename": "codex-app-server-package-aarch64-apple-darwin.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "7fcd5f0346c9338dd45f1af7c53115a29f651ac61a4264e2dbca49b7aa064ac0",
+      "sha256": "fe53328d2aa683e33ecef412a04ffb798025f65d7a41be9b09ad91fe91794402",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-app-server",
           "installPath": "bin/codex-app-server",
-          "sha256": "45ef99a75f0cc7135765ba9ac8d66a61f5f88d64fd03bf7fce99141d33b4207e",
+          "sha256": "ed05f1f2c1b94b9e3dc63e25699c4d2b76acc379ff071e4544e44477d34dc0d4",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -33,10 +33,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-code-mode-host",
           "installPath": "bin/codex-code-mode-host",
-          "sha256": "0d28d33772ccb5a8fad1b04c80c55422ec72ccdef7e183d0e04b93a04294868a",
+          "sha256": "f98e96213fc3c55ffb0a396b698967af8c91c85653cf0b3b990cef271894be25",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -44,11 +44,23 @@
           "expectedFileArchPattern": "Mach-O 64-bit executable arm64"
         },
         {
+          "component": "exec-server",
+          "version": "0.171.0",
+          "archivePath": "bin/codex-exec-server",
+          "installPath": "bin/codex-exec-server",
+          "sha256": "f598a83975b1e80770b3aec31b261fcbeca595c89f8b8098acccb559aa093604",
+          "executable": true,
+          "validationArgs": [
+            "--version"
+          ],
+          "expectedFileArchPattern": "Mach-O 64-bit executable arm64"
+        },
+        {
           "component": "package-metadata",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "670975f440d9c6f972c538b7d4fff7af0191c8598d176398453c41b68561530f",
+          "sha256": "61a21a413b6467cca4e0808632060de86ac5c131b2bd8c5bc5add6cc3c2fdc01",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -58,7 +70,7 @@
           "version": "15.2.0",
           "archivePath": "codex-path/rg",
           "installPath": "codex-path/rg",
-          "sha256": "fd819df955fce19b2ee89c89c94e19a16127481de1ab0e5099add82cdfdc96a0",
+          "sha256": "8e6162ff63d0f0909ad47c8e1df575a8ac716a69a4dc6a9da1f5589bef7b1a25",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -69,31 +81,31 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.164.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.171.0/LICENSE"
       }
     },
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.164.0",
+      "version": "0.171.0",
       "platform": "darwin",
       "arch": "x64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.171.0/codex-app-server-package-x86_64-apple-darwin.tar.gz",
       "archiveFilename": "codex-app-server-package-x86_64-apple-darwin.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "125dea1f429558275a6cd73dfc7f20cc823193c1a61ee69222af250ae04e9762",
+      "sha256": "047c0fbff055623590df793c5e31fca537299dea51132c1272f25698e439d512",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-app-server",
           "installPath": "bin/codex-app-server",
-          "sha256": "186f4888b58cf493d605fc7f8b7724cebf233a779cdc1a402e2322dc1a217eff",
+          "sha256": "f81d88ee94a8dc546c6eab1a6ad7e210ac5fad86f8b21279869546a71f13e137",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -102,10 +114,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-code-mode-host",
           "installPath": "bin/codex-code-mode-host",
-          "sha256": "73b2685166243c8f049f1a35fc8c8716e06df74376f239819d396961f534fb32",
+          "sha256": "3e824b1ca7458c2cd86b7accdebb5bdbedbb7e86eecefe6456aa0079589bf223",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -113,11 +125,23 @@
           "expectedFileArchPattern": "Mach-O 64-bit executable x86_64"
         },
         {
+          "component": "exec-server",
+          "version": "0.171.0",
+          "archivePath": "bin/codex-exec-server",
+          "installPath": "bin/codex-exec-server",
+          "sha256": "8e12445ef4fea974ee28d9643c8960c34ae378490af134b39c5a52b7007a50d3",
+          "executable": true,
+          "validationArgs": [
+            "--version"
+          ],
+          "expectedFileArchPattern": "Mach-O 64-bit executable x86_64"
+        },
+        {
           "component": "package-metadata",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "1c58dc566398c3dcc21114c3cafcbcad75202f99cf92070ca66605c4ffbe67eb",
+          "sha256": "db6fb6dc31e0e7c59fc2a7caf8e78404ac853462114a628a0303f1efff231724",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -127,7 +151,7 @@
           "version": "15.2.0",
           "archivePath": "codex-path/rg",
           "installPath": "codex-path/rg",
-          "sha256": "ec39fec9c00b38d1ba00b701f921ba14f876e786bcb6fd0c6930e6670f4d0fab",
+          "sha256": "930a30021883ee49b927088c4d32296c25434737683a1a8fdeb0e10dc87658fa",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -138,31 +162,31 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.164.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.171.0/LICENSE"
       }
     },
     {
       "agent": "codex",
       "component": "package",
       "vendor": "openai",
-      "version": "0.164.0",
+      "version": "0.171.0",
       "platform": "win32",
       "arch": "x64",
       "sourceType": "github-release-package",
-      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.164.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
+      "sourceUrl": "https://github.com/openai/codex/releases/download/rust-v0.171.0/codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
       "archiveFilename": "codex-app-server-package-x86_64-pc-windows-msvc.tar.gz",
       "archiveFormat": "tar.gz",
-      "sha256": "e177a62037b0b6b26774700f07a713db67f85efd2187c6a574c7a6a14ebf4b7e",
+      "sha256": "9b20001daac4387f94315013382c6853e40c8f63de0603be021e4a5e983c329c",
       "installRoot": "codex",
       "exactArchiveMembers": true,
       "packageMetadataPath": "codex-package.json",
       "members": [
         {
           "component": "app-server",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-app-server.exe",
           "installPath": "bin/codex-app-server.exe",
-          "sha256": "82314aa236834a8b7240cc5fe4fdf71d4502822e476105ccbe010ef6689083d7",
+          "sha256": "ed5fae3b2cc4aaa2d41762ed5748d5fb28da2c7d00d65db6f75f458593483ea4",
           "executable": true,
           "validationArgs": [
             "--version"
@@ -171,10 +195,10 @@
         },
         {
           "component": "code-mode-host",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "bin/codex-code-mode-host.exe",
           "installPath": "bin/codex-code-mode-host.exe",
-          "sha256": "be52517ca0f9a8eb626ec065ed3a357b5ee150fe1934a254d0126e6d40f29b57",
+          "sha256": "aa02c6460ec6e2cd67d0d402d4fb5a4dc55d1a9b726596fae3534d4dfb023a16",
           "executable": true,
           "validationArgs": [
             "--help"
@@ -182,11 +206,23 @@
           "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows"
         },
         {
+          "component": "exec-server",
+          "version": "0.171.0",
+          "archivePath": "bin/codex-exec-server.exe",
+          "installPath": "bin/codex-exec-server.exe",
+          "sha256": "b7084b9a1630bda8e372a7c6f22766d0bd864f7f9067562320ecfd4f27d490e5",
+          "executable": true,
+          "validationArgs": [
+            "--version"
+          ],
+          "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows"
+        },
+        {
           "component": "package-metadata",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "codex-package.json",
           "installPath": "codex-package.json",
-          "sha256": "ae56184505506730c2d846b6afd1de188a7b11383a7a46b4a67365fa842eb6b1",
+          "sha256": "54f0de729ee5d11b1241607060ba45edb7b08dddf189719660a2a6fa4901897a",
           "executable": false,
           "validationArgs": [],
           "expectedFileArchPattern": ""
@@ -205,20 +241,20 @@
         },
         {
           "component": "command-runner",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "codex-resources/codex-command-runner.exe",
           "installPath": "codex-resources/codex-command-runner.exe",
-          "sha256": "30b0ba5d42d3a95c839731fbf9939d728a70fcd9e433245a7cb15bc79418a4db",
+          "sha256": "17d1294209288eb5351d17ed0e1ea5934aa0c6763ced275ed200521ca4fa7050",
           "executable": true,
           "validationArgs": [],
           "expectedFileArchPattern": "PE32+ executable (GUI) x86-64, for MS Windows"
         },
         {
           "component": "windows-sandbox-setup",
-          "version": "0.164.0",
+          "version": "0.171.0",
           "archivePath": "codex-resources/codex-windows-sandbox-setup.exe",
           "installPath": "codex-resources/codex-windows-sandbox-setup.exe",
-          "sha256": "2cac62ff24aca3aef7768ab5b96d4102e8434eb0cf8ddbc6171b85a8fb3bb4ef",
+          "sha256": "6d4c34d7aeda0f242e8183c92f25588e5a91286c2196f44a4405058d9c436587",
           "executable": true,
           "validationArgs": [],
           "expectedFileArchPattern": "PE32+ executable (console) x86-64, for MS Windows"
@@ -227,7 +263,7 @@
       "license": {
         "spdx": "Apache-2.0",
         "redistribution": "permitted",
-        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.164.0/LICENSE"
+        "noticeUrl": "https://github.com/openai/codex/blob/rust-v0.171.0/LICENSE"
       }
     },
     {
