@@ -64,8 +64,8 @@ assert.match(css, /\.deck-notice \.deck-notice-icon \{ width: 24px; height: 24px
 // The icon's focus ring (2 px at 2 px) clears the name by 4 px: an 8 px gap, the same in the fit's sum (the lead, #932).
 assert.match(css, /\.deck-notice-line \{[^}]*gap: 8px;/)
 assert.match(view, /const NOTICE_ACTION_GAP = 8\b/)
-assert.match(css, /\.deck-bar > \.deck-notice:has\(\.deck-notice-cut\) \{ flex-shrink: 1000000000;/)
-// No fixed width: the note's words are as wide as the bar gives them.
-for (const rule of (css.match(/\.deck-notice(?:-words|-text|-cut|-shown|-sizer)?(?![\w-])[^{]*\{[^}]*\}/g) ?? []).filter(rule => !rule.includes("deck-notice-icon"))) assert.doesNotMatch(rule, /(^|[\s;{])(max-)?width:\s*\d/, rule)
+assert.match(css, /\.deck-notice \{[^}]*flex: 1 0 0;/, "the Saved as notice uses the shared leftover room")
+// Outside the minimum-width probe the words are as wide as the bar gives them.
+for (const rule of (css.match(/\.deck-notice(?:-words|-text|-cut|-shown|-sizer)?(?![\w-])[^{]*\{[^}]*\}/g) ?? []).filter(rule => !rule.includes('deck-notice-icon') && !rule.includes('data-measure-min'))) assert.doesNotMatch(rule, /(^|[\s;{])(max-)?width:\s*\d/, rule)
 
 console.log('noticeCut: passed')

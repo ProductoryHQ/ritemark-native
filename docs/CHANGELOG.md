@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — v2.4.0
+
+### Fixed
+
+- **Long notes in the deck bar give way first (#950).** The note shortens before Publish loses its label, and the theme button shows its full name or just its swatch. The full note and theme name are in their tooltips.
+
 ## [Unreleased] — v2.3.0
 
 ### ChatGPT models and runtime

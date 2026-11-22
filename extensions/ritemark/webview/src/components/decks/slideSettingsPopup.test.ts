@@ -130,7 +130,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
 // anchored beside where it came from; nothing above or under the slide.
 {
   const view = here('./DeckView.tsx')
-  const bar = view.slice(view.indexOf('<header className="deck-bar">'), view.indexOf('</header>'))
+  const bar = view.slice(view.indexOf('<header className="deck-bar"'), view.indexOf('</header>'))
   for (const gone of ['Popover', 'gear', 'Slide settings', 'deck-settings-button', 'SegmentedControl', 'Borderless', 'How the slides look', 'deck-look']) {
     assert.ok(!bar.includes(gone), `nothing of "${gone}" in the bar`)
   }

@@ -172,17 +172,19 @@ interface Notice {
  */
 function NoticeWords({ text, name, after }: { text: string; name: string; after: ReactNode }) {
   const boxRef = useRef<HTMLSpanElement>(null)
+  const lineRef = useRef<HTMLSpanElement>(null)
   const shownRef = useRef<HTMLSpanElement>(null)
   const afterRef = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const box = boxRef.current
+    const line = lineRef.current
     const shown = shownRef.current
-    if (!box || !shown) return
+    if (!box || !line || !shown) return
     const prefix = text.slice(0, text.length - name.length)
     let live = true
     const fit = () => {
       if (!live) return // a fonts' answer that comes after this notice was replaced
-      const room = box.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      const room = line.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
       shown.textContent = fitNotice(prefix, name, words => {
         shown.textContent = words
         return shown.scrollWidth <= room
@@ -199,8 +201,8 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
   }, [text, name])
   return (
     <span ref={boxRef} className="deck-notice-cut">
-      <span className="deck-notice-sizer" aria-hidden="true">{text}<span className="deck-notice-room" /></span>
-      <span className="deck-notice-line">
+      <span className="deck-notice-sizer" aria-hidden="true"><span>{text}</span><span className="deck-notice-room" /></span>
+      <span ref={lineRef} className="deck-notice-line">
         <Tooltip label={text} className="deck-notice-words">
           <span ref={shownRef} className="deck-notice-shown" aria-hidden="true" />
         </Tooltip>
@@ -213,6 +215,23 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 
 /** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
 const NOTICE_ACTION_GAP = 8
+
+/** Check the bar with full controls and the notice down to its ellipses and actions. */
+function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement) {
+  bar.removeAttribute('data-theme-compact')
+  notice.setAttribute('data-measure-min', '')
+  const minimum = notice.getBoundingClientRect().width
+  notice.removeAttribute('data-measure-min')
+  notice.style.setProperty('--deck-notice-min', `${minimum}px`)
+
+  roomChanged() // Ask Publish and Present to measure again with the bar's controls at full width.
+  const last = bar.lastElementChild
+  const right = bar.getBoundingClientRect().right - parseFloat(getComputedStyle(bar).paddingRight)
+  if (last && last.getBoundingClientRect().right > right + 0.01) {
+    bar.setAttribute('data-theme-compact', '')
+    roomChanged()
+  }
+}
 
 const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
@@ -410,6 +429,8 @@ export function DeckView({
   // Beside or above (deckLayout.ts): decided from the room once it is measured, and again whenever it changes.
   const [orientation, setOrientation] = useState<DeckOrientation | null>(null)
   const [dragging, setDragging] = useState(false)
+  const barRef = useRef<HTMLElement>(null)
+  const barNoticeRef = useRef<HTMLSpanElement>(null)
   const deskRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -1505,9 +1526,24 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [flash])
 
-  // Sprint 170: a notice that comes or goes changes the bar's room: Publish and Present, folded to their icons for a
-  // long one, show their words again once it has gone (ui/button.tsx, `roomChanged`).
-  useLayoutEffect(() => { roomChanged() }, [notice])
+  useLayoutEffect(() => {
+    const bar = barRef.current
+    const notice = barNoticeRef.current
+    if (!bar || !notice) return
+    const fit = () => fitDeckBar(bar, notice)
+    fit()
+    const resize = new ResizeObserver(fit)
+    resize.observe(bar)
+    // Controls can gain or lose room at the same width (for example, when Publish becomes a split button).
+    const content = new MutationObserver(fit)
+    content.observe(bar, { childList: true, characterData: true, subtree: true })
+    document.fonts?.addEventListener('loadingdone', fit)
+    return () => {
+      resize.disconnect()
+      content.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fit)
+    }
+  }, [])
 
   // A notice in the bar fades after a while.
   useEffect(() => {
@@ -1992,7 +2028,7 @@ export function DeckView({
     <DeckIconsContext.Provider value={iconsInUse}>
     <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
-      <header className="deck-bar">
+      <header className="deck-bar" ref={barRef}>
         <Tooltip label={stripShown ? 'Hide the slides' : 'Show the slides'}>
           <Button
             variant="toolbar"
@@ -2009,7 +2045,7 @@ export function DeckView({
         {/* Slide, both or handout (17 November): under 600 px the handout has no room, and the deck shows the slide only. */}
         {deskWidth >= NARROWEST_DESK ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
         <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
-        <span className="deck-notice" role="status" aria-live="polite">
+        <span className="deck-notice" ref={barNoticeRef} role="status" aria-live="polite">
           {notice ? (
             <>
               {notice.name && notice.text.endsWith(notice.name) ? (
@@ -2059,7 +2095,7 @@ export function DeckView({
             </>
           ) : slideFull && slideShown ? fullLine : null}
         </span>
-        <span className="flex-1" />
+        <span className="deck-bar-spacer" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>

@@ -100,7 +100,7 @@ export function ThemeMenu({ theme, named, look, onLook, transition, onTransition
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      {/* When the bar is short of room its name gives way first (decks.css); the tooltip always names the theme. */}
+      {/* When the notice has given up its room, the bar can show just the swatch. The tooltip always names the theme. */}
       <Tooltip label={`${theme.name}: the deck's look and theme`} className="deck-theme-slot">
         <PopoverTrigger asChild>
           <Button variant="toolbar" size="bar" className="deck-theme-button" aria-label={`Theme: ${theme.name}`}>

@@ -135,7 +135,7 @@ const draw = (view: DeckViewMode, above = false) =>
     }
     return view.slice(at)
   }
-  const bar = view.slice(view.indexOf('<header className="deck-bar">'), view.indexOf('</header>'))
+  const bar = view.slice(view.indexOf('<header className="deck-bar"'), view.indexOf('</header>'))
   const strip = bar.indexOf("aria-label=\"Slides\"")
   const switchAt = bar.indexOf('<DeckViewSwitch')
   const count = bar.indexOf('className="deck-count"')
