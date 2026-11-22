@@ -528,8 +528,8 @@ export class DeckPresenter implements vscode.Disposable {
         await this.showSameSlide(running);
         return;
       case 'present/tab':
-        // Sprint 163: a tab chosen on the presenter view's Now shows on the wall; not a move, and only from there.
-        if (screen !== running.presenter) return;
+        // Tabs are chosen from Now when the presenter view is open, otherwise directly on the wall.
+        if (screen !== (running.presenter ?? running.wall)) return;
         running.tabs = withTab(running.tabs, request.block, request.tab);
         await this.showSameSlide(running);
         return;

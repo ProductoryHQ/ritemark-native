@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Share.** Publish puts the deck online as one page with Copy on each prompt and exercises to tick; Save slides and handout as PDF is under Publish's arrow (Sprints 159, 170).
 - **The AI names the slides it changed (#967).** After editing a deck, it describes what changed using slide numbers and titles, and names handout changes by their slide.
 
+#### Fixed
+- **Switch tabs while presenting without the presenter view (#974).** Click a tab on the slide to show its contents and stay on that slide.
+
 ### Sprint 162: deck themes
 
 #### Added

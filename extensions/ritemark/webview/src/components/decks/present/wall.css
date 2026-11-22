@@ -12,6 +12,7 @@
 
 .wall-frame { position: absolute; overflow: visible; }
 .wall-slide { position: absolute; inset: 0; }
+.deck-wall .wall-slide:not(.tabs-pickable) .blk-tab { cursor: default; }
 .wall-slide .deck-slide:has(> .deck-sl.is-blocks), .wall-slide .deck-sl.is-blocks { overflow: visible; }
 .wall-slide .deck-sl { background: transparent; }
 .wall-slide .deck-sl.is-blocks .photo { top: calc(-1 * var(--wall-bleed-y, 0px)); bottom: calc(-1 * var(--wall-bleed-y, 0px)); }

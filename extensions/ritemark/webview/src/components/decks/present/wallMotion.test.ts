@@ -260,7 +260,7 @@ class FakeClock implements MotionClock {
   // A move whose step had not started when a press showed the next item is put at its end, so the item still rises.
   assert.match(wallSource, /if \(moves\.current !== leavingSerial\) \{ setLeaving\(value => \(value\?\.serial === leavingSerial \? null : value\)\); return \}/)
   // The slide on the wall and the one going are drawn at their steps; the editor's canvases never are.
-  assert.match(wallSource, /layer\(state\.slide, '', `slide-\$\{serial\}`, false, state\.reveal\?\.shown\)/)
+  assert.match(wallSource, /layer\(state\.slide, tabsPickable \? 'tabs-pickable' : '', `slide-\$\{serial\}`, false, state\.reveal\?\.shown\)/)
 }
 
 // ---- README item 20 on the wall: with `row` (a press going on), the new slide's content arrives in a row, drawn by the
