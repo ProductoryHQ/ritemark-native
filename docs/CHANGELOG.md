@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### ChatGPT models and runtime
 
 #### Changed
-- **GPT-6.2 models and the bundled Codex CLI.** GPT-6.2 Sol becomes Codex’s default and GPT-6.2 Astra joins the model list (#956, PR #963). The bundled Codex CLI moves from 0.164.0 to 0.171.0, the first version that runs GPT-6.2 (the Codex 0.171.0 runtime PR).
+- **GPT-6.2 models and the bundled Codex CLI.** GPT-6.2 Sol becomes Codex’s default and GPT-6.2 Astra joins the model list (#956, PR #963). The bundled Codex CLI moves from 0.164.0 to 0.171.0, the first version that runs GPT-6.2 (PR #964).
 
 ### Decks is on (#916)
 
