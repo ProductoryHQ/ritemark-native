@@ -31,8 +31,10 @@ function probeParams(method) {
     clientInfo: { name: 'ritemark-native', title: 'Ritemark Native', version: '1.4.0' },
     capabilities: { experimentalApi: true },
   };
-  // {} is a valid thread/start. Force a parameter error before a session can start.
-  return method === 'thread/start' ? { cwd: false } : {};
+  // {} is a valid thread/start. Force a parameter error before a session (or a login) can start.
+  if (method === 'thread/start') return { cwd: false };
+  if (method === 'account/login/start') return { type: false };
+  return {};
 }
 
 function probeEnvironment(home) {
@@ -87,8 +89,9 @@ export async function probeMethods(binary, methods, {
           const { value, done } = await lines.next();
           if (failure) throw failure;
           if (done) throw new Error('app-server closed stdout before replying');
-          const reply = JSON.parse(value);
-          if (reply.id === id && !('method' in reply)) return reply;
+          let reply;
+          try { reply = JSON.parse(value); } catch { continue; } // a log line, not a reply
+          if (reply?.id === id && !('method' in reply)) return reply;
         }
       } finally {
         clearTimeout(timer);
@@ -137,8 +140,25 @@ export async function probeMethods(binary, methods, {
   }
 }
 
+// A method that can't exist. It must come back MISSING, or the check can't tell
+// a missing method from a present one and fails rather than passing unchecked.
+export const ABSENT_METHOD = 'ritemark/absentMethodProbe';
+
+export async function verifyBinary(binary, methods, options = {}) {
+  const log = options.log ?? console.log;
+  const lines = [];
+  await probeMethods(binary, [...methods, ABSENT_METHOD], { ...options, log: line => { lines.push(line); log(line); } });
+  const control = lines.find(line => line.startsWith(`  ${ABSENT_METHOD} `)) ?? '';
+  if (!control.includes(' MISSING ')) {
+    log(`  FAIL: the control method ${ABSENT_METHOD} was not reported MISSING, so a missing method can't be told apart`);
+    return false;
+  }
+  // The control is meant to be missing: judge the real methods alone.
+  return lines.filter(line => !line.startsWith(`  ${ABSENT_METHOD} `)).every(line => !/ (MISSING|FAIL) /.test(line));
+}
+
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const binary = process.argv[2];
   if (!binary) throw new Error('usage: verify-codex-methods.mjs <codex-app-server>');
-  if (!await probeMethods(path.resolve(binary), collectMethods())) process.exitCode = 1;
+  if (!await verifyBinary(path.resolve(binary), collectMethods())) process.exitCode = 1;
 }

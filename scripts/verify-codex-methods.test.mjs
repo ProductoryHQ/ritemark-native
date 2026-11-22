@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { collectMethods, probeMethods } from './lib/verify-codex-methods.mjs';
+import { ABSENT_METHOD, collectMethods, probeMethods, verifyBinary } from './lib/verify-codex-methods.mjs';
 
 test('covers every outgoing app-server request, including the handshake', () => {
   assert.deepEqual(collectMethods().sort(), [
@@ -36,6 +36,8 @@ const peer = `
     else if (method === 'silent') continue;
     else if (method === 'crash') process.exit(4);
     else if (method === 'malformed') reply = {};
+    else if (method === 'noise') { console.log('a log line, not JSON'); reply = { result: null }; }
+    else if (method === ${JSON.stringify(ABSENT_METHOD)}) reply = process.argv[2] === 'everything-present' ? { result: null } : { error: { code: -32601, message: 'method not found' } };
     console.log(JSON.stringify({ id, ...reply }));
   }
 `;
@@ -78,3 +80,33 @@ for (const [method, reason] of [['silent', /timed out/], ['crash', /closed|exite
     assert.match(output, reason);
   });
 }
+
+test('skips a stdout line that is not JSON', async () => {
+  const { ok, output } = await probe(['noise', 'ok']);
+  assert.equal(ok, true);
+  assert.match(output, /noise PRESENT/);
+});
+
+async function verify(methods, mode = 'normal') {
+  const fixture = mkdtempSync(path.join(tmpdir(), 'codex-methods-test-'));
+  const lines = [];
+  try {
+    const ok = await verifyBinary(process.execPath, ['initialize', ...methods], {
+      args: ['--input-type=module', '-e', peer, path.join(fixture, 'child-home'), mode], timeoutMs: 1000, log: line => lines.push(line),
+    });
+    return { ok, output: lines.join('\n') };
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+test('the control method must come back missing: then the real methods decide', async () => {
+  assert.equal((await verify(['ok', 'denied'])).ok, true);
+  assert.equal((await verify(['ok', 'missing'])).ok, false);
+});
+
+test('fails when a server reports even an invented method as present', async () => {
+  const { ok, output } = await verify(['ok'], 'everything-present');
+  assert.equal(ok, false);
+  assert.match(output, /control method .* was not reported MISSING/);
+});
