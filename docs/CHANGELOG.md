@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Slide library.** Other decks listed by folder, sections taken whole with one undo, search that shows each slide once, and an offer for the slides you repeat (Sprint 165).
 - **Present.** The wall shows only the slide; with a second display the laptop shows this slide, the next, the comments and the clock. Clicker, blank screen, spotlight, timer and QR code (Sprint 159 and the Present PRs).
 - **Share.** Publish puts the deck online as one page with Copy on each prompt and exercises to tick; Save slides and handout as PDF is under Publish's arrow (Sprints 159, 170).
+- **The AI names the slides it changed (#967).** After editing a deck, it describes what changed using slide numbers and titles, and names handout changes by their slide.
 
 ### Sprint 162: deck themes
 
