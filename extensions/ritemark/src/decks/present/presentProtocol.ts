@@ -127,7 +127,7 @@ export interface WallState {
    * slide shows whole.
    */
   reveal: WallReveal | null;
-  /** Sprint 163: the tab each Tabs block shows, as the presenter view chose it (`WallTabs`); empty: each its first. */
+  /** The tab each Tabs block shows (`WallTabs`); empty: each its first. */
   tabs: WallTabs;
   /** Sprint 163 PR 1: the code blocks' ↗ Open in… (false for a deck with `open-in: none`). */
   openIn: boolean;
@@ -257,7 +257,7 @@ export type WallRequest =
   | { type: 'present/timer'; minutes: number | null }
   /** Item 12: L held over the presenter view's Now: the dot's place on the slide, or none (null). */
   | { type: 'present/pointer'; at: WallPoint | null }
-  /** Sprint 163: a tab chosen on the presenter view's Now: Tabs block `block` of the slide shows its tab `tab`. */
+  /** From the presenter view's Now, or the wall when that view is off: Tabs block `block` shows its tab `tab`. */
   | { type: 'present/tab'; block: number; tab: number };
 
 /** The deck view's Present: from its current slide (`index`, from 0) or from the start. */
