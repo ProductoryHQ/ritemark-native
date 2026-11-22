@@ -133,6 +133,31 @@ check_codex_code_mode_host() { # app-server-path code-mode-host-path
     fail "codex code-mode host exists but its --help smoke test fails"
   fi
 }
+# Codex 0.171.0 ships the standalone executor beside app-server and names it in codex-package.json
+# (`execServer`). A tree that lost it would still pass the app-server check, so it gets its own.
+check_codex_exec_server() { # app-server-path exec-server-path expected-version
+  local app_server="$1" exec_server="$2" want="$3"
+  if [[ ! -x "$app_server" ]]; then
+    skip "codex app-server is not installed, so its exec-server cannot be checked"
+    return
+  fi
+  if [[ ! -x "$exec_server" ]]; then
+    fail "codex app-server is installed but required exec-server is missing ($exec_server)"
+    return
+  fi
+  local out; out="$("$exec_server" --version 2>&1)"
+  # As check_version: where the manifest's version can't be read (Git Bash on the Windows
+  # runner hands node a /d/... path), presence and a working --version are the check.
+  if [[ -z "$want" ]]; then
+    if [[ "$out" == *codex-exec-server* ]]; then pass "codex exec-server is installed beside app-server and reports '$out' (no manifest version to compare)"; else fail "codex exec-server --version printed '$out'"; fi
+    return
+  fi
+  if [[ "$out" == *"$want"* ]]; then
+    pass "codex exec-server is installed beside app-server and reports $want"
+  else
+    fail "codex exec-server reports '$out' but the manifest pins ${want:-nothing}"
+  fi
+}
 check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude runtime)"
 check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode runtime)"
 check_version opencode-ripgrep "$BIN/opencode-path/rg$EXE_SUFFIX" "$(manifest_version opencode ripgrep)"
@@ -140,6 +165,10 @@ check_version codex    "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" "$(manifest_
 check_codex_code_mode_host \
   "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" \
   "$BIN/codex/bin/codex-code-mode-host$EXE_SUFFIX"
+check_codex_exec_server \
+  "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" \
+  "$BIN/codex/bin/codex-exec-server$EXE_SUFFIX" \
+  "$(manifest_version codex exec-server)"
 check_codex_windows_sandbox_helpers "$BIN/codex/bin/codex-app-server$EXE_SUFFIX"
 
 if $VERSIONS_ONLY; then
