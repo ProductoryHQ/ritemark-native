@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { debounceCount } from '../lib/debounceCount'
 import { countWords, onDocChanged } from '../lib/docChange'
 import { useEditor, EditorContent, useEditorState, type Editor as TipTapEditor } from '@tiptap/react'
 import { DOMSerializer } from '@tiptap/pm/model'
@@ -80,6 +81,7 @@ interface EditorProps {
    *  so the smallest replacement is found against what the view shows. Called with the document the host's text reads
    *  as; returns it, or a copy with only view-side nodes added. */
   viewOfIncoming?: (doc: PMNode) => PMNode
+  countDocumentWords?: (editor: TipTapEditor) => number
 }
 
 /** A Text document's column: the editor's box is at most this wide, centred (a deck's handout alone takes it too). */
@@ -99,6 +101,7 @@ export function Editor({
   header,
   extensions,
   viewOfIncoming,
+  countDocumentWords,
 }: EditorProps) {
   // Register the comment `marked` tokenizer before initialContent is parsed on
   // mount — only when the flag is on (see ensureCommentMarkedPipeline above).
@@ -704,7 +707,7 @@ export function Editor({
     if (!editor) return
 
     const updateWordCount = () => {
-      const count = countWords(editor.state.doc)
+      const count = countDocumentWords ? countDocumentWords(editor) : countWords(editor.state.doc)
       setWordCount(count)
       // Send word count to extension for status bar display. Sprint 138
       // (experience 38): with the equations beside it, "96 words · 5 equations".
@@ -715,8 +718,11 @@ export function Editor({
     updateWordCount()
 
     // Listen for every document change, including host-applied revisions
-    return onDocChanged(editor, updateWordCount)
-  }, [editor])
+    if (!countDocumentWords) return onDocChanged(editor, updateWordCount)
+    const pending = debounceCount(updateWordCount)
+    const unsubscribe = onDocChanged(editor, pending.schedule)
+    return () => { unsubscribe(); pending.cancel() }
+  }, [editor, countDocumentWords])
 
   // Create and manage the + button alongside the drag handle
   useEffect(() => {

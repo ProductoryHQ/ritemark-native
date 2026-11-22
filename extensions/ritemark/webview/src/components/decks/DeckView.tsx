@@ -29,6 +29,7 @@ import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
 import { onDocChanged } from '../../lib/docChange'
+import { deckWordCount } from './deckWordCount'
 import type { SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
@@ -342,6 +343,8 @@ export function stageWidthFor(avail: number, ratio: number, handoutShown: boolea
   if (!handoutShown) return avail
   return Math.max(0, Math.min(avail - HANDOUT_MIN, Math.max(STAGE_MIN, Math.round(avail * ratio))))
 }
+
+const countDeckEditorWords = (editor: TipTapEditor) => deckWordCount(editorHTMLToMarkdown(editor.getHTML()))
 
 export function DeckView({
   content,
@@ -2223,6 +2226,7 @@ export function DeckView({
             commentCallouts={commentCallouts}
             syncTarget={syncTarget}
             onExternalApplied={onExternalApplied}
+            countDocumentWords={countDeckEditorWords}
             extensions={DECK_EXTENSIONS}
             viewOfIncoming={textHandout ? undefined : withDrawnHeadings}
           />
