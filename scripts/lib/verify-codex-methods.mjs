@@ -1,5 +1,5 @@
 // Probe the same outbound JSONL requests as Ritemark, against the binary on disk.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -62,21 +62,27 @@ export async function probeMethods(binary, methods, {
   timeoutMs = 10000, log = console.log,
 } = {}) {
   const home = mkdtempSync(path.join(tmpdir(), 'ritemark-codex-methods-'));
-  let child, reader, closed, failure;
+  let child, reader, closed, failure, interruptedBy;
+  function killTree() {
+    // On Windows a killed app-server can leave helpers holding files in its home.
+    if (process.platform === 'win32' && child?.pid) spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    child?.kill('SIGKILL');
+  }
   function stop(error) {
     failure ??= error;
-    child?.kill('SIGKILL');
+    killTree();
     reader?.close();
   }
-  const interrupt = () => stop(new Error('interrupted'));
+  const onSigint = () => { interruptedBy ??= 'SIGINT'; stop(new Error('interrupted')); };
+  const onSigterm = () => { interruptedBy ??= 'SIGTERM'; stop(new Error('interrupted')); };
   let index = 0;
   try {
-    child = spawn(binary, args, { cwd: home, env: probeEnvironment(home), stdio: ['pipe', 'pipe', 'ignore'] });
+    child = spawn(binary, args, { cwd: tmpdir(), env: probeEnvironment(home), stdio: ['pipe', 'pipe', 'ignore'] });
     closed = new Promise(resolve => child.once('close', resolve));
     child.on('error', stop);
     child.stdin.on('error', stop);
-    process.on('SIGINT', interrupt);
-    process.on('SIGTERM', interrupt);
+    process.on('SIGINT', onSigint);
+    process.on('SIGTERM', onSigterm);
     reader = createInterface({ input: child.stdout, crlfDelay: Infinity });
     const lines = reader[Symbol.asyncIterator]();
     const send = message => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
@@ -128,14 +134,21 @@ export async function probeMethods(binary, methods, {
     return false;
   } finally {
     try {
-      child?.kill('SIGKILL');
+      killTree();
       child?.stdout.destroy();
       child?.stdin.destroy();
       await closed;
-      rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      try {
+        rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      } catch (error) {
+        // The answers are already judged; a leftover empty-of-credentials temp folder is not a failed check.
+        log(`  warning: could not remove the temporary CODEX_HOME ${home} (${error.code || error.message})`);
+      }
     } finally {
-      process.off('SIGINT', interrupt);
-      process.off('SIGTERM', interrupt);
+      process.off('SIGINT', onSigint);
+      process.off('SIGTERM', onSigterm);
+      // Ctrl-C or a CI cancel stops the whole verification, not just this probe.
+      if (interruptedBy) process.kill(process.pid, interruptedBy);
     }
   }
 }

@@ -110,3 +110,30 @@ test('fails when a server reports even an invented method as present', async () 
   assert.equal(ok, false);
   assert.match(output, /control method .* was not reported MISSING/);
 });
+
+test('a SIGTERM during the probe stops the process after cleanup instead of becoming a failed check', async () => {
+  const { spawn } = await import('node:child_process');
+  const lib = new URL('./lib/verify-codex-methods.mjs', import.meta.url).href;
+  const fixture = mkdtempSync(path.join(tmpdir(), 'codex-methods-test-'));
+  const runner = `
+    const { probeMethods } = await import(${JSON.stringify(lib)});
+    await probeMethods(process.execPath, ['initialize', 'silent'], {
+      args: ['--input-type=module', '-e', ${JSON.stringify(peer)}, ${JSON.stringify(path.join(fixture, 'child-home'))}],
+      timeoutMs: 20000, log: line => console.log(line),
+    });
+    console.log('CONTINUED');
+  `;
+  try {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', runner], { stdio: ['ignore', 'pipe', 'ignore'] });
+    let output = '';
+    child.stdout.on('data', chunk => {
+      output += chunk;
+      if (output.includes('initialize PRESENT')) setTimeout(() => child.kill('SIGTERM'), 200);
+    });
+    const [code, signal] = await new Promise(resolve => child.on('close', (c, s) => resolve([c, s])));
+    assert.equal(signal, 'SIGTERM', `exit ${code}: ${output}`);
+    assert.doesNotMatch(output, /CONTINUED/);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
