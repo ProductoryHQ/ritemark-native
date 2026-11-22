@@ -1,7 +1,7 @@
 /**
  * Sprint 141 R9: `scripts/check-model-feed.ts` passes a good candidate and fails a
  * bad one. Runs the script against the working tree only (`--refs ''`), so it needs
- * no release tags. Run: npx tsx src/ai/modelCatalog/checkModelFeed.test.ts
+ * no release tags. Run: node --import tsx src/ai/modelCatalog/checkModelFeed.test.ts
  */
 
 import assert from 'node:assert/strict';
@@ -15,13 +15,12 @@ import { makeTempDir } from '../../testing/tempDir';
 
 const extensionRoot = path.resolve(__dirname, '../../..');
 const script = path.join(extensionRoot, 'scripts', 'check-model-feed.ts');
-const tsx = path.join(extensionRoot, 'node_modules', '.bin', 'tsx');
 const dir = makeTempDir('rm141-check-');
 
 function run(candidate: unknown, extra: string[] = []): { status: number | null; out: string } {
   const file = path.join(dir, `candidate-${Math.random().toString(36).slice(2)}.json`);
   fs.writeFileSync(file, JSON.stringify(candidate));
-  const result = spawnSync(tsx, [script, '--candidate', file, '--refs', '', ...extra], { encoding: 'utf8', cwd: extensionRoot });
+  const result = spawnSync(process.execPath, ['--import', 'tsx', script, '--candidate', file, '--refs', '', ...extra], { encoding: 'utf8', cwd: extensionRoot });
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 }
 
@@ -54,7 +53,7 @@ test('S33: a candidate the validator rejects fails (negative)', () => {
 
 test('S34: a default that falls back to the first row fails, unless accepted (negative)', () => {
   const gated = JSON.parse(JSON.stringify(good));
-  gated.providers.codex.models.find((row: { id: string }) => row.id === CODEX_MODEL_IDS.SOL_6_1).minAppVersion = '99.0.0';
+  gated.providers.codex.models.find((row: { id: string }) => row.id === CODEX_MODEL_IDS.SOL_6_2).minAppVersion = '99.0.0';
   const current = path.join(dir, 'current.json');
   fs.writeFileSync(current, JSON.stringify(good));
   const failed = run(gated, ['--current', current]);
