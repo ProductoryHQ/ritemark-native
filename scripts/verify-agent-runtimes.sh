@@ -146,7 +146,13 @@ check_codex_exec_server() { # app-server-path exec-server-path expected-version
     return
   fi
   local out; out="$("$exec_server" --version 2>&1)"
-  if [[ -n "$want" && "$out" == *"$want"* ]]; then
+  # As check_version: where the manifest's version can't be read (Git Bash on the Windows
+  # runner hands node a /d/... path), presence and a working --version are the check.
+  if [[ -z "$want" ]]; then
+    if [[ "$out" == *codex-exec-server* ]]; then pass "codex exec-server is installed beside app-server and reports '$out' (no manifest version to compare)"; else fail "codex exec-server --version printed '$out'"; fi
+    return
+  fi
+  if [[ "$out" == *"$want"* ]]; then
     pass "codex exec-server is installed beside app-server and reports $want"
   else
     fail "codex exec-server reports '$out' but the manifest pins ${want:-nothing}"
