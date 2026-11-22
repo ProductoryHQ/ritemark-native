@@ -654,7 +654,7 @@ test('GH #398: a conversation saved on GPT-5.6 Sol keeps it', () => {
 
 const menuLabels = (models: { label: string; hidden?: boolean }[]): string[] =>
   models.filter((model) => !model.hidden).map((model) => model.label);
-const CLAUDE_5_MENU = ['Sonnet 5.5', 'Opus 5.5', 'Sonnet 5', 'Opus 5', 'Fable 5.1', 'Fable 5', 'Haiku 5.5'];
+const CLAUDE_5_MENU = ['Sonnet 5.5', 'Opus 5.5', 'Sonnet 5', 'Opus 5', 'Fable 5.2', 'Fable 5.1', 'Fable 5', 'Haiku 5.5'];
 
 test('v1.14.0: claudeGeneration reads the generation from every Claude id shape', () => {
   const cases: Array<[string | undefined, number | undefined]> = [
