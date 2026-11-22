@@ -44,7 +44,7 @@ The `getDefault` rule was read from each tag's `index.ts`, and `check:model-feed
 | OpenCode's new rows (Argon on Google and OpenRouter, the Claude 5.5s, GPT-6.1 Sol, OpenRouter's Claude Sonnet 5.5 and GPT-6.1 Sol) | 2.0.0 | OpenCode 1.19.3 (2.0.0) is the version Argon was run on (`c4808be`). Older OpenCode builds do fetch the current registry (A3), but nothing was run on them |
 | Codex GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | 2.3.0 | First Ritemark release bundling Codex 0.171.0, which supports both models |
 | OpenCode's OpenAI and OpenRouter routes for GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | 2.3.0 | Same release floor as the new Codex rows for this lineup update |
-| OpenAI API GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | None | Flows sends model IDs directly to the OpenAI API with the user's key. These rows have no bundled CLI dependency |
+| OpenAI API GPT-6.2 Sol and GPT-6.2 Astra (2.3.0 RC2) | 2.3.0 | Flows calls the API with the user's key, but picks the API by the app's own `modelConfig.ts`: in 2.2 (`LLMNodeExecutor.ts:211`, `usesResponsesAPI`) an unknown model goes through Chat Completions without reasoning. 2.3.0 is the first release that knows both as Responses API models |
 
 **No gate on a bundled row.** The plan allowed a bundled gate up to `main`'s version. The code showed otherwise: before activation, `modelCatalog` resolves with app version `0.0.0` (`index.ts`, `_appVersion`). A gate there would hide the row from the build itself until activation. So bundled rows carry none, and a unit test says so (R6, revised).
 

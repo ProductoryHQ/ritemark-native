@@ -47,8 +47,11 @@ assert.deepEqual(resolveRequestedModelIn(older, undefined, 'codex'), { id: CODEX
 for (const id of gpt62) {
   const row = feed.providers.openai!.models.find(model => model.id === id);
   assert.ok(row);
-  assert.equal(row.minAppVersion, undefined);
-  assert.ok(resolveStaticModels('openai', feed, null, emptyCatalog, '2.2.0').some(model => model.id === id));
+  // 2.2's modelConfig.ts lacks these, so its Flows would call them through Chat Completions.
+  assert.equal(row.minAppVersion, '2.3.0');
+  assert.equal(BUNDLED_CATALOG.providers.openai!.models.find(model => model.id === id)?.minAppVersion, undefined);
+  assert.ok(!resolveStaticModels('openai', feed, null, emptyCatalog, '2.2.0').some(model => model.id === id));
+  assert.ok(resolveStaticModels('openai', feed, null, emptyCatalog, '2.3.0').some(model => model.id === id));
   assert.equal(getModelConfig(id)?.api, 'responses');
 }
 
