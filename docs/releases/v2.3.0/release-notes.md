@@ -61,6 +61,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 - **Present from Ritemark.** Choose **Present** to show only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
 - **Lead the room while you present.** Use a clicker, blank the screen or light up one item. Show a timer for an exercise, or a QR code for the page.
+- **Switch tabs while you present.** Click a tab on the slide to show it. With a second display, click it on your laptop's slide, and the projector follows.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 
 ### Share the deck
