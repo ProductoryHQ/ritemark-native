@@ -1,0 +1,26 @@
+# RiteMark Patch: ritemark-custom-editor-at-startup
+#
+# Purpose: A document opened at start opens in Ritemark's editor: ICustomEditorService is created Eager, so the custom editors are registered with the editor resolver before a start's documents are resolved
+#
+# Why: #978: with Ritemark closed, a double-click on a .md file in Finder or Explorer opened it in the text editor; the Delayed service was created on idle, after the resolver had already chosen
+#
+# File(s): src/vs/workbench/contrib/customEditor/browser/customEditor.contribution.ts
+# Created: 2026-11-23
+#
+diff --git a/src/vs/workbench/contrib/customEditor/browser/customEditor.contribution.ts b/src/vs/workbench/contrib/customEditor/browser/customEditor.contribution.ts
+index a02a6f3aef6..dd45a0686ee 100644
+--- a/src/vs/workbench/contrib/customEditor/browser/customEditor.contribution.ts
++++ b/src/vs/workbench/contrib/customEditor/browser/customEditor.contribution.ts
+@@ -16,7 +16,11 @@ import { CustomEditorInput } from './customEditorInput.js';
+ import { CustomEditorDiffInput, CustomEditorSideBySideDiffInput } from './customEditorDiffInput.js';
+ import { CustomEditorService } from './customEditors.js';
+ 
+-registerSingleton(ICustomEditorService, CustomEditorService, InstantiationType.Delayed);
++// Ritemark (#978): Eager, not Delayed. Created as soon as the working-copy handler below injects it at startup,
++// it registers the custom editors with the editor resolver before the documents a start opens are resolved.
++// Delayed, it was made on idle, and a document handed over at a cold start (a double-click in Finder or
++// Explorer while the app is closed) could resolve first and open in the text editor.
++registerSingleton(ICustomEditorService, CustomEditorService, InstantiationType.Eager);
+ 
+ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane)
+ 	.registerEditorPane(

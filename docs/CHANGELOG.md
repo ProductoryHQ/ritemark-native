@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.3.0
 
+### A document opened from Finder or Explorer (#978)
+
+#### Fixed
+- **A double-clicked document opens in Ritemark’s editor.** With Ritemark closed, a `.md` file or a `.rtms` deck double-clicked in Finder or Explorer could open in the text editor, mostly on Windows and on a profile that had been used before. VS Code created its custom-editor service on idle, after the editor resolver had already chosen the text editor for the document the start opened. New patch 022 creates it at startup instead (`InstantiationType.Eager`).
+
 ### ChatGPT models and runtime
 
 #### Changed
