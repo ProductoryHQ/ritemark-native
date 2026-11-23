@@ -113,7 +113,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 ## Fixes
 
-- **A document you double-click opens in Ritemark.** With Ritemark closed, double-click a Markdown file or a deck in Finder or Explorer: it opens in Ritemark’s editor. Before, it could open as plain text.
+- **A document you double-click opens in Ritemark.** With Ritemark closed, double-click a deck, or a Markdown file that opens with Ritemark, in Finder or Explorer: it opens in Ritemark’s editor. Before, it could open as plain text.
 - **On Windows, Claude asks you to sign in when it needs to.** Before, Claude could look ready, and the first question failed.
 - **One sign-in at a time.** While a sign-in runs, the AI's sheet shows "Signing in…" with **Cancel**. Before, it offered a second sign-in.
 - **A web page that failed to load opens again.** Open its file once it's back, and the page loads. Before, you saw the failed page again.
