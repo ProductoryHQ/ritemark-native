@@ -274,6 +274,8 @@ export function setFontTwins(twins: Iterable<[string, string]>): void {
   for (const [family, twin] of twins) fontTwins.set(family.toLowerCase(), twin)
 }
 
+export const fontPointsToPixels = (points: number) => points * 4 / 3
+
 /** A font as CSS, on the white paper: its family with fallbacks, size, weight, slant, decoration and colour. */
 export function fontCss(font: Partial<FontStyle> | undefined, base: FontStyle): Record<string, string> {
   const f = { ...base, ...font }
@@ -282,7 +284,7 @@ export function fontCss(font: Partial<FontStyle> | undefined, base: FontStyle): 
   const decoration = [f.underline ? 'underline' : '', f.strike ? 'line-through' : ''].filter(Boolean).join(' ')
   const css: Record<string, string> = {
     fontFamily: twin ? `'${twin}', Arial, sans-serif` : `'${family.replace(/['"\\]/g, '')}', 'Carlito', Arial, sans-serif`,
-    fontSize: `${((f.size ?? 11) * 4) / 3}px`,
+    fontSize: `${fontPointsToPixels(f.size ?? 11)}px`,
     fontWeight: f.bold ? '700' : '400',
     fontStyle: f.italic ? 'italic' : 'normal',
     color: f.color ?? '#000000',
@@ -291,7 +293,7 @@ export function fontCss(font: Partial<FontStyle> | undefined, base: FontStyle): 
   if (f.underline === 'double' || f.underline === 'doubleAccounting') css.textDecorationStyle = 'double'
   if (f.vertAlign) {
     css.verticalAlign = f.vertAlign === 'superscript' ? 'super' : 'sub'
-    css.fontSize = `${((f.size ?? 11) * 4) / 3 * 0.75}px`
+    css.fontSize = `${fontPointsToPixels(f.size ?? 11) * 0.75}px`
   }
   return css
 }

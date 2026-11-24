@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use. They follow the workbook’s text formatting and chart layout.
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - When you open a deck, the status bar shows its slide count in place of the word count.
 - Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.

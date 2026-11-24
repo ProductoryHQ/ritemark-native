@@ -21,6 +21,8 @@ import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand
 import { columnScale, type ExcelGeometry } from './columnWidth'
 import { isMac } from '../../hooks/usePlatform'
 import type { CellStyle } from './excelStyles'
+import { DrawingView } from './DrawingView'
+import { measure, forgetMeasures } from './gridTextMeasure'
 import './sheetGrid.css'
 
 export interface SheetGridProps {
@@ -50,29 +52,9 @@ const OVERSCAN = 3
 
 type RegionKind = 'corner' | 'top' | 'left' | 'body'
 
-let measureContext: CanvasRenderingContext2D | null = null
 /** Column widths and the cell inset as the Excel on this computer lays them out (columnWidth.ts). */
 const GEOMETRY: ExcelGeometry = isMac ? 'mac' : 'windows'
 const CELL_PADDING = cellPadding(GEOMETRY)
-
-/** Text widths, kept while the fonts are the same: scrolling measures the same cells again and again. */
-const measured = new Map<string, number>()
-function measure(text: string, font: string): number {
-  const key = `${font}\u0000${text}`
-  const known = measured.get(key)
-  if (known !== undefined) return known
-  if (!measureContext) measureContext = document.createElement('canvas').getContext('2d')
-  if (!measureContext) return text.length * 7
-  measureContext.font = font
-  const width = measureContext.measureText(text).width
-  if (measured.size > 50_000) measured.clear()
-  measured.set(key, width)
-  return width
-}
-/** Fonts that finished loading change widths: measure again. */
-function forgetMeasures() {
-  measured.clear()
-}
 
 function horizontalOf(cell: CellModel | undefined, style: CellStyle | undefined): string {
   const h = style?.align.horizontal
@@ -769,20 +751,7 @@ export function SheetGrid({
         body: x0 + w > FW && y0 + h > FH,
       }
       if (!reaches[kind]) return
-      const what = d.what === 'chart' ? 'Chart' : d.what === 'image' ? 'Picture' : 'Shape'
-      const label = d.what === 'chart' && d.title ? `Chart: ${d.title}` : what
-      const small = w < 160 || h < 90
-      out.push(
-        <div key={`o${n}`} className="sg-object" style={place(HW + x0, HH + y0, w, h)} title={`${label}. Kept in the file. Open in Excel to see it.`}>
-          <Icon name={d.what === 'chart' ? 'chart-bar' : 'image'} size={16} tone="inherit" className="shrink-0" />
-          {!small && (
-            <div className="min-w-0">
-              <div className="sg-object-label">{label}</div>
-              <div className="sg-object-sub">Kept in the file. Open in Excel to see it.</div>
-            </div>
-          )}
-        </div>,
-      )
+      out.push(<DrawingView key={`o${n}`} drawing={d} style={place(HW + x0, HH + y0, w, h)} workbook={model} version={version} width={w} height={h} />)
     })
     return out
   }
