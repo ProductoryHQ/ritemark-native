@@ -157,6 +157,24 @@ test('SVG drops nested and self-closing metadata without rewriting the drawing',
   checkPixels('svg', source, cleaned);
 });
 
+test('SVG drops comments and Inkscape/Sodipodi data, which keep local paths', () => {
+  const source = Buffer.from('<?xml version="1.0" encoding="UTF-8"?>\n<!-- Generator: Adobe Illustrator 28 -->\n'
+    + '<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" '
+    + 'width="2" height="3" sodipodi:docname="logo.svg" inkscape:export-filename="/Users/someone/Documents/logo.png">'
+    + '<sodipodi:namedview id="n" inkscape:zoom="2"><inkscape:grid/></sodipodi:namedview>'
+    + '<rect width="2" height="3" fill="red" inkscape:label="box"/></svg>');
+  const cleaned = clean(source).toString('utf8');
+  assert.doesNotMatch(cleaned, /someone|Generator|sodipodi:docname|inkscape:export|namedview|inkscape:label|<!--/);
+  assert.match(cleaned, /<rect width="2" height="3" fill="red"\/>/);
+  checkPixels('svg', source, Buffer.from(cleaned));
+});
+
+test('BMP and ICO carry no metadata and go as they are', () => {
+  const bmp = Buffer.alloc(58); bmp.write('BM', 0, 'latin1'); bmp.writeUInt32LE(58, 2); bmp.writeUInt32LE(54, 10); bmp.writeUInt32LE(40, 14);
+  const ico = Buffer.alloc(22 + PNG.length); ico.writeUInt16LE(1, 2); ico.writeUInt16LE(1, 4); PNG.copy(ico, 22);
+  for (const source of [bmp, ico]) assert.deepEqual(clean(source), source);
+});
+
 test('truncated raster containers, SVG with a DTD, and unknown formats are uncleanable', () => {
   for (const source of [JPEG, PNG, WEBP, GIF]) {
     assert.equal(cleanPicture(source.subarray(0, source.length - 1)).kind, 'uncleanable');

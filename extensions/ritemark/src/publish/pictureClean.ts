@@ -24,9 +24,23 @@ export function cleanPicture(bytes: Buffer): PictureCleanResult {
   else if (bytes.subarray(0, 8).equals(PNG)) cleaned = cleanPng(bytes);
   else if (bytes.toString('latin1', 0, 3) === 'GIF') cleaned = cleanGif(bytes);
   else if (bytes.toString('latin1', 8, 12) === 'WEBP') cleaned = cleanWebp(bytes);
+  // BMP and ICO have no metadata container: they go as they are (a favicon.ico kept its place in 2.3).
+  else if (isBmp(bytes) || isIco(bytes)) cleaned = bytes;
   else cleaned = cleanSvg(bytes);
   return cleaned ? { kind: 'clean', bytes: cleaned } : { kind: 'uncleanable' };
 }
+
+function isBmp(bytes: Buffer): boolean {
+  return bytes.length >= 26 && bytes.toString('latin1', 0, 2) === 'BM' && bytes.readUInt32LE(2) === bytes.length;
+}
+
+function isIco(bytes: Buffer): boolean {
+  return bytes.length >= 22 && bytes.readUInt16LE(0) === 0 && bytes.readUInt16LE(2) === 1 && bytes.readUInt16LE(4) > 0;
+}
+
+/** Editors' own data in an SVG: Inkscape and Sodipodi keep local file paths (with the user's name) there. */
+const EDITOR_PREFIX = /^(?:sodipodi|inkscape):/;
+const EDITOR_ATTRIBUTE = /\s+(?:sodipodi|inkscape):[^\s=<>/"']+\s*=\s*(?:"[^"<]*"|'[^'<]*')/g;
 
 /** Read only IFD0's orientation. No other tag, embedded thumbnail or original offset is copied. */
 function exifOrientation(payload: Buffer): number | undefined {
@@ -256,6 +270,12 @@ function cleanSvg(bytes: Buffer): Buffer | undefined {
     const [token, closing, name, attributes, selfClosing] = match;
     if (!name) {
       if (token.startsWith('<![CDATA[') && stack.length === 0) return;
+      if (token.startsWith('<!--') && removedAt < 0) {
+        // Comments carry authoring notes ("Generator: …"); the drawing never needs them.
+        parts.push(svg.slice(keptFrom, start));
+        keptFrom = position;
+        continue;
+      }
       const encoding = /^<\?xml\s[\s\S]*?\bencoding\s*=\s*(['"])([^'"]+)\1/i.exec(token)?.[2];
       if (encoding && !/^utf-8$/i.test(encoding)) return;
       continue;
@@ -268,11 +288,17 @@ function cleanSvg(bytes: Buffer): Buffer | undefined {
         if (root || localName !== 'svg') return;
         root = true;
       }
-      if (localName === 'metadata' && removedAt < 0) {
+      if ((localName === 'metadata' || EDITOR_PREFIX.test(name)) && removedAt < 0) {
         removedAt = stack.length;
         parts.push(svg.slice(keptFrom, start));
       }
       if (!selfClosing) stack.push(name);
+      if (removedAt < 0 && EDITOR_ATTRIBUTE.test(attributes)) {
+        EDITOR_ATTRIBUTE.lastIndex = 0;
+        parts.push(svg.slice(keptFrom, start), token.replace(EDITOR_ATTRIBUTE, ''));
+        keptFrom = position;
+      }
+      EDITOR_ATTRIBUTE.lastIndex = 0;
     }
     if (removedAt === stack.length) {
       keptFrom = position;
