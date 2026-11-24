@@ -4,8 +4,14 @@ import { formatCellValue } from './numberFormat'
 import { fontPointsToPixels } from './sheetLayout'
 
 type DrawableChart = Extract<ChartModel, { supported: true }>
+
+function isCircularPlot(plot: ChartPlot) {
+  return plot.kind === 'pie' || plot.kind === 'doughnut'
+}
+
 export function drawsChart(chart: ChartModel | undefined): chart is DrawableChart {
-  return !!chart?.supported && chart.plots.length > 0 && chart.plots.every((plot) => {
+  if (!chart?.supported || !chart.plots.length || (chart.plots.length > 1 && chart.plots.some(isCircularPlot))) return false
+  return chart.plots.every((plot) => {
     const valueAxes = chart.axes.filter(({ id, kind }) => kind === 'value' && plot.axisIds.includes(id ?? -1))
     return valueAxes.length <= (plot.kind === 'scatter' ? 2 : 1)
   })
@@ -40,6 +46,7 @@ export interface ChartLayout {
   width: number
   height: number
   name: string
+  chartTitle: string
   plot: Rect
   plotShape?: ChartShape
   chartShape?: ChartShape
@@ -209,11 +216,12 @@ function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, perc
 
 /** Keep extrema in each bucket, at their original category coordinates. */
 const MAX_DRAWN_POINTS = 5000
+// Each bucket contributes up to two extrema per series, with room for the endpoints.
+const MAX_BUCKETS = (MAX_DRAWN_POINTS - 2) / 2
 
-function sampledIndices(values: ReadonlyMap<number, { to: number }>, count: number, missingAsZero = false): number[] {
+function sampledIndices(values: ReadonlyMap<number, { to: number }>, count: number, missingAsZero = false,
+  bucketCount = MAX_BUCKETS): number[] {
   if (count <= MAX_DRAWN_POINTS) return Array.from({ length: count }, (_, index) => index)
-  // Each bucket contributes up to two extrema, with room for the endpoints.
-  const bucketCount = (MAX_DRAWN_POINTS - 2) / 2
   const buckets = new Map<number, { min: number; max: number; size: number }>()
   for (const [index, value] of values) {
     const bucket = Math.floor(index * bucketCount / count)
@@ -332,7 +340,7 @@ function preparePlot(model: DrawableChart, plotModel: ChartPlot, resolved: reado
   const line = plotModel.kind === 'line'
   const area = plotModel.kind === 'area'
   const scatter = plotModel.kind === 'scatter'
-  const circular = plotModel.kind === 'pie' || plotModel.kind === 'doughnut'
+  const circular = isCircularPlot(plotModel)
   const scatterStyle = plotModel.scatterStyle ?? 'marker'
   const scatterLines = scatter && ['line', 'lineMarker', 'smooth', 'smoothMarker'].includes(scatterStyle)
   const scatterMarkers = scatter && ['marker', 'lineMarker', 'smoothMarker'].includes(scatterStyle)
@@ -404,7 +412,7 @@ export function layoutChart(model: DrawableChart, resolved: readonly (readonly C
   const right = legendBounds && (legend?.position === 'r' || legend?.position === 'tr')
     ? Math.min(width - pad, legendBounds.x - 8) : width - pad
   const makeLayout = (plot: Rect, scale: ChartLayout['scale']): ChartLayout => ({
-    width, height, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
+    width, height, chartTitle: title, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
     plot, plotShape: model.plotShape, chartShape: model.chartShape, categoryBand: 0, scale, bars: [], lines: [], markers: [], gridlines: [], axes: [], axisLabels: [],
     titles: title ? [{ x: titleBounds.x + titleBounds.width / 2, y: titleBounds.y + titleBounds.height / 2, text: title, anchor: 'middle', style: chartTitle.style, runs: chartTitle.runs }] : [],
     dataLabels: [], legend,
@@ -764,6 +772,19 @@ function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotDat
     const spacing = 1 - clamp(plotModel.overlap ?? (stacked ? 100 : 0), -100, 100) / 100
     const cluster = 1 + (series.length - 1) * spacing
     const barWidth = band / (cluster + clamp(plotModel.gapWidth ?? 150, 0, 500) / 100)
+    // Grouped marks share categories, including the extrema that only one series needs.
+    let sharedIndices: number[] | undefined
+    if (points.length > 1 && (stacked || plotModel.kind === 'column' || horizontal)) {
+      if (count <= MAX_DRAWN_POINTS) sharedIndices = Array.from({ length: count }, (_, index) => index)
+      else {
+        const bucketCount = Math.max(1, Math.floor(MAX_BUCKETS / points.length))
+        const union = new Set<number>()
+        for (const values of points) {
+          for (const index of sampledIndices(values, count, blanksAsZero, bucketCount)) union.add(index)
+        }
+        sharedIndices = [...union].sort((a, b) => a - b)
+      }
+    }
     series.forEach((entry, seriesIndex) => {
       const { color, marker, shape, name } = entries[seriesIndex]
       const pointStyles = new Map(entry.pointStyles.map((style) => [style.index, style]))
@@ -773,7 +794,7 @@ function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotDat
       let segment = segments[0]
       const bases: Point[][] = [[]]
       let base = bases[0]
-      const indices = sampledIndices(values, count, blanksAsZero)
+      const indices = sharedIndices ?? sampledIndices(values, count, blanksAsZero)
       const runs = line && !blanksAsZero && model.displayBlanksAs !== 'span' && count > MAX_DRAWN_POINTS
         ? sampledLineRuns(values, indices, log) : undefined
       let previousRun: number | undefined

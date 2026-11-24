@@ -134,10 +134,11 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
     assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
     assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
   }
-  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall], conditionalFormats: 0 }),
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
     "This sheet has 2 waterfall charts, a treemap chart, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
-  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }], conditionalFormats: 1 }),
-    "This sheet has a picture and colour rules. They're kept in the file; Open in Excel to see them.")
+  // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
+    "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
 })
 
 const colours = await open('charts-colours')
@@ -744,4 +745,43 @@ test('pie keeps saved chart text, rich label runs and the manual plot', () => {
   assert.equal(label.style.rotation, 2)
   assert.deepEqual(label.runs, [{ text: 'Saved label', style: { size: 12, rotation: 2, bold: true, italic: false, color: '#000000' } }])
   assert.equal(markupOf(layout).querySelector('[data-chart="data-labels"] tspan')!.textContent, 'Saved label')
+})
+
+test('grouped plots draw every series at the union of their bucket extrema', () => {
+  const first = Array<number>(6001).fill(2)
+  const second = Array<number>(6001).fill(3)
+  first[1] = 80
+  second[2] = 90
+  const column = synthetic('column')
+  for (const grouping of [undefined, 'clustered', 'stacked', 'percentStacked']) {
+    const layout = layoutChart({ ...column, plots: [{ ...column.plots[0], grouping }] },
+      [seriesOf(first), seriesOf(second)], 480, 288, measure)
+    const indices = [0, 1].map((series) => layout.bars.filter((bar) => bar.series === series).map((bar) => bar.index))
+    assert.deepEqual(indices[0], indices[1], grouping)
+    for (const index of [1, 2]) assert.ok(indices[0].includes(index), grouping)
+    assert.ok(indices[0].length <= 5000, grouping)
+  }
+})
+
+test('combos containing a pie or doughnut keep their card and name the circular kind', () => {
+  for (const [tag, kind] of [['pieChart', 'pie'], ['doughnutChart', 'doughnut']]) {
+    const chart = readChart(`<chartSpace><chart><plotArea><barChart><barDir val="col"/></barChart><${tag}/></plotArea></chart></chartSpace>`)
+    const drawing = { ...combo, chart }
+    const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
+      drawing, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
+    }))
+    assert.equal(drawsChart(chart), false)
+    assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
+    assert.match(keptNotice({ drawings: [drawing] })!, new RegExp(`a ${kind} chart`))
+  }
+})
+
+test('the quiet line describes unnamed charts alongside named kinds', () => {
+  const draw = (tag: string) => ({ ...combo, chart: readChart(`<chartSpace><chart><plotArea><${tag}/></plotArea></chart></chartSpace>`) })
+  const unknown = { ...combo, chart: readChart('<chartSpace><chart><plotArea/></chart></chartSpace>', undefined, true) }
+  for (const others of [[unknown], [unknown, unknown]]) {
+    assert.match(keptNotice({ drawings: [...others, draw('radarChart')] })!,
+      others.length === 1 ? /a radar chart and another chart\./ : /a radar chart and 2 other charts\./)
+  }
+  assert.match(keptNotice({ drawings: [unknown] })!, /has a chart\./)
 })

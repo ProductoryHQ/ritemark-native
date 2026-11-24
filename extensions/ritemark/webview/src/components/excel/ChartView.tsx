@@ -229,20 +229,21 @@ export const PositionedChart = memo(function PositionedChart({ chart, workbook, 
     return geometry
   },
     [chart, series, w, h, workbook.date1904, fontVersion])
-  const style: CSSProperties = { width: '100%', height: '100%', background: '#fff', overflow: 'hidden' }
+  const style: CSSProperties = { width: '100%', height: '100%', background: '#fff' }
   const target = layout && !layout.emptyReason ? selection : undefined
   const choose = (element: HTMLDivElement) => {
     if (!target || !layout) return
-    const title = chart.title ? layout.titles[0]?.text : undefined
-    element.focus({ preventScroll: true })
-    target.choose(element, chartFormulaText(chart, title, sheetName))
+    target.choose(element, chartFormulaText(chart, layout.chartTitle, sheetName))
   }
   return (
     <div ref={container} style={style} className={target ? 'sg-chart' : undefined}
-      data-sheet-chart={target?.id} role={target ? 'button' : undefined}
+      id={target?.focusable ? target.id : undefined} data-sheet-chart={target?.id} role={target ? 'button' : undefined}
       tabIndex={target ? target.focusable ? 0 : -1 : undefined}
       aria-hidden={target && !target.focusable ? true : undefined}
       aria-label={target ? layout?.name : undefined} aria-pressed={target?.chosen}
+      onMouseDown={target && !target.focusable ? (event) => {
+        if (event.button === 0) event.preventDefault()
+      } : undefined}
       onClick={target && ((event) => choose(event.currentTarget))}
       onKeyDown={target && ((event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
@@ -250,7 +251,9 @@ export const PositionedChart = memo(function PositionedChart({ chart, workbook, 
         event.stopPropagation()
         choose(event.currentTarget)
       })}>
-      {layout && (layout.emptyReason ? emptyFallback(layout.emptyReason) : <ChartView layout={layout} />)}
+      <div className="h-full w-full overflow-hidden">
+        {layout && (layout.emptyReason ? emptyFallback(layout.emptyReason) : <ChartView layout={layout} />)}
+      </div>
     </div>
   )
 })

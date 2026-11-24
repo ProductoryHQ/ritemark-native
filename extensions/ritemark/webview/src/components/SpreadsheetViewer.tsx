@@ -14,6 +14,7 @@ import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 import { SheetFormulaBar, SheetGrid } from './excel/SheetGrid'
 import { useChartSelection } from './excel/chartSelection'
+import { cellRulesForVersion } from './excel/cellRules'
 import './excel/sheetGrid.css'
 import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
 import { drawsChart } from './excel/chartLayout'
@@ -517,8 +518,12 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  const model = source?.model
+  const sheetModel = model?.sheets.find((s) => s.name === selectedSheet)
   useEffect(() => chartSelection.clear(), [sheetModel, chartSelection.clear])
+  // The model is edited in place. A new version invalidates all range and formula facts.
+  const rulesForSheet = useMemo(() => model && cellRulesForVersion(model), [model, version])
+  const cellRules = sheetModel && rulesForSheet?.(sheetModel)
   const sheetChart = sheetModel?.kind === 'chartsheet'
     ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart')?.chart : undefined
   const excelNotice = fileType !== 'xlsx'
@@ -527,7 +532,7 @@ export function SpreadsheetViewer({
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel && keptNotice(sheetModel.layout, sheetModel.kind === 'worksheet' ? cellRules : undefined)
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -647,9 +652,12 @@ export function SpreadsheetViewer({
 
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
+      {sheetModel?.kind === 'chartsheet' && (
+        <SheetFormulaBar id={chartSelection.barId} reference={chartSelection.chosen ? 'Chart' : ''} showFormulaIcon={false}
+          aria-label="Chart details" value={chartSelection.chosen?.text ?? ''} readOnly />
+      )}
       {source?.model && drawsChart(sheetChart) ? (
         <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard()}>
-          {chartSelection.chosen && <SheetFormulaBar reference="Chart" aria-label="Chart details" value={chartSelection.chosen.text} readOnly />}
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0">
               <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard}
@@ -664,6 +672,7 @@ export function SpreadsheetViewer({
           model={source.model}
           sheet={sheetModel}
           version={version}
+          cellRules={cellRules}
           editable={isEditable}
           onEdit={editCell}
           getInput={gridInput}

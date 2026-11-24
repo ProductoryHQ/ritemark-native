@@ -36,6 +36,8 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 ## PR 4: combo, the second axis, chosen charts, the 5,000-point thinning (Standard, look change)
 - [ ] Combo (columns with a line, a second value axis on the right)
 - [ ] The accent ring on a click; the formula bar's text (R8, frame 10); Esc and a click elsewhere let go
+- [ ] Ctrl+Alt+5 (Cmd+Option+5 on Mac, since Ctrl+Option is VoiceOver's) cycles through the grid and charts in sheet order. Hold Shift to reverse direction. Tab steps cells from the grid and moves focus between charts and the grid from a chart. Escape returns focus to the grid.
+- [ ] Copy as a picture (`chartCopy.ts`); a tooltip on nothing new (no new elements)
 - [ ] Series over more than 5,000 points thinned, keeping each bucket's lowest and highest (R25)
 - [ ] Out-of-scope kinds keep the card; the line names them (scenario 13)
 - [ ] Proof: scenarios 1 (combo), 10, 11, 13, 14, each beside Excel's render; the lead's look; the copy checked by pasting the picture into a Ritemark document
@@ -46,10 +48,12 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 - [ ] High review, security review, and paste into a Ritemark document
 
 ## PR 5: the rules reader and engine (Standard, no visible change)
-- [ ] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan
-- [ ] Tests: every rule kind against hand-made grids; formulas relative to the range's top-left cell; priority and stop-if-true; the date injected; the x14 data bar twin
-- [ ] "Unreadable" for anything outside the subset, never a guess (scenario 26)
+- [x] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan
+- [x] Tests: every rule kind against hand-made grids; formulas relative to the range's top-left cell; priority and stop-if-true; the date injected; the x14 data bar twin
+- [x] "Unreadable" for anything outside the subset, never a guess (scenario 26)
 - [ ] Proof: for each rule fixture, the engine's per-cell result table matches the cells Excel's render colours (cell list, in `research/`)
+
+PR 5 only reads and evaluates rules, so there is no user-facing release note.
 
 ## PR 6: cell rules, colour scales and data bars drawn (Standard, look change)
 - [ ] `cellRules.ts` joined into `SheetGrid.tsx`'s cell layers for the visible window: fills, font changes, borders, scale fills, data bars with axis, negative colour, gradient or solid, border, show bar only

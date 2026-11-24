@@ -1,11 +1,38 @@
+import { familiesOf, matchingFontFace, readableStyleSheets } from '../../lib/svgFontFaces'
+
+function bundledFontCss(doc: Document, families: ReadonlySet<string>): string {
+  let css = ''
+  const collect = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      const face = matchingFontFace(rule, families)
+      // Accept only the bundled font payloads. Copy never fetches fonts.
+      if (face && /^url\(["']?data:font\/woff2;base64,[A-Za-z0-9+/=]+["']?\)(?:\s+format\(["']woff2["']\))?$/i.test(face.style.getPropertyValue('src'))) {
+        css += face.cssText
+      } else if ('cssRules' in rule) {
+        collect((rule as CSSGroupingRule).cssRules)
+      }
+    }
+  }
+  for (const { rules } of readableStyleSheets(doc)) collect(rules)
+  return css
+}
+
 // ChartView supplies the SVG geometry, local clip paths, and inline font names.
 function serializeChartSvg(svg: SVGSVGElement, width: number, height: number): Blob {
   const copy = svg.cloneNode(true) as SVGSVGElement
+  const families = new Set<string>()
   for (const text of copy.querySelectorAll<SVGTextContentElement>('text, tspan')) {
     // Workbook typefaces are names. Fall back when a value looks like a URL.
     if (/[:/\\]|url\s*\(/i.test(text.style.fontFamily)) {
-      text.style.fontFamily = 'Carlito, Arial, sans-serif'
+      text.style.fontFamily = "'Ritemark Grid Sans', Carlito, Arial, sans-serif"
     }
+    for (const family of familiesOf(text.style.fontFamily)) families.add(family)
+  }
+  const css = bundledFontCss(svg.ownerDocument, families)
+  if (css) {
+    const style = svg.ownerDocument.createElementNS(svg.namespaceURI, 'style')
+    style.textContent = css
+    copy.insertBefore(style, copy.firstChild)
   }
   copy.setAttribute('width', String(width))
   copy.setAttribute('height', String(height))
@@ -28,6 +55,7 @@ async function chartPng(svg: SVGSVGElement): Promise<Blob> {
       image.onerror = () => reject(new Error('Chart SVG could not be loaded'))
       image.src = url
     })
+    await image.decode()
     // ChartView sits on white paper in the worksheet.
     context.fillStyle = '#ffffff'
     context.fillRect(0, 0, canvas.width, canvas.height)
@@ -40,15 +68,22 @@ async function chartPng(svg: SVGSVGElement): Promise<Blob> {
   }
 }
 
-export async function copyChart(target: HTMLDivElement): Promise<void> {
+let copying = false
+
+export async function copyChart(target: HTMLElement): Promise<void> {
+  if (copying) return
+  const svg = target.querySelector('svg')
+  if (!svg) return
+  copying = true
   try {
-    const svg = target.querySelector('svg')
-    if (!svg) return
     // Start the write during the Copy gesture while the PNG is still being made.
     const png = chartPng(svg)
     const write = async () => navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
-    await Promise.all([png, write()])
+    const results = await Promise.allSettled([png, write()])
+    if (results.some(({ status }) => status === 'rejected')) throw new Error('Chart copy failed')
   } catch {
     console.warn('Could not copy the Excel chart as a picture.')
+  } finally {
+    copying = false
   }
 }
