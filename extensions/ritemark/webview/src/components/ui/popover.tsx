@@ -43,7 +43,7 @@ export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent }
 
 /** A hover/focus popover anchored to an element rendered outside React. */
 export function AnchoredHoverPopover({
-  anchor, contentRef, children, onClose, onPointerEnter, onPointerLeave, label, collisionBoundary,
+  anchor, contentRef, children, onClose, onPointerEnter, onPointerLeave, label, collisionBoundary, className,
 }: {
   anchor: HTMLElement
   contentRef: React.Ref<HTMLDivElement>
@@ -51,6 +51,8 @@ export function AnchoredHoverPopover({
   onClose: () => void
   label: string
   collisionBoundary?: Element | null
+  /** Added to the card's own classes (this card only; the shared Popover keeps its look). */
+  className?: string
   onPointerEnter: () => void
   onPointerLeave: () => void
 }) {
@@ -66,9 +68,9 @@ export function AnchoredHoverPopover({
         collisionBoundary={collisionBoundary ?? undefined}
         collisionPadding={collisionBoundary ? 12 : 8}
         sticky={collisionBoundary ? 'always' : 'partial'}
-        className={collisionBoundary
+        className={cn(collisionBoundary
           ? 'w-[17rem] max-w-[var(--radix-popover-content-available-width,0px)] max-h-[var(--radix-popover-content-available-height)] overflow-auto'
-          : undefined}
+          : undefined, className)}
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={() => {

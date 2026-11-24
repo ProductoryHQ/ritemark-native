@@ -89,6 +89,8 @@ export function SourcePassageCard({
       // Give Radix the loaded card's natural height for its first collision calculation.
       key={preview ? 'preview' : 'loading'}
       label="Source passage"
+      // Dark: a visible hairline, since this card lands on running text and the composer's edge (Experience 50).
+      className="dark:shadow-[0_0_0_1px_var(--r-hairline-strong),0_16px_34px_-10px_rgba(0,0,0,.45)]"
       collisionBoundary={anchor.closest('[data-chat-column]')}
       {...{ anchor, contentRef, onClose, onPointerEnter, onPointerLeave }}
     >
