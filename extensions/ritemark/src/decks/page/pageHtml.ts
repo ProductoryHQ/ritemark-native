@@ -44,6 +44,7 @@ import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
 import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, type PublicSlide } from './publicDeck';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { PAGE_SCRIPT } from './pageScript';
+import { DECK_VERSION_META, PAGE_FOLLOWER } from './pageFollower';
 import { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses } from '../blocks/codeTools';
 import { buttonHtml, buttonParagraphOf } from '../blocks/buttonBlock';
 
@@ -611,6 +612,13 @@ svg { flex: none; }
 .layer .deck-sl.is-blocks .blk-tab:not(.is-active):active { background: color-mix(in srgb, var(--s-hd, #fff) 9%, transparent); }
 .layer .deck-sl.is-blocks .blk-tab:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: -2px; }
 .foot { display: none; }
+.deck-follow-note { position: fixed; left: 50%; bottom: calc(var(--line-h) + 8px); transform: translateX(-50%); z-index: 21;
+  width: max-content; max-width: calc(100% - 32px); padding: 8px 12px; border-radius: 8px; background: var(--lbar); color: var(--lstrong);
+  font: 500 13.5px/18px 'Sofia Sans', sans-serif; }
+/* The note's words and its "Go on to" in the bar's type: the page's body font is the slide's, never the note's. */
+.deck-follow-note button { height: auto; margin-left: 8px; padding: 0 2px; font: 600 13.5px/18px 'Sofia Sans', sans-serif; color: var(--lstrong); text-decoration: underline; text-underline-offset: 3px; }
+.deck-removed-slide { opacity: .8; }
+.deck-changed-block { box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent); border-radius: 3px; }
 .empty { position: fixed; inset: 0 0 var(--line-h); display: grid; place-items: center; margin: 0; color: var(--lmuted); }
 .toast, .restart { position: fixed; left: 50%; bottom: calc(var(--line-h) + 12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 10px; background: #fff; color: #1C1F4A; font: 600 13.5px/18px 'Sofia Sans', sans-serif; box-shadow: 0 0 0 1px rgba(28,31,74,.08), 0 12px 30px -10px rgba(8,9,30,.6); }
 /* Small details 7: a quiet way back to the start when the page returns to a reader's place, for 5 s. */
@@ -620,6 +628,7 @@ svg { flex: none; }
 /* A narrow window (half a laptop, a phone): the slide's blocks in one column at reading size, on the same ground; the
    page scrolls when a slide is taller than the window, and the text follows under it. */
 @media screen and (max-width: 860px) {
+  .deck-follow-note { position: relative; left: auto; bottom: auto; transform: none; margin: 8px auto 0; }
   body { overflow: auto; }
   .ground { position: fixed; }
   .view { position: relative; inset: auto; padding: 16px 16px calc(var(--line-h) + 12px); min-height: 100vh; }
@@ -717,6 +726,7 @@ svg { flex: none; }
 export const PRINT_CSS = `
 .paddr, .foot.addr-only { display: none; }
 @media print {
+  .deck-follow-note { display: none !important; }
   @page { margin: 14mm 15mm; }
   html, body { height: auto; overflow: visible; background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; color: #33365A; --ink: #1C1F4A; --text: #33365A; --muted: #6B6F94; --label: #8A5A00; --line: #DADCE4; --soft: #F4F4FA; --link: #1C1F4A; }
@@ -1010,17 +1020,18 @@ function contentsHtml(slides: PublicSlide[]): string {
 const SCRIPT_TEXT = `\n${PAGE_SCRIPT}\n`;
 
 /**
- * The page's Content Security Policy: its one script by its hash, so nothing else runs (no inline handler, no other
- * script); styles its own (inline), fonts its own (inline, and the theme's beside it); pictures from beside it (and from
+ * The page's Content Security Policy pins the player and follower by their exact hashes.
+ * Styles are inline, fonts are inline or beside the page, and pictures come from beside it (and from
  * disk when the file is opened there, as in the room without a network); and nothing loaded from anywhere else. It goes
  * first in the head.
  */
 export const PAGE_CSP = [
   "default-src 'none'",
-  `script-src 'sha256-${createHash('sha256').update(SCRIPT_TEXT).digest('base64')}'`,
+  `script-src 'sha256-${createHash('sha256').update(SCRIPT_TEXT).digest('base64')}' 'sha256-${createHash('sha256').update(PAGE_FOLLOWER).digest('base64')}'`,
   "style-src 'unsafe-inline'",
   // Sofia Sans inline, and the theme's fonts from beside the page (`'self'` online, `file:` when opened from disk).
   "font-src 'self' data: file:",
+  "connect-src 'self'",
   "img-src 'self' data: file:",
   "base-uri 'none'",
   "form-action 'none'",
@@ -1080,6 +1091,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       `id="s${index + 1}"`,
       `data-i="${index}"`,
       `data-key="${shortHash(keys[index])}"`,
+      `data-slide-title="${esc(title)}"`,
       items > 0 ? `data-items="${items}"` : '',
       isExercise(slide) ? 'data-exercise=""' : '',
       'role="group"',
@@ -1120,6 +1132,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
+    `<meta name="${DECK_VERSION_META}" content="0">`,
     `<title>${esc(deck.title || deck.client || 'Slides')}</title>`,
     `<style>\n${fontFaces(assets.fonts, assets.themeFonts)}\n${PAGE_CSS}\n${assets.slideCss.replace(/<\/style/gi, '<\\/style')}\n${pageColours(deck)}\n${options.print === 'slides' ? SLIDES_PRINT_CSS : `${PRINT_CSS}\n${printOrderCss(count, printedSections)}${options.print === 'handout' ? `\n${HANDOUT_PRINT_CSS}\n${handoutNumbersCss(count)}` : ''}`}\n</style>`,
     '</head>',
@@ -1128,7 +1141,9 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     `<body class="${borderless ? 'bl' : 'card'}" data-store="ritemark-ticks-${pageKey}" data-place="ritemark-place-${pageKey}" data-transition="${esc(deck.transition ?? 'fade')}">`,
     '<div class="ground" aria-hidden="true"></div>',
     '<div class="wrap" id="wrap">',
-    `<main class="view" id="view" aria-label="Slides"><div class="frame" id="frame">\n${layers.join('\n')}\n</div></main>`,
+    `<main class="view" id="view" aria-label="Slides"><div class="frame" id="frame">\n${layers.join('\n')}\n</div>`
+      + '<div class="deck-follow-note" id="deck-updated" role="status" hidden>Updated just now</div>'
+      + '<div class="deck-follow-note" id="deck-removed" hidden>This slide was taken out of the deck. You can finish reading it. <button class="fb" id="deck-onward" type="button"></button></div></main>',
     prefetch,
     `<aside class="side" id="side" aria-label="The text for this slide" hidden><button class="fb ic sclose" id="sclose" type="button" aria-label="Hide the text" ${tip('Hide the text')}>${iconSvg('x', 16)}</button>`,
     preamble ? `<div class="pre" data-i="0">\n${preamble}</div>` : '',
@@ -1154,6 +1169,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="The picture, full size" tabindex="-1" hidden>'
       + `<button class="zoom-x" type="button" aria-label="Close">${iconSvg('x', 20)}</button>`
       + '<div class="zoom-pic"></div></div>',
+    `<script>${PAGE_FOLLOWER}</script>`,
     `<script>${SCRIPT_TEXT}</script>`,
     '</body>',
     '</html>',
