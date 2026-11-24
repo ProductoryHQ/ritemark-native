@@ -58,7 +58,7 @@ Codex has two distinct extension mechanisms, both kept in sync with their Claude
 - **Codex skills** — `.agents/skills/*/SKILL.md` — procedural playbooks. Counterpart of `.claude/skills/*`.
 - **Codex role agents (subagents)** — `.codex/agents/*.toml` — standalone TOML files (`name`, `description`, `developer_instructions`; optional `model`, `mcp_servers`, `skills.config`), auto-discovered by Codex and spawned by `name`. Counterpart of `.claude/agents/*.md`.
 
-These are different object types: a Claude role agent maps to a `.codex/agents/*.toml`, not to a skill, and a Codex agent should reference its matching skill rather than duplicate it. The Claude-runtime-only agents (`harness-equalizer`, `knowledge-builder`) have no Codex counterpart by design.
+These are different object types: a Claude role agent maps to a `.codex/agents/*.toml`, not to a skill, and a Codex agent should reference its matching skill rather than duplicate it. The Claude-runtime-only agent `knowledge-builder` has no Codex counterpart by design.
 
 ### Default Workflow
 
