@@ -22,7 +22,12 @@ assert.deepEqual(timetableStatus(readTimetable(front + slide(170))), {
 });
 
 const untimed = readTimetable(front + slide());
-assert.equal(timetableStatus(untimed), null);
+assert.deepEqual(timetableStatus(untimed), { text: '1 slide', over: false, tooltip: 'Deck length' });
+assert.deepEqual(timetableStatus(readTimetable(slide().repeat(6))), {
+  text: '6 slides',
+  over: false,
+  tooltip: 'Deck length',
+});
 assert.equal(slideMinutesText(untimed.slides[0]), null);
 assert.equal(slideMinutesText(readTimetable(slide(0)).slides[0]), '0 min');
 assert.equal(slideCountWithMinutes('Slide 17 of 17', over.slides[16]), 'Slide 17 of 17');
