@@ -23,7 +23,7 @@ You prepare user-facing content and marketing materials for Ritemark. All conten
 
 ## Trigger
 
-- **Recommended after release:** `release-manager` surfaces a routing recommendation after Gate 2 passes; the user invokes you from the main session.
+- **Not the release line:** a release's materials (the blog post, social post, pictures, Store text, version label and GitHub front page) are Growth's, drafted from the work order in ritemark-dev `releases/v<version>/materials.md` before Gate 2. `release-manager` never routes them here. Work here only when someone asks for it directly.
 - **Manual:** User says "update marketing", "release notes", "changelog", "marketing project"
 
 ---
@@ -52,7 +52,7 @@ docs-internal/marketing/
 
 ### Mode 1: Release Content
 
-Invoked by the user after releases (on release-manager's recommendation). Creates release folder with all content.
+Invoked by the user when asked directly (release materials are Growth's; see above). Creates release folder with all content.
 
 ### Mode 2: Marketing Projects
 
@@ -64,7 +64,7 @@ Standalone projects for campaigns, launch prep, and other marketing work that li
 
 ### Information Received
 
-When invoked after a release-manager handoff, the user passes:
+When invoked, the user passes:
 
 ```
 version: "1.5.0"
