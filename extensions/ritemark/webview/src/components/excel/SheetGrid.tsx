@@ -474,9 +474,20 @@ export function SheetGrid({
     el.selectionStart = el.selectionEnd = el.value.length
   }, [editing?.pos.i, editing?.pos.c, editing?.fromBar]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const drawingRowY = (row: number) => Y[Math.min(layout.displayOf.get(row) ?? layout.rows, layout.rows)]
+  const drawingOrigin = (anchor: SheetModel['layout']['drawings'][number]['anchor']) => {
+    const { from, pos } = anchor
+    if (!from) return pos
+    return {
+      x: X[Math.min(from.col, layout.cols)] + from.colOff,
+      y: drawingRowY(from.row) + from.rowOff,
+    }
+  }
+
   const onGridKey = (e: React.KeyboardEvent) => {
     // keys from the sort menu (a portal, but a React child of the grid) are the menu's
-    if (editing || !scroller.current?.contains(e.target as Node)) return
+    const grid = scroller.current
+    if (editing || !grid?.contains(e.target as Node)) return
     const move: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     const fromChart = chartTarget(e.target)
     if (move[e.key] && (!fromChart || chartSelection.chosen)) {
@@ -485,10 +496,26 @@ export function SheetGrid({
       if (fromChart) focusGrid()
       return
     }
+    const cycleCharts = e.key === 'F6' || (fromChart && e.key === 'Tab')
+    if (cycleCharts && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      const charts = sheet.layout.drawings.flatMap(({ what, anchor }, index) => {
+        if (what !== 'chart') return []
+        const origin = drawingOrigin(anchor)
+        const element = grid.ownerDocument.getElementById(chartSelection.idFor(index))
+        return origin && element ? [{ ...origin, element }] : []
+      }).sort((a, b) => a.y - b.y || a.x - b.x)
+      if (!charts.length) return
+      e.preventDefault()
+      const fromId = fromChart?.getAttribute('data-sheet-chart')
+      const targets = [grid, ...charts.map(({ element }) => element)]
+      const current = charts.findIndex(({ element }) => element.id === fromId) + 1
+      const next = (current + (e.shiftKey ? -1 : 1) + targets.length) % targets.length
+      chartSelection.clear()
+      targets[next].focus()
+      return
+    }
     if (fromChart) return
     if (e.key === 'Tab') {
-      // Let Tab reach a chart on the sheet. In a sheet with only cells, Tab still steps a column.
-      if (scroller.current.querySelector('[data-sheet-chart][tabindex="0"]')) return
       e.preventDefault()
       select(step(selected, 0, e.shiftKey ? -1 : 1))
       return
@@ -733,21 +760,14 @@ export function SheetGrid({
     const out: ReactNode[] = []
     sheet.layout.drawings.forEach((d, n) => {
       const a = d.anchor
-      let x0: number
-      let y0: number
+      const origin = drawingOrigin(a)
+      if (!origin) return
+      const { x: x0, y: y0 } = origin
       let w: number
       let h: number
-      const yOf = (row: number) => Y[Math.min(layout.displayOf.get(row) ?? layout.rows, layout.rows)]
-      if (a.from) {
-        x0 = X[Math.min(a.from.col, layout.cols)] + a.from.colOff
-        y0 = yOf(a.from.row) + a.from.rowOff
-      } else if (a.pos) {
-        x0 = a.pos.x
-        y0 = a.pos.y
-      } else return
       if (a.to) {
         w = X[Math.min(a.to.col, layout.cols)] + a.to.colOff - x0
-        h = yOf(a.to.row) + a.to.rowOff - y0
+        h = drawingRowY(a.to.row) + a.to.rowOff - y0
       } else if (a.size) {
         w = a.size.width
         h = a.size.height
@@ -883,6 +903,7 @@ export function SheetGrid({
     <div className="flex min-h-0 flex-1 flex-col">
       {/* the formula bar: the cell and what it holds (experience 47, frame 1); typing here edits the cell */}
       <SheetFormulaBar
+        id={chartSelection.barId}
         reference={reference}
         aria-label={chartSelection.chosen ? 'Chart details' : `What ${reference} holds`}
         value={barValue}
@@ -933,9 +954,9 @@ interface SheetFormulaBarProps extends ComponentProps<'textarea'> {
   reference: string
 }
 
-export function SheetFormulaBar({ reference, ...input }: SheetFormulaBarProps) {
+export function SheetFormulaBar({ id, reference, ...input }: SheetFormulaBarProps) {
   return (
-    <div className="mx-4 mb-3 flex min-h-[32px] shrink-0 items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
+    <div id={id} className="mx-4 mb-3 flex min-h-[32px] shrink-0 items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
       <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
         <span className="truncate">{reference}</span>
       </span>

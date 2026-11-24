@@ -45,12 +45,19 @@ export interface ChartSelectionTarget {
 
 export function useChartSelection(restoreFocus?: () => void) {
   const prefix = useId()
-  const [chosen, setChosen] = useState<{ id: string; text: string; target: HTMLDivElement } | null>(null)
+  const barId = `${prefix}-formula-bar`
+  const idFor = (index: number) => `${prefix}-${index}`
+  const [chosen, setChosen] = useState<{ id: string; text: string; target: HTMLElement } | null>(null)
   const clear = useCallback(() => setChosen(null), [])
   useEffect(() => {
     if (!chosen) return
+    const inBar = (target: EventTarget | null) => document.getElementById(barId)?.contains(target as Node)
     const outside = (event: Event) => {
-      if (chartTarget(event.target)?.getAttribute('data-sheet-chart') !== chosen.id) setChosen(null)
+      if (!inBar(event.target) && chartTarget(event.target)?.getAttribute('data-sheet-chart') !== chosen.id) clear()
+    }
+    const onFocus = (event: FocusEvent) => {
+      const chart = chartTarget(event.target)
+      if (chart && chart.getAttribute('data-sheet-chart') !== chosen.id) clear()
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
@@ -59,23 +66,33 @@ export function useChartSelection(restoreFocus?: () => void) {
         event.preventDefault()
         if (restoreFocus) restoreFocus()
         else chosen.target.blur()
+      } else if (restoreFocus && inBar(document.activeElement)) {
+        event.preventDefault()
+        restoreFocus()
       }
     }
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('click', outside, true)
     document.addEventListener('keydown', escape, true)
+    document.addEventListener('focusin', onFocus, true)
     return () => {
       document.removeEventListener('pointerdown', outside, true)
       document.removeEventListener('click', outside, true)
       document.removeEventListener('keydown', escape, true)
+      document.removeEventListener('focusin', onFocus, true)
     }
-  }, [chosen, restoreFocus])
+  }, [barId, chosen, clear, restoreFocus])
   function bind(index: number, focusable = true): ChartSelectionTarget {
-    const id = `${prefix}-${index}`
+    const id = idFor(index)
     return {
       id, focusable, chosen: chosen?.id === id,
-      choose: (target, text) => setChosen({ id, text, target }),
+      choose: (target, text) => {
+        const main = target.ownerDocument.getElementById(id)
+        if (!main) return
+        main.focus({ preventScroll: true })
+        setChosen({ id, text, target: main })
+      },
     }
   }
-  return { chosen, clear, bind }
+  return { chosen, clear, bind, barId, idFor }
 }

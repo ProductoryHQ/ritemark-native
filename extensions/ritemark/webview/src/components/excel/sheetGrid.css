@@ -206,10 +206,13 @@
 }
 
 
-.sg-chart { outline: none; }
-.sg-chart[aria-pressed="true"],
-:where(:root:not([data-input-mode="pointer"])) .sg-chart:focus-visible {
+.sg-chart { position: relative; outline: none; }
+.sg-chart[aria-pressed="true"]::after,
+:where(:root:not([data-input-mode="pointer"])) .sg-chart:focus-visible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
   outline: 2px solid var(--ritemark-indigo-deep, #3730a3);
   outline-offset: -2px;
-  border-radius: 8px;
 }

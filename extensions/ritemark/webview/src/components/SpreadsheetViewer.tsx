@@ -527,7 +527,7 @@ export function SpreadsheetViewer({
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel && keptNotice(sheetModel.layout)
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -647,9 +647,12 @@ export function SpreadsheetViewer({
 
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
+      {sheetModel?.kind === 'chartsheet' && (
+        <SheetFormulaBar id={chartSelection.barId} reference={chartSelection.chosen ? 'Chart' : ''}
+          aria-label="Chart details" value={chartSelection.chosen?.text ?? ''} readOnly />
+      )}
       {source?.model && drawsChart(sheetChart) ? (
         <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard()}>
-          {chartSelection.chosen && <SheetFormulaBar reference="Chart" aria-label="Chart details" value={chartSelection.chosen.text} readOnly />}
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0">
               <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard}

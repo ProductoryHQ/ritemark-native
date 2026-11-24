@@ -36,6 +36,7 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 ## PR 4: combo, the second axis, chosen charts, copy, the 5,000-point thinning (Standard, look change)
 - [ ] Combo (columns with a line, a second value axis on the right)
 - [ ] The accent ring on a click; the formula bar's text (R8, frame 10); Esc and a click elsewhere let go
+- [ ] F6 and Shift+F6 cycle through the grid and charts in sheet order. Tab steps cells from the grid and moves focus between charts and the grid from a chart.
 - [ ] Copy as a picture (`chartCopy.ts`); a tooltip on nothing new (no new elements)
 - [ ] Series over more than 5,000 points thinned, keeping each bucket's lowest and highest (R25)
 - [ ] Out-of-scope kinds keep the card; the line names them (scenario 13)

@@ -13,9 +13,13 @@ const extendedKinds = new Map([
 ])
 
 function unsupportedKinds(chart: ChartModel | undefined): string[] {
-  if (!chart || chart.supported) return ['']
+  if (!chart) return ['']
+  if (chart.supported) {
+    const circular = chart.plots.filter(({ kind }) => kind === 'pie' || kind === 'doughnut')
+    return chart.plots.length > 1 && circular.length ? circular.map(({ kind }) => kind) : ['']
+  }
   if (chart.kind !== 'chartex') return [chartKinds.get(chart.kind) ?? '']
-  return chart.extendedKinds?.map((kind) => extendedKinds.get(kind) ?? 'extended') ?? ['extended']
+  return chart.extendedKinds?.map((kind) => extendedKinds.get(kind) ?? '') ?? ['']
 }
 
 /** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
@@ -29,9 +33,12 @@ export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings' | 'condition
     for (const kind of new Set(unsupportedKinds(drawing.chart))) charts.set(kind, (charts.get(kind) ?? 0) + 1)
   }
   for (const [kind, count] of charts) {
-    const label = kind ? `${kind} chart` : 'chart'
-    things.push(count === 1 && kind === 'extended' ? 'an extended chart' : name(count, label, `${label}s`))
+    if (kind) things.push(name(count, `${kind} chart`, `${kind} charts`))
   }
+  const unnamed = charts.get('') ?? 0
+  if (unnamed) things.push(things.length
+    ? (unnamed === 1 ? 'another chart' : `${unnamed} other charts`)
+    : name(unnamed, 'chart', 'charts'))
   if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
   if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
   if (layout.conditionalFormats) things.push('colour rules')
