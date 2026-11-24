@@ -387,6 +387,7 @@ interface AISidebarState {
    */
   chatDocuments: Record<string, ChatDocumentView>;
   frontDocumentPath: string | null;
+  openedSourceLink: { id: string; path: string } | null;
   /** Sprint 155 (PR 2): the person's click on the head's icon; the host brings the chat's document forward. */
   bringChatDocumentForward: (conversationId: string) => void;
 
@@ -1140,6 +1141,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     conversationStoreNotice: null,
     chatDocuments: {},
     frontDocumentPath: null,
+    openedSourceLink: null,
 
     promptQueues: {},
     composerDrafts: {},
@@ -3088,6 +3090,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           });
           break;
 
+        case 'chat:source/opened':
+          set({ openedSourceLink: { id: message.id, path: message.path } });
+          break;
         case 'active-file-changed':
           set({ activeFilePath: message.path, activeFileLabel: message.label ?? null, activeSlide: message.slide ?? null });
           break;
@@ -3249,6 +3254,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
 
         case 'toggle-history-panel':
           get().toggleHistoryPanel();
+          break;
+
+        case 'chat:files-picked':
+          window.dispatchEvent(new CustomEvent('ritemark:chat-files-picked', { detail: message.files }));
           break;
 
         case 'files-dropped':
@@ -3420,6 +3429,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 pendingPlanApproval: undefined,
                 approval: undefined,
                 result: {
+                  ...(message.liveDeckSteps?.length ? { liveDeckSteps: message.liveDeckSteps } : {}),
                   text: message.text || '',
                   filesModified: message.filesModified || [],
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
@@ -3589,6 +3599,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 errorKind: message.errorKind,
                 errorDetail: message.errorDetail,
                 rawError: message.rawError,
+                liveDeckSteps: message.liveDeckSteps,
               });
             },
             { requireRunning: false },

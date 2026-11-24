@@ -3,9 +3,8 @@
  *
  * One interface for a place that holds pages; Cloudflare (`cloudflare/`) is its first implementation. What goes up is
  * PR 3's model (`types.ts`): a `GatheredPlan`, which only `gatherPage` makes, after its key scan. `readVerifiedUpload`
- * turns that plan into bytes by reading each file's `realPath` again and checking its `sha256`: the bytes that go are
- * exactly the bytes the sheet's scan read, or nothing goes. Nothing here imports `vscode`, so every part tests under
- * plain Node.
+ * turns that plan into bytes by reading each file's `realPath` again and checking its hashes. Pictures are cleaned again, and the sent
+ * bytes must match the plan. Nothing here imports `vscode`, so every part tests under plain Node.
  *
  * A token never appears in any type below that leaves the host: the connection's snapshot holds the account's name
  * and its workers.dev name only.
@@ -16,6 +15,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { contentHashOf, isGatheredPlan } from './gather';
 import { MAX_FILE_BYTES, MAX_FILES, type GatheredPlan } from './types';
+import { cleanPicture } from './pictureClean';
 import { plainPart } from './plainText';
 
 /** One file that goes up, at the path it is served from (`/index.html`, `/img/a.png`), with its checked bytes. */
@@ -51,12 +51,15 @@ export interface PublishedSite {
   name: string;
   /** The public address of the page. */
   address: string;
+  /** The version stamped into a deck page and its deployed version file. */
+  deckVersion?: number;
 }
 
 export type PublishErrorCode =
   | 'not-connected'
   | 'refused'
   | 'cannot-publish'
+  | 'busy'
   | 'unreachable'
   | 'name-taken'
   | 'name-invalid'
@@ -98,7 +101,7 @@ export interface PublishHost {
    * Publish or Update: the same call with the same `siteName` keeps the address (M8). `replacing` is false for a
    * first publish, which refuses a name already on the account (`address-taken`).
    */
-  publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean }): Promise<PublishedSite>;
+  publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean; lastDeckVersion?: number }): Promise<PublishedSite>;
   /** Unpublish; resolves only after the address has stopped answering (R7, M9). */
   unpublish(siteName: string, address: string, options?: { onSlow?: () => void }): Promise<void>;
   /**
@@ -141,14 +144,14 @@ export interface ReadFileDeps {
 
 /**
  * PR 3's plan as bytes (its blocking item): each file read by its `realPath`, its sha256 checked against the plan,
- * and those bytes, not a second read, are what goes. All files are read and checked before anything is sent, so a
+ * and the verified, cleaned bytes are what goes. All files are read and checked before anything is sent, so a
  * file that changed after the sheet stops the whole upload and says which. A plan `gatherPage` didn't make, one over
  * the free plan's limits, or one whose hash list doesn't add up is refused.
  */
 export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps = {}): Promise<VerifiedUpload> {
   if (!isGatheredPlan(plan)) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
   if (plan.tooMany || plan.files.length > MAX_FILES) {
-    throw new PublishError('too-many', `This page uses ${plan.files.length} files. Cloudflare's free plan takes ${MAX_FILES}.`);
+    throw new PublishError('too-many', `This page uses more than ${MAX_FILES} files, the limit for Cloudflare's free plan.`);
   }
   if (plan.tooBig.length > 0) {
     throw new PublishError('too-big', `${plainPart(path.posix.basename(plan.tooBig[0].projectPath))} is larger than 25 MB, too big to publish.`);
@@ -171,8 +174,15 @@ export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps 
       if (error instanceof PublishError) throw error;
       throw new PublishError('changed', FILE_CHANGED(name));
     }
-    if (bytes.byteLength > MAX_FILE_BYTES || createHash('sha256').update(bytes).digest('hex') !== file.sha256) {
+    if (bytes.byteLength > MAX_FILE_BYTES || createHash('sha256').update(bytes).digest('hex') !== (file.sourceSha256 ?? file.sha256)) {
       throw new PublishError('changed', FILE_CHANGED(name));
+    }
+    if (file.kind === 'picture') {
+      const cleaned = cleanPicture(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
+      if (cleaned.kind !== 'clean' || createHash('sha256').update(cleaned.bytes).digest('hex') !== file.sha256) {
+        throw new PublishError('changed', FILE_CHANGED(name));
+      }
+      bytes = cleaned.bytes;
     }
     files.push(Object.freeze({ urlPath: file === plan.files[0] ? pageUrlPathOf(file.relPath) : `/${file.relPath}`, bytes }));
   }

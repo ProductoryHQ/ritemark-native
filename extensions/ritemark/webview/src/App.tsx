@@ -304,6 +304,11 @@ function App() {
           return
         // Sprint 148 (R9): a search result opened this document; its find bar opens on the match. The find bar
         // only: nothing in the document is read, changed or sent.
+        case 'find:top':
+          setFindRequest(null)
+          setShowFindBar(false)
+          document.querySelector('.ProseMirror > :first-child')?.scrollIntoView({ block: 'start' })
+          return
         case 'find:open': {
           const request = decodeFindOpen(message, Date.now())
           if (!request) return

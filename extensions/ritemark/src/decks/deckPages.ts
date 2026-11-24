@@ -14,6 +14,8 @@ import { openInBrowser } from './openInLink';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { readTimetable } from './timetable';
+import { timetableStatus } from './timetableDisplay';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
@@ -23,7 +25,7 @@ import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, them
 import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
-import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
+import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, sessionTimeEdit, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { frontMatterField, parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
@@ -77,6 +79,7 @@ export class DeckPages implements vscode.Disposable {
   private readonly writes = new Map<string, LibraryWrite>();
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
+  private readonly sessionEdits = new WeakMap<vscode.TextDocument, Promise<void>>();
   /** Present on the deck's bar (Sprint 159): the presenter, set once at activation (`decksHost.ts`). */
   presenter: {
     start: (origin: { document: vscode.TextDocument; panel: vscode.WebviewPanel }, request: DeckPresentRequest) => Promise<void>;
@@ -186,25 +189,53 @@ export class DeckPages implements vscode.Disposable {
     return slidesOfText(document.getText()).length > 0;
   }
 
+  private timetableItem: vscode.StatusBarItem | undefined;
+
+  private refreshTimetable(): void {
+    const active = [...this.views].find(view => view.panel.active);
+    const status = active && this.deckModeFor(active.document, true)
+      ? timetableStatus(readTimetable(active.document.getText())) : null;
+    if (!status) {
+      this.timetableItem?.hide();
+      return;
+    }
+    // The same status-bar position as the document word count, just left of AI status.
+    const item = this.timetableItem ??= vscode.window.createStatusBarItem(
+      'ritemark.deckLength', vscode.StatusBarAlignment.Right, 101,
+    );
+    item.name = 'Ritemark Deck Length';
+    item.text = status.text;
+    item.tooltip = status.tooltip;
+    item.color = status.over ? new vscode.ThemeColor('ritemark.deckLengthOver') : undefined;
+    item.show();
+  }
+
   /** A deck's panel, while it is open: the active one is where the library inserts. */
   connect(document: vscode.TextDocument, panel: vscode.WebviewPanel): vscode.Disposable {
     const view: DeckView = { document, panel, current: 0, count: 0, slides: [], slideCount: 0 };
     this.views.add(view);
     if (panel.active) this.active = view;
     const state = panel.onDidChangeViewState(() => {
+      this.refreshTimetable();
       if (panel.active && this.active !== view) {
         this.active = view;
         this.changed.fire();
       }
     });
     this.changed.fire();
+    this.refreshTimetable();
+    const edits = vscode.workspace.onDidChangeTextDocument(event => {
+      if (event.document === document && event.contentChanges.length && panel.active) this.refreshTimetable();
+    });
     // The bar's Publish control hears the page's state while this view is open.
-    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message));
+    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message), panel.webview);
     return {
       dispose: () => {
         seat?.dispose();
         state.dispose();
+        edits.dispose();
         this.views.delete(view);
+        this.refreshTimetable();
         if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
         this.changed.fire();
         if (view.slides.length > 0) this.slideChanged.fire();
@@ -395,6 +426,25 @@ export class DeckPages implements vscode.Disposable {
       throw error;
     }
     switch (request.type) {
+      case 'deck/session-time': {
+        const { field, value } = request;
+        // The end is relative to the start as written. A start and then an end committed in quick succession
+        // must use the new start, even when the document has not sent it back to the view yet.
+        const pending = (this.sessionEdits.get(document) ?? Promise.resolve()).then(async () => {
+          if (document.isClosed) return;
+          const change = sessionTimeEdit(document.getText(), field, value);
+          if (!change) return;
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
+          if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+        }).catch(async () => {
+          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.` });
+        });
+        this.sessionEdits.set(document, pending);
+        await pending;
+        if (this.sessionEdits.get(document) === pending) this.sessionEdits.delete(document);
+        return;
+      }
       case 'deck/open-in':
         openInBrowser(request.url);
         return;
@@ -444,7 +494,13 @@ export class DeckPages implements vscode.Disposable {
         return;
       }
       case 'deck/page-state':
-        if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
+        await this.publisher?.requestPageState(document, webview);
+        return;
+      case 'deck/live-fit':
+        this.publisher?.rememberLiveInput(document, webview, request);
+        return;
+      case 'deck/live-action':
+        await this.publisher?.liveAction(document, request.action, webview);
         return;
       case 'deck/publish':
         await this.publisher?.publish(document, request.text, request.look, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
@@ -630,6 +686,7 @@ export class DeckPages implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.timetableItem?.dispose();
     for (const timer of this.selectTitle.values()) clearTimeout(timer);
     this.selectTitle.clear();
     for (const pending of this.pendingNotice.values()) clearTimeout(pending.timer);

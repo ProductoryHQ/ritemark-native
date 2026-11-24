@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { CAPABILITY_CONTEXT_VERSION } from '../ai/capabilityContext';
 import {
   RUNTIME_CONTINUATION_ADAPTER_CONTRACT_VERSION,
   RUNTIME_CONTINUATION_DESCRIPTOR_VERSION,
   checkRuntimeContinuationCompatibility,
   createRuntimeCompatibilityFingerprint,
   redactRuntimeContinuationDescriptor,
+  resolveRuntimeContinuation,
   type RuntimeContinuationCompatibility,
   type RuntimeContinuationDescriptorV1,
 } from './continuation';
@@ -75,6 +77,21 @@ function run(): void {
   assert.notEqual(withTools, first);
   assert.notEqual(withTools, createRuntimeCompatibilityFingerprint('installation-secret', { ...fingerprintInput, toolSet: 'abd' }));
   assert.equal(createRuntimeCompatibilityFingerprint('installation-secret', { ...fingerprintInput, toolSet: undefined }), first);
+
+  // Sprint 173 S22: a saved conversation is restored with fresh instructions.
+  assert.equal(CAPABILITY_CONTEXT_VERSION, 6);
+  for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
+    const fingerprint = (capabilityContextVersion?: number) => createRuntimeCompatibilityFingerprint(
+      'test-installation', { ...fingerprintInput, runtimeId, capabilityContextVersion },
+    );
+    const compatibility = { ...expected, runtimeId, compatibilityFingerprint: fingerprint(CAPABILITY_CONTEXT_VERSION) };
+    for (const previous of [undefined, 5]) {
+      const saved = { ...descriptor, runtimeId, compatibilityFingerprint: fingerprint(previous) };
+      assert.equal(resolveRuntimeContinuation(runtimeId, { descriptor: saved, compatibility }).kind, 'fallback');
+    }
+    const current = { ...descriptor, runtimeId, compatibilityFingerprint: compatibility.compatibilityFingerprint };
+    assert.equal(resolveRuntimeContinuation(runtimeId, { descriptor: current, compatibility }).kind, 'native');
+  }
 
   const redacted = redactRuntimeContinuationDescriptor(descriptor, scopeId);
   assert.equal(redacted.scopeMatches, true);

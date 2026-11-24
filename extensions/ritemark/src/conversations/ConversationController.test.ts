@@ -182,7 +182,9 @@ async function run(): Promise<void> {
     });
     assert.equal(JSON.stringify(checkpointedFirst).includes('host-only-thread-id'), true);
 
+    const liveDeckSteps = [{ type: 'live_deck_updated' as const, message: 'Updated the page' }];
     const completedFirst = await controller.completeRuntimeTurn({
+      liveDeckSteps,
       conversationId: firstRecord.conversationId,
       bindingGeneration: firstRecord.bindingGeneration,
       runtimeId: 'codex',
@@ -196,6 +198,8 @@ async function run(): Promise<void> {
     });
     assert.equal(completedFirst.title, 'Durable project chat history');
     assert.equal(completedFirst.events.at(-1)?.kind, 'assistant-message');
+    const savedFinal = (await store.get(firstRecord.conversationId))?.events.at(-1);
+    assert.deepEqual(savedFinal?.kind === 'assistant-message' && savedFinal.liveDeckSteps, liveDeckSteps);
     assert.equal(
       completedFirst.continuations?.codex?.coveredThroughEventId,
       completedFirst.events.find((event) => event.kind === 'assistant-message')?.eventId,

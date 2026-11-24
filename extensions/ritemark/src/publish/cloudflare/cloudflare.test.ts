@@ -66,7 +66,7 @@ async function upload(files: Record<string, string | Uint8Array> = HARBOUR): Pro
 function page(): UploadFile[] {
   return [
     { urlPath: '/index.html', bytes: Buffer.from('<h1>Harbour</h1><img src="img/a.png">') },
-    { urlPath: '/img/a.png', bytes: Buffer.from([137, 80, 78, 71, 1, 2, 3]) },
+    { urlPath: '/img/a.png', bytes: HARBOUR['img/a.png'] as Uint8Array },
     { urlPath: '/style.css', bytes: Buffer.from('body{color:#123}') },
   ];
 }

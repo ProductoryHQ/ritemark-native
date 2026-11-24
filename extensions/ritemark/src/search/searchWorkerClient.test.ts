@@ -58,6 +58,19 @@ const answerFor = (request: Extract<HostToWorkerMessage, { type: 'query' }>): Wo
 });
 
 async function main() {
+  // Sprint 173: reading starts the worker without an index or its on-disk cache.
+  const readerWorker = new FakeWorker();
+  const reader = new SearchWorkerClient(() => readerWorker, null);
+  const document = { path: 'Report.pdf', from: 3, to: 4 };
+  const read = reader.read(document, ['/p']);
+  assert.deepEqual(readerWorker.sent, [{ type: 'read', requestId: 1, document, roots: ['/p'] }]);
+  const result = { text: '## Page 3', kind: 'pdf' as const };
+  readerWorker.reply({ type: 'read', requestId: 1, result });
+  assert.deepEqual(await read, result);
+  const pendingRead = reader.read(document, ['/p']);
+  reader.dispose();
+  assert.equal(await pendingRead, null);
+
   const workers: FakeWorker[] = [];
   const client = new SearchWorkerClient(() => {
     const worker = new FakeWorker();

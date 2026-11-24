@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { contentHashOf, gatherPage, kindOf } from './gather';
 import { GitCheckError, gitIgnored } from './gitIgnore';
 import { cssReferences, moduleReferences, relTokens, srcsetUrls } from './references';
+import { JPEG, PNG } from './testing/pictures';
 import { MAX_FILE_BYTES } from './types';
 import type { LeftOutReason, PublishPlan } from './types';
 
@@ -125,7 +126,7 @@ for (const key of ['a','b']) {
     const imgs: string[] = [];
     for (let i = 1; i <= 20; i++) imgs.push(`before/shot-${i}.png`);
     for (let i = 1; i <= 19; i++) imgs.push(`after-${i}.png`);
-    for (const img of imgs) write(`compare/${img}`, `png ${img}`);
+    for (const img of imgs) write(`compare/${img}`, PNG);
     const plan = await corpus('compare/P6 before and after.html', imgs.map((i) => `<img src="${i}" alt="">`).join('\n'));
     assert.equal(plan.files.length, 40, 'the page and its 39 pictures');
     assert.deepEqual(goes(plan).slice(1), imgs, 'in the order the page uses them, the page first');
@@ -182,8 +183,8 @@ for (const key of ['a','b']) {
   // ---------- S7: what goes ----------
 
   await check('S7: two pictures, a stylesheet and its font: "This page and 4 files"', async () => {
-    write('harbour/img/a.png', 'a');
-    write('harbour/img/b.png', 'b');
+    write('harbour/img/a.png', PNG);
+    write('harbour/img/b.png', PNG);
     write('harbour/fonts/x.woff2', 'font');
     write('harbour/style.css', "@font-face { font-family: X; src: url('fonts/x.woff2') format('woff2'); }");
     const plan = await gather('harbour/Harbour programme.html', `<link rel="stylesheet" href="style.css"><img src="img/a.png"><img src="img/b.png">`);
@@ -194,7 +195,10 @@ for (const key of ['a','b']) {
   });
 
   await check('srcset, poster, CSS url() in <style> and style="", <object data>, video <source>, SVG <image>', async () => {
-    for (const f of ['m/small.jpg', 'm/large.jpg', 'm/poster.jpg', 'm/bg.png', 'm/inline.png', 'm/doc.pdf', 'm/clip.mp4', 'm/sprite.svg', 'm/pic.png']) write(`media/${f}`, f);
+    for (const f of ['m/small.jpg', 'm/large.jpg', 'm/poster.jpg', 'm/bg.png', 'm/inline.png', 'm/doc.pdf', 'm/clip.mp4', 'm/sprite.svg', 'm/pic.png']) {
+      const bytes = f.endsWith('.png') ? PNG : f.endsWith('.jpg') ? JPEG : f.endsWith('.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"/>' : f;
+      write(`media/${f}`, bytes);
+    }
     const plan = await gather('media/media.html', `<img srcset="m/small.jpg 480w, m/large.jpg 1080w" src="m/small.jpg">
 <video poster="m/poster.jpg"><source src="m/clip.mp4" type="video/mp4"></video>
 <style>body { background: url("m/bg.png") }</style><div style="background-image:url(m/inline.png)"></div>
@@ -212,7 +216,7 @@ for (const key of ['a','b']) {
   });
 
   await check('<base href> moves every relative reference', async () => {
-    write('based/assets/logo.png', 'logo');
+    write('based/assets/logo.png', PNG);
     const plan = await gather('based/page.html', '<base href="assets/"><img src="logo.png">');
     assert.deepEqual(goes(plan), ['page.html', 'assets/logo.png']);
     const remote = await gather('based/remote.html', '<base href="https://example.com/"><img src="assets/logo.png">');
@@ -224,10 +228,10 @@ for (const key of ['a','b']) {
     write('links/budget.xlsx', 'xlsx');
     write('links/report.pdf', 'pdf');
     write('links/style.css', 'body { color: #222 }');
-    write('links/favicon.png', 'ico');
-    write('links/touch.png', 'touch');
+    write('links/favicon.png', PNG);
+    write('links/touch.png', PNG);
     write('links/feed.xml', 'rss');
-    write('links/map.png', 'map');
+    write('links/map.png', PNG);
     const plan = await gather('links/page.html', [
       '<link rel="stylesheet" href="style.css"><link rel="icon" href="favicon.png"><link rel="apple-touch-icon" href="touch.png">',
       '<link rel="alternate" type="application/rss+xml" href="feed.xml">',
@@ -244,7 +248,7 @@ for (const key of ['a','b']) {
     write('hints/next.md', '# next');
     write('hints/dns.md', '# dns');
     write('hints/style.css', 'p { margin: 0 }');
-    write('hints/fav.png', 'ico');
+    write('hints/fav.png', PNG);
     const plan = await gather('hints/page.html', [
       '<link rel="prefetch" href="pre.md">',
       '<link rel="next prefetch" href="next.md">',
@@ -258,7 +262,7 @@ for (const key of ['a','b']) {
   });
 
   await check('a link that comes before the picture it links never keeps the picture back', async () => {
-    write('links2/big.png', 'big');
+    write('links2/big.png', PNG);
     const plan = await gather('links2/page.html', '<a href="big.png">Full size</a><img src="big.png">');
     assert.deepEqual(goes(plan), ['page.html', 'big.png']);
     assert.deepEqual(left(plan), []);
@@ -302,7 +306,7 @@ for (const key of ['a','b']) {
     fs.mkdirSync(path.join(project, 'linked/img'), { recursive: true });
     fs.symlinkSync(path.join(outside, 'scan.png'), path.join(project, 'linked/img/logo.png'));
     fs.symlinkSync(path.join(project, '.env'), path.join(project, 'linked/img/env.png'));
-    write('linked/img/real.png', 'real');
+    write('linked/img/real.png', PNG);
     fs.symlinkSync(path.join(project, 'linked/img/real.png'), path.join(project, 'linked/img/alias.png'));
     const plan = await gather('linked/page.html', '<img src="img/logo.png"><img src="img/env.png"><img src="img/alias.png">');
     assert.equal(reasonOf(plan, 'img/logo.png'), 'outside');
@@ -360,7 +364,7 @@ for (const key of ['a','b']) {
     write('gi/build/app.js', 'x');
     write('gi/theme.local.css', "body { background: url('secret-bg.png') }");
     write('gi/secret-bg.png', 'bg');
-    write('gi/kept.png', 'kept');
+    write('gi/kept.png', PNG);
     const plan = await gather('gi/page.html', '<script src="build/app.js"></script><link rel="stylesheet" href="theme.local.css"><img src="kept.png">');
     assert.deepEqual(goes(plan), ['page.html', 'kept.png']);
     assert.equal(reasonOf(plan, 'gi/build/app.js'), 'gitIgnored');
@@ -371,7 +375,7 @@ for (const key of ['a','b']) {
   await check('minor 7: a symlink in the project to a file Git ignores is "Git ignores it" (Git is asked about the real path)', async () => {
     write('gi7/build/key.png', 'a picture Git ignores');
     fs.symlinkSync(path.join(project, 'gi7/build/key.png'), path.join(project, 'gi7/logo.png'));
-    write('gi7/kept.png', 'kept');
+    write('gi7/kept.png', PNG);
     const plan = await gather('gi7/page.html', '<img src="logo.png"><img src="kept.png">');
     assert.deepEqual(goes(plan), ['page.html', 'kept.png'], 'the name the page uses is not ignored; the file it points to is');
     assert.deepEqual(left(plan), [['gi7/logo.png', 'gitIgnored']]);
@@ -379,7 +383,7 @@ for (const key of ['a','b']) {
 
   await check('minor 6: a file behind a linked folder in the project is left out ("couldn\'t be checked"); the rest still go', async () => {
     write('gi6/real/a.png', 'a');
-    write('gi6/b.png', 'b');
+    write('gi6/b.png', PNG);
     fs.symlinkSync(path.join(project, 'gi6/real'), path.join(project, 'gi6/alias'));
     const plan = await gather('gi6/page.html', '<img src="alias/a.png"><img src="b.png">');
     assert.deepEqual(goes(plan), ['page.html', 'b.png'], 'one refused path never fails the whole gather');
@@ -426,7 +430,7 @@ for (const key of ['a','b']) {
 
   await check('no Git repository: nothing is ignored', async () => {
     const plain = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'publish-nogit-')));
-    fs.writeFileSync(path.join(plain, 'a.png'), 'a');
+    fs.writeFileSync(path.join(plain, 'a.png'), PNG);
     fs.writeFileSync(path.join(plain, 'page.html'), '<img src="a.png">');
     const plan = await gatherPage(path.join(plain, 'page.html'), plain);
     assert.deepEqual(goes(plan), ['page.html', 'a.png']);
@@ -489,7 +493,7 @@ for (const key of ['a','b']) {
   });
 
   await check('round 4: an inline module, a stylesheet and an HTML comment mask their comments and strings', async () => {
-    for (const f of ['real.js', 'private.js', 'gone.js', 'real.css', 'private.css', 'gone.css', 'real.png', 'private.png', 'quoted.png', 'gone.png', 'cdo.png']) write(`masked2/${f}`, 'x');
+    for (const f of ['real.js', 'private.js', 'gone.js', 'real.css', 'private.css', 'gone.css', 'real.png', 'private.png', 'quoted.png', 'gone.png', 'cdo.png']) write(`masked2/${f}`, f.endsWith('.png') ? PNG : 'x');
     const plan = await gather('masked2/page.html', [
       "<script type=\"module\">// import './private.js'\nconst x = 'import \"./private.js\"';\nimport './real.js';</script>",
       '<style>/* @import "private.css"; */ @import "real.css"; .a { content: "url(quoted.png)"; background: url(real.png) } /* url(private.png) */</style>',

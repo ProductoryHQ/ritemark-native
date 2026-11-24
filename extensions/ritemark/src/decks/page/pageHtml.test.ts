@@ -17,6 +17,7 @@ import { scanText } from '../../publish/secretScan';
 import { PAGE_FONTS } from './pageFile';
 import { DIGEST_META, HANDOUT_PRINT_CSS, OPEN_IN_MAX_ADDRESS, PAGE_CSP, PAGE_CSS, PRINT_CSS, SLIDES_PRINT_CSS, handoutNumbersCss, handoutHtml, isSlideOnly, openInAddresses, pageHtml, pictureAddress, pictureFile, sanitizeHtml, type PageAssets, type PictureFrom } from './pageHtml';
 import { PAGE_SCRIPT } from './pageScript';
+import { PAGE_FOLLOWER } from './pageFollower';
 import { deckDigest, publicDeck } from './publicDeck';
 import { UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, iconSvg, type PageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
@@ -57,6 +58,11 @@ assert.ok(html.includes(`<meta name="${DIGEST_META}" content="${digest}">`));
 assert.equal(root.querySelector('title')!.text, 'Harbour title');
 assert.ok(!root.querySelector('body')!.text.includes('Ritemark'), 'nothing of Ritemark on the page');
 assert.equal(root.querySelector('.who b')!.text, 'Harbour Logistics');
+const updateStatus = root.querySelector('#line .who .deck-title + #deck-updated')!;
+assert.equal(updateStatus.getAttribute('role'), 'status');
+assert.equal(updateStatus.text, '');
+assert.ok(!root.querySelector('#view #deck-updated'));
+assert.ok(root.querySelector('#view #deck-removed.deck-follow-note'));
 assert.equal(root.querySelector('body')!.getAttribute('class'), 'bl', 'the deck\'s look (Borderless) holds');
 
 // At phone widths the toolbar buttons show only icons, so their names must survive without visible text.
@@ -108,6 +114,19 @@ assert.ok(!/@media print[\s\S]*\.blk-flow \{[^}]*left: 64px/.test(html));
     '.blk-steps .tick { width: 32px; height: 32px;',
   ]) assert.ok(narrow.includes(`.layer.flow .deck-sl.is-blocks ${rule}`), rule);
   assert.ok(!/\.layer(?:\.flow)? \.layer\b/.test(PAGE_CSS), 'no slide inside a slide');
+  assert.match(narrow, /\.view \{[^}]*padding: 16px 16px /);
+  assert.match(narrow, /\.deck-follow-note \{[^}]*margin: 8px 0 0;\s*width: 100%; max-width: none; text-align: left;/);
+  // The note keeps its inner padding (text never on the box's edge); "Go on to" takes its own line on a phone.
+  assert.match(narrow, /\.deck-follow-note button \{ display: block; margin: 4px 0 0; padding: 0; \}/);
+}
+{
+  const fill = /\.deck-changed-block::after \{([^}]+)\}/.exec(PAGE_CSS)![1];
+  assert.match(fill, /position: absolute; inset: -6px 0; z-index: -1; pointer-events: none;/);
+  assert.match(fill, /border-radius: 6px; background: color-mix\(in srgb, var\(--accent\) 16%, transparent\);/);
+  assert.match(fill, /animation: deck-change-fade \.5s linear 1\.5s forwards;/);
+  assert.match(PAGE_CSS, /@keyframes deck-change-fade \{ to \{ opacity: 0; \} \}/);
+  const reducedMotion = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS)![1];
+  assert.match(reducedMotion, /\.deck-changed-block::after \{ animation: none; \}/);
 }
 const parts = root.querySelectorAll('#side .part');
 assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);
@@ -179,10 +198,9 @@ assert.ok(!/(?:src|href)="(?:https?:)?\/\//i.test(html
   .replace(/<a href="https:\/\/[^"]*" target="_blank" rel="noopener noreferrer">/g, '')
   .replace(/<a class="open" href="https:\/\/(?:claude\.ai\/new|chatgpt\.com\/)\?q=[^"]*" target="_blank" rel="noopener noreferrer"/g, '')), 'no remote address but the handout\'s own web links and the prompts\' Open in links');
 assert.ok(!/@import|<link\b/i.test(html), 'no stylesheet from elsewhere');
-assert.equal(references.inlineScripts.length, 1);
+assert.deepEqual(references.inlineScripts, [PAGE_FOLLOWER, `\n${PAGE_SCRIPT}\n`]);
 assert.equal(references.builtAttribute, false);
 assert.equal(scriptBuildsReferences(PAGE_SCRIPT), false, 'the script builds no file names');
-assert.ok(references.inlineScripts.every(script => !scriptBuildsReferences(script)));
 assert.ok(!PAGE_SCRIPT.includes('</script'), 'the script never closes its own tag');
 
 // Nothing key-shaped in the page's own parts: with the fonts inlined, 2.2's scan stays quiet.
@@ -289,21 +307,26 @@ assert.deepEqual(scanText(html), []);
   assert.deepEqual(pageReferences(page).refs.filter(ref => ref.as !== 'link'), [], 'and nothing the gather would send for it');
 }
 
-// The page's Content Security Policy: first in the head; its one script allowed by its exact hash, nothing else run or
-// loaded from elsewhere.
+// R28: the player's original hash stays, and the follower adds its own exact hash and same-origin connections.
 {
   const head = html.slice(0, html.indexOf('<title>'));
   assert.ok(head.startsWith('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta http-equiv="Content-Security-Policy" content="'));
   const policy = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)![1];
   assert.equal(policy, PAGE_CSP);
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => match[1]);
-  assert.equal(scripts.length, 1);
-  const hash = createHash('sha256').update(scripts[0]).digest('base64');
-  assert.ok(policy.includes(`script-src 'sha256-${hash}'`), 'the script is allowed by its own hash');
-  for (const part of ["default-src 'none'", "style-src 'unsafe-inline'", "font-src 'self' data: file:", "img-src 'self' data: file:", "base-uri 'none'", "form-action 'none'"]) {
-    assert.ok(policy.includes(part), part);
-  }
-  assert.ok(!/unsafe-eval|https?:|\*/.test(policy), 'nothing from elsewhere, no eval');
+  assert.equal(scripts.length, 2);
+  const [follower, player] = scripts.map(script => createHash('sha256').update(script).digest('base64'));
+  assert.match(scripts[0], /version\.json/);
+  assert.equal(policy, [
+    "default-src 'none'",
+    `script-src 'sha256-${player}' 'sha256-${follower}'`,
+    "style-src 'unsafe-inline'",
+    "font-src 'self' data: file:",
+    "connect-src 'self'",
+    "img-src 'self' data: file:",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; '));
 }
 
 // A deck with nothing to show says so.

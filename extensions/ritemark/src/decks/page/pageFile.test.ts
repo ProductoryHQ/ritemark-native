@@ -19,6 +19,7 @@ import { PAGE_FONTS, buildDeckPage, currentPageDigest, deckNameOf, foreignPageLi
 import type { PageAssets } from './pageHtml';
 import { PRIVATE_DECK, PRIVATE_WORDS } from './testing/privateDeck';
 import { makeTempDir } from '../../testing/tempDir';
+import { PNG } from '../../publish/testing/pictures';
 
 const extension = path.resolve(__dirname, '..', '..', '..');
 const assets: PageAssets = {
@@ -40,7 +41,8 @@ async function main(): Promise<void> {
   const pagePath = pagePathFor(deckPath);
   fs.writeFileSync(deckPath, PRIVATE_DECK);
   // The picture a shown part uses, and the one only the skipped slide uses (and a key-looking name in neither).
-  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a5d70000000049454e44ae426082', 'hex');
+  // A well-formed PNG: publish cleans pictures and leaves a malformed one out (Sprint 175 PR 1).
+  const png = PNG;
   fs.writeFileSync(path.join(folder, 'images', 'which-stays.png'), png);
   fs.writeFileSync(path.join(folder, 'images', `${PRIVATE_WORDS.skippedPicture}.png`), png);
 

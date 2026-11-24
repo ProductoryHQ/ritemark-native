@@ -42,19 +42,15 @@ import { AgentMentionPopup, type AgentMentionPopupHandle } from './AgentMentionP
 import { SlashCommandPopup, type SlashCommandPopupHandle } from './SlashCommandPopup';
 import { type AgentDefinition, parseMentions, findAgent } from './agentRegistry';
 import { type SlashCommand, type CommandAction, parseCommand, mergeCommands } from './slashCommands';
-import type { FileAttachment, AttachmentKind, ThinkingEffortCapability } from './types';
+import type { FileAttachment, PickChatFilesMessage, ThinkingEffortCapability } from './types';
 import { currentSlideChipLabel, currentSlideChipTooltip, type SlideAtSend } from '../../../../src/decks/currentSlide';
+
+import { vscode } from '../../lib/vscode';
+import { classifyFile, rebuildPickedFile } from './chatAttachments';
+import type { PickedChatFile } from '../../../../src/views/chatAttachmentProtocol';
 
 let attachmentIdCounter = 0;
 let pathChipIdCounter = 0;
-
-/** File extensions we accept, grouped by kind */
-const IMAGE_EXTENSIONS = '.png,.jpg,.jpeg,.gif,.webp';
-const PDF_EXTENSIONS = '.pdf';
-// Sprint 172: `.rtms` (a deck, Markdown inside) is text, as an older `.deck.md` already is by its `.md`
-export const TEXT_EXTENSIONS = '.md,.rtms,.txt,.csv,.json,.xml,.yaml,.yml,.toml,.html,.css,.js,.ts,.tsx,.jsx,.py,.sh,.sql,.log';
-
-const ALL_ACCEPTED = [IMAGE_EXTENSIONS, PDF_EXTENSIONS, TEXT_EXTENSIONS].join(',');
 
 /** Max text file size (500KB — larger files should be read by the agent from disk) */
 const MAX_TEXT_SIZE = 512 * 1024;
@@ -74,22 +70,6 @@ interface PathChip {
   id: string;
   path: string;
   isFolder: boolean;
-}
-
-export function classifyFile(file: Pick<File, 'type' | 'name'>): AttachmentKind | null {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type === 'application/pdf') return 'pdf';
-  // Treat anything text-ish as text
-  if (
-    file.type.startsWith('text/') ||
-    file.type === 'application/json' ||
-    file.type === 'application/xml' ||
-    file.type === 'application/yaml' ||
-    file.name.match(/\.(md|rtms|txt|csv|json|xml|yaml|yml|toml|html|css|js|ts|tsx|jsx|py|sh|sql|log)$/i)
-  ) {
-    return 'text';
-  }
-  return null;
 }
 
 function readFileAsBase64(file: File): Promise<{ data: string; mediaType: string }> {
@@ -209,7 +189,6 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
   const [commandQuery, setCommandQuery] = useState('');
   const [commandPosition, setCommandPosition] = useState({ top: 0, left: 0 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mentionPopupRef = useRef<AgentMentionPopupHandle>(null);
   const commandPopupRef = useRef<SlashCommandPopupHandle>(null);
@@ -850,19 +829,22 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
     setPathChips((prev) => prev.filter((p) => p.id !== id));
   }, []);
 
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
+  const pickFiles = () => vscode.postMessage({ type: 'chat:pick-files' } satisfies PickChatFilesMessage);
 
-    for (const file of files) {
-      try {
-        const att = await processFile(file);
-        if (att) setAttachments((prev) => [...prev, att]);
-      } catch (err) {
-        console.error('Failed to read file:', err);
+  useEffect(() => {
+    const handler = async (event: Event) => {
+      const files = (event as CustomEvent<PickedChatFile[]>).detail;
+      for (const file of files) {
+        try {
+          const attachment = await processFile(rebuildPickedFile(file));
+          if (attachment) setAttachments((prev) => [...prev, attachment]);
+        } catch (err) {
+          console.error('Failed to read file:', err);
+        }
       }
-    }
-    e.target.value = '';
+    };
+    window.addEventListener('ritemark:chat-files-picked', handler);
+    return () => window.removeEventListener('ritemark:chat-files-picked', handler);
   }, [processFile]);
 
   // Drag and drop handlers
@@ -1727,14 +1709,6 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
             />
             {isAgentMode && (
               <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ALL_ACCEPTED}
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
                 <Tooltip label={isLoading ? 'Attach files when the current reply has finished' : 'Attach files'} side="top" className="max-[298px]:hidden">
                   <Button
                     type="button"
@@ -1743,7 +1717,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
                     className={`${FOOTER_ICON_BUTTON} text-[var(--r-ink-muted)]`}
                     aria-label="Attach files"
                     disabled={isLoading}
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={pickFiles}
                   >
                     <Icon name="paperclip" size={14} className="size-3.5" />
                   </Button>
@@ -1764,7 +1738,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
                   </Tooltip>
                   <DropdownMenuContent side="top" align="end" collisionBoundary={menuBoundary} className="min-w-0">
                     {/* As wide as its two items: the 10rem default is wider than a 170 px side bar allows. */}
-                    <DropdownMenuItem disabled={isLoading} onSelect={() => fileInputRef.current?.click()}>
+                    <DropdownMenuItem disabled={isLoading} onSelect={pickFiles}>
                       <Icon name="paperclip" size={14} />
                       Attach files…
                     </DropdownMenuItem>

@@ -28,7 +28,7 @@ const NAMED_GREEN = String.raw`(?:lime|green|limegreen|forestgreen|seagreen|dark
 /** Properties and attributes that take a colour, in CSS and in JSX style objects. */
 const COLOUR_KEY = String.raw`(?:color|background|background-color|backgroundColor|fill|stroke|border|border-color|borderColor|outline|outline-color|outlineColor|stop-color|stopColor|accent-color|accentColor|caret-color|caretColor)`
 const GREEN = new RegExp([
-  String.raw`--r-success|--ritemark(?:-dark)?-success|ritemark-success`,
+  String.raw`--r-live-page-updated-icon|--r-success|--ritemark(?:-dark)?-success|ritemark-success`,
   String.raw`--vscode-(?:testing-iconPassed|charts-green|terminal-ansi(?:Bright)?Green|gitDecoration-addedResourceForeground|(?:editorGutter|minimapGutter|editorOverviewRuler)-added[\w-]*|diffEditor-inserted[\w-]*|notebookStatusSuccessIcon-foreground|debugIcon-startForeground|[\w-]*[Ss]uccess[\w-]*)`,
   String.raw`(?:^|[\s"'\x60:!])[a-z-]*-(?:green|emerald)-\d`,
   String.raw`#(?:${GREEN_HEX})(?:[0-9a-f]{2})?\b`,
@@ -45,6 +45,9 @@ const ALLOWED: Array<{ file: string; line: RegExp; why: string }> = [
   { file: 'components/settings/AdvancedSection.tsx', line: /bg: 'bg-ritemark-success', ariaLabel: 'Status: ready'/, why: "Settings' runtime ready dot, in Ritemark's parts" },
   { file: 'components/settings/AiAccountsSection.tsx', line: /rounded-full bg-ritemark-success" \/>$/, why: "AI accounts' Ready mark on an AI's row (frame 2)" },
   { file: 'components/transcribe/TranscribePanel.tsx', line: /engine\.readiness\.ready \? 'bg-ritemark-success'/, why: "a Transcribe engine's ready dot" },
+  { file: 'index.css', line: /^\s*--r-live-page-updated-icon:/, why: 'the live page globe token' },
+  { file: 'components/ai-sidebar/LiveDeckSteps.tsx', line: /updated.*--r-live-page-updated-icon/, why: 'Sprint 175 frame 3 marks a live page update with a green globe' },
+  { file: 'components/decks/DeckPublish.tsx', line: /rounded-full bg-\[var\(--r-success\)\] ring-2/, why: "Sprint 175 frame 1: a live page's dot on the deck bar's Live chip says the page is following the deck" },
   { file: 'components/agent/ProvenanceBadge.tsx', line: /label: 'ChatGPT'/, why: "ChatGPT's provenance badge says which, not done" },
 ]
 

@@ -9,6 +9,7 @@
  *
  * Pure: no `vscode` import, so the editors' providers and the tests share it.
  */
+import { MAX_FIND_TEXT, sourcePage, sourceText } from '../../webview/src/utils/sourcePassage';
 import type { DocumentFormat, SearchResult } from './protocol';
 
 /** Host → page. The Markdown editor, the Word preview and the PDF preview handle it. */
@@ -20,12 +21,14 @@ export interface FindOpenMessage {
   occurrence: number;
   /** PDF only: the passage's page, for when the occurrence can't be found again. */
   page?: number;
+  /** A source link with an explicit PDF page counts matches within that page. */
+  source?: true;
 }
 
 /** The formats whose pages have a find bar. A CSV opens at its top (R9: the table has no find bar). */
 export const FIND_FORMATS: readonly DocumentFormat[] = ['markdown', 'docx', 'pdf'];
 
-export const MAX_FIND_TEXT = 200;
+export { MAX_FIND_TEXT };
 export const MAX_OCCURRENCE = 1_000_000;
 /** How long a request waits for its page to say it is listening. */
 export const FIND_WAIT_MS = 15_000;
@@ -47,7 +50,17 @@ export function findOpenMessage(result: SearchResult): FindOpenMessage | null {
   return message;
 }
 
-type Post = (message: FindOpenMessage) => Thenable<unknown> | unknown;
+/** A source link uses the existing find bar after the worker verifies its quote. */
+export function findOpenForPassage(text: string, occurrence: number, page?: number): FindOpenMessage | null {
+  const quote = sourceText(text);
+  if (!quote || !Number.isInteger(occurrence) || occurrence < 0 || occurrence > MAX_OCCURRENCE) return null;
+  const unit = sourcePage(page);
+  return { type: 'find:open', text: quote, occurrence, source: true, ...(unit ? { page: unit } : {}) };
+}
+
+export type FindNavigation = FindOpenMessage | { type: 'find:top' } | { type: 'find:page' | 'find:slide'; page: number };
+
+type Post = (message: FindNavigation) => Thenable<unknown> | unknown;
 interface Thenable<T> { then(onfulfilled?: (value: T) => unknown, onrejected?: (reason: unknown) => unknown): unknown }
 
 /**
@@ -55,13 +68,13 @@ interface Thenable<T> { then(onfulfilled?: (value: T) => unknown, onrejected?: (
  * a page that fails to take the message just stays at its top.
  */
 export class FindRequests {
-  private readonly pending = new Map<string, { message: FindOpenMessage; at: number }>();
+  private readonly pending = new Map<string, { message: FindNavigation; at: number }>();
   private readonly pages = new Map<string, Map<object, Post>>();
 
   constructor(private readonly now: () => number = Date.now, private readonly waitMs = FIND_WAIT_MS) {}
 
   /** Opened from a result: post to the document's listening pages, or keep it until one says it is listening. */
-  request(key: string, message: FindOpenMessage): 'posted' | 'waiting' {
+  request(key: string, message: FindNavigation): 'posted' | 'waiting' {
     // A request no page took in time goes, so a document opened elsewhere (a Markdown file in the text editor)
     // and later in Ritemark doesn't open a find bar nobody asked for.
     const now = this.now();
@@ -96,7 +109,7 @@ export class FindRequests {
   }
 
   /** For tests. */
-  waiting(key: string): FindOpenMessage | null {
+  waiting(key: string): FindNavigation | null {
     return this.pending.get(key)?.message ?? null;
   }
 
@@ -106,7 +119,7 @@ export class FindRequests {
   }
 }
 
-function send(post: Post, message: FindOpenMessage): void {
+function send(post: Post, message: FindNavigation): void {
   try {
     const sent = post(message) as Thenable<unknown> | undefined;
     if (sent && typeof sent.then === 'function') sent.then(undefined, () => {});

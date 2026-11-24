@@ -91,6 +91,11 @@ export interface UserMessageEventV1 extends ConversationEventBaseV1 {
   origin?: 'background-task';
 }
 
+export interface LiveDeckStep {
+  type: 'live_deck_updated' | 'live_deck_paused';
+  message: string;
+}
+
 export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
   kind: 'assistant-message';
   content: string;
@@ -121,6 +126,7 @@ export interface AssistantMessageEventV1 extends ConversationEventBaseV1 {
    * quarantine the chat, and an older build simply ignores it.
    */
   filesModified?: string[];
+  liveDeckSteps?: LiveDeckStep[];
 }
 
 export interface ActivityEventV1 extends ConversationEventBaseV1 {
@@ -150,6 +156,7 @@ export interface BoundaryEventV1 extends ConversationEventBaseV1 {
   errorDetail?: RuntimeErrorDetail;
   /** Sprint 155: a turn that failed or was stopped may still have changed files; as on an assistant message. */
   filesModified?: string[];
+  liveDeckSteps?: LiveDeckStep[];
 }
 
 export type DispatchReceiptStateV1 = 'not-sent' | 'ambiguous' | 'accepted';
@@ -541,6 +548,7 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
       appliedThinkingEffort,
       ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: integerAt(input.activeDurationMs, `${path}.activeDurationMs`) }),
       ...lenientFilesModified(input),
+      ...lenientLiveDeckSteps(input),
     };
   }
   if (kind === 'activity') {
@@ -581,7 +589,17 @@ export function decodeConversationEventV1(value: unknown, path = 'event'): Conve
     }),
     ...lenientErrorFields(input),
     ...lenientFilesModified(input),
+    ...lenientLiveDeckSteps(input),
   };
+}
+
+/** Optional turn metadata. Older records have no live page steps. */
+function lenientLiveDeckSteps(input: Record<string, unknown>): { liveDeckSteps?: LiveDeckStep[] } {
+  if (!Array.isArray(input.liveDeckSteps)) return {};
+  const liveDeckSteps = input.liveDeckSteps.filter((step): step is LiveDeckStep =>
+    step != null && (step.type === 'live_deck_updated' || step.type === 'live_deck_paused')
+    && typeof step.message === 'string' && step.message.length > 0);
+  return liveDeckSteps.length ? { liveDeckSteps } : {};
 }
 
 /**

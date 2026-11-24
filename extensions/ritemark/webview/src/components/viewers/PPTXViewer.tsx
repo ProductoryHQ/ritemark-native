@@ -1,3 +1,4 @@
+import { sourcePage } from '../../utils/sourcePassage'
 /**
  * PowerPoint preview (.pptx), read-only.
  *
@@ -72,6 +73,7 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
   const [deck, setDeck] = useState<LoadedDeck | null>(null)
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [renderError, setRenderError] = useState<PptxLoadError | null>(null)
+  const [linkedSlide, setLinkedSlide] = useState<number | null>(null)
   const [slow, setSlow] = useState(false)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [zoom, setZoom] = useState(1)
@@ -107,6 +109,9 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
       const message = event.data
       if (message.type === 'openStatus') {
         if (typeof message.openLabel === 'string') setOpenLabel(message.openLabel)
+      } else if (message.type === 'find:slide') {
+        const page = sourcePage(message.page)
+        if (page !== undefined) setLinkedSlide(page - 1)
       } else if (message.type === 'fileChanged') {
         // Edited elsewhere: read it again and come back to the same slide.
         slideToRestore.current = currentSlideRef.current
@@ -297,6 +302,18 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
       requestAnimationFrame(() => goToSlide(slide))
     }
   }, [phase, deck, stageWidth, goToSlide])
+
+  useEffect(() => {
+    if (phase !== 'ready' || linkedSlide === null) return
+    const frame = requestAnimationFrame(() => {
+      if (linkedSlide < slideCount) {
+        revealMatch.current = false
+        goToSlide(linkedSlide)
+      }
+      setLinkedSlide(null)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [phase, linkedSlide, slideCount, goToSlide])
 
   // Fit width / fit slide follow the window until the user zooms by hand.
   useEffect(() => {

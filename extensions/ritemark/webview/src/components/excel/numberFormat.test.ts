@@ -67,6 +67,9 @@ assert.equal(valueFromInput('31.02.2026', 'dd.mm.yyyy'), '31.02.2026', 'not a da
 assert.equal(valueFromInput('25%', '0%'), 0.25)
 assert.equal(valueFromInput('1450', '#,##0.00 "€"'), 1450)
 assert.equal(valueFromInput('Booked', 'General'), 'Booked')
+assert.equal(valueFromInput('9,999.25', '#,##0.00'), 9999.25)
+assert.equal(valueFromInput('9,99', '#,##0'), '9,99')
+assert.equal(valueFromInput('9,999', 'General'), '9,999')
 assert.equal(valueFromInput('', 'dd.mm.yyyy'), null)
 // times and durations typed in a time cell stay times
 assert.equal(valueFromInput('8:15', '[h]:mm'), 0.34375)

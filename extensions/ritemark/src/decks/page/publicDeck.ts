@@ -18,7 +18,7 @@
  *  - skipped slides, with their words, their handout and their pictures;
  *  - comments: standalone `<!-- … -->` notes are removed whole, and anchored `<mark data-comment="…">` marks are
  *    unwrapped to their text;
- *  - the front matter (its theme path, its look), and each slide's `id`, `from`, `kept` and `skip` lines;
+ *  - the front matter (including the presenter's `ritemark-length`), and each slide's `id`, `from`, `kept`, `skip` and `time` lines;
  *  - words a layout doesn't draw (the deck view's "kept for other layouts"), and the "From the library" line, which
  *    is the deck view's own and never in the file.
  *
@@ -45,7 +45,7 @@ export interface PublicSlide {
    * alone, as on the stage).
    */
   kind: string;
-  /** Only what the slide's layout draws: never its id, from, kept or skip lines, nor words kept for other layouts. */
+  /** Only what the slide's layout draws. Private header fields such as `time` stay in the deck. */
   data: SlideData;
   /** The handout under it, as Markdown, with its notes fences and comments taken out. */
   handout: string;

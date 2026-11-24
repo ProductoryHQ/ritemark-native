@@ -20,11 +20,17 @@
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
-import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
+import { clockMinutes, explicitMinutes, sessionLengthFromEnd, type SessionTimeField, type Timetable } from '../../../../src/decks/timetable'
+import { nextMinutesRow, slideMinutesText, timetableFoot, timetableRows } from '../../../../src/decks/timetableDisplay'
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
+import { lengthMinutesOf } from '../../../../src/decks/present/presentSession'
 import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { useDismissOnOutside } from '../../lib/dismissOnOutside'
+import { draftMinutes } from './DeckMinutes'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, MoreActionsTrigger } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
@@ -175,6 +181,7 @@ function Gap({ at, count, actions, dropHere }: { at: number; count: number; acti
 interface ThumbnailProps {
   entry: DeckSlideEntry
   count: number
+  minutesLabel: string | null
   current: boolean
   theme: DeckTheme
   borderless: boolean
@@ -203,7 +210,7 @@ interface ThumbnailProps {
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash, makingPicture }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, minutesLabel, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash, makingPicture }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -211,7 +218,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${minutesLabel ? `, ${minutesLabel}` : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}${joining ? ' is-join' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -225,6 +232,11 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       <span className="deck-thumb-no">{index + 1}</span>
       <div className="deck-thumb-slide">
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} missing={missing} />
+        {minutesLabel ? (
+          <Tooltip label={`${minutesLabel} planned`} className="deck-thumb-minutes">
+            <span aria-hidden="true">{minutesLabel}</span>
+          </Tooltip>
+        ) : null}
         {/* Keyed by the serial: a second undo of the same slide plays it again. None under reduced motion (decks.css). */}
         {flash ? <span key={flash} className="deck-thumb-flash" aria-hidden="true" /> : null}
       </div>
@@ -238,7 +250,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       {comments > 0 ? (
         // Sprint 161: the slide's comments, counted on the strip only (the thumbnails people see draw none).
-        <Tooltip label={comments === 1 ? '1 comment on this slide' : `${comments} comments on this slide`} className="deck-thumb-comments">
+        <Tooltip label={comments === 1 ? '1 comment on this slide' : `${comments} comments on this slide`} className={`deck-thumb-comments${minutesLabel ? ' has-minutes' : ''}`}>
           <span>{comments}</span>
         </Tooltip>
       ) : null}
@@ -281,6 +293,12 @@ function liftedCopy(thumb: HTMLElement): HTMLElement | null {
 
 interface SlideStripProps {
   slides: DeckSlideEntry[]
+  timing: Timetable
+  mode: 'thumbnails' | 'list'
+  onMode: (mode: 'thumbnails' | 'list') => void
+  onPickTimedSlide: (index: number) => void
+  onMinutes: (index: number, value: string | undefined) => void
+  onSession: (field: SessionTimeField, value: string) => void
   current: number
   theme: DeckTheme
   borderless: boolean
@@ -298,7 +316,212 @@ interface SlideStripProps {
   flash?: { index: number; serial: number } | null
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null, flash = null }: SlideStripProps) {
+const sessionFields = {
+  start: { placeholder: 'Start', tip: "Set the session's start. The rows then show clock times." },
+  length: { placeholder: 'Length', tip: "The session's length in minutes. The presenter view uses it too." },
+  end: { placeholder: 'End', tip: "Set the session's end. Ritemark keeps it as the session's length." },
+}
+
+function SessionTime({ field, value, display, start, onSave }: {
+  field: SessionTimeField
+  value: string | null
+  display?: string | null
+  start?: number | null
+  onSave: (field: SessionTimeField, value: string) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const input = useRef<HTMLInputElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const returnFocus = useRef(false)
+  const closing = useRef(false)
+  const editing = draft !== null
+  useLayoutEffect(() => {
+    if (editing) {
+      closing.current = false
+      input.current?.focus()
+      input.current?.select()
+    } else if (returnFocus.current) {
+      returnFocus.current = false
+      trigger.current?.focus({ preventScroll: true })
+    }
+  }, [editing])
+  useDismissOnOutside(input, () => input.current?.blur(), { enabled: editing })
+
+  const label = `Session ${field}`
+  const { placeholder, tip } = sessionFields[field]
+  if (draft === null) return (
+    <Tooltip label={tip}>
+      <Button ref={trigger} variant="ghost" size="compact" className="deck-session-time" aria-label={`${label}${value ? ` ${value}` : ''}`} onClick={() => setDraft(value ?? '')}>
+        {display ?? value ?? placeholder}
+      </Button>
+    </Tooltip>
+  )
+
+  const minutes = clockMinutes(draft)
+  const valid = field === 'length' ? draft === '' || lengthMinutesOf(draft) !== null
+    : field === 'start' ? draft === '' || minutes !== null
+    : minutes !== null && sessionLengthFromEnd(start ?? null, minutes) !== null
+  const close = (save: boolean) => {
+    if (closing.current) return
+    closing.current = true
+    setDraft(null)
+    if (save && valid && draft !== value) onSave(field, draft)
+  }
+  return (
+    <>
+      <Tooltip label={tip} hoverOnly>
+        <Input ref={input} className="deck-session-input" aria-label={label} aria-invalid={!valid}
+          inputMode={field === 'length' ? 'numeric' : undefined} placeholder={field === 'length' ? placeholder : 'HH:MM'}
+          value={draft} onChange={event => setDraft(event.target.value)} onBlur={() => close(true)}
+          onKeyDown={event => {
+            if (event.nativeEvent.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.key === 'Enter' && !valid) return
+            returnFocus.current = true
+            close(event.key === 'Enter')
+          }}
+        />
+      </Tooltip>
+      {field === 'length' && <span>min</span>}
+    </>
+  )
+}
+
+function MinutesCell({ index, minutes, fromLabel, onPick, onSave, onMove }: {
+  index: number
+  minutes: number | null
+  fromLabel: boolean
+  onPick: () => void
+  onSave: (value: string | undefined) => void
+  onMove: (backwards: boolean) => void
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  const cancel = useRef(false)
+  useDismissOnOutside(input, () => input.current?.blur(), { enabled: focused })
+  const value = draft === null ? null : draftMinutes(draft)
+  return (
+    <Tooltip label={fromLabel ? 'From the exercise label. Click to change.' : 'Whole minutes, 0 to 1440. Press Return for the next slide.'} hoverOnly>
+      <Input
+        ref={input}
+        className="deck-list-minutes"
+        data-minutes-row={index}
+        inputMode="numeric"
+        aria-label={`Slide ${index + 1} minutes`}
+        aria-invalid={draft !== null && value === null}
+        value={draft ?? (minutes === null ? '' : String(minutes))}
+        onFocus={event => {
+          cancel.current = false
+          setFocused(true)
+          event.currentTarget.select()
+          onPick()
+        }}
+        onChange={event => setDraft(event.target.value)}
+        onBlur={() => {
+          setFocused(false)
+          setDraft(null)
+          if (!cancel.current && value !== null && value !== (minutes === null ? undefined : String(minutes))) onSave(value)
+        }}
+        onKeyDown={event => {
+          if (event.nativeEvent.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return
+          event.preventDefault()
+          event.stopPropagation()
+          if (event.key === 'Enter' && draft !== null && value === null) return
+          cancel.current = event.key === 'Escape'
+          event.currentTarget.blur()
+          if (!cancel.current) onMove(event.shiftKey)
+        }}
+      />
+    </Tooltip>
+  )
+}
+
+function TimedRows({ slides, timing, current, onPickTimedSlide, onMinutes, onSession }: SlideStripProps) {
+  const rowsRef = useRef<HTMLDivElement>(null)
+  const rows = useMemo(() => timetableRows(timing), [timing])
+  const foot = timetableFoot(timing)
+  useLayoutEffect(() => {
+    rowsRef.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [current])
+
+  const move = (index: number, backwards: boolean) => {
+    const next = nextMinutesRow(timing.slides, index, backwards)
+    if (next !== null) rowsRef.current?.querySelector<HTMLInputElement>(`[data-minutes-row="${next}"]`)?.focus()
+  }
+
+  return (
+    <>
+      <div ref={rowsRef} className="deck-list-rows" aria-label="Slide timings" role="group">
+        {rows.map(row => {
+          const entry = slides[row.index]
+          const title = entry.data.title?.replace(/\s+/g, ' ').trim() || 'Untitled slide'
+          return (
+            <div key={entry.data.id ?? row.index} className={`deck-list-row${row.skipped ? ' is-skip' : ''}${row.sectionMinutes !== null ? ' is-section' : ''}`}
+              aria-current={row.index === current ? 'true' : undefined}>
+              <Tooltip label={title} hoverOnly className="deck-list-title">
+                <Button variant="ghost" size="compact" className="deck-list-pick"
+                  aria-label={`Slide ${row.index + 1}: ${title}${row.skipped ? ', skipped' : ''}`}
+                  onClick={() => onPickTimedSlide(row.index)}>
+                  <span className="deck-list-no">{row.index + 1}</span>
+                  <span className="deck-list-name">{title}</span>
+                </Button>
+              </Tooltip>
+              <span className="deck-list-start">{row.start}</span>
+              {row.sectionMinutes !== null
+                ? <span className="deck-list-sum" aria-label={`Section total ${row.sectionMinutes} minutes`}>{row.sectionMinutes}</span>
+                : <MinutesCell index={row.index} minutes={row.minutes} fromLabel={row.labelMinutes !== null && explicitMinutes(entry.data.time) === null}
+                    onPick={() => onPickTimedSlide(row.index)} onSave={value => onMinutes(row.index, value)} onMove={backwards => move(row.index, backwards)} />}
+            </div>
+          )
+        })}
+      </div>
+      <div className="deck-list-foot">
+        <div className="deck-list-total">{foot.count} · {foot.total}</div>
+        <div className="deck-list-session">
+          <span className="deck-list-times">
+            Session{' '}
+            {foot.start === null && <SessionTime field="length" display={foot.length}
+              value={timing.sessionMinutes === null ? null : String(timing.sessionMinutes)} onSave={onSession} />}
+            <SessionTime field="start" value={foot.start} onSave={onSession} />
+            {foot.start !== null && <> to <SessionTime field="end" value={foot.end} start={timing.sessionStart} onSave={onSession} /></>}
+          </span>
+          {foot.comparison && <span className={foot.over ? 'is-over' : undefined}>{foot.comparison}</span>}
+        </div>
+        {foot.untimed && <div>{foot.untimed}</div>}
+        <div>Type the minutes, then ↵ for the next slide.</div>
+      </div>
+    </>
+  )
+}
+
+export function SlideStrip(props: SlideStripProps) {
+  const { mode, onMode } = props
+  return (
+    <div className={`deck-strip-panel${mode === 'list' ? ' is-list' : ''}`}>
+      <div className="deck-strip-head">
+        <div className="deck-strip-switch" role="group" aria-label="Slide strip view">
+          {([
+            ['thumbnails', 'Slide thumbnails', 'squares-four'],
+            ['list', 'Timed slide list', 'list'],
+          ] as const).map(([value, label, icon]) => (
+            <Tooltip key={value} label={label}>
+              <Button variant="toolbar" size="icon-xs" aria-label={label} aria-pressed={mode === value}
+                data-state={mode === value ? 'active' : undefined} onClick={() => onMode(value)}>
+                <Icon name={icon} size={14} tone="inherit" />
+              </Button>
+            </Tooltip>
+          ))}
+        </div>
+        {mode === 'list' && <><span>Starts</span><span>Min</span></>}
+      </div>
+      {mode === 'list' ? <TimedRows {...props} /> : <Thumbnails {...props} />}
+    </div>
+  )
+}
+
+function Thumbnails({ slides, timing, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null, flash = null }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -495,6 +718,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
           <Thumbnail
             entry={entry}
             count={count}
+            minutesLabel={slideMinutesText(timing.slides[entry.index])}
             current={entry.index === current}
             theme={theme}
             borderless={borderless}

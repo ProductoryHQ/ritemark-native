@@ -132,7 +132,7 @@ assert.ok(
 );
 const moreMenu = chatInput.slice(chatInput.indexOf('<DropdownMenuContent'), chatInput.indexOf('</DropdownMenuContent>'));
 assert.ok(
-  moreMenu.includes('onSelect={() => fileInputRef.current?.click()}') && moreMenu.includes('Attach files…'),
+  chatInput.includes('onClick={pickFiles}') && moreMenu.includes('onSelect={pickFiles}') && moreMenu.includes('Attach files…'),
   'The "…" menu attaches files with the same file picker as the attach button',
 );
 assert.ok(

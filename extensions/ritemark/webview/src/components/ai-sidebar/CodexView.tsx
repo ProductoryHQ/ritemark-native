@@ -6,6 +6,7 @@
  * approval dialogs for shell commands and file changes.
  */
 
+import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -266,6 +267,8 @@ export function CodexTurn({
           />
         </div>
       )}
+
+      <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
 
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
           the conversation-level ActivityStatusLine is the single status point

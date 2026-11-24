@@ -1,3 +1,5 @@
+/// <reference path="../pdfjs-modules.d.ts" />
+
 /**
  * Sprint 148 (R2, A2): a PDF's text through pdf.js (`pdfjs-dist`, the webview's
  * version), with the PDF preview's own index (`buildPdfSearchIndex`), so the
@@ -82,8 +84,9 @@ function ownBuffer(bytes: Uint8Array): Uint8Array {
   return bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes : bytes.slice();
 }
 
-/** Reads a PDF's text. `bytes` may be detached afterwards. */
-export async function readPdf(bytes: Uint8Array, budget: number, pause: () => Promise<void>): Promise<ReadOutcome> {
+type PdfFailure = { ok: false; reason: 'protected' | 'unreadable' };
+
+export async function withPdf<T>(bytes: Uint8Array, read: (doc: PdfDocument) => Promise<T>): Promise<T | PdfFailure> {
   const library = await loadPdfjs();
   let doc: PdfDocument;
   try {
@@ -101,6 +104,26 @@ export async function readPdf(bytes: Uint8Array, budget: number, pause: () => Pr
     return { ok: false, reason: (error as { name?: string })?.name === 'PasswordException' ? 'protected' : 'unreadable' };
   }
   try {
+    return await read(doc);
+  } catch {
+    return { ok: false, reason: 'unreadable' };
+  } finally {
+    await doc.destroy().catch(() => undefined);
+  }
+}
+
+export async function pdfPageContent(doc: PdfDocument, page: number) {
+  const pdfPage = await doc.getPage(page);
+  try {
+    return await pdfPage.getTextContent();
+  } finally {
+    pdfPage.cleanup();
+  }
+}
+
+/** Reads a PDF's text. `bytes` may be detached afterwards. */
+export async function readPdf(bytes: Uint8Array, budget: number, pause: () => Promise<void>): Promise<ReadOutcome> {
+  return withPdf<ReadOutcome>(bytes, async (doc) => {
     const shapes: ChunkShape[][] = [];
     let chars = 0;
     const proxy = {
@@ -110,11 +133,9 @@ export async function readPdf(bytes: Uint8Array, budget: number, pause: () => Pr
         const page: ChunkShape[] = [];
         shapes[pageNumber - 1] = page;
         if (chars >= budget) return { getTextContent: async () => ({ items: [] }) };
-        const pdfPage = await doc.getPage(pageNumber);
         return {
           getTextContent: async () => {
-            const content = await pdfPage.getTextContent();
-            pdfPage.cleanup();
+            const content = await pdfPageContent(doc, pageNumber);
             const items = content.items;
             for (let i = 0; i < items.length; i++) {
               const item = items[i];
@@ -167,9 +188,5 @@ export async function readPdf(bytes: Uint8Array, budget: number, pause: () => Pr
     });
     flush();
     return { ok: true, passages: sink.passages, truncated: sink.truncated || chars >= budget };
-  } catch {
-    return { ok: false, reason: 'unreadable' };
-  } finally {
-    await doc.destroy().catch(() => undefined);
-  }
+  });
 }

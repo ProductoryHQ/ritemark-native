@@ -1,6 +1,6 @@
 # Release Plan — v2.4.0
 
-**Status:** **Open for development, 22 November 2026.** Jarmo said “võiks avada 2.4 ja lasta Codexil teha mingeid parandusi” and followed with “avad releasei arenduseks”. 2.3.0 was published on 23 November 2026, so `main` is no longer frozen; the held 2.4 PRs merge one at a time from 24 November.<br>
+**Status:** **Roadmap approved 24 November 2026** ([deck](https://claude.ai/artifact/Lsbc9YDNmC6eWXvYmaZ5H8)); open for development since 22 November. Jarmo said “võiks avada 2.4 ja lasta Codexil teha mingeid parandusi” and followed with “avad releasei arenduseks”. 2.3.0 was published on 23 November 2026, so `main` is no longer frozen; the held 2.4 PRs merge one at a time from 24 November.<br>
 **Target:** v2.4.0<br>
 **Milestone:** v2.4.0 (GitHub milestone 20)<br>
 **Tier:** Shell because #953 touches the build and #954 touches the Windows installer.<br>
@@ -29,8 +29,9 @@ Sprints are to be numbered when planned.
 
 | Sprint | Issues | Scope | Status |
 |---|---|---|---|
-| Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents and PDFs. A Word document or PDF gets its own starting points once every AI passes the reading test. Word equations come through as math. Answers name sources in the sentence and link those names to the passages read (Jarmo’s choice C). Experience 50, drawn 22 November. | Drawn; sprint plan not written |
-| Excel charts and colour rules | #971 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Drawn; sprint plan not written |
+| 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov; [plan](sprint-173-word-folder/sprint-plan.md) |
+| 174 · Excel charts and colour rules | #971 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Approved 24 Nov; [plan](sprint-174-excel-charts/sprint-plan.md) |
+| 175 · The live deck | to file | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Approved in the roadmap 24 Nov; plan after the Cloudflare measurements and the drawings |
 
 ## Work outside sprints
 
@@ -56,6 +57,10 @@ Sprints are to be numbered when planned.
 | #924 | Apply a place’s default in a fresh frame. | No PR yet |
 | #582 | Address a noisy log line. | No PR yet |
 | #501 | Address the first start after an update on Windows. | No PR yet |
+
+## Cut line
+
+If 2.4 runs short, drawing the colour rules in Excel’s cells (Sprint 174, PRs 6 and 7) moves to 2.5; the charts stay. Jarmo, 24 November 2026.
 
 ## Out of 2.4
 
@@ -83,3 +88,5 @@ The meaning layer (#591) moves to a later release with its own sprint plan. Jarm
 | 2026-11-22 | Move the meaning layer (#591) to a later release. | Jarmo (“tähenduskiht hilisemaks”) |
 | 2026-11-22 | Choose way C for sources in Word folder answers, naming and linking sources in the sentence. | Jarmo (“C kuigi D on hea. Siis C aitab meil võrrelda end Notebook LMiga”, relayed in his words by the Experience lead) |
 | 2026-11-23 | File the RC4 smoke test’s findings as 2.4 issues (#980–#984). | Jarmo (“jah”) |
+| 2026-11-24 | Put live publishing in 2.4: five measurements first; layer 1 behind a switch per page. | Jarmo, relayed in his words by the Chief of Staff (“jah, mõõtmised koos viiendaga, alusta kohe ja läheb 2.4”; “Layer 1 is in.”) |
+| 2026-11-24 | Approve the 2.4 roadmap (four streams in order; sprint plans and their questions are the Development manager’s), the cut line, and an AI’s edit publishing a live deck when its switch is on. | Jarmo (“roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi”) |

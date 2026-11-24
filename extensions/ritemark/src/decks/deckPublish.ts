@@ -25,6 +25,14 @@
  *    the deck's own now.
  */
 import * as fs from 'node:fs';
+import { createHash } from 'node:crypto';
+import { locatePage, isInside } from '../browser/localPage';
+import { OUTSIDE_PROJECT_MESSAGE } from '../browser/pageCommands';
+import { trackEvent } from '../analytics/posthog';
+import { DeckLive, type LiveSaveReceipt } from './deckLive';
+import { locateLiveIssues } from './deckLiveIssues';
+import type { LiveResult } from '../publish/liveUpdate';
+import type { LivePreference } from '../publish/publishRecords';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
@@ -33,6 +41,8 @@ import type { PublishFeature } from '../publish/vscodePublish';
 import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '../publish/vscodePublish';
 import { PAGE_BEING_PUBLISHED, WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
 import { splitFrontMatter } from '../editorSync/frontMatter';
+import { readRitemarkSavedLogicalHash } from '../editorSync/saveReceipt';
+import { normalizeLogicalText } from '../editorSync/state';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { frontMatterLook, parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
@@ -56,6 +66,9 @@ interface DeckSeat {
   document: vscode.TextDocument;
   post: (message: DeckHostMessage) => Promise<boolean>;
   bar?: PageBarState;
+  liveInput?: { text: string; look: 'card' | 'borderless'; steps: readonly number[] };
+  watcher?: vscode.Disposable;
+  owner?: vscode.Webview;
   /**
    * The seat's refreshes, one after another (the review of #791): a theme's Save and its Undo, or an AI's write and
    * the watcher's, each ask again, and an older answer must never be posted after a newer one, nor its 2.2 state kept.
@@ -86,12 +99,16 @@ export function publishedAddress(bar: PageBarState | undefined): string | null {
   return bar.address && WORKERS_DEV_ADDRESS.test(bar.address) ? bar.address : null;
 }
 
+function liveSnapshot(text: string): string {
+  return createHash('sha256').update(normalizeLogicalText(text)).digest('hex');
+}
+
 export class DeckPublisher implements vscode.Disposable {
   private readonly seats = new Set<DeckSeat>();
   private readonly disposables: vscode.Disposable[] = [];
   private readonly timers = new Map<DeckSeat, ReturnType<typeof setTimeout>>();
   /** Decks whose Publish is running, by their path compared as the system compares it. */
-  private readonly running = new Set<string>();
+  private readonly running = new Map<string, Promise<void>>();
   /** The sheet's rows for each page this window wrote, with the digest written beside them, by the page's real path. */
   private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
   /** The app's own font files, read once per window (they never change while it runs). */
@@ -99,6 +116,21 @@ export class DeckPublisher implements vscode.Disposable {
   /** A page's state changed in Publish (by its real path): Present asks again whether the deck is published. */
   private readonly pageChanged = new vscode.EventEmitter<string>();
   readonly onDidChangePage = this.pageChanged.event;
+  private readonly liveSaved = new vscode.EventEmitter<LiveSaveReceipt>();
+  readonly onDidSaveLive = this.liveSaved.event;
+  private readonly liveChanged = new vscode.EventEmitter<{ pagePath: string; result: LiveResult; receipt?: LiveSaveReceipt }>();
+  readonly onDidUpdateLive = this.liveChanged.event;
+  private readonly liveUsage = new Set<string>();
+  private readonly live = new DeckLive((pagePath, result, receipt) => {
+    if (result?.kind === 'updated' || result?.kind === 'paused') {
+      this.liveChanged.fire({ pagePath, result, ...(receipt && !receipt.superseded ? { receipt } : {}) });
+    }
+    if (result?.kind === 'updated' && !this.liveUsage.has(pagePath)) {
+      this.liveUsage.add(pagePath);
+      void trackEvent('feature_used', { feature: 'live_deck_update', source: 'deck' });
+    }
+    void this.refreshPage(pagePath);
+  });
   /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
   private readonly fontsHeld = new Map<string, number>();
   private feature: PublishFeature | null = null;
@@ -109,6 +141,10 @@ export class DeckPublisher implements vscode.Disposable {
     this.disposables.push(
       vscode.workspace.onDidChangeTextDocument(event => {
         for (const seat of this.seats) if (seat.document === event.document) this.refreshSoon(seat);
+      }),
+      vscode.workspace.onDidSaveTextDocument(document => {
+        const seat = [...this.seats].find(item => item.document === document);
+        if (seat) this.savedForLive(seat, readRitemarkSavedLogicalHash(document));
       }),
       // Decks turned off or on in Settings: the control hides or shows at once.
       vscode.workspace.onDidChangeConfiguration(event => {
@@ -130,10 +166,132 @@ export class DeckPublisher implements vscode.Disposable {
   }
 
   /** An open deck view: its bar's chip is kept up to date until the returned disposable. */
-  attach(document: vscode.TextDocument, post: DeckSeat['post']): vscode.Disposable {
-    const seat: DeckSeat = { document, post };
+  attach(document: vscode.TextDocument, post: DeckSeat['post'], owner?: vscode.Webview): vscode.Disposable {
+    const seat: DeckSeat = { document, post, owner };
     this.seats.add(seat);
-    return { dispose: () => { this.seats.delete(seat); clearTimeout(this.timers.get(seat)); this.timers.delete(seat); } };
+    if (document.uri.scheme === 'file') {
+      const file = document.uri.fsPath;
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(path.dirname(file), path.basename(file)), false, false, true);
+      const saved = (uri: vscode.Uri) => {
+        if (samePath(uri.fsPath, file)) this.savedForLive(seat);
+      };
+      watcher.onDidChange(saved);
+      watcher.onDidCreate(saved);
+      seat.watcher = watcher;
+    }
+    return { dispose: () => {
+      seat.watcher?.dispose();
+      this.seats.delete(seat);
+      clearTimeout(this.timers.get(seat));
+      this.timers.delete(seat);
+      void pageKeyOf(pagePathFor(document.uri.fsPath)).then(page => {
+        if (![...this.seats].some(item => samePath(item.document.uri.fsPath, document.uri.fsPath))) this.live.stop(normalizeForCompare(page));
+      });
+    } };
+  }
+
+  /** Input from the connected deck view. Capturing fit never starts a publish. */
+  rememberLiveInput(document: vscode.TextDocument, owner: vscode.Webview | undefined, input: NonNullable<DeckSeat['liveInput']>): void {
+    for (const seat of this.seats) {
+      if (seat.document === document && (!owner || seat.owner === owner)) seat.liveInput = input;
+    }
+  }
+
+  async liveAction(document: vscode.TextDocument, action: 'on' | 'off' | 'resume', owner?: vscode.Webview): Promise<void> {
+    const seat = [...this.seats].find(item => item.document === document && (!owner || item.owner === owner));
+    const controller = (action === 'off' ? this.feature : this.ready())?.controller;
+    if (!seat || !controller || document.uri.scheme !== 'file') return;
+    const pagePath = await pageKeyOf(pagePathFor(document.uri.fsPath));
+    if (!this.seats.has(seat)) return;
+    if (action === 'off') {
+      if (await controller.setLive(pagePath, false)) this.live.stop(normalizeForCompare(pagePath));
+      return;
+    }
+    if (action === 'on' && !await controller.setLive(pagePath, true)) return;
+    if (action === 'resume') {
+      const record = await controller.recordFor(pagePath);
+      if (!record?.live?.pause) return;
+    }
+    await this.requestLive(seat, action === 'resume');
+  }
+
+  private savedForLive(seat: DeckSeat, savedHash?: string): void {
+    if (!this.ready() || seat.document.uri.scheme !== 'file') return;
+    const file = seat.document.uri.fsPath;
+    const snapshot = savedHash
+      ? Promise.resolve(savedHash)
+      : fs.promises.readFile(file, 'utf8').then(liveSnapshot, () => undefined);
+    let settle!: () => void;
+    const settled = new Promise<void>(resolve => { settle = resolve; });
+    const receipt: LiveSaveReceipt = { file, settled, settle };
+    this.liveSaved.fire(receipt);
+    void this.requestLive(seat, false, receipt, snapshot).catch(settle);
+  }
+
+  private async requestLive(
+    seat: DeckSeat, resume = false, receipt?: LiveSaveReceipt, snapshot?: Promise<string | undefined>,
+  ): Promise<void> {
+    const feature = this.ready();
+    const file = seat.document.uri.fsPath;
+    if (!feature || seat.document.uri.scheme !== 'file' || !this.seats.has(seat)) {
+      receipt?.settle();
+      return;
+    }
+    const page = await pageKeyOf(pagePathFor(file));
+    const record = await feature.controller.recordFor(page);
+    if (!record?.live?.on || !this.seats.has(seat)) {
+      receipt?.settle();
+      return;
+    }
+    const pageId = normalizeForCompare(page);
+    if (record.live.pause && !resume && !this.live.hasPendingResume(pageId)) {
+      receipt?.settle();
+      void this.refreshDocument(seat.document);
+      return;
+    }
+    const preference = record.live;
+    const openSeats = [...this.seats].filter(item => samePath(item.document.uri.fsPath, file));
+    const open = () => Boolean(this.ready()) && openSeats.some(item => this.seats.has(item));
+    if (!open()) {
+      receipt?.settle();
+      return;
+    }
+    await this.live.request(pageId, async (goOn, sending) => {
+      const current = await feature.controller.recordFor(page);
+      if (!open() || current?.live?.id !== preference.id || (current.live.pause && !goOn)) return { kind: 'stopped' };
+      const realFile = await fs.promises.realpath(file);
+      const roots = await projectRoots();
+      const project = roots.find(root => isInside(page, root));
+      if (!project || !isInside(realFile, project) || !samePath(path.dirname(realFile), path.dirname(page))) {
+        const release = feature.controller.holdPage(page);
+        if (!release) return { kind: 'busy' };
+        try {
+          return await feature.controller.pauseLivePage(page, { preference: current.live, resume: goOn, active: open }, OUTSIDE_PROJECT_MESSAGE);
+        } finally {
+          release();
+        }
+      }
+      const saved = await fs.promises.readFile(realFile, 'utf8');
+      // The queue reads the latest bytes. Credit only the snapshot observed
+      // by this save, even when another write raced its live update.
+      if (receipt && snapshot && await snapshot !== liveSnapshot(saved)) {
+        receipt.superseded = true;
+        receipt.settle();
+      }
+      const body = splitFrontMatter(saved).content;
+      const look = frontMatterLook(saved);
+      const matches = (item: DeckSeat) => item.liveInput?.text === body && item.liveInput.look === look;
+      const input = (matches(seat) ? seat : [...this.seats].find(item => samePath(item.document.uri.fsPath, file) && matches(item)))?.liveInput;
+      // The fit belongs to this saved body. For an external save, use the existing textAndFit fallback.
+      const savedDocument = { uri: seat.document.uri, getText: () => saved };
+      const result = await this.publishDeck(savedDocument, body, look, input?.steps ?? [], () => {}, {
+        preference: current.live, resume: goOn, active: open, sending, roots,
+      });
+      if (goOn && open() && result.kind === 'paused' && result.pause.kind === 'connection') {
+        await feature.controller.startTokenEntry();
+      }
+      return result;
+    }, resume, receipt);
   }
 
   // ------------------------------------------------------------------ the chip
@@ -141,6 +299,11 @@ export class DeckPublisher implements vscode.Disposable {
   private ready(): PublishFeature | null {
     const feature = this.feature;
     return feature && feature.isReady() && isEnabled('decks') ? feature : null;
+  }
+
+  async requestPageState(document: vscode.TextDocument, owner: vscode.Webview): Promise<void> {
+    const seat = [...this.seats].find(item => item.document === document && item.owner === owner);
+    if (seat) await this.refresh(seat);
   }
 
   /** The deck bar's Publish control: hidden until Publish can be reached; else the page's state. */
@@ -167,7 +330,22 @@ export class DeckPublisher implements vscode.Disposable {
     const kind = bar?.kind ?? 'unpublished';
     let changed = bar?.changed === true;
     if (kind === 'published' && !changed) changed = await this.deckChanged(document, pagePath);
-    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds() }, bar };
+    const pageKey = await pageKeyOf(pagePath);
+    const preference = (kind === 'published' || kind === 'publishing')
+      ? (await this.feature?.controller.recordFor(pageKey))?.live : undefined;
+    const live = preference && this.live.state(normalizeForCompare(pageKey), preference);
+    if (live?.state === 'paused' && live.pause?.kind === 'key') {
+      if (live.pause.location) {
+        // Stored scan coordinates include front matter. The deck editor holds just the body.
+        const fullText = document.getText();
+        const body = splitFrontMatter(fullText).content;
+        const headLines = fullText.slice(0, fullText.length - body.length).split('\n').length - 1;
+        live.pause = { ...live.pause, location: { ...live.pause.location, line: live.pause.location.line - headLines } };
+      }
+      live.resumeBlocked = await this.stillHasKey(document, pagePath) ? 'Take the key out first.' : undefined;
+    }
+    const address = publishedAddress(bar);
+    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(address && { address }), ...(live && { live }) }, bar };
   }
 
   /**
@@ -228,8 +406,8 @@ export class DeckPublisher implements vscode.Disposable {
     }
   }
 
-  private refreshDocument(document: vscode.TextDocument): void {
-    for (const seat of this.seats) if (seat.document === document) void this.refresh(seat);
+  private refreshDocument(document: Pick<vscode.TextDocument, 'uri'>): void {
+    for (const seat of this.seats) if (samePath(seat.document.uri.fsPath, document.uri.fsPath)) void this.refresh(seat);
   }
 
   /**
@@ -248,48 +426,60 @@ export class DeckPublisher implements vscode.Disposable {
    * fit steps, then 2.2's Publish on it.
    */
   async publish(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[], notice: (text: string) => void): Promise<void> {
+    this.rememberLiveInput(document, undefined, { text: body, look, steps });
+    if (!this.ready()) return this.refreshDocument(document);
+    await this.publishDeck(document, body, look, steps, notice);
+  }
+
+  private async publishDeck(
+    document: Pick<vscode.TextDocument, 'uri' | 'getText'>, body: string, look: 'card' | 'borderless',
+    steps: readonly number[], notice: (text: string) => void,
+    live?: { preference: LivePreference; resume: boolean; active: () => boolean; sending: () => void; roots: string[] },
+  ): Promise<LiveResult> {
+    const stopped: LiveResult = { kind: 'stopped' };
+    const offline = (detail: string): LiveResult => ({ kind: 'offline', detail });
     const feature = this.ready();
     // Turned off since the control was drawn: it hides
-    if (!feature) return this.refreshDocument(document);
+    if (!feature) return stopped;
     const deckPath = document.uri.fsPath;
     const key = normalizeForCompare(deckPath);
-    if (this.running.has(key)) return; // a second press while the first is still going: its sheet is on its way
-    this.running.add(key);
+    const running = this.running.get(key);
+    if (running) return { kind: 'busy', until: running };
+    let finish!: () => void;
+    this.running.set(key, new Promise<void>(resolve => { finish = resolve; }));
     // This Publish's font files, held while it runs (`holdFonts`), let go at its end at the latest.
     let unhold = () => {};
+    let releasePage: (() => void) | undefined;
     try {
       const pagePath = pagePathFor(deckPath);
       const pageKey = await pageKeyOf(pagePath);
-      // The view's words and look (`pageInput`, which Save as PDF reads too)
-      const { text } = this.textAndFit(document, body, look, steps);
-      let built: Awaited<ReturnType<typeof buildDeckPage>>;
-      let theme: DeckTheme;
-      // Sprint 162 PR 3: the theme's fonts beyond Sofia Sans go beside the page as files, written just before it; and
-      // its logo (PR 4), when its file is there.
-      let fontFiles: PageFontFile[];
-      let logoFiles: PageFile[];
-      try {
-        const input = await this.pageInput(document, body, look, steps);
-        theme = input.theme;
-        logoFiles = input.logo ? [input.logo] : [];
-        fontFiles = input.fonts;
-        built = await buildDeckPage({ deckPath, text: input.text, theme, steps: input.steps }, { ...(await loadPageAssets(this.extensionPath)), themeFonts: fontFiles, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null });
-      } catch (error) {
-        console.warn('[Decks] Could not build the page:', error);
-        notice(PAGE_NOT_WRITTEN);
-        return;
-      }
       // The page is held while its file is written, so no sheet gathers bytes that are about to change; one open on
       // it already (from the browser's bar), or the page going up, keeps the file as that flow read it
       const release = feature.controller.holdPage(pageKey);
       if (!release) {
         notice(PAGE_BEING_PUBLISHED);
-        return;
+        return { kind: 'busy' };
       }
+      releasePage = release;
+      // The view's words and look (`pageInput`, which Save as PDF reads too)
+      const { text } = this.textAndFit(document, body, look, steps);
+      let built: Awaited<ReturnType<typeof this.buildPage>>;
+      try {
+        built = await this.buildPage(document, body, look, steps);
+      } catch (error) {
+        if (live) return await feature.controller.pauseLivePage(pageKey, live, PAGE_NOT_WRITTEN);
+        console.warn('[Decks] Could not build the page:', error);
+        notice(PAGE_NOT_WRITTEN);
+        return stopped;
+      }
+      const { theme, fontFiles, logoFiles } = built;
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
       let fonts: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
       let logos: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
       let hadRecord: boolean;
+      let legacyDigest: string | undefined;
+      let livePageSha: string | undefined;
+      let reusePublishedHtml = false;
       // This Publish's fonts are held until it ends, so another deck's cancelled Publish never takes them back.
       const fontTargets = [...fontFiles, ...logoFiles].map(file => path.join(path.dirname(deckPath), ...file.address.split('/')));
       unhold = this.holdFonts(fontTargets);
@@ -301,7 +491,23 @@ export class DeckPublisher implements vscode.Disposable {
         await removePageFonts(nodeFontFs, deckPath, logos, logoFiles, target => this.fontsHeld.has(target), LOGO_PLACE).catch(() => undefined);
       };
       try {
-        hadRecord = Boolean(await feature.controller.recordFor(pageKey));
+        const record = await feature.controller.recordFor(pageKey);
+        hadRecord = Boolean(record);
+        if (live && record && (!record.deckDigest || record.deckDigest === built.digest)) {
+          const existing = await locatePage(pageKey, live.roots);
+          const bytes = existing.kind === 'project' && samePath(existing.realPath, pageKey)
+            ? await fs.promises.readFile(pageKey).catch(() => undefined) : undefined;
+          const existingSha = bytes && createHash('sha256').update(bytes).digest('hex');
+          if (existing.kind === 'project' && bytes && record.files.some(file => path.basename(file.path) === path.basename(pageKey) && file.sha256 === existingSha)) {
+            legacyDigest = readPageMeta(bytes.subarray(0, 4096).toString('utf8')).digest ?? undefined;
+            if (legacyDigest === built.digest && existingSha) {
+              // A timetable-only save can arrive before the view measures fit again. Keep the checked published
+              // HTML in place, but still gather its assets so changes to a picture's bytes can go.
+              reusePublishedHtml = await feature.controller.matchesPublishedBytes(existing, record.contentHash).catch(() => false);
+              if (reusePublishedHtml) livePageSha = existingSha;
+            }
+          }
+        }
         // The fonts first, so the page never names a font that isn't beside it yet.
         const fontsWritten = await writePageFonts(nodeFontFs, deckPath, fontFiles);
         if (fontsWritten.kind === 'refused') {
@@ -314,23 +520,39 @@ export class DeckPublisher implements vscode.Disposable {
             written = { kind: 'refused', pagePath, line: logoWritten.line };
           } else {
             logos = logoWritten;
-            written = await writeDeckPage(nodePageFs, deckPath, built.html);
+            written = reusePublishedHtml
+              ? { kind: 'written', pagePath, created: false, unchanged: true }
+              : await writeDeckPage(nodePageFs, deckPath, built.html);
           }
         }
       } catch (error) {
+        if (live) {
+          await takeBackFonts();
+          return offline(PAGE_NOT_WRITTEN);
+        }
         console.warn('[Decks] Could not write the page:', error);
         await takeBackFonts();
         notice(PAGE_NOT_WRITTEN);
-        return;
-      } finally {
-        release();
+        return stopped;
       }
       if (written.kind === 'refused') {
         await takeBackFonts();
+        if (live) return await feature.controller.pauseLivePage(pageKey, live, written.line);
         notice(written.line);
-        return;
+        return stopped;
       }
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
+      if (live) {
+        const location = await locatePage(pagePath, live.roots);
+        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return await feature.controller.pauseLivePage(pageKey, live, OUTSIDE_PROJECT_MESSAGE);
+        const describe = await locateLiveIssues(deckPath, text, built);
+        return await feature.controller.updateLive(location, {
+          ...live, digest: built.digest, legacyDigest, describe,
+          pageSha: livePageSha ?? createHash('sha256').update(built.html).digest('hex'),
+        });
+      }
+      release();
+      releasePage = undefined;
       let outcome: PublishOutcome | undefined | 'stopped';
       try {
         outcome = await feature.publishPage(vscode.Uri.file(pagePath));
@@ -351,11 +573,42 @@ export class DeckPublisher implements vscode.Disposable {
           await takeBackFonts();
         }
       }
+      return stopped;
     } finally {
+      releasePage?.();
       unhold();
       this.running.delete(key);
+      finish();
       this.refreshDocument(document);
     }
+  }
+
+  /** Read-only preview for the paused menu. Go on always runs the complete guard again. */
+  private async stillHasKey(document: vscode.TextDocument, pagePath: string): Promise<boolean> {
+    try {
+      const realPath = await pageKeyOf(pagePath);
+      const projectFolder = (await projectRoots()).find(root => isInside(realPath, root));
+      const realDeck = await fs.promises.realpath(document.uri.fsPath);
+      if (!projectFolder || !samePath(path.dirname(realDeck), path.dirname(realPath))) return true;
+      const saved = await fs.promises.readFile(realDeck, 'utf8');
+      const source = { uri: document.uri, getText: () => saved };
+      const built = await this.buildPage(source, splitFrontMatter(saved).content, frontMatterLook(saved), []);
+      return await this.feature!.controller.hasLiveKey({ realPath, projectFolder }, built.html);
+    } catch {
+      return true;
+    }
+  }
+
+  /** The same render, including its fitted steps, for manual and live updates. */
+  private async buildPage(
+    document: Pick<vscode.TextDocument, 'uri' | 'getText'>,
+    body: string, look: 'card' | 'borderless', steps: readonly number[],
+  ) {
+    const input = await this.pageInput(document, body, look, steps);
+    const assets = await loadPageAssets(this.extensionPath);
+    const logo = input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null;
+    const page = await buildDeckPage(input, { ...assets, themeFonts: input.fonts, logo });
+    return { ...page, theme: input.theme, fontFiles: input.fonts, logoFiles: input.logo ? [input.logo] : [] };
   }
 
   // ------------------------------------------------------------------ Save as PDF (Sprint 170)
@@ -364,7 +617,7 @@ export class DeckPublisher implements vscode.Disposable {
    * The view's words and look, with the document's front matter, where the editor read that front matter as parseDeck
    * does; else the document as saved (publishText), whose slides take the view's fit only while they are as many.
    */
-  private textAndFit(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): { text: string; steps: readonly number[] } {
+  private textAndFit(document: Pick<vscode.TextDocument, 'getText'>, body: string, look: 'card' | 'borderless', steps: readonly number[]): { text: string; steps: readonly number[] } {
     const documentText = document.getText();
     const { text, fromView } = publishText(documentText, body, splitFrontMatter(documentText).content, look);
     return { text, steps: fromView || parseDeck(text.replace(/^\uFEFF/, '')).slides.length === steps.length ? steps : [] };
@@ -374,7 +627,7 @@ export class DeckPublisher implements vscode.Disposable {
    * What the page is made from, for Publish and for Save as PDF alike (Sprint 170), so the PDF is the page: the view's
    * words and fit (`textAndFit`), the theme as its file on disk has it, its font files and its logo. Writes nothing.
    */
-  async pageInput(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
+  async pageInput(document: Pick<vscode.TextDocument, 'uri' | 'getText'>, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
     const deckPath = document.uri.fsPath;
     const { text, steps: fit } = this.textAndFit(document, body, look, steps);
     const read = await this.lookFor(deckPath, text);
@@ -502,9 +755,19 @@ export class DeckPublisher implements vscode.Disposable {
     this.timers.clear();
     this.disposables.forEach(disposable => disposable.dispose());
     this.pageChanged.dispose();
+    this.liveSaved.dispose();
+    this.liveChanged.dispose();
+    this.live.dispose();
+    for (const seat of this.seats) seat.watcher?.dispose();
     this.seats.clear();
     this.written.clear();
   }
+}
+
+async function projectRoots(): Promise<string[]> {
+  const folders = (vscode.workspace.workspaceFolders ?? []).filter(folder => folder.uri.scheme === 'file');
+  const roots = await Promise.all(folders.map(folder => fs.promises.realpath(folder.uri.fsPath).catch(() => null)));
+  return roots.filter((root): root is string => root !== null);
 }
 
 /** A page's first 4 KB: where its metas are. */

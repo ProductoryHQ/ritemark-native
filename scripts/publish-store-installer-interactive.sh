@@ -29,12 +29,22 @@ echo "  SHA-256: $ritemark_expected_sha256"
 echo "  overwrite: forbidden (If-None-Match: * plus indefinite windows/ lock)"
 echo
 
-IFS= read -r -s -p "R2 Account ID: " R2_ACCOUNT_ID
-echo
-IFS= read -r -s -p "R2 Access Key ID: " R2_ACCESS_KEY_ID
-echo
-IFS= read -r -s -p "R2 Secret Access Key: " R2_SECRET_ACCESS_KEY
-echo
+# The three R2 values come from the macOS Keychain, service `ritemark-release` (never `ritemark-test-keys`), put
+# there once by Jarmo with `security add-generic-password -U -s ritemark-release -a <account> -w`. A value that is
+# not there is asked for, as before. Nothing is printed, logged or passed on a command line.
+ritemark_release_value() {
+  security find-generic-password -s ritemark-release -a "$1" -w 2>/dev/null || true
+}
+R2_ACCOUNT_ID=$(ritemark_release_value r2-account-id)
+R2_ACCESS_KEY_ID=$(ritemark_release_value r2-access-key-id)
+R2_SECRET_ACCESS_KEY=$(ritemark_release_value r2-secret-access-key)
+if [[ -n "$R2_ACCOUNT_ID" && -n "$R2_ACCESS_KEY_ID" && -n "$R2_SECRET_ACCESS_KEY" ]]; then
+  echo "R2 values: from the Keychain (service ritemark-release)."
+else
+  if [[ -z "$R2_ACCOUNT_ID" ]]; then IFS= read -r -s -p "R2 Account ID: " R2_ACCOUNT_ID; echo; fi
+  if [[ -z "$R2_ACCESS_KEY_ID" ]]; then IFS= read -r -s -p "R2 Access Key ID: " R2_ACCESS_KEY_ID; echo; fi
+  if [[ -z "$R2_SECRET_ACCESS_KEY" ]]; then IFS= read -r -s -p "R2 Secret Access Key: " R2_SECRET_ACCESS_KEY; echo; fi
+fi
 IFS= read -r -p "Type the exact key to approve this upload: " ritemark_confirmed_key
 
 if [[ "$ritemark_confirmed_key" != "$ritemark_expected_key" ]]; then

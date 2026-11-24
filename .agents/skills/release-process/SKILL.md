@@ -70,7 +70,7 @@ Use this for VS Code core changes, `patches/vscode`, branding, app bundle change
 ./scripts/verify-notarization.sh dist/Ritemark-X.Y.Z-darwin-arm64.dmg
 ```
 
-9. Switch the repository private and manually dispatch `build-macos-x64.yml` and `build-windows.yml` against the exact approved source commit. These workflows are `workflow_dispatch`-only; a tag push does not trigger them. Restore the repository to public after the Windows workflow completes.
+9. Manually dispatch `build-macos-x64.yml` and `build-windows.yml` against `main` with the exact approved source commit. These workflows are `workflow_dispatch`-only; a tag push does not trigger them. Windows builds on the free `windows-latest` runner. **The repository stays public: never change its visibility** (every public → private change erased ProductoryHQ/ritemark-native's stars and watchers; Sprint 144, #506).
 10. Download the x64 artifact tarball into `dist/x64-ci`, run `./scripts/extract-macos-x64-artifact.sh` to verify and restore its symlinks/modes, sign it, create the x64 DMG without notarizing it, and verify the signed Windows installer.
 11. Gate 2: Jarmo tests the signed, unnotarized x64 DMG and Windows installer. Complete any release-bound Store/external matrix against the exact Windows hash. Do not notarize x64 until Jarmo approves and at least 60 minutes have elapsed since the x64 DMG build with no new bug.
 12. After Gate 2 plus the full hardening window, notarize/staple and verify the x64 DMG.
@@ -163,7 +163,7 @@ Anthropic ties each new model to a minimum Claude Code version and publishes bot
 
 - arm64 macOS builds locally on Apple Silicon.
 - x64 macOS comes from GitHub Actions; never cross-compile x64 from arm64.
-- Windows comes from GitHub Actions. Before manually dispatching the paid Windows workflow, switch `ProductoryHQ/ritemark-native` private because larger Windows runners are not available on public repos. Switch back after CI finishes.
+- Windows comes from GitHub Actions, dispatched by hand, on the free `windows-latest` runner. Never switch `ProductoryHQ/ritemark-native` private or public: a visibility change erases its stars and watchers (Sprint 144, #506).
 - Push the version commit before pushing the tag.
 
 ## Blocking Output
