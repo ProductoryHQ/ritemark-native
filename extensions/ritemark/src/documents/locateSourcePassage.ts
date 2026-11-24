@@ -4,6 +4,7 @@ import { readDocx } from '../search/worker/readers/docx';
 import { readMarkdown } from '../search/worker/readers/markdown';
 import { pdfPageContent, withPdf } from '../search/worker/readers/pdf';
 import { decodeText } from '../search/worker/readers/types';
+import { powerpointMarkdown } from './powerpointMarkdown';
 import type { SourceLocation } from './documentRead';
 
 const TEXT_BUDGET = 400_000;
@@ -36,8 +37,7 @@ export async function locateSourcePassage(
 ): Promise<SourceLocation | undefined> {
   if (extension === '.pdf') {
     const result = await withPdf(bytes, async (doc): Promise<SourceLocation | undefined> => {
-      if (page !== undefined && page > doc.numPages) return;
-      if (!text) return page ? { page } : undefined;
+      if (!text) return page && page <= doc.numPages ? { page } : undefined;
 
       const quote = normalize(text);
       const matchOn = async (number: number) => {
@@ -72,20 +72,34 @@ export async function locateSourcePassage(
         const literalStart = start - lineSpaces.filter((space) => space < start).length;
         let occurrence = 0;
         for (let at = prior.indexOf(needle); at >= 0 && at < literalStart; at = prior.indexOf(needle, at + needle.length)) occurrence++;
-        return { text: literal, occurrence };
+        const displayText = block.slice(start, end);
+        return { text: literal, occurrence, ...(displayText === literal ? {} : { displayText }) };
       };
 
-      if (page !== undefined) {
+      if (page !== undefined && page <= doc.numPages) {
         const match = await matchOn(page);
         if (match) return { ...match, page };
       }
       for (let number = 1; number <= doc.numPages; number++) {
         if (number === page) continue;
         const match = await matchOn(number);
-        if (match) return page ? { page } : { ...match, page: number };
+        if (match) return { ...match, page: number };
       }
     });
     return result && !('reason' in result) ? result : undefined;
+  }
+
+  if (extension === '.pptx') {
+    const deck = await powerpointMarkdown(bytes);
+    if (!deck.ok || !page || page > deck.total) return;
+    if (!text) return { page };
+    await pause();
+    const { body, notes } = await deck.slide(page);
+    for (const block of [body, notes]) {
+      const range = quoteRange(block, normalize(text));
+      if (range) return { text: block.slice(...range), occurrence: 0, page };
+    }
+    return;
   }
 
   if (!text) return;
