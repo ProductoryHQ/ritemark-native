@@ -38,7 +38,7 @@ async function main() {
       assert.equal(sha256(bytes), before, `${label}: ${name} changed input bytes`)
     }
   }
-  console.log(`  R21: input bytes preserved on ${fixtures.length} workbooks`)
+  console.log(`  R21: the reader does not mutate its input on ${fixtures.length} workbooks`)
 
   for (const [label, file] of fixtures) {
     const bytes = new Uint8Array(fs.readFileSync(file))

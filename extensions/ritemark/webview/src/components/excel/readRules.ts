@@ -78,7 +78,7 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
       const sqref = decodeXmlEntities(each(block, 'sqref')[0]?.[1] ?? '')
       for (const [a, rule] of each(block, 'cfRule')) {
         const id = attr(a, 'id')?.trim().toUpperCase()
-        extensions.push({ a, sqref, id })
+        extensions.push({ a, sqref, id, content: rule })
         const bar = each(rule, 'dataBar')[0]
         if (id && attr(a, 'type') === 'dataBar' && bar) twins.set(id, bar)
       }
@@ -102,6 +102,15 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
     stdDev: number(a, 'stdDev', 0), timePeriod: attr(a, 'timePeriod'),
   })
 
+  const readIcons = (content: string): ConditionalRule['icons'] => {
+    const icons = each(content, 'iconSet')[0]
+    if (!icons) return undefined
+    return {
+      name: attr(icons[0], 'iconSet') ?? '3TrafficLights1', stops: stopsOf(icons[1]),
+      reverse: flag(icons[0], 'reverse'), showValue: flag(icons[0], 'showValue', true),
+    }
+  }
+
   const rules: RuleSet = []
   for (const [, attrs, body] of xml.matchAll(blocks)) {
     const sqref = decoded(attrs, 'sqref') ?? ''
@@ -118,11 +127,7 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
       if (type === 'colorScale' && scale) {
         rule.scale = { stops: stopsOf(scale[1]), colors: each(scale[1], 'color').map(([tag]) => colorOf(tag, ctx)) }
       }
-      const icons = each(content, 'iconSet')[0]
-      if (type === 'iconSet' && icons) {
-        rule.icons = { name: attr(icons[0], 'iconSet') ?? '3TrafficLights1', stops: stopsOf(icons[1]),
-          reverse: flag(icons[0], 'reverse'), showValue: flag(icons[0], 'showValue', true) }
-      }
+      if (type === 'iconSet') rule.icons = readIcons(content)
       const bar = each(content, 'dataBar')[0]
       if (type === 'dataBar' && bar) {
         const twin = twins.get(id?.toUpperCase() ?? '')
@@ -148,8 +153,12 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
       rules.push(rule)
     }
   }
-  for (const { a, sqref, id } of extensions) {
-    if (!id || !linked.has(id)) rules.push(basicRule('unreadable', sqref, areasOf(sqref), a))
+  for (const { a, sqref, id, content } of extensions) {
+    if (id && linked.has(id)) continue
+    const type = attr(a, 'type') === 'iconSet' ? 'iconSet' : 'unreadable'
+    const rule = basicRule(type, sqref, areasOf(sqref), a)
+    if (type === 'iconSet') rule.icons = readIcons(content)
+    rules.push(rule)
   }
   return rules
 }

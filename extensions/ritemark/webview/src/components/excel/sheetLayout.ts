@@ -21,6 +21,10 @@ export function cellPadding(geometry: ExcelGeometry): number {
   return geometry === 'mac' ? 3 : 2
 }
 
+export function sheetRowAt(rowOf: Int32Array, displayIndex: number): number {
+  return rowOf[displayIndex]
+}
+
 export interface SheetLayout {
   /** Drawn rows and columns. */
   rows: number
