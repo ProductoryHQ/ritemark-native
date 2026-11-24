@@ -5,7 +5,8 @@ export type PictureCleanResult =
   | { kind: 'uncleanable' };
 
 const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-const PNG_METADATA = new Set(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']);
+// caBX: C2PA content credentials, which can name the signer or author (security review).
+const PNG_METADATA = new Set(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME', 'caBX']);
 const WEBP_IMAGE = new Set(['VP8 ', 'VP8L', 'ALPH']);
 const WEBP_DISPLAY = new Set([...WEBP_IMAGE, 'ICCP', 'ANIM']);
 
@@ -40,7 +41,23 @@ function isIco(bytes: Buffer): boolean {
 
 /** Editors' own data in an SVG: Inkscape and Sodipodi keep local file paths (with the user's name) there. */
 const EDITOR_PREFIX = /^(?:sodipodi|inkscape):/;
-const EDITOR_ATTRIBUTE = /\s+(?:sodipodi|inkscape):[^\s=<>/"']+\s*=\s*(?:"[^"<]*"|'[^'<]*')/g;
+/** One attribute at a time, anchored where the last one ended: a match inside another attribute's quoted value can't happen. */
+const ONE_ATTRIBUTE = /\s+([^\s=<>/"']+)\s*=\s*(?:"[^"<]*"|'[^'<]*')/y;
+
+/** The attributes without the editors' own, or undefined when none of them was an editor's. */
+function withoutEditorAttributes(attributes: string): string | undefined {
+  const kept: string[] = [];
+  let dropped = false;
+  ONE_ATTRIBUTE.lastIndex = 0;
+  while (ONE_ATTRIBUTE.lastIndex < attributes.length) {
+    const at = ONE_ATTRIBUTE.lastIndex;
+    const match = ONE_ATTRIBUTE.exec(attributes);
+    if (!match) return undefined; // The tag regex already accepted it; never guess at a different reading.
+    if (EDITOR_PREFIX.test(match[1])) dropped = true;
+    else kept.push(attributes.slice(at, ONE_ATTRIBUTE.lastIndex));
+  }
+  return dropped ? kept.join('') : undefined;
+}
 
 /** Read only IFD0's orientation. No other tag, embedded thumbnail or original offset is copied. */
 function exifOrientation(payload: Buffer): number | undefined {
@@ -293,12 +310,12 @@ function cleanSvg(bytes: Buffer): Buffer | undefined {
         parts.push(svg.slice(keptFrom, start));
       }
       if (!selfClosing) stack.push(name);
-      if (removedAt < 0 && EDITOR_ATTRIBUTE.test(attributes)) {
-        EDITOR_ATTRIBUTE.lastIndex = 0;
-        parts.push(svg.slice(keptFrom, start), token.replace(EDITOR_ATTRIBUTE, ''));
+      const cleanAttributes = removedAt < 0 && attributes ? withoutEditorAttributes(attributes) : undefined;
+      if (cleanAttributes !== undefined) {
+        // The tag rebuilt from its own name and its kept attributes, each copied whole.
+        parts.push(svg.slice(keptFrom, start), `<${name}${cleanAttributes}${selfClosing ? '/' : ''}>`);
         keptFrom = position;
       }
-      EDITOR_ATTRIBUTE.lastIndex = 0;
     }
     if (removedAt === stack.length) {
       keptFrom = position;

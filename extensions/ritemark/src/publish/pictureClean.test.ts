@@ -169,6 +169,13 @@ test('SVG drops comments and Inkscape/Sodipodi data, which keep local paths', ()
   checkPixels('svg', source, Buffer.from(cleaned));
 });
 
+test('an editor attribute inside another attribute\'s value never becomes markup (security review)', () => {
+  const source = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" a='v inkscape:n="' b="x' onload='alert(1)' c='"><rect width="1" height="1"/></svg>`);
+  const cleaned = clean(source).toString('utf8');
+  assert.equal(cleaned, source.toString('utf8'), 'no editor attribute: the tag is copied unchanged');
+  assert.doesNotMatch(cleaned.replace(/'[^']*'|"[^"]*"/g, ''), /onload/);
+});
+
 test('BMP and ICO carry no metadata and go as they are', () => {
   const bmp = Buffer.alloc(58); bmp.write('BM', 0, 'latin1'); bmp.writeUInt32LE(58, 2); bmp.writeUInt32LE(54, 10); bmp.writeUInt32LE(40, 14);
   const ico = Buffer.alloc(22 + PNG.length); ico.writeUInt16LE(1, 2); ico.writeUInt16LE(1, 4); PNG.copy(ico, 22);
