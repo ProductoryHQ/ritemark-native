@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
 import { cssReferences, moduleReferences, pageReferences, Reference, scriptBuildsReferences } from './references';
@@ -185,7 +186,8 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     leftOutSeen.add(k);
     leftOut.push({ display, reason });
   };
-  let scriptBuilt = page.builtAttribute || page.inlineScripts.some(scriptBuildsReferences);
+  // The pinned deck follower only reads the generated same-origin version file and the page itself.
+  let scriptBuilt = page.builtAttribute || page.inlineScripts.some(script => script.trim() !== PAGE_FOLLOWER.trim() && scriptBuildsReferences(script));
   /**
    * Files the page only links to, named after the walk unless the page also uses them (`<a href="a.png">` beside
    * `<img src="a.png">` sends the picture). A link never marks a file seen, so it can't keep a used file back.

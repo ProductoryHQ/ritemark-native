@@ -16,6 +16,7 @@
  * Unpublish asks the public address with no credentials at all, and reads no body.
  */
 
+import { DECK_VERSION_PATH } from '../../decks/page/pageFollower';
 import { PublishError } from '../host';
 import { COMPATIBILITY_DATE, NAME_RE, NOINDEX_HEADERS, type ManifestEntry } from './assets';
 import { redact } from './redact';
@@ -195,7 +196,7 @@ export class CloudflareClient {
    * noindex on every path, and the workers.dev address with previews off. Returns how many files went up (M8: an
    * Update sends only the ones Cloudflare doesn't hold).
    */
-  async deploy(accountId: string, scriptName: string, manifest: Record<string, { hash: string; size: number }>, entries: readonly ManifestEntry[]): Promise<{ uploaded: number }> {
+  async deploy(accountId: string, scriptName: string, manifest: Record<string, { hash: string; size: number }>, entries: readonly ManifestEntry[], deckVersion = false): Promise<{ uploaded: number }> {
     const account = this.account(accountId);
     const script = this.script(scriptName);
     const extra = [accountId];
@@ -242,10 +243,11 @@ export class CloudflareClient {
       if (!completion) throw new CloudflareApiError(0, [], 'Cloudflare did not finish the upload.');
     }
 
+    const headers = deckVersion ? `${NOINDEX_HEADERS}\n${DECK_VERSION_PATH}\n  Cache-Control: no-store\n` : NOINDEX_HEADERS;
     const metadata = {
       assets: {
         jwt: completion,
-        config: { html_handling: 'auto-trailing-slash', not_found_handling: 'none', _headers: NOINDEX_HEADERS },
+        config: { html_handling: 'auto-trailing-slash', not_found_handling: 'none', _headers: headers },
       },
       compatibility_date: COMPATIBILITY_DATE,
     };
