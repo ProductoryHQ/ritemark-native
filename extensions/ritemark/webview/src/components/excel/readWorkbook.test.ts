@@ -3,12 +3,14 @@
  * Run: npx tsx webview/src/components/excel/readWorkbook.test.ts
  */
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
 import { cellKey, readWorkbook } from './readWorkbook'
+import { compileRules } from './ruleEngine'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
 const spike = path.join(repo, 'docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures')
@@ -22,7 +24,16 @@ const fixtures: Array<[string, string]> = [
 async function main() {
   for (const [label, file] of fixtures) {
     const bytes = new Uint8Array(fs.readFileSync(file))
+    const hash = () => createHash('sha256').update(bytes).digest('hex')
+    const before = hash()
     const model = await readWorkbook(bytes)
+    for (const sheet of model.sheets) {
+      const compiled = compileRules(sheet, sheet.layout.rules, { ...model, today: new Date(2026, 10, 24) })
+      for (const rule of sheet.layout.rules) {
+        for (const { top, left } of rule.areas) compiled.styleAt(top, left)
+      }
+    }
+    assert.equal(hash(), before, `${label}: reading and applying rule styles preserve the input bytes`)
     const book = XLSX.read(bytes, { type: 'array', cellFormula: true })
     assert.deepEqual(model.sheets.map((s) => s.name), book.SheetNames, `${label}: the sheets`)
     let compared = 0
