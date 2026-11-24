@@ -23,6 +23,7 @@ import { isMac } from '../../hooks/usePlatform'
 import { ruleFont, ruleTextColor, visibleCellRules, type CellRules } from './cellRules'
 import type { CellStyle, DifferentialStyle } from './excelStyles'
 import { DrawingView } from './DrawingView'
+import { noteKeyboardNavigation } from '../ui/input-mode'
 import { chartShortcutDescription, chartTarget, isChartShortcut, useChartSelection } from './chartSelection'
 import { measure, forgetMeasures } from './gridTextMeasure'
 
@@ -529,6 +530,8 @@ export function SheetGrid({
       }).sort((a, b) => a.y - b.y || a.x - b.x)
       if (!charts.length) return
       e.preventDefault()
+      // Reached by the keyboard: the chart's ring shows even when the last input was a click
+      if (objectShortcut) noteKeyboardNavigation()
       const fromId = fromChart?.getAttribute('data-sheet-chart')
       const targets = [grid, ...charts.map(({ element }) => element)]
       const current = charts.findIndex(({ element }) => element.id === fromId) + 1
