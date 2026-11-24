@@ -15,6 +15,8 @@ import { attr, columnNumber, decodeCellText, decodeXmlEntities, rootPrefix, text
 import { shiftFormula } from '../../../../src/excel/sharedFormula'
 import { formatCellValue, formatCode } from './numberFormat'
 import { colorContext, colorOf, fontOf, readStyles, section, type ColorContext, type FontStyle, type WorkbookStyles } from './excelStyles'
+import { chartTitle, readChart } from './readChart'
+import type { ChartModel } from './chartModel'
 
 export type SheetState = 'visible' | 'hidden' | 'veryHidden'
 import { readRules, type RuleSet } from './readRules'
@@ -74,6 +76,7 @@ export interface DrawingModel {
   what: 'chart' | 'image' | 'shape'
   /** The chart's title, when it has one. */
   title?: string
+  chart?: ChartModel
   anchor: DrawingAnchor
 }
 
@@ -223,7 +226,7 @@ const isTrue = (v: string | undefined) => v === '1' || v === 'true'
 const EMU_PER_PIXEL = 9525
 
 /** A drawing part's charts, pictures and shapes, with their anchors. */
-async function readDrawings(zip: JSZip, drawingPath: string): Promise<DrawingModel[]> {
+async function readDrawings(zip: JSZip, drawingPath: string, ctx: ColorContext): Promise<DrawingModel[]> {
   const xml = await text(zip, drawingPath)
   if (!xml) return []
   const drawingRels = await rels(zip, drawingPath)
@@ -247,8 +250,16 @@ async function readDrawings(zip: JSZip, drawingPath: string): Promise<DrawingMod
     }
     const chartRid = /<(?:\w+:)?chart(?=[\s/>])[^>]*\s[\w.-]+:id="([^"]+)"/.exec(body)?.[1]
     if (chartRid) {
-      const chartPath = drawingRels.get(chartRid)?.target
-      out.push({ what: 'chart', title: chartPath ? chartTitle(await text(zip, chartPath)) : undefined, anchor })
+      const relation = drawingRels.get(chartRid)
+      try {
+        const xml = relation ? await text(zip, relation.target) : ''
+        const chart: ChartModel | undefined = relation?.type === 'chartEx'
+          ? { supported: false, kind: 'chartex' }
+          : xml ? readChart(xml, ctx) : undefined
+        out.push({ what: 'chart', title: chartTitle(xml), anchor, chart })
+      } catch {
+        out.push({ what: 'chart', anchor, chart: { supported: false, kind: 'unknown' } })
+      }
     } else if (/<(?:\w+:)?blip(?=[\s/>])/.test(body)) {
       out.push({ what: 'image', anchor })
     } else if (/<(?:\w+:)?sp(?=[\s>])/.test(body)) {
@@ -256,13 +267,6 @@ async function readDrawings(zip: JSZip, drawingPath: string): Promise<DrawingMod
     }
   }
   return out
-}
-
-/** A chart part's title, as its runs spell it. */
-function chartTitle(xml: string): string | undefined {
-  const title = section(xml, 'title')
-  const words = [...title.matchAll(/<(?:\w+:)?t>([^<]*)<\/(?:\w+:)?t>/g)].map((m) => decodeXmlEntities(m[1])).join('')
-  return words || undefined
 }
 
 async function readWorksheet(
@@ -441,7 +445,7 @@ async function readWorksheet(
   const sheetRels = await rels(zip, path)
   const drawingId = new RegExp(`<${p}drawing(?=[\\s/>])[^>]*\\s[\\w.-]+:id="([^"]+)"`).exec(xml)?.[1]
   const drawingPath = drawingId ? sheetRels.get(drawingId)?.target : undefined
-  if (drawingPath) layout.drawings = await readDrawings(zip, drawingPath)
+  if (drawingPath) layout.drawings = await readDrawings(zip, drawingPath, ctx)
   for (const rel of sheetRels.values()) {
     if (rel.type !== 'comments') continue
     for (const m of (await text(zip, rel.target)).matchAll(/<(?:\w+:)?comment(?=[\s>])[^>]*\bref="([^"]+)"/g)) {
@@ -458,7 +462,7 @@ async function readChartSheet(zip: JSZip, path: string, name: string, state: She
   layout.tabColor = colorOf(/<(?:\w+:)?tabColor(?=[\s/>])[^>]*\/?>/.exec(xml)?.[0], ctx)
   const drawingId = /<(?:\w+:)?drawing(?=[\s/>])[^>]*\s[\w.-]+:id="([^"]+)"/.exec(xml)?.[1]
   const drawingPath = drawingId ? (await rels(zip, path)).get(drawingId)?.target : undefined
-  if (drawingPath) layout.drawings = await readDrawings(zip, drawingPath)
+  if (drawingPath) layout.drawings = await readDrawings(zip, drawingPath, ctx)
   return { name, state, kind: 'chartsheet', cells: new Map(), maxR: -1, maxC: -1, hiddenRows: new Set(), hiddenCols: new Set(), layout }
 }
 

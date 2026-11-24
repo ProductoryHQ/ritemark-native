@@ -3429,6 +3429,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 pendingPlanApproval: undefined,
                 approval: undefined,
                 result: {
+                  ...(message.liveDeckSteps?.length ? { liveDeckSteps: message.liveDeckSteps } : {}),
                   text: message.text || '',
                   filesModified: message.filesModified || [],
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
@@ -3598,6 +3599,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 errorKind: message.errorKind,
                 errorDetail: message.errorDetail,
                 rawError: message.rawError,
+                liveDeckSteps: message.liveDeckSteps,
               });
             },
             { requireRunning: false },

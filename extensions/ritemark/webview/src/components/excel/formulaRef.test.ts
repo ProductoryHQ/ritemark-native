@@ -1,14 +1,19 @@
 import assert from 'node:assert/strict'
-import { EXCEL_COLS, EXCEL_ROWS, parseFormulaRef, refArea } from './formulaRef'
+import { parseFormulaRef, referenceBounds } from './formulaRef'
 
-const quoted = parseFormulaRef("='Quarter ''A''!'!\$A2:B\$4")!
-assert.equal(quoted.sheet, "Quarter 'A'!")
-assert.deepEqual(refArea(quoted, 1, 2), { top: 2, left: 0, bottom: 3, right: 3 })
-assert.deepEqual(refArea(parseFormulaRef('Sheet1!B:D')!), { top: 0, left: 1, bottom: EXCEL_ROWS - 1, right: 3 })
-assert.deepEqual(refArea(parseFormulaRef('\$1:3')!, 2, 1), { top: 0, left: 0, bottom: 4, right: EXCEL_COLS - 1 })
-assert.deepEqual(refArea(parseFormulaRef('XFD1048576')!), { top: EXCEL_ROWS - 1, left: EXCEL_COLS - 1, bottom: EXCEL_ROWS - 1, right: EXCEL_COLS - 1 })
-for (const bad of ['XFE1', 'A0', 'A1048577', 'A1:B', 'A1,A2', "'[Other.xlsx]Sheet'!A1", 'A1#']) {
+assert.deepEqual(parseFormulaRef('A1')?.start, { row: 0, col: 0, absoluteRow: false, absoluteCol: false })
+assert.deepEqual(parseFormulaRef('=Sheet1!$C7')?.start, { row: 6, col: 2, absoluteRow: false, absoluteCol: true })
+assert.equal(parseFormulaRef('=Sheet1!$C7')?.sheet, 'Sheet1')
+const quoted = parseFormulaRef("'Sample ''24'!c$5:$e$7")!
+assert.equal(quoted.sheet, "Sample '24")
+assert.deepEqual(quoted.start, { row: 4, col: 2, absoluteRow: true, absoluteCol: false })
+assert.deepEqual(quoted.end, { row: 6, col: 4, absoluteRow: true, absoluteCol: true })
+assert.deepEqual(referenceBounds(quoted), { top: 4, bottom: 6, left: 2, right: 4 })
+assert.equal(parseFormulaRef("'Sample! Sheet'!A1")?.sheet, 'Sample! Sheet')
+assert.deepEqual(referenceBounds(parseFormulaRef('$D:B')!, 7), { top: 0, bottom: 7, left: 1, right: 3 })
+assert.deepEqual(referenceBounds(parseFormulaRef('Sheet1!$3:5')!, 10, 9), { top: 2, bottom: 4, left: 0, right: 9 })
+assert.equal(parseFormulaRef('XFD1048576')?.start.col, 16383)
+for (const bad of ['XFE1', 'A1048577', 'A0', 'A', '1', 'A:5', 'A1:B', 'A1,B2', 'A1:', 'OFFSET(A1)', '[Other.xlsx]Sheet1!A1', "'[Other.xlsx]Sheet 1'!A1", 'S1:S2!A1']) {
   assert.equal(parseFormulaRef(bad), undefined, bad)
 }
-assert.equal(refArea(parseFormulaRef('A1')!, -1, 0), undefined)
-console.log('formulaRef: A1 cells, ranges, quoted sheets and bounds passed')
+console.log('formulaRef: all passed')

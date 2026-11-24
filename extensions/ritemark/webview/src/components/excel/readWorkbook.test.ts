@@ -3,30 +3,58 @@
  * Run: npx tsx webview/src/components/excel/readWorkbook.test.ts
  */
 import assert from 'node:assert/strict'
+import { serialize } from 'node:v8'
 import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
+import { resolveSeries } from './chartSeries'
+import { chartsKeepFixtures } from '../../../../src/excel/chartsKeepFixtures.test'
 import { cellKey, readWorkbook } from './readWorkbook'
 import { compileRules } from './ruleEngine'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
 const spike = path.join(repo, 'docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures')
 const fixtures: Array<[string, string]> = [
-  ...['training-budget.xlsx', 'estonian-timesheet.xlsx', 'project-plan.xlsx', 'sales-report.xlsx'].map((n) => [n, path.join(spike, n)] as [string, string]),
-  ['rich.xlsx', path.join(repo, 'extensions/ritemark/src/excel/fixtures/rich.xlsx')],
-  ['rich-excelish.xlsx', path.join(repo, 'extensions/ritemark/src/excel/fixtures/rich-excelish.xlsx')],
+  ...['training-budget.xlsx', 'estonian-timesheet.xlsx', 'project-plan.xlsx'].map((n) => [n, path.join(spike, n)] as [string, string]),
+  ...chartsKeepFixtures.map(({ file }): [string, string] => [path.basename(file), file]),
   ['Excel for Mac', path.join(repo, 'docs/development/sprints/sprint-81-excel-editing/test-workbook.xlsx')],
 ]
 
+// R21. PR 1 and PR 5 add readChart and compileRules adapters here.
+const workbookByteReaders = [
+  { name: 'readWorkbook', read: readWorkbook },
+]
+const sha256 = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex')
+
 async function main() {
+  for (const [label, file] of fixtures) {
+    for (const { name, read } of workbookByteReaders) {
+      const bytes = new Uint8Array(fs.readFileSync(file))
+      const before = sha256(bytes)
+      await read(bytes)
+      assert.equal(sha256(bytes), before, `${label}: ${name} changed input bytes`)
+    }
+  }
+  console.log(`  R21: input bytes preserved on ${fixtures.length} workbooks`)
+
   for (const [label, file] of fixtures) {
     const bytes = new Uint8Array(fs.readFileSync(file))
     const hash = () => createHash('sha256').update(bytes).digest('hex')
     const before = hash()
     const model = await readWorkbook(bytes)
+    assert.equal(hash(), before, `${label}: reading the workbook and its chart parts changes no byte`)
+    for (const sheet of model.sheets) {
+      for (const drawing of sheet.layout.drawings) {
+        if (!drawing.chart) continue
+        const before = sha256(serialize([drawing.chart, model.sheets]))
+        resolveSeries(drawing.chart, model.sheets, model)
+        assert.equal(sha256(serialize([drawing.chart, model.sheets])), before, `${label}: resolveSeries changed the chart or sheets`)
+      }
+    }
+    assert.equal(hash(), before, `${label}: resolving chart series changes no byte`)
     for (const sheet of model.sheets) {
       const compiled = compileRules(sheet, sheet.layout.rules, { ...model, today: new Date(2026, 10, 24) })
       for (const rule of sheet.layout.rules) {
@@ -106,7 +134,10 @@ async function main() {
   // The sales report: a chart sheet is a sheet without cells
   {
     const model = await readWorkbook(new Uint8Array(fs.readFileSync(path.join(spike, 'sales-report.xlsx'))))
-    assert.ok(model.sheets.some((s) => s.kind === 'chartsheet'), 'a chart sheet')
+    const chartSheet = model.sheets.find((s) => s.kind === 'chartsheet')
+    assert.ok(chartSheet, 'a chart sheet')
+    assert.equal(chartSheet.cells.size, 0)
+    assert.ok(chartSheet.layout.drawings.some((drawing) => drawing.chart?.supported), 'a parsed chart on the chart sheet')
   }
 
   // Shared formulas: each cell gets the anchor's formula, moved

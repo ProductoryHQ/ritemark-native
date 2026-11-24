@@ -11,7 +11,7 @@ Workbooks made in Excel (the fixture set in PR 0) or, where noted, by the openpy
 | 5 | A 3-D clustered column and a 3-D pie | Opened | Each shows as its flat twin, not as a card | R4 |
 | 6 | The sales report: a chart over Q5:Q7 | A person types 9,999 into Q6 | The bar for Q6 redraws at once | R7 |
 | 7 | A chart over formula cells | A person types over a cell the formulas read | The chart does not move; the line after the edit says totals update in Excel | R7 |
-| 8 | A chart whose series points at a sheet that was deleted | Opened | It draws from the cached values; no error | R7 |
+| 8 | A chart whose source is another workbook that isn’t there | Opened | It draws with the values Excel saved in the chart | R7 |
 | 9 | A chart on a chart sheet ("Revenue trend") | The tab is chosen | The chart fills the sheet; the tab has its chart icon | R5 |
 | 10 | A chart | It is clicked | The accent ring shows; the bar says "Chart · Revenue by region · a column chart from Q5:Q7. Change it in Excel." | R8 |
 | 11 | A chosen chart | Copy | A picture of the chart is on the clipboard | R8 |
@@ -42,3 +42,5 @@ Workbooks made in Excel (the fixture set in PR 0) or, where noted, by the openpy
 | 36 | The sales report | One cell edited, saved, and the saved file read back | Every `conditionalFormatting` element and the `extLst` in the sheet are identical outside the edited cell; `styles.xml` is identical | R22 |
 | 37 | The save, with a sort active | Saved | Sorting is a view; no chart or rule part changes | R23 |
 | 38 | `charts-all-kinds.xlsx` | It is opened in the preview and the app is closed | `shasum` of the file before and after is the same | R21 |
+
+Map charts are out of scope because they need Bing.
