@@ -12,9 +12,10 @@
  */
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
 import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
-import { explicitMinutes, readTimetable } from '../../../../src/decks/timetable'
+import { clockMinutes, explicitMinutes, readTimetable, SESSION_LENGTH, SESSION_START } from '../../../../src/decks/timetable'
 import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
 import { DeckMinutes } from './DeckMinutes'
+import { lengthMinutesOf } from '../../../../src/decks/present/presentSession'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
@@ -94,6 +95,7 @@ const DECK_EXTENSIONS = [DeckSlideWithPartHead, DeckGuard, DeckCurrent, DeckLine
 
 /** The strip's width (the prototype's 132). */
 const STRIP_WIDTH = 132
+const TIMETABLE_STRIP_WIDTH = 300
 /** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
 const NOTICE_MS = 8000
@@ -105,6 +107,7 @@ const STAGE_MIN = 300
 /** Below this desk width the strip folds; below the next, the handout folds. (Both are rooms under 1,100, where the
  *  slide sits above the handout: deckLayout.ts.) */
 const NARROW_DESK = 900
+const MIN_STRIP_DESK = 660
 const NARROWEST_DESK = 600
 
 /** The slide's share, as this deck's view kept it (`deckViewState`; the view itself is never kept): of the width with the slide beside
@@ -371,7 +374,12 @@ export function DeckView({
   const [editor, setEditor] = useState<TipTapEditor | null>(null)
   const [slides, setSlides] = useState<DeckSlideEntry[]>([])
   const [current, setCurrent] = useState(0)
-  const [stripWanted, setStripWanted] = useState(true)
+  const [stripWanted, setStripWanted] = useState<boolean | null>(null)
+  const [stripMode, setStripMode] = useState<'thumbnails' | 'list'>(() => deckViewState().deckStripMode === 'list' ? 'list' : 'thumbnails')
+  const chooseStripMode = (mode: typeof stripMode) => {
+    setStripMode(mode)
+    keepDeckViewState({ deckStripMode: mode })
+  }
   // Fold either side (16 November): the slide, the handout, or neither. Every deck opens in Slide only (19 November);
   // the choice lives while the deck is open and is never kept.
   const [fold, setFold] = useState<DeckFold>(OPENING_FOLD)
@@ -671,7 +679,8 @@ export function DeckView({
   const slide = slides[shown]
   const timing = useMemo(() => readTimetable(slides.map(entry =>
     writeSlideBlock(entry.kind, entry.node.attrs.body)).join('\n\n')), [slides])
-  const hasSlideMinutes = timing.slides.some(entry => entry.minutes !== null)
+  const sessionStart = clockMinutes(properties[SESSION_START])
+  const sessionMinutes = lengthMinutesOf(String(properties[SESSION_LENGTH] ?? ''))
   const shownTiming = timing.slides[shown]
   const countLabel = count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`
   // A draft belongs to the current slide. Not keyed on the body: saving the time changes it, and the box would lose focus.
@@ -691,13 +700,13 @@ export function DeckView({
     return () => observer.disconnect()
   }, [])
 
-  const narrow = deskWidth > 0 && deskWidth < NARROW_DESK
-  const stripShown = stripWanted && !narrow
+  const stripFits = deskWidth === 0 || deskWidth >= MIN_STRIP_DESK
+  const stripShown = stripFits && (stripWanted ?? (stripMode === 'list' || deskWidth === 0 || deskWidth >= NARROW_DESK))
   const handoutRoom = !(deskWidth > 0 && deskWidth < NARROWEST_DESK)
   const { slideShown, handoutShown } = foldedSides(fold, handoutRoom || showHandoutInNarrowView)
   const slideShownRef = useRef(slideShown)
   slideShownRef.current = slideShown
-  const stripWidth = stripShown ? STRIP_WIDTH : 0
+  const stripWidth = stripShown ? (stripMode === 'list' ? TIMETABLE_STRIP_WIDTH : STRIP_WIDTH) : 0
   // The deck's room: the desk less the strip. Opening or folding any panel, or resizing the window, decides again.
   const avail = Math.max(0, deskWidth - stripWidth)
   useLayoutEffect(() => {
@@ -789,7 +798,7 @@ export function DeckView({
     if (strip && thumb && (thumb.offsetTop < strip.scrollTop || thumb.offsetTop > strip.scrollTop + strip.clientHeight - 70)) {
       strip.scrollTop = thumb.offsetTop - 120
     }
-  }, [editor, shown, count])
+  }, [editor, shown, count, stripMode, stripShown])
 
   // Where the slide's pane stands once another slide is shown (#902, #871): beside the handout the pane can be taller
   // than its room. A slide chosen any way (the strip's click and keys, Home and End, a comment, the rail, the handout
@@ -1594,7 +1603,16 @@ export function DeckView({
     const entry = slidesOf(editor.state.doc)[shown]
     if (entry) dispatch(updateSlide(editor.state, shown, change(entry.data), kind))
   }, [editor, dispatch, shown])
-  const commitMinutes = (time: string | undefined) => changeSlide(data => ({ ...data, time }))
+  const commitMinutes = (index: number, time: string | undefined) => {
+    if (!editor || editor.isDestroyed) return
+    const entry = slidesOf(editor.state.doc)[index]
+    if (entry) dispatchStep(updateSlide(editor.state, index, { ...entry.data, time }))
+  }
+
+  const pickTimedSlide = (index: number) => {
+    if (!slideShown) setFold(null)
+    pick(index)
+  }
 
   // A picture pasted or dropped on a slide: saved beside the deck by the host, then the slide shows it. A slide that
   // places no picture beside or behind its words becomes a Picture slide.
@@ -2079,8 +2097,8 @@ export function DeckView({
             data-state={stripShown ? 'active' : undefined}
             aria-pressed={stripShown}
             aria-label="Slides"
-            disabled={narrow}
-            onClick={() => setStripWanted(value => !value)}
+            disabled={!stripFits}
+            onClick={() => setStripWanted(!stripShown)}
           >
             <Icon name="list" size={14} tone={stripShown ? 'inherit' : 'muted'} />
           </Button>
@@ -2091,7 +2109,7 @@ export function DeckView({
           {shownTiming && shownTiming.sectionMinutes === null ? (
             <DeckMinutes key={minutesKey} count={countLabel} timing={shownTiming}
               fromLabel={shownTiming.labelMinutes !== null && explicitMinutes(slide?.data.time) === null}
-              onCommit={commitMinutes} />
+              onCommit={time => commitMinutes(shown, time)} />
           ) : slideCountWithMinutes(countLabel, shownTiming)}
         </span>
         <span className="deck-notice" role="status" aria-live="polite">
@@ -2160,7 +2178,7 @@ export function DeckView({
         <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 
-      <div ref={deskRef} className="deck-desk">
+      <div ref={deskRef} className="deck-desk" style={{ ['--deck-strip' as string]: `${stripWidth}px` }}>
         {themeChange ? (
           <ThemeChangeSheet
             change={themeChange}
@@ -2173,7 +2191,12 @@ export function DeckView({
           <SlideStrip
             slides={slides}
             current={shown}
-            timing={hasSlideMinutes ? timing.slides : undefined}
+            timing={{ ...timing, sessionStart, sessionMinutes }}
+            mode={stripMode}
+            onMode={chooseStripMode}
+            onPickTimedSlide={pickTimedSlide}
+            onMinutes={commitMinutes}
+            onSession={(field, value) => sendToExtension('deck/session-time', { field, value })}
             theme={theme}
             borderless={borderless}
             assets={assets}
