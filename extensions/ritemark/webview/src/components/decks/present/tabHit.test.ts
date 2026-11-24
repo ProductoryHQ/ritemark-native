@@ -1,9 +1,11 @@
 /** #974: a tab click is a wall action only on the shown slide with the presenter view off. */
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
-import { createWindow } from '@mixmark-io/domino'
+import * as domino from '@mixmark-io/domino'
 import { tabHit, wallTabHit } from './tabHit'
 
+// domino has createWindow at run time, but its types don't name it.
+const { createWindow } = domino as unknown as { createWindow(html: string): Window }
 const { document } = createWindow(`
   <div class="wall-slide">
     <div class="blk-tabs" data-tabs-index="2">
