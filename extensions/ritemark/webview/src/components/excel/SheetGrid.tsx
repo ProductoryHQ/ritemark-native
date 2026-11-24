@@ -23,7 +23,7 @@ import { isMac } from '../../hooks/usePlatform'
 import { ruleFont, ruleTextColor, visibleCellRules, type CellRules } from './cellRules'
 import type { CellStyle, DifferentialStyle } from './excelStyles'
 import { DrawingView } from './DrawingView'
-import { chartTarget, useChartSelection } from './chartSelection'
+import { chartShortcutDescription, chartTarget, isChartShortcut, useChartSelection } from './chartSelection'
 import { measure, forgetMeasures } from './gridTextMeasure'
 
 export interface SheetGridProps {
@@ -518,7 +518,7 @@ export function SheetGrid({
     }
     // The webview forwards even canceled keydowns to the workbench, where F6 moves between parts.
     // Excel's object shortcut uses the physical 5 key because Option can change the typed character.
-    const objectShortcut = e.code === 'Digit5' && e.ctrlKey && e.altKey && !e.metaKey && !e.getModifierState('AltGraph')
+    const objectShortcut = isChartShortcut(e)
     const chartTab = fromChart && e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey
     if (objectShortcut || chartTab) {
       const charts = sheet.layout.drawings.flatMap(({ what, anchor }, index) => {
@@ -945,6 +945,7 @@ export function SheetGrid({
       <SheetFormulaBar
         id={chartSelection.barId}
         reference={reference}
+        showFormulaIcon={!chartSelection.chosen}
         aria-label={chartSelection.chosen ? 'Chart details' : `What ${reference} holds`}
         value={barValue}
         readOnly={!editable || !!chartSelection.chosen}
@@ -968,7 +969,8 @@ export function SheetGrid({
       />
 
       <div className="sg-paper">
-        <div ref={scroller} className="sg-scroller" tabIndex={0} onScroll={onScroll} onKeyDown={onGridKey} onMouseDown={onPointerDown} aria-label={`Sheet ${sheet.name}`}>
+        <div ref={scroller} className="sg-scroller" tabIndex={0} onScroll={onScroll} onKeyDown={onGridKey} onMouseDown={onPointerDown} aria-label={`Sheet ${sheet.name}`}
+          aria-description={sheet.layout.drawings.some(({ what }) => what === 'chart') ? chartShortcutDescription() : undefined}>
           <div
             className="sg-canvas"
             style={{
@@ -992,17 +994,20 @@ export function SheetGrid({
 
 interface SheetFormulaBarProps extends ComponentProps<'textarea'> {
   reference: string
+  showFormulaIcon: boolean
 }
 
-export function SheetFormulaBar({ id, reference, ...input }: SheetFormulaBarProps) {
+export function SheetFormulaBar({ id, reference, showFormulaIcon, ...input }: SheetFormulaBarProps) {
   return (
     <div id={id} className="mx-4 mb-3 flex min-h-[32px] shrink-0 items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
       <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
         <span className="truncate">{reference}</span>
       </span>
-      <span className="flex items-center pl-2.5 text-[var(--r-ink-faint)]">
-        <Icon name="function" size={14} tone="inherit" />
-      </span>
+      {showFormulaIcon && (
+        <span className="flex items-center pl-2.5 text-[var(--r-ink-faint)]">
+          <Icon name="function" size={14} tone="inherit" />
+        </span>
+      )}
       <textarea
         rows={1}
         className="h-[30px] min-h-[30px] flex-1 resize-none overflow-hidden rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"

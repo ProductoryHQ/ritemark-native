@@ -8,10 +8,12 @@ import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { readWorkbook } from './readWorkbook'
 import { SheetGrid } from './SheetGrid'
+import { chartShortcutDescription, isChartShortcut } from './chartSelection'
+import { isMac } from '../../hooks/usePlatform'
 
 Object.assign(globalThis, { React })
 
-async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, type: string, props?: Record<string, unknown>) => Event; focused: () => Element | undefined }) => void, variant?: 'frozen' | 'untitled') {
+async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, type: string, props?: Record<string, unknown>) => Event; focused: () => Element | undefined }) => void, variant?: 'frozen' | 'untitled' | 'adjacent' | 'separated') {
   const fixture = new URL(
     '../../../../../../docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures/sales-report.xlsx', import.meta.url,
   )
@@ -26,6 +28,17 @@ async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, t
   if (variant === 'untitled' && drawing.chart?.supported) {
     drawing.chart.title = { text: '' }
     drawing.chart.axes[0].title = { text: 'Axis title' }
+  }
+  if ((variant === 'adjacent' || variant === 'separated') && drawing.chart?.supported) {
+    const chart = drawing.chart
+    chart.kind = 'combo'
+    const [plot] = chart.plots
+    const [series] = plot.series
+    series.val = { ...series.val!, formula: "'Sales 2026'!$B$2:$B$7" }
+    const column = variant === 'adjacent' ? 'C' : 'D'
+    chart.plots.push({ ...plot, kind: 'line', series: [
+      { ...series, val: { ...series.val, formula: `'sales 2026'!$${column}$2:$${column}$7` } },
+    ] })
   }
   const doc = createDocument('<!doctype html><html><body></body></html>') as unknown as Document
   let active: Element | undefined
@@ -81,11 +94,13 @@ test('worksheet chart choosing updates the formula bar until Escape or an outsid
   const chart = host.querySelector('[data-sheet-chart][tabindex="0"]')!
   assert.equal(chart.getAttribute('aria-label'), 'Column chart: Revenue by region')
   assert.equal(selected(), null)
+  assert.ok(formula().previousElementSibling?.querySelector('svg'))
   dispatch(chart, 'click', { button: 0 })
   assert.equal(selected(), chart)
   assert.equal(formula().getAttribute('aria-label'), 'Chart details')
   assert.equal(formula().value, 'Revenue by region · a column chart from Q5:Q7. Change it in Excel.')
   assert.ok(formula().readOnly)
+  assert.ok(!(formula().parentNode as Element).querySelector('svg'))
   dispatch(formula(), 'pointerdown', { button: 0 })
   dispatch(formula(), 'click', { button: 0 })
   assert.equal(selected(), chart)
@@ -134,7 +149,8 @@ test('choosing a frozen copy focuses its main chart and keyboard navigation clea
   assert.equal(dispatch(grid, 'keydown', { key: 'F6' }).defaultPrevented, false)
   assert.equal(dispatch(grid, 'keydown', { key: 'F6', shiftKey: true }).defaultPrevented, false)
   assert.ok(focused() === grid)
-  const objectShortcut = { key: '5', code: 'Digit5', ctrlKey: true, altKey: true }
+  assert.equal(grid.getAttribute('aria-description'), chartShortcutDescription())
+  const objectShortcut = { key: '5', code: 'Digit5', ctrlKey: !isMac, metaKey: isMac, altKey: true }
   assert.ok(dispatch(grid, 'keydown', { ...objectShortcut, shiftKey: true }).defaultPrevented)
   assert.ok(focused() === second, 'focus moves to the second target')
   dispatch(second, 'keydown', { key: 'Escape' })
@@ -154,9 +170,29 @@ test('an empty chart title leaves the axis title out of the formula bar', () => 
   assert.equal(host.querySelector('textarea')!.value, 'a column chart from Q5:Q7. Change it in Excel.')
 }, 'untitled'))
 
+for (const [variant, expected] of [['adjacent', 'B2:C7'], ['separated', 'B2:B7, D2:D7']] as const) {
+  test(`the combo chart bar formats ${variant} series`, () => withGrid(({ host, dispatch }) => {
+    dispatch(host.querySelector('[data-sheet-chart]')!, 'click', { button: 0 })
+    assert.equal(host.querySelector('textarea')!.value, `Revenue by region · a combo chart from ${expected}. Change it in Excel.`)
+  }, variant))
+}
+
+test('chart cycling uses the platform modifier and ignores AltGraph', () => {
+  const windows = { code: 'Digit5', ctrlKey: true, altKey: true, metaKey: false, getModifierState: () => false }
+  const mac = { ...windows, ctrlKey: false, metaKey: true }
+  assert.equal(isChartShortcut(windows, false), true)
+  assert.equal(isChartShortcut(windows, true), false)
+  assert.equal(isChartShortcut(mac, true), true)
+  assert.equal(isChartShortcut(mac, false), false)
+  assert.equal(isChartShortcut({ ...windows, getModifierState: () => true }, false), false)
+  assert.match(chartShortcutDescription(true), /Cmd\+Option\+5.*Shift/)
+  assert.match(chartShortcutDescription(false), /Ctrl\+Alt\+5.*Shift/)
+})
+
 test('the chart-sheet formula bar is mounted independently of chart selection', () => {
   const source = readFileSync(new URL('../SpreadsheetViewer.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /chosen\s*&&\s*<SheetFormulaBar/)
+  assert.match(source, /showFormulaIcon=\{false\}/)
   assert.match(source, /value=\{chartSelection\.chosen\?\.text \?\? ''\}/)
 })
 

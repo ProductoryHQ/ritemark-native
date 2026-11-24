@@ -653,7 +653,7 @@ export function SpreadsheetViewer({
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
       {sheetModel?.kind === 'chartsheet' && (
-        <SheetFormulaBar id={chartSelection.barId} reference={chartSelection.chosen ? 'Chart' : ''}
+        <SheetFormulaBar id={chartSelection.barId} reference={chartSelection.chosen ? 'Chart' : ''} showFormulaIcon={false}
           aria-label="Chart details" value={chartSelection.chosen?.text ?? ''} readOnly />
       )}
       {source?.model && drawsChart(sheetChart) ? (

@@ -49,6 +49,24 @@ export function referenceBounds(ref: FormulaRef, lastRow = EXCEL_ROWS - 1, lastC
   }
 }
 
+/** Join two local references when their union is a rectangle and their edges touch. */
+export function joinAdjacentRefs(first: FormulaRef, second: FormulaRef): FormulaRef | undefined {
+  if (first.sheet?.toLowerCase() !== second.sheet?.toLowerCase()) return undefined
+  const a = referenceBounds(first)
+  const b = referenceBounds(second)
+  const across = a.top === b.top && a.bottom === b.bottom && (a.right + 1 === b.left || b.right + 1 === a.left)
+  const down = a.left === b.left && a.right === b.right && (a.bottom + 1 === b.top || b.bottom + 1 === a.top)
+  if (!across && !down) return undefined
+
+  const wholeColumns = first.start.row === undefined || second.start.row === undefined
+  const wholeRows = first.start.col === undefined || second.start.col === undefined
+  return {
+    sheet: first.sheet,
+    start: { row: wholeColumns ? undefined : Math.min(a.top, b.top), col: wholeRows ? undefined : Math.min(a.left, b.left), absoluteRow: false, absoluteCol: false },
+    end: { row: wholeColumns ? undefined : Math.max(a.bottom, b.bottom), col: wholeRows ? undefined : Math.max(a.right, b.right), absoluteRow: false, absoluteCol: false },
+  }
+}
+
 // A token pattern shared with the rule formula lexer. Whole axes require a colon.
 export const A1_TOKEN = /(?:(?:'(?:[^']|'')+'|[\p{L}_][\p{L}\p{N}_.]*)!)?(?:\$?[A-Z]{1,3}\$?[1-9]\d*(?::\$?[A-Z]{1,3}\$?[1-9]\d*)?|\$?[A-Z]{1,3}:\$?[A-Z]{1,3}|\$?[1-9]\d*:\$?[1-9]\d*)/iu
 
