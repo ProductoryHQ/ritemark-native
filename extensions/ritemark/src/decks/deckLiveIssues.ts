@@ -13,10 +13,11 @@ import { parse } from 'node-html-parser';
 
 const ABSOLUTE_FILE = /^(?:[\\/]|[a-z]:|file:)/i;
 
-/** Attach a slide and source position to an existing guard without copying text to the record. */
+/** Attach a slide, source position and masked preview to a pause. */
 export async function locateLiveIssues(deckPath: string, text: string, built: BuiltPage) {
   const folder = await fs.promises.realpath(path.dirname(deckPath));
-  const sources = parseDeck(text.replace(/^\uFEFF/, '')).slides
+  text = text.replace(/^\uFEFF/, '');
+  const sources = parseDeck(text).slides
     .map((slide, index) => ({ ...slide, index: index + 1 }))
     .filter(slide => !slideDataOf(slide.kind, slide.body).skip);
   const pictures: { slide?: number; file: string; outside: boolean; absolute: boolean }[] = [];
@@ -59,9 +60,15 @@ export async function locateLiveIssues(deckPath: string, text: string, built: Bu
       });
       const source = sources[index];
       if (!source) return issue;
-      const match = scanText(text.slice(source.start, source.handoutEnd)).find(item => item.rule === hit.rule);
+      const part = text.slice(source.start, source.handoutEnd);
+      const match = scanText(part).find(item => item.rule === hit.rule);
+      const line = match && part.split('\n')[match.line - 1];
+      const keyPreview = line && match && match.endColumn - match.column >= 3
+        ? `${line[match.column]}…${line[match.endColumn - 1]}`
+        : undefined;
       return {
         ...issue, slide: source.index, detail: `Slide ${source.index}'s text has what looks like a key.`,
+        keyPreview,
         location: match && {
           line: text.slice(0, source.start).split('\n').length + match.line - 1,
           column: match.column, endColumn: match.endColumn,

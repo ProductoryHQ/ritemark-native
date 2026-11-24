@@ -4,8 +4,8 @@
  *
  *  - Hidden until Publish can be reached (the flag on and the whole-window sheet there), as the browser bar's is.
  *  - On the bar after Saved, before Present (frame 2), at the bar's 30 px (`size="bar"`).
- *  - Unpublished: Publish, outlined, with the globe. Published: the chip, "Published" or "Published · changed", whose menu has See online, Copy
- *    link, Update the page (only after a public change) and Unpublish. Publishing… and Unpublishing… while they run.
+ *  - Unpublished: Publish, outlined, with the globe. Published: the chip opens the page actions, including Update on
+ *    every save. While that is on, the chip shows the live state and any pause can be reviewed from the same menu.
  *  - Publish and Update the page send the deck's text and look as this view holds them (the document may not have its
  *    newest words or look yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The
  *    fit is measured on the slides drawn once out of sight (`MeasureSlides`) in that look, the way the strip draws
@@ -23,7 +23,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { DeckPageAction, DeckPageState, DeckPdfKind } from '../../../../src/decks/deckProtocol'
+import type { DeckPageAction, DeckPageState, DeckPdfKind, DeckRequest } from '../../../../src/decks/deckProtocol'
 import { pdfItemLabel, pdfKindFor } from '../../../../src/decks/deckPdfKinds'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { onMessage, sendToExtension } from '../../bridge'
@@ -35,6 +35,7 @@ import { Tooltip } from '../ui/tooltip'
 import type { DeckSlideEntry } from './deckDocument'
 import type { DeckViewMode } from './DeckFolds'
 import { SlideCanvas } from './slide/SlideCanvas'
+import type { LivePause } from '../../../../src/publish/publishRecords'
 import { BLOCK_MAX_STEP } from '../../../../src/decks/blocks/slideRenderer'
 
 /** The measuring slides' width: any will do, since the fit is measured on the 960 × 540 layout before it is scaled. */
@@ -77,6 +78,15 @@ function isState(value: unknown): value is DeckPageState {
     && ['unpublished', 'publishing', 'published', 'unpublishing'].includes(state.kind)
 }
 
+type LiveAction = Extract<DeckRequest, { type: 'deck/live-action' }>['action']
+export type PauseTarget = Pick<LivePause, 'slide' | 'location' | 'keyPreview'>
+
+const LIVE_HELP = 'Open pages catch up within about 15 seconds.'
+
+export function sendLiveAction(action: LiveAction) {
+  sendToExtension('deck/live-action', { action })
+}
+
 interface DeckPublishProps {
   slides: DeckSlideEntry[]
   theme: DeckTheme
@@ -86,15 +96,24 @@ interface DeckPublishProps {
   text: () => string
   /** The view as drawn (Slide only under 600 px): what Save as PDF's item names. */
   view: DeckViewMode
+  onShowPause: (target: PauseTarget) => void
   /** `name`: the file the words end with (#931: cut in its middle when the bar is short of room). */
   onNotice: (text: string, action?: { label: string; tip: string; run: () => void; icon?: 'folder-open'; ariaLabel?: string }, name?: string) => void
 }
 
-export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice }: DeckPublishProps) {
+export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice, onShowPause }: DeckPublishProps) {
   const [state, setState] = useState<DeckPageState | null>(null)
   // A Publish or a Save as PDF waiting for its slides' fit: the slides, the text and the look as they were at the
   // press, and which it was (the PDF's kind named at the press, never read again later).
   const [measuring, setMeasuring] = useState<{ slides: DeckSlideEntry[]; text: string; borderless: boolean; pdf: DeckPdfKind | null } | null>(null)
+
+  const [livePress, setLivePress] = useState<'on' | 'resume' | null>(null)
+  const liveOn = state?.live?.on === true
+  const lastFit = useRef<ReturnType<typeof publishRequest> | null>(null)
+
+  useEffect(() => {
+    if (!liveOn) lastFit.current = null
+  }, [liveOn])
 
   useEffect(() => {
     const stop = onMessage(message => {
@@ -115,8 +134,40 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
         view={view}
         onPublish={() => setMeasuring(current => current ?? { slides, text: text(), borderless, pdf: null })}
         onSavePdf={kind => setMeasuring(current => current ?? { slides, text: text(), borderless, pdf: kind })}
+        onShowPause={onShowPause}
+        onLiveAction={action => {
+          if (action === 'off') {
+            setLivePress(null)
+            sendLiveAction(action)
+          } else {
+            setLivePress(action)
+          }
+        }}
         onAction={action => sendToExtension('deck/page-action', { action })}
       />
+      {(liveOn || livePress) && createPortal(
+        <MeasureSlides
+          slides={slides}
+          theme={theme}
+          borderless={borderless}
+          assets={assets}
+          onMeasured={steps => {
+            const fit = publishRequest({ text: text(), borderless }, steps)
+            const last = lastFit.current
+            if (livePress || last?.text !== fit.text || last.look !== fit.look || last.steps.join() !== fit.steps.join()) {
+              sendToExtension('deck/live-fit', fit)
+              lastFit.current = fit
+            }
+            // Send the fit first so the first update can use it too.
+            if (livePress) {
+              sendLiveAction(livePress)
+              setLivePress(null)
+            }
+          }}
+        />,
+        document.body,
+        livePress ?? 'live',
+      )}
       {measuring ? createPortal(
         <MeasureSlides
           slides={measuring.slides}
@@ -156,7 +207,7 @@ function MeasureSlides({ slides, theme, borderless, assets, onMeasured }: {
       })
     })
     return () => cancelAnimationFrame(frame)
-  }, [slides])
+  }, [slides, theme, borderless, assets])
   return (
     <div ref={root} className="deck-measure" aria-hidden="true">
       {slides.map(entry => (
@@ -169,14 +220,17 @@ function MeasureSlides({ slides, theme, borderless, assets, onMeasured }: {
 }
 
 /** The control for a state: drawn by itself, so each state can be rendered and checked. */
-export function DeckPublishControl({ state, view = 'both', onPublish: publish, onSavePdf, onAction: act }: {
+export function DeckPublishControl({ state, view = 'both', onPublish: publish, onSavePdf, onAction: act, onLiveAction, onShowPause }: {
   state: DeckPageState | null
   /** The view as drawn: Save as PDF's item names its kind. */
   view?: DeckViewMode
   onPublish: () => void
   onSavePdf?: (kind: DeckPdfKind) => void
   onAction: (action: DeckPageAction) => void
+  onLiveAction?: (action: LiveAction) => void
+  onShowPause?: (target: PauseTarget) => void
 }) {
+  const showingPause = useRef(false)
   if (!state) return null
   // The one PDF item, for the kind this view saves among those this app makes; none where it makes none.
   const pdfKind = onSavePdf ? pdfKindFor(view, state.pdf ?? []) : null
@@ -193,10 +247,10 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
     )
   }
   const pdfItem = pdfKind ? (
-    <DropdownMenuItem onSelect={() => onSavePdf?.(pdfKind)}>
+    <PublishMenuItem tip={pdfItemLabel(pdfKind).replace(/…$/, '')} onSelect={() => onSavePdf?.(pdfKind)}>
       <Icon name="file-pdf" size={14} tone="inherit" />
       {pdfItemLabel(pdfKind)}
-    </DropdownMenuItem>
+    </PublishMenuItem>
   ) : null
 
   if (state.kind === 'unpublished' && pdfItem) {
@@ -212,10 +266,10 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
           tooltip: 'Publish, or save the deck as a PDF',
           content: (
             <>
-              <DropdownMenuItem onSelect={publish}>
+              <PublishMenuItem tip="Publish the slides and their handout as a web page" onSelect={publish}>
                 <Icon name="globe" size={14} tone="inherit" />
                 Publish…
-              </DropdownMenuItem>
+              </PublishMenuItem>
               {pdfItem}
             </>
           ),
@@ -236,7 +290,8 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
     )
   }
 
-  if (state.kind === 'publishing' || state.kind === 'unpublishing') {
+  // The publisher's own bar is busy during a live deploy too. The deck keeps its live chip and switch.
+  if ((state.kind === 'publishing' && state.live?.state !== 'updating') || state.kind === 'unpublishing') {
     const publishing = state.kind === 'publishing'
     return (
       <Tooltip label={publishing ? 'The page is going online' : 'The page is being taken down'}>
@@ -248,39 +303,146 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
     )
   }
 
+  const chip = publishedChip(state)
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down'}>
+      <Tooltip label={chip.tip}>
         <DropdownMenuTrigger asChild>
-          <Button variant="toolbar" size="bar" className="deck-publish-chip">
-            <Icon name="globe" size={14} tone="inherit" />
-            {state.changed ? 'Published · changed' : 'Published'}
+          <Button variant={state.live ? 'outline' : 'toolbar'} size="bar" className={chip.className}>
+            {state.live?.state === 'live'
+              ? <span aria-hidden="true" className="size-2 rounded-full bg-[var(--r-success)] ring-2 ring-[var(--r-success-soft)]" />
+              : <Icon name={chip.icon} size={14} tone="inherit" className={state.live?.state === 'updating' ? 'animate-spin' : undefined} />}
+            {chip.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
         </DropdownMenuTrigger>
       </Tooltip>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onSelect={() => act('see-online')}>
-          <Icon name="arrow-square-out" size={14} tone="inherit" />
-          See online
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => act('copy-link')}>
-          <Icon name="link-simple" size={14} tone="inherit" />
-          Copy link
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!state.changed} onSelect={publish}>
-          <Icon name="arrows-clockwise" size={14} tone="inherit" />
-          Update the page
-          {state.changed ? null : <span className="ml-auto pl-3 text-[12px] text-ink-muted">No changes</span>}
-        </DropdownMenuItem>
-        {pdfItem ? <DropdownMenuSeparator /> : null}
-        {pdfItem}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem tone="danger" onSelect={() => act('unpublish')}>
-          <Icon name="x-circle" size={14} tone="inherit" />
-          Unpublish
-        </DropdownMenuItem>
+      <DropdownMenuContent
+        align="end"
+        className="w-[330px] max-w-[calc(100vw_-_16px)] p-2"
+        onCloseAutoFocus={event => {
+          if (showingPause.current) event.preventDefault()
+          showingPause.current = false
+        }}
+      >
+        {publishedMenu(state, pdfItem, publish, act, onLiveAction, onShowPause && (target => {
+          showingPause.current = !!target.location
+          onShowPause(target)
+        }))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+// The menu's rows are also inspected by the deck tests, since Radix portals them only in the browser.
+export function publishedMenu(
+  state: DeckPageState,
+  pdfItem: React.ReactNode,
+  publish: () => void,
+  act: (action: DeckPageAction) => void,
+  onLiveAction?: (action: LiveAction) => void,
+  onShowPause?: (target: PauseTarget) => void,
+) {
+  const pause = state.live?.state === 'paused' ? state.live.pause : undefined
+  return (
+    <>
+      {pause && <>
+        <p className="mb-1 rounded-md bg-[var(--r-warning-surface)] p-2 text-xs leading-relaxed text-[var(--r-warning-ink)]">
+          {pauseWords(pause)}
+        </p>
+        {pause.slide !== undefined && (
+          <PublishMenuItem tip="Open the slide where the update paused" onSelect={() => onShowPause?.(pauseTarget(pause))}>
+            <Icon name="magnifying-glass" size={14} tone="inherit" />
+            Show it on slide {pause.slide}
+          </PublishMenuItem>
+        )}
+        <PublishMenuItem tip={state.live?.resumeBlocked ?? 'Try updating the page again'} disabled={!!state.live?.resumeBlocked} onSelect={() => onLiveAction?.('resume')}>
+          <Icon name="play" size={14} tone="inherit" />
+          Go on
+          {state.live?.resumeBlocked && <span className="ml-auto text-xs">{state.live.resumeBlocked}</span>}
+        </PublishMenuItem>
+        <DropdownMenuSeparator />
+      </>}
+      <PublishMenuItem
+        tip={LIVE_HELP}
+        role="menuitemcheckbox"
+        aria-checked={!!state.live?.on}
+        onSelect={() => onLiveAction?.(state.live?.on ? 'off' : 'on')}
+      >
+        <Icon name="arrows-clockwise" size={14} tone="inherit" />
+        <span className="min-w-0 flex-1">
+          Update on every save
+          <span className="block whitespace-normal text-xs text-ink-muted">{LIVE_HELP}</span>
+        </span>
+        <span aria-hidden="true" data-on={!!state.live?.on} className="group flex h-[18px] w-[30px] shrink-0 items-center rounded-full bg-hairline-strong px-0.5 data-[on=true]:bg-primary">
+          <span className="size-3.5 rounded-full bg-white group-data-[on=true]:translate-x-3" />
+        </span>
+      </PublishMenuItem>
+      <DropdownMenuSeparator />
+      <PublishMenuItem tip="Copy the published page’s address" onSelect={() => act('copy-link')}>
+        <Icon name="link-simple" size={14} tone="inherit" />
+        Copy link
+      </PublishMenuItem>
+      <PublishMenuItem tip="Open the published page in your browser" onSelect={() => act('see-online')}>
+        <Icon name="arrow-square-out" size={14} tone="inherit" />
+        <span className="min-w-0">
+          See online
+          {state.address && <span className="block truncate text-xs text-ink-muted">{state.address.replace(/^https:\/\//, '')}</span>}
+        </span>
+      </PublishMenuItem>
+      {pdfItem}
+      {!state.live?.on && (
+        <PublishMenuItem tip={state.changed ? 'Review and publish the changes' : 'No changes to publish'} disabled={!state.changed} onSelect={publish}>
+          <Icon name="arrows-clockwise" size={14} tone="inherit" />
+          Update the page
+          {state.changed ? null : <span className="ml-auto pl-3 text-xs text-ink-muted">No changes</span>}
+        </PublishMenuItem>
+      )}
+      <DropdownMenuSeparator />
+      <PublishMenuItem tip="Take the published page offline" tone="danger" onSelect={() => act('unpublish')}>
+        <Icon name="x-circle" size={14} tone="inherit" />
+        Unpublish
+      </PublishMenuItem>
+    </>
+  )
+}
+
+function PublishMenuItem({ tip, ...props }: React.ComponentProps<typeof DropdownMenuItem> & { tip: string }) {
+  return (
+    <Tooltip label={tip} hoverOnly side="left" className="flex">
+      <DropdownMenuItem className="w-full whitespace-nowrap" {...props} />
+    </Tooltip>
+  )
+}
+
+const LIVE_CHIPS = {
+  live: { label: 'Live', icon: 'globe', className: 'text-ink-strong', tip: LIVE_HELP },
+  updating: { label: 'Updating…', icon: 'circle-notch', className: 'text-ink-strong', tip: 'Updating the published page…' },
+  paused: { label: 'Paused', icon: 'pause', className: 'border-[var(--r-warning-line)] bg-[var(--r-warning-surface)] text-[var(--r-warning-ink)] hover:bg-[var(--r-warning-surface)] hover:text-[var(--r-warning-ink)]', tip: 'Open pages keep what they had.' },
+  offline: { label: 'Offline', icon: 'circle', className: 'text-ink-muted', tip: 'Saves stay on this computer. The page catches up when the connection is back.' },
+} as const
+
+export function publishedChip(state: DeckPageState) {
+  if (state.live?.on) {
+    const chip = LIVE_CHIPS[state.live.state]
+    return { ...chip, tip: state.live.tooltip || chip.tip }
+  }
+  return {
+    label: state.changed ? 'Published · changed' : 'Published',
+    icon: 'globe' as const,
+    className: 'deck-publish-chip',
+    tip: state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down',
+  }
+}
+
+export function pauseWords(pause: LivePause): string {
+  const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(pause.at)
+  const preview = pause.kind === 'key' && pause.keyPreview && /^.….$/u.test(pause.keyPreview) ? pause.keyPreview : undefined
+  const detail = preview ? `${pause.detail.replace(/\.$/, '')}, ${preview}.` : pause.detail
+  const files = pause.outsideFiles?.map(file => file.split(/[\\/]/).pop()).join(', ')
+  return `Paused at ${time}. ${detail}${files ? ` ${files}.` : ''} Open pages keep what they had.`
+}
+
+function pauseTarget({ slide, location, keyPreview }: LivePause): PauseTarget {
+  return { slide, location, keyPreview }
 }

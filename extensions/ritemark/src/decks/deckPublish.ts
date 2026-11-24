@@ -287,9 +287,17 @@ export class DeckPublisher implements vscode.Disposable {
       ? (await this.feature?.controller.recordFor(pageKey))?.live : undefined;
     const live = preference && this.live.state(normalizeForCompare(pageKey), preference);
     if (live?.state === 'paused' && live.pause?.kind === 'key') {
+      if (live.pause.location) {
+        // Stored scan coordinates include front matter. The deck editor holds just the body.
+        const fullText = document.getText();
+        const body = splitFrontMatter(fullText).content;
+        const headLines = fullText.slice(0, fullText.length - body.length).split('\n').length - 1;
+        live.pause = { ...live.pause, location: { ...live.pause.location, line: live.pause.location.line - headLines } };
+      }
       live.resumeBlocked = await this.stillHasKey(document, pagePath) ? 'Take the key out first.' : undefined;
     }
-    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(live && { live }) }, bar };
+    const address = publishedAddress(bar);
+    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(address && { address }), ...(live && { live }) }, bar };
   }
 
   /**

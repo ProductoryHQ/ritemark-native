@@ -119,6 +119,7 @@ export interface DeckPageState {
   changed: boolean;
   /** Sprint 170: the PDF kinds this app can save, in Publish's menu; none in a shell without the print (patch 021). */
   pdf?: DeckPdfKind[];
+  address?: string;
   live?: DeckLiveState;
 }
 

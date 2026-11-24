@@ -11,15 +11,16 @@ import type { DeckPageState } from '../../../../src/decks/deckProtocol'
 register(`data:text/javascript,${encodeURIComponent(
   "export async function load(url, context, next) { return url.endsWith('.css') ? { format: 'module', source: '', shortCircuit: true } : next(url, context) }",
 )}`)
+const sentMessages: unknown[] = []
 Object.assign(globalThis, {
-  acquireVsCodeApi: () => ({ postMessage: () => {}, getState: () => undefined, setState: () => {} }),
+  acquireVsCodeApi: () => ({ postMessage: (message: unknown) => sentMessages.push(message), getState: () => undefined, setState: () => {} }),
 })
 const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
 const { parse } = await import('node-html-parser')
-const { DeckPublishControl, measuredSteps, pdfRequest, publishRequest, savedNotice } = await import('./DeckPublish')
+const { DeckPublishControl, measuredSteps, pdfRequest, publishRequest, savedNotice, publishedChip, publishedMenu, pauseWords, sendLiveAction } = await import('./DeckPublish')
 
 const draw = (state: DeckPageState | null) => renderToStaticMarkup(createElement(DeckPublishControl, { state, onPublish: () => {}, onAction: () => {} }))
 const words = (html: string) => parse(html).text.trim()
@@ -87,6 +88,8 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   const sent = (borderless: boolean) => decodeDeckRequest({ type: 'deck/publish', ...publishRequest({ text, borderless }, [0, 2]) })
   assert.deepEqual(sent(true), { type: 'deck/publish', text, look: 'borderless', steps: [0, 2] })
   assert.deepEqual(sent(false), { type: 'deck/publish', text, look: 'card', steps: [0, 2] })
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/live-fit', ...publishRequest({ text, borderless: true }, [0, 2]) }),
+    { type: 'deck/live-fit', text, look: 'borderless', steps: [0, 2] })
 }
 
 // Sprint 170 (#881): where the app can save a PDF, Publish is a split button: Publish stays the main part, and the ▾
@@ -128,6 +131,88 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   // The view reaches Publish, so the item names its kind (R2).
   const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
   assert.ok(/<DeckPublish [^\n]*view=\{viewShown\}/.test(view), 'the view as drawn reaches Publish')
+}
+
+// Sprint 175 PR 7: live states use the host's tooltip, and only Live and Paused use state colours.
+{
+  const base = { ready: true, kind: 'published', changed: true } as const
+  const states = [
+    ['live', 'Live', '--r-success', 'Open pages catch up within about 15 seconds.'],
+    ['updating', 'Updating…', 'text-ink-strong', 'Updating the published page…'],
+    ['paused', 'Paused', '--r-warning-ink', 'Open pages keep what they had.'],
+    ['offline', 'Offline', 'text-ink-muted', 'Saves stay on this computer.'],
+  ] as const
+  for (const [state, label, colour, tooltip] of states) {
+    const model = { ...base, live: { on: true as const, state, tooltip } }
+    const html = draw(model)
+    assert.equal(words(html), label)
+    assert.ok(html.includes(colour))
+    assert.equal(html.includes('--r-success'), state === 'live')
+    assert.equal(html.includes('--r-warning'), state === 'paused')
+    assert.equal(publishedChip(model).tip, tooltip)
+  }
+  const sending = draw({ ...base, kind: 'publishing', live: { on: true, state: 'updating', tooltip: '' } })
+  assert.equal(words(sending), 'Updating…')
+  assert.equal(button(sending)?.getAttribute('aria-haspopup'), 'menu')
+  assert.match(draw(base), /deck-publish-chip/)
+  assert.match(publishedChip(base).tip, /changed since it was published/)
+}
+
+// Radix portals the menu in the browser. Inspect its rows and invoke the same select handlers.
+{
+  const base = { ready: true, kind: 'published', changed: true, address: 'https://example.workers.dev' } as const
+  type RowProps = { children?: React.ReactNode; tip?: string; disabled?: boolean; role?: string; 'aria-checked'?: boolean; onSelect?: () => void }
+  const rowsOf = (node: React.ReactNode): React.ReactElement<RowProps>[] =>
+    React.Children.toArray(node).flatMap(child => {
+      if (!React.isValidElement<RowProps>(child)) return []
+      return child.type === React.Fragment ? rowsOf(child.props.children) : [child]
+    })
+  const textOf = (node: React.ReactNode): string => React.Children.toArray(node).map(child =>
+    React.isValidElement<RowProps>(child) ? textOf(child.props.children) : String(child),
+  ).join('')
+  const pdf = createElement('span', null, 'Save slides as PDF…')
+  let showMessage: unknown
+  const menu = (state: DeckPageState) => rowsOf(publishedMenu(state, pdf, () => {}, () => {}, sendLiveAction, target => { showMessage = target }))
+  const labels = (rows: ReturnType<typeof menu>) => rows.map(row => textOf(row.props.children).trim()).filter(Boolean)
+  const off = menu(base)
+  const live = menu({ ...base, live: { on: true, state: 'live', tooltip: '' } })
+  const actions = ['Update on every saveOpen pages catch up within about 15 seconds.', 'Copy link', 'See onlineexample.workers.dev', 'Save slides as PDF…']
+  assert.deepEqual(labels(off), [...actions, 'Update the page', 'Unpublish'])
+  assert.deepEqual(labels(live), [...actions, 'Unpublish'])
+  assert.equal(off[0].props.role, 'menuitemcheckbox')
+  assert.equal(off[0].props['aria-checked'], false)
+  assert.equal(live[0].props['aria-checked'], true)
+  assert.equal(off[0].props.tip, 'Open pages catch up within about 15 seconds.')
+  off[0].props.onSelect?.()
+  live[0].props.onSelect?.()
+
+  const at = new Date(2026, 10, 24, 10, 42).getTime()
+  const localTime = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(at)
+  const location = { line: 32, column: 4, endColumn: 32 }
+  const pause = { kind: 'key', at, detail: "Slide 6's text has what looks like a key.", slide: 6, location, keyPreview: 's…a' } as const
+  const paused = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', resumeBlocked: 'Take the key out first.', pause } })
+  assert.deepEqual(labels(paused), [
+    `Paused at ${localTime}. Slide 6's text has what looks like a key, s…a. Open pages keep what they had.`,
+    'Show it on slide 6', 'Go onTake the key out first.', ...actions, 'Unpublish',
+  ])
+  assert.equal(paused[2].props.disabled, true)
+  assert.equal(paused[2].props.tip, 'Take the key out first.')
+  paused[1].props.onSelect?.()
+  assert.deepEqual(showMessage, { slide: 6, location, keyPreview: 's…a' })
+  assert.doesNotMatch(pauseWords({ ...pause, keyPreview: 'longer…preview' }), /longer|preview/)
+
+  const outside = { kind: 'outside', at, slide: 9, detail: "Slide 9 shows a picture from outside the deck's folder.", outsideFiles: ['other/picture.png', 'elsewhere/graph.svg'] } as const
+  const files = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', pause: { ...outside, outsideFiles: [...outside.outsideFiles] } } })
+  assert.match(labels(files)[0], /picture\.png, graph\.svg\. Open pages keep what they had\.$/)
+  files[1].props.onSelect?.()
+  assert.deepEqual(showMessage, { slide: 9, location: undefined, keyPreview: undefined })
+  assert.equal(files[2].props.disabled, false)
+  files[2].props.onSelect?.()
+  const connection = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', pause: { kind: 'connection', at, detail: 'Cloudflare needs you to connect again.' } } })
+  assert.match(labels(connection)[0], /Cloudflare needs you to connect again\. Open pages keep what they had\.$/)
+  assert.equal(labels(connection)[1], 'Go on')
+
+  assert.deepEqual(sentMessages, ['on', 'off', 'resume'].map(action => ({ type: 'deck/live-action', action })))
 }
 
 console.log('DeckPublish: passed')

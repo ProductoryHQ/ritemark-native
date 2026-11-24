@@ -366,6 +366,7 @@ async function main(): Promise<void> {
     assert.equal(diagnosis?.kind, 'key');
     assert.equal(diagnosis?.slide, 1);
     assert.equal(diagnosis?.location?.line, text.slice(0, text.indexOf(fixtureKey)).split('\n').length);
+    assert.equal(diagnosis?.keyPreview, 's…1');
     assert.equal(JSON.stringify(diagnosis).includes(fixtureKey), false);
 
     const foundPicture = new Promise<void>(resolve => { nextResult = resolve; });
