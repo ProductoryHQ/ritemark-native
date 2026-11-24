@@ -59,6 +59,7 @@ export type PublishErrorCode =
   | 'not-connected'
   | 'refused'
   | 'cannot-publish'
+  | 'busy'
   | 'unreachable'
   | 'name-taken'
   | 'name-invalid'

@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude, ChatGPT, and OpenCode can now read Word and PDF files in your project, including selected PDF pages (#991).
 - Claude, ChatGPT, and OpenCode can now read PowerPoint files in your project, with speaker notes kept under the slide they belong to (#993).
 - Deck files can store planned minutes for each slide and use the presenter’s session length. These timings stay private when you publish the deck (#1001).
+- Turn on Update on every save to keep a published deck’s page up to date (#1007).
 
 ### Fixed
 

@@ -121,10 +121,14 @@ test('S9 and S12: an older or malformed response is ignored; scroll and selectio
   assert.equal(r.reloads(), 1);
   const arrived = reader(changed, r.hash(), r.storage);
   assert.equal(arrived.position.textContent, '2 / 4');
-  assert.equal(arrived.doc.getElementById('deck-updated')!.hidden, false);
+  const updated = arrived.doc.querySelector('#line .who #deck-updated')!;
+  assert.equal(updated.textContent, 'Updated just now');
   assert.deepEqual(Array.from(arrived.doc.querySelectorAll('.deck-changed-block'), node => node.textContent), ['Ask in five lines.']);
-  await arrived.advance(2000);
-  assert.equal(arrived.doc.getElementById('deck-updated')!.hidden, true);
+  await arrived.advance(1999);
+  assert.equal(updated.textContent, 'Updated just now');
+  assert.ok(arrived.doc.querySelector('.deck-changed-block'));
+  await arrived.advance(1);
+  assert.equal(updated.textContent, '');
   assert.ok(!arrived.doc.querySelector('.deck-changed-block'));
 });
 
@@ -138,7 +142,7 @@ test('S10 and S19: a shared number opens that position; an update follows the ke
   const arrived = reader(inserted, r.hash(), r.storage);
   assert.equal(arrived.position.textContent, '3 / 5');
   assert.equal(arrived.hash(), '#3');
-  assert.equal(arrived.doc.getElementById('deck-updated')!.hidden, true);
+  assert.equal(arrived.doc.getElementById('deck-updated')!.textContent, '');
   assert.ok(!arrived.doc.querySelector('.deck-changed-block'));
   const linked = reader(page(108, [['One'], ['Two'], ['Three'], ['Four'], ['Five'], ['Six']]), '#6');
   assert.equal(linked.position.textContent, '6 / 6');
@@ -166,14 +170,37 @@ test('S11: keep the removed slide and offer the next surviving slide, or the las
   assert.equal(last.doc.getElementById('deck-onward')!.textContent, 'Go on to Closed yard');
 });
 
-test('a failed text comparison shows the update without a glow', async () => {
+test('the removed slide note stays after the update message expires', async () => {
+  const changed = page(106, [['Briefing'], ['Late trucks', 'Ask in five lines.'], ['Coffee']]);
+  const next = page(107, [['Briefing'], ['Coffee']]);
+  const first = reader(original);
+  await first.focus(changed.info, changed.html);
+  await first.advance(1000);
+  assert.equal(first.reloads(), 1);
+  const r = reader(changed, first.hash(), first.storage);
+  const updated = r.doc.getElementById('deck-updated')!;
+  const removed = r.doc.getElementById('deck-removed')!;
+  assert.equal(updated.textContent, 'Updated just now');
+  await r.focus(next.info, next.html);
+  await r.advance(1000);
+  assert.equal(removed.hidden, false);
+  await r.advance(1000);
+  assert.equal(updated.textContent, '');
+  await r.advance(10000);
+  assert.equal(removed.hidden, false);
+  assert.equal(r.position.textContent, '– / 2');
+  r.doc.getElementById('deck-onward')!.click();
+  assert.equal(r.reloads(), 1);
+});
+
+test('a failed text comparison shows the update without a fill', async () => {
   const next = page(106, [['Briefing'], ['Late trucks', 'Ask in five lines.']]);
   const r = reader(original);
   await r.focus(next.info, null);
   await r.advance(1000);
   assert.equal(r.reloads(), 1);
   const arrived = reader(next, r.hash(), r.storage);
-  assert.equal(arrived.doc.getElementById('deck-updated')!.hidden, false);
+  assert.equal(arrived.doc.getElementById('deck-updated')!.textContent, 'Updated just now');
   assert.ok(!arrived.doc.querySelector('.deck-changed-block'));
 });
 
@@ -185,7 +212,7 @@ test('a stale HTML reload keeps the handoff until the published version catches 
   assert.equal(r.reloads(), 1);
   const stale = reader(original, r.hash(), r.storage);
   assert.equal(stale.position.textContent, '2 / 4');
-  assert.equal(stale.doc.getElementById('deck-updated')!.hidden, true);
+  assert.equal(stale.doc.getElementById('deck-updated')!.textContent, '');
   await new Promise(setImmediate);
   await stale.focus(next.info, next.html);
   await stale.advance(1000);
