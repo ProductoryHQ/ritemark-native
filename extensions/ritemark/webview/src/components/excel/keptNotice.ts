@@ -1,11 +1,18 @@
 import type { CellRules } from './cellRules'
+import { drawsChart } from './chartLayout'
+import type { SheetLayoutInfo } from './readWorkbook'
 
-/** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
-export function keptNotice(layout: { drawings: Array<{ what: string }> }, rules: CellRules): string | undefined {
-  const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
+/**
+ * What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7).
+ * Charts the preview draws (Sprint 174 PR 2 on) and colour rules it draws (PR 6) aren't named; icon sets and rules it
+ * can't read are.
+ */
+export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings'>, rules?: CellRules): string | undefined {
+  const count = (what: string) => layout.drawings.filter((d) => d.what === what && (what !== 'chart' || !drawsChart(d.chart))).length
   const things: string[] = []
   const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
-  if (count('chart')) things.push(name(count('chart'), 'chart', 'charts'))
+  const charts = count('chart')
+  if (charts) things.push(name(charts, 'chart', 'charts'))
   if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
   if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
   if (rules?.iconSets.length) things.push(rules.iconSets.length === 1 ? 'an icon set' : `${rules.iconSets.length} icon sets`)

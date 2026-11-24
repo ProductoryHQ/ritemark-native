@@ -14,6 +14,8 @@ import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 import { SheetGrid } from './excel/SheetGrid'
 import { cellRulesForVersion } from './excel/cellRules'
+import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
+import { drawsChart } from './excel/chartLayout'
 import { keptNotice } from './excel/keptNotice'
 import { Tooltip } from './ui/tooltip'
 import { defaultSpreadsheetApp } from '../hooks/usePlatform'
@@ -518,6 +520,8 @@ export function SpreadsheetViewer({
   // The model is edited in place. A new version invalidates all range and formula facts.
   const rulesForSheet = useMemo(() => model && cellRulesForVersion(model), [model, version])
   const cellRules = sheetModel && rulesForSheet?.(sheetModel)
+  const sheetChart = sheetModel?.kind === 'chartsheet'
+    ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart')?.chart : undefined
   const excelNotice = fileType !== 'xlsx'
     ? undefined
     : isEditable && editingFormula
@@ -580,6 +584,22 @@ export function SpreadsheetViewer({
 
   const isEmpty = parsedData.rows.length === 0
 
+  const chartSheetCard = sheetModel?.kind === 'chartsheet' && (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
+        <Icon name="chart-bar" size={20} tone="inherit" />
+        <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
+        <span>It's kept in the file as it is. The preview doesn't draw this kind of chart.</span>
+        <Tooltip label={`${openInLabel}, where the chart is drawn`}>
+          <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
+            <Icon name="arrow-square-out" size={14} tone="inherit" />
+            <span>{openInLabel}</span>
+          </Button>
+        </Tooltip>
+      </div>
+    </div>
+  )
+
   return (
     <>
       {/* Conflict dialogs */}
@@ -627,21 +647,17 @@ export function SpreadsheetViewer({
       )}
 
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
-          grid; a chart sheet is a card (frame 8). .xls and the SheetJS fallback keep the table below. */}
-      {source?.model && sheetModel?.kind === 'chartsheet' ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
-            <Icon name="chart-bar" size={20} tone="inherit" />
-            <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
-            <span>It's kept in the file as it is. The preview doesn't draw charts yet.</span>
-            <Tooltip label={`${openInLabel}, where the chart is drawn`}>
-              <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
-                <Icon name="arrow-square-out" size={14} tone="inherit" />
-                <span>{openInLabel}</span>
-              </Button>
-            </Tooltip>
+          grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
+      {source?.model && drawsChart(sheetChart) ? (
+        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard}>
+          <div className="relative min-h-0 flex-1">
+            <div className="absolute inset-0">
+              <PositionedChart chart={sheetChart} workbook={source.model} version={version} />
+            </div>
           </div>
-        </div>
+        </ChartErrorBoundary>
+      ) : source?.model && sheetModel?.kind === 'chartsheet' ? (
+        chartSheetCard
       ) : source?.model && sheetModel ? (
         <SheetGrid
           model={source.model}

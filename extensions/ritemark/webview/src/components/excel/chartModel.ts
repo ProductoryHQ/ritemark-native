@@ -16,6 +16,7 @@ export interface ChartData {
 export interface ChartShape {
   fill?: string
   line?: string
+  hasLine?: boolean
   lineWidth?: number
   dash?: string
   noFill?: boolean
@@ -31,12 +32,26 @@ export interface ChartTextStyle {
   rotation?: number
 }
 
+export interface ChartManualLayout {
+  target?: string
+  xMode?: string
+  yMode?: string
+  widthMode?: string
+  heightMode?: string
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+}
+
 export interface ChartTitle {
+  automatic?: boolean
   text?: string
   reference?: ChartData
   style?: ChartTextStyle
   runs?: { text: string; style?: ChartTextStyle }[]
   overlay?: boolean
+  layout?: ChartManualLayout
 }
 
 export interface ChartNumberFormat {
@@ -137,10 +152,14 @@ export type ChartModel =
       kind: PlotKind | 'combo'
       plots: ChartPlot[]
       axes: ChartAxis[]
+      plotShape?: ChartShape
+      chartShape?: ChartShape
+      plotLayout?: ChartManualLayout
       title?: ChartTitle
       legend?: {
         position?: string
         overlay?: boolean
+        layout?: ChartManualLayout
         textStyle?: ChartTextStyle
         shape?: ChartShape
         entries: { index: number; deleted?: boolean; textStyle?: ChartTextStyle }[]

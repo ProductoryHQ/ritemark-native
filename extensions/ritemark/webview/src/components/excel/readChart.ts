@@ -4,7 +4,7 @@ import {
 } from './excelStyles'
 import { drawingPresets } from './drawingColorNames'
 import type {
-  ChartAxis, ChartData, ChartLabels, ChartMarker, ChartModel, ChartNumberFormat,
+  ChartAxis, ChartData, ChartLabels, ChartMarker, ChartManualLayout, ChartModel, ChartNumberFormat,
   ChartPlot, ChartSeries, ChartShape, ChartTextStyle, ChartTitle, ChartValue,
 } from './chartModel'
 
@@ -116,6 +116,7 @@ function shape(el: Element | undefined, ctx: ColorContext): ChartShape | undefin
   return {
     fill: drawingColor(props.get('solidFill'), ctx),
     line: drawingColor(lineProps.get('solidFill'), ctx),
+    hasLine: line ? true : undefined,
     lineWidth: width === undefined ? undefined : width / 9525,
     dash: lineProps.val('prstDash'),
     noFill: props.get('noFill') ? true : undefined,
@@ -123,25 +124,51 @@ function shape(el: Element | undefined, ctx: ColorContext): ChartShape | undefin
   }
 }
 
-function textStyle(container: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
-  if (!container) return undefined
-  const props = fields(container.body)
-  const body = props.get('bodyPr')
-  const para = fields(props.get('p')?.body)
-  const run = fields(para.get('r')?.body).get('rPr')
-  const pr = ['rPr', 'defRPr', 'endParaRPr'].includes(container.name) ? container
-    : fields(para.get('pPr')?.body).get('defRPr') ?? run ?? para.get('endParaRPr')
-  const tag = pr?.tag ?? ''
-  const style = fields(pr?.body)
-  const size = number(attr(tag, 'sz'))
-  const rotation = number(attr(body?.tag ?? '', 'rot'))
+function runStyle(pr: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
+  if (!pr) return undefined
+  const style = fields(pr.body)
+  const size = number(attr(pr.tag, 'sz'))
   return {
-    size: size === undefined ? undefined : size / 100,
-    bold: bool(attr(tag, 'b')),
-    italic: bool(attr(tag, 'i')),
+    size: size === undefined || size <= 0 ? undefined : size / 100,
+    bold: bool(attr(pr.tag, 'b')),
+    italic: bool(attr(pr.tag, 'i')),
     font: attr(style.get('latin')?.tag ?? '', 'typeface'),
     color: drawingColor(style.get('solidFill'), ctx),
-    rotation: rotation === undefined ? undefined : rotation / 60_000,
+  }
+}
+
+function paragraphStyle(list: Fields, paragraph: Fields, ctx: ColorContext): ChartTextStyle | undefined {
+  const props = paragraph.get('pPr')
+  const level = number(attr(props?.tag ?? '', 'lvl')) ?? 0
+  const defaults = (el?: Element) => runStyle(fields(el?.body).get('defRPr'), ctx)
+  return mergeTextStyles(defaults(list.get('defPPr')), defaults(list.get(`lvl${level + 1}pPr`)), defaults(props))
+}
+
+function bodyStyle(props: Fields): ChartTextStyle | undefined {
+  const rotation = number(attr(props.get('bodyPr')?.tag ?? '', 'rot'))
+  return rotation === undefined || Math.abs(rotation) > 5_400_000 ? undefined : { rotation: rotation / 60_000 }
+}
+
+function textStyle(container: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
+  const props = fields(container?.body)
+  const para = fields(props.get('p')?.body)
+  return mergeTextStyles(
+    runStyle(para.get('endParaRPr'), ctx),
+    paragraphStyle(fields(props.get('lstStyle')?.body), para, ctx),
+    bodyStyle(props),
+  )
+}
+
+function manualLayout(props: Fields): ChartManualLayout | undefined {
+  const manual = fields(props.get('layout')?.body).get('manualLayout')
+  if (!manual) return undefined
+  const layout = fields(manual.body)
+  return {
+    target: layout.val('layoutTarget'),
+    xMode: layout.val('xMode'), yMode: layout.val('yMode'),
+    widthMode: layout.val('wMode'), heightMode: layout.val('hMode'),
+    x: layout.num('x'), y: layout.num('y'),
+    width: layout.num('w'), height: layout.num('h'),
   }
 }
 
@@ -205,23 +232,48 @@ function richTitleText(body: string): string | undefined {
   return words || undefined
 }
 
+function mergeTextStyles(...styles: (ChartTextStyle | undefined)[]): ChartTextStyle | undefined {
+  const entries = styles.flatMap((style) => Object.entries(style ?? {}).filter(([, value]) => value !== undefined))
+  return entries.length ? Object.fromEntries(entries) : undefined
+}
+
 function title(el: Element | undefined, ctx: ColorContext): ChartTitle | undefined {
   if (!el) return undefined
   const props = fields(el.body)
   const tx = props.get('tx')
   const rich = fields(tx?.body).get('rich')
   const reference = rich ? undefined : data(tx)
-  const runs = fields(rich?.body).all('p').flatMap((p) =>
-    fields(p.body).elements.filter((run) => run.name === 'r' || run.name === 'fld').map((run) => {
-      const runFields = fields(run.body)
-      return { text: runFields.text('t') ?? '', style: textStyle(runFields.get('rPr'), ctx) }
-    }))
+  const richProps = fields(rich?.body)
+  const list = fields(richProps.get('lstStyle')?.body)
+  const paragraphs = richProps.all('p')
+  const runs = paragraphs.flatMap((p, index) => {
+    const para = fields(p.body)
+    const style = paragraphStyle(list, para, ctx)
+    return [
+      ...(index ? [{ text: ' ' }] : []),
+      ...para.elements.flatMap((run) => {
+        if (run.name === 'br') return [{ text: ' ', style }]
+        if (run.name !== 'r' && run.name !== 'fld') return []
+        const props = fields(run.body)
+        return [{ text: props.text('t') ?? '', style: mergeTextStyles(style, runStyle(props.get('rPr'), ctx)) }]
+      }),
+    ]
+  })
+  // Keep the existing single-line title, including its outer whitespace trimming.
+  while (runs.length && !runs[0].text.trim()) runs.shift()
+  while (runs.length && !runs[runs.length - 1].text.trim()) runs.pop()
+  if (runs.length) {
+    runs[0].text = runs[0].text.trimStart()
+    runs[runs.length - 1].text = runs[runs.length - 1].text.trimEnd()
+  }
   return {
-    text: rich ? richTitleText(rich.body) ?? (runs.map((run) => run.text).join('') || undefined) : reference?.points.get(0)?.toString(),
+    text: rich ? runs.map((run) => run.text).join('') || undefined : reference?.points.get(0)?.toString(),
     reference,
+    automatic: !tx || undefined,
     runs: rich ? runs : undefined,
-    style: textStyle(props.get('txPr') ?? rich, ctx),
+    style: mergeTextStyles(textStyle(props.get('txPr'), ctx), bodyStyle(richProps)),
     overlay: props.bool('overlay'),
+    layout: manualLayout(props),
   }
 }
 
@@ -387,12 +439,25 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
   }
   const space = fields(root.body)
   const chart = fields(space.get('chart')?.body)
+  const plotArea = fields(chart.get('plotArea')?.body)
   const plots: ChartPlot[] = []
   const axes: ChartAxis[] = []
-  for (const element of children(chart.get('plotArea')?.body ?? '')) {
+  for (const element of plotArea.elements) {
     const plotKind = plotKinds.get(element.name)
     const axisKind = axisKinds.get(element.name)
-    if (plotKind) plots.push(plot(plotKind, fields(element.body), ctx))
+    if (plotKind) {
+      const parsed = plot(plotKind, fields(element.body), ctx)
+      if (element.name === 'line3DChart') {
+        // Excel styles the ribbon as a filled surface. Use that fill for the flat line.
+        for (const entry of parsed.series) {
+          const ribbon = entry.shape
+          if (ribbon && !ribbon.noFill && (ribbon.noLine || !ribbon.line)) {
+            entry.shape = { line: ribbon.fill }
+          }
+        }
+      }
+      plots.push(parsed)
+    }
     else if (axisKind) axes.push(axis(axisKind, fields(element.body), ctx))
     else if (element.name.endsWith('Chart')) return { supported: false, kind: element.name as `${string}Chart` }
   }
@@ -409,8 +474,12 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
     kind: plots.length > 1 ? 'combo' : plots[0].kind,
     plots,
     axes,
+    plotLayout: manualLayout(plotArea),
+    plotShape: shape(plotArea.get('spPr'), ctx),
+    chartShape: shape(space.get('spPr'), ctx),
     title: title(chart.get('title'), ctx),
     legend: legendEl ? {
+      layout: manualLayout(legend),
       position: legend.val('legendPos'),
       overlay: legend.bool('overlay'),
       textStyle: textStyle(legend.get('txPr'), ctx),
