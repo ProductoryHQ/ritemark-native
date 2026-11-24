@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+### Added
+
+- Claude, ChatGPT, and OpenCode can now read Word and PDF files in your project, including selected PDF pages (#991).
+
 ### Fixed
 
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
