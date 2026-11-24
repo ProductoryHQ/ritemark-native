@@ -1,5 +1,5 @@
 import { decodeSourcePassage } from '../../webview/src/utils/sourcePassage';
-import { openSourcePassage, type ReadSource } from './openSourcePassage';
+import { openSourcePassage, previewSourcePassage, type ReadSource } from './openSourcePassage';
 /**
  * Unified AI View Provider
  * Hosts the AI chat sidebar (Primary Sidebar) for the Claude Code and Codex runtimes.
@@ -92,7 +92,7 @@ import { BOARD_TOOL_GROUP, DECK_TOOL_GROUP, toolGroupsFor, toolSetKey } from '..
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
 import { countTurnAccepted, countTurnEnded } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
-import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
+import { CAPABILITY_CONTEXT_VERSION, renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
 import { RUNTIME_CAPABILITIES, capabilitiesFor } from '../runtime/capabilities';
 import {
@@ -655,8 +655,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // path is resolved and confined here, never trusted.
           const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
           const passage = decodeSourcePassage(message.passage);
-          if (rawPath && passage && this._readSource) await openSourcePassage(rawPath, passage, this._readSource);
-          else if (rawPath) await this._followChatLink(rawPath);
+          if (rawPath && passage && this._readSource) {
+            const path = await openSourcePassage(rawPath, passage, this._readSource, message.openLinkLocation === true);
+            if (path && typeof message.sourceLinkId === 'string') {
+              void webviewView.webview.postMessage({ type: 'chat:source/opened', id: message.sourceLinkId, path });
+            }
+          } else if (rawPath) await this._followChatLink(rawPath);
+          break;
+        }
+
+        case 'chat:source/preview': {
+          const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
+          const passage = decodeSourcePassage(message.passage);
+          if (!rawPath || !passage || !this._readSource || typeof message.requestId !== 'string') break;
+          const preview = await previewSourcePassage(rawPath, passage, this._readSource);
+          void webviewView.webview.postMessage({ type: 'chat:source/previewed', requestId: message.requestId, preview });
           break;
         }
 
@@ -1283,6 +1296,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   sandboxMode: codexSandboxMode ?? null,
                   approvalPolicy: codexApprovalPolicy ?? null,
                   authBinding,
+                  capabilityContextVersion: CAPABILITY_CONTEXT_VERSION,
                   // A Codex thread resumes only with the tools it started with (P2).
                   ...(isCodex && codexDynamicTools ? { toolSet: toolSetKey(codexDynamicTools) } : {}),
                 },
