@@ -1,0 +1,4 @@
+- **Keep your published deck up to date.** You can now let open pages follow your deck as you save it.
+- **Share pictures without private details.** Ritemark removes location, camera and author details from the pictures it publishes.
+- **Plan how long each slide takes.** Set minutes for each slide and use the timed list to see how the deck fits your session.
+- **See what happened after an AI edit.** The chat tells you when an AI's save updates your live page or makes it pause.
