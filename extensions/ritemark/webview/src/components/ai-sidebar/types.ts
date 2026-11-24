@@ -9,6 +9,9 @@ import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
 
+import type { ChatFilesPickedMessage } from '../../../../src/views/chatAttachmentProtocol';
+
+export type { PickChatFilesMessage } from '../../../../src/views/chatAttachmentProtocol';
 export type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 
 // ── Agent types (mirrored from extension src/agent/types.ts) ──
@@ -559,6 +562,7 @@ export type ExtensionMessage =
   | import('../../../../src/conversations/protocol').ConversationResultMessage
   | import('../../../../src/conversations/protocol').ConversationHostEvent
   | { type: 'files-dropped'; paths: string[] }
+  | ChatFilesPickedMessage
   // Codex messages
   | { type: 'codex:status'; status: CodexSidebarStatus; generation?: number; revision?: number }
   | ({ type: 'codex-progress'; progress: AgentProgress } & ConversationScopedMessage)
