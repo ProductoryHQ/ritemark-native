@@ -119,9 +119,14 @@ export function readTheme(xml: string): ThemeInfo {
   }
 }
 
-/** A colour lightened (tint > 0) or darkened (tint < 0) in HLS, as Excel does (§18.8.19). */
-export function applyTint(hex: string, tint: number): string {
-  if (!tint) return hex
+interface Luminance {
+  multiplier: number
+  offset: number
+}
+
+/** Apply a SpreadsheetML tint or DrawingML luminance transform in HLS. */
+export function applyTint(hex: string, tint: number, luminance?: Luminance): string {
+  if (!tint && !luminance) return hex
   let r = parseInt(hex.slice(0, 2), 16) / 255
   let g = parseInt(hex.slice(2, 4), 16) / 255
   let b = parseInt(hex.slice(4, 6), 16) / 255
@@ -136,7 +141,9 @@ export function applyTint(hex: string, tint: number): string {
     h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
     h /= 6
   }
-  l = tint < 0 ? l * (1 + tint) : l * (1 - tint) + tint
+  l = luminance
+    ? Math.min(1, Math.max(0, l * luminance.multiplier + luminance.offset))
+    : tint < 0 ? l * (1 + tint) : l * (1 - tint) + tint
   const hue = (p: number, q: number, t: number) => {
     if (t < 0) t += 1
     if (t > 1) t -= 1
@@ -163,7 +170,7 @@ export interface ColorContext {
 }
 
 /** A `<color>`, `<fgColor>`, `<tabColor>`… tag as a CSS colour; undefined for "automatic" or none. */
-export function colorOf(tag: string | undefined, ctx: ColorContext): string | undefined {
+export function colorOf(tag: string | undefined, ctx: ColorContext, luminance?: Luminance): string | undefined {
   if (!tag) return undefined
   if (attr(tag, 'auto') === '1' || attr(tag, 'auto') === 'true') return undefined
   let hex: string | undefined
@@ -178,7 +185,7 @@ export function colorOf(tag: string | undefined, ctx: ColorContext): string | un
     hex = ctx.indexed[i]
   }
   if (!hex) return undefined
-  return '#' + applyTint(hex, Number(attr(tag, 'tint') ?? 0))
+  return '#' + applyTint(hex, Number(attr(tag, 'tint') ?? 0), luminance)
 }
 
 const BORDER: Record<string, [number, BorderSide['style']]> = {

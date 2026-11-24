@@ -3,11 +3,13 @@
  * Run: npx tsx webview/src/components/excel/readWorkbook.test.ts
  */
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as XLSX from 'xlsx'
 import JSZip from 'jszip'
+import { resolveSeries } from './chartSeries'
 import { cellKey, readWorkbook } from './readWorkbook'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
@@ -22,7 +24,16 @@ const fixtures: Array<[string, string]> = [
 async function main() {
   for (const [label, file] of fixtures) {
     const bytes = new Uint8Array(fs.readFileSync(file))
+    const hash = () => createHash('sha256').update(bytes).digest('hex')
+    const before = hash()
     const model = await readWorkbook(bytes)
+    assert.equal(hash(), before, `${label}: reading the workbook and its chart parts changes no byte`)
+    for (const sheet of model.sheets) {
+      for (const drawing of sheet.layout.drawings) {
+        if (drawing.chart) resolveSeries(drawing.chart, model.sheets, model)
+      }
+    }
+    assert.equal(hash(), before, `${label}: resolving chart series changes no byte`)
     const book = XLSX.read(bytes, { type: 'array', cellFormula: true })
     assert.deepEqual(model.sheets.map((s) => s.name), book.SheetNames, `${label}: the sheets`)
     let compared = 0
@@ -95,7 +106,10 @@ async function main() {
   // The sales report: a chart sheet is a sheet without cells
   {
     const model = await readWorkbook(new Uint8Array(fs.readFileSync(path.join(spike, 'sales-report.xlsx'))))
-    assert.ok(model.sheets.some((s) => s.kind === 'chartsheet'), 'a chart sheet')
+    const chartSheet = model.sheets.find((s) => s.kind === 'chartsheet')
+    assert.ok(chartSheet, 'a chart sheet')
+    assert.equal(chartSheet.cells.size, 0)
+    assert.ok(chartSheet.layout.drawings.some((drawing) => drawing.chart?.supported), 'a parsed chart on the chart sheet')
   }
 
   // Shared formulas: each cell gets the anchor's formula, moved
