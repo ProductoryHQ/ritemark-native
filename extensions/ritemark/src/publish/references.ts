@@ -18,7 +18,7 @@ export interface Reference {
    * `<area href>`, a `<link>` that loads nothing for the page, such as `rel="alternate"`), not a file the page uses.
    * R3 sends only what the page uses, so a linked document stays behind and is named (`gather.ts`).
    */
-  as: 'style' | 'module' | 'script' | 'link' | 'any';
+  as: 'style' | 'module' | 'script' | 'link' | 'picture' | 'any';
 }
 
 export interface PageReferences {
@@ -145,10 +145,16 @@ export function pageReferences(html: string): PageReferences {
       let as: Reference['as'] = 'any';
       if (tag === 'link' && name === 'href') {
         if (rel.has('stylesheet')) as = 'style';
+        else if (rel.has('icon') || rel.has('apple-touch-icon') || rel.has('apple-touch-icon-precomposed') ||
+          rel.has('mask-icon') || (rel.has('preload') && attrs.as?.toLowerCase() === 'image')) as = 'picture';
         else if (rel.has('modulepreload')) as = 'module';
         else if (![...rel].some((word) => LOADING_LINK_RELS.has(word))) as = 'link';
       } else if ((name === 'href' || name === 'xlink:href') && LINK_TAGS.has(tag)) {
         as = 'link';
+      } else if (name === 'background' ||
+        (name === 'src' && (tag === 'img' || tag === 'input' && attrs.type?.toLowerCase() === 'image')) ||
+        (name === 'poster' && tag === 'video') || (tag === 'image' && (name === 'href' || name === 'xlink:href'))) {
+        as = 'picture';
       }
       out.refs.push({ value: value.trim(), as });
     }
@@ -156,7 +162,7 @@ export function pageReferences(html: string): PageReferences {
       const value = attrs[name];
       if (value === undefined) continue;
       if (looksBuilt(value)) out.builtAttribute = true;
-      for (const url of srcsetUrls(value)) out.refs.push({ value: url, as: 'any' });
+      for (const url of srcsetUrls(value)) out.refs.push({ value: url, as: 'picture' });
     }
   }
   return out;

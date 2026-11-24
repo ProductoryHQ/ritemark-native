@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
 - Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).
