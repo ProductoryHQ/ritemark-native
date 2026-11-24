@@ -20,6 +20,8 @@
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
+import type { TimetableSlide } from '../../../../src/decks/timetable'
+import { slideMinutesText } from '../../../../src/decks/timetableDisplay'
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
@@ -175,6 +177,7 @@ function Gap({ at, count, actions, dropHere }: { at: number; count: number; acti
 interface ThumbnailProps {
   entry: DeckSlideEntry
   count: number
+  minutesLabel: string | null
   current: boolean
   theme: DeckTheme
   borderless: boolean
@@ -203,7 +206,7 @@ interface ThumbnailProps {
 }
 
 /** One numbered thumbnail, with its menu. */
-const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash, makingPicture }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ entry, count, minutesLabel, current, theme, borderless, assets, missing, actions, dragging, onDragStart, menuOpen, onMenuOpen, onMenuCloseFocus, badgeLabel, badgeAmber, comments, joining, flash, makingPicture }: ThumbnailProps) {
   const { index, kind, data } = entry
   const skipped = data.skip === true
   const fromLibrary = badgeLabel !== null
@@ -211,7 +214,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
     <div
       role="option"
       aria-selected={current}
-      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
+      aria-label={`Slide ${index + 1}${data.title ? `: ${data.title}` : ''}${skipped ? ', skipped' : ''}${minutesLabel ? `, ${minutesLabel}` : ''}${badgeLabel ? `, ${badgeLabel.toLowerCase()}` : ''}${makingPicture ? ', ChatGPT is making a picture' : ''}`}
       data-thumb={index}
       className={`deck-thumb${current ? ' is-current' : ''}${skipped ? ' is-skip' : ''}${dragging ? ' is-dragging' : ''}${menuOpen ? ' is-menu' : ''}${joining ? ' is-join' : ''}`}
       onPointerDown={event => onDragStart(index, event)}
@@ -225,6 +228,11 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       <span className="deck-thumb-no">{index + 1}</span>
       <div className="deck-thumb-slide">
         <SlideCanvas kind={kind} data={data as SlideData} width={THUMB_WIDTH} theme={theme} borderless={borderless} assets={assets} missing={missing} />
+        {minutesLabel ? (
+          <Tooltip label={`${minutesLabel} planned`} className="deck-thumb-minutes">
+            <span aria-hidden="true">{minutesLabel}</span>
+          </Tooltip>
+        ) : null}
         {/* Keyed by the serial: a second undo of the same slide plays it again. None under reduced motion (decks.css). */}
         {flash ? <span key={flash} className="deck-thumb-flash" aria-hidden="true" /> : null}
       </div>
@@ -238,7 +246,7 @@ const Thumbnail = memo(function Thumbnail({ entry, count, current, theme, border
       {skipped ? <span className="deck-thumb-eye"><Icon name="eye-slash" size={12} tone="inherit" /></span> : null}
       {comments > 0 ? (
         // Sprint 161: the slide's comments, counted on the strip only (the thumbnails people see draw none).
-        <Tooltip label={comments === 1 ? '1 comment on this slide' : `${comments} comments on this slide`} className="deck-thumb-comments">
+        <Tooltip label={comments === 1 ? '1 comment on this slide' : `${comments} comments on this slide`} className={`deck-thumb-comments${minutesLabel ? ' has-minutes' : ''}`}>
           <span>{comments}</span>
         </Tooltip>
       ) : null}
@@ -281,6 +289,7 @@ function liftedCopy(thumb: HTMLElement): HTMLElement | null {
 
 interface SlideStripProps {
   slides: DeckSlideEntry[]
+  timing?: readonly TimetableSlide[]
   current: number
   theme: DeckTheme
   borderless: boolean
@@ -298,7 +307,7 @@ interface SlideStripProps {
   flash?: { index: number; serial: number } | null
 }
 
-export function SlideStrip({ slides, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null, flash = null }: SlideStripProps) {
+export function SlideStrip({ slides, timing, current, theme, borderless, assets, missing, actions, stripRef, marks, commentCounts, joinAt = null, flash = null }: SlideStripProps) {
   const count = slides.length
   const [drag, setDrag] = useState<{ from: number; to: number | null } | null>(null)
   const [menuFor, setMenuFor] = useState<number | null>(null)
@@ -495,6 +504,7 @@ export function SlideStrip({ slides, current, theme, borderless, assets, missing
           <Thumbnail
             entry={entry}
             count={count}
+            minutesLabel={slideMinutesText(timing?.[entry.index])}
             current={entry.index === current}
             theme={theme}
             borderless={borderless}
