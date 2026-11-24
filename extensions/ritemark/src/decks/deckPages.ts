@@ -227,7 +227,7 @@ export class DeckPages implements vscode.Disposable {
       if (event.document === document && event.contentChanges.length && panel.active) this.refreshTimetable();
     });
     // The bar's Publish control hears the page's state while this view is open.
-    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message));
+    const seat = this.publisher?.attach(document, message => this.post(panel.webview, message), panel.webview);
     return {
       dispose: () => {
         seat?.dispose();
@@ -474,7 +474,13 @@ export class DeckPages implements vscode.Disposable {
         return;
       }
       case 'deck/page-state':
-        if (this.publisher) await this.post(webview, { type: 'deck/page-state', state: await this.publisher.stateOf(document) });
+        await this.publisher?.requestPageState(document, webview);
+        return;
+      case 'deck/live-fit':
+        this.publisher?.rememberLiveInput(document, webview, request);
+        return;
+      case 'deck/live-action':
+        await this.publisher?.liveAction(document, request.action, webview);
         return;
       case 'deck/publish':
         await this.publisher?.publish(document, request.text, request.look, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
