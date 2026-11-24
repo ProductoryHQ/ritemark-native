@@ -7,12 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — v2.4.0
+
+### Fixed
+
+- Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
+- Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).
+
 ## [Unreleased] — v2.3.0
+
+### A document opened from Finder or Explorer (#978)
+
+#### Fixed
+- **A double-clicked document opens in Ritemark’s editor.** With Ritemark closed, a `.md` file or a `.rtms` deck double-clicked in Finder or Explorer could open in the text editor, mostly on Windows and on a profile that had been used before. VS Code created its custom-editor service on idle, after the editor resolver had already chosen the text editor for the document the start opened. New patch 022 creates it at startup instead (`InstantiationType.Eager`).
+
+### ChatGPT models and runtime
+
+#### Changed
+- **GPT-6.2 models and the bundled Codex CLI.** GPT-6.2 Sol becomes Codex’s default and GPT-6.2 Astra joins the model list (#956, PR #963). The bundled Codex CLI moves from 0.164.0 to 0.171.0, the first version that runs GPT-6.2 (PR #964).
 
 ### Decks is on (#916)
 
 #### Changed
-- **Decks is on by default.** A `.deck.md` file opens as a deck, with its slides beside their handout; New → Deck, the Deck card on Home and the Slide library are there from the first start. The setting `ritemark.features.decks` stays as an off switch: off, a `.deck.md` opens as an ordinary document, New and Home lose Deck, and the Slide library goes. Until now Decks was on `main` behind that setting, off by default (since Sprint 159 PR 2, #735), and these lines were left out while it was (Jarmo, 20 November 2026: "Decks läheb 2.3 sisse").
+- **Decks is on by default.** A `<name>.rtms` file opens as a deck, with its slides beside their handout. Older `.deck.md` files still open as decks under their original names. New → Deck, the Deck card on Home and the Slide library are there from the first start. Turn off `ritemark.features.decks` to open both kinds of file as ordinary documents and hide Deck from New and Home and the Slide library from the sidebar. Until now Decks was on `main` behind that setting, off by default (since Sprint 159 PR 2, #735), and these lines were left out while it was (Jarmo, 20 November 2026: "Decks läheb 2.3 sisse").
+- **Decks have their own file type (Sprint 172, #940, PRs #949, #951, #952).** New decks are saved as `<name>.rtms`. Finder shows “Ritemark Deck” with the deck badge, and Explorer shows “Ritemark Deck” with the deck icon. Every install registers Ritemark to open these files by default.
 
 ### Decks: Sprints 159, 161 and 164–171
 
@@ -24,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The Slide library.** Other decks listed by folder, sections taken whole with one undo, search that shows each slide once, and an offer for the slides you repeat (Sprint 165).
 - **Present.** The wall shows only the slide; with a second display the laptop shows this slide, the next, the comments and the clock. Clicker, blank screen, spotlight, timer and QR code (Sprint 159 and the Present PRs).
 - **Share.** Publish puts the deck online as one page with Copy on each prompt and exercises to tick; Save slides and handout as PDF is under Publish's arrow (Sprints 159, 170).
+- **The AI names the slides it changed (#967).** After editing a deck, it describes what changed using slide numbers and titles, and names handout changes by their slide.
+
+#### Fixed
+- **Switch tabs while presenting without the presenter view (#974).** Click a tab on the slide to show its contents and stay on that slide.
 
 ### Sprint 162: deck themes
 

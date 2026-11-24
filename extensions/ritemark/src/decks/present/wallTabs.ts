@@ -1,9 +1,9 @@
 /**
- * Sprint 163 (decks README "Present"): the tab each Tabs block on the wall's slide shows, chosen on the presenter view's
- * Now, by the block's place among the slide's Tabs blocks (from 0, as the renderer draws them); a block without a choice
- * shows its first tab. Not kept: a move starts every block at its first tab again, and nothing goes in the file.
+ * The tab each Tabs block on the wall's slide shows, chosen on the presenter view's Now or on the wall when that view
+ * is off. The block's place among the slide's Tabs blocks starts at 0, as in the renderer. A block without a choice
+ * shows its first tab. A move starts every block at its first tab again, and nothing goes in the file.
  *
- * Pure and without imports, so the host's protocol and the presenter view read and write the same choice.
+ * Pure and without imports, so the host's protocol and both views read and write the same choice.
  */
 export type WallTabs = number[];
 

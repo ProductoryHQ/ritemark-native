@@ -20,15 +20,14 @@
 #
 # Usage:
 #   ./scripts/verify-agent-runtimes.sh              # all checks
-#   ./scripts/verify-agent-runtimes.sh --versions   # version discovery only (fast)
+#   ./scripts/verify-agent-runtimes.sh --versions   # versions and offline Codex checks
 #
 # Exit non-zero if any check FAILS. Most checks that cannot run (missing binary,
 # SDK not installed) report SKIP rather than failing — a skip is an honest "not
 # proven" and must reach the matrix as such rather than being counted as a pass.
 #
-# The permission gate is the deliberate exception: if it cannot be exercised it
-# reports FAIL, not SKIP. It is the entire safety boundary for that runtime, so
-# "we could not check it" and "it is broken" deserve the same answer here.
+# The permission gate and Codex RPC check report FAIL when a probe gets no answer,
+# and the Codex RPC check also fails when codex-app-server is not installed.
 #
 set -u
 
@@ -73,18 +72,21 @@ echo
 # manifest and the bytes on disk agree.
 echo "--- version discovery ---"
 manifest_version() {
-  node -e "
-    const m=require('$EXT/binaries/agents/manifest.json');
-    const r=m.runtimes.find(x=>x.agent==='$1' && (x.component==='$2' || x.members?.some(y=>y.component==='$2')));
-    const member=r?.members?.find(y=>y.component==='$2');
-    process.stdout.write(member?.version || r?.version || '');
-  " 2>/dev/null
+  local manifest="$EXT/binaries/agents/manifest.json"
+  if command -v cygpath >/dev/null; then manifest="$(cygpath -m "$manifest")" || return 1; fi
+  node -e '
+    const [file, agent, component] = process.argv.slice(1);
+    const m=require(file);
+    const r=m.runtimes.find(x=>x.agent===agent && (x.component===component || x.members?.some(y=>y.component===component)));
+    const member=r?.members?.find(y=>y.component===component);
+    process.stdout.write(member?.version || r?.version || "");
+  ' "$manifest" "$1" "$2"
 }
 check_version() { # name binary-path expected-substring
   local name="$1" path="$2" want="$3"
   if [[ ! -x "$path" ]]; then skip "$name binary not installed ($path) — run fetch-agent-runtimes.sh"; return; fi
   local out matched; out="$("$path" --version 2>&1)"
-  if [[ -z "$want" ]]; then skip "$name has no manifest version to compare against"; return; fi
+  if [[ -z "$want" ]]; then fail "$name has no manifest version to compare against"; return; fi
   if [[ "$out" == *"$want"* ]]; then
     matched="$(printf '%s\n' "$out" | grep -F "$want" | head -1)"
     pass "$name reports $matched (manifest: $want)"
@@ -133,17 +135,58 @@ check_codex_code_mode_host() { # app-server-path code-mode-host-path
     fail "codex code-mode host exists but its --help smoke test fails"
   fi
 }
+# Codex 0.171.0 ships the standalone executor beside app-server and names it in codex-package.json
+# (`execServer`). A tree that lost it would still pass the app-server check, so it gets its own.
+check_codex_exec_server() { # app-server-path exec-server-path expected-version
+  local app_server="$1" exec_server="$2" want="$3"
+  if [[ ! -x "$app_server" ]]; then
+    skip "codex app-server is not installed, so its exec-server cannot be checked"
+    return
+  fi
+  if [[ ! -x "$exec_server" ]]; then
+    fail "codex app-server is installed but required exec-server is missing ($exec_server)"
+    return
+  fi
+  local out; out="$("$exec_server" --version 2>&1)"
+  if [[ -z "$want" ]]; then
+    fail "codex exec-server has no manifest version to compare against"
+    return
+  fi
+  if [[ "$out" == *"$want"* ]]; then
+    pass "codex exec-server is installed beside app-server and reports $want"
+  else
+    fail "codex exec-server reports '$out' but the manifest pins ${want:-nothing}"
+  fi
+}
 check_version claude   "$BIN/claude$EXE_SUFFIX"           "$(manifest_version claude runtime)"
 check_version opencode "$BIN/opencode$EXE_SUFFIX"         "$(manifest_version opencode runtime)"
 check_version opencode-ripgrep "$BIN/opencode-path/rg$EXE_SUFFIX" "$(manifest_version opencode ripgrep)"
+
+# Even --version and --help can write to CODEX_HOME. Isolate the metadata
+# commands as well as the JSON-RPC session (which creates its own empty home).
+codex_smoke_home="$(mktemp -d)" || exit 1
+trap 'rm -rf "$codex_smoke_home"' EXIT
+CODEX_HOME="$codex_smoke_home"
+if command -v cygpath >/dev/null; then CODEX_HOME="$(cygpath -m "$codex_smoke_home")" || exit 1; fi
+export CODEX_HOME
 check_version codex    "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" "$(manifest_version codex app-server)"
 check_codex_code_mode_host \
   "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" \
   "$BIN/codex/bin/codex-code-mode-host$EXE_SUFFIX"
+check_codex_exec_server \
+  "$BIN/codex/bin/codex-app-server$EXE_SUFFIX" \
+  "$BIN/codex/bin/codex-exec-server$EXE_SUFFIX" \
+  "$(manifest_version codex exec-server)"
 check_codex_windows_sandbox_helpers "$BIN/codex/bin/codex-app-server$EXE_SUFFIX"
 
+if node "$ROOT/scripts/lib/verify-codex-methods.mjs" "$BIN/codex/bin/codex-app-server$EXE_SUFFIX"; then
+  pass "codex app-server answered all Ritemark JSON-RPC methods"
+else
+  fail "codex app-server JSON-RPC method check failed"
+fi
+
 if $VERSIONS_ONLY; then
-  echo; echo "(--versions: stopping before the behavioural checks)"
+  echo; echo "(--versions: stopping before the OpenCode behavioural checks)"
   [[ $FAILURES -gt 0 ]] && exit 1 || exit 0
 fi
 

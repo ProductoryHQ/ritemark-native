@@ -3,7 +3,7 @@
 Nothing starts until Jarmo approves the plan in his own words (shell-tier, and it changes his decisions 1 and 10). Then the sprint branch, before the first edit.
 
 ## PR 1: the one rule, every deck place, the agents (extension-tier)
-- [ ] Issue created in milestone v2.3.0, linked to #940 (PR 1 refers to #940 itself, as the brief asked; no issue of its own)
+- [ ] Issue created in milestone v2.3.0, linked to #940 (PR 1 refers to #940 itself, as the brief asked; no issue of its own) — PR #949 uses #940 directly.
 - [x] `deckFileName.ts`: `DECK_EXTENSION` `.rtms`, `LEGACY_DECK_EXTENSION`, `isDeckPath` for both, `deckNameOf`, `deckFileName`, `DECK_GLOB`, `splitFileName` (R1, R4, R5)
 - [x] Every file in the audit's first table moved to the rule; the grep in `technical-plan.md` Workstream 1 finds only `deckFileName.ts` and comments
 - [x] New → Deck, Home's Deck card, Make a copy and a new library topic make `.rtms` (R3)
@@ -14,11 +14,12 @@ Nothing starts until Jarmo approves the plan in his own words (shell-tier, and i
 - [x] DECKS instructions, the deck tools' path check and words, `themeAi.ts`, `themeProtocol.ts` (R8)
 - [x] Unit rows for each change; the old `.deck.md` tests green, changed only where a new name is now `.rtms`
 - [x] The demo project: its decks renamed with their `from:` lines (six: the folder held seven decks, not eight); `Copilot at work.deck.md` kept
-- [ ] Live proof in an isolated test window: scenarios 1, 4, 5, 9, 12 and 14 (a writer's change to an open `.rtms`, the sync path an AI's write takes) done, shots under `proof/pr1/`; 18–20 (Claude and Codex) not run: the vault has no Anthropic or OpenAI test key (`governance/test-keys.md`: "Not made"), and a test window is never signed in
-- [ ] Risk and How to revert in the PR; Review record; the Experience lead's look at the shots; release-notes line; architecture.md row
+- [ ] Live proof in an isolated test window — The shots in [proof/pr1/](proof/pr1/) cover local editing and compatibility; the live AI checks remain open. Scenarios 18–20 were not run because the isolated profile had no test credentials.
+- [x] Release-notes line and architecture row landed.
+- [x] Risk and How to revert in the PR; Review record; the Experience lead's look at the shots — How to revert in #949's text; its Review record names the final head (full chain EXIT 0); the Experience lead's OK on `a711effa` (shots 1–5).
 
 ## PR 2: the Mac's file type (shell-tier)
-- [ ] Issue created in milestone v2.3.0, linked to #940
+- [ ] Issue created in milestone v2.3.0, linked to #940 — PR #951 uses #940 directly.
 - [x] The badge: `branding/icons/deck-badge.svg` (Phosphor `presentation`, bold, #4338ca), compiled into the asset catalog `branding/icons/deck-badge.car` (the runner showed `.icns` gets no badge), and the command in `branding/README.md`
 - [x] `scripts/stamp-deck-document-type.sh` and its test on a bare plist (`scripts/test-stamp-deck-document-type.sh`, in `validate-qa.sh`)
 - [x] First commit: `.github/workflows/deck-type-proof.yml` and `scripts/qa/deck-type-proof.swift`; three runs; their artifacts (UTType, the opening app, the drawn icon with the badge, the app icon unchanged, Quick Look, Spotlight) under `proof/pr2/`; the badge's form decided: an asset catalog
@@ -28,18 +29,18 @@ Nothing starts until Jarmo approves the plan in his own words (shell-tier, and i
 - [x] `branding/product.json`: `*.rtms` → `ritemark.editor`
 - [x] A dev build's plist has no deck type (scenario 24): read from the rundev tree's `.build/electron` app, no `ai.productory.ritemark.deck`, no exported types, no `Assets.car`
 - [x] TEST-CHECKLIST rows for the Mac (audit §4): 24t–24x
-- [ ] Risk and How to revert; Review record (High)
+- [x] Risk and How to revert; Review record (High) — How to revert in #951's text; its Review record (High) has the full chain EXIT 0 and the Experience lead's OK on `9c68d421` (the icon at 512/128/64/32, kind, owner, opener, Quick Look, Spotlight).
 
 ## PR 3: Windows (shell-tier)
-- [ ] Issue created in milestone v2.3.0, linked to #940; closes #940 with the last merge (PR 3 refers to #940 itself; the manager sets Closes at merge time if it merges last)
+- [ ] Issue created in milestone v2.3.0, linked to #940; closes #940 with the last merge (PR 3 refers to #940 itself; the manager sets Closes at merge time if it merges last) — PR #952 uses #940 directly, and the release plan records #940 closed.
 - [x] `branding/win32/deck.ico` to the Experience lead's design: her six drawn sizes (16, 24, 32, 48, 64, 256), pixel for pixel, made with `branding/win32/make-deck-ico.py`; Windows scales 20 and 40 from them
 - [x] `ritemark.iss`: the icon file, `ChangesAssociations=yes`, the `.rtms` registry block with no task (R10)
 - [x] The CI round trip's registry probe checks `.rtms` after install and after uninstall (scenario 29)
 - [x] TEST-CHECKLIST rows for Windows (audit §4): 24y, the CI round trip; 24z, Explorer's icon and a double-click
-- [ ] Risk and How to revert; Review record (High)
+- [x] Risk and How to revert; Review record (High) — How to revert in #952's text; its Review record (High) has the full chain EXIT 0, and `deck.ico`'s six frames are the Experience lead's own PNGs, pixel for pixel. Its look on a PC is checked at Gate 2 (row 24z).
 
 ## Sprint end
-- [ ] The full test chain once on each final head, output to a file
-- [ ] `qa-validator` at the sprint's end
-- [ ] Release plan row set to Done
-- [ ] Gate 2 rows (scenarios 25–28, 30) handed to the 2.3 RC's checklist; they are checked by Jarmo on the RC, not in this sprint
+- [x] The full test chain once on each final head, output to a file — EXIT 0 on each PR's final head, given in its Review record (#949, #951, #952); the logs stayed in the manager's scratchpad.
+- [ ] `qa-validator` at the sprint's end — it ran on 21 November and found the close-out gaps this paperwork closes; its sign-off follows once this lands.
+- [x] Release plan row set to Done ([release plan](../release-plan.md)).
+- [x] Gate 2 scenarios 25–28 and 30 are in the [2.3 RC checklist](../../../../releases/v2.3.0/TEST-CHECKLIST.md), rows 24u–24x and 24z. Jarmo checks them on the RC.

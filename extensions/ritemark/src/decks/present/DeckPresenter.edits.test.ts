@@ -270,7 +270,7 @@ async function main(): Promise<void> {
     wall.send({ type: 'present/spot', item: 0 });
     await settle();
     assert.equal(last(wall, 'present/wall').fill, null);
-    // Sprint 163: a tab chosen on Now shows on the wall; only the presenter view chooses, it is no move, and a move
+    // Sprint 163: with the presenter view on, a tab chosen on Now shows on the wall; it is no move, and a move
     // starts every Tabs block at its first tab again (below).
     presenterView.send({ type: 'present/tab', block: 0, tab: 2 });
     await settle();
@@ -279,7 +279,7 @@ async function main(): Promise<void> {
     assert.equal((last(wall, 'present/wall').slide as { title: string }).title, spotOn, 'a tab is not a move');
     wall.send({ type: 'present/tab', block: 0, tab: 1 });
     await settle();
-    assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'the wall never chooses a tab');
+    assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'the wall cannot choose a tab while the presenter view is on');
     presenterView.send({ type: 'present/tab', block: 0, tab: -1 });
     await settle();
     assert.deepEqual(last(wall, 'present/wall').tabs, [2], 'a place that is not one is not a request');
@@ -389,6 +389,15 @@ async function main(): Promise<void> {
     wall.send({ type: 'present/presenter' });
     await settle();
     assert.equal(last(wall, 'present/wall').timer, null, 'no timer left on the wall without the view that stops it');
+    // #974: with the presenter view off, the wall chooses the tab on its own slide.
+    const beforeTab = last(wall, 'present/wall');
+    assert.equal((beforeTab.presenter as { on: boolean }).on, false);
+    wall.send({ type: 'present/tab', block: 0, tab: 2 });
+    await settle();
+    const afterTab = last(wall, 'present/wall');
+    assert.deepEqual(afterTab.tabs, [2], 'the wall shows the tab it chose');
+    assert.deepEqual(afterTab.slide, beforeTab.slide, 'the tab click stays on the same slide');
+    assert.equal(afterTab.spot, beforeTab.spot, 'the tab click keeps the spotlight as it was');
     // On again, as the person last chose (the next start opens it too).
     wall.send({ type: 'present/presenter' });
     await settle(50);

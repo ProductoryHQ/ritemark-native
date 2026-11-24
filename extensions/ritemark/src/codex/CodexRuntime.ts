@@ -361,7 +361,7 @@ export class CodexSession implements RuntimeSession {
       ? {
           mode: 'plan' as const,
           settings: {
-            model: resolvedModel ?? CODEX_MODEL_IDS.SOL_6_1,
+            model: resolvedModel ?? CODEX_MODEL_IDS.SOL_6_2,
             reasoning_effort: effectiveThinkingEffort ?? null,
             developer_instructions: config.codexPlanDeveloperInstructions ?? CODEX_PLAN_DEVELOPER_INSTRUCTIONS,
           },
