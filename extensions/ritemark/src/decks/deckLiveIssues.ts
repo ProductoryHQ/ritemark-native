@@ -105,7 +105,7 @@ export async function locateLiveIssues(deckPath: string, text: string, built: Bu
       const display = (file: string) => liveFileDisplay(file, plan.projectFolder, home);
       const files = [
         ...pictures.filter(item => item.outside).map(item => display(item.file)),
-        ...(issue?.outsideFiles ?? []),
+        ...(issue?.outsideFiles ?? []).map(file => display(path.resolve(plan.projectFolder, file))),
       ];
       const outsideFiles = [...new Set(files)];
       return {
