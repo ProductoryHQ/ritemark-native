@@ -4,6 +4,7 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
@@ -66,6 +67,7 @@ export interface ModelOption {
 export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
+  step?: ToolStep;
   type: AgentProgressType;
   message: string;
   tool?: string;
@@ -434,6 +436,7 @@ export interface CodexConversationTurn {
   planDecision?: 'approved' | 'rejected';
   result?: {
     status: string;
+    activityDurationMs?: number;
     error?: string;
     /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
     errorKind?: RuntimeErrorKind;

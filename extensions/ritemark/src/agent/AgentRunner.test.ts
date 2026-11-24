@@ -8,6 +8,8 @@ import {
   DEFAULT_SETTING_SOURCES,
   modelMatchesExpectedIdentity,
   normalizeClaudeSdkSuccessResult,
+  processAssistantMessage,
+  processToolResultMessage,
 } from './AgentRunner';
 
 // Sprint 127 R1: a declared model reaches the CLI as a modelPicker row plus its
@@ -498,7 +500,33 @@ async function testSyntheticAuthSuccessEnvelopeFailsTheTurn(): Promise<void> {
   }, 'the SDK terminal is_error bit remains authoritative even with prior assistant activity');
 }
 
+function testDocumentStepEvents() {
+  const files: string[] = [];
+  const events: Array<Parameters<Parameters<typeof processAssistantMessage>[2]>> = [];
+  const capture: Parameters<typeof processAssistantMessage>[2] = (...event) => events.push(event);
+  processAssistantMessage({
+    type: 'assistant',
+    message: { content: [
+      { type: 'tool_use', id: 'doc', name: 'mcp__ritemark_documents__read_document', input: { path: 'Reference/Locked.docx' } },
+      { type: 'tool_use', id: 'ls', name: 'Glob', input: { path: 'Reference', pattern: '*.docx' } },
+    ] },
+  } as Parameters<typeof processAssistantMessage>[0], files, capture);
+  processToolResultMessage({
+    type: 'user',
+    message: { content: [
+      { type: 'tool_result', tool_use_id: 'ls', content: 'Reference/Locked.docx' },
+      { type: 'tool_result', tool_use_id: 'doc', content: 'The file is locked.', _meta: { documentReadReason: 'password' } },
+    ] },
+  } as Parameters<typeof processToolResultMessage>[0], files, capture);
+  assert.deepEqual(events.map((event) => event[5]?.id), ['doc', 'ls', 'ls', 'doc']);
+  assert.equal(events[0][5]?.path, 'Reference/Locked.docx');
+  assert.deepEqual(events[2][5]?.listing, ['Reference/Locked.docx']);
+  assert.equal(events[3][5]?.warning, 'it has a password');
+  assert.deepEqual(files, []);
+}
+
 async function main() {
+  testDocumentStepEvents();
   testCanonicalModelIdentityMatching();
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();

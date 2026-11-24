@@ -21,6 +21,7 @@
 
 'use strict';
 
+import type { DocumentReadReason } from '../documents/documentRead';
 import * as net from 'net';
 import type { RitemarkIpcRequest, RitemarkIpcResponse, RitemarkIpcToolDefinition } from '../runtime/RitemarkIpcServer';
 
@@ -125,8 +126,8 @@ function send(obj: JsonRpcResponse): void {
   process.stdout.write(JSON.stringify(obj) + '\n');
 }
 
-function textResult(id: string | number, text: string, isError: boolean): void {
-  send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }], isError } });
+function textResult(id: string | number, text: string, isError: boolean, reason?: DocumentReadReason): void {
+  send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text }], isError, ...(reason ? { _meta: { documentReadReason: reason } } : {}) } });
 }
 
 function handleRequest(msg: JsonRpcRequest): void {
@@ -172,7 +173,7 @@ function handleRequest(msg: JsonRpcRequest): void {
           }
           return callIpc({ op: 'call', tool: toolName, params: args }).then((resp) => {
             if (resp.error !== undefined) textResult(id as string | number, `Error: ${resp.error}`, true);
-            else textResult(id as string | number, resp.text ?? '', Boolean(resp.isError));
+            else textResult(id as string | number, resp.text ?? '', Boolean(resp.isError), resp.reason);
           });
         })
         .catch((err: unknown) => {

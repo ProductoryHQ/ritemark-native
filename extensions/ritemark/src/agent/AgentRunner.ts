@@ -11,6 +11,7 @@
  * of ~8-12s (no process re-spawn).
  */
 
+import { documentReadReasonOf, isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import type {
   AgentExecutionOptions,
   AgentPlanApprovalRequest,
@@ -395,7 +396,8 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
     message,
     tool?,
     file?,
-    subagentInfo?
+    subagentInfo?,
+    step?
   ) => {
     onProgress?.({
       type,
@@ -406,6 +408,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
       subagentId: subagentInfo?.subagentId,
       subagentTask: subagentInfo?.subagentTask,
       parentToolUseId: subagentInfo?.parentToolUseId,
+      ...(step ? { step } : {}),
     });
   };
 
@@ -511,7 +514,7 @@ export async function runAgent(options: AgentExecutionOptions): Promise<AgentRes
           processAssistantMessage(message, filesModified, emitProgress, message.parent_tool_use_id);
         }
       } else if (message.type === 'user') {
-        processToolResultMessage(message, filesModified);
+        processToolResultMessage(message, filesModified, emitProgress);
       } else if (message.type === 'tool_progress' || (message.type === 'system' && message.subtype === 'task_notification')) {
         processSystemMessage(message, emitProgress);
       } else if (message.type === 'result') {
@@ -842,7 +845,7 @@ export class AgentSession {
     this._clearPendingQuestion();
     this._clearPendingPlanApproval();
     this._clearPendingToolApproval();
-    this._emitProgress = (type, message, tool?, file?, subagentInfo?) => {
+    this._emitProgress = (type, message, tool?, file?, subagentInfo?, step?) => {
       onProgress?.({
         type,
         message,
@@ -852,6 +855,7 @@ export class AgentSession {
         subagentId: subagentInfo?.subagentId,
         subagentTask: subagentInfo?.subagentTask,
         parentToolUseId: subagentInfo?.parentToolUseId,
+        ...(step ? { step } : {}),
       });
     };
     this._emitQuestion = onQuestion || null;
@@ -986,7 +990,7 @@ export class AgentSession {
   }
 
   private _progressEmitter(deliver: (progress: AgentProgress) => void): ExtendedProgressEmitter {
-    return (type, message, tool, file, subagentInfo) => deliver({
+    return (type, message, tool, file, subagentInfo, step) => deliver({
       type,
       message,
       tool,
@@ -995,6 +999,7 @@ export class AgentSession {
       subagentId: subagentInfo?.subagentId,
       subagentTask: subagentInfo?.subagentTask,
       parentToolUseId: subagentInfo?.parentToolUseId,
+      ...(step ? { step } : {}),
     });
   }
 
@@ -1457,7 +1462,7 @@ export class AgentSession {
           this._handleTaskMessage(message);
         } else if (message.type === 'user') {
           this._handleUserMessage(message);
-          processToolResultMessage(message, this._runtimeTurn ? this._runtimeTurn.filesModified : this._turnFilesModified);
+          processToolResultMessage(message, this._runtimeTurn ? this._runtimeTurn.filesModified : this._turnFilesModified, this._emitterFor(message.parent_tool_use_id));
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
           traceClaude('sdk', 'system:status', { status: (message as any).status });
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
@@ -1854,8 +1859,12 @@ type ExtendedProgressEmitter = (
   message: string,
   tool?: string,
   file?: string,
-  subagentInfo?: { subagentId?: string; subagentTask?: string; parentToolUseId?: string }
+  subagentInfo?: { subagentId?: string; subagentTask?: string; parentToolUseId?: string },
+  step?: ToolStep,
 ) => void;
+
+// Like the pending edits below, overlapping turns keep their tool results separate.
+const pendingSteps = new WeakMap<string[], Map<string, { step: ToolStep; tool: string; parentToolUseId?: string }>>();
 
 /**
  * Sprint 155: a turn's changes waiting for their tool's result, keyed by the
@@ -1879,16 +1888,24 @@ function pendingChangesOf(filesModified: string[]): Map<string, string> {
  * with `is_error: true` — the bundled CLI (0.3.310) answers a denied tool_use
  * that way, with `toolDenialKind` "user-rejected" — so neither counts.
  */
-export function processToolResultMessage(message: SDKMessage, filesModified: string[]): void {
+export function processToolResultMessage(message: SDKMessage, filesModified: string[], emitProgress?: ExtendedProgressEmitter): void {
   const content = (message.message as { content?: unknown } | undefined)?.content;
   if (!Array.isArray(content)) return;
   const pending = pendingChanges.get(filesModified);
-  if (!pending) return;
-  for (const block of content as Array<{ type?: string; tool_use_id?: string; is_error?: boolean }>) {
+  const steps = pendingSteps.get(filesModified);
+  if (!pending && !steps) return;
+  for (const block of content as Array<{ type?: string; tool_use_id?: string; is_error?: boolean; content?: unknown; _meta?: unknown }>) {
     if (block.type !== 'tool_result' || !block.tool_use_id) continue;
-    const file = pending.get(block.tool_use_id);
+    const activity = steps?.get(block.tool_use_id);
+    if (activity) {
+      steps?.delete(block.tool_use_id);
+      const { step, tool, parentToolUseId } = activity;
+      const update = toolStepResult(step, block.content, block.is_error === true, isDocumentReadTool(tool), documentReadReasonOf(block));
+      emitProgress?.(parentToolUseId ? 'subagent_progress' : 'tool_use', '', tool, step.path, { parentToolUseId }, update);
+    }
+    const file = pending?.get(block.tool_use_id);
     if (file === undefined) continue;
-    pending.delete(block.tool_use_id);
+    pending?.delete(block.tool_use_id);
     if (block.is_error !== true) filesModified.push(file);
   }
 }
@@ -1924,6 +1941,7 @@ export function processAssistantMessage(
     } else if (block.type === 'tool_use') {
       const input = block.input as {
         file_path?: string;
+        path?: string;
         command?: string;
         pattern?: string;
         description?: string;
@@ -1975,13 +1993,31 @@ export function processAssistantMessage(
         toolMessage = `Searching for: ${input.pattern}`;
       }
 
+      let step: ToolStep | undefined;
+      if (block.id && block.name) {
+        const path = input?.path ?? input?.file_path;
+        const target = typeof path === 'string' ? path : undefined;
+        if (isDocumentReadTool(block.name) || block.name === 'Read') {
+          step = { id: block.id, kind: 'read', path: target };
+        } else if (block.name === 'Glob' || block.name === 'LS') {
+          step = { id: block.id, kind: 'folder', path: target, command: typeof input?.pattern === 'string' ? input.pattern : undefined };
+        } else if (block.name === 'Bash') {
+          step = { id: block.id, kind: 'shell', command: typeof input?.command === 'string' ? input.command : undefined };
+        }
+        if (step) {
+          const steps = pendingSteps.get(filesModified) ?? new Map();
+          steps.set(block.id, { step, tool: block.name, parentToolUseId: parentToolUseId ?? undefined });
+          pendingSteps.set(filesModified, steps);
+        }
+      }
+
       // If this is a subagent activity (has parent_tool_use_id), tag it
       if (parentToolUseId) {
         emitProgress('subagent_progress', toolMessage, block.name, input?.file_path, {
           parentToolUseId,
-        });
+        }, step);
       } else {
-        emitProgress('tool_use', toolMessage, block.name, input?.file_path);
+        emitProgress('tool_use', toolMessage, block.name, input?.file_path, undefined, step);
       }
     }
   }

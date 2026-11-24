@@ -6,6 +6,9 @@
  * approval dialogs for shell commands and file changes.
  */
 
+import { ActivityCard } from './ActivityCard';
+import { ActivityDetails } from './ActivityDetails';
+import { activityHeadline, readSummary, stepLabel } from './stepLabel';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -150,6 +153,7 @@ export function CodexTurn({
   onDiscardPlan: (turnId: string, feedback?: string) => void;
 }) {
   const hasActivities = turn.activities.length > 0;
+  const hasNamedSteps = turn.activities.some((activity) => stepLabel(activity));
   const lastActivity = hasActivities ? turn.activities[turn.activities.length - 1] : null;
   const rawPlanText = turn.planText || ((turn.result && !turn.result.error) ? turn.streamingText : '');
   const displayPlanText = extractPlanDisplayText(rawPlanText);
@@ -183,7 +187,8 @@ export function CodexTurn({
       </UserPromptBubble>
 
       {/* Collapsible activities */}
-      {hasActivities && (
+      {hasNamedSteps && turn.isRunning && <ActivityDetails activities={turn.activities} running />}
+      {hasActivities && !hasNamedSteps && (
         <ActivitySection
           activities={turn.activities}
           isRunning={turn.isRunning}
@@ -267,6 +272,16 @@ export function CodexTurn({
         </div>
       )}
 
+      {hasNamedSteps && !turn.isRunning && (
+        <ActivitySection
+          activities={turn.activities}
+          isRunning={false}
+          lastActivity={lastActivity}
+          runtimeLabel={runtimeLabel}
+          activeMs={turn.result?.activityDurationMs}
+        />
+      )}
+
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
           the conversation-level ActivityStatusLine is the single status point
           (a green check here contradicted the amber waiting state below it). */}
@@ -324,12 +339,14 @@ function ActivitySection({
   isRunning,
   lastActivity,
   runtimeLabel,
+  activeMs,
 }: {
   activities: AgentProgress[];
   isRunning: boolean;
   lastActivity: AgentProgress | null;
   /** ChatGPT or OpenCode: the provider's own words are labelled as theirs. */
   runtimeLabel: string;
+  activeMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -339,7 +356,7 @@ function ActivitySection({
   const actions = activities.filter((activity) => activity.type !== 'error').length;
   const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
   const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
-  const latestMessage = lastActivity?.message || '';
+  const latestMessage = activityHeadline(lastActivity);
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">
@@ -361,7 +378,7 @@ function ActivitySection({
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
             ? `${latestMessage}${count > 1 ? ` (${count} actions)` : ''}`
-            : theirWords ?? completed
+            : theirWords ?? readSummary(activities, activeMs) ?? completed
           }
         </span>
       </button>
@@ -370,7 +387,7 @@ function ActivitySection({
       {expanded && (
         <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
           {activities.map((activity, i) => (
-            <ActivityLine key={i} activity={activity} />
+            stepLabel(activity) ? <ActivityCard key={i} activity={activity} /> : <ActivityLine key={i} activity={activity} />
           ))}
         </div>
       )}

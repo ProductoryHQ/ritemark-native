@@ -94,6 +94,8 @@ async function main() {
   const locked = await read('Protected.docx');
   assert.match(locked.text, /it has a password\. Open it in Word, or save a copy without the password/i);
   assert.ok(!locked.isError);
+  assert.equal(locked.reason, 'password');
+  assert.equal((await read('Missing.docx')).isError, true);
   await writeFile(path.join(project, 'Damaged.docx'), word.subarray(0, 120));
   assert.match((await read('Damaged.docx')).text, /damaged/i);
   await writeFile(path.join(project, 'Old.doc'), Buffer.alloc(0));

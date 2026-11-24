@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- AI chat steps show which documents were read and explain when a document could not be opened (#996).
 - Claude, ChatGPT, and OpenCode can now read Word and PDF files in your project, including selected PDF pages (#991).
 - Claude, ChatGPT, and OpenCode can now read PowerPoint files in your project, with speaker notes kept under the slide they belong to (#993).
 

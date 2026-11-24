@@ -23,6 +23,7 @@
  */
 
 import * as path from 'path';
+import type { DocumentReadReason } from '../documents/documentRead';
 import type { AgentId } from '../agent/types';
 import type { BrowserTurnPage } from '../browser/BrowserActionTools';
 import type { DynamicToolDefinition } from '../codex/codexProtocol';
@@ -38,10 +39,14 @@ import {
   type ToolResult,
 } from './ritemarkTools';
 
-type McpContent = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+type McpContent = { content: Array<{ type: 'text'; text: string }>; isError?: boolean; _meta?: { documentReadReason: DocumentReadReason } };
 
 function mcpContent(result: ToolResult): McpContent {
-  return { content: [{ type: 'text', text: result.text }], ...(result.isError ? { isError: true } : {}) };
+  return {
+    content: [{ type: 'text', text: result.text }],
+    ...(result.isError ? { isError: true } : {}),
+    ...(result.reason ? { _meta: { documentReadReason: result.reason } } : {}),
+  };
 }
 
 export class RitemarkToolsInjector {
@@ -72,11 +77,11 @@ export class RitemarkToolsInjector {
     name: string,
     args: Record<string, unknown>,
     browserPage?: BrowserTurnPage,
-  ): Promise<{ text: string; success: boolean }> {
+  ): Promise<{ text: string; success: boolean; reason?: DocumentReadReason }> {
     const found = findCodexTool(groups, name);
     if (!found) return { text: `Unknown tool: ${name}`, success: false };
     const result = await runTool(found.tool, args, { runtimeId: 'codex', ...(browserPage ? { browserPage } : {}) });
-    return { text: result.text, success: !result.isError };
+    return { text: result.text, success: !result.isError, ...(result.reason ? { reason: result.reason } : {}) };
   }
 
   /**
@@ -112,7 +117,7 @@ export class RitemarkToolsInjector {
     const tool = group.tools.find((item) => item.name === request.tool);
     if (!tool) return { text: `Unknown tool: ${String(request.tool)}`, isError: true };
     const result = await runTool(tool, request.params, { runtimeId, ...(browserPage ? { browserPage } : {}) });
-    return { text: result.text, ...(result.isError ? { isError: true } : {}) };
+    return { text: result.text, ...(result.reason ? { reason: result.reason } : {}), ...(result.isError ? { isError: true } : {}) };
   }
 }
 

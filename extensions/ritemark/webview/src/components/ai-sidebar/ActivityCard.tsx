@@ -2,6 +2,10 @@
  * ActivityCard — compact activity entry with icon + one line.
  */
 
+import { useId, useState } from 'react';
+import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
+import { stepLabel } from './stepLabel';
 import { Icon } from '../ui/Icon';
 import type { AgentProgress } from './types';
 
@@ -50,6 +54,42 @@ interface ActivityCardProps {
 }
 
 export function ActivityCard({ activity }: ActivityCardProps) {
+  const step = stepLabel(activity);
+  const [expanded, setExpanded] = useState(false);
+  const id = useId();
+  if (step) {
+    const indicator = step.warning ? 'warning' : activity.step?.status === 'completed' ? 'check' : 'circle-notch';
+    const row = (
+      <>
+        <Icon name={indicator} className="size-3" tone="inherit" />
+        <Icon name={step.icon} className="size-3.5" tone="inherit" />
+        <span className="min-w-0 truncate">{step.label}</span>
+      </>
+    );
+    const color = step.warning ? 'text-[var(--r-warning-ink)]' : 'text-[var(--r-ink-muted)]';
+    return (
+      <div className={color}>
+        {step.detail ? (
+          <Tooltip className="flex min-w-0" label={expanded ? 'Hide step details' : 'Show step details'}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto w-full min-w-0 justify-start gap-1.5 px-1 py-0.5 text-[11px] font-normal"
+              aria-expanded={expanded}
+              aria-controls={expanded ? id : undefined}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {row}
+            </Button>
+          </Tooltip>
+        ) : <div className="flex min-w-0 items-center gap-1.5 px-1 py-0.5 text-[11px]">{row}</div>}
+        {expanded && (
+          <pre id={id} className="ml-4 whitespace-pre-wrap break-all px-1 text-[11px]">{step.detail}</pre>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-start gap-2 rounded px-1 py-0.5 text-[11px]">
       <span className="shrink-0 mt-0.5 opacity-50">

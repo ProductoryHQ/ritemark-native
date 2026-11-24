@@ -10,6 +10,7 @@ import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { useActiveConversation, useAISidebarStore } from './store';
+import { activityHeadline } from './stepLabel';
 import { deriveActivityState, presentActivityState } from './activityState';
 import { activeDurationMs } from './types';
 import { useReadyAlternative } from './TurnFailureCard';
@@ -55,7 +56,7 @@ export function ActivityStatusLine() {
   const activeSeconds = metrics ? activeDurationMs(metrics) / 1000 : undefined;
   const waitedSeconds = metrics?.waitedMs ? metrics.waitedMs / 1000 : undefined;
   const liveActivity = last?.isRunning
-    ? last.activities[last.activities.length - 1]?.message?.slice(0, 80)
+    ? activityHeadline(last.activities[last.activities.length - 1]).slice(0, 80)
     : undefined;
   const runningSubagents = last?.isRunning && 'subagents' in last
     ? ((last as { subagents?: Array<{ status: string }> }).subagents?.filter((x) => x.status === 'running').length ?? 0)

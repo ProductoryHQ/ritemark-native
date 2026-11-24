@@ -15,7 +15,7 @@ const slideParts = [3, 1, 6, 4, 2, 5];
 const relationships = (contents: string) =>
   `<Relationships xmlns="${schema}/package/2006/relationships">${contents}</Relationships>`;
 const text = (contents: string) => `<a:p><a:r><a:t>${contents}</a:t></a:r></a:p>`;
-const shape = (contents: string, placeholder?: string) => `<p:sp>${placeholder ? `<p:nvSpPr><p:nvPr><p:ph type="${placeholder}"/></p:nvPr></p:nvSpPr>` : ''}<p:txBody>${text(contents)}</p:txBody></p:sp>`;
+const shape = (contents: string, placeholder?: string) => `<p:sp>${placeholder !== undefined ? `<p:nvSpPr><p:nvPr><p:ph${placeholder ? ` type="${placeholder}"` : ' idx="1"'}/></p:nvPr></p:nvSpPr>` : ''}<p:txBody>${text(contents)}</p:txBody></p:sp>`;
 const tree = (contents: string) => `<p:cSld><p:spTree>${contents}</p:spTree></p:cSld>`;
 const cell = (contents: string) => `<a:tc><a:txBody>${text(contents)}</a:txBody></a:tc>`;
 const table = `<p:graphicFrame><a:graphic><a:graphicData><a:tbl><a:tr>${cell('Region')}${cell('Days')}</a:tr><a:tr>${cell('North | East')}${cell('5')}</a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>`;
@@ -32,14 +32,14 @@ async function fixture(notesParts: Array<number | null>): Promise<Uint8Array> {
   for (const part of sorted) {
     const index = slideParts.indexOf(part);
     const slide = index + 1;
-    zip.file(`ppt/slides/slide${part}.xml`, `<p:sld ${namespaces}>${tree(shape(`Slide ${slide} &amp; its text`) + (slide === 3 ? table : ''))}</p:sld>`);
+    zip.file(`ppt/slides/slide${part}.xml`, `<p:sld ${namespaces}${slide === 6 ? ' show="0"' : ''}>${tree(shape(`Slide ${slide} &amp; its text`) + (slide === 3 ? table : ''))}</p:sld>`);
     const notesPart = notesParts[index];
     const layout = `<Relationship Id="rId1" Type="${office}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>`;
     const notes = notesPart == null ? '' :
       `<Relationship Id="rId2" Type="${office}/notesSlide" Target="../notesSlides/notesSlide${notesPart}.xml"/>`;
     zip.file(`ppt/slides/_rels/slide${part}.xml.rels`, relationships(layout + notes));
     if (notesPart != null) {
-      const placeholders = shape('Ignored thumbnail', 'sldImg') + shape(`Speaker notes for slide ${slide}.`, 'body') + shape('Ignored page number', 'sldNum');
+      const placeholders = shape('Ignored thumbnail', 'sldImg') + shape(`Speaker notes for slide ${slide}.`, slide === 6 ? '' : 'body') + shape('Ignored page number', 'sldNum');
       zip.file(`ppt/notesSlides/notesSlide${notesPart}.xml`, `<p:notes ${namespaces}>${tree(placeholders)}</p:notes>`);
     }
   }
@@ -49,7 +49,7 @@ async function fixture(notesParts: Array<number | null>): Promise<Uint8Array> {
 function expectedSlide(slide: number, hasNotes: boolean): string {
   const body = slide === 3 ? '\n\n| Region | Days |\n| --- | --- |\n| North \\| East | 5 |' : '';
   const notes = hasNotes ? `Notes:\n\nSpeaker notes for slide ${slide}.` : 'Notes: none';
-  return `## Slide ${slide}\n\nSlide ${slide} & its text${body}\n\n${notes}`;
+  return `## Slide ${slide}${slide === 6 ? ' (hidden)' : ''}\n\nSlide ${slide} & its text${body}\n\n${notes}`;
 }
 
 async function main() {

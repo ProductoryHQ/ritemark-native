@@ -5,6 +5,7 @@
  * Used by AgentRunner, UnifiedViewProvider, and webview.
  */
 
+import type { ToolStep } from '../runtime/toolStep';
 import type { ExplicitThinkingEffort, ThinkingEffort } from '../runtime/thinkingEffort';
 import type { ClaudeSessionDeclaration } from '../ai/modelCatalog/runtimeDeclarations';
 import type { CurrentSlide } from '../decks/currentSlide';
@@ -88,6 +89,7 @@ export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'pla
  * Progress event emitted during agent execution
  */
 export interface AgentProgress {
+  step?: ToolStep;
   type: AgentProgressType;
   message: string;
   /** For streamed text: the message this delta belongs to (ChatGPT's item id). Sprint 139 (#552). */

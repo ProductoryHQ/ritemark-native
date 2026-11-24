@@ -110,6 +110,8 @@ export function finalizeCodexTurnResult(
     requiresPlanReview: turn.requiresPlanReview || shouldRequirePlanReview,
     result: {
       status: result.status || 'success',
+      ...(turn.activities.some((activity) => activity.step?.kind === 'read')
+        ? { activityDurationMs: Math.max(0, Date.now() - turn.timestamp) } : {}),
       error: result.error,
       ...(result.error && result.errorKind ? { errorKind: result.errorKind } : {}),
       ...(result.error && result.errorKind && result.errorDetail ? { errorDetail: result.errorDetail } : {}),

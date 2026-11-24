@@ -13,7 +13,7 @@ import { documentTooLarge, readAsMarkdown } from './readAsMarkdown';
 // the path and confirms access to the current file before using the result.
 let lastRead: { key: string; result: DocumentReadResult } | undefined;
 
-const outside = { text: 'Choose a file inside the project folder. Ritemark can only read project documents.', isError: true };
+const outside: DocumentReadResult = { reason: 'outside', text: 'Choose a file inside the project folder. Ritemark can only read project documents.', isError: true };
 
 export async function readProjectDocument(
   request: DocumentReadRequest,
@@ -23,21 +23,21 @@ export async function readProjectDocument(
 ): Promise<DocumentReadResult> {
   const resolved = await resolveProjectDocument(request.path, roots);
   if (!resolved.ok) {
-    return resolved.reason === 'outside' ? outside : { text: 'The file could not be found or opened. Check its location and permissions in the project folder.' };
+    return resolved.reason === 'outside' ? outside : { reason: 'unavailable', text: 'The file could not be found or opened. Check its location and permissions in the project folder.', isError: true };
   }
 
   const target = resolved.path;
   const name = path.basename(target).replace(/[\r\n\u2028\u2029]/g, ' ');
   const extension = path.extname(target).toLowerCase();
-  const unavailable = { text: `Couldn't open ${name}. Check that the file is still in the project and that you can open it.` };
+  const unavailable: DocumentReadResult = { reason: 'unavailable', text: `Couldn't open ${name}. Check that the file is still in the project and that you can open it.`, isError: true };
   try {
     const before = await lstat(target);
     if (!before.isFile()) return { text: 'Choose a Word (.docx), PDF, or PowerPoint (.pptx) file inside the project folder.' };
     if (extension === '.doc') {
-      return { text: `${name} is an older Word format. Open it in Word and save a .docx copy.` };
+      return { reason: 'legacy', text: `${name} is an older Word format. Open it in Word and save a .docx copy.` };
     }
     if (extension === '.ppt') {
-      return { text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
+      return { reason: 'legacy', text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
     }
     if (extension !== '.docx' && extension !== '.pdf' && extension !== '.pptx') {
       return { text: 'This tool reads Word (.docx), PDF, and PowerPoint (.pptx) files. You can open Markdown files in the Ritemark editor.' };
@@ -53,10 +53,10 @@ export async function readProjectDocument(
     const cloud = cloudState(resolved.candidate, before, platform, oneDriveRoots)
       ?? cloudState(target, before, platform, oneDriveRoots);
     if (cloud === 'online-only') {
-      return { kind, text: `${name} is kept online only. Download it yourself or save a local copy in the project, then try again.` };
+      return { kind, reason: 'online', text: `${name} is kept online only. Download it yourself or save a local copy in the project, then try again.` };
     }
     if (cloud === 'cloud-folder') {
-      return { kind, text: `${name} is in a OneDrive folder where files may be kept online only. Save a copy in a local project folder outside OneDrive, then try again.` };
+      return { kind, reason: 'online', text: `${name} is in a OneDrive folder where files may be kept online only. Save a copy in a local project folder outside OneDrive, then try again.` };
     }
     if (before.size > maxBytes) return documentTooLarge(name, kind);
 

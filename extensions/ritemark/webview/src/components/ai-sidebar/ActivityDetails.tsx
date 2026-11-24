@@ -2,6 +2,7 @@
  * ActivityDetails — collapsible tool call list using native <details>/<summary>.
  */
 
+import { readSummary, stepLabel } from './stepLabel';
 import { ActivityCard } from './ActivityCard';
 import { activeDurationMs } from './types';
 import { formatSeconds } from './activityState';
@@ -10,9 +11,18 @@ import type { AgentProgress, AgentMetrics } from './types';
 interface ActivityDetailsProps {
   activities: AgentProgress[];
   metrics?: AgentMetrics;
+  running?: boolean;
 }
 
-export function ActivityDetails({ activities, metrics }: ActivityDetailsProps) {
+export function ActivityDetails({ activities, metrics, running }: ActivityDetailsProps) {
+  if (running) {
+    const steps = activities.filter((activity) => stepLabel(activity));
+    return steps.length ? (
+      <div className="space-y-0.5">
+        {steps.map((step, i) => <ActivityCard key={step.step?.id ?? i} activity={step} />)}
+      </div>
+    ) : null;
+  }
   if (!activities.length) return null;
 
   const stepCount = activities.length;
@@ -27,7 +37,7 @@ export function ActivityDetails({ activities, metrics }: ActivityDetailsProps) {
   return (
     <details className="mt-2 rounded-md border border-transparent text-[11px]">
       <summary className="cursor-pointer select-none text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]">
-        Activity ({summaryParts.join(' \u00b7 ')})
+        {readSummary(activities, activeMs) ?? `Activity (${summaryParts.join(' · ')})`}
       </summary>
       <div className="mt-1.5 ml-1 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
         {activities.map((a, i) => (

@@ -65,6 +65,7 @@ import {
   type PromptQueues,
   type QueueItem,
 } from './promptQueue';
+import { updateStep } from './stepLabel';
 import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
@@ -3286,7 +3287,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               };
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: [...(lastTurn.subagents || []), newSubagent],
               };
             }
@@ -3294,10 +3295,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Add activity to the matching subagent
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.parentToolUseId
-                    ? { ...sa, activities: [...sa.activities, progress] }
+                    ? { ...sa, activities: updateStep(sa.activities, progress) }
                     : sa
                 ),
               };
@@ -3306,7 +3307,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Mark subagent as done
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.subagentId
                     ? { ...sa, status: 'done' as const, result: progress.message }
@@ -3315,7 +3316,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               };
             }
             // Regular activity
-            return { ...lastTurn, activities: [...lastTurn.activities, progress] };
+            return { ...lastTurn, activities: updateStep(lastTurn.activities, progress) };
           });
           break;
         }
@@ -3520,7 +3521,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
-            activities: [...lastTurn.activities, message.progress as AgentProgress],
+            activities: updateStep(lastTurn.activities, message.progress as AgentProgress),
             // Sprint 143 (#544): the AI went on; its wait is over.
             retry: undefined,
           }));

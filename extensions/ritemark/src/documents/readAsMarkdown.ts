@@ -7,13 +7,14 @@ import { wordMarkdown, WordXmlTooLarge } from './wordMarkdown';
 export const DOCUMENT_TEXT_LIMIT = 400_000;
 
 const units = (count: number, unit: string) => `${count} ${unit}${count === 1 ? '' : 's'}`;
-const unreadable = (name: string, kind: DocumentKind) => ({
+const unreadable = (name: string, kind: DocumentKind): DocumentReadResult => ({
   kind,
+  reason: 'damaged',
   text: `Couldn't read ${name}. The file may be damaged. Try opening it in its usual app and saving a new copy.`,
 });
 
 export function documentTooLarge(name: string, kind: DocumentKind): DocumentReadResult {
-  return { kind, text: `Couldn't read ${name}. It is too big (the limit is 50 MB). Open it in its usual app or save a smaller copy.` };
+  return { kind, reason: 'size', text: `Couldn't read ${name}. It is too big (the limit is 50 MB). Open it in its usual app or save a smaller copy.` };
 }
 
 const kindLabel: Record<DocumentKind, string> = { word: 'Word', pdf: 'PDF', powerpoint: 'PowerPoint' };
@@ -41,14 +42,14 @@ export async function readAsMarkdown(
       const word = await wordMarkdown(bytes, limit);
       if (!word.ok) {
         if (word.reason === 'password-protected') {
-          return { kind, text: `Couldn't read ${name}: it has a password. Open it in Word, or save a copy without the password.` };
+          return { kind, reason: 'password', text: `Couldn't read ${name}: it has a password. Open it in Word, or save a copy without the password.` };
         }
         if (word.reason === 'too-large') return documentTooLarge(name, kind);
         if (word.reason === 'legacy-format') {
-          return { kind, text: `${name} is an older Word format. Open it in Word and save a .docx copy.` };
+          return { kind, reason: 'legacy', text: `${name} is an older Word format. Open it in Word and save a .docx copy.` };
         }
         if (word.reason === 'too-complex') {
-          return { kind, text: `Couldn't read ${name}. Its contents are too large or complex. Open it in Word or save a smaller copy.` };
+          return { kind, reason: 'size', text: `Couldn't read ${name}. Its contents are too large or complex. Open it in Word or save a smaller copy.` };
         }
         return unreadable(name, kind);
       }
@@ -69,7 +70,7 @@ export async function readAsMarkdown(
           cut = 'cut in block 1';
         }
       }
-      if (!count) return { kind, text: `${name} has no readable text in its body. Open it in Word to see the document.` };
+      if (!count) return { kind, reason: 'empty', text: `${name} has no readable text in its body. Open it in Word to see the document.` };
       if (cut) cut += ` of ${count}`;
       return reading(name, kind, units(count, 'block'), cut ?? 'whole text', text, cut);
     }
@@ -78,14 +79,14 @@ export async function readAsMarkdown(
       const deck = await powerpointMarkdown(bytes);
       if (!deck.ok) {
         if (deck.reason === 'password-protected') {
-          return { kind, text: `Couldn't read ${name}: it has a password. Open it in PowerPoint, or save a copy without the password.` };
+          return { kind, reason: 'password', text: `Couldn't read ${name}: it has a password. Open it in PowerPoint, or save a copy without the password.` };
         }
         if (deck.reason === 'too-large') return documentTooLarge(name, kind);
         if (deck.reason === 'legacy-format') {
-          return { kind, text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
+          return { kind, reason: 'legacy', text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
         }
         if (deck.reason === 'too-complex') {
-          return { kind, text: `Couldn't read ${name}. Its contents are too large or complex. Open it in PowerPoint or save a smaller copy.` };
+          return { kind, reason: 'size', text: `Couldn't read ${name}. Its contents are too large or complex. Open it in PowerPoint or save a smaller copy.` };
         }
         return unreadable(name, kind);
       }
@@ -103,8 +104,8 @@ export async function readAsMarkdown(
       let cut: string | undefined;
       for (let slide = from; slide <= to; slide++) {
         await pause();
-        const { body, notes } = await deck.slide(slide);
-        const chunk = `${text ? '\n\n' : ''}## Slide ${slide}\n\n${body || 'No extractable text on this slide.'}\n\n${notes ? `Notes:\n\n${notes}` : 'Notes: none'}`;
+        const { body, notes, hidden } = await deck.slide(slide);
+        const chunk = `${text ? '\n\n' : ''}## Slide ${slide}${hidden ? ' (hidden)' : ''}\n\n${body || 'No extractable text on this slide.'}\n\n${notes ? `Notes:\n\n${notes}` : 'Notes: none'}`;
         if (text.length + chunk.length <= limit) text += chunk;
         else {
           if (text) cut = `cut after slide ${slide - 1} of ${total}`;
@@ -166,23 +167,23 @@ export async function readAsMarkdown(
         for (const item of items) chars += item.str?.length ?? 0;
       }
       if (chars < SCANNED_PDF_TEXT_THRESHOLD) {
-        return { kind, text: `${name} is a scan with no text (${units(total, 'page')}). Open it in the PDF viewer or use a copy with searchable text.` };
+        return { kind, reason: 'scan' as const, text: `${name} is a scan with no text (${units(total, 'page')}). Open it in the PDF viewer or use a copy with searchable text.` };
       }
       const status = from === 1 && to === total ? 'whole text' : from === to ? `page ${from}` : `pages ${from}–${to}`;
       return reading(name, kind, units(total, 'page'), cut ? `${status === 'whole text' ? '' : status + ', '}${cut}` : status, text, cut);
     });
-    if ('reason' in result) {
+    if (!('text' in result)) {
       return result.reason === 'protected'
-        ? { kind, text: `Couldn't read ${name}: it has a password. Open it in a PDF viewer or save a copy without the password.` }
+        ? { kind, reason: 'password', text: `Couldn't read ${name}: it has a password. Open it in a PDF viewer or save a copy without the password.` }
         : unreadable(name, kind);
     }
     return result;
   } catch (error) {
     if (error instanceof PowerPointXmlTooLarge) {
-      return { kind, text: `Couldn't read ${name}. Its PowerPoint text or formatting data is too large. Open it in PowerPoint or save a smaller copy.` };
+      return { kind, reason: 'size', text: `Couldn't read ${name}. Its PowerPoint text or formatting data is too large. Open it in PowerPoint or save a smaller copy.` };
     }
     if (error instanceof WordXmlTooLarge) {
-      return { kind, text: `Couldn't read ${name}. Its Word text or formatting data is too large. Open it in Word or save a smaller copy.` };
+      return { kind, reason: 'size', text: `Couldn't read ${name}. Its Word text or formatting data is too large. Open it in Word or save a smaller copy.` };
     }
     return unreadable(name, kind);
   }
