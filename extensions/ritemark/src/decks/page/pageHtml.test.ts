@@ -58,6 +58,11 @@ assert.ok(html.includes(`<meta name="${DIGEST_META}" content="${digest}">`));
 assert.equal(root.querySelector('title')!.text, 'Harbour title');
 assert.ok(!root.querySelector('body')!.text.includes('Ritemark'), 'nothing of Ritemark on the page');
 assert.equal(root.querySelector('.who b')!.text, 'Harbour Logistics');
+const updateStatus = root.querySelector('#line .who .deck-title + #deck-updated')!;
+assert.equal(updateStatus.getAttribute('role'), 'status');
+assert.equal(updateStatus.text, '');
+assert.ok(!root.querySelector('#view #deck-updated'));
+assert.ok(root.querySelector('#view #deck-removed.deck-follow-note'));
 assert.equal(root.querySelector('body')!.getAttribute('class'), 'bl', 'the deck\'s look (Borderless) holds');
 
 // At phone widths the toolbar buttons show only icons, so their names must survive without visible text.
@@ -109,6 +114,19 @@ assert.ok(!/@media print[\s\S]*\.blk-flow \{[^}]*left: 64px/.test(html));
     '.blk-steps .tick { width: 32px; height: 32px;',
   ]) assert.ok(narrow.includes(`.layer.flow .deck-sl.is-blocks ${rule}`), rule);
   assert.ok(!/\.layer(?:\.flow)? \.layer\b/.test(PAGE_CSS), 'no slide inside a slide');
+  assert.match(narrow, /\.view \{[^}]*padding: 16px 16px /);
+  assert.match(narrow, /\.deck-follow-note \{[^}]*margin: 8px 0 0;\s*width: 100%; max-width: none; text-align: left;/);
+  // The note keeps its inner padding (text never on the box's edge); "Go on to" takes its own line on a phone.
+  assert.match(narrow, /\.deck-follow-note button \{ display: block; margin: 4px 0 0; padding: 0; \}/);
+}
+{
+  const fill = /\.deck-changed-block::after \{([^}]+)\}/.exec(PAGE_CSS)![1];
+  assert.match(fill, /position: absolute; inset: -6px 0; z-index: -1; pointer-events: none;/);
+  assert.match(fill, /border-radius: 6px; background: color-mix\(in srgb, var\(--accent\) 16%, transparent\);/);
+  assert.match(fill, /animation: deck-change-fade \.5s linear 1\.5s forwards;/);
+  assert.match(PAGE_CSS, /@keyframes deck-change-fade \{ to \{ opacity: 0; \} \}/);
+  const reducedMotion = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(PAGE_CSS)![1];
+  assert.match(reducedMotion, /\.deck-changed-block::after \{ animation: none; \}/);
 }
 const parts = root.querySelectorAll('#side .part');
 assert.deepEqual(parts.map(part => part.getAttribute('id')), ['t1', 't2', 't3', 't4', 't5']);

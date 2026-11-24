@@ -63,15 +63,15 @@ export const PAGE_FOLLOWER = String.raw`
     try { sessionStorage.removeItem(store); } catch (error) { /* storage is optional */ }
     if (handoff.announce) {
       var nodes = restored < 0 ? [] : blocks(doc, restored);
-      var glowing = version === handoff.v && Array.isArray(handoff.changed)
+      var highlighted = version === handoff.v && Array.isArray(handoff.changed)
         ? handoff.changed.map(function (change) { return nodes[change.index]; }) : [];
       // The deployed HTML can advance again between the comparison and the reload.
-      if (!glowing.every(function (node, i) { return node && words(node) === handoff.changed[i].text; })) glowing = [];
-      glowing.forEach(function (node) { node.classList.add('deck-changed-block'); });
-      updated.hidden = false;
+      if (!highlighted.every(function (node, i) { return node && words(node) === handoff.changed[i].text; })) highlighted = [];
+      highlighted.forEach(function (node) { node.classList.add('deck-changed-block'); });
+      updated.textContent = 'Updated just now';
       setTimeout(function () {
-        updated.hidden = true;
-        glowing.forEach(function (node) { node.classList.remove('deck-changed-block'); });
+        updated.textContent = '';
+        highlighted.forEach(function (node) { node.classList.remove('deck-changed-block'); });
       }, 2000);
     }
     restoring = false;
@@ -156,7 +156,7 @@ export const PAGE_FOLLOWER = String.raw`
         if (nextSlide && nextSlide.getAttribute('data-key') === key) comparison = changedBlocks(blocks(doc, current), blocks(fresh, nextIndex));
       }
     } catch (error) {
-      // A failed comparison still allows a reload with a notice and without a glow.
+      // A failed comparison still allows a reload with a notice and without a highlight.
     } finally { busy = false; }
     if (pending !== info || active() !== current || !idle()) { schedule(); return; }
     reload(info, key, comparison);
