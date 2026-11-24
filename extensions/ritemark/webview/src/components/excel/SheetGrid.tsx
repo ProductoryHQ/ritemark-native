@@ -8,7 +8,7 @@
  * fills, borders, text, then charts' and pictures' places, the selection and the cell being edited. Its geometry
  * comes from sheetLayout.ts.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ComponentProps, type ReactNode } from 'react'
 import * as XLSX from 'xlsx'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
@@ -22,8 +22,8 @@ import { columnScale, type ExcelGeometry } from './columnWidth'
 import { isMac } from '../../hooks/usePlatform'
 import type { CellStyle } from './excelStyles'
 import { DrawingView } from './DrawingView'
+import { chartTarget, useChartSelection } from './chartSelection'
 import { measure, forgetMeasures } from './gridTextMeasure'
-import './sheetGrid.css'
 
 export interface SheetGridProps {
   model: WorkbookModel
@@ -87,6 +87,8 @@ export function SheetGrid({
   const base = styles.baseFont
   const scroller = useRef<HTMLDivElement>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
+  const focusGrid = useCallback(() => scroller.current?.focus(), [])
+  const chartSelection = useChartSelection(focusGrid)
   const [viewport, setViewport] = useState({ w: 1200, h: 800 })
   const [scroll, setScroll] = useState({ x: 0, y: 0 })
   // a sort: its column and direction, and the row order worked out when it was chosen
@@ -129,10 +131,11 @@ export function SheetGrid({
   useEffect(() => {
     setSortState(null)
     setEditing(null)
+    chartSelection.clear()
     setReach({ sheet: sheet.name, rows: 0, cols: 0 })
     setSelected({ i: sheet.layout.frozen.rows, c: sheet.layout.frozen.cols })
     scroller.current?.scrollTo(0, 0)
-  }, [sheet])
+  }, [sheet, chartSelection.clear])
 
   useLayoutEffect(() => {
     const el = scroller.current
@@ -383,10 +386,11 @@ export function SheetGrid({
   }, [layout])
 
   const select = useCallback((pos: Pos) => {
+    chartSelection.clear()
     const m = mergeOf(pos.i, pos.c)
     setSelected(m ? { i: layout.displayOf.get(m[0]) ?? pos.i, c: m[1] } : pos)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout])
+  }, [layout, chartSelection.clear])
 
   // A sideways scroll settles with a whole column at the frozen line: a cell cut partway reads as another number
   // ("20.00 €" for 5,220.00 €; the Experience lead, 15 November). Vertical scrolling stays smooth: a cut row doesn't
@@ -474,16 +478,22 @@ export function SheetGrid({
     // keys from the sort menu (a portal, but a React child of the grid) are the menu's
     if (editing || !scroller.current?.contains(e.target as Node)) return
     const move: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
-    if (move[e.key]) {
+    const fromChart = chartTarget(e.target)
+    if (move[e.key] && (!fromChart || chartSelection.chosen)) {
       e.preventDefault()
       select(step(selected, ...move[e.key]))
+      if (fromChart) focusGrid()
       return
     }
+    if (fromChart) return
     if (e.key === 'Tab') {
+      // Let Tab reach a chart on the sheet. In a sheet with only cells, Tab still steps a column.
+      if (scroller.current.querySelector('[data-sheet-chart][tabindex="0"]')) return
       e.preventDefault()
       select(step(selected, 0, e.shiftKey ? -1 : 1))
       return
     }
+    if (chartSelection.chosen) return
     if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
       e.preventDefault()
       writeClipboard(selectedCell?.text ?? '')
@@ -529,7 +539,8 @@ export function SheetGrid({
   const onPointerDown = (e: React.MouseEvent) => {
     // a click inside the cell being edited moves its caret; it doesn't choose another cell
     // a click in the sort menu (a portal, but a React child of the grid) is the menu's
-    if (e.button !== 0 || e.target === editorRef.current || !scroller.current?.contains(e.target as Node)) return
+    if (e.button !== 0 || e.target === editorRef.current || !scroller.current?.contains(e.target as Node) || chartTarget(e.target)) return
+    chartSelection.clear()
     const pos = posFromPoint(e.clientX, e.clientY)
     if (!pos) return
     if (editing) commit()
@@ -647,7 +658,7 @@ export function SheetGrid({
     }
     out.push(...objects(kind, place))
     if (layout.headerH) out.push(...headers(kind, place))
-    if (kind === regionOfPos(selected)) {
+    if (!chartSelection.chosen && kind === regionOfPos(selected)) {
       const R = cellRect(selected)
       // the ring reaches 1 px outside its cell; where the cell meets the region's edge (B5 beside the frozen line,
       // a first row under the headers) the region would clip that side, so the ring steps inside there
@@ -751,7 +762,9 @@ export function SheetGrid({
         body: x0 + w > FW && y0 + h > FH,
       }
       if (!reaches[kind]) return
-      out.push(<DrawingView key={`o${n}`} drawing={d} style={place(HW + x0, HH + y0, w, h)} workbook={model} version={version} width={w} height={h} />)
+      const primary = y0 < FH ? (x0 < FW ? 'corner' : 'top') : (x0 < FW ? 'left' : 'body')
+      out.push(<DrawingView key={`o${n}`} drawing={d} style={place(HW + x0, HH + y0, w, h)} workbook={model} version={version} width={w} height={h}
+        selection={d.what === 'chart' ? chartSelection.bind(n, kind === primary) : undefined} sheetName={sheet.name} />)
     })
     return out
   }
@@ -765,7 +778,7 @@ export function SheetGrid({
     if (kind === 'corner' || kind === 'top') {
       for (let c = Math.max(0, c0); c <= c1; c++) {
         if (!layout.colW[c]) continue
-        const current = c === selected.c
+        const current = !chartSelection.chosen && c === selected.c
         const hiddenNext = c + 1 < layout.cols && !layout.colW[c + 1]
         const cls = `sg-head sg-col-head${current ? ' sg-current' : ''}${hiddenNext ? ' sg-hidden-next' : ''}${sort?.col === c ? ' sg-sorted' : ''}`
         out.push(
@@ -814,7 +827,7 @@ export function SheetGrid({
         out.push(
           <div
             key={`hy${i}`}
-            className={`sg-head sg-row-head${i === selected.i ? ' sg-current' : ''}${hiddenNext ? ' sg-hidden-next' : ''}`}
+            className={`sg-head sg-row-head${!chartSelection.chosen && i === selected.i ? ' sg-current' : ''}${hiddenNext ? ' sg-hidden-next' : ''}`}
             style={place(0, HH + Y[i], HW, layout.rowH[i])}
           >
             {rowOf[i] + 1}
@@ -863,43 +876,35 @@ export function SheetGrid({
     )
   }
 
-  const reference = `${letters(selected.c)}${selectedRow + 1}`
-  const barValue = editing ? editing.value : (formula ?? getInput(selectedRow, selected.c))
+  const reference = chartSelection.chosen ? 'Chart' : `${letters(selected.c)}${selectedRow + 1}`
+  const barValue = chartSelection.chosen?.text ?? (editing ? editing.value : (formula ?? getInput(selectedRow, selected.c)))
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* the formula bar: the cell and what it holds (experience 47, frame 1); typing here edits the cell */}
-      <div className="mx-4 mb-3 flex min-h-[32px] shrink-0 items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
-        <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
-          <span className="truncate">{reference}</span>
-        </span>
-        <span className="flex items-center pl-2.5 text-[var(--r-ink-faint)]">
-          <Icon name="function" size={14} tone="inherit" />
-        </span>
-        <textarea
-          rows={1}
-          aria-label={`What ${reference} holds`}
-          className="h-[30px] min-h-[30px] flex-1 resize-none overflow-hidden rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"
-          value={barValue}
-          readOnly={!editable}
-          onFocus={() => {
-            if (editable && !editingRef.current) setEditing({ pos: selected, value: formula ?? getInput(selectedRow, selected.c), fromBar: true })
-          }}
-          onChange={(e) => setEditing({ pos: editing?.pos ?? selected, value: e.target.value, fromBar: true })}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              commit(step(selected, 1, 0))
-            } else if (e.key === 'Escape') {
-              e.preventDefault()
-              cancel()
-            }
-          }}
-          onBlur={() => {
-            if (editingRef.current?.fromBar) commit()
-          }}
-        />
-      </div>
+      <SheetFormulaBar
+        reference={reference}
+        aria-label={chartSelection.chosen ? 'Chart details' : `What ${reference} holds`}
+        value={barValue}
+        readOnly={!editable || !!chartSelection.chosen}
+        onFocus={() => {
+          if (editable && !chartSelection.chosen && !editingRef.current) setEditing({ pos: selected, value: formula ?? getInput(selectedRow, selected.c), fromBar: true })
+        }}
+        onChange={(e) => setEditing({ pos: editing?.pos ?? selected, value: e.target.value, fromBar: true })}
+        onKeyDown={(e) => {
+          if (chartSelection.chosen) return
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            commit(step(selected, 1, 0))
+          } else if (e.key === 'Escape') {
+            e.preventDefault()
+            cancel()
+          }
+        }}
+        onBlur={() => {
+          if (editingRef.current?.fromBar) commit()
+        }}
+      />
 
       <div className="sg-paper">
         <div ref={scroller} className="sg-scroller" tabIndex={0} onScroll={onScroll} onKeyDown={onGridKey} onMouseDown={onPointerDown} aria-label={`Sheet ${sheet.name}`}>
@@ -920,6 +925,28 @@ export function SheetGrid({
         </div>
       </div>
 
+    </div>
+  )
+}
+
+interface SheetFormulaBarProps extends ComponentProps<'textarea'> {
+  reference: string
+}
+
+export function SheetFormulaBar({ reference, ...input }: SheetFormulaBarProps) {
+  return (
+    <div className="mx-4 mb-3 flex min-h-[32px] shrink-0 items-stretch rounded-md border border-[var(--r-hairline)] bg-[var(--r-surface)]">
+      <span className="flex min-w-[48px] max-w-[160px] flex-none items-center border-r border-[var(--r-hairline)] px-2.5 text-xs text-[var(--r-ink-muted)]">
+        <span className="truncate">{reference}</span>
+      </span>
+      <span className="flex items-center pl-2.5 text-[var(--r-ink-faint)]">
+        <Icon name="function" size={14} tone="inherit" />
+      </span>
+      <textarea
+        rows={1}
+        className="h-[30px] min-h-[30px] flex-1 resize-none overflow-hidden rounded-r-md border-0 bg-transparent px-2.5 py-[5px] text-[13px] leading-5 text-[var(--r-ink-strong)] outline-none"
+        {...input}
+      />
     </div>
   )
 }

@@ -151,7 +151,9 @@ async function main() {
     report(file, chart)
     const name = file.slice('synthetic-'.length, -'.xml'.length)
     if (name === 'chartex' || name === 'unknown') {
-      assert.deepEqual(chart, { supported: false, kind: name === 'chartex' ? 'chartex' : 'radarChart' })
+      assert.deepEqual(chart, name === 'chartex'
+        ? { supported: false, kind: 'chartex', extendedKinds: ['waterfall'] }
+        : { supported: false, kind: 'radarChart' })
       continue
     }
     const [kind, grouping, marker] = expected[name]
@@ -288,7 +290,7 @@ async function main() {
   zip.file('xl/charts/chart1.xml', readFileSync(new URL('synthetic-chartex.xml', fixtures)))
   const extended = await readWorkbook(await zip.generateAsync({ type: 'uint8array' }))
   const drawing = extended.sheets.flatMap((sheet) => sheet.layout.drawings).find(({ what }) => what === 'chart')
-  assert.deepEqual(drawing?.chart, { supported: false, kind: 'chartex' })
+  assert.deepEqual(drawing?.chart, { supported: false, kind: 'chartex', extendedKinds: ['waterfall'] })
 
   zip.file(relsPath, relations)
   zip.file('xl/charts/chart1.xml', column.replace('<c:v>12</c:v>', '<c:v>&#x110000;</c:v>'))

@@ -146,7 +146,7 @@ export interface ChartAxis {
 }
 
 export type ChartModel =
-  | { supported: false; kind: ChartKind }
+  | { supported: false; kind: ChartKind; extendedKinds?: string[] }
   | {
       supported: true
       kind: PlotKind | 'combo'

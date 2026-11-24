@@ -12,7 +12,9 @@ import type { DocumentApplyTarget } from '../types/documentSync'
 import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
 import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
-import { SheetGrid } from './excel/SheetGrid'
+import { SheetFormulaBar, SheetGrid } from './excel/SheetGrid'
+import { useChartSelection } from './excel/chartSelection'
+import './excel/sheetGrid.css'
 import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
 import { drawsChart } from './excel/chartLayout'
 import { keptNotice } from './excel/keptNotice'
@@ -99,6 +101,7 @@ export function SpreadsheetViewer({
   const [showSizeWarning, setShowSizeWarning] = useState(false)
   const [proceedWithLargeFile, setProceedWithLargeFile] = useState(false)
   const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const chartSelection = useChartSelection()
   const [source, setSource] = useState<SheetSource | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
   const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
@@ -515,6 +518,7 @@ export function SpreadsheetViewer({
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
   const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  useEffect(() => chartSelection.clear(), [sheetModel, chartSelection.clear])
   const sheetChart = sheetModel?.kind === 'chartsheet'
     ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart')?.chart : undefined
   const excelNotice = fileType !== 'xlsx'
@@ -645,9 +649,11 @@ export function SpreadsheetViewer({
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
       {source?.model && drawsChart(sheetChart) ? (
         <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard()}>
+          {chartSelection.chosen && <SheetFormulaBar reference="Chart" aria-label="Chart details" value={chartSelection.chosen.text} readOnly />}
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0">
-              <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard} />
+              <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard}
+                selection={chartSelection.bind(0)} sheetName={sheetModel?.name} />
             </div>
           </div>
         </ChartErrorBoundary>

@@ -205,3 +205,11 @@
   line-height: 1.2;
 }
 
+
+.sg-chart { outline: none; }
+.sg-chart[aria-pressed="true"],
+:where(:root:not([data-input-mode="pointer"])) .sg-chart:focus-visible {
+  outline: 2px solid var(--ritemark-indigo-deep, #3730a3);
+  outline-offset: -2px;
+  border-radius: 8px;
+}

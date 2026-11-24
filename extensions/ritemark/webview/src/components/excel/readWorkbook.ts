@@ -249,9 +249,8 @@ async function readDrawings(zip: JSZip, drawingPath: string, ctx: ColorContext):
       const relation = drawingRels.get(chartRid)
       try {
         const xml = relation ? await text(zip, relation.target) : ''
-        const chart: ChartModel | undefined = relation?.type === 'chartEx'
-          ? { supported: false, kind: 'chartex' }
-          : xml ? readChart(xml, ctx) : undefined
+        const extended = relation?.type === 'chartEx'
+        const chart = xml || extended ? readChart(xml, ctx, extended) : undefined
         out.push({ what: 'chart', title: chartTitle(xml), anchor, chart })
       } catch {
         out.push({ what: 'chart', anchor, chart: { supported: false, kind: 'unknown' } })

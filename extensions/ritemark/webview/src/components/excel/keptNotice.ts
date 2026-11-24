@@ -1,13 +1,37 @@
 import { drawsChart } from './chartLayout'
+import type { ChartModel } from './chartModel'
 import type { SheetLayoutInfo } from './readWorkbook'
+
+const chartKinds = new Map([
+  ['radarChart', 'radar'], ['stockChart', 'stock'], ['surfaceChart', 'surface'],
+  ['surface3DChart', 'surface'], ['bubbleChart', 'bubble'],
+])
+const extendedKinds = new Map([
+  ['waterfall', 'waterfall'], ['treemap', 'treemap'], ['histogram', 'histogram'],
+  ['clusteredColumn', 'histogram'], ['paretoLine', 'histogram'], ['funnel', 'funnel'], ['boxWhisker', 'box and whisker'],
+  ['sunburst', 'sunburst'], ['regionMap', 'map'],
+])
+
+function unsupportedKinds(chart: ChartModel | undefined): string[] {
+  if (!chart || chart.supported) return ['']
+  if (chart.kind !== 'chartex') return [chartKinds.get(chart.kind) ?? '']
+  return chart.extendedKinds?.map((kind) => extendedKinds.get(kind) ?? 'extended') ?? ['extended']
+}
 
 /** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
 export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings' | 'conditionalFormats'>): string | undefined {
-  const count = (what: string) => layout.drawings.filter((d) => d.what === what && (what !== 'chart' || !drawsChart(d.chart))).length
+  const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
   const things: string[] = []
   const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
-  const charts = count('chart')
-  if (charts) things.push(name(charts, 'chart', 'charts'))
+  const charts = new Map<string, number>()
+  for (const drawing of layout.drawings) {
+    if (drawing.what !== 'chart' || drawsChart(drawing.chart)) continue
+    for (const kind of new Set(unsupportedKinds(drawing.chart))) charts.set(kind, (charts.get(kind) ?? 0) + 1)
+  }
+  for (const [kind, count] of charts) {
+    const label = kind ? `${kind} chart` : 'chart'
+    things.push(count === 1 && kind === 'extended' ? 'an extended chart' : name(count, label, `${label}s`))
+  }
   if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
   if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
   if (layout.conditionalFormats) things.push('colour rules')
