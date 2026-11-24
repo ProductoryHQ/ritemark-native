@@ -14,11 +14,16 @@ import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import Module from 'node:module';
+import { gatherPage } from '../publish/gather';
+import { liveIssue, type LiveIssue } from '../publish/liveUpdate';
+import type { GatheredPlan } from '../publish/types';
 import { makeTempDir } from '../testing/tempDir';
 
 // ── A small vscode for the host module: a project folder on disk, one open deck, 2.2's page state ──
 const root = makeTempDir('ritemark-deck-publish-');
 const none = () => ({ dispose() {} });
+const savedListeners: Array<(document: unknown) => void> = [];
+const watchListeners: Array<(uri: { fsPath: string }) => void> = [];
 const changeListeners: Array<(event: { document: unknown }) => void> = [];
 let pageStateAsks = 0;
 let bar: { kind: 'unpublished' | 'published'; changed: boolean } = { kind: 'unpublished', changed: false };
@@ -33,6 +38,7 @@ class EventEmitter<T> {
 }
 const vscodeStub = {
   EventEmitter,
+  RelativePattern: class {},
   Uri: { file: (fsPath: string) => ({ scheme: 'file', fsPath, toString: () => `file://${fsPath}` }) },
   workspace: {
     get workspaceFolders() { return [{ uri: { scheme: 'file', fsPath: root } }]; },
@@ -40,6 +46,12 @@ const vscodeStub = {
     textDocuments: [],
     onDidChangeTextDocument: (listener: (event: { document: unknown }) => void) => { changeListeners.push(listener); return { dispose() {} }; },
     onDidChangeConfiguration: none,
+    onDidSaveTextDocument: (listener: (document: unknown) => void) => { savedListeners.push(listener); return none(); },
+    createFileSystemWatcher: () => ({
+      ...none(),
+      onDidChange: (listener: (uri: { fsPath: string }) => void) => { watchListeners.push(listener); return none(); },
+      onDidCreate: none,
+    }),
     getConfiguration: () => ({ get: (key: string, fallback?: unknown) => (key === 'decks' ? true : fallback) }),
   },
   window: {},
@@ -257,10 +269,102 @@ async function main(): Promise<void> {
       off.dispose();
     }
   }
+  // The live run uses the same saved words and measured fit as a manual Update.
+  let preference: { on: true; id: string } | undefined;
+  let liveHtml = '';
+  let liveDigest = '';
+  let diagnosis: LiveIssue | undefined;
+  let nextResult: (() => void) | undefined;
+  const liveFeature = {
+    ...feature,
+    controller: {
+      ...feature.controller,
+      recordFor: async () => ({ files: [], live: preference }),
+      setLive: async (_page: string, on: boolean) => {
+        preference = on ? { on: true, id: 'test' } : undefined;
+        return true;
+      },
+      updateLive: async (_page: unknown, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
+        liveDigest = input.digest;
+        liveHtml = fs.readFileSync(pagePath, 'utf8');
+        const plan = await gatherPage(pagePath, root);
+        diagnosis = input.describe(plan, liveIssue(plan));
+        return { kind: 'updated', pictures: [] };
+      },
+    },
+  };
+  const livePublisher = new DeckPublisher(extension);
+  const uri = document.uri;
+  try {
+    livePublisher.connect(liveFeature as never);
+    const seat = livePublisher.attach(document as never, async () => true);
+    const ready = new Promise<void>(resolve => { nextResult = resolve; });
+    livePublisher.onDidUpdateLive(() => nextResult?.());
+    assert.equal(liveHtml, '', 'connecting and attaching never send');
+    text = deckText('Paper');
+    fs.writeFileSync(deckPath, text);
+    const body = splitFrontMatter(text).content;
+    livePublisher.rememberLiveInput(document as never, undefined, { text: body, look: 'card', steps: [2] });
+    await livePublisher.liveAction(document as never, 'on');
+    await ready;
+    const fromLive = liveHtml;
+    const beforeTimetable = liveDigest;
+    assert.ok(fromLive);
+    await livePublisher.liveAction(document as never, 'off');
+    await livePublisher.publish(document as never, body, 'card', [2], () => {});
+    assert.equal(fromLive, fs.readFileSync(pagePath, 'utf8'), 'live and manual Update build the same page, including fit');
+    seat.dispose();
+    preference = { on: true, id: 'already-on' };
+    liveHtml = '';
+    livePublisher.attach(document as never, async () => true);
+    await livePublisher.stateOf(document as never);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.equal(liveHtml, '', 'opening a deck while its switch is on sends nothing');
+    const timed = new Promise<void>(resolve => { nextResult = resolve; });
+    text = text.replace('deck: 1', 'deck: 1\nritemark-length: 180').replace('id: a1', 'id: a1\ntime: 25');
+    fs.writeFileSync(deckPath, text);
+    savedListeners.at(-1)?.(document);
+    await timed;
+    assert.equal(liveDigest, beforeTimetable, 'minutes and session changes have no public digest');
+    const changed = new Promise<void>(resolve => { nextResult = resolve; });
+    text = text.replace('Welcome, everyone.', 'An external save.');
+    fs.writeFileSync(deckPath, text);
+    watchListeners.at(-1)?.(uri);
+    await changed;
+    assert.match(liveHtml, /An external save/);
+    const saved = new Promise<void>(resolve => { nextResult = resolve; });
+    text = text.replace('An external save.', 'An editor save.');
+    fs.writeFileSync(deckPath, text);
+    savedListeners.at(-1)?.(document);
+    await saved;
+    assert.match(liveHtml, /An editor save/);
+    const foundKey = new Promise<void>(resolve => { nextResult = resolve; });
+    const fixtureKey = ['sk', 'ant', 'A1'.repeat(14)].join('-');
+    text = text.replace('An editor save.', fixtureKey);
+    fs.writeFileSync(deckPath, text);
+    savedListeners.at(-1)?.(document);
+    await foundKey;
+    assert.equal(diagnosis?.kind, 'key');
+    assert.equal(diagnosis?.slide, 1);
+    assert.equal(diagnosis?.location?.line, text.slice(0, text.indexOf(fixtureKey)).split('\n').length);
+    assert.equal(JSON.stringify(diagnosis).includes(fixtureKey), false);
+
+    const foundPicture = new Promise<void>(resolve => { nextResult = resolve; });
+    text = text.replace(fixtureKey, '![Outside](/tmp/elsewhere.png)');
+    fs.writeFileSync(deckPath, text);
+    savedListeners.at(-1)?.(document);
+    await foundPicture;
+    assert.equal(diagnosis?.kind, 'outside');
+    assert.equal(diagnosis?.slide, 1);
+
+  } finally {
+    livePublisher.dispose();
+  }
   console.log('deckPublish: all passed');
 }
 
-main().catch(error => {
+const deadline = setTimeout(() => { throw new Error('deckPublish test timed out'); }, 8_000);
+main().finally(() => clearTimeout(deadline)).catch(error => {
   console.error(error);
   process.exit(1);
 });

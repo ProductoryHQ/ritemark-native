@@ -22,13 +22,17 @@
  */
 
 import * as path from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { liveIssue, type LiveIssue, type LiveResult } from './liveUpdate';
 import type { PublishedSite, PublishHost, VerifiedUpload } from './host';
 import { PublishError, readVerifiedUpload } from './host';
-import { isGatheredPlan } from './gather';
+import { gatherPage, isGatheredPlan } from './gather';
+import { GitCheckError } from './gitIgnore';
 import { siteNameFor, suggestSubdomain } from './cloudflare/assets';
 import { ADDRESS_TAKEN, CONNECT_AGAIN, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH } from './cloudflare/CloudflareHost';
 import { SubdomainExistsError } from './cloudflare/client';
-import { recordFor, sheetNeeded, type PublishRecord, type PublishRecordStore } from './publishRecords';
+import { recordFor, sheetNeeded, type LivePreference, type PublishRecord, type PublishRecordStore } from './publishRecords';
 import { decodeSettingsRequest, type WebPageRow, type WebPagesSettingsProjection } from './settingsProtocol';
 import { isValidPagePart } from './sheetProtocol';
 import { plainLine, plainPart } from './plainText';
@@ -163,7 +167,8 @@ export type PublishConsent =
   /** "Publish anyway" in the sheet, past the key warning: the second, explicit press. */
   | 'sheet-anyway'
   /** Update the page with the same files and nothing key-shaped: `sheetNeeded` is false. */
-  | 'unchanged-update';
+  | 'unchanged-update'
+  | 'live-update';
 
 export interface PublishUi {
   openExternal(url: string): Promise<boolean>;
@@ -246,6 +251,8 @@ export class PublishController {
   /** Sites taken down whose record couldn't be removed: never shown as online. */
   private readonly gone = new Set<string>();
   private readonly siteLines = new Map<string, string>();
+  /** Only updateLive can authorize its own gathered plan, once. */
+  private readonly livePlans = new WeakMap<GatheredPlan, { record: PublishRecord; active: () => boolean }>();
   private readonly publishing = new Set<string>();
   private readonly sheets = new Set<string>();
   /** Pages whose file is being written for a Publish (the deck's bar, `holdPage`): no flow starts on them meanwhile. */
@@ -410,7 +417,16 @@ export class PublishController {
   /** Every published page's bar asks for its state again. */
   private async askBarsAgain(): Promise<void> {
     const pages = new Set((await this.deps.records.list().catch(() => [] as PublishRecord[])).map((r) => r.pagePath));
-    for (const pagePath of pages) this.deps.onPageState?.(pagePath);
+    for (const pagePath of pages) {
+      const record = await this.liveRecord(pagePath);
+      if (record?.live && !record.live.pause && record.accountId !== this.deps.host.accountId()) {
+        await this.deps.records.changeLive(record, {
+          ...record.live,
+          pause: { kind: 'connection', detail: 'Cloudflare needs you to connect again.', at: this.now() },
+        }).catch(() => this.deps.log('[publish] could not record the live connection pause'));
+      }
+      this.deps.onPageState?.(pagePath);
+    }
   }
 
   private async bySite(siteName: string): Promise<PublishRecord | undefined> {
@@ -455,22 +471,25 @@ export class PublishController {
     try {
       let down = false;
       try {
-        await this.deps.host.unpublish(record.siteName, record.address, {
-          onSlow: () => {
-            this.unpublishing.set(id, { slow: true });
-            void this.post();
-            this.deps.onPageState?.(record.pagePath);
-            if (fromBar && !closeSlow) {
-              try {
-                closeSlow = this.ui.showWaiting(SLOW_UNPUBLISH);
-              } catch {
-                closeSlow = () => undefined;
+        await this.deps.records.withPageDeploy(record.pagePath, async () => {
+          if (this.deps.host.accountId() !== record.accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
+          await this.deps.host.unpublish(record.siteName, record.address, {
+            onSlow: () => {
+              this.unpublishing.set(id, { slow: true });
+              void this.post();
+              this.deps.onPageState?.(record.pagePath);
+              if (fromBar && !closeSlow) {
+                try {
+                  closeSlow = this.ui.showWaiting(SLOW_UNPUBLISH);
+                } catch {
+                  closeSlow = () => undefined;
+                }
               }
-            }
-          },
+            },
+          });
+          down = true;
+          await this.deps.records.remove(record.pagePath, record.siteName);
         });
-        down = true;
-        await this.deps.records.remove(record.pagePath, record.siteName);
         this.gone.delete(id);
       } catch (error) {
         if (down) {
@@ -646,6 +665,102 @@ export class PublishController {
     }
   }
 
+  /** Sprint 175 amends Sprint 149 R1: publishing is explicit. The person presses Publish or Update the page,
+   * or turns on Update on every save for that page. No AI tool, Flow, schedule or start-up path publishes, updates,
+   * unpublishes, grants live consent or ends a pause.
+   */
+  async setLive(pagePath: string, on: boolean): Promise<boolean> {
+    const record = await this.liveRecord(pagePath);
+    if (!record || (on && (!this.canPublish() || this.unpublishing.has(record.siteName)))) return false;
+    if (Boolean(record.live?.on) === on) return false;
+    const changed = await this.deps.records.changeLive(record, on ? { on: true, id: randomUUID() } : undefined);
+    if (changed) this.deps.onPageState?.(pagePath);
+    return changed;
+  }
+
+  /** Whether preserving the fitted local HTML also preserves every byte readers already have. */
+  async matchesPublishedBytes(page: ProjectPage, hash: string): Promise<boolean> {
+    return (await this.deps.gather(page.realPath, page.projectFolder)).contentHash === hash;
+  }
+
+  /** Preview only. Supply the newly rendered page in memory and scan its local references as usual. */
+  async hasLiveKey(page: ProjectPage, html: string): Promise<boolean> {
+    const plan = await gatherPage(page.realPath, page.projectFolder, {
+      readFile: file => file === page.realPath ? Promise.resolve(Buffer.from(html)) : readFile(file),
+    });
+    return plan.keyHits.length > 0;
+  }
+
+  /** Quiet update for an already published deck. The caller holds the page through the build and gather. */
+  async updateLive(
+    page: ProjectPage,
+    input: {
+      preference: LivePreference;
+      resume: boolean;
+      active: () => boolean;
+      sending?: () => void;
+      legacyDigest?: string;
+      digest: string;
+      pageSha: string;
+      describe?: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined;
+    },
+  ): Promise<LiveResult> {
+    const record = await this.liveRecord(page.realPath);
+    if (!record?.live?.on || record.live.id !== input.preference.id || (record.live.pause && !input.resume)
+      || !this.held.has(page.realPath) || this.unpublishing.has(record.siteName) || !input.active() || !this.canPublish()) {
+      return { kind: 'stopped' };
+    }
+    const pause = async (issue: LiveIssue): Promise<LiveResult> => {
+      const saved = { ...issue, at: this.now() };
+      if (!input.active() || !await this.deps.records.changeLive(record, { ...record.live!, pause: saved })) return { kind: 'stopped' };
+      return { kind: 'paused', pause: saved };
+    };
+    const connection: LiveIssue = { kind: 'connection', detail: 'Cloudflare needs you to connect again.' };
+    const active = () => input.active() && this.canPublish();
+    try {
+      const plan = await this.deps.gather(page.realPath, page.projectFolder);
+      const issue = liveIssue(plan, input.resume && record.live.pause?.kind === 'outside' ? record.live.pause.scope : undefined);
+      if (!plan.tooBig.some(file => file.projectPath === plan.files[0]?.projectPath) && plan.files[0]?.sha256 !== input.pageSha) {
+        return { kind: 'offline', detail: 'The page file changed while Ritemark was checking it.' };
+      }
+      const described = input.describe?.(plan, issue) ?? issue;
+      if (described) return await pause(described);
+      if (record.accountId !== this.deps.host.accountId()) return await pause(connection);
+      if (input.resume && record.live.pause?.kind === 'connection') await this.deps.host.refreshSubdomain();
+      if (!active()) return { kind: 'stopped' };
+      const before = new Map(record.files.map(file => [file.path, file.sha256]));
+      const assets = plan.files.filter(file => file.kind !== 'page');
+      const beforeDigest = record.deckDigest ?? input.legacyDigest;
+      if (!record.deckDigest && input.legacyDigest) await this.deps.records.rememberDeckDigest(record, input.legacyDigest);
+      const digest = input.digest;
+      const oldPage = plan.files.find(file => file.kind === 'page')?.relPath;
+      let result: LiveResult = { kind: 'unchanged' };
+      if (plan.contentHash !== record.contentHash && !(beforeDigest && beforeDigest === digest
+        && oldPage && before.has(oldPage) && before.size === assets.length + 1
+        && assets.every(file => before.get(file.relPath) === file.sha256))) {
+        input.sending?.();
+        this.livePlans.set(plan, { record, active });
+        try {
+          await this.publishPage({ plan, consent: 'live-update' });
+        } finally {
+          this.livePlans.delete(plan);
+        }
+        const added = assets.filter(file => file.kind === 'picture' && !before.has(file.relPath));
+        result = { kind: 'updated', pictures: [...new Set(added.map(file => plainPart(path.basename(file.relPath))))] };
+      }
+      if (record.live.pause) await this.deps.records.changeLive(record, { on: true, id: record.live.id });
+      return result;
+    } catch (error) {
+      if (!active()) return { kind: 'stopped' };
+      const current = await this.liveRecord(page.realPath);
+      if (!current || current.siteName !== record.siteName || current.live?.id !== record.live.id
+        || JSON.stringify(current.live.pause) !== JSON.stringify(record.live.pause)) return { kind: 'stopped' };
+      if (error instanceof GitCheckError) return pause({ kind: 'unchecked', detail: "Ritemark couldn't check which files Git ignores in this project." });
+      if (error instanceof PublishError && ['not-connected', 'refused', 'cannot-publish'].includes(error.code)) return pause(connection);
+      return { kind: 'offline', detail: error instanceof PublishError ? plainLine(error.message) : COULD_NOT_REACH_PUBLISH };
+    }
+  }
+
   /**
    * Publish or Update one page (R7). Takes only PR 3's gather-and-scan result and the person's consent: a plan
    * `gatherPage` didn't make is refused, a key-shaped hit needs the sheet's "Publish anyway", and an update without
@@ -664,9 +779,13 @@ export class PublishController {
     if (!accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
-    if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     const record = await this.liveRecord(pagePath);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
+    const live = consent === 'live-update' ? this.livePlans.get(plan) : undefined;
+    if (consent === 'live-update' && (!record?.live?.on || !live || !this.matchesLive(record, live.record) || !live.active())) {
+      throw new PublishError('changed', 'Live publishing stopped.');
+    }
+    if (this.publishing.has(pagePath) || (record && this.unpublishing.has(record.siteName))) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     if (plan.keyHits.length > 0 && consent !== 'sheet-anyway') throw new PublishError('failed', KEY_NEEDS_SHEET);
     if (consent === 'unchanged-update' && (!record || sheetNeeded(record, plan))) {
       throw new PublishError('failed', 'What goes changed. Press Publish to see it.');
@@ -680,16 +799,36 @@ export class PublishController {
     this.pageLines.delete(pagePath);
     this.deps.onPageState?.(pagePath);
     try {
-      // Verify the source checked by the scan and the cleaned bytes the record will hash.
-      const upload = await this.readUpload(plan);
-      const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record) });
-      this.gone.delete(site.name);
-      try {
-        await this.deps.records.put(recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now())));
-      } catch {
-        this.deps.log('[publish] published, but the record could not be written');
-        this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
-      }
+      const { site, upload } = await this.deps.records.withPageDeploy(pagePath, async () => {
+        // Verify the source checked by the scan and the cleaned bytes the record will hash.
+        const upload = await this.readUpload(plan);
+        const current = await this.liveRecord(pagePath);
+        if (current?.siteName !== record?.siteName || current?.contentHash !== record?.contentHash
+          || (current && this.unpublishing.has(current.siteName))) {
+          throw new PublishError('changed', 'The published page changed. Try again.');
+        }
+        if (live && (!current || !this.matchesLive(current, live.record) || !live.active())) {
+          throw new PublishError('changed', 'Live publishing stopped.');
+        }
+        if (this.deps.host.accountId() !== accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
+        const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record) });
+        this.gone.delete(site.name);
+        try {
+          const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
+          const html = upload.files.find(file => file.urlPath === upload.pageUrlPath);
+          if (html) {
+            const head = Buffer.from(html.bytes.subarray(0, 4096)).toString('utf8');
+            if (head.includes('<meta name="generator" content="Ritemark">')) {
+              next.deckDigest = /<meta name="ritemark-deck" content="([0-9a-f]{64})">/.exec(head)?.[1];
+            }
+          }
+          await this.deps.records.put(next);
+        } catch {
+          this.deps.log('[publish] published, but the record could not be written');
+          this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
+        }
+        return { site, upload };
+      });
       await this.post();
       if (!record) await this.waitForFirstAnswer(pagePath, site, input.newName === true, pageTitleOf(upload, pagePath));
       return site;
@@ -703,6 +842,11 @@ export class PublishController {
       this.publishing.delete(pagePath);
       this.deps.onPageState?.(pagePath);
     }
+  }
+
+  private matchesLive(current: PublishRecord, expected: PublishRecord): boolean {
+    return current.siteName === expected.siteName && current.live?.id === expected.live?.id
+      && JSON.stringify(current.live?.pause) === JSON.stringify(expected.live?.pause) && current.contentHash === expected.contentHash;
   }
 
   /**
