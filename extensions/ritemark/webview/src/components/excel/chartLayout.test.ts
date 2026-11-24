@@ -134,10 +134,11 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
     assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
     assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
   }
-  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall], conditionalFormats: 0 }),
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
     "This sheet has 2 waterfall charts, a treemap chart, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
-  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }], conditionalFormats: 1 }),
-    "This sheet has a picture and colour rules. They're kept in the file; Open in Excel to see them.")
+  // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
+    "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
 })
 
 const colours = await open('charts-colours')
@@ -771,7 +772,7 @@ test('combos containing a pie or doughnut keep their card and name the circular 
     }))
     assert.equal(drawsChart(chart), false)
     assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
-    assert.match(keptNotice({ drawings: [drawing], conditionalFormats: 0 })!, new RegExp(`a ${kind} chart`))
+    assert.match(keptNotice({ drawings: [drawing] })!, new RegExp(`a ${kind} chart`))
   }
 })
 
@@ -779,8 +780,8 @@ test('the quiet line describes unnamed charts alongside named kinds', () => {
   const draw = (tag: string) => ({ ...combo, chart: readChart(`<chartSpace><chart><plotArea><${tag}/></plotArea></chart></chartSpace>`) })
   const unknown = { ...combo, chart: readChart('<chartSpace><chart><plotArea/></chart></chartSpace>', undefined, true) }
   for (const others of [[unknown], [unknown, unknown]]) {
-    assert.match(keptNotice({ drawings: [...others, draw('radarChart')], conditionalFormats: 0 })!,
+    assert.match(keptNotice({ drawings: [...others, draw('radarChart')] })!,
       others.length === 1 ? /a radar chart and another chart\./ : /a radar chart and 2 other charts\./)
   }
-  assert.match(keptNotice({ drawings: [unknown], conditionalFormats: 0 })!, /has a chart\./)
+  assert.match(keptNotice({ drawings: [unknown] })!, /has a chart\./)
 })

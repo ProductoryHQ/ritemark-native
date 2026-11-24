@@ -19,6 +19,8 @@ import { chartTitle, readChart } from './readChart'
 import type { ChartModel } from './chartModel'
 
 export type SheetState = 'visible' | 'hidden' | 'veryHidden'
+import { readRules, type RuleSet } from './readRules'
+
 export type CellKind = 'n' | 's' | 'b' | 'e'
 
 /** A run of rich text, in its own font. */
@@ -96,6 +98,7 @@ export interface SheetLayoutInfo {
   drawings: DrawingModel[]
   /** Colour scales, data bars and other conditional formats: kept in the file, not drawn. */
   conditionalFormats: number
+  rules: RuleSet
   /** Cells with a comment (Excel's red corner). */
   comments: Array<[number, number]>
 }
@@ -141,6 +144,7 @@ export function emptyLayout(): SheetLayoutInfo {
     showHeaders: true,
     drawings: [],
     conditionalFormats: 0,
+    rules: [],
     comments: [],
   }
 }
@@ -434,6 +438,8 @@ async function readWorksheet(
     }
   }
   layout.conditionalFormats = (xml.match(new RegExp(`<${p}conditionalFormatting(?=[\\s>])`, 'g')) ?? []).length
+
+  layout.rules = readRules(xml, ctx)
 
   const sheetRels = await rels(zip, path)
   const drawingId = new RegExp(`<${p}drawing(?=[\\s/>])[^>]*\\s[\\w.-]+:id="([^"]+)"`).exec(xml)?.[1]

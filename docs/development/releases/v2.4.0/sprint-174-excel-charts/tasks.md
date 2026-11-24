@@ -43,10 +43,12 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 - [ ] Proof: scenarios 1 (combo), 10, 11, 13, 14, each beside Excel's render; the lead's look; the copy checked by pasting the picture into a Ritemark document
 
 ## PR 5: the rules reader and engine (Standard, no visible change)
-- [ ] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan
-- [ ] Tests: every rule kind against hand-made grids; formulas relative to the range's top-left cell; priority and stop-if-true; the date injected; the x14 data bar twin
-- [ ] "Unreadable" for anything outside the subset, never a guess (scenario 26)
+- [x] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan
+- [x] Tests: every rule kind against hand-made grids; formulas relative to the range's top-left cell; priority and stop-if-true; the date injected; the x14 data bar twin
+- [x] "Unreadable" for anything outside the subset, never a guess (scenario 26)
 - [ ] Proof: for each rule fixture, the engine's per-cell result table matches the cells Excel's render colours (cell list, in `research/`)
+
+PR 5 only reads and evaluates rules, so there is no user-facing release note.
 
 ## PR 6: cell rules, colour scales and data bars drawn (Standard, look change)
 - [ ] `cellRules.ts` joined into `SheetGrid.tsx`'s cell layers for the visible window: fills, font changes, borders, scale fills, data bars with axis, negative colour, gradient or solid, border, show bar only

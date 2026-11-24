@@ -1,3 +1,4 @@
+import { compileCellRules } from './cellRules'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
@@ -63,7 +64,7 @@ async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, t
     return event
   }
   try {
-    flushSync(() => root.render(<SheetGrid model={model} sheet={sheet} version={0} editable
+    flushSync(() => root.render(<SheetGrid model={model} sheet={sheet} version={0} editable cellRules={compileCellRules(model, sheet)}
       onEdit={() => edits++} getInput={() => ''} getFormula={() => undefined} onOpenInExcel={() => {}} openInLabel="Open in Excel" />))
     run({ host, dispatch, focused: () => active })
     assert.equal(edits, 0)

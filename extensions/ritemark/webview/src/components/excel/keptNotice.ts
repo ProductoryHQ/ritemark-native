@@ -1,3 +1,4 @@
+import type { CellRules } from './cellRules'
 import { drawsChart } from './chartLayout'
 import type { ChartModel } from './chartModel'
 import type { SheetLayoutInfo } from './readWorkbook'
@@ -22,8 +23,12 @@ function unsupportedKinds(chart: ChartModel | undefined): string[] {
   return chart.extendedKinds?.map((kind) => extendedKinds.get(kind) ?? '') ?? ['']
 }
 
-/** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
-export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings' | 'conditionalFormats'>): string | undefined {
+/**
+ * What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7).
+ * Charts the preview draws (Sprint 174 PR 2 on) and colour rules it draws (PR 6) aren't named; chart kinds it can't
+ * draw are named by kind (PR 4), and icon sets and rules it can't read are named (PR 6).
+ */
+export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings'>, rules?: CellRules): string | undefined {
   const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
   const things: string[] = []
   const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
@@ -41,7 +46,8 @@ export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings' | 'condition
     : name(unnamed, 'chart', 'charts'))
   if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
   if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
-  if (layout.conditionalFormats) things.push('colour rules')
+  if (rules?.iconSets.length) things.push(rules.iconSets.length === 1 ? 'an icon set' : `${rules.iconSets.length} icon sets`)
+  if (rules?.unreadable.length) things.push(name(rules.unreadable.length, "colour rule it can't read", "colour rules it can't read"))
   if (!things.length) return undefined
   const list = things.length === 1 ? things[0] : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`
   const one = things.length === 1 && /^an? /.test(list)
