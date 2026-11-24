@@ -40,7 +40,7 @@ const TONE_CLASS: Record<string, string> = {
   faint: 'text-[var(--r-ink-faint)]',
 };
 
-export function ActivityStatusLine() {
+export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?: boolean } = {}) {
   const conversation = useActiveConversation();
   const state = deriveActivityState(conversation);
 
@@ -109,6 +109,8 @@ export function ActivityStatusLine() {
   return (
     <div
       className={`flex min-h-6 items-center gap-1.5 px-1 text-[12px] ${TONE_CLASS[presentation.tone]}`}
+      // Inline, so it wins over the transcript's space-y: the meta lines' 8 px gap (the step's 4 px padding + 1 + Done's 3).
+      style={closesLiveStep ? { marginTop: 1 } : undefined}
       title={title}
       data-activity-state={state}
     >
