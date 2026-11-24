@@ -205,7 +205,7 @@ export class DeckPages implements vscode.Disposable {
     item.name = 'Ritemark Deck Length';
     item.text = status.text;
     item.tooltip = status.tooltip;
-    item.color = status.over ? new vscode.ThemeColor('editorWarning.foreground') : undefined;
+    item.color = status.over ? new vscode.ThemeColor('ritemark.deckLengthOver') : undefined;
     item.show();
   }
 

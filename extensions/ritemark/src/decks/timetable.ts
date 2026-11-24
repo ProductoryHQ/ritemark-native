@@ -20,7 +20,7 @@ export interface Timetable {
   untimedCount: number;
 }
 
-function explicitMinutes(value: string | undefined): number | null {
+export function explicitMinutes(value: string | undefined): number | null {
   if (value === undefined || !/^\d+$/.test(value)) return null;
   const minutes = Number(value);
   return Number.isSafeInteger(minutes) ? minutes : null;

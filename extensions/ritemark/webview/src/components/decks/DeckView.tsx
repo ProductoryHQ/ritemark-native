@@ -11,8 +11,8 @@
  * to its part; writing in a part makes its slide the current one.
  */
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
-import { readTimetable } from '../../../../src/decks/timetable'
-import { slideMinutesText } from '../../../../src/decks/timetableDisplay'
+import { explicitMinutes, readTimetable } from '../../../../src/decks/timetable'
+import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
 import { DeckMinutes } from './DeckMinutes'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
@@ -670,9 +670,6 @@ export function DeckView({
     writeSlideBlock(entry.kind, entry.node.attrs.body)).join('\n\n')), [slides])
   const hasSlideMinutes = timing.slides.some(entry => entry.minutes !== null)
   const shownTiming = timing.slides[shown]
-  const minutesLabel = slideMinutesText(shownTiming)
-  const canEditMinutes = shownTiming && shownTiming.sectionMinutes === null
-    && (shownTiming.labelMinutes === null || slide?.data.time !== undefined)
   const countLabel = count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`
   // A draft belongs to the current slide. Not keyed on the body: saving the time changes it, and the box would lose focus.
   const minutesKey = `${shown}:${slide?.data.id ?? ''}`
@@ -2026,19 +2023,12 @@ export function DeckView({
         {/* Slide, both or handout (17 November): under 600 px the handout has no room, and the deck shows the slide only. */}
         {deskWidth >= NARROWEST_DESK ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
         <span className="deck-count">
-          {!hasSlideMinutes && canEditMinutes ? (
-            <DeckMinutes key={minutesKey} label={countLabel} minutes={null} addFromCount
+          {shownTiming && shownTiming.sectionMinutes === null ? (
+            <DeckMinutes key={minutesKey} count={countLabel} timing={shownTiming}
+              fromLabel={shownTiming.labelMinutes !== null && explicitMinutes(slide?.data.time) === null}
               onCommit={commitMinutes} />
-          ) : countLabel}
+          ) : slideCountWithMinutes(countLabel, shownTiming)}
         </span>
-        {hasSlideMinutes && (canEditMinutes ? (
-          <DeckMinutes key={minutesKey} label={minutesLabel ?? 'Set minutes'} minutes={shownTiming.minutes}
-            onCommit={commitMinutes} />
-        ) : minutesLabel ? (
-          <Tooltip label={shownTiming.sectionMinutes !== null ? 'Time for the slides in this section' : 'Minutes from the exercise label'}>
-            <span className="deck-minutes-chip"><Icon name="timer" size={14} tone="muted" />{minutesLabel}</span>
-          </Tooltip>
-        ) : null)}
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>

@@ -11,6 +11,11 @@ export function slideMinutesText(slide: TimetableSlide | undefined): string | nu
   return minutes === null ? null : `${minutes} min`;
 }
 
+export function slideCountWithMinutes(count: string, slide: TimetableSlide | undefined): string {
+  const minutes = slideMinutesText(slide);
+  return minutes === null ? count : `${count} · ${minutes}`;
+}
+
 export function timetableStatus(timetable: Timetable): { text: string; over: boolean; tooltip: string } | null {
   const { slides, totalMinutes, sessionMinutes, untimedCount } = timetable;
   if (!slides.some(slide => slide.minutes !== null)) return null;
