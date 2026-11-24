@@ -41,7 +41,7 @@ Given/when/then, one group per requirement. They become the tests and the manual
 - **S24.** Given that link, when clicked, then the Word preview opens in a tab of its own scrolled to the passage, marked for a moment; the link in the answer shows as the current one.
 - **S25.** Given a PDF link with page 4, then the PDF preview opens on page 4 with the words marked; if the words moved, page 4 still opens.
 - **S26.** Given a slide link ("the deck's slide 5"), then the deck's preview opens on slide 5.
-- **S27.** Given quoted words not in the document (the AI paraphrased), then the document opens at its top and the hover says "couldn't find these words; opened at the top".
+- **S27.** Given quoted words missing from the document, the hover card shows those words in muted ink and says “These words aren't in the document.” Its action opens the cited page or slide, or opens the document if the link gives no page. Clicking the source link itself keeps the existing fallback to the top in Word and PDF.
 - **S28.** Given a link to a file outside the project, to `javascript:` or `command:`, or with quoted words over 200 characters or with control characters, then it opens nothing at a passage; an outside file is explained as today, and quoted words are dropped.
 - **S29.** Given Codex cites a file with `:codex-file-citation{path=…}` (no passage), then it still opens the file at its top as today.
 - **S30.** Given the person clicks away or presses Esc while the hover card is open, then it closes (REVIEW.md: popups close on outside click and Esc).

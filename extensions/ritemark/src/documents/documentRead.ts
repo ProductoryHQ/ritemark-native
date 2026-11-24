@@ -17,4 +17,4 @@ export interface DocumentReadResult {
   location?: SourceLocation;
 }
 
-export type SourceLocation = { text: string; occurrence: number; page?: number } | { page: number };
+export type SourceLocation = { text: string; occurrence: number; page?: number; displayText?: string } | { page: number };

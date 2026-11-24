@@ -33,8 +33,9 @@ async function main() {
     return id === 'vscode' ? vscode : originalLoad.call(this, id, ...args);
   };
   let openSourcePassage: typeof import('./openSourcePassage').openSourcePassage;
+  let previewSourcePassage: typeof import('./openSourcePassage').previewSourcePassage;
   try {
-    ({ openSourcePassage } = require('./openSourcePassage') as typeof import('./openSourcePassage'));
+    ({ openSourcePassage, previewSourcePassage } = require('./openSourcePassage') as typeof import('./openSourcePassage'));
   } finally {
     loader._load = originalLoad;
   }
@@ -52,16 +53,54 @@ async function main() {
     assert.deepEqual(request, { path: join(root, 'Word.docx'), passage: { text: 'words', page: 4 } });
     return { text: '', location: { text: 'Words', occurrence: 0 } };
   });
-  await openSourcePassage('Report.pdf', { text: 'moved words', page: 4 }, async () => ({ text: '', location: { page: 4 } }));
+  await openSourcePassage('Report.pdf', { text: 'moved words', page: 4 }, async () => ({ text: '', location: { text: 'Moved words', occurrence: 0, page: 5 } }));
   await openSourcePassage('Deck.pptx', { text: 'speaker notes', page: 5 }, noRead);
   await openSourcePassage('No match.docx', { text: 'paraphrase' }, async () => ({ text: '' }));
   assert.deepEqual(opens.map((file) => findRequests.waiting(file)), [
     { type: 'find:open', text: 'Words', occurrence: 0, source: true },
-    { type: 'find:page', page: 4 },
+    { type: 'find:open', text: 'Moved words', occurrence: 0, page: 5, source: true },
     { type: 'find:slide', page: 5 },
     { type: 'find:top' },
   ]);
   assert.match(info[0], /Couldn't find these words. Opened at the top/);
+
+  // S23: preview is read-only and displays the worker's literal match.
+  const opensBeforePreview = opens.length;
+  assert.deepEqual(await previewSourcePassage('Word.docx', { text: 'words', page: 4 }, async () =>
+    ({ text: '', location: { text: 'Words', occurrence: 0 } })), {
+    name: 'Word', extension: '.docx', page: 4, quote: 'Words', missing: false,
+  });
+  assert.deepEqual(await previewSourcePassage('Report.pdf', { text: 'moved words', page: 4 }, async () =>
+    ({ text: '', location: { text: 'Movedwords', displayText: 'Moved words', occurrence: 0, page: 5 } })), {
+    name: 'Report', extension: '.pdf', page: 5, quote: 'Moved words', missing: false,
+  });
+  assert.deepEqual(await previewSourcePassage('Deck.pptx', { text: 'notes', page: 4 }, async () =>
+    ({ text: '', location: { text: 'Notes', occurrence: 0, page: 4 } })), {
+    name: 'Deck', extension: '.pptx', page: 4, quote: 'Notes', missing: false,
+  });
+  assert.deepEqual(await previewSourcePassage('Deck.pptx', { text: 'made-up words', page: 5 }, async () => ({ text: '' })), {
+    name: 'Deck', extension: '.pptx', page: undefined, quote: undefined, missing: true,
+  });
+  assert.deepEqual(await previewSourcePassage('../Outside.docx', { text: 'words' }, noRead), {
+    error: 'Choose a source file inside the project folder.',
+  });
+  assert.equal(opens.length, opensBeforePreview);
+
+  // Missing-card actions use the link location without re-running the quote search.
+  for (const [file, page, navigation] of [
+    ['No match.docx', 4, { type: 'find:page', page: 4 }],
+    ['Report.pdf', 2, { type: 'find:page', page: 2 }],
+    ['Deck.pptx', 4, { type: 'find:slide', page: 4 }],
+    ['Word.docx', undefined, null],
+  ] as const) {
+    const filePath = join(root, file);
+    const panel = {};
+    findRequests.ready(filePath, panel, () => {});
+    findRequests.gone(filePath, panel);
+    assert.equal(await openSourcePassage(file, { text: 'made-up words', page }, noRead, true), filePath);
+    assert.deepEqual(findRequests.waiting(filePath), navigation);
+  }
+  assert.equal(info.length, 1);
 
   const windowsRealpath = async (file: string) => file.toLowerCase();
   assert.equal((await resolveProjectDocument('c:/REVIEW/Report.pdf', ['C:\\Review'], windowsRealpath, win32)).ok, true);
