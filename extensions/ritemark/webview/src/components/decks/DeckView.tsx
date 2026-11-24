@@ -11,6 +11,7 @@
  * to its part; writing in a part makes its slide the current one.
  */
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
 import { clockMinutes, explicitMinutes, readTimetable, SESSION_LENGTH, SESSION_START } from '../../../../src/decks/timetable'
 import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
 import { DeckMinutes } from './DeckMinutes'
@@ -34,7 +35,7 @@ import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
 import { onDocChanged } from '../../lib/docChange'
 import { deckWordCount } from './deckWordCount'
-import type { SlideData } from '../../../../src/decks/deckFormat'
+import { parseDeck, type SlideData } from '../../../../src/decks/deckFormat'
 import { DECK_DERIVED, DECK_OPERATION, RATIO_MAX, RATIO_MIN, initialRatio, withDrawnHeadings, deleteSlide, derivedHeadings, partHeadingAt, partRange, duplicateSlide, handoutHasText, insertSlide, isSlideNode, moveSlide, nudgeTarget, partChangedBy, partContent, sealHistory, partIndexAt, replacePart, restoreSlide, slideDataOf, slidesOf, updateSlide, type DeckSlideEntry } from './deckDocument'
 import { StartCard } from './StartCard'
 import { deckStarted, startCardPlace, startCardRows, type StartCardState } from '../../../../src/decks/startCard'
@@ -80,7 +81,8 @@ import { DeckDrawnHeadings } from './handout/drawnHeadings'
 import { Stage } from './Stage'
 import { DeckComments, deckCommentStops, stopIndexOf } from './DeckComments'
 import { PresentButton, usePresentKeys, type PresentFrom } from './present/PresentButton'
-import { DeckPublish } from './DeckPublish'
+import { DeckPublish, type PauseTarget } from './DeckPublish'
+import { computeResults } from '../../extensions/SearchExtension'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
 import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
@@ -381,6 +383,7 @@ export function DeckView({
   // Fold either side (16 November): the slide, the handout, or neither. Every deck opens in Slide only (19 November);
   // the choice lives while the deck is open and is never kept.
   const [fold, setFold] = useState<DeckFold>(OPENING_FOLD)
+  const [showHandoutInNarrowView, setShowHandoutInNarrowView] = useState(false)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
   const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
@@ -699,7 +702,8 @@ export function DeckView({
 
   const stripFits = deskWidth === 0 || deskWidth >= MIN_STRIP_DESK
   const stripShown = stripFits && (stripWanted ?? (stripMode === 'list' || deskWidth === 0 || deskWidth >= NARROW_DESK))
-  const { slideShown, handoutShown } = foldedSides(fold, !(deskWidth > 0 && deskWidth < NARROWEST_DESK))
+  const handoutRoom = !(deskWidth > 0 && deskWidth < NARROWEST_DESK)
+  const { slideShown, handoutShown } = foldedSides(fold, handoutRoom || showHandoutInNarrowView)
   const slideShownRef = useRef(slideShown)
   slideShownRef.current = slideShown
   const stripWidth = stripShown ? (stripMode === 'list' ? TIMETABLE_STRIP_WIDTH : STRIP_WIDTH) : 0
@@ -756,7 +760,7 @@ export function DeckView({
   })
   /** The handout's left edge; beside, the line between the slide and the handout too. */
   const dividerLeft = above ? stripWidth : stripWidth + stageWidth
-  /** What the view switch shows chosen: the view as drawn (under 600 px the handout has no room, so Slide only). */
+  /** What the view switch shows chosen: the view as drawn, including a handout opened by Show it. */
   const viewShown: DeckViewMode = !handoutShown ? 'slide' : !slideShown ? 'handout' : 'both'
 
   const scrollContainer = useCallback((): HTMLElement | null => {
@@ -1104,6 +1108,7 @@ export function DeckView({
    *  still rings. */
   const chooseView = useCallback((view: DeckViewMode) => {
     const next = foldOfView(view)
+    setShowHandoutInNarrowView(false)
     findBorrowedHandout.current = false
     setFold(next)
     requestAnimationFrame(() => pick(currentRef.current))
@@ -1688,6 +1693,66 @@ export function DeckView({
   /** The deck's text as this view holds it now, front matter left out (the host reads the slides from it). */
   const currentText = useCallback(() => (editor && !editor.isDestroyed ? editorHTMLToMarkdown(editor.getHTML()) : contentRef.current), [editor])
 
+  const showPause = useCallback(({ slide: number, location, keyPreview }: PauseTarget) => {
+    if (number === undefined || number < 1 || number > countRef.current) return
+    const index = number - 1
+    pick(index)
+    if (!location || !editor || editor.isDestroyed) return
+    // Scan locations are in the saved body, with a one-based line and zero-based UTF-16 columns.
+    const body = contentRef.current.replace(/^\uFEFF/, '')
+    const lines = body.split('\n')
+    const line = lines[location.line - 1]
+    const { column, endColumn } = location
+    if (line === undefined || column === undefined || endColumn === undefined || endColumn <= column || endColumn > line.length) return
+    const target = line.slice(column, endColumn)
+    if (keyPreview && !matchesKeyPreview(target, keyPreview)) return
+    const source = parseDeck(body).slides[index]
+    if (!source) return
+    const offset = lines.slice(0, location.line - 1).reduce((sum, row) => sum + row.length + 1, column)
+    if (offset < source.start || offset >= source.handoutEnd) return
+    const inHandout = offset >= source.handoutStart
+    const before = body.slice(inHandout ? source.handoutStart : source.start, offset)
+    const occurrence = before.split(target).length - 1
+    if (inHandout && !handoutShown) {
+      chooseView(handoutRoom ? 'both' : 'handout')
+      // Show it is an explicit request to see handout text even when only one pane fits.
+      setShowHandoutInNarrowView(!handoutRoom)
+    }
+    if (!inHandout && !slideShown) chooseView('slide')
+
+    requestAnimationFrame(() => {
+      if (editor.isDestroyed || currentRef.current !== index) return
+      if (inHandout) {
+        const range = partRange(editor.state.doc, index)
+        const match = range && computeResults(editor.state.doc, target)
+          .filter(hit => hit.from >= range.from && hit.to <= range.to && editor.state.doc.textBetween(hit.from, hit.to) === target)[occurrence]
+        if (match) editor.chain().focus().setTextSelection(match).scrollIntoView().run()
+        return
+      }
+      const stage = stageRef.current?.querySelector('.deck-big')
+      if (!stage) return
+      // The stage has its own editor. Use the DOM range there, as the stage does for layout text.
+      const walker = document.createTreeWalker(stage, NodeFilter.SHOW_TEXT)
+      let remaining = occurrence
+      while (walker.nextNode()) {
+        const node = walker.currentNode
+        const text = node.textContent ?? ''
+        for (let at = text.indexOf(target); at >= 0; at = text.indexOf(target, at + target.length)) {
+          if (remaining-- !== 0) continue
+          const range = document.createRange()
+          range.setStart(node, at)
+          range.setEnd(node, at + target.length)
+          node.parentElement?.closest<HTMLElement>('[contenteditable="true"]')?.focus({ preventScroll: true })
+          const selection = window.getSelection()
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+          node.parentElement?.scrollIntoView({ block: 'nearest' })
+          return
+        }
+      }
+    })
+  }, [editor, pick, handoutRoom, handoutShown, slideShown, chooseView])
+
   // Sprint 159 (PR 7): a deck New just made opens with its title slide's title selected, ready to be typed over. The
   // host says so once this view has told it which slide it shows; the slides may not be read yet, so it waits for them.
   useEffect(() => onMessage(message => {
@@ -2038,8 +2103,8 @@ export function DeckView({
             <Icon name="list" size={14} tone={stripShown ? 'inherit' : 'muted'} />
           </Button>
         </Tooltip>
-        {/* Slide, both or handout (17 November): under 600 px the handout has no room, and the deck shows the slide only. */}
-        {deskWidth >= NARROWEST_DESK ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
+        {/* Under 600 px the slide normally has the desk. Show it can open the handout in its place. */}
+        {deskWidth >= NARROWEST_DESK || showHandoutInNarrowView ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
         <span className="deck-count">
           {shownTiming && shownTiming.sectionMinutes === null ? (
             <DeckMinutes key={minutesKey} count={countLabel} timing={shownTiming}
@@ -2109,7 +2174,7 @@ export function DeckView({
           // #931: while "Saved as <name>" shows, the deck's own Saved steps aside, so the note has its room
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
-        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} />
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} onShowPause={showPause} />
         <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 

@@ -47,7 +47,7 @@ declare module '@tiptap/core' {
   }
 }
 
-function computeResults(doc: ProseMirrorNode, term: string): SearchResult[] {
+export function computeResults(doc: ProseMirrorNode, term: string): SearchResult[] {
   if (!term) return []
 
   const results: SearchResult[] = []
