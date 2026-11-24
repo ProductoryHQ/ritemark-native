@@ -82,6 +82,8 @@ type LiveAction = Extract<DeckRequest, { type: 'deck/live-action' }>['action']
 export type PauseTarget = Pick<LivePause, 'slide' | 'location' | 'keyPreview'>
 
 const LIVE_HELP = 'Open pages catch up within about 15 seconds.'
+/** A pause in typing before a live deck's fit is measured again. */
+const LIVE_FIT_SETTLE_MS = 800
 
 export function sendLiveAction(action: LiveAction) {
   sendToExtension('deck/live-action', { action })
@@ -115,6 +117,17 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
     if (!liveOn) lastFit.current = null
   }, [liveOn])
 
+  // While live, the fit is measured from the slides once typing has paused for a moment, never at every keystroke:
+  // measuring renders every slide off screen, and only a saved state is ever sent (the live engine reads the file).
+  // The text is taken with the slides, so a fit always goes with the words it was measured for.
+  const [settled, setSettled] = useState(() => ({ slides, text: '' }))
+  useEffect(() => {
+    if (!liveOn && !livePress) return
+    if (livePress) { setSettled({ slides, text: text() }); return }
+    const timer = setTimeout(() => setSettled({ slides, text: text() }), LIVE_FIT_SETTLE_MS)
+    return () => clearTimeout(timer)
+  }, [slides, liveOn, livePress, text])
+
   useEffect(() => {
     const stop = onMessage(message => {
       if (message.type === 'deck/page-state' && isState(message.state)) setState(message.state)
@@ -147,12 +160,12 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
       />
       {(liveOn || livePress) && createPortal(
         <MeasureSlides
-          slides={slides}
+          slides={settled.slides}
           theme={theme}
           borderless={borderless}
           assets={assets}
           onMeasured={steps => {
-            const fit = publishRequest({ text: text(), borderless }, steps)
+            const fit = publishRequest({ text: settled.text || text(), borderless }, steps)
             const last = lastFit.current
             if (livePress || last?.text !== fit.text || last.look !== fit.look || last.steps.join() !== fit.steps.join()) {
               sendToExtension('deck/live-fit', fit)
