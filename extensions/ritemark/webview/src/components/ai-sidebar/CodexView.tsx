@@ -6,7 +6,7 @@
  * approval dialogs for shell commands and file changes.
  */
 
-import { ActivityCard } from './ActivityCard';
+import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -268,6 +268,8 @@ export function CodexTurn({
         </div>
       )}
 
+      <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
+
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
           the conversation-level ActivityStatusLine is the single status point
           (a green check here contradicted the amber waiting state below it). */}
@@ -380,9 +382,6 @@ function ActivitySection({
 }
 
 function ActivityLine({ activity }: { activity: AgentProgress }) {
-  if (activity.type === 'live_deck_updated' || activity.type === 'live_deck_paused') {
-    return <ActivityCard activity={activity} />;
-  }
   const icon = activity.tool === 'shell' ? (
     <Icon name="terminal" size={12} className="shrink-0" />
   ) : activity.tool === 'apply_patch' ? (

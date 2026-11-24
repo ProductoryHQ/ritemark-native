@@ -5,6 +5,7 @@
  */
 
 import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
+import type { LiveDeckStep } from '../../../../src/conversations/types';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
 import type { RuntimeErrorDetail, RuntimeErrorKind } from '../../../../src/runtime/turnFailureCopy';
 import type { CurrentSlide, SlideAtSend } from '../../../../src/decks/currentSlide';
@@ -63,7 +64,7 @@ export interface ModelOption {
   hidden?: boolean;
 }
 
-export type AgentProgressType = 'live_deck_updated' | 'live_deck_paused' | 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
   type: AgentProgressType;
@@ -298,6 +299,7 @@ export interface AgentConversationTurn {
   /** Subagents spawned during this turn */
   subagents?: SubagentProgress[];
   result?: {
+    liveDeckSteps?: LiveDeckStep[];
     text: string;
     filesModified: string[];
     /** Absent on a restored turn whose working time was never saved (#488). */
@@ -433,6 +435,7 @@ export interface CodexConversationTurn {
   planHandled?: boolean;
   planDecision?: 'approved' | 'rejected';
   result?: {
+    liveDeckSteps?: LiveDeckStep[];
     status: string;
     error?: string;
     /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
@@ -540,7 +543,7 @@ export type ExtensionMessage =
   | ({ type: 'agent-turn-started'; turnId: string; origin: 'background-task' } & ConversationScopedMessage)
   | ({ type: 'agent-question'; question: AgentQuestion } & ConversationScopedMessage)
   | ({ type: 'agent-plan-approval'; request: AgentPlanApprovalRequest } & ConversationScopedMessage)
-  | ({ type: 'agent-result'; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; stopped?: boolean } & ConversationScopedMessage)
+  | ({ type: 'agent-result'; liveDeckSteps?: LiveDeckStep[]; text?: string; filesModified?: string[]; metrics?: AgentMetrics; error?: string; failureKind?: RuntimeFailureKind; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; stopped?: boolean } & ConversationScopedMessage)
   | ({ type: 'agent-approval-request'; requestId: string; agentId: string; kind: 'file-write' | 'shell-command' | 'permission' | 'plan'; filePath?: string; diff?: string; command?: string; workingDir?: string; permissionLabel?: string; planText?: string } & ConversationScopedMessage)
   | { type: 'agent-setup:progress'; progress: InstallProgress }
   | { type: 'agent-setup:complete'; status: SetupStatus; environmentStatus?: AgentEnvironmentStatus; generation?: number; revision?: number }
@@ -574,7 +577,7 @@ export type ExtensionMessage =
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
   | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)
-  | ({ type: 'codex-result'; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; rawError?: string } & ConversationScopedMessage)
+  | ({ type: 'codex-result'; liveDeckSteps?: LiveDeckStep[]; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; rawError?: string } & ConversationScopedMessage)
   | ({ type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> } & ConversationScopedMessage)
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }

@@ -3,14 +3,9 @@ import type { DeckPublisher } from '../decks/deckPublish';
 import type { LiveSaveReceipt } from '../decks/deckLive';
 import type { LiveResult } from '../publish/liveUpdate';
 import { normalizeForCompare } from '../utils/pathIdentity';
+import type { LiveDeckStep } from '../conversations/types';
 
 type Source = Pick<DeckPublisher, 'onDidSaveLive' | 'onDidUpdateLive'>;
-
-export type LiveDeckStep = {
-  type: 'live_deck_updated' | 'live_deck_paused';
-  message: string;
-  timestamp: number;
-};
 
 function fileKey(file: string): string {
   try {
@@ -65,14 +60,14 @@ export function trackLiveDeckTurn(source: Source, timeoutMs = 30_000) {
         const steps = new Map<string, LiveDeckStep>();
         for (const { receipt, key } of matching) {
           const result = saves.get(receipt);
-          const timestamp = Date.now();
           if (result?.kind === 'updated') {
-            steps.set(key, { type: 'live_deck_updated', message: 'Updated the page', timestamp });
+            steps.set(key, { type: 'live_deck_updated', message: 'Updated the page' });
           } else if (result?.kind === 'paused') {
+            // File-led details quote the file name, so initial-letter casing leaves it intact.
             const detail = result.pause.detail
               .replace(/^Slide (\d+)'s text (?=has what looks like a key\.$)/, 'Slide $1 ')
-              .replace(/^Slide /, 'slide ').replace(/\.$/, '');
-            steps.set(key, { type: 'live_deck_paused', message: `The page waits: ${detail}`, timestamp });
+              .replace(/^\p{Lu}/u, letter => letter.toLowerCase()).replace(/\.$/, '');
+            steps.set(key, { type: 'live_deck_paused', message: `The page waits: ${detail}` });
           }
         }
         return [...steps.values()];

@@ -243,7 +243,8 @@ export class DeckPublisher implements vscode.Disposable {
       receipt?.settle();
       return;
     }
-    if (record.live.pause && !resume) {
+    const pageId = normalizeForCompare(page);
+    if (record.live.pause && !resume && !this.live.hasPendingResume(pageId)) {
       receipt?.settle();
       void this.refreshDocument(seat.document);
       return;
@@ -255,7 +256,7 @@ export class DeckPublisher implements vscode.Disposable {
       receipt?.settle();
       return;
     }
-    await this.live.request(normalizeForCompare(page), async (goOn, sending) => {
+    await this.live.request(pageId, async (goOn, sending) => {
       const current = await feature.controller.recordFor(page);
       if (!open() || current?.live?.id !== preference.id || (current.live.pause && !goOn)) return { kind: 'stopped' };
       const realFile = await fs.promises.realpath(file);

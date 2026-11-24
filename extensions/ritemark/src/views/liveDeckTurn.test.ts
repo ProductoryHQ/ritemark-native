@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { resolve } from 'node:path';
 import type { Event } from 'vscode';
-import type { LiveSaveReceipt } from '../decks/deckLive';
+import { DeckLive, type LiveSaveReceipt } from '../decks/deckLive';
 import type { LiveResult } from '../publish/liveUpdate';
 import { trackLiveDeckTurn } from './liveDeckTurn';
 
@@ -91,4 +91,47 @@ test('times out without a step and ignores a late live result', async () => {
   assert.deepEqual(await turn.finish([file]), []);
   assert.equal(deck.listenerCount(), 0);
   save.finish({ kind: 'updated', pictures: [] });
+});
+
+test('a save merged into a pending Go on produces the turn step', async () => {
+  const saved = signal<LiveSaveReceipt>();
+  const changed = signal<{ pagePath: string; receipt?: LiveSaveReceipt; result: LiveResult }>();
+  const live = new DeckLive((pagePath, result, receipt) => {
+    if (result) changed.emit({ pagePath, receipt, result });
+  });
+  let release!: () => void;
+  const first = live.request(pagePath, async () => {
+    await new Promise<void>(resolve => { release = resolve; });
+    return { kind: 'unchanged' };
+  });
+  await Promise.resolve();
+  const goOn = live.request(pagePath, async () => {
+    assert.fail('the save should supply the queued update');
+  }, true);
+  assert.equal(live.hasPendingResume(pagePath), true);
+  const turn = trackLiveDeckTurn({ onDidSaveLive: saved.event, onDidUpdateLive: changed.event });
+  let settle!: () => void;
+  const receipt = { file, settled: new Promise<void>(resolve => { settle = resolve; }), settle };
+  saved.emit(receipt);
+  const save = live.request(pagePath, async resume => {
+    assert.equal(resume, true);
+    return { kind: 'updated', pictures: [] };
+  }, false, receipt);
+  const steps = turn.finish([file]);
+  release();
+  await Promise.all([first, goOn, save]);
+  assert.deepEqual(await steps, [{ type: 'live_deck_updated', message: 'Updated the page' }]);
+  live.dispose();
+});
+
+test('pause copy lowercases an opening sentence and preserves a leading file name', async () => {
+  const deck = harness();
+  for (const [detail, expected] of [
+    ['The page uses more files than Cloudflare allows.', 'the page uses more files than Cloudflare allows'],
+    ['"Harbour.html" is already beside this deck.', '"Harbour.html" is already beside this deck'],
+  ]) {
+    const turn = deck.start();
+    deck.save().finish({ kind: 'paused', pause: { kind: 'page', detail, at: 1 } });
+    assert.equal((await turn.finish([file]))?.[0]?.message, `The page waits: ${expected}`);
+  }
 });

@@ -136,6 +136,7 @@ export function projectionToConversation(
         userPrompt: user.text,
         activities: [],
         ...(terminalEvent ? { result: {
+          ...(terminalEvent.liveDeckSteps?.length ? { liveDeckSteps: terminalEvent.liveDeckSteps } : {}),
           text: assistantContent,
           filesModified: [],
           // #488: the saved working time, or no metrics at all (the status line
@@ -172,6 +173,7 @@ export function projectionToConversation(
         streamingText: assistantContent,
         activities: [],
         ...(terminalEvent ? { result: {
+          ...(terminalEvent.liveDeckSteps?.length ? { liveDeckSteps: terminalEvent.liveDeckSteps } : {}),
           status: terminalEvent.kind === 'boundary'
             ? terminalEvent.boundaryKind === 'cancelled' ? 'cancelled' : 'failed'
             : terminalEvent.terminalStatus ?? 'completed',

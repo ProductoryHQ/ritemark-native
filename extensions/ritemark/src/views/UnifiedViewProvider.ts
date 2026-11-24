@@ -1,5 +1,6 @@
 import type { DeckPublisher } from '../decks/deckPublish';
 import { trackLiveDeckTurn } from './liveDeckTurn';
+import type { LiveDeckStep } from '../conversations/types';
 import { decodeSourcePassage } from '../../webview/src/utils/sourcePassage';
 import { openSourcePassage, previewSourcePassage, type ReadSource } from './openSourcePassage';
 /**
@@ -1329,6 +1330,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             };
           }
 
+          let liveDeckSteps: LiveDeckStep[] | undefined;
           const sessionConfig: RuntimeSessionConfig = {
             workspacePath: this._workspacePath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
             model: pinnedModel,
@@ -1488,6 +1490,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               this._view?.webview.postMessage({
                 type: 'agent-result', conversationId,
                 agentId,
+                liveDeckSteps,
                 text: result.text ?? '',
                 filesModified: result.filesModified ?? [],
                 metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
@@ -1519,6 +1522,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   appliedThinkingEffort,
                   activeDurationMs: turnActiveDurationMs(result.metrics),
                   filesModified: result.filesModified ?? [],
+                  liveDeckSteps,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
@@ -1569,6 +1573,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               this._view?.webview.postMessage({
                 type: 'codex-result', conversationId,
                 agentId,
+                liveDeckSteps,
                 status: result.status,
                 error,
                 ...(errorKind ? { errorKind } : {}),
@@ -1601,6 +1606,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   appliedThinkingEffort,
                   // Sprint 155: Codex's completed file changes, OpenCode's completed edits.
                   filesModified: result.filesModified ?? [],
+                  liveDeckSteps,
                   generateTitle: titleGeneration,
                 }), hostConversationEnabled);
                 this._applyCommentTaskTerminal(conversationId, conversationTurnId, {
@@ -1710,8 +1716,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             (result: Result) => {
               if (completing || !isCurrentRuntimeTurn()) return;
               completing = true;
-              this._finishAfterLiveDeck(conversationId, agentId as AgentId, liveDeckTurn, result.filesModified,
-                isCurrentRuntimeTurn, () => complete(result));
+              this._finishAfterLiveDeck(conversationId, liveDeckTurn, result.filesModified,
+                isCurrentRuntimeTurn, steps => {
+                  liveDeckSteps = steps;
+                  complete(result);
+                });
             };
           sessionConfig.onComplete = afterLiveDeck(sessionConfig.onComplete!);
           sessionConfig.onCodexComplete = afterLiveDeck(sessionConfig.onCodexComplete!);
@@ -4237,29 +4246,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
 
   private _finishAfterLiveDeck(
     conversationId: string,
-    agentId: AgentId,
     turn: ReturnType<typeof trackLiveDeckTurn> | undefined,
     files: string[] | undefined,
     isCurrent: () => boolean,
-    complete: () => void,
+    complete: (steps?: LiveDeckStep[]) => void,
   ): void {
     if (!isCurrent()) return;
     const waiting = turn?.finish(files ?? []);
-    const close = () => {
+    const close = (steps?: LiveDeckStep[]) => {
       if (this._liveDeckTurns.get(conversationId) === turn) this._liveDeckTurns.delete(conversationId);
-      if (isCurrent()) complete();
+      if (isCurrent()) complete(steps?.length ? steps : undefined);
     };
     if (!waiting) {
       close();
       return;
     }
-    void waiting.then(steps => {
-      if (!isCurrent()) return;
-      const type = agentId === 'claude-code' ? 'agent-progress' : 'codex-progress';
-      for (const progress of steps) {
-        void this._view?.webview.postMessage({ type, conversationId, agentId, progress });
-      }
-    }).finally(close);
+    void waiting.then(close, () => close());
   }
 
   /**
@@ -4559,7 +4561,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         const tracking = liveDeckTurn;
         liveDeckTurn = undefined;
         const isCurrent = () => !turnId || this._activeConversationTurnIds.get(conversationId) === turnId;
-        this._finishAfterLiveDeck(conversationId, agentId, tracking, result.filesModified, isCurrent, () => {
+        this._finishAfterLiveDeck(conversationId, tracking, result.filesModified, isCurrent, liveDeckSteps => {
           if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
             this._activeConversationTurnIds.delete(conversationId);
           }
@@ -4575,6 +4577,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const cancelled = this._consumeCancelIntent(conversationId, turnId);
           post({
             type: 'agent-result',
+            liveDeckSteps,
             text: result.text ?? '',
             filesModified: result.filesModified ?? [],
             metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
@@ -4598,6 +4601,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             failureKind,
             ...(status === 'failed' && errorKind ? { errorKind } : {}),
             ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
+            liveDeckSteps,
             activeDurationMs: turnActiveDurationMs(result.metrics),
             filesModified: result.filesModified ?? [],
           }), hostConversationEnabled);

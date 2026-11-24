@@ -56,6 +56,10 @@ export class DeckLive {
     return { on: true, state: 'live', tooltip: `Open pages catch up within about 15 seconds.${pictures}` };
   }
 
+  hasPendingResume(page: string): boolean {
+    return this.pages.get(page)?.pending?.resume === true;
+  }
+
   request(page: string, run: Update['run'], resume = false, receipt?: LiveSaveReceipt): Promise<void> {
     const activity = this.pages.get(page) ?? { generation: 0 };
     this.pages.set(page, activity);
@@ -105,7 +109,7 @@ export class DeckLive {
           this.keepPending(activity, update);
           this.retry(page, activity, OFFLINE_RETRY_MS);
         }
-        this.changed(page, result, update.resume ? undefined : update.receipt);
+        this.changed(page, result, update.receipt);
         if (activity.pending !== update) update.receipt?.settle();
         if (activity.retry || result.kind === 'offline') break;
       }

@@ -77,6 +77,7 @@ export function finalizeCodexTurnResult(
   turn: CodexConversationTurn,
   result: {
     status?: string;
+    liveDeckSteps?: NonNullable<CodexConversationTurn['result']>['liveDeckSteps'];
     error?: string;
     errorKind?: NonNullable<CodexConversationTurn['result']>['errorKind'];
     errorDetail?: NonNullable<CodexConversationTurn['result']>['errorDetail'];
@@ -110,6 +111,7 @@ export function finalizeCodexTurnResult(
     requiresPlanReview: turn.requiresPlanReview || shouldRequirePlanReview,
     result: {
       status: result.status || 'success',
+      ...(result.liveDeckSteps?.length ? { liveDeckSteps: result.liveDeckSteps } : {}),
       error: result.error,
       ...(result.error && result.errorKind ? { errorKind: result.errorKind } : {}),
       ...(result.error && result.errorKind && result.errorDetail ? { errorDetail: result.errorDetail } : {}),
