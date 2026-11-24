@@ -232,7 +232,8 @@ export const markdownStyles = `
   text-decoration-color: color-mix(in srgb, var(--r-accent) 45%, transparent);
   text-underline-offset: 2px;
 }
-.rendered-markdown a[data-source-link]:is(:hover, :focus-visible, [aria-current="true"]) {
+.rendered-markdown a[data-source-link]:is(:hover, [aria-current="true"]),
+:where(:root:not([data-input-mode="pointer"])) .rendered-markdown a[data-source-link]:focus-visible {
   color: var(--r-accent);
   text-decoration-color: currentColor;
 }
