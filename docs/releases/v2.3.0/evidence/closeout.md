@@ -17,3 +17,5 @@
 - **Microsoft Store:** Growth prepares the update draft. Submit waits for Jarmo's sign-in and word.
 - **Gate results and deferrals:** `gate-results.md` and `../TEST-CHECKLIST.md`.
 - **Not archived:** the DMGs and the installer, because the GitHub Release holds the same bytes.
+- **10.3, on 24 November 2026:** cleared on Jarmo's word ("sa võid puhastada"), after this evidence was pushed (#985) and the installer upload had finished. `VSCode-darwin-arm64/`, `VSCode-darwin-x64/` and `dist/` were deleted by name in this worktree and in RC3's (`.worktrees/release-1f43c73caf3f`, never published), about 15 GB. The re-audit (`worktree-hygiene.mjs --report`) read `verified disposable release worktree ((detached))` for both.
+- **10.4, on 24 November 2026:** on the same word, `worktree-hygiene.mjs --clean` removed the four `REVIEW` entries: RC3's and RC4's release worktrees, `fix-978` (merged as #979) and `codex-582` (merged). Free disk went from 9.3 GB to 50 GB. Branches were kept.
