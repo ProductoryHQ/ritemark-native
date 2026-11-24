@@ -19,6 +19,7 @@
 import { promises as fsp } from 'node:fs';
 import { parentPort } from 'node:worker_threads';
 import type { HostToWorkerMessage, WorkerToHostMessage } from '../protocol';
+import { readProjectDocument } from '../../documents/readProjectDocument';
 import { Indexer, type IndexerFs } from './indexer';
 import { TextCache } from './textCache';
 
@@ -48,6 +49,7 @@ const fs: IndexerFs = {
 };
 
 let indexer: Indexer | null = null;
+let pendingReads = Promise.resolve();
 
 port.on('message', (message: HostToWorkerMessage) => {
   switch (message.type) {
@@ -88,6 +90,15 @@ port.on('message', (message: HostToWorkerMessage) => {
       post({ type: 'answer', requestId: message.requestId, answer });
       return;
     }
+    case 'read':
+      // Serialize these reads to keep simultaneous agent calls within the worker heap budget.
+      pendingReads = pendingReads.then(async () => {
+        const result = await readProjectDocument(message.document, message.roots, pause).catch(() => ({
+          text: "Ritemark couldn't read this file. Try opening it in its usual app.",
+        }));
+        post({ type: 'read', requestId: message.requestId, result });
+      });
+      return;
     case 'passages':
       post({ type: 'passages', requestId: message.requestId, passages: indexer?.index.passages(message.words, message.limit) ?? [] });
       return;

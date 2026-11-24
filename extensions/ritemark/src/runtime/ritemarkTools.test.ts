@@ -648,6 +648,80 @@ async function main(): Promise<void> {
     assert.match((await runTool(tool('list_decks'), { where: 'other', query: 'exercise' }, context)).text, /Harbour\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 4 \([^)]*block slide\): Plain/);
   }
 
+  // Sprint 173 (S1, S4, S37): all three projections expose the same definition
+  // and return the same text. The usage payload is built without caller data.
+  {
+    const injector = new RitemarkToolsInjector();
+    const documentGroups = () => toolGroupsFor({ browser: false }).filter((group) => group.id === 'documents');
+    const ipcList = () => injector.handleIpc({ id: '1', op: 'list', group: 'documents' });
+    assert.deepEqual(documentGroups(), []);
+    assert.equal(toolGroupById('documents'), null);
+    assert.equal((await ipcList()).tools, undefined);
+
+    const usage: unknown[] = [];
+    const requests: unknown[] = [];
+    const text = 'Interview.docx · Word · 1 block · whole text\n\n# Operations';
+    tools.setDocumentToolHost(() => ({
+      async read(request) {
+        requests.push(request);
+        return { kind: 'word', text };
+      },
+      trackUsage(properties) { usage.push(properties); },
+    }));
+    try {
+      const groups = documentGroups();
+      assert.equal(groups.length, 1);
+      assert.equal(toolGroupById('documents'), groups[0]);
+      const params = { path: 'Interview.docx' };
+      const [dynamic] = injector.codexDynamicTools(groups)!;
+      assert.equal(dynamic.name, 'read_document');
+      assert.deepEqual(injector.claudeAllowedTools(groups), ['mcp__ritemark_documents__read_document']);
+      assert.deepEqual(injector.acpMcpServers(groups, '/tmp/test.sock').map((server) =>
+        (server as { name: string }).name), ['ritemark_documents']);
+
+      const [openCode] = (await ipcList()).tools!;
+      assert.equal(openCode.name, dynamic.name);
+      assert.deepEqual({ ...openCode.inputSchema, additionalProperties: false }, dynamic.inputSchema);
+      assert.deepEqual(dynamic.inputSchema.required, ['path']);
+      assert.deepEqual(Object.keys(dynamic.inputSchema.properties as object), ['path', 'from', 'to']);
+
+      const servers = (await injector.claudeMcpServers(groups)) as Record<string, {
+        instance: { connect(transport: unknown): Promise<void> };
+      }>;
+      // Speak MCP to the same server the Claude SDK receives, without running Claude.
+      type Message = { id?: number; result?: unknown };
+      const responses = new Map<number, (message: Message) => void>();
+      const transport = {
+        start: async () => {},
+        close: async () => {},
+        send: async (message: Message) => { if (message.id !== undefined) responses.get(message.id)?.(message); },
+        onmessage: undefined as ((message: unknown) => void) | undefined,
+      };
+      await servers.ritemark_documents.instance.connect(transport);
+      const mcp = (id: number, method: string, params?: object) => new Promise<Message>((resolve) => {
+        responses.set(id, resolve);
+        transport.onmessage!({ jsonrpc: '2.0', id, method, params });
+      });
+      const claude = ((await mcp(1, 'tools/list')).result as { tools: Array<typeof openCode> }).tools[0];
+      assert.equal(claude.name, dynamic.name);
+      assert.deepEqual(claude.inputSchema.properties, dynamic.inputSchema.properties);
+      assert.deepEqual(claude.inputSchema.required, dynamic.inputSchema.required);
+      assert.deepEqual((await mcp(2, 'tools/call', { name: dynamic.name, arguments: params })).result,
+        { content: [{ type: 'text', text }] });
+      assert.deepEqual(await injector.codexToolCall(groups, dynamic.name, params), { text, success: true });
+      assert.deepEqual(await injector.handleIpc({ id: '2', op: 'call', group: 'documents', tool: dynamic.name, params }), { text });
+      assert.deepEqual(requests, [params, params, params]);
+      assert.deepEqual(usage, Array.from({ length: 3 }, () => ({ feature: 'read_document', source: 'word' })));
+
+      const invalid = await injector.codexToolCall(groups, dynamic.name, { ...params, from: 4, to: 3 });
+      assert.equal(invalid.success, false);
+      assert.equal(requests.length, 3);
+      assert.equal(usage.length, 3);
+    } finally {
+      tools.setDocumentToolHost(() => null);
+    }
+  }
+
   console.log('runtime/ritemarkTools: all assertions passed');
 }
 

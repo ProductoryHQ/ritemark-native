@@ -8,8 +8,10 @@
  * - The host ↔ worker messages: the index runs in a worker thread
  *   (`out/search/searchWorker.js`), never on the extension host's main thread.
  *
- * No imports: the webview and the worker read these types too.
+ * Types only: the webview and the worker read these too.
  */
+
+import type { DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
 
 export type SearchKind = 'document' | 'chat' | 'task';
 export type SearchLayer = 'words' | 'meaning';
@@ -303,6 +305,7 @@ export type HostToWorkerMessage =
   | { type: 'chats-changed' }
   | { type: 'tasks'; sources: IndexSource[] }
   | { type: 'query'; requestId: number; queryId: number; text: string; options: SearchOptions; perKind: number; expand?: SearchKind }
+  | { type: 'read'; requestId: number; document: DocumentReadRequest; roots: string[] }
   | { type: 'passages'; requestId: number; words: string[]; limit: number }
   | { type: 'map'; requestId: number }
   | { type: 'stats'; requestId: number };
@@ -321,6 +324,7 @@ export interface WorkerStats {
 export type WorkerToHostMessage =
   | { type: 'status'; status: IndexStatus }
   | { type: 'answer'; requestId: number; answer: SearchAnswer }
+  | { type: 'read'; requestId: number; result: DocumentReadResult }
   | { type: 'passages'; requestId: number; passages: PassageAnswer[] }
   | { type: 'map'; requestId: number; entries: MapEntry[] }
   | { type: 'stats'; requestId: number; stats: WorkerStats }

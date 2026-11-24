@@ -10,6 +10,7 @@
  *
  * No `vscode` import: tests drive it with a fake worker.
  */
+import type { DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
 import type {
   HostToWorkerMessage,
   IndexSource,
@@ -82,11 +83,11 @@ export class SearchWorkerClient {
   private lastTasks: IndexSource[] | null = null;
   private latestStatus: IndexStatus | null = null;
   private readonly statusListeners = new Set<(status: IndexStatus) => void>();
-  private config: WorkerConfig;
+  private config: WorkerConfig | null;
 
   constructor(
     private readonly factory: WorkerFactory,
-    config: WorkerConfig,
+    config: WorkerConfig | null,
     private readonly log: (event: string, counts: Record<string, number>) => void = () => undefined,
   ) {
     this.config = config;
@@ -111,7 +112,7 @@ export class SearchWorkerClient {
 
   start(): void {
     if (this.worker || this.disposed || this.unavailable) return;
-    const config = this.attempt === 0 ? this.config : { ...this.config, limits: halfLimits(this.config.limits) };
+    const config = this.attempt === 0 || !this.config ? this.config : { ...this.config, limits: halfLimits(this.config.limits) };
     const worker = this.factory(this.attempt);
     this.worker = worker;
     worker.on('message', (message) => {
@@ -123,7 +124,7 @@ export class SearchWorkerClient {
     worker.on('exit', (code) => {
       if (this.worker === worker) this.onStopped(worker, code === 0 ? 'exit' : 'crash');
     });
-    worker.postMessage({ type: 'init', config });
+    if (config) worker.postMessage({ type: 'init', config });
     if (this.lastTasks) worker.postMessage({ type: 'tasks', sources: this.lastTasks });
   }
 
@@ -173,7 +174,7 @@ export class SearchWorkerClient {
   /** Sends what the worker follows (events, rules, chats); dropped while no worker runs, as the next start walks again. */
   post(message: Extract<HostToWorkerMessage, { type: 'fs-events' | 'rules' | 'chats-changed' | 'tasks' }>): void {
     if (message.type === 'tasks') this.lastTasks = message.sources;
-    if (message.type === 'rules') this.config = { ...this.config, filesExclude: message.filesExclude };
+    if (message.type === 'rules' && this.config) this.config = { ...this.config, filesExclude: message.filesExclude };
     this.worker?.postMessage(message);
   }
 
@@ -216,6 +217,14 @@ export class SearchWorkerClient {
       request.resolve(message?.answer ?? null);
       this.pump();
     });
+  }
+
+  async read(document: DocumentReadRequest, roots: string[]): Promise<DocumentReadResult | null> {
+    this.start();
+    const message = await this.request<Extract<WorkerToHostMessage, { type: 'read' }>>((requestId) => ({
+      type: 'read', requestId, document, roots,
+    }));
+    return message?.result ?? null;
   }
 
   async passages(words: string[], limit: number): Promise<PassageAnswer[]> {
