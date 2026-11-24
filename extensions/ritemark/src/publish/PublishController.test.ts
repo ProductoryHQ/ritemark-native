@@ -16,6 +16,7 @@ import { CloudflareAccount, CONNECTION_SECRET_KEY, type SecretsLike } from './cl
 import { CloudflareClient, type FetchLike } from './cloudflare/client';
 import { CloudflareHost, CONNECT_AGAIN, COULD_NOT_REACH_UNPUBLISH } from './cloudflare/CloudflareHost';
 import { FakeCloudflare } from './cloudflare/testing/fakeCloudflare';
+import { PNG } from './testing/pictures';
 import { HARBOUR, testProject, type TestProject } from './cloudflare/testing/pages';
 import {
   DISCONNECT_FAILED,
@@ -343,7 +344,7 @@ test('Update: the same files and no key go straight up at the same address; a ne
     assert.equal(second.address, first.address, 'the address stays (M8)');
     assert.notEqual(second.contentHash, first.contentHash);
     await t.project.write('Harbour programme.html', '<link rel="stylesheet" href="style.css"><h1>Harbour</h1><img src="img/a.png"><img src="img/b.png">');
-    await t.project.write('img/b.png', new Uint8Array([1, 2]));
+    await t.project.write('img/b.png', PNG);
     await t.controller.publishFromBar(t.page);
     assert.equal(t.sheets.length, 2, 'S27: a new file shows the sheet');
     assert.equal(t.sheets[1].options.address?.editable, false, 'an update keeps its address');
@@ -645,7 +646,7 @@ test('publishPage: "unchanged-update" with a record but a changed file list is r
   try {
     const record = await publishedOnce(t);
     await t.project.write('Harbour programme.html', '<link rel="stylesheet" href="style.css"><h1>Harbour</h1><img src="img/a.png"><img src="img/b.png">');
-    await t.project.write('img/b.png', new Uint8Array([1, 2]));
+    await t.project.write('img/b.png', PNG);
     const plan = await t.project.gather();
     assert.equal(plan.keyHits.length, 0, 'nothing key-shaped: only the list guard stands');
     assert.ok(plan.files.length > record.files.length, 'a new file goes');
@@ -1026,7 +1027,7 @@ test('a deck\'s page: its rows in the sheet, a first publish, an update without 
     slideCss: await fs.readFile(path.join(extension, 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8'),
     fonts: await Promise.all(PAGE_FONTS.map(async (font) => ({ base64: (await fs.readFile(path.join(extension, 'media', 'fonts', font.file))).toString('base64'), unicodeRange: font.unicodeRange }))),
   };
-  const picture = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  const picture = PNG;
   const files = { 'Harbour Logistics/AI assistants and agents.html': '<p>placeholder</p>', 'Harbour Logistics/AI assistants and agents.deck.md': PRIVATE_DECK, 'Harbour Logistics/images/which-stays.png': picture };
   let deckText = PRIVATE_DECK;
   let rowsAsked = 0;

@@ -48,6 +48,7 @@ export function reasonWords(row: Pick<SheetLeftOutRow, 'reason' | 'count'>): str
     gitIgnored: 'Git ignores it',
     otherPage: "another page, so its link won't work",
     link: "a linked file, so its link won't work",
+    uncleanable: "couldn't remove picture metadata",
     gitUnchecked: "couldn't be checked",
   }
   return words[row.reason]

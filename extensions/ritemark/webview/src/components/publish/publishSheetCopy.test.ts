@@ -46,8 +46,8 @@ assert.equal(NOTHING_ELSE, 'Nothing else from the project.')
 assert.equal(WHO_CAN_SEE, "Anyone with the link can open the page. It isn't listed or searchable, and you can unpublish it any time.")
 
 // Left out, the five reasons (answer 3), a link (review of #669) and a path Git can't check (minor 6)
-const reasons = (['outside', 'hidden', 'toolFolder', 'gitIgnored', 'otherPage', 'link', 'gitUnchecked'] as const).map((reason) => leftOutReasonFor({ name: 'x', display: 'x', reason }))
-assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work", "a linked file, so its link won't work", "couldn't be checked"])
+const reasons = (['outside', 'hidden', 'toolFolder', 'gitIgnored', 'otherPage', 'link', 'gitUnchecked', 'uncleanable'] as const).map((reason) => leftOutReasonFor({ name: 'x', display: 'x', reason }))
+assert.deepEqual(reasons, ['outside this project', 'a hidden file', "a tool's folder", 'Git ignores it', "another page, so its link won't work", "a linked file, so its link won't work", "couldn't be checked", "couldn't remove picture metadata"])
 const folded = { name: '', display: '', reason: 'otherPage' as const, count: 7 }
 assert.equal(leftOutName(folded), '7 other pages', 'A3 finding 3: folded')
 assert.equal(leftOutReasonFor(folded), "so their links won't work")
