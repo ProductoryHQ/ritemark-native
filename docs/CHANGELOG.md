@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- Excel previews also explain when a chart sheet contains a chart they can’t draw.
+
 - Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values.
 - Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use. They follow the workbook’s text formatting and chart layout.
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.

@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { test } from 'node:test'
+import { basename } from 'node:path'
+import { chartsKeepFixtures } from '../../../../src/excel/chartsKeepFixtures.test'
 import { cellRulesForVersion, compileCellRules, dataBarPaint, ruleCellStyle, ruleCellText, ruleTextColor, visibleCellRules } from './cellRules'
+import { drawsChart } from './chartLayout'
 import { keptNotice } from './keptNotice'
 import { cellKey, readWorkbook } from './readWorkbook'
 import { buildLayout, fontCss } from './sheetLayout'
@@ -147,16 +151,81 @@ async function main() {
   assert.equal(at(2, 1, 11, 1, true), spilled)
   assert.deepEqual(calls, [[11, 2], [0, 2], [11, 0], [11, 1]])
 
-  assert.equal(keptNotice(sheet.layout, compileCellRules(model, sheet, today)), undefined)
-  const deferred = await load('rules-icons-unreadable')
-  const [icons, unreadable] = deferred.sheets
-  const iconRules = compileCellRules(deferred, icons, today)!
-  assert.deepEqual(iconRules.styleAt(1, 1), {})
-  assert.equal(keptNotice(icons.layout, iconRules), "This sheet has 2 icon sets. They're kept in the file; Open in Excel to see them.")
-  const unreadableRules = compileCellRules(deferred, unreadable, today)!
-  assert.deepEqual(unreadableRules.styleAt(4, 2), {})
-  assert.equal(unreadableRules.styleAt(4, 1).dxf?.fill, '#C6EFCE')
-  assert.equal(keptNotice(unreadable.layout, unreadableRules), "This sheet has a colour rule it can't read. It's kept in the file; Open in Excel to see it.")
   console.log('cellRules tests passed')
 }
-main().catch((error) => { console.error(error); process.exitCode = 1 })
+test('conditional cell rendering and cache reuse', main)
+
+
+test('scenario 26: an unreadable formula leaves its cells plain and is named', async () => {
+  const model = await load('rules-icons-unreadable')
+  const sheet = model.sheets[1]
+  const rules = compileCellRules(model, sheet, today)!
+  assert.deepEqual(rules.styleAt(4, 2), {})
+  assert.equal(rules.styleAt(4, 1).dxf?.fill, '#C6EFCE')
+  assert.equal(keptNotice(sheet.layout, rules),
+    "This sheet has a colour rule it can't read. It's kept in the file; Open in Excel to see it.")
+})
+
+test('scenario 31: icon sets keep cell values and do not block a colour rule', async () => {
+  const model = await load('rules-icons-unreadable')
+  const sheet = model.sheets[0]
+  const layout = buildLayout(sheet, model.styles, { minWidth: 0, minHeight: 0 })
+  const window = { i0: 0, i1: 10, c0: 0, c1: 3 }
+  const rules = compileCellRules(model, sheet, today)!
+  const { at } = visibleCellRules(rules, layout, window, sheet, model)
+  for (let row = 1; row <= 10; row++) {
+    for (const col of [1, 2]) {
+      assert.equal(at(row, col), undefined, 'the grid falls back to the original cell and style')
+      const cell = sheet.cells.get(cellKey(row, col))!
+      assert.equal(cell.text, String(cell.value))
+    }
+  }
+  assert.equal(at(1, 3)?.style?.fill, '#C6EFCE')
+  const [icons, , colour] = sheet.layout.rules
+  const overlap = compileRules(sheet, [{ ...icons, areas: colour.areas, sqref: colour.sqref, stopIfTrue: true }, colour],
+    { today, date1904: model.date1904, styles: model.styles })
+  assert.equal(visibleCellRules(overlap, layout, window, sheet, model).at(1, 3)?.style?.fill, '#C6EFCE')
+  assert.equal(keptNotice(sheet.layout, rules),
+    "This sheet has 2 icon sets. They're kept in the file; Open in Excel to see them.")
+})
+
+test('scenario 32: a drawn chart and drawn rules leave no quiet line', async () => {
+  const charts = await load('charts-all-kinds')
+  const model = await load('rules-all-kinds')
+  const sheet = model.sheets[0]
+  const rules = compileCellRules(model, sheet, today)!
+  const layout = { ...sheet.layout, drawings: charts.sheets[0].layout.drawings }
+  assert.ok(layout.drawings.length)
+  assert.ok(rules.styleAt(1, 1).dxf?.fill)
+  assert.equal(keptNotice(layout, rules), undefined)
+})
+
+test('quiet line on every available fixture sheet', async () => {
+  const chart = "This sheet has a chart. It's kept in the file; Open in Excel to see it."
+  const picture = "This sheet has a picture. It's kept in the file; Open in Excel to see it."
+  const named: Record<string, Record<string, string>> = {
+    'rich.xlsx': { Budget: picture },
+    'rich-excelish.xlsx': { Budget: picture },
+    'rules-icons-unreadable.xlsx': {
+      'Icon sets': "This sheet has 2 icon sets. They're kept in the file; Open in Excel to see them.",
+      'Unreadable formula': "This sheet has a colour rule it can't read. It's kept in the file; Open in Excel to see it.",
+    },
+  }
+  for (const { file } of chartsKeepFixtures) {
+    const model = await readWorkbook(await readFile(file))
+    for (const sheet of model.sheets) {
+      const undrawn = sheet.layout.drawings.filter((drawing) => drawing.what === 'chart' && !drawsChart(drawing.chart))
+      const expected = named[basename(file)]?.[sheet.name] ?? (undrawn.length ? chart : undefined)
+      assert.equal(keptNotice(sheet.layout, compileCellRules(model, sheet, today)),
+        expected, `${basename(file)} / ${sheet.name}`)
+    }
+  }
+})
+
+test('quiet line combines undrawn charts, pictures and shapes', async () => {
+  const model = await load('charts-3d')
+  const [drawn] = model.sheets[0].layout.drawings
+  const undrawn = { ...drawn, chart: { supported: false, kind: 'unknown' } } as const
+  assert.equal(keptNotice({ drawings: [drawn, undrawn, { ...drawn, what: 'image' }, { ...drawn, what: 'shape' }] }),
+    "This sheet has a chart, a picture and a shape. They're kept in the file; Open in Excel to see them.")
+})

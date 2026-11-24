@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
+import { compareCells } from '../../webview/src/components/sheetSort';
+import { readWorkbook } from '../../webview/src/components/excel/readWorkbook';
+import { buildLayout, sortedRows } from '../../webview/src/components/excel/sheetLayout';
 import { applyCellEdits, indexWorkbook } from './applyCellEdits';
 import { chartsKeepFixtures } from './chartsKeepFixtures.test';
 import { attr, locateCell, parseCellRef, rootPrefix } from './sheetXml';
@@ -72,6 +75,21 @@ async function main() {
     const saved = openPackage(bytes);
     await assertKeepsWorkbook(index.pkg, saved, sheetPath, ref);
     console.log(`  ${basename(file)}: package and worksheet bytes preserved`);
+
+    if (basename(file) === 'sales-report.xlsx') {
+      const model = await readWorkbook(original);
+      const worksheet = model.sheets.find((item) => item.name === sheet)!;
+      const { r, c } = parseCellRef(ref)!;
+      const rowOrder = sortedRows(worksheet, c - 1, -1, compareCells);
+      const view = buildLayout(worksheet, model.styles, { minWidth: 0, minHeight: 0, rowOrder });
+      const displayRow = view.displayOf.get(r - 1)!;
+      assert.notEqual(displayRow, r - 1, 'the edit is made on a row that moved in the sorted view');
+      const sortedRef = ref.replace(/\d+$/, String(view.rowOf[displayRow] + 1));
+      const sortedSave = await applyCellEdits(original, [{ sheet, ref: sortedRef, value: 4321 }], index);
+      assert.equal(sortedRef, ref);
+      await assertKeepsWorkbook(index.pkg, openPackage(sortedSave.bytes), sheetPath, ref);
+      console.log('  sales-report.xlsx: a save from the sorted view preserves package and worksheet bytes');
+    }
 
     // Corrupt independent copies of the saved rich workbook, one XML payload byte at a time.
     if (basename(file) !== 'rich-excelish.xlsx') continue;

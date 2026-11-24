@@ -528,7 +528,7 @@ export function SpreadsheetViewer({
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout, cellRules) : undefined
+        : sheetModel ? keptNotice(sheetModel.layout, cellRules) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
