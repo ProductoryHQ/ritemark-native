@@ -14,13 +14,14 @@ import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import Module from 'node:module';
+import type { LivePreference } from '../publish/publishRecords';
 import { gatherPage } from '../publish/gather';
 import { liveIssue, type LiveIssue } from '../publish/liveUpdate';
 import type { GatheredPlan } from '../publish/types';
 import { makeTempDir } from '../testing/tempDir';
 
 // ── A small vscode for the host module: a project folder on disk, one open deck, 2.2's page state ──
-const root = makeTempDir('ritemark-deck-publish-');
+const root = fs.realpathSync(makeTempDir('ritemark-deck-publish-'));
 const none = () => ({ dispose() {} });
 const savedListeners: Array<(document: unknown) => void> = [];
 const watchListeners: Array<(uri: { fsPath: string }) => void> = [];
@@ -63,10 +64,12 @@ const vscodeStub = {
     },
   },
 };
+const usage: unknown[] = [];
 const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
 // Node can't import a .css file (esbuild inlines it): the page's slide rules, read from disk as the page tests do.
 const slideCss = fs.readFileSync(path.resolve(__dirname, '..', '..', 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8');
 (Module as unknown as { _load: unknown })._load = (request: string, ...rest: unknown[]) => {
+  if (request === '../analytics/posthog') return { trackEvent: async (...event: unknown[]) => { usage.push(event); } };
   if (request === 'vscode') return vscodeStub;
   if (request.endsWith('/slide/slide.css')) return { __esModule: true, default: slideCss };
   return load(request, ...rest);
@@ -74,6 +77,8 @@ const slideCss = fs.readFileSync(path.resolve(__dirname, '..', '..', 'webview', 
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DeckPublisher } = require('./deckPublish') as typeof import('./deckPublish');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { foreignPageLine } = require('./page/pageFile') as typeof import('./page/pageFile');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { splitFrontMatter } = require('../editorSync/frontMatter') as typeof import('../editorSync/frontMatter');
 
@@ -270,13 +275,22 @@ async function main(): Promise<void> {
     }
   }
   // The live run uses the same saved words and measured fit as a manual Update.
-  let preference: { on: true; id: string } | undefined;
+  let preference: LivePreference | undefined;
+  let finishManual: (() => void) | undefined;
+  let manualStarted: (() => void) | undefined;
   let liveHtml = '';
   let liveDigest = '';
   let diagnosis: LiveIssue | undefined;
   let nextResult: (() => void) | undefined;
   const liveFeature = {
     ...feature,
+    publishPage: async () => {
+      if (manualStarted) await new Promise<void>(resolve => {
+        finishManual = resolve;
+        manualStarted?.();
+      });
+      return 'published';
+    },
     controller: {
       ...feature.controller,
       recordFor: async () => ({ files: [], live: preference }),
@@ -284,10 +298,15 @@ async function main(): Promise<void> {
         preference = on ? { on: true, id: 'test' } : undefined;
         return true;
       },
-      updateLive: async (_page: unknown, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
+      pauseLivePage: async (_page: string, _input: unknown, detail: string) => {
+        const pause = { kind: 'page' as const, at: 1, detail };
+        preference = { ...preference!, pause };
+        return { kind: 'paused', pause };
+      },
+      updateLive: async (page: { realPath: string }, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
         liveDigest = input.digest;
-        liveHtml = fs.readFileSync(pagePath, 'utf8');
-        const plan = await gatherPage(pagePath, root);
+        liveHtml = fs.readFileSync(page.realPath, 'utf8');
+        const plan = await gatherPage(page.realPath, root);
         diagnosis = input.describe(plan, liveIssue(plan));
         return { kind: 'updated', pictures: [] };
       },
@@ -356,6 +375,55 @@ async function main(): Promise<void> {
     await foundPicture;
     assert.equal(diagnosis?.kind, 'outside');
     assert.equal(diagnosis?.slide, 1);
+
+    const usageForFirstPage = [...usage];
+    const otherDeck = path.join(path.dirname(deckPath), 'Other.rtms');
+    fs.writeFileSync(otherDeck, deckText('Paper'));
+    const otherDocument = { uri: vscodeStub.Uri.file(otherDeck), getText: () => deckText('Paper') };
+    const otherSeat = livePublisher.attach(otherDocument as never, async () => true);
+    await livePublisher.liveAction(otherDocument as never, 'on');
+    otherSeat.dispose();
+    const usageForBoth = [...usage];
+
+    const ownedHtml = fs.readFileSync(pagePath, 'utf8');
+    fs.writeFileSync(pagePath, '<main>Someone else’s page</main>');
+    await livePublisher.liveAction(document as never, 'on');
+    const refusedState = (await livePublisher.stateOf(document as never)).live;
+    await livePublisher.liveAction(document as never, 'off');
+    fs.writeFileSync(pagePath, ownedHtml);
+
+    const states: string[] = [];
+    livePublisher.attach(document as never, async message => {
+      if (message.type === 'deck/page-state' && message.state.live) states.push(message.state.live.state);
+      return true;
+    });
+    preference = { on: true, id: 'manual-overlap' };
+    const started = new Promise<void>(resolve => { manualStarted = resolve; });
+    const manual = livePublisher.publish(document as never, splitFrontMatter(text).content, 'card', [], () => {});
+    await started;
+    const afterManual = new Promise<void>(resolve => { nextResult = resolve; });
+    for (const words of ['First save.', 'Latest save.']) {
+      text = deckText('Paper').replace('Welcome, everyone.', words);
+      fs.writeFileSync(deckPath, text);
+      savedListeners.at(-1)?.(document);
+      await new Promise(resolve => setTimeout(resolve, 35));
+    }
+    const beforeManualFinishes = liveHtml;
+    finishManual?.();
+    await manual;
+    const sentPromptly = await Promise.race([afterManual.then(() => true), new Promise(resolve => setTimeout(() => resolve(false), 500))]);
+
+    const event = ['feature_used', { feature: 'live_deck_update', source: 'deck' }];
+    assert.deepEqual(usageForFirstPage, [event]);
+    assert.deepEqual(usageForBoth, [event, event]);
+    assert.equal(refusedState?.state, 'paused');
+    assert.equal(refusedState?.pause?.kind, 'page');
+    assert.equal(refusedState?.pause?.detail, foreignPageLine(pagePath));
+    assert.equal(beforeManualFinishes.includes('Latest save.'), false);
+    assert.equal(states.includes('offline'), false);
+    assert.equal(sentPromptly, true, 'the pending save follows the manual publish immediately');
+    assert.equal(liveHtml.includes('Latest save.'), true);
+    assert.equal(liveHtml.includes('First save.'), false);
 
   } finally {
     livePublisher.dispose();

@@ -24,6 +24,7 @@ interface Activity {
   pictures?: string[];
 }
 
+const BUSY_RETRY_MS = 2_000;
 const OFFLINE_RETRY_MS = 30_000;
 const OFFLINE = 'The page is offline. Your changes are saved on this computer.';
 
@@ -75,19 +76,21 @@ export class DeckLive {
         if (this.pages.get(page) !== activity) return;
         if (activity.generation !== generation) continue;
         if (result.kind === 'paused') this.dropPendingSave(activity);
-        if (result.kind === 'offline') {
-          activity.offline = result.detail;
-          // A failed Go on leaves the pause in place and needs another press.
-          if (!update.resume) {
-            activity.pending ??= update;
-            activity.retry = setTimeout(() => {
-              activity.retry = undefined;
-              void this.start(page, activity);
-            }, OFFLINE_RETRY_MS);
+        activity.offline = result.kind === 'offline' ? result.detail : undefined;
+        if (result.kind === 'updated') activity.pictures = result.pictures;
+        if (result.kind === 'busy') {
+          this.keepPending(activity, update);
+          if (result.until) {
+            this.changed(page, result);
+            await result.until;
+            continue;
           }
-        } else {
-          activity.offline = undefined;
-          if (result.kind === 'updated') activity.pictures = result.pictures;
+          this.retry(page, activity, BUSY_RETRY_MS);
+        }
+        // A failed Go on leaves the pause in place and needs another press.
+        if (result.kind === 'offline' && !update.resume) {
+          this.keepPending(activity, update);
+          this.retry(page, activity, OFFLINE_RETRY_MS);
         }
         this.changed(page, result);
         if (activity.retry || result.kind === 'offline') break;
@@ -103,6 +106,18 @@ export class DeckLive {
     });
     this.changed(page);
     return activity.running;
+  }
+
+  private keepPending(activity: Activity, update: Update): void {
+    activity.pending ??= update;
+    activity.pending.resume ||= update.resume;
+  }
+
+  private retry(page: string, activity: Activity, delay: number): void {
+    activity.retry = setTimeout(() => {
+      activity.retry = undefined;
+      void this.start(page, activity);
+    }, delay);
   }
 
   private dropPendingSave(activity: Activity): void {

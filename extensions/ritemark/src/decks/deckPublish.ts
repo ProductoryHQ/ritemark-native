@@ -102,7 +102,7 @@ export class DeckPublisher implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly timers = new Map<DeckSeat, ReturnType<typeof setTimeout>>();
   /** Decks whose Publish is running, by their path compared as the system compares it. */
-  private readonly running = new Set<string>();
+  private readonly running = new Map<string, Promise<void>>();
   /** The sheet's rows for each page this window wrote, with the digest written beside them, by the page's real path. */
   private readonly written = new Map<string, { digest: string; rows: DeckSheetRows }>();
   /** The app's own font files, read once per window (they never change while it runs). */
@@ -112,9 +112,13 @@ export class DeckPublisher implements vscode.Disposable {
   readonly onDidChangePage = this.pageChanged.event;
   private readonly liveChanged = new vscode.EventEmitter<{ pagePath: string; result: LiveResult }>();
   readonly onDidUpdateLive = this.liveChanged.event;
+  private readonly liveUsage = new Set<string>();
   private readonly live = new DeckLive((pagePath, result) => {
     if (result?.kind === 'updated' || result?.kind === 'paused') this.liveChanged.fire({ pagePath, result });
-    if (result?.kind === 'updated') void trackEvent('feature_used', { feature: 'live_deck_update', source: 'deck' });
+    if (result?.kind === 'updated' && !this.liveUsage.has(pagePath)) {
+      this.liveUsage.add(pagePath);
+      void trackEvent('feature_used', { feature: 'live_deck_update', source: 'deck' });
+    }
     void this.refreshPage(pagePath);
   });
   /** Font files beside a page that a Publish running in this window uses: never taken back by another's cancel. */
@@ -383,32 +387,36 @@ export class DeckPublisher implements vscode.Disposable {
     if (!feature) return stopped;
     const deckPath = document.uri.fsPath;
     const key = normalizeForCompare(deckPath);
-    if (this.running.has(key)) return offline(PAGE_BEING_PUBLISHED); // a second press while the first is still going: its sheet is on its way
-    this.running.add(key);
+    const running = this.running.get(key);
+    if (running) return { kind: 'busy', until: running };
+    let finish!: () => void;
+    this.running.set(key, new Promise<void>(resolve => { finish = resolve; }));
     // This Publish's font files, held while it runs (`holdFonts`), let go at its end at the latest.
     let unhold = () => {};
+    let releasePage: (() => void) | undefined;
     try {
       const pagePath = pagePathFor(deckPath);
       const pageKey = await pageKeyOf(pagePath);
+      // The page is held while its file is written, so no sheet gathers bytes that are about to change; one open on
+      // it already (from the browser's bar), or the page going up, keeps the file as that flow read it
+      const release = feature.controller.holdPage(pageKey);
+      if (!release) {
+        notice(PAGE_BEING_PUBLISHED);
+        return { kind: 'busy' };
+      }
+      releasePage = release;
       // The view's words and look (`pageInput`, which Save as PDF reads too)
       const { text } = this.textAndFit(document, body, look, steps);
       let built: Awaited<ReturnType<typeof this.buildPage>>;
       try {
         built = await this.buildPage(document, body, look, steps);
       } catch (error) {
-        if (live) return offline(PAGE_NOT_WRITTEN);
+        if (live) return await feature.controller.pauseLivePage(pageKey, live, PAGE_NOT_WRITTEN);
         console.warn('[Decks] Could not build the page:', error);
         notice(PAGE_NOT_WRITTEN);
         return stopped;
       }
       const { theme, fontFiles, logoFiles } = built;
-      // The page is held while its file is written, so no sheet gathers bytes that are about to change; one open on
-      // it already (from the browser's bar), or the page going up, keeps the file as that flow read it
-      const release = feature.controller.holdPage(pageKey);
-      if (!release) {
-        notice(PAGE_BEING_PUBLISHED);
-        return offline(PAGE_BEING_PUBLISHED);
-      }
       let written: Awaited<ReturnType<typeof writeDeckPage>>;
       let fonts: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
       let logos: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
@@ -463,7 +471,6 @@ export class DeckPublisher implements vscode.Disposable {
         }
       } catch (error) {
         if (live) {
-          release();
           await takeBackFonts();
           return offline(PAGE_NOT_WRITTEN);
         }
@@ -471,29 +478,25 @@ export class DeckPublisher implements vscode.Disposable {
         await takeBackFonts();
         notice(PAGE_NOT_WRITTEN);
         return stopped;
-      } finally {
-        if (!live) release();
       }
       if (written.kind === 'refused') {
         await takeBackFonts();
-        release();
+        if (live) return await feature.controller.pauseLivePage(pageKey, live, written.line);
         notice(written.line);
-        return offline(PAGE_NOT_WRITTEN);
+        return stopped;
       }
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
       if (live) {
-        try {
-          const location = await locatePage(pagePath, live.roots);
-          if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return offline(OUTSIDE_PROJECT_MESSAGE);
-          const describe = await locateLiveIssues(deckPath, text, built);
-          return await feature.controller.updateLive(location, {
-            ...live, digest: built.digest, legacyDigest, describe,
-            pageSha: livePageSha ?? createHash('sha256').update(built.html).digest('hex'),
-          });
-        } finally {
-          release();
-        }
+        const location = await locatePage(pagePath, live.roots);
+        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return offline(OUTSIDE_PROJECT_MESSAGE);
+        const describe = await locateLiveIssues(deckPath, text, built);
+        return await feature.controller.updateLive(location, {
+          ...live, digest: built.digest, legacyDigest, describe,
+          pageSha: livePageSha ?? createHash('sha256').update(built.html).digest('hex'),
+        });
       }
+      release();
+      releasePage = undefined;
       let outcome: PublishOutcome | undefined | 'stopped';
       try {
         outcome = await feature.publishPage(vscode.Uri.file(pagePath));
@@ -516,8 +519,10 @@ export class DeckPublisher implements vscode.Disposable {
       }
       return stopped;
     } finally {
+      releasePage?.();
       unhold();
       this.running.delete(key);
+      finish();
       this.refreshDocument(document);
     }
   }

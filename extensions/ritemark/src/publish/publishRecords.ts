@@ -17,17 +17,20 @@
 import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { PublishError } from './host';
 import type { PublishPlan } from './types';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export type LivePauseKind = 'key' | 'outside' | 'limits' | 'unchecked' | 'picture' | 'connection';
+export type LivePauseKind = 'key' | 'outside' | 'limits' | 'unchecked' | 'picture' | 'connection' | 'page';
 
 export interface LivePause {
   kind: LivePauseKind;
   at: number;
   detail: string;
   scope?: string;
+  /** Project-relative display names for the files covered by scope. */
+  outsideFiles?: string[];
   slide?: number;
   location?: { line: number; column?: number; endColumn?: number };
 }
@@ -173,7 +176,10 @@ export class PublishRecordStore {
         await this.takeOverStale(lockFile, seen);
         continue;
       }
-      if (Date.now() > deadline) throw new Error('the list of published pages is busy');
+      if (Date.now() > deadline) {
+        if (deploy) throw new PublishError('busy', 'This page is being published from another window.');
+        throw new Error('the list of published pages is busy');
+      }
       await sleep(10 + Math.floor(Math.random() * 20));
     }
     try {

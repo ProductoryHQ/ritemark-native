@@ -12,6 +12,8 @@ import { changedSincePublish, LOCK_STALE_MS, LOCK_WAIT_MS, type PublishRecord, P
 import { isSheetWebviewMessage } from './sheetProtocol';
 import { sheetModelOf } from './sheetModel';
 import type { PublishPlan } from './types';
+import { mock } from 'node:test';
+import { PublishError } from './host';
 import { makeTempDir } from '../testing/tempDir';
 
 function plan(files: [string, string][], extra: Partial<PublishPlan> = {}): PublishPlan {
@@ -186,6 +188,19 @@ async function main(): Promise<void> {
 
     await crossHostWrites(record);
     await deadHostLockMidWait(record);
+
+    await store.withPageDeploy(first.pagePath, async () => {
+      let clockReads = 0;
+      mock.method(Date, 'now', () => new Date().getTime() + LOCK_WAIT_MS * clockReads++);
+      try {
+        await assert.rejects(new PublishRecordStore(storage).withPageDeploy(first.pagePath, async () => {
+          assert.fail('a live owner still holds the lock');
+        }), (error: unknown) => error instanceof PublishError && error.code === 'busy'
+          && error.message === 'This page is being published from another window.');
+      } finally {
+        mock.restoreAll();
+      }
+    });
 
     // Windows keys ignore case
     const win = new PublishRecordStore(makeTempDir('publish-records-win-'), 'win32');

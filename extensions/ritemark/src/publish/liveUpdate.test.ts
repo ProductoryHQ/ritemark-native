@@ -91,6 +91,27 @@ async function main() {
     }
   };
 
+  const preference = (await controller.recordFor(page.realPath))!.live!;
+  const activeAttempt = { preference, resume: false, active: () => true };
+  const release = controller.holdPage(page.realPath)!;
+  try {
+    const paused = await controller.pauseLivePage(page.realPath, activeAttempt, 'Rename the file beside the deck.');
+    assert.equal(paused.kind, 'paused');
+    assert.deepEqual((await records.get(page.realPath))?.live?.pause, paused.kind === 'paused' ? paused.pause : undefined);
+  } finally {
+    release();
+  }
+  assert.equal((await update(initial)).kind, 'stopped', 'an ordinary save cannot end a page pause');
+  assert.equal((await update(initial, true)).kind, 'unchanged', 'Go on checks the page again');
+  assert.equal((await records.get(page.realPath))?.live?.pause, undefined);
+
+  const firstHold = controller.holdPage(page.realPath)!;
+  firstHold();
+  const secondHold = controller.holdPage(page.realPath)!;
+  firstHold();
+  assert.equal(controller.isBusy(page.realPath), true, 'releasing an old hold twice never releases a newer hold');
+  secondHold();
+
   assert.equal((await update(initial)).kind, 'unchanged');
   const secret = '<main>' + syntheticKey + '</main>';
   const key = await update(secret);
@@ -114,6 +135,9 @@ async function main() {
   const outside = await update(img);
   assert.equal(outside.kind === 'paused' && outside.pause.kind, 'outside');
   assert.equal(sent.length, 1);
+  const outsidePause = (await records.get(page.realPath))?.live?.pause;
+  assert.deepEqual(outsidePause?.outsideFiles, ['deck/picture.png']);
+  assert.equal(JSON.stringify(outsidePause).includes(root), false);
   await fs.unlink(inside);
   await fs.writeFile(inside, withMetadata);
   const fixed = await update(img, true);

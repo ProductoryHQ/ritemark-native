@@ -62,6 +62,33 @@ async function main() {
     await new Promise<void>(resolve => setImmediate(resolve));
     assert.deepEqual(sent, ['A', 'C', 'E'], 'the first retry takes the latest save');
 
+    let attempts = 0;
+    const pause = { kind: 'page' as const, detail: 'The page file belongs to someone else.', at: 1 };
+    const blocked = async (resume: boolean): Promise<LiveResult> => {
+      attempts++;
+      return resume ? { kind: 'updated', pictures: [] } : { kind: 'paused', pause };
+    };
+    await live.request('refused-page', blocked);
+    mock.timers.tick(30_000);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(attempts, 1, 'a refused page is never retried by a timer');
+    await live.request('refused-page', blocked, true);
+    assert.equal(attempts, 2, 'Go on reruns the update');
+
+    let busy = true;
+    let busyAttempts = 0;
+    await live.request('busy-page', async () => {
+      busyAttempts++;
+      return busy ? { kind: 'busy' } : { kind: 'unchanged' };
+    });
+    assert.equal(live.state('busy-page', preference).state, 'live');
+    busy = false;
+    mock.timers.tick(1_999);
+    assert.equal(busyAttempts, 1);
+    mock.timers.tick(1);
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(busyAttempts, 2, 'a hold without a completion signal retries after two seconds');
+
     connected = false;
     await live.request('closed-page', retry);
     live.stop('closed-page');

@@ -8,12 +8,14 @@ export type LiveResult =
   | { kind: 'updated'; pictures: string[] }
   | { kind: 'unchanged' | 'stopped' }
   | { kind: 'paused'; pause: LivePause }
-  | { kind: 'offline'; detail: string };
+  | { kind: 'offline'; detail: string }
+  | { kind: 'busy'; until?: Promise<void> };
 
 export interface LiveIssue {
   kind: LivePauseKind;
   detail: string;
   scope?: string;
+  outsideFiles?: LivePause['outsideFiles'];
   slide?: number;
   location?: LivePause['location'];
 }
@@ -28,7 +30,10 @@ export function liveIssue(plan: GatheredPlan, acceptedScope?: string): LiveIssue
     || !isInside(path.resolve(plan.projectFolder, file.projectPath), folder));
   if (outside.length) {
     const scope = createHash('sha256').update(JSON.stringify(outside.map(file => [file.projectPath, file.realPath, file.sha256]).sort())).digest('hex');
-    if (scope !== acceptedScope) return { kind: 'outside', scope, detail: "The page uses a file outside the deck's folder." };
+    if (scope !== acceptedScope) return {
+      kind: 'outside', scope, detail: "The page uses a file outside the deck's folder.",
+      outsideFiles: [...new Set(outside.map(file => file.projectPath))].sort(),
+    };
   }
   if (plan.leftOut.some(row => row.reason === 'uncleanable')) return { kind: 'picture', detail: "A picture's metadata couldn't be removed." };
   if (plan.leftOut.some(row => row.reason === 'gitUnchecked')) return { kind: 'unchecked', detail: "Ritemark couldn't check whether a file can go." };

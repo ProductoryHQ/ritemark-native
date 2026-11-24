@@ -75,7 +75,9 @@ export async function locateLiveIssues(deckPath: string, text: string, built: Bu
     if (!picture) return issue;
     if (picture.absolute || issue?.kind === 'outside') {
       return {
-        kind: 'outside', slide: picture.slide, scope: picture.absolute ? undefined : issue?.scope,
+        kind: 'outside', slide: picture.slide,
+        outsideFiles: picture.absolute ? undefined : issue?.outsideFiles,
+        scope: picture.absolute ? undefined : issue?.scope,
         detail: issue?.kind === 'outside' && !issue.scope ? issue.detail : picture.slide
           ? `Slide ${picture.slide} shows a picture from outside the deck's folder.`
           : "The handout shows a picture from outside the deck's folder.",

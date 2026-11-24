@@ -243,6 +243,12 @@ export interface PublishControllerDeps {
   random?: () => Buffer;
 }
 
+interface LiveAttempt {
+  preference: LivePreference;
+  resume: boolean;
+  active: () => boolean;
+}
+
 export class PublishController {
   private enteringToken = false;
   private message: string | null = null;
@@ -691,13 +697,31 @@ export class PublishController {
     return plan.keyHits.length > 0;
   }
 
+  private async recordForLiveAttempt(pagePath: string, input: LiveAttempt) {
+    const record = await this.liveRecord(pagePath);
+    if (!record?.live?.on || record.live.id !== input.preference.id || (record.live.pause && !input.resume)
+      || !this.held.has(pagePath) || this.unpublishing.has(record.siteName) || !input.active() || !this.canPublish()) {
+      return undefined;
+    }
+    return { ...record, live: record.live };
+  }
+
+  private async saveLivePause(record: PublishRecord & { live: LivePreference }, input: LiveAttempt, issue: LiveIssue): Promise<LiveResult> {
+    const pause = { ...issue, at: this.now() };
+    if (!input.active() || !await this.deps.records.changeLive(record, { ...record.live, pause })) return { kind: 'stopped' };
+    return { kind: 'paused', pause };
+  }
+
+  /** A local build or write refusal leaves the published page as it was. */
+  async pauseLivePage(pagePath: string, input: LiveAttempt, detail: string): Promise<LiveResult> {
+    const record = await this.recordForLiveAttempt(pagePath, input);
+    return record ? this.saveLivePause(record, input, { kind: 'page', detail }) : { kind: 'stopped' };
+  }
+
   /** Quiet update for an already published deck. The caller holds the page through the build and gather. */
   async updateLive(
     page: ProjectPage,
-    input: {
-      preference: LivePreference;
-      resume: boolean;
-      active: () => boolean;
+    input: LiveAttempt & {
       sending?: () => void;
       legacyDigest?: string;
       digest: string;
@@ -705,16 +729,9 @@ export class PublishController {
       describe?: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined;
     },
   ): Promise<LiveResult> {
-    const record = await this.liveRecord(page.realPath);
-    if (!record?.live?.on || record.live.id !== input.preference.id || (record.live.pause && !input.resume)
-      || !this.held.has(page.realPath) || this.unpublishing.has(record.siteName) || !input.active() || !this.canPublish()) {
-      return { kind: 'stopped' };
-    }
-    const pause = async (issue: LiveIssue): Promise<LiveResult> => {
-      const saved = { ...issue, at: this.now() };
-      if (!input.active() || !await this.deps.records.changeLive(record, { ...record.live!, pause: saved })) return { kind: 'stopped' };
-      return { kind: 'paused', pause: saved };
-    };
+    const record = await this.recordForLiveAttempt(page.realPath, input);
+    if (!record) return { kind: 'stopped' };
+    const pause = (issue: LiveIssue) => this.saveLivePause(record, input, issue);
     const connection: LiveIssue = { kind: 'connection', detail: 'Cloudflare needs you to connect again.' };
     const active = () => input.active() && this.canPublish();
     try {
@@ -755,6 +772,7 @@ export class PublishController {
       const current = await this.liveRecord(page.realPath);
       if (!current || current.siteName !== record.siteName || current.live?.id !== record.live.id
         || JSON.stringify(current.live.pause) !== JSON.stringify(record.live.pause)) return { kind: 'stopped' };
+      if (error instanceof PublishError && error.code === 'busy') return { kind: 'busy' };
       if (error instanceof GitCheckError) return pause({ kind: 'unchecked', detail: "Ritemark couldn't check which files Git ignores in this project." });
       if (error instanceof PublishError && ['not-connected', 'refused', 'cannot-publish'].includes(error.code)) return pause(connection);
       return { kind: 'offline', detail: error instanceof PublishError ? plainLine(error.message) : COULD_NOT_REACH_PUBLISH };
@@ -780,13 +798,13 @@ export class PublishController {
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
     const record = await this.liveRecord(pagePath);
-    if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
+    if (this.publishing.has(pagePath)) throw new PublishError('busy', PAGE_BEING_PUBLISHED);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     const live = consent === 'live-update' ? this.livePlans.get(plan) : undefined;
     if (consent === 'live-update' && (!record?.live?.on || !live || !this.matchesLive(record, live.record) || !live.active())) {
       throw new PublishError('changed', 'Live publishing stopped.');
     }
-    if (this.publishing.has(pagePath) || (record && this.unpublishing.has(record.siteName))) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
+    if (this.publishing.has(pagePath) || (record && this.unpublishing.has(record.siteName))) throw new PublishError('busy', PAGE_BEING_PUBLISHED);
     if (plan.keyHits.length > 0 && consent !== 'sheet-anyway') throw new PublishError('failed', KEY_NEEDS_SHEET);
     if (consent === 'unchanged-update' && (!record || sheetNeeded(record, plan))) {
       throw new PublishError('failed', 'What goes changed. Press Publish to see it.');
@@ -839,7 +857,7 @@ export class PublishController {
       const line = error instanceof PublishError
         ? (error.code === 'address-taken' ? ADDRESS_TAKEN : error.message)
         : COULD_NOT_REACH_PUBLISH;
-      this.pageLines.set(pagePath, line);
+      if (!live || !(error instanceof PublishError && error.code === 'busy')) this.pageLines.set(pagePath, line);
       throw error instanceof PublishError ? error : new PublishError('failed', line);
     } finally {
       this.publishing.delete(pagePath);
@@ -923,7 +941,12 @@ export class PublishController {
   holdPage(pagePath: string): (() => void) | null {
     if (this.isBusy(pagePath)) return null;
     this.held.add(pagePath);
-    return () => { this.held.delete(pagePath); };
+    let held = true;
+    return () => {
+      if (!held) return;
+      held = false;
+      this.held.delete(pagePath);
+    };
   }
 
   /** The page's record while it is online, for the bar's Copy link, Open the page and Unpublish. */
