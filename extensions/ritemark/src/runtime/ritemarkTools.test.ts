@@ -661,9 +661,11 @@ async function main(): Promise<void> {
     const usage: unknown[] = [];
     const requests: unknown[] = [];
     const text = 'Interview.docx · Word · 1 block · whole text\n\n# Operations';
+    const slideText = 'Briefing.pptx · PowerPoint · 1 slide · whole text\n\n## Slide 1\n\nNotes: none';
     tools.setDocumentToolHost(() => ({
       async read(request) {
         requests.push(request);
+        if (request.path === 'Briefing.pptx') return { kind: 'powerpoint', text: slideText };
         return { kind: 'word', text };
       },
       trackUsage(properties) { usage.push(properties); },
@@ -675,6 +677,7 @@ async function main(): Promise<void> {
       const params = { path: 'Interview.docx' };
       const [dynamic] = injector.codexDynamicTools(groups)!;
       assert.equal(dynamic.name, 'read_document');
+      assert.match(dynamic.description, /PowerPoint/);
       assert.deepEqual(injector.claudeAllowedTools(groups), ['mcp__ritemark_documents__read_document']);
       assert.deepEqual(injector.acpMcpServers(groups, '/tmp/test.sock').map((server) =>
         (server as { name: string }).name), ['ritemark_documents']);
@@ -717,6 +720,11 @@ async function main(): Promise<void> {
       assert.equal(invalid.success, false);
       assert.equal(requests.length, 3);
       assert.equal(usage.length, 3);
+
+      const slide = { path: 'Briefing.pptx', from: 1, to: 1 };
+      assert.deepEqual(await injector.codexToolCall(groups, dynamic.name, slide), { text: slideText, success: true });
+      assert.deepEqual(requests[3], slide);
+      assert.deepEqual(usage[3], { feature: 'read_document', source: 'powerpoint' });
     } finally {
       tools.setDocumentToolHost(() => null);
     }

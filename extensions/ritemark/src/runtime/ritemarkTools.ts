@@ -806,18 +806,18 @@ export function createDocumentToolGroup(host: () => DocumentToolHost | null): Ri
     codexPrefix: '',
     tools: [{
       name: 'read_document',
-      description: 'Read a Word (.docx) or PDF file in the project as Markdown. Use a project-relative or absolute path. PDFs can be read by page range.',
+      description: 'Read a Word (.docx), PDF, or PowerPoint (.pptx) file in the project as Markdown. Use a project-relative or absolute path. Select PDF pages or PowerPoint slides by range. PowerPoint speaker notes are listed with their slides.',
       input: {
         path: z.string().min(1).describe('Path to the document inside the project'),
-        from: z.number().int().positive().optional().describe('First PDF page (1-based, inclusive)'),
-        to: z.number().int().positive().optional().describe('Last PDF page (1-based, inclusive)'),
+        from: z.number().int().positive().optional().describe('First PDF page or PowerPoint slide (1-based, inclusive)'),
+        to: z.number().int().positive().optional().describe('Last PDF page or PowerPoint slide (1-based, inclusive)'),
       },
       async run(args) {
         const current = host();
         if (!current) return { text: 'Open a project folder to read a document.', isError: true };
         const request = args as unknown as DocumentReadRequest;
         if (request.from !== undefined && request.to !== undefined && request.from > request.to) {
-          return { text: 'Choose a first page that comes before or is the same as the last page.', isError: true };
+          return { text: 'Choose a start number less than or equal to the end number.', isError: true };
         }
         const { kind, ...result } = await current.read(request);
         if (kind && !result.isError) current.trackUsage({ feature: 'read_document', source: kind });
