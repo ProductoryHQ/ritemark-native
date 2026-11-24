@@ -15,6 +15,9 @@
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
+/* In dark, the same ground as the viewers' Open in Word and Share buttons. */
+.ritemark-dark .deck-bar :is(.deck-publish-chip, .deck-page-state-chip) { background: var(--r-surface); }
+.ritemark-dark .deck-bar :is(.deck-publish-chip, .deck-page-state-chip):hover { background: var(--r-surface-soft); filter: none; }
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
 .deck-theme-swatch { position: relative; display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .14); overflow: hidden; }

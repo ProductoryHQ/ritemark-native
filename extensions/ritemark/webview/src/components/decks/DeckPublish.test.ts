@@ -137,8 +137,8 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
 {
   const base = { ready: true, kind: 'published', changed: true } as const
   const states = [
-    ['live', 'Live', '--r-success', 'Open pages catch up within about 15 seconds.'],
-    ['updating', 'Updating…', 'text-ink-strong', 'Updating the published page…'],
+    ['live', 'Live', '--r-success', 'The page follows this deck. Open pages catch up within about 15\u00a0seconds.'],
+    ['updating', 'Live', 'text-ink-strong', 'Updating the published page…'],
     ['paused', 'Paused', '--r-warning-ink', 'Open pages keep what they had.'],
     ['offline', 'Offline', 'text-ink-muted', 'Saves stay on this computer.'],
   ] as const
@@ -152,7 +152,16 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
     assert.equal(publishedChip(model).tip, tooltip)
   }
   const sending = draw({ ...base, kind: 'publishing', live: { on: true, state: 'updating', tooltip: '' } })
-  assert.equal(words(sending), 'Updating…')
+  assert.equal(words(sending), 'Live')
+  const live = publishedChip({ ...base, live: { on: true, state: 'live', tooltip: '' } })
+  const updating = publishedChip({ ...base, live: { on: true, state: 'updating', tooltip: '' } })
+  assert.equal(live.label, updating.label)
+  assert.equal(live.className, updating.className)
+  assert.equal(live.dot, true)
+  assert.equal(updating.dot, false)
+  assert.equal(updating.spinning, true)
+  assert.equal(updating.tip, 'Updating the published page…')
+  assert.equal(words(draw({ ...base, kind: 'publishing', address: 'https://example.workers.dev' })), 'Updating…')
   assert.equal(button(sending)?.getAttribute('aria-haspopup'), 'menu')
   assert.match(draw(base), /deck-publish-chip/)
   assert.match(publishedChip(base).tip, /changed since it was published/)
@@ -176,36 +185,51 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   const labels = (rows: ReturnType<typeof menu>) => rows.map(row => textOf(row.props.children).trim()).filter(Boolean)
   const off = menu(base)
   const live = menu({ ...base, live: { on: true, state: 'live', tooltip: '' } })
-  const actions = ['Update on every saveOpen pages catch up within about 15 seconds.', 'Copy link', 'See onlineexample.workers.dev', 'Save slides as PDF…']
+  const actions = ['Update on every saveOpen pages catch up within about 15\u00a0seconds.', 'Copy link', 'See onlineexample.workers.dev', 'Save slides as PDF…']
   assert.deepEqual(labels(off), [...actions, 'Update the page', 'Unpublish'])
   assert.deepEqual(labels(live), [...actions, 'Unpublish'])
   assert.equal(off[0].props.role, 'menuitemcheckbox')
   assert.equal(off[0].props['aria-checked'], false)
   assert.equal(live[0].props['aria-checked'], true)
-  assert.equal(off[0].props.tip, 'Open pages catch up within about 15 seconds.')
+  assert.equal(off[0].props.tip, 'Open pages catch up within about 15\u00a0seconds.')
   off[0].props.onSelect?.()
   live[0].props.onSelect?.()
 
   const at = new Date(2026, 10, 24, 10, 42).getTime()
   const localTime = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(at)
   const location = { line: 32, column: 4, endColumn: 32 }
-  const pause = { kind: 'key', at, detail: "Slide 6's text has what looks like a key.", slide: 6, location, keyPreview: 's…a' } as const
+  const pause = { kind: 'key', at, detail: "Slide 6 has what looks like a key.", slide: 6, location, keyPreview: 'sk-ant-…7f3a' } as const
   const paused = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', resumeBlocked: 'Take the key out first.', pause } })
   assert.deepEqual(labels(paused), [
-    `Paused at ${localTime}. Slide 6's text has what looks like a key, s…a. Open pages keep what they had.`,
+    `Paused at ${localTime}. Slide 6 has what looks like a key (sk-ant-…7f3a). Open pages keep what they had.`,
     'Show it on slide 6', 'Go onTake the key out first.', ...actions, 'Unpublish',
   ])
   assert.equal(paused[2].props.disabled, true)
-  assert.equal(paused[2].props.tip, 'Take the key out first.')
+  assert.equal(paused[2].props.tip, undefined)
   paused[1].props.onSelect?.()
-  assert.deepEqual(showMessage, { slide: 6, location, keyPreview: 's…a' })
+  assert.deepEqual(showMessage, { slide: 6, location, keyPreview: 'sk-ant-…7f3a' })
   assert.doesNotMatch(pauseWords({ ...pause, keyPreview: 'longer…preview' }), /longer|preview/)
 
-  const outside = { kind: 'outside', at, slide: 9, detail: "Slide 9 shows a picture from outside the deck's folder.", outsideFiles: ['other/picture.png', 'elsewhere/graph.svg'] } as const
-  const files = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', pause: { ...outside, outsideFiles: [...outside.outsideFiles] } } })
-  assert.match(labels(files)[0], /picture\.png, graph\.svg\. Open pages keep what they had\.$/)
+  const tail = 'Open pages keep what they had.'
+  const opening = `Paused at ${localTime}.`
+  assert.equal(pauseWords({ ...pause, keyPreview: undefined }), `${opening} Slide 6 has what looks like a key. ${tail}`)
+  assert.equal(pauseWords({ ...pause, slide: undefined }), `${opening} The handout has what looks like a key (sk-ant-…7f3a). ${tail}`)
+  assert.equal(publishedChip({ ...base, live: { on: true, state: 'paused', tooltip: '', pause } }).tip,
+    'Paused: slide 6 has what looks like a key. Open pages keep what they had.')
+  assert.match(readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8'), /!matchesKeyPreview\(target, keyPreview\)/)
+  const outside = { kind: 'outside', at, slide: 6, detail: '', outsideFiles: ['Shared/logo.png'] } as const
+  assert.equal(pauseWords({ ...outside, outsideFiles: [...outside.outsideFiles] }),
+    `${opening} Slide 6 shows Shared/logo.png, which is outside the deck's folder. ${tail}`)
+  assert.equal(pauseWords({ ...outside, slide: undefined, outsideFiles: ['~/Shared/logo.png'] }),
+    `${opening} The handout shows ~/Shared/logo.png, which is outside the deck's folder. ${tail}`)
+  const files = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', pause: {
+    ...outside, outsideFiles: ['Shared/logo.png', 'elsewhere/graph.svg', '~/photo.png'],
+  } } })
+  assert.equal(labels(files)[0], `${opening} Slide 6 shows Shared/logo.png and 2 other files, which are outside the deck's folder. ${tail}`)
+  assert.equal(pauseWords({ kind: 'limits', at, detail: 'logo.png is too big to publish (26 MB). A file can be up to 25 MB.' }),
+    `${opening} logo.png is too big to publish (26 MB). A file can be up to 25 MB. ${tail}`)
   files[1].props.onSelect?.()
-  assert.deepEqual(showMessage, { slide: 9, location: undefined, keyPreview: undefined })
+  assert.deepEqual(showMessage, { slide: 6, location: undefined, keyPreview: undefined })
   assert.equal(files[2].props.disabled, false)
   files[2].props.onSelect?.()
   const connection = menu({ ...base, live: { on: true, state: 'paused', tooltip: '', pause: { kind: 'connection', at, detail: 'Cloudflare needs you to connect again.' } } })

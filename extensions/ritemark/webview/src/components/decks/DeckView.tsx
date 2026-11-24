@@ -11,6 +11,7 @@
  * to its part; writing in a part makes its slide the current one.
  */
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
 import { explicitMinutes, readTimetable } from '../../../../src/decks/timetable'
 import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
 import { DeckMinutes } from './DeckMinutes'
@@ -1686,7 +1687,7 @@ export function DeckView({
     const { column, endColumn } = location
     if (line === undefined || column === undefined || endColumn === undefined || endColumn <= column || endColumn > line.length) return
     const target = line.slice(column, endColumn)
-    if (keyPreview && `${target[0]}…${target[target.length - 1]}` !== keyPreview) return
+    if (keyPreview && !matchesKeyPreview(target, keyPreview)) return
     const source = parseDeck(body).slides[index]
     if (!source) return
     const offset = lines.slice(0, location.line - 1).reduce((sum, row) => sum + row.length + 1, column)

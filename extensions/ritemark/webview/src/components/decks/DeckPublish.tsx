@@ -24,6 +24,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { DeckPageAction, DeckPageState, DeckPdfKind, DeckRequest } from '../../../../src/decks/deckProtocol'
+import { LIVE_HELP, LIVE_TIP, PAUSE_TAIL, keyPauseDetail, outsidePauseDetail, pausedTip } from '../../../../src/decks/deckLiveCopy'
+import { isKeyPreview } from '../../../../src/decks/keyPreview'
 import { pdfItemLabel, pdfKindFor } from '../../../../src/decks/deckPdfKinds'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { onMessage, sendToExtension } from '../../bridge'
@@ -81,7 +83,6 @@ function isState(value: unknown): value is DeckPageState {
 type LiveAction = Extract<DeckRequest, { type: 'deck/live-action' }>['action']
 export type PauseTarget = Pick<LivePause, 'slide' | 'location' | 'keyPreview'>
 
-const LIVE_HELP = 'Open pages catch up within about 15 seconds.'
 /** A pause in typing before a live deck's fit is measured again. */
 const LIVE_FIT_SETTLE_MS = 800
 
@@ -306,11 +307,12 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
   // The publisher's own bar is busy during a live deploy too. The deck keeps its live chip and switch.
   if ((state.kind === 'publishing' && state.live?.state !== 'updating') || state.kind === 'unpublishing') {
     const publishing = state.kind === 'publishing'
+    const updating = publishing && !state.live?.on && !!state.address
     return (
-      <Tooltip label={publishing ? 'The page is going online' : 'The page is being taken down'}>
+      <Tooltip label={updating ? LIVE_CHIPS.updating.tip : publishing ? 'The page is going online' : 'The page is being taken down'}>
         <Button variant="toolbar" size="bar" className="deck-publish-chip" disabled>
           <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin" />
-          {publishing ? 'Publishing…' : 'Unpublishing…'}
+          {updating ? 'Updating…' : publishing ? 'Publishing…' : 'Unpublishing…'}
         </Button>
       </Tooltip>
     )
@@ -321,10 +323,12 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
     <DropdownMenu modal={false}>
       <Tooltip label={chip.tip}>
         <DropdownMenuTrigger asChild>
-          <Button variant={state.live ? 'outline' : 'toolbar'} size="bar" className={chip.className}>
-            {state.live?.state === 'live'
-              ? <span aria-hidden="true" className="size-2 rounded-full bg-[var(--r-success)] ring-2 ring-[var(--r-success-soft)]" />
-              : <Icon name={chip.icon} size={14} tone="inherit" className={state.live?.state === 'updating' ? 'animate-spin' : undefined} />}
+          <Button variant={state.live ? 'outline' : 'toolbar'} size="bar" className={`deck-page-state-chip ${chip.className}`}>
+            <span className="flex size-4 shrink-0 items-center justify-center">
+              {chip.dot
+                ? <span aria-hidden="true" className="size-2 rounded-full bg-[var(--r-success)] ring-2 ring-[var(--r-success-soft)]" />
+                : <Icon name={chip.icon} size={14} tone="inherit" className={chip.spinning ? 'animate-spin' : undefined} />}
+            </span>
             {chip.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
@@ -369,7 +373,7 @@ export function publishedMenu(
             Show it on slide {pause.slide}
           </PublishMenuItem>
         )}
-        <PublishMenuItem tip={state.live?.resumeBlocked ?? 'Try updating the page again'} disabled={!!state.live?.resumeBlocked} onSelect={() => onLiveAction?.('resume')}>
+        <PublishMenuItem tip={state.live?.resumeBlocked ? undefined : 'Try updating the page again'} disabled={!!state.live?.resumeBlocked} onSelect={() => onLiveAction?.('resume')}>
           <Icon name="play" size={14} tone="inherit" />
           Go on
           {state.live?.resumeBlocked && <span className="ml-auto text-xs">{state.live.resumeBlocked}</span>}
@@ -420,17 +424,19 @@ export function publishedMenu(
   )
 }
 
-function PublishMenuItem({ tip, ...props }: React.ComponentProps<typeof DropdownMenuItem> & { tip: string }) {
+function PublishMenuItem({ tip, ...props }: React.ComponentProps<typeof DropdownMenuItem> & { tip?: string }) {
+  const item = <DropdownMenuItem className="w-full whitespace-nowrap" {...props} />
+  if (!tip) return item
   return (
     <Tooltip label={tip} hoverOnly side="left" className="flex">
-      <DropdownMenuItem className="w-full whitespace-nowrap" {...props} />
+      {item}
     </Tooltip>
   )
 }
 
 const LIVE_CHIPS = {
-  live: { label: 'Live', icon: 'globe', className: 'text-ink-strong', tip: LIVE_HELP },
-  updating: { label: 'Updating…', icon: 'circle-notch', className: 'text-ink-strong', tip: 'Updating the published page…' },
+  live: { label: 'Live', icon: 'globe', className: 'text-ink-strong', tip: LIVE_TIP },
+  updating: { label: 'Live', icon: 'circle-notch', className: 'text-ink-strong', tip: 'Updating the published page…' },
   paused: { label: 'Paused', icon: 'pause', className: 'border-[var(--r-warning-line)] bg-[var(--r-warning-surface)] text-[var(--r-warning-ink)] hover:bg-[var(--r-warning-surface)] hover:text-[var(--r-warning-ink)]', tip: 'Open pages keep what they had.' },
   offline: { label: 'Offline', icon: 'circle', className: 'text-ink-muted', tip: 'Saves stay on this computer. The page catches up when the connection is back.' },
 } as const
@@ -438,22 +444,32 @@ const LIVE_CHIPS = {
 export function publishedChip(state: DeckPageState) {
   if (state.live?.on) {
     const chip = LIVE_CHIPS[state.live.state]
-    return { ...chip, tip: state.live.tooltip || chip.tip }
+    return {
+      ...chip,
+      dot: state.live.state === 'live',
+      spinning: state.live.state === 'updating',
+      tip: state.live.tooltip || (state.live.pause ? pausedTip(state.live.pause) : chip.tip),
+    }
   }
   return {
     label: state.changed ? 'Published · changed' : 'Published',
     icon: 'globe' as const,
     className: 'deck-publish-chip',
+    dot: false,
+    spinning: false,
     tip: state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down',
   }
 }
 
 export function pauseWords(pause: LivePause): string {
   const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(pause.at)
-  const preview = pause.kind === 'key' && pause.keyPreview && /^.….$/u.test(pause.keyPreview) ? pause.keyPreview : undefined
-  const detail = preview ? `${pause.detail.replace(/\.$/, '')}, ${preview}.` : pause.detail
-  const files = pause.outsideFiles?.map(file => file.split(/[\\/]/).pop()).join(', ')
-  return `Paused at ${time}. ${detail}${files ? ` ${files}.` : ''} Open pages keep what they had.`
+  let detail = pause.detail
+  if (pause.kind === 'key') {
+    detail = keyPauseDetail(pause.slide)
+    if (pause.keyPreview && isKeyPreview(pause.keyPreview)) detail = `${detail.slice(0, -1)} (${pause.keyPreview}).`
+  }
+  if (pause.kind === 'outside' && pause.outsideFiles?.length) detail = outsidePauseDetail(pause.slide, pause.outsideFiles)
+  return `Paused at ${time}. ${detail} ${PAUSE_TAIL}`
 }
 
 function pauseTarget({ slide, location, keyPreview }: LivePause): PauseTarget {

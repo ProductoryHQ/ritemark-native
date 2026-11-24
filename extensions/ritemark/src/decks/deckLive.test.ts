@@ -13,6 +13,10 @@ async function main() {
   const firstStarted = new Promise<void>(resolve => { startFirst = resolve; });
   const firstFinishes = new Promise<void>(resolve => { completeFirst = resolve; });
   assert.equal(live.state('page', preference).state, 'live');
+  assert.equal(live.state('page', preference).tooltip, 'The page follows this deck. Open pages catch up within about 15\u00a0seconds.');
+  assert.equal(live.state('page', { ...preference, pause: {
+    kind: 'key', slide: 6, at: 1, detail: 'Slide 6 has what looks like a key.', keyPreview: 'sk-ant-…7f3a',
+  } }).tooltip, 'Paused: slide 6 has what looks like a key. Open pages keep what they had.');
   assert.deepEqual(sent, [], 'projecting an open page never runs a save');
 
   let saved = 'A';
