@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-11-24 (Sprint 175: live deck publishing, picture cleaning, the timetable and the AI step; Sprint 173, PR 5: source hover card and fallback navigation). Before: 2026-11-21 (Sprint 172, PRs 1–3: one rule names new decks `<name>.rtms` and keeps older `.deck.md` names working, macOS release builds stamp the Ritemark Deck file type and Finder badge, and the Windows installer registers the file type and Explorer icon). Before: 2026-11-20, Sprint 169 closed out: a box's icon is any Phosphor regular icon, drawn the same on every surface, found with the icon menu's Search icons, and an unknown name opens that search with its name (see *Decks*). Before: 2026-11-17, Sprint 161: block slides, the slide editor on the stage, and comments on the slide for Claude, in the handout's own notation (see *Decks*). Before: Sprints 159 and 160 closed out. Sprint 159: Decks on main behind `ritemark.features.decks` — a frame place's `setting` (patch 002), New → Deck, Present with the presenter view and the shell's `_ritemark.present.*` (patches 004, 018, 019), the handout page and Publish on the deck's bar; Sprint 160: Claude's readiness has one source per state (one sign-in decision in `agent/setup.ts`, the saved key read on every check, `claudeLogin.ts` the only writer of signing-in), the AI's sheet follows a running sign-in, and a usage limit says so; Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
+**Last updated:** 2026-11-25 (Sprint 173: document readers, source navigation and Word equation conversion). Before: 2026-11-24 (Sprint 175: live deck publishing, picture cleaning, the timetable and the AI step; Sprint 173, PR 5: source hover card and fallback navigation). Before: 2026-11-21 (Sprint 172, PRs 1–3: one rule names new decks `<name>.rtms` and keeps older `.deck.md` names working, macOS release builds stamp the Ritemark Deck file type and Finder badge, and the Windows installer registers the file type and Explorer icon). Before: 2026-11-20, Sprint 169 closed out: a box's icon is any Phosphor regular icon, drawn the same on every surface, found with the icon menu's Search icons, and an unknown name opens that search with its name (see *Decks*). Before: 2026-11-17, Sprint 161: block slides, the slide editor on the stage, and comments on the slide for Claude, in the handout's own notation (see *Decks*). Before: Sprints 159 and 160 closed out. Sprint 159: Decks on main behind `ritemark.features.decks` — a frame place's `setting` (patch 002), New → Deck, Present with the presenter view and the shell's `_ritemark.present.*` (patches 004, 018, 019), the handout page and Publish on the deck's bar; Sprint 160: Claude's readiness has one source per state (one sign-in decision in `agent/setup.ts`, the saved key read on every check, `claudeLogin.ts` the only writer of signing-in), the AI's sheet follows a running sign-in, and a usage limit says so; Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -878,7 +878,40 @@ A deck is a Markdown file, `<name>.rtms` (Sprint 172; one made before may be `<n
 | Themes and theme editing | Roadmap step 3 |
 | The place without its setting, the flag gone | Roadmap step 5 |
 
+## Project document reading (Sprint 173)
+
+The shared `documents` group in `runtime/ritemarkTools.ts` exposes the read-only
+`read_document` tool through `RitemarkToolsInjector` to Claude, Codex and OpenCode
+when a project folder is open. `SearchHost` and `SearchWorkerClient` send a `read`
+request with the project roots. The worker calls `documents/readProjectDocument.ts`
+without loading the search index. `resolveProjectDocument` checks containment
+after canonicalizing the path. The reader checks cloud placeholders and package
+limits before extracting text.
+
+`documents/readAsMarkdown.ts` returns Markdown with a header for the document
+kind, unit count, selected range and any truncation. `wordMarkdown.ts` keeps
+headings, lists and tables. PDF page ranges use the worker's PDF.js reader.
+`powerpointMarkdown.ts` reads slides in presentation order and resolves each
+slide's own notes relationship. Usage tracking records `feature_used` with
+`feature: read_document` and the document kind as `source`.
+
+Both `wordMarkdown.ts` and the Office webview's `docx/docxToMarkdown.ts` use
+`documents/ommlToLatex.ts`. The webview carries the equations through Mammoth as
+markers and restores them as math before Turndown. Inline math uses `$…$` and
+display math uses `$$…$$`, with inline math in table cells. Unsupported equations
+keep their text inside the delimiters, and the reader header counts approximations.
+
 ## Chat source previews
+
+The shared source instructions in `ai/capabilityContext.ts` ask all three runtimes
+to name sources in prose and link the quoted words. `classifyChatHref` decodes
+the `#p=…&q=…` fragment into a page or slide and quote. `UnifiedViewProvider`
+routes previews and opens through `views/openSourcePassage.ts`, which validates
+the project path and uses the worker's `read` request in passage mode.
+`documents/locateSourcePassage.ts` returns the literal match for the existing
+find navigation. PDF lookup tries the cited page first and searches the other
+pages if needed. A PowerPoint link opens the cited slide. A direct Word or PDF
+link with an unmatched quote opens at the top.
 
 `chat:source/previewed` returns an error or a preview with the extensionless name, lowercase extension, optional page or slide number, literal quote when found, and a missing flag. The webview reads the requested words and location from the original link when the quote is missing. The card's fallback sends `chat:open-file` with `openLinkLocation: true` so the host validates the same project path and opens the cited page, slide, or document directly.
 
