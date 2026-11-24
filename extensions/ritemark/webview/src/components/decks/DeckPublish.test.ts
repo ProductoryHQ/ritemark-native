@@ -176,9 +176,14 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
       if (!React.isValidElement<RowProps>(child)) return []
       return child.type === React.Fragment ? rowsOf(child.props.children) : [child]
     })
-  const textOf = (node: React.ReactNode): string => React.Children.toArray(node).map(child =>
-    React.isValidElement<RowProps>(child) ? textOf(child.props.children) : String(child),
-  ).join('')
+  // A small text-only component (the pause words) is drawn by calling it, as React would.
+  const textOf = (node: React.ReactNode): string => React.Children.toArray(node).map(child => {
+    if (!React.isValidElement<RowProps>(child)) return String(child)
+    if (typeof child.type === 'function' && child.props.children === undefined) {
+      return textOf((child.type as (props: unknown) => React.ReactNode)(child.props))
+    }
+    return textOf(child.props.children)
+  }).join('')
   const pdf = createElement('span', null, 'Save slides as PDF…')
   let showMessage: unknown
   const menu = (state: DeckPageState) => rowsOf(publishedMenu(state, pdf, () => {}, () => {}, sendLiveAction, target => { showMessage = target }))

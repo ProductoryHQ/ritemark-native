@@ -364,8 +364,8 @@ export function publishedMenu(
   return (
     <>
       {pause && <>
-        <p className="mb-1 rounded-md bg-[var(--r-warning-surface)] p-2 text-xs leading-relaxed text-[var(--r-warning-ink)]">
-          {pauseWords(pause)}
+        <p className="mb-1 rounded-md bg-[var(--r-warning-surface)] p-2 text-xs leading-relaxed text-pretty text-[var(--r-warning-ink)]">
+          <PauseWords pause={pause} />
         </p>
         {pause.slide !== undefined && (
           <PublishMenuItem tip="Open the slide where the update paused" onSelect={() => onShowPause?.(pauseTarget(pause))}>
@@ -459,6 +459,15 @@ export function publishedChip(state: DeckPageState) {
     spinning: false,
     tip: state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down',
   }
+}
+
+/** The pause words, with the key preview kept on one line: `(sk-ant-…7f3a)` would otherwise break at a hyphen. */
+function PauseWords({ pause }: { pause: LivePause }) {
+  const words = pauseWords(pause)
+  const keep = pause.kind === 'key' && pause.keyPreview && isKeyPreview(pause.keyPreview) ? `(${pause.keyPreview})` : null
+  const at = keep ? words.indexOf(keep) : -1
+  if (!keep || at < 0) return <>{words}</>
+  return <>{words.slice(0, at)}<span className="whitespace-nowrap">{keep}</span>{words.slice(at + keep.length)}</>
 }
 
 export function pauseWords(pause: LivePause): string {
