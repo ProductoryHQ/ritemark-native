@@ -16,15 +16,14 @@
  */
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { renderAsync } from 'docx-preview'
-import mammoth from 'mammoth'
 import { sendToExtension } from '../../bridge'
-import { createTurndownService } from '../../utils/turndownService'
-import { buildExtractedImageFilename, mimeToExt, stripExt } from '../../utils/imageNaming'
+import { stripExt } from '../../utils/imageNaming'
 import { sourcePage } from '../../utils/sourcePassage'
 import { matchCountLabel, stepMatch } from '../../utils/textSearch'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
+import { docxToMarkdown } from './docx/docxToMarkdown'
 import { describeUnsupported, paperForLocale } from './docx/docxXml'
 import { installOfficeFontAliases } from './docx/officeFonts'
 import { planPageBreaks } from './docx/pagination'
@@ -82,12 +81,6 @@ interface DOCXViewerProps {
   canSaveAsMarkdown?: boolean
   /** Set when the host's check refused the file before sending it (R5). */
   loadError?: DocxLoadError | null
-}
-
-interface ExtractedImage {
-  filename: string
-  contentType: string
-  base64: string
 }
 
 // renderAltChunks off: an alt chunk is HTML embedded in the document, and it
@@ -577,44 +570,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
     try {
       const bytes = decodeBase64ToBytes(content)
       const sourceBasename = stripExt(filename) || 'document'
-      const images: ExtractedImage[] = []
-      const unrecognizedMimes = new Set<string>()
-
-      const result = await mammoth.convertToHtml(
-        { arrayBuffer: bytes.buffer as ArrayBuffer },
-        {
-          convertImage: mammoth.images.imgElement(async (image) => {
-            const base64 = await image.readAsBase64String()
-            const { ext, recognized } = mimeToExt(image.contentType)
-            if (!recognized) unrecognizedMimes.add(image.contentType)
-            const imgFilename = buildExtractedImageFilename(
-              sourceBasename,
-              images.length + 1,
-              ext
-            )
-            images.push({ filename: imgFilename, contentType: image.contentType, base64 })
-            const relPath = `./images/${imgFilename}`
-            // src + title=relative path so the shared turndown image rule (in
-            // utils/turndownService) emits ./images/... in the final markdown
-            // rather than the DOM-resolved absolute URL.
-            return { src: relPath, title: relPath }
-          }),
-        }
-      )
-
-      const html = result.value
-      const warnings = result.messages
-        .filter((m) => m.type === 'warning')
-        .map((m) => m.message)
-
-      if (unrecognizedMimes.size > 0) {
-        warnings.push(
-          `Saved ${unrecognizedMimes.size} image${unrecognizedMimes.size === 1 ? '' : 's'} with unrecognized content type${unrecognizedMimes.size === 1 ? '' : 's'} (${[...unrecognizedMimes].join(', ')}); files were written with .png extension and may not render correctly.`
-        )
-      }
-
-      const turndownService = createTurndownService()
-      const markdown = turndownService.turndown(html)
+      const { markdown, images, warnings } = await docxToMarkdown(bytes, sourceBasename)
 
       sendToExtension('saveAsMarkdown', {
         payload: {

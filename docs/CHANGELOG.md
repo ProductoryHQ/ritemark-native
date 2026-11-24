@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Equations in Word stay as math when AI reads the document or you save a Markdown copy (#1011).
 - Switch the slide strip to a timed list to enter slide minutes in order. Set a session length to see whether the deck fits, and add a start to see clock times for each slide.
 - Set slide minutes while editing a deck and see how the total fits your session (#1004).
 - After you update a published deck, open pages catch up when readers pause, keeping each reader on their slide (#1005).
