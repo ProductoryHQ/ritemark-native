@@ -33,13 +33,17 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 - [ ] 3-D pie drawn flat
 - [ ] Proof: scenarios 1 (these kinds), 5, each beside Excel's render; the lead's look
 
-## PR 4: combo, the second axis, chosen charts, copy, the 5,000-point thinning (Standard, look change)
+## PR 4: combo, the second axis, chosen charts, the 5,000-point thinning (Standard, look change)
 - [ ] Combo (columns with a line, a second value axis on the right)
 - [ ] The accent ring on a click; the formula bar's text (R8, frame 10); Esc and a click elsewhere let go
-- [ ] Copy as a picture (`chartCopy.ts`); a tooltip on nothing new (no new elements)
 - [ ] Series over more than 5,000 points thinned, keeping each bucket's lowest and highest (R25)
 - [ ] Out-of-scope kinds keep the card; the line names them (scenario 13)
 - [ ] Proof: scenarios 1 (combo), 10, 11, 13, 14, each beside Excel's render; the lead's look; the copy checked by pasting the picture into a Ritemark document
+
+## PR 4b — Copy a chosen chart as a picture (High)
+
+- [x] Copy the chosen chart as a PNG with Cmd/Ctrl+C (R8)
+- [ ] High review, security review, and paste into a Ritemark document
 
 ## PR 5: the rules reader and engine (Standard, no visible change)
 - [ ] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan

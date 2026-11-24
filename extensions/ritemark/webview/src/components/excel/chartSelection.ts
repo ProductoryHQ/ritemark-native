@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import * as XLSX from 'xlsx'
 import type { ChartModel } from './chartModel'
+import { copyChart } from './chartCopy'
 import { parseFormulaRef, type ReferenceEndpoint } from './formulaRef'
 
 type SupportedChart = Extract<ChartModel, { supported: true }>
@@ -52,7 +53,12 @@ export function useChartSelection(restoreFocus?: () => void) {
     const outside = (event: Event) => {
       if (chartTarget(event.target)?.getAttribute('data-sheet-chart') !== chosen.id) setChosen(null)
     }
-    const escape = (event: KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'c') {
+        event.preventDefault()
+        void copyChart(chosen.target)
+        return
+      }
       if (event.key !== 'Escape') return
       setChosen(null)
       if (chartTarget(document.activeElement)?.getAttribute('data-sheet-chart') === chosen.id) {
@@ -63,11 +69,11 @@ export function useChartSelection(restoreFocus?: () => void) {
     }
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('click', outside, true)
-    document.addEventListener('keydown', escape, true)
+    document.addEventListener('keydown', onKeyDown, true)
     return () => {
       document.removeEventListener('pointerdown', outside, true)
       document.removeEventListener('click', outside, true)
-      document.removeEventListener('keydown', escape, true)
+      document.removeEventListener('keydown', onKeyDown, true)
     }
   }, [chosen, restoreFocus])
   function bind(index: number, focusable = true): ChartSelectionTarget {
