@@ -58,7 +58,15 @@ export interface ThemeInfo {
   majorFont?: string
 }
 
+export interface DifferentialStyle {
+  font?: Partial<{ [K in keyof FontStyle]: FontStyle[K] | null }>
+  fill?: string
+  border?: CellBorders
+  numberFormat?: { id: number; code?: string }
+}
+
 export interface WorkbookStyles {
+  dxfs: DifferentialStyle[]
   /** The workbook's own number formats, by numFmtId. */
   numFmts: Map<number, string>
   /** Each cell style's (cellXfs entry's) numFmtId, by the cell's `s`. */
@@ -87,7 +95,7 @@ export function section(xml: string, tag: string): string {
 }
 
 /** Each element named `tag`: its attributes and its content ('' when self-closing). */
-function each(xml: string, tag: string): Array<[string, string]> {
+export function each(xml: string, tag: string): Array<[string, string]> {
   const out: Array<[string, string]> = []
   for (const m of xml.matchAll(new RegExp(`<(?:\\w+:)?${tag}(?=[\\s/>])([^>]*?)(?:\\/>|>([\\s\\S]*?)</(?:\\w+:)?${tag}>)`, 'g'))) {
     out.push([m[1], m[2] ?? ''])
@@ -245,11 +253,11 @@ export function fontOf(body: string, ctx: ColorContext, base?: FontStyle): FontS
   }
 }
 
-function fillOf(body: string, ctx: ColorContext): string | undefined {
+function fillOf(body: string, ctx: ColorContext, differential = false): string | undefined {
   const p = /<(?:\w+:)?patternFill(?=[\s/>])([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?patternFill>)/.exec(body)
   if (p) {
     const inner = p[2] ?? ''
-    const type = attr(p[1], 'patternType') ?? (inner.includes('fgColor') ? 'solid' : 'none')
+    const type = attr(p[1], 'patternType') ?? (differential || inner.includes('fgColor') ? 'solid' : 'none')
     if (type === 'none') return undefined
     const fg = colorOf(/<(?:\w+:)?fgColor(?=[\s/>])[^>]*\/?>/.exec(inner)?.[0], ctx)
     const bg = colorOf(/<(?:\w+:)?bgColor(?=[\s/>])[^>]*\/?>/.exec(inner)?.[0], ctx)
@@ -324,7 +332,33 @@ export function readStyles(xml: string, themeXml = ''): WorkbookStyles {
     })
   }
   const families = [...new Set(fonts.map((f) => f.name).filter((n): n is string => !!n))]
-  return { numFmts, xfNumFmt, xfs, baseFont, theme, families }
+  const dxfs = each(section(xml, 'dxfs'), 'dxf').map(([, body]): DifferentialStyle => {
+    const style: DifferentialStyle = {}
+    const font = section(body, 'font')
+    if (font) {
+      const parsed = fontOf(font, ctx)
+      const tags = {
+        b: 'bold', i: 'italic', u: 'underline', strike: 'strike', color: 'color',
+        name: 'name', rFont: 'name', scheme: 'name', sz: 'size', vertAlign: 'vertAlign',
+      } as const
+      style.font = Object.fromEntries(Object.entries(tags)
+        .filter(([tag]) => each(font, tag).length)
+        .map(([tag, key]) => [key, tag === 'vertAlign' || tag === 'u' || tag === 'color' ? parsed[key] ?? null : parsed[key]])
+        .filter(([, value]) => value !== undefined))
+    }
+    const fill = fillOf(section(body, 'fill'), ctx, true)
+    if (fill) style.fill = fill
+    const border = bordersOf(section(body, 'border'), ctx)
+    if (border) style.border = Object.fromEntries(Object.entries(border).filter(([, side]) => side))
+    const [format] = each(body, 'numFmt')
+    if (format) {
+      const id = Number(attr(format[0], 'numFmtId'))
+      const code = attr(format[0], 'formatCode')
+      if (Number.isInteger(id)) style.numberFormat = { id, code: code === undefined ? undefined : decodeXmlEntities(code) }
+    }
+    return style
+  })
+  return { numFmts, xfNumFmt, xfs, baseFont, theme, families, dxfs }
 }
 
 /** The colour context of a workbook's styles, for tab colours and rich-text runs. */

@@ -13,6 +13,7 @@ import JSZip from 'jszip'
 import { resolveSeries } from './chartSeries'
 import { chartsKeepFixtures } from '../../../../src/excel/chartsKeepFixtures.test'
 import { cellKey, readWorkbook } from './readWorkbook'
+import { compileRules } from './ruleEngine'
 
 const repo = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../../..')
 const spike = path.join(repo, 'docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures')
@@ -54,6 +55,13 @@ async function main() {
       }
     }
     assert.equal(hash(), before, `${label}: resolving chart series changes no byte`)
+    for (const sheet of model.sheets) {
+      const compiled = compileRules(sheet, sheet.layout.rules, { ...model, today: new Date(2026, 10, 24) })
+      for (const rule of sheet.layout.rules) {
+        for (const { top, left } of rule.areas) compiled.styleAt(top, left)
+      }
+    }
+    assert.equal(hash(), before, `${label}: reading and applying rule styles preserve the input bytes`)
     const book = XLSX.read(bytes, { type: 'array', cellFormula: true })
     assert.deepEqual(model.sheets.map((s) => s.name), book.SheetNames, `${label}: the sheets`)
     let compared = 0
