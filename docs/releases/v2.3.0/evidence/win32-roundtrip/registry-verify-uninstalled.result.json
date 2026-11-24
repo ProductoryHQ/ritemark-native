@@ -1,0 +1,19 @@
+{
+  "Mode": "verify-uninstalled",
+  "Identity": "runnervmbpeip\\rmci-45200964871",
+  "Count": 0,
+  "KeyNames": [],
+  "DisplayNames": [],
+  "Publishers": [],
+  "DisplayVersions": [],
+  "DeckFileType": {
+    "ExtensionKey": false,
+    "ProgIdKey": false,
+    "ProgId": null,
+    "InOpenWith": false,
+    "Name": null,
+    "Icon": null,
+    "IconFileExists": false,
+    "OpenCommand": null
+  }
+}
