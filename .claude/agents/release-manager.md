@@ -35,7 +35,7 @@ If missing, block before release execution. This is separate from Gate 1/Gate 2;
 
 | Gate | Owner | Cleared by |
 | --- | --- | --- |
-| Gate 1 (Technical) | You | Hygiene audit reviewed; new exact-main release worktree; source/provenance checks pass; arm64 DMG verified |
+| Gate 1 | **Jarmo** tests the un-notarized arm64 DMG | Before you ask him: hygiene audit reviewed; new exact-main release worktree; source/provenance checks pass; arm64 DMG verified |
 | Gate 2 (Human) | Jarmo | "tested locally", "approved for release", "ship it" |
 
 If either gate is open, you BLOCK and explain what is missing.
@@ -101,7 +101,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 3 | Sign + DMG arm64 — **NO notarization yet** (record build time) | Agent | — |
 | **4** | **Jarmo tests the UN-notarized signed arm64 DMG locally** | **Jarmo** | **Gate 1 — BLOCKS step 5** |
 | 4b | Hardening period (**≥60 min since DMG build, no new bugs**) → notarize + staple arm64 | Agent | **REQUIRES Gate 1 cleared + 60-min window** |
-| 5 | Tag → push (triggers x64 + Windows CI); the repo stays public | Agent | **REQUIRES Gate 1 cleared** |
+| 5 | Dispatch x64 + Windows CI by hand (`workflow_dispatch`, exact source commit; a tag push triggers nothing); the repo stays public | Agent | **REQUIRES Gate 1 cleared** |
 | 6 | Download x64 from CI, sign, DMG — **NO notarization yet** | Agent | — |
 | **7** | **Jarmo tests the UN-notarized x64 DMG + Windows installer** | **Jarmo** | **Gate 2** |
 | 7b | Hardening period (**≥60 min since x64 DMG build, no new bugs**) → notarize + staple x64 | Agent | **REQUIRES Gate 2 cleared + 60-min window** |
@@ -113,7 +113,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 
 **⛔⛔ NOTARIZATION-ORDER HARD RULE.** Jarmo ALWAYS tests the **un-notarized** build; notarization is the last step before publish, run only after the gate passes. There must be a **≥60-minute hardening period between DMG build and notarization** (let late bugs surface). Apple notarization is a limited/rate-sensitive resource — a team-eligibility hold (case 102892219755) once cost weeks. NEVER spend a submission on an untested or unsettled build. If a bug surfaces during the hardening window, rebuild → clock + gate reset. Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening → notarize → publish.**
 
-**Step 5 is HARD-GATED on Step 4.** The tag push triggers a long, costly multi-platform CI run (x64 + Windows). NEVER push the tag until Jarmo has explicitly cleared Gate 1 — testing the **un-notarized** arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
+**Step 5 is HARD-GATED on Step 4.** The x64 and Windows CI runs are long and costly and are dispatched by hand (`workflow_dispatch`-only since v1.8.2; a tag push triggers nothing; the tag is created on the source commit at publish). Throwaway runs that prove CI green before a candidate are fine (`release` skill); never dispatch the candidate's builds until Jarmo has explicitly cleared Gate 1 — testing the **un-notarized** arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
 
 ### Extension-only release (Sprint 93 — LIGHT gate, deliberately asymmetric to the full-release table above)
 
@@ -269,9 +269,9 @@ If ANY blockers exist, REFUSE to proceed.
 1. **Always audit and create a clean release worktree first** — hygiene review, `create-release-worktree.sh`, and `release-preflight.sh` MUST pass before anything.
 2. **Always track steps as tasks** — never skip a step silently.
 3. **NEVER skip gates** — wait for Jarmo's explicit approval at each gate.
-4. **NEVER skip the tag** — tag push triggers x64 + Windows CI builds.
+4. **NEVER skip the tag** — create it on the release's source commit at publish time (it triggers no CI).
 5. **Always push the version commit BEFORE creating the tag** — otherwise GH Actions has no version bump.
-6. **NEVER push the release tag before Gate 1 clears** — the tag push triggers expensive multi-platform CI (x64 + Windows). Jarmo MUST first install the **un-notarized** arm64 DMG locally and explicitly approve ("tested locally" / "approved" / "ship it"). A Gate 1 failure after CI ran wastes the entire build.
+6. **NEVER dispatch the candidate's x64 + Windows CI before Gate 1 clears** — those runs are expensive. Jarmo MUST first install the **un-notarized** arm64 DMG locally and explicitly approve ("tested locally" / "approved" / "ship it"). A Gate 1 failure after CI ran wastes the entire build.
 7. **NEVER proceed without ALL approvals** — both gates must pass.
 12. **NEVER notarize before Jarmo has tested the un-notarized build AND a ≥60-min hardening period has elapsed since the DMG build.** Jarmo tests the un-notarized DMG; notarization is the last step before publish. Apple submissions are limited/rate-sensitive — never burn one on an untested or unsettled build. Bug in the window → rebuild, reset clock + gate.
 8. **Always wait for GH Actions** — verify status before Windows phase.
