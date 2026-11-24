@@ -1,6 +1,6 @@
 import { attr, decodeXmlEntities, rootPrefix } from '../../../../src/excel/sheetXml'
 import { colorOf, each, type ColorContext } from './excelStyles'
-import { parseFormulaRef, refArea, type RefArea } from './formulaRef'
+import { parseFormulaRef, referenceBounds, type RefArea } from './formulaRef'
 
 const kinds = [
   'cellIs', 'containsText', 'notContainsText', 'beginsWith', 'endsWith', 'containsBlanks',
@@ -85,7 +85,7 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
     const sqref = decoded(attrs, 'sqref') ?? ''
     const areas = sqref.trim().split(/\s+/).flatMap((item) => {
       const ref = parseFormulaRef(item)
-      const area = ref && !ref.sheet ? refArea(ref) : undefined
+      const area = ref && !ref.sheet ? referenceBounds(ref) : undefined
       return area ? [area] : []
     })
     if (!areas.length) continue

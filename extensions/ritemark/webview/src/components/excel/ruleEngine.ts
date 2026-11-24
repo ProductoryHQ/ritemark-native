@@ -4,7 +4,7 @@ import type { ConditionalRule, DataBarRule, RuleSet, RuleThreshold } from './rea
 import type { CellModel, SheetModel } from './readWorkbook'
 import {
   calendarDay, compareScalars, DAY, excelDay, FORMULA_ERROR, formulaTruth,
-  readRuleFormula, runRuleFormula, UNREADABLE, wildcardText, type FormulaContext, type Scalar,
+  primeFormulaRanges, readRuleFormula, runRuleFormula, type FormulaRangeCache, UNREADABLE, wildcardText, type FormulaContext, type Scalar,
 } from './ruleFormula'
 
 type RuleSheet = Pick<SheetModel, 'cells' | 'name'>
@@ -46,18 +46,18 @@ const keyOf = (value: Scalar) => typeof value === 'string' ? value.toUpperCase()
 const clamp = (n: number) => Math.max(0, Math.min(1, n))
 
 /** Small ranges use direct lookups. Whole rows and columns walk the sparse cells. */
-function* cellsIn(sheet: RuleSheet, area: RefArea): Iterable<Scalar> {
+function* cellsIn(sheet: RuleSheet, area: RefArea): Iterable<[number, Scalar]> {
   const count = (area.bottom - area.top + 1) * (area.right - area.left + 1)
   if (count <= sheet.cells.size) {
     for (let row = area.top; row <= area.bottom; row++) {
       for (let col = area.left; col <= area.right; col++) {
         const cell = sheet.cells.get(row * EXCEL_COLS + col)
-        if (cell) yield toScalar(cell)
+        if (cell) yield [row * EXCEL_COLS + col, toScalar(cell)]
       }
     }
   } else {
     for (const [key, cell] of sheet.cells) {
-      if (inside(area, Math.floor(key / EXCEL_COLS), key % EXCEL_COLS)) yield toScalar(cell)
+      if (inside(area, Math.floor(key / EXCEL_COLS), key % EXCEL_COLS)) yield [key, toScalar(cell)]
     }
   }
 }
@@ -69,11 +69,14 @@ interface RangeFacts {
   deviation: number
 }
 
-function collectFacts(sheet: RuleSheet, area: RefArea): RangeFacts {
+function collectFacts(sheet: RuleSheet, areas: readonly RefArea[]): RangeFacts {
   const numbers: number[] = []
   const counts = new Map<Scalar, number>()
   let sum = 0
-  for (const value of cellsIn(sheet, area)) {
+  const seen = areas.length > 1 ? new Set<number>() : undefined
+  for (const area of areas) for (const [cell, value] of cellsIn(sheet, area)) {
+    if (seen?.has(cell)) continue
+    seen?.add(cell)
     if (isNumber(value)) {
       numbers.push(value)
       sum += value
@@ -96,7 +99,7 @@ function dateWindow(period: string | undefined, ctx: RuleContext): [number, numb
   const month = (delta: number) => Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1)
   const windows: Record<string, [number, number]> = {
     yesterday: [today - DAY, today], today: [today, today + DAY], tomorrow: [today + DAY, today + 2 * DAY],
-    last7Days: [today - 7 * DAY, today],
+    last7Days: [today - 6 * DAY, today + DAY],
     lastWeek: [week - 7 * DAY, week], thisWeek: [week, week + 7 * DAY], nextWeek: [week + 7 * DAY, week + 14 * DAY],
     lastMonth: [month(-1), month(0)], thisMonth: [month(0), month(1)], nextMonth: [month(1), month(2)],
   }
@@ -163,32 +166,45 @@ function compare(operator: string | undefined, value: Scalar, args: Scalar[]): b
     case 'greaterThanOrEqual': return x >= 0
     case 'lessThan': return x < 0
     case 'lessThanOrEqual': return x <= 0
-    case 'between': return x >= 0 && compareScalars(value, args[1]) <= 0
-    case 'notBetween': return x < 0 || compareScalars(value, args[1]) > 0
+    case 'between': case 'notBetween': {
+      const reversed = compareScalars(args[0], args[1]) > 0
+      const y = compareScalars(value, args[1])
+      const between = reversed ? y >= 0 && x <= 0 : x >= 0 && y <= 0
+      return operator === 'between' ? between : !between
+    }
     default: return false
   }
 }
 
-function compileArea(
+function compileRule(
   rule: ConditionalRule, area: RefArea,
   formulas: Parsed[], thresholds: Array<Parsed | undefined>,
   context: RuleContext, getSheet: (name?: string) => RuleSheet | undefined,
-  factsFor: (area: RefArea) => RangeFacts, window?: [number, number],
-): MatchAt {
+  factsFor: () => RangeFacts, cache: FormulaRangeCache, window?: [number, number],
+): MatchAt | undefined {
   const formulaContext = (row: number, col: number): FormulaContext => ({
-    row, col, anchor: area, today: context.today, date1904: context.date1904,
+    row, col, anchor: area, today: context.today, date1904: context.date1904, rangeCache: cache,
     cellAt(name, r, c) {
       const target = getSheet(name)
       return target ? toScalar(target.cells.get(r * EXCEL_COLS + c)) : FORMULA_ERROR
     },
     *cellsIn(name, range) {
       const target = getSheet(name)
-      if (target) yield* cellsIn(target, range)
+      if (target) {
+        for (const [, value] of cellsIn(target, range)) yield value
+      }
       else yield FORMULA_ERROR
     },
   })
   const run = (formula: Parsed | undefined, row: number, col: number) =>
     formula === undefined || formula === UNREADABLE ? FORMULA_ERROR : runRuleFormula(formula, formulaContext(row, col))
+
+  const atAnchor = formulaContext(area.top, area.left)
+  for (const formula of [...formulas, ...thresholds]) {
+    if (formula && formula !== UNREADABLE) primeFormulaRanges(formula, atAnchor)
+  }
+  const limits = thresholds.map((formula) => run(formula, area.top, area.left))
+  if (limits.some((limit, i) => thresholds[i] !== undefined && !isNumber(limit))) return undefined
 
   switch (rule.type) {
     case 'cellIs': return (r, c, value) => compare(rule.operator, value, formulas.map((f) => run(f, r, c)))
@@ -198,7 +214,7 @@ function compileArea(
       if (text === undefined) return () => false
       const needle = text.toUpperCase()
       return (_r, _c, value) => {
-        if (value === null || value === FORMULA_ERROR) return false
+        if (value === null || value === FORMULA_ERROR) return rule.type === 'notContainsText'
         const input = String(value).toUpperCase()
         const match = rule.type === 'beginsWith' ? input.startsWith(needle)
           : rule.type === 'endsWith' ? input.endsWith(needle) : wildcardText(input, '*' + text + '*')
@@ -210,7 +226,7 @@ function compileArea(
     case 'containsErrors': return (_r, _c, value) => value === FORMULA_ERROR
     case 'notContainsErrors': return (_r, _c, value) => value !== FORMULA_ERROR
     case 'duplicateValues': case 'uniqueValues': {
-      const { counts } = factsFor(area)
+      const { counts } = factsFor()
       return (_r, _c, value) => {
         const count = counts.get(keyOf(value)) ?? 0
         return rule.type === 'uniqueValues' ? count === 1 : count > 1
@@ -221,7 +237,7 @@ function compileArea(
     case 'iconSet': return () => false
   }
 
-  const { numbers, mean, deviation } = factsFor(area)
+  const { numbers, mean, deviation } = factsFor()
   if (!numbers.length) return () => false
   const low = numbers[0]
   const high = numbers[numbers.length - 1]
@@ -239,22 +255,19 @@ function compileArea(
   }
 
   const resolve = (stop: RuleThreshold, i: number): number => {
-    const value = stop.value?.trim() ? Number(stop.value) : NaN
+    const value = limits[i]
+    const number = isNumber(value) ? value : NaN
     switch (stop.type) {
       case 'min': return low
       case 'max': return high
       case 'autoMin': return Math.min(0, low)
       case 'autoMax': return Math.max(0, high)
-      case 'num': return value
-      case 'percent': return low + (high - low) * clamp(value / 100)
+      case 'num': case 'formula': return number
+      case 'percent': return low + (high - low) * clamp(number / 100)
       case 'percentile': {
-        const rank = (numbers.length - 1) * clamp(value / 100)
+        const rank = (numbers.length - 1) * clamp(number / 100)
         const index = Math.floor(rank)
         return numbers[index] + (numbers[Math.ceil(rank)] - numbers[index]) * (rank - index)
-      }
-      case 'formula': {
-        const result = run(thresholds[i], area.top, area.left)
-        return isNumber(result) ? result : NaN
       }
       default: return NaN
     }
@@ -292,11 +305,12 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
   sheets.set(sheet.name.toUpperCase(), sheet)
   const getSheet = (name?: string) => name === undefined ? sheet : sheets.get(name.toUpperCase())
   const facts = new Map<string, RangeFacts>()
-  const factsFor = (area: RefArea) => {
-    const key = `${area.top}:${area.left}:${area.bottom}:${area.right}`
+  const cache: FormulaRangeCache = new Map()
+  const factsFor = (rule: ConditionalRule) => {
+    const key = rule.sqref
     let cached = facts.get(key)
     if (!cached) {
-      cached = collectFacts(sheet, area)
+      cached = collectFacts(sheet, rule.areas)
       facts.set(key, cached)
     }
     return cached
@@ -310,7 +324,7 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
     // error and blank rules. Their declared type and attributes define the test.
     const formulas = rule.type === 'cellIs' || rule.type === 'expression' ? rule.formulas.map(readRuleFormula) : []
     const thresholds = (rule.scale?.stops ?? rule.bar?.stops ?? []).map((stop) =>
-      stop.type === 'formula' ? readRuleFormula(stop.value ?? '') : undefined)
+      ['formula', 'num', 'percent', 'percentile'].includes(stop.type) ? readRuleFormula(stop.value ?? '') : undefined)
     const required = rule.type === 'expression' || rule.type === 'cellIs'
       ? rule.operator === 'between' || rule.operator === 'notBetween' ? 2 : 1 : 0
     if (formulas.length < required || [...formulas, ...thresholds].includes(UNREADABLE)) {
@@ -318,9 +332,15 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
       return []
     }
     const window = rule.type === 'timePeriod' ? dateWindow(rule.timePeriod, ctx) : undefined
+    const anchor = rule.areas[0]
+    if (!anchor) return []
+    const match = compileRule(rule, anchor, formulas, thresholds, ctx, getSheet, () => factsFor(rule), cache, window)
+    if (!match) {
+      unreadable.push(rule)
+      return []
+    }
     return [{
-      rule, dxf: rule.dxfId === undefined ? undefined : ctx.styles.dxfs[rule.dxfId],
-      areas: rule.areas.map((area) => ({ area, match: compileArea(rule, area, formulas, thresholds, ctx, getSheet, factsFor, window) })),
+      rule, match, dxf: rule.dxfId === undefined ? undefined : ctx.styles.dxfs[rule.dxfId],
     }]
   })
   return {
@@ -328,8 +348,9 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
     styleAt(row: number, col: number): RuleStyle {
       const result: RuleStyle = {}
       const value = toScalar(sheet.cells.get(row * EXCEL_COLS + col))
-      for (const { rule, dxf, areas } of compiled) {
-        const match = areas.find(({ area }) => inside(area, row, col))?.match(row, col, value)
+      for (const { rule, dxf, match: matchAt } of compiled) {
+        if (!rule.areas.some((area) => inside(area, row, col))) continue
+        const match = matchAt(row, col, value)
         if (!match) continue
         if (typeof match === 'object' && 'bar' in match) result.dataBar ??= match.bar
         if (typeof match === 'object' && 'fill' in match && !result.dxf?.fill) result.colorScale ??= match.fill

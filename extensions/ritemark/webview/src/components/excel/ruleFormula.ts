@@ -11,6 +11,7 @@ export interface FormulaContext {
   today: Date
   date1904: boolean
   cellAt(sheet: string | undefined, row: number, col: number): Scalar
+  rangeCache?: FormulaRangeCache
   cellsIn(sheet: string | undefined, area: RefArea): Iterable<Scalar>
 }
 
@@ -198,11 +199,18 @@ export function wildcardText(value: string, pattern: string): boolean {
   return token === tokens.length
 }
 
+const countKey = (value: Scalar) => typeof value === 'string' ? value.toUpperCase() : value
+
+function criterionParts(value: string) {
+  const [, op = '=', text] = /^(<>|<=|>=|=|<|>)?([\s\S]*)$/.exec(value)!
+  const target = text.trim() && Number.isFinite(Number(text)) ? Number(text) : text
+  return { op, target }
+}
+
 function criterion(value: Scalar): (candidate: Scalar) => boolean {
   if (value === ERROR) return (candidate) => candidate === ERROR
   if (typeof value !== 'string') return (candidate) => candidate !== null && candidate !== ERROR && compareScalars(candidate, value) === 0
-  const [, op = '=', text] = /^(<>|<=|>=|=|<|>)?([\s\S]*)$/.exec(value)!
-  const target = text.trim() && Number.isFinite(Number(text)) ? Number(text) : text
+  const { op, target } = criterionParts(value)
   return (candidate) => {
     if (candidate === ERROR) return false
     if (op === '=' || op === '<>') {
@@ -212,6 +220,96 @@ function criterion(value: Scalar): (candidate: Scalar) => boolean {
       return op === '=' ? equal : !equal
     }
     return candidate !== null && typeof candidate === typeof target && relation(op, compareScalars(candidate, target))
+  }
+}
+
+interface RangeSummary {
+  count: number
+  occupied: number
+  total: number
+  min: number
+  max: number
+  error: boolean
+}
+
+interface CachedRange {
+  summary?: RangeSummary
+  counts?: Map<Scalar, number>
+}
+
+export type FormulaRangeCache = Map<string, CachedRange>
+
+function staticRange(ref: FormulaRef, area: RefArea, ctx: FormulaContext): CachedRange | undefined {
+  const cache = ctx.rangeCache
+  if (!cache || ![ref.start, ref.end].every(({ row, col, absoluteRow, absoluteCol }) =>
+    (row === undefined || absoluteRow) && (col === undefined || absoluteCol))) return undefined
+  const key = JSON.stringify([ref.sheet?.toUpperCase(), area.top, area.left, area.bottom, area.right])
+  let entry = cache.get(key)
+  if (!entry) {
+    entry = {}
+    cache.set(key, entry)
+  }
+  return entry
+}
+
+function summarize(values: Iterable<Scalar>, coerce: boolean): RangeSummary {
+  const result = { count: 0, occupied: 0, total: 0, min: Infinity, max: -Infinity, error: false }
+  for (const value of values) {
+    if (value === null) continue
+    result.occupied++
+    if (value === ERROR) result.error = true
+    const n = typeof value === 'number' ? value : coerce ? numeric(value) : NaN
+    if (!Number.isFinite(n)) continue
+    result.count++
+    result.total += n
+    result.min = Math.min(result.min, n)
+    result.max = Math.max(result.max, n)
+  }
+  return result
+}
+
+function rangeSummary(ref: FormulaRef, area: RefArea, ctx: FormulaContext): RangeSummary {
+  const entry = staticRange(ref, area, ctx)
+  const summary = entry?.summary ?? summarize(ctx.cellsIn(ref.sheet, area), false)
+  if (entry) entry.summary = summary
+  return summary
+}
+
+function rangeCounts(ref: FormulaRef, area: RefArea, ctx: FormulaContext): Map<Scalar, number> | undefined {
+  const entry = staticRange(ref, area, ctx)
+  if (!entry) return undefined
+  if (!entry.counts) {
+    const counts = new Map<Scalar, number>()
+    let blanks = (area.bottom - area.top + 1) * (area.right - area.left + 1)
+    for (const value of ctx.cellsIn(ref.sheet, area)) {
+      if (value === null) continue
+      blanks--
+      const key = countKey(value)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    counts.set(null, blanks)
+    entry.counts = counts
+  }
+  return entry.counts
+}
+
+export function primeFormulaRanges(expr: Expression, ctx: FormulaContext): void {
+  switch (expr.kind) {
+    case 'unary': primeFormulaRanges(expr.arg, ctx); break
+    case 'binary':
+      primeFormulaRanges(expr.left, ctx)
+      primeFormulaRanges(expr.right, ctx)
+      break
+    case 'call':
+      for (const [i, arg] of expr.args.entries()) {
+        primeFormulaRanges(arg, ctx)
+        if (arg.kind !== 'ref') continue
+        const area = refArea(arg.ref)
+        if (!area || !staticRange(arg.ref, area, ctx)) continue
+        if (expr.name === 'COUNTIF' && i === 0) rangeCounts(arg.ref, area, ctx)
+        if (['SUM', 'AVERAGE', 'MIN', 'MAX', 'COUNT', 'COUNTA'].includes(expr.name)) rangeSummary(arg.ref, area, ctx)
+      }
+      break
   }
 }
 
@@ -251,17 +349,15 @@ export function runRuleFormula(expr: Expression, ctx: FormulaContext): Scalar {
     for (const arg of args) {
       const area = arg.kind === 'ref' ? areaOf(arg.ref) : undefined
       if (arg.kind === 'ref' && !area) return ERROR
-      const values: Iterable<Scalar> = arg.kind === 'ref' && area ? ctx.cellsIn(arg.ref.sheet, area) : [read(arg)]
-      for (const value of values) {
-        if (value !== null) occupied++
-        if (value === ERROR && name !== 'COUNT' && name !== 'COUNTA') return ERROR
-        const n = typeof value === 'number' ? value : arg.kind !== 'ref' && value !== null ? numeric(value) : NaN
-        if (!Number.isFinite(n)) continue
-        count++
-        total += n
-        min = Math.min(min, n)
-        max = Math.max(max, n)
-      }
+      const summary = arg.kind === 'ref' && area
+        ? rangeSummary(arg.ref, area, ctx)
+        : summarize([read(arg)], true)
+      if (summary.error && name !== 'COUNT' && name !== 'COUNTA') return ERROR
+      count += summary.count
+      occupied += summary.occupied
+      total += summary.total
+      min = Math.min(min, summary.min)
+      max = Math.max(max, summary.max)
     }
     switch (name) {
       case 'COUNT': return count
@@ -286,7 +382,21 @@ export function runRuleFormula(expr: Expression, ctx: FormulaContext): Scalar {
         const arg = args[0]
         const area = arg.kind === 'ref' ? areaOf(arg.ref) : undefined
         if (!area || arg.kind !== 'ref') return ERROR
-        const matches = criterion(read(args[1]))
+        const input = read(args[1])
+        const counts = rangeCounts(arg.ref, area, ctx)
+        if (counts) {
+          const { op, target }: { op: string; target: Scalar } = typeof input === 'string'
+            ? criterionParts(input) : { op: '=', target: input }
+          if (op === '=' && (typeof target !== 'string' || !/[~*?]/.test(target))) {
+            if (target === null) return (counts.get(0) ?? 0) + (counts.get(false) ?? 0) + (counts.get('') ?? 0)
+            return (counts.get(countKey(target)) ?? 0) + (target === '' ? counts.get(null) ?? 0 : 0)
+          }
+          const matches = criterion(input)
+          let count = 0
+          for (const [value, occurrences] of counts) if (matches(value)) count += occurrences
+          return count
+        }
+        const matches = criterion(input)
         let count = 0
         let occupied = 0
         for (const value of ctx.cellsIn(arg.ref.sheet, area)) {
