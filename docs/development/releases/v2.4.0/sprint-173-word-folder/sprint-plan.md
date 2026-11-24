@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: ten numbered requirements, edge-case-heavy path and link handling, a flow across the webview, the host, a worker and three AI runtimes). Override with: "use plain full track".
 Branch: `sprint-173-word-folder-prN` for each PR (this plan is on `docs-sprint-173-word-folder`)
 Release tier: extension (no path on `CLAUDE.md`'s shell-tier list; see technical-plan.md)
-Status: **Phase 2 (PLAN), awaiting Jarmo's approval.** No code until he approves in his own words.
+Status: **Approved 24 November 2026** through the 2.4 roadmap. Jarmo: "roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi" (roadmap deck: https://claude.ai/artifact/Lsbc9YDNmC6eWXvYmaZ5H8; ritemark-dev decisions/log.md). The open questions below are settled by the Development manager by their recommendations (Jarmo, 24 Nov: sprint questions are the head of development's).
 
 The parent release is v2.4.0 (`../release-plan.md`, milestone 20; thesis approved 22 November). The drawing: experience 50, `product/design/experience/experiences/wordfolder/README.md`. The shape: `releases/v2.4.0/shape.md`, item 1.
 
@@ -63,7 +63,7 @@ One tool for all three AIs (`read_document`: Word, PDF, PowerPoint, with notes k
 - **Fixture hygiene:** Office files carry the saver's name; scrub before commit.
 - The release is shell-tier for other reasons; this sprint is not, so a late fix can still ride an extension release.
 
-## Open questions for Jarmo
+## Open questions (settled by the recommendations, 24 November)
 1. **Does the starting-point gate open per AI, or only when every AI has passed?** The task and the code's name say "every AI"; the drawing (decision 5) says per AI. *Recommendation: per AI, on 3 of 3 on the Mac, and kept for Windows only if it also passes there at Gate 2.* The column shows the chosen AI's own state, so nobody is offered something their AI hasn't passed.
 2. **What does "pass" ask?** *Recommendation: 3 of 3 runs, all six criteria in spec G1 (a fourth run of repairs counts as a new set of three), stricter than the spike's PDF 5 of 6.*
 3. **A scan: read as a picture, or named?** The drawing says a scan is read as a picture where the AI can see pictures. Doing it inside the tool means rendering PDF pages to images in the host, which each runtime takes differently (Claude and ChatGPT accept images in tool results, OpenCode depends on its model) and that is a runtime-specific path. *Recommendation: not in 2.4. The tool says "a scan with no text" and the AI may open the file itself as an image; frame 5's "read as a picture" stays true where an AI does it on its own. Revisit with the reading test's numbers.*
@@ -74,4 +74,4 @@ One tool for all three AIs (`read_document`: Word, PDF, PowerPoint, with notes k
 8. **Windows runs at Gate 2 only.** The reading test names Mac and Windows. *Recommendation: Mac runs gate each AI's flip before the merge; Windows's three runs per AI happen on the release candidate at Gate 2 (as `REVIEW.md` says), and a Windows failure turns that AI's starting points off on Windows only.*
 
 ## Approval
-- [ ] Jarmo approved this sprint plan (his own words; nobody else's relay is approval)
+- [x] Jarmo approved this sprint plan, through the 2.4 roadmap, 24 November 2026: "roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi"
