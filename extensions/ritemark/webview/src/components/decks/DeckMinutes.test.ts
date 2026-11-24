@@ -36,5 +36,5 @@ assert.match(source, /useDismissOnOutside\(edit, \(\) => input.current\?\.blur\(
 assert.match(source, /onBlur=\{\(\) => \{\s*if \(closing\.current\) return\s*setDraft\(null\)\s*if \(value !== null\) onCommit\(value\)/)
 // Return and Escape close the box themselves: a blur as the box leaves the page saves nothing more.
 assert.match(source, /returnFocus\.current = true\s*closing\.current = true\s*setDraft\(null\)/)
-assert.match(source, /if \(event.key === 'Enter' && value === null\) return\s*returnFocus.current = true\s*setDraft\(null\)\s*if \(event.key === 'Enter' && value !== null\) onCommit\(value\)/, 'Escape closes without committing')
+assert.match(source, /if \(event.key === 'Enter' && value === null\) return\s*returnFocus.current = true\s*closing\.current = true\s*setDraft\(null\)\s*if \(event.key === 'Enter' && value !== null\) onCommit\(value\)/, 'Escape closes without committing')
 console.log('DeckMinutes: run, label draft, blur, Escape, clearing and range passed')
