@@ -681,7 +681,7 @@ export class PublishController {
     this.pageLines.delete(pagePath);
     this.deps.onPageState?.(pagePath);
     try {
-      // Exactly the bytes the scan read, or nothing (PR 3's blocking item)
+      // Verify the source checked by the scan and the cleaned bytes the record will hash.
       const upload = await this.readUpload(plan);
       const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record), lastDeckVersion: record?.deckVersion });
       this.gone.delete(site.name);

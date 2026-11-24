@@ -1,3 +1,5 @@
+import { decodeSourcePassage } from '../../webview/src/utils/sourcePassage';
+import { openSourcePassage, type ReadSource } from './openSourcePassage';
 /**
  * Unified AI View Provider
  * Hosts the AI chat sidebar (Primary Sidebar) for the Claude Code and Codex runtimes.
@@ -652,7 +654,9 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           // why (Sprint 122, #282). Chat content is model-authored, so the
           // path is resolved and confined here, never trusted.
           const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
-          if (rawPath) await this._followChatLink(rawPath);
+          const passage = decodeSourcePassage(message.passage);
+          if (rawPath && passage && this._readSource) await openSourcePassage(rawPath, passage, this._readSource);
+          else if (rawPath) await this._followChatLink(rawPath);
           break;
         }
 
@@ -3793,6 +3797,12 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       realpath: (p) => fs.realpathSync(p),
       isDirectory: (p) => fs.statSync(p).isDirectory(),
     });
+  }
+
+  private _readSource?: ReadSource;
+
+  public setSourceReader(read: ReadSource): void {
+    this._readSource = read;
   }
 
   /** An ordinary click on a chat file link or path. */

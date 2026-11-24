@@ -13,21 +13,49 @@
  * host's call: it has the filesystem, the webview deliberately does not.
  */
 
+import { decodeSourcePassage, type SourcePassage } from '../../utils/sourcePassage';
+
 export type ChatLinkTarget =
   | { kind: 'external'; url: string }
-  | { kind: 'file'; path: string }
+  | { kind: 'file'; path: string; passage?: SourcePassage }
   /** A scheme chat content may not open (mailto:, vscode:, command:, …). Explained, never followed. */
   | { kind: 'unsupported'; href: string; scheme: string }
   | { kind: 'none' };
 
 /** Classify an anchor href from rendered chat markdown. */
 export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTarget {
-  const href = (rawHref ?? '').trim();
+  let href = (rawHref ?? '').trim();
   if (!href || href.startsWith('#')) return { kind: 'none' };
   if (/^(https?:)/i.test(href)) return { kind: 'external', url: href };
+  // Split before decoding the path so an encoded '#' stays part of the filename.
+  let passage: SourcePassage | undefined;
+  const hash = href.indexOf('#');
+  const fragment = hash < 0 ? '' : href.slice(hash + 1);
+  if (/^(?:p|q)=/.test(fragment)) {
+    href = href.slice(0, hash);
+    const params = new URLSearchParams(fragment);
+    const page = params.get('p');
+    const quote = params.get('q');
+    try {
+      // URLSearchParams tolerates broken escapes. A malformed quote is a plain file link.
+      if (quote !== null) decodeURIComponent(fragment);
+      passage = decodeSourcePassage({
+        text: quote ?? undefined,
+        page: page && /^\d+$/.test(page) ? Number(page) : undefined,
+      });
+    } catch {
+      // Keep the file link.
+    }
+  }
+  const file = (path: string): ChatLinkTarget => ({
+    kind: 'file', path: stripLineSuffix(path), ...(passage ? { passage } : {}),
+  });
   if (/^file:\/\//i.test(href)) {
     try {
-      return { kind: 'file', path: stripLineSuffix(decodeURIComponent(new URL(href).pathname)) };
+      const url = new URL(href);
+      const path = decodeURIComponent(url.pathname);
+      if (passage && url.hostname) return { kind: 'none' };
+      return file(passage ? path.replace(/^\/(?=[a-z]:\/)/i, '') : path);
     } catch {
       return { kind: 'none' };
     }
@@ -42,11 +70,12 @@ export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTa
   } catch {
     // keep raw href if percent-decoding fails
   }
-  if (/^[a-z]:[\\/]/i.test(windowsPath)) return { kind: 'file', path: stripLineSuffix(windowsPath) };
+  if (/^[a-z]:[\\/]/i.test(windowsPath)) return file(windowsPath);
   // Any other scheme (mailto:, vscode:, command:, data:, javascript:) is not
   // ours to open from chat content — but the click says so instead of doing
   // nothing.
-  const scheme = withoutLine.match(/^([a-z][a-z0-9+.-]*):/i);
+  const scheme = withoutLine.match(/^([a-z][a-z0-9+.-]*):/i)
+    ?? (fragment && /^[a-z][a-z0-9+-]*$/i.test(withoutLine) ? href.match(/^([a-z][a-z0-9+-]*):/i) : null);
   if (scheme) return { kind: 'unsupported', href, scheme: scheme[1].toLowerCase() };
   // Scheme-less → treat as a workspace-relative (or absolute posix) file path.
   let decoded = href;
@@ -55,7 +84,7 @@ export function classifyChatHref(rawHref: string | null | undefined): ChatLinkTa
   } catch {
     // keep raw href if percent-decoding fails
   }
-  return { kind: 'file', path: stripLineSuffix(decoded) };
+  return file(decoded);
 }
 
 /**
@@ -70,7 +99,7 @@ export function rewriteCodexCitations(content: string): string {
     if (!path) return whole;
     const name = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
     const label = name.replace(/([\\`*_[\]])/g, '\\$1');
-    const href = encodeURI(path).replace(/\(/g, '%28').replace(/\)/g, '%29');
+    const href = encodeURI(path).replace(/#/g, '%23').replace(/\(/g, '%28').replace(/\)/g, '%29');
     return `[${label}](${href})`;
   });
 }

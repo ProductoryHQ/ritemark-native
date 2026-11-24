@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { gatherPage } from '../../gather';
+import { PNG } from '../../testing/pictures';
 import type { GatheredPlan } from '../../types';
 
 export interface TestProject {
@@ -23,7 +24,7 @@ export interface TestProject {
 /** The page the tests publish: a heading, a picture and a style. */
 export const HARBOUR: Record<string, string | Uint8Array> = {
   'Harbour programme.html': '<link rel="stylesheet" href="style.css"><h1>Harbour</h1><img src="img/a.png">',
-  'img/a.png': new Uint8Array([137, 80, 78, 71, 1, 2, 3]),
+  'img/a.png': PNG,
   'style.css': 'body{color:#123}',
 };
 

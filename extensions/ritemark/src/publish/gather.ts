@@ -25,6 +25,7 @@ import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
 import { cssReferences, moduleReferences, pageReferences, Reference, scriptBuildsReferences } from './references';
+import { cleanPicture, hasPictureSignature } from './pictureClean';
 import { isText, scanText } from './secretScan';
 import {
   FileKind,
@@ -48,6 +49,7 @@ export interface GatherOptions {
 
 const KIND_BY_EXTENSION: Record<string, FileKind> = {
   '.png': 'picture', '.jpg': 'picture', '.jpeg': 'picture', '.gif': 'picture', '.webp': 'picture', '.avif': 'picture',
+  '.heic': 'picture', '.heif': 'picture', '.jxl': 'picture', '.svgz': 'picture',
   '.svg': 'picture', '.ico': 'picture', '.bmp': 'picture', '.apng': 'picture', '.tif': 'picture', '.tiff': 'picture',
   '.css': 'style',
   '.js': 'script', '.mjs': 'script', '.cjs': 'script',
@@ -163,6 +165,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   const gitIgnoredFn = options.gitIgnored ?? defaultGitIgnored;
   const key = (x: string) => (platform === 'win32' ? x.toLowerCase() : x);
 
+  if (!isInside(pagePath, projectFolder, platform)) throw new Error('This page is outside this project.');
   const pageBytes = await readFile(pagePath);
   const pageText = pageBytes.toString('utf8');
   const page = pageReferences(pageText);
@@ -178,6 +181,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
 
   const accepted: Pending[] = [];
   const seen = new Set<string>([key(pagePath)]);
+  const picturePaths = new Set<string>();
   const leftOut: LeftOut[] = [];
   const leftOutSeen = new Set<string>();
   const addLeftOut = (display: string, reason: LeftOutReason) => {
@@ -214,6 +218,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
       const lexical = resolved.fsPath;
       const isLink = ref.as === 'link';
+      if (ref.as === 'picture') picturePaths.add(key(lexical));
       if (seen.has(key(lexical))) continue;
       if (!isLink) seen.add(key(lexical));
       if (!isInside(lexical, projectFolder, platform)) {
@@ -301,27 +306,28 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   }
 
   // Sizes, hashes and the key scan, over the page and every file that goes
-  const pageReal = pagePath;
   const all: { lexical: string; real: string; size: number }[] = [
-    { lexical: pagePath, real: pageReal, size: pageBytes.length },
+    { lexical: pagePath, real: pagePath, size: pageBytes.length },
     ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size })),
   ];
-  const root = commonFolder(all.map((f) => f.lexical), p);
-  const files: GatheredFile[] = [];
+  const gathered: { file: GatheredFile; lexical: string }[] = [];
   const tooBig: PublishPlan['tooBig'] = [];
   const keyHits: KeyHit[] = [];
   for (const f of all) {
     const projectPath = toSlash(p.relative(projectFolder, f.lexical));
     const file: GatheredFile = {
-      relPath: toSlash(p.relative(root, f.lexical)),
+      relPath: '',
       projectPath,
       realPath: f.real,
-      kind: f.real === pageReal && f.lexical === pagePath ? 'page' : kindOf(f.lexical),
+      kind: f.lexical === pagePath ? 'page' : kindOf(f.lexical),
       size: f.size,
     };
+    if (file.kind !== 'page' && (picturePaths.has(key(f.lexical)) || kindOf(f.real) === 'picture')) {
+      file.kind = 'picture';
+    }
     if (f.size > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: f.size });
-      files.push(file);
+      gathered.push({ file, lexical: f.lexical });
       continue;
     }
     const bytes = f.lexical === pagePath ? pageBytes : await readFile(f.real);
@@ -329,10 +335,23 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     // A file can grow between its stat and this read: the limit holds for the bytes read, which are what would go
     if (bytes.length > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: bytes.length });
-      files.push(file);
+      gathered.push({ file, lexical: f.lexical });
       continue;
     }
-    file.sha256 = createHash('sha256').update(bytes).digest('hex');
+    if (file.kind !== 'page' && hasPictureSignature(bytes)) file.kind = 'picture';
+    let sent = bytes;
+    if (file.kind === 'picture') {
+      const cleaned = cleanPicture(bytes);
+      if (cleaned.kind === 'uncleanable') {
+        addLeftOut(projectPath, 'uncleanable');
+        continue;
+      }
+      sent = cleaned.bytes;
+      file.sourceSha256 = createHash('sha256').update(bytes).digest('hex');
+      file.size = sent.length;
+    }
+    file.sha256 = createHash('sha256').update(sent).digest('hex');
+    // Scan the source so any warning can point to its original line in the editor.
     if (isText(bytes)) {
       const text = bytes.toString('utf8');
       for (const hit of scanText(text)) {
@@ -340,8 +359,14 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
       if (file.kind === 'script' && scriptBuildsReferences(text)) scriptBuilt = true;
     }
-    files.push(file);
+    gathered.push({ file, lexical: f.lexical });
   }
+
+  const root = commonFolder(gathered.map(({ lexical }) => lexical), p);
+  const files = gathered.map(({ file, lexical }) => {
+    file.relPath = toSlash(p.relative(root, lexical));
+    return file;
+  });
 
   // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
   return frozenPlan({
@@ -352,7 +377,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     leftOut,
     scriptBuilt,
     tooBig,
-    tooMany: files.length > MAX_FILES,
+    tooMany: all.length > MAX_FILES,
     keyHits,
     contentHash: contentHashOf(files),
   });

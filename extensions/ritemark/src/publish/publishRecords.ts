@@ -271,11 +271,12 @@ export function changedSincePublish(record: PublishRecord, plan: PublishPlan): b
 /**
  * Whether Update the page shows the sheet again (R5, R4): always the first time; again when the list of files that
  * would go differs from the last publish (S27); and whenever something looks like a key, since the scan runs again on
- * every update and its warning lives in the sheet. Otherwise Update goes straight up.
+ * every update and its warning lives in the sheet. A picture left out because it could not be cleaned also
+ * needs the sheet. Otherwise Update goes straight up.
  */
 export function sheetNeeded(record: PublishRecord | undefined, plan: PublishPlan): boolean {
   if (!record) return true;
-  if (plan.keyHits.length > 0 || plan.tooBig.length > 0 || plan.tooMany) return true;
+  if (plan.keyHits.length > 0 || plan.tooBig.length > 0 || plan.tooMany || plan.leftOut.some((row) => row.reason === 'uncleanable')) return true;
   const before = new Set(record.files.map((f) => f.path));
   const now = plan.files.map((f) => f.relPath);
   return before.size !== now.length || now.some((p) => !before.has(p));

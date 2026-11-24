@@ -238,6 +238,13 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         sendToExtension('refresh')
       } else if (message.type === 'fileDeleted') {
         setDeleted(true)
+      } else if (message.type === 'find:top') {
+        landing.current = null
+        revealMatch.current = false
+        setQuery('')
+        setSearchOpen(false)
+        pageToRestore.current = null
+        scrollerRef.current?.scrollTo({ top: 0 })
       } else if (message.type === 'find:open') {
         // Sprint 148 (R9): opened from a search result. The find bar only: the document isn't touched.
         const request = decodeFindOpen(message, Date.now())

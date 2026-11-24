@@ -21,8 +21,8 @@ interface Context {
 }
 
 /** The passages of `word/document.xml`. */
-export function documentXmlPassages(xml: string, budget: number): ReadOutcome {
-  const sink = new PassageSink(budget);
+export function documentXmlPassages(xml: string, budget: number, preserveSpacing = false): ReadOutcome {
+  const sink = new PassageSink(budget, preserveSpacing);
   const stack: Context[] = [];
   let block = 0;
   let inText = false;
@@ -67,7 +67,7 @@ export function documentXmlPassages(xml: string, budget: number): ReadOutcome {
           const done = stack.pop();
           if (!done) break;
           const parentCell = stack.length > 0 && stack[stack.length - 1].kind === 'cell' ? stack[stack.length - 1] : null;
-          if (parentCell) parentCell.text += (parentCell.text ? ' ' : '') + done.text;
+          if (parentCell && !preserveSpacing) parentCell.text += (parentCell.text ? ' ' : '') + done.text;
           else sink.add(done.text, { block: block++ });
         }
         break;
@@ -88,7 +88,7 @@ export function documentXmlPassages(xml: string, budget: number): ReadOutcome {
   return { ok: true, passages: sink.passages, truncated: sink.truncated };
 }
 
-export async function readDocx(bytes: Uint8Array, budget: number): Promise<ReadOutcome> {
+export async function readDocx(bytes: Uint8Array, budget: number, preserveSpacing = false): Promise<ReadOutcome> {
   // The preview's checks, but not its inflating of every part: only document.xml is read, capped at its size.
   const verdict = await checkOfficePackage(bytes, 'word/', OFFICE_PREVIEW_LIMITS, { verifyParts: false });
   if (!verdict.ok) {
@@ -101,5 +101,5 @@ export async function readDocx(bytes: Uint8Array, budget: number): Promise<ReadO
   const data = await readZipEntry(bytes, entry);
   if (!data) return { ok: false, reason: 'unreadable' };
   const xml = new TextDecoder('utf-8').decode(data);
-  return documentXmlPassages(xml, budget);
+  return documentXmlPassages(xml, budget, preserveSpacing);
 }

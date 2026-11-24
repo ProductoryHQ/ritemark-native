@@ -12,6 +12,7 @@
  * No `vscode` import, so it is unit-testable with a fake filesystem.
  */
 import * as nodePath from 'path';
+import { samePath, isInside } from '../utils/pathIdentity';
 
 export type ChatLocalTargetKind =
   | 'project-file'
@@ -36,7 +37,7 @@ export interface ChatLinkFs {
   isDirectory(path: string): boolean;
 }
 
-type PathApi = Pick<typeof nodePath, 'isAbsolute' | 'join' | 'sep'>;
+type PathApi = Pick<typeof nodePath, 'isAbsolute' | 'join' | 'sep' | 'resolve' | 'normalize'>;
 
 const NOT_FOUND = new Set(['ENOENT', 'ENOTDIR']);
 
@@ -70,7 +71,7 @@ export function resolveChatLocalTarget(
   if (workspaceRoot) {
     try {
       const realRoot = fs.realpath(workspaceRoot);
-      inside = real === realRoot || real.startsWith(realRoot + path.sep);
+      inside = samePath(real, realRoot, path) || isInside(real, realRoot, path);
     } catch {
       inside = false;
     }
