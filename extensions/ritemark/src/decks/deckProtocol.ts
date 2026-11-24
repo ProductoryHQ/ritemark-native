@@ -9,6 +9,7 @@ import { isOpenInAddress } from './blocks/codeTools';
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
+import type { DeckLiveState } from './deckLive';
 import type { ThemeChangeView } from './themeChange';
 import { isDeckPath } from './deckFileName';
 
@@ -83,6 +84,8 @@ export type DeckRequest =
   | { type: 'deck/publish'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
   | { type: 'deck/page-action'; action: DeckPageAction }
+  | { type: 'deck/live-action'; action: 'on' | 'off' | 'resume' }
+  | { type: 'deck/live-fit'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /**
    * Sprint 170 (#881): Save as PDF from Publish's menu: the kind the item named (from the view at the press), and the
    * deck's text, look and fit as `deck/publish` sends them.
@@ -116,6 +119,7 @@ export interface DeckPageState {
   changed: boolean;
   /** Sprint 170: the PDF kinds this app can save, in Publish's menu; none in a shell without the print (patch 021). */
   pdf?: DeckPdfKind[];
+  live?: DeckLiveState;
 }
 
 /** The host's answers. */
@@ -320,6 +324,15 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/page-state': {
       exactKeys(input, ['type']);
       return { type: 'deck/page-state' };
+    }
+    case 'deck/live-action': {
+      exactKeys(input, ['type', 'action']);
+      if (input.action !== 'on' && input.action !== 'off' && input.action !== 'resume') throw new DeckProtocolError('Unknown live action');
+      return { type: 'deck/live-action', action: input.action };
+    }
+    case 'deck/live-fit': {
+      exactKeys(input, ['type', 'text', 'look', 'steps']);
+      return { type: 'deck/live-fit', ...publishFields(input) };
     }
     case 'deck/publish': {
       exactKeys(input, ['type', 'text', 'look', 'steps']);

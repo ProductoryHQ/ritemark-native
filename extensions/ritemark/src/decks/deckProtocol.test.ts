@@ -198,4 +198,13 @@ for (const action of ['copy-link', 'see-online', 'unpublish'] as const) {
 assert.throws(() => decodeDeckRequest({ type: 'deck/page-action', action: 'open-url' }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/page-action', action: 'see-online', url: 'https://evil.example' }), DeckProtocolError);
 
+for (const action of ['on', 'off', 'resume'] as const) {
+  assert.deepEqual(decodeDeckRequest({ type: 'deck/live-action', action }), { type: 'deck/live-action', action });
+}
+assert.throws(() => decodeDeckRequest({ type: 'deck/live-action', action: 'deploy' }), DeckProtocolError);
+assert.throws(() => decodeDeckRequest({ type: 'deck/live-action', action: 'on', pagePath: '/elsewhere.html' }), DeckProtocolError);
+const fit = { type: 'deck/live-fit', text: body, look: 'card', steps: [2] };
+assert.deepEqual(decodeDeckRequest(fit), fit);
+assert.throws(() => decodeDeckRequest({ ...fit, steps: [-1] }), DeckProtocolError);
+
 console.log('deckProtocol: passed');
