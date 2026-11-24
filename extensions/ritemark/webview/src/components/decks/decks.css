@@ -719,7 +719,7 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-list-row[aria-current="true"] .deck-list-no { color: var(--r-accent); font-weight: 700; }
 .deck-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deck-list-start, .deck-list-sum { text-align: right; color: var(--r-ink-muted); }
-.deck-list-sum { padding-right: 6px; }
+.deck-list-sum { padding-right: 7px; } /* the digits inside a minutes box: 1 px border + 6 px padding */
 .deck-list-row .deck-list-minutes, .deck-list-foot .deck-session-input { height: 22px; padding: 0 6px; border: 1px solid var(--r-hairline-strong); background: var(--r-surface); color: var(--r-ink-strong); font: inherit; text-align: right; box-shadow: none; }
 .deck-list-row .deck-list-minutes:focus, .deck-list-foot .deck-session-input:focus { border-color: var(--r-accent); }
 :where(:root:not([data-input-mode="pointer"])) .deck-list-minutes:focus-visible, :where(:root:not([data-input-mode="pointer"])) .deck-session-input:focus-visible { outline: 1px solid var(--r-accent); }
