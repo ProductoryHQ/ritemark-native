@@ -461,8 +461,9 @@ svg { flex: none; }
 .line { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: var(--line-h); padding: 0 10px 0 20px; display: flex; align-items: center; gap: 4px; font: 500 13.5px/1 'Sofia Sans', sans-serif; color: var(--lmuted); }
 .line .who { min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .line .who b { color: var(--lstrong); font-weight: 700; }
-.line .who span::before { content: ' \\00b7  '; }
-.line .who b:empty + span::before { content: none; }
+.line .deck-title::before, .line .who b:not(:empty) ~ #deck-updated:not(:empty)::before,
+.line .deck-title + #deck-updated:not(:empty)::before { content: ' \\00b7  '; }
+.line .who b:empty + .deck-title::before { content: none; }
 .fb { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 10px; border-radius: 8px; color: var(--lbtn); font: 600 13.5px/32px 'Sofia Sans', sans-serif; white-space: nowrap; transition: background-color .12s, color .12s; }
 .fb:hover { background: var(--lhover); color: var(--lstrong); }
 .fb:active { background: var(--lpress); }
@@ -618,7 +619,10 @@ svg { flex: none; }
 /* The note's words and its "Go on to" in the bar's type: the page's body font is the slide's, never the note's. */
 .deck-follow-note button { height: auto; margin-left: 8px; padding: 0 2px; font: 600 13.5px/18px 'Sofia Sans', sans-serif; color: var(--lstrong); text-decoration: underline; text-underline-offset: 3px; }
 .deck-removed-slide { opacity: .8; }
-.deck-changed-block { box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent); border-radius: 3px; }
+.deck-changed-block { position: relative; isolation: isolate; }
+.deck-changed-block::after { content: ''; position: absolute; inset: -6px; z-index: -1; pointer-events: none;
+  border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); animation: deck-change-fade .5s linear 1.5s forwards; }
+@keyframes deck-change-fade { to { opacity: 0; } }
 .empty { position: fixed; inset: 0 0 var(--line-h); display: grid; place-items: center; margin: 0; color: var(--lmuted); }
 .toast, .restart { position: fixed; left: 50%; bottom: calc(var(--line-h) + 12px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 40; max-width: calc(100vw - 32px); padding: 10px 14px; border-radius: 10px; background: #fff; color: #1C1F4A; font: 600 13.5px/18px 'Sofia Sans', sans-serif; box-shadow: 0 0 0 1px rgba(28,31,74,.08), 0 12px 30px -10px rgba(8,9,30,.6); }
 /* Small details 7: a quiet way back to the start when the page returns to a reader's place, for 5 s. */
@@ -628,7 +632,8 @@ svg { flex: none; }
 /* A narrow window (half a laptop, a phone): the slide's blocks in one column at reading size, on the same ground; the
    page scrolls when a slide is taller than the window, and the text follows under it. */
 @media screen and (max-width: 860px) {
-  .deck-follow-note { position: relative; left: auto; bottom: auto; transform: none; margin: 8px auto 0; }
+  .deck-follow-note { position: relative; left: auto; bottom: auto; transform: none; margin: 8px 0 0;
+    width: 100%; max-width: none; padding-inline: 0; text-align: left; }
   body { overflow: auto; }
   .ground { position: fixed; }
   .view { position: relative; inset: auto; padding: 16px 16px calc(var(--line-h) + 12px); min-height: 100vh; }
@@ -688,10 +693,11 @@ svg { flex: none; }
   .side { position: relative; inset: auto; z-index: 1; width: auto; padding: 4px 16px calc(var(--line-h) + 16px); background: none; box-shadow: none; overflow: visible; }
   .side .sclose { display: none; }
   .line { background: var(--lbar); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 -1px 0 var(--lsep); padding-left: 16px; }
-  .line .who span { display: none; }
+  .line .deck-title { display: none; }
+  .line .who b:empty ~ #deck-updated::before { display: none; }
 }
 @media screen and (max-width: 599px) {
-  .line .who { visibility: hidden; }
+  .line .who b, .line .who #deck-updated::before { display: none; }
   #morebtn .lbl { display: none; }
   #morebtn { width: 32px; padding: 0; justify-content: center; }
 }
@@ -701,6 +707,7 @@ svg { flex: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .prog i, .fb, .restart, .layer .deck-sl.is-blocks .blk-steps .tick { transition: none; animation: none; }
+  .deck-changed-block::after { animation: none; }
 }
 `;
 
@@ -1118,7 +1125,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
   // name, hashed (never on the page), so two such decks in one folder keep their ticks and places apart. It is the key
   // such a page had before Sprint 163 PR 4, when its title was the file's name.
   const pageKey = shortHash(`${deck.client}\u0000${deck.title || options.name || ''}`);
-  const who = `<div class="who"><b>${esc(deck.client)}</b>${deck.title ? `<span>${esc(deck.title)}</span>` : ''}</div>`;
+  const who = `<div class="who"><b>${esc(deck.client)}</b>${deck.title ? `<span class="deck-title">${esc(deck.title)}</span>` : ''}<span id="deck-updated" role="status"></span></div>`;
   const foot = [deck.client, deck.title].filter(Boolean).map(esc).join(' · ');
   // Small details 13: the printed handout's footer carries the page's address (the script writes it; never on screen).
   const footer = `<div class="foot${foot ? '' : ' addr-only'}">${foot ? `<span>${foot}</span>` : ''}<span class="paddr" id="paddr"></span></div>`;
@@ -1142,7 +1149,6 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '<div class="ground" aria-hidden="true"></div>',
     '<div class="wrap" id="wrap">',
     `<main class="view" id="view" aria-label="Slides"><div class="frame" id="frame">\n${layers.join('\n')}\n</div>`
-      + '<div class="deck-follow-note" id="deck-updated" role="status" hidden>Updated just now</div>'
       + '<div class="deck-follow-note" id="deck-removed" hidden>This slide was taken out of the deck. You can finish reading it. <button class="fb" id="deck-onward" type="button"></button></div></main>',
     prefetch,
     `<aside class="side" id="side" aria-label="The text for this slide" hidden><button class="fb ic sclose" id="sclose" type="button" aria-label="Hide the text" ${tip('Hide the text')}>${iconSvg('x', 16)}</button>`,
