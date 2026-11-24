@@ -1,10 +1,25 @@
-import { useCallback, type CSSProperties } from 'react'
+import { useCallback, useEffect, type CSSProperties, type ReactNode } from 'react'
 import { Icon } from '../ui/Icon'
 import { Tooltip } from '../ui/tooltip'
 import { ChartErrorBoundary, PositionedChart } from './ChartView'
 import { drawsChart } from './chartLayout'
 import type { ChartSelectionTarget } from './chartSelection'
 import type { DrawingModel, WorkbookModel } from './readWorkbook'
+
+export type ChartFailureReporter = (drawing: DrawingModel, change: 1 | -1) => void
+
+/** Report only committed fallbacks, including when the chart later recovers. */
+export function FailedChart({ drawing, report, children }: {
+  drawing: DrawingModel
+  report?: ChartFailureReporter
+  children: ReactNode
+}) {
+  useEffect(() => {
+    report?.(drawing, 1)
+    return () => report?.(drawing, -1)
+  }, [drawing, report])
+  return children
+}
 
 interface DrawingViewProps {
   drawing: DrawingModel
@@ -15,9 +30,10 @@ interface DrawingViewProps {
   height: number
   selection?: ChartSelectionTarget
   sheetName?: string
+  onChartFailure?: ChartFailureReporter
 }
 
-export function DrawingView({ drawing, style, workbook, version, width, height, selection, sheetName }: DrawingViewProps) {
+export function DrawingView({ drawing, style, workbook, version, width, height, selection, sheetName, onChartFailure }: DrawingViewProps) {
   const what = drawing.what === 'chart' ? 'Chart' : drawing.what === 'image' ? 'Picture' : 'Shape'
   const label = drawing.what === 'chart' && drawing.title ? `Chart: ${drawing.title}` : what
   const small = width < 160 || height < 90
@@ -41,7 +57,7 @@ export function DrawingView({ drawing, style, workbook, version, width, height, 
   const fallback = <div style={{ ...style, zIndex: 4 }}>{card()}</div>
   if (!drawsChart(drawing.chart)) return fallback
   return (
-    <ChartErrorBoundary chart={drawing.chart} workbook={workbook} version={version} fallback={fallback}>
+    <ChartErrorBoundary chart={drawing.chart} workbook={workbook} version={version} fallback={<FailedChart drawing={drawing} report={onChartFailure}>{fallback}</FailedChart>}>
       <div style={{ ...style, zIndex: 4 }}>
         <PositionedChart chart={drawing.chart} workbook={workbook} version={version} width={width} height={height} emptyFallback={card} selection={selection} sheetName={sheetName} />
       </div>

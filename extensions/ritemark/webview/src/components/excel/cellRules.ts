@@ -3,23 +3,68 @@ import type { CellStyle, DifferentialStyle, FontStyle } from './excelStyles'
 import { formatCellValue, formatCode } from './numberFormat'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
 import { styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
-import { compileRules, type DataBarStyle, type RuleStyle } from './ruleEngine'
+import { calendarDay } from './ruleFormula'
+import { compileRules, createRuleCache, type DataBarStyle, type RuleStyle } from './ruleEngine'
 
-export function compileCellRules(model: WorkbookModel, sheet: SheetModel, today = new Date()) {
+export function compileCellRules(model: WorkbookModel, sheet: SheetModel, today = new Date(), cache?: ReturnType<typeof createRuleCache>) {
   if (!sheet.layout.rules.length) return undefined
   return compileRules(sheet, sheet.layout.rules, {
     today, date1904: model.date1904, styles: model.styles, sheets: model.sheets,
-  })
+  }, cache)
 }
 
 export type CellRules = ReturnType<typeof compileCellRules>
 
-/** Tabs share one workbook version. Compile each sheet when it is first shown. */
-export function cellRulesForVersion(model: WorkbookModel, today = new Date()) {
-  const compiled = new Map<SheetModel, CellRules>()
-  return (sheet: SheetModel) => {
-    if (!compiled.has(sheet)) compiled.set(sheet, compileCellRules(model, sheet, today))
-    return compiled.get(sheet)
+/** Tabs share an edited workbook. A reload creates a new cache. */
+export function createCellRuleCache(model: WorkbookModel) {
+  const sheets = new Map<SheetModel, {
+    cache: ReturnType<typeof createRuleCache>
+    compiled?: { day: number; rules: CellRules }
+  }>()
+  return {
+    forSheet(sheet: SheetModel, today: Date): CellRules {
+      if (!sheet.layout.rules.length) return undefined
+      let entry = sheets.get(sheet)
+      if (!entry) {
+        entry = { cache: createRuleCache(sheet.name) }
+        sheets.set(sheet, entry)
+      }
+      const day = calendarDay(today)
+      if (entry.compiled?.day !== day) {
+        entry.compiled = { day, rules: compileCellRules(model, sheet, today, entry.cache) }
+      }
+      return entry.compiled.rules
+    },
+    invalidate(sheet: string, row: number, col: number) {
+      for (const entry of sheets.values()) {
+        if (entry.cache.invalidate(sheet, row, col)) entry.compiled = undefined
+      }
+    },
+  }
+}
+
+interface RuleDayClock {
+  addEventListener(type: 'focus', refresh: () => void): void
+  removeEventListener(type: 'focus', refresh: () => void): void
+  setTimeout(refresh: () => void, delay: number): number
+  clearTimeout(id: number): void
+}
+
+export function watchRuleDay(onDay: (date: Date) => void, clock: RuleDayClock = window, now = () => new Date()) {
+  let timer: number | undefined
+  const refresh = () => {
+    if (timer !== undefined) clock.clearTimeout(timer)
+    const current = now()
+    onDay(current)
+    const next = new Date(current)
+    next.setHours(24, 0, 0, 0)
+    timer = clock.setTimeout(refresh, next.getTime() - current.getTime())
+  }
+  clock.addEventListener('focus', refresh)
+  refresh()
+  return () => {
+    if (timer !== undefined) clock.clearTimeout(timer)
+    clock.removeEventListener('focus', refresh)
   }
 }
 
