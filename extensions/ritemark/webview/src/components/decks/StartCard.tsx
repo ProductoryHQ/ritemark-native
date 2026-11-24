@@ -78,7 +78,7 @@ export const StartCard = forwardRef<HTMLDivElement, StartCardProps>(function Sta
       ) : null}
       {earlier.length ? (
         <>
-          <div className="deck-start-label"><Icon name="copy" size={14} tone="inherit" className="deck-start-icon" />Or copy an earlier deck</div>
+          <div className="deck-start-label"><Icon name="copy" size={14} tone="inherit" className="deck-start-icon" />{aiName ? 'Or copy an earlier deck' : 'Copy an earlier deck'}</div>
           <div className="deck-start-earlier">
             {shown.map(deck => (
               <Tooltip key={deck.path} label={`This deck becomes a copy of ${deck.name}`}>
