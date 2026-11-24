@@ -1,6 +1,6 @@
 import { attr, decodeXmlEntities } from '../../../../src/excel/sheetXml'
 import {
-  colorOf, readTheme, section, type ColorContext, type ColorTransform,
+  chartColorVariation, colorOf, readTheme, section, type ColorContext, type ColorTransform,
 } from './excelStyles'
 import { drawingPresets } from './drawingColorNames'
 import type {
@@ -418,15 +418,8 @@ function plot(kind: ChartPlot['kind'], props: Fields, ctx: ColorContext): ChartP
   }
 }
 
-// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
-const style201Variations = [
-  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
-  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
-]
-
 function automaticSeriesColor(index: number, ctx: ColorContext): string | undefined {
-  const [mod, off] = style201Variations[Math.floor(index / 6) % style201Variations.length]
-  return colorOf(`theme="${4 + index % 6}"`, ctx, [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }])
+  return colorOf(`theme="${4 + index % 6}"`, ctx, chartColorVariation(Math.floor(index / 6)))
 }
 
 export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }): ChartModel {
