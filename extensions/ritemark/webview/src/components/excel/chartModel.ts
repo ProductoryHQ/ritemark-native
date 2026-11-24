@@ -71,6 +71,8 @@ export interface ChartMarker {
 export interface ChartSeries extends Partial<Record<SeriesField, ChartData>> {
   index?: number
   order?: number
+  /** Theme colour used when the chart leaves the series colour automatic. */
+  automaticColor?: string
   shape?: ChartShape
   marker?: ChartMarker
   smooth?: boolean

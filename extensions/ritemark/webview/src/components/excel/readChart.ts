@@ -1,7 +1,8 @@
 import { attr, decodeXmlEntities } from '../../../../src/excel/sheetXml'
 import {
-  colorOf, readTheme, section, type ColorContext,
+  colorOf, readTheme, section, type ColorContext, type ColorTransform,
 } from './excelStyles'
+import { drawingPresets } from './drawingColorNames'
 import type {
   ChartAxis, ChartData, ChartLabels, ChartMarker, ChartModel, ChartNumberFormat,
   ChartPlot, ChartSeries, ChartShape, ChartTextStyle, ChartTitle, ChartValue,
@@ -73,19 +74,37 @@ const schemeColors = ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3
   'accent5', 'accent6', 'hlink', 'folHlink']
 const schemeAliases: Record<string, string> = { bg1: 'lt1', tx1: 'dk1', bg2: 'lt2', tx2: 'dk2' }
 
+// Use neutral defaults for system colours when Excel did not save lastClr.
+const systemColors = new Map(Object.entries({
+  scrollbar: 'C8C8C8', background: '000000', activeCaption: '99B4D1', inactiveCaption: 'BFCDDB',
+  menu: 'F0F0F0', window: 'FFFFFF', windowFrame: '646464', menuText: '000000', windowText: '000000',
+  captionText: '000000', activeBorder: 'B4B4B4', inactiveBorder: 'F4F7FC', appWorkspace: 'ABABAB',
+  highlight: '3399FF', highlightText: 'FFFFFF', btnFace: 'F0F0F0', btnShadow: 'A0A0A0',
+  grayText: '6D6D6D', btnText: '000000', inactiveCaptionText: '434E54', btnHighlight: 'FFFFFF',
+  '3dDkShadow': '696969', '3dLight': 'E3E3E3', infoText: '000000', infoBk: 'FFFFE1',
+  hotLight: '0066CC', gradientActiveCaption: 'B9D1EA', gradientInactiveCaption: 'D7E4F2',
+  menuHighlight: '3399FF', menuBar: 'F0F0F0',
+}))
+
 /** Translate DrawingML's colour attributes to the shared workbook colour resolver. */
 function drawingColor(fill: Element | undefined, ctx: ColorContext): string | undefined {
   const color = children(fill?.body ?? '').next().value
   if (!color) return undefined
   const value = attr(color.tag, 'val') ?? ''
   const scheme = color.name === 'schemeClr' ? schemeColors.indexOf(schemeAliases[value] ?? value) : -1
-  const rgb = color.name === 'srgbClr' ? value : color.name === 'sysClr' ? attr(color.tag, 'lastClr') : undefined
+  const preset = value.replace(/^(dk|lt|med)(?=[A-Z])/, (prefix) =>
+    prefix === 'dk' ? 'dark' : prefix === 'lt' ? 'light' : 'medium').toLowerCase()
+  const rgb = color.name === 'srgbClr' ? value
+    : color.name === 'sysClr' ? attr(color.tag, 'lastClr') ?? systemColors.get(value)
+    : color.name === 'prstClr' ? drawingPresets.get(preset) : undefined
   if (scheme < 0 && !rgb) return undefined
-  const transforms = fields(color.body)
-  const multiplier = (transforms.num('lumMod') ?? 100_000) / 100_000
-  const offset = (transforms.num('lumOff') ?? 0) / 100_000
-  const tag = scheme >= 0 ? `theme="${scheme}"` : `rgb="${rgb}"`
-  return colorOf(tag, ctx, multiplier === 1 && offset === 0 ? undefined : { multiplier, offset })
+  const transforms: ColorTransform[] = []
+  for (const { name, tag } of children(color.body)) {
+    if (name !== 'lumMod' && name !== 'lumOff' && name !== 'satMod' && name !== 'shade' && name !== 'tint') continue
+    const value = number(attr(tag, 'val'))
+    if (value !== undefined) transforms.push({ kind: name, value: value / 100_000 })
+  }
+  return colorOf(scheme >= 0 ? `theme="${scheme}"` : `rgb="${rgb}"`, ctx, transforms)
 }
 
 function shape(el: Element | undefined, ctx: ColorContext): ChartShape | undefined {
@@ -181,7 +200,8 @@ export function chartTitle(xml: string): string | undefined {
 }
 
 function richTitleText(body: string): string | undefined {
-  const words = [...body.matchAll(/<(?:\w+:)?t>([^<]*)<\/(?:\w+:)?t>/g)].map((m) => decodeXmlEntities(m[1])).join('')
+  const words = [...body.matchAll(/<(?:[\w.-]+:)?t(?=[\s>])[^>]*>([^<]*)<\/(?:[\w.-]+:)?t>|<(?:[\w.-]+:)?(?:p|br)(?=[\s/>])[^>]*>/g)]
+    .map((match) => match[1] === undefined ? ' ' : decodeXmlEntities(match[1])).join('').trim()
   return words || undefined
 }
 
@@ -346,6 +366,17 @@ function plot(kind: ChartPlot['kind'], props: Fields, ctx: ColorContext): ChartP
   }
 }
 
+// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
+const style201Variations = [
+  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
+  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
+]
+
+function automaticSeriesColor(index: number, ctx: ColorContext): string | undefined {
+  const [mod, off] = style201Variations[Math.floor(index / 6) % style201Variations.length]
+  return colorOf(`theme="${4 + index % 6}"`, ctx, [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }])
+}
+
 export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }): ChartModel {
   const root = children(xml).next().value
   if (root?.name !== 'chartSpace') return { supported: false, kind: 'unknown' }
@@ -367,6 +398,10 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
   }
   if (!plots.length) return { supported: false, kind: 'unknown' }
 
+  const orderedSeries = plots.flatMap((plot) => plot.series).sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  orderedSeries.forEach((entry, index) => {
+    entry.automaticColor = automaticSeriesColor(index, ctx)
+  })
   const legendEl = chart.get('legend')
   const legend = fields(legendEl?.body)
   return {

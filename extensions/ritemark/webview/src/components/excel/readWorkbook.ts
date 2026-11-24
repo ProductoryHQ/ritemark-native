@@ -247,11 +247,15 @@ async function readDrawings(zip: JSZip, drawingPath: string, ctx: ColorContext):
     const chartRid = /<(?:\w+:)?chart(?=[\s/>])[^>]*\s[\w.-]+:id="([^"]+)"/.exec(body)?.[1]
     if (chartRid) {
       const relation = drawingRels.get(chartRid)
-      const xml = relation ? await text(zip, relation.target) : ''
-      const chart = relation?.type === 'chartEx'
-        ? { supported: false as const, kind: 'chartex' as const }
-        : xml ? readChart(xml, ctx) : undefined
-      out.push({ what: 'chart', title: chartTitle(xml), anchor, chart })
+      try {
+        const xml = relation ? await text(zip, relation.target) : ''
+        const chart: ChartModel | undefined = relation?.type === 'chartEx'
+          ? { supported: false, kind: 'chartex' }
+          : xml ? readChart(xml, ctx) : undefined
+        out.push({ what: 'chart', title: chartTitle(xml), anchor, chart })
+      } catch {
+        out.push({ what: 'chart', anchor, chart: { supported: false, kind: 'unknown' } })
+      }
     } else if (/<(?:\w+:)?blip(?=[\s/>])/.test(body)) {
       out.push({ what: 'image', anchor })
     } else if (/<(?:\w+:)?sp(?=[\s>])/.test(body)) {

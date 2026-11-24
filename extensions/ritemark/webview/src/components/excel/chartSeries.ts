@@ -1,12 +1,12 @@
 import type { ChartData, ChartModel, ChartSeries, ChartValue } from './chartModel'
 import { parseFormulaRef, referenceBounds } from './formulaRef'
-import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
+import { cellKey, codeOf, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
 
 /**
- * Use the current cells and fill missing point indices from the chart cache.
+ * Use the current cells when the reference can be read.
  * Keep the range sparse, so whole rows/columns need only visit populated cells.
  */
-function resolveData(data: ChartData | undefined, sheets: readonly SheetModel[], workbook: WorkbookModel): ChartData | undefined {
+function resolveData(data: ChartData | undefined, sheets: readonly SheetModel[], workbook: WorkbookModel, role?: 'cat' | 'tx'): ChartData | undefined {
   if (!data?.formula) return data
   const ref = parseFormulaRef(data.formula)
   if (!ref) return data
@@ -17,13 +17,22 @@ function resolveData(data: ChartData | undefined, sheets: readonly SheetModel[],
   const { top, bottom, left, right } = referenceBounds(ref, sheet.maxR, sheet.maxC)
   const width = right - left + 1
   const count = width * (bottom - top + 1)
-  const { type } = data
-  const points = new Map(data.points)
+  // For two-dimensional categories, preserve the cache's level order and point indices.
+  if (role === 'cat' && width > 1 && bottom > top) return data
+
+  const { type, formatCode } = data
+  const points = new Map<number, ChartValue>()
+  let sourceFormat: string | undefined
+  let formatIndex = Infinity
   function set(index: number, cell: CellModel) {
-    const value: ChartValue = type === 'string' ? cell.text : cell.value
-    // A present error, blank or non-numeric cell must not show a stale numeric point.
-    if (cell.kind === 'e' || (type === 'number' && typeof value !== 'number')) points.delete(index)
-    else points.set(index, value)
+    if (cell.kind === 'e' || cell.value === '') return
+    const value = type === 'string' || (role && typeof cell.value !== 'number') ? cell.text : cell.value
+    if (type === 'number' && !role && typeof value !== 'number') return
+    points.set(index, value)
+    if (formatCode === undefined && typeof cell.value === 'number' && index < formatIndex) {
+      sourceFormat = codeOf(workbook, cell.s)
+      formatIndex = index
+    }
   }
   if (count <= sheet.cells.size) {
     for (let row = top; row <= bottom; row++) {
@@ -40,7 +49,7 @@ function resolveData(data: ChartData | undefined, sheets: readonly SheetModel[],
       if (row >= top && row <= bottom && col >= left && col <= right) set((row - top) * width + col - left, cell)
     }
   }
-  return { ...data, points, pointCount: Math.max(count, data.pointCount ?? 0) }
+  return { ...data, points, pointCount: count, formatCode: data.formatCode ?? sourceFormat }
 }
 
 /** Resolve each plot's series in plot order, using the latest sheets supplied by the grid. */
@@ -48,8 +57,8 @@ export function resolveSeries(model: ChartModel, sheets: readonly SheetModel[], 
   if (!model.supported) return []
   return model.plots.map(({ series }) => series.map((entry) => ({
     ...entry,
-    tx: resolveData(entry.tx, sheets, workbook),
-    cat: resolveData(entry.cat, sheets, workbook),
+    tx: resolveData(entry.tx, sheets, workbook, 'tx'),
+    cat: resolveData(entry.cat, sheets, workbook, 'cat'),
     val: resolveData(entry.val, sheets, workbook),
     xVal: resolveData(entry.xVal, sheets, workbook),
     yVal: resolveData(entry.yVal, sheets, workbook),

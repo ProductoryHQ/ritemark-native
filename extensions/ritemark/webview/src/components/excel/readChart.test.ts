@@ -3,7 +3,9 @@ import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import JSZip from 'jszip'
 import type { ChartModel, ChartPlot } from './chartModel'
-import { readChart } from './readChart'
+import { chartTitle, readChart } from './readChart'
+import { resolveSeries } from './chartSeries'
+import { chartsKeepFixtures } from '../../../../src/excel/chartsKeepFixtures.test'
 import { readWorkbook } from './readWorkbook'
 import { readTheme } from './excelStyles'
 
@@ -40,6 +42,102 @@ function report(file: string, chart: ChartModel) {
   const ranges = series.map(({ tx, cat, val, xVal, yVal }) =>
     [tx, cat, val, xVal, yVal].flatMap((data) => data?.formula ? [`\`${data.formula}\``] : []).join(', '))
   console.log(`| \`${file}\` | ${chart.kind} | ${series.length} | ${title ?? '—'} | ${ranges.join('<br>') || '—'} | |`)
+}
+
+type ExpectedChart = [sheet: string, kind: ChartPlot['kind'] | 'combo', title: string | undefined,
+  columns?: string, lastRow?: number, grouping?: string]
+
+const standardTitle = 'Trucks per day'
+const stackedTitle = 'Trucks per day, all depots'
+const shareTitle = 'Share of trucks by depot'
+const excelCharts: Record<string, ExpectedChart[]> = {
+  'charts-all-kinds': [
+    ['Clustered column', 'column', standardTitle, 'BCD', 7, 'clustered'],
+    ['Stacked column', 'column', stackedTitle, 'BCD', 7, 'stacked'],
+    ['100% stacked column', 'column', shareTitle, 'BCD', 7, 'percentStacked'],
+    ['Bar', 'bar', standardTitle, 'BCD', 7, 'clustered'],
+    ['Stacked bar', 'bar', stackedTitle, 'BCD', 7, 'stacked'],
+    ['100% stacked bar', 'bar', shareTitle, 'BCD', 7, 'percentStacked'],
+    ['Line', 'line', standardTitle],
+    ['Line with markers', 'line', standardTitle],
+    ['Area', 'area', undefined],
+    ['Stacked area', 'area', stackedTitle, 'BCD', 7, 'stacked'],
+    ['Pie', 'pie', 'Handovers by depot', 'B', 5],
+    ['Doughnut', 'doughnut', 'Why trucks were late', 'B', 5],
+    // The fixture README tracks the Experience lead's rebuild with one series and explicit X values.
+    ['Scatter', 'scatter', 'Distance and lateness', 'AB', 13],
+    ['Combo', 'combo', 'Trucks and on-time share', 'BC'],
+  ],
+  'charts-3d': [
+    ['3-D column', 'column', standardTitle], ['3-D bar', 'bar', standardTitle],
+    ['3-D line', 'line', standardTitle], ['3-D pie', 'pie', 'Handovers by depot', 'B', 5],
+  ],
+  'charts-colours': [
+    ['Theme tints', 'column', 'Trucks per year by depot'],
+    ['Set colours', 'column', 'Trucks per day, house colours'],
+    ['Automatic', 'column', 'Trucks per day, automatic colours'],
+    ['Labels and axes', 'line', 'On-time share against target', 'BC'],
+  ],
+  'chart-sheet': [
+    ['Revenue trend', 'line', 'Revenue trend', 'D'],
+    ['Lost source', 'column', 'Trucks per day (old data)'],
+  ],
+}
+
+async function checkExcelCharts() {
+  for (const [file, expected] of Object.entries(excelCharts)) {
+    const book = await readWorkbook(readFileSync(new URL(`excel-174/${file}.xlsx`, fixtures)))
+    assert.deepEqual(book.sheets.flatMap((sheet) =>
+      sheet.layout.drawings.filter(({ what }) => what === 'chart').map(() => sheet.name)),
+    expected.map(([name]) => name), file)
+    for (const [name, kind, title, columns = 'BCD', lastRow = 7, grouping] of expected) {
+      const sheet = book.sheets.find((sheet) => sheet.name === name)!
+      const drawing = sheet.layout.drawings.find(({ what }) => what === 'chart')!
+      const chart = drawing.chart
+      const label = `${file}.xlsx / ${name}`
+      assert.ok(chart?.supported, label)
+      assert.equal(chart.kind, kind, label)
+      assert.equal(chart.title?.text, title, label)
+      assert.equal(drawing.title, title, label)
+      if (grouping) assert.equal(chart.plots[0].grouping, grouping, label)
+      const series = chart.plots.flatMap((plot) => plot.series)
+      const ranges = series.map(({ tx, cat, val, xVal, yVal }) =>
+        [tx?.formula, cat?.formula, val?.formula, xVal?.formula, yVal?.formula])
+      const source = name === 'Revenue trend' ? 'Data' : name === 'Lost source' ? "'[1]Old data'"
+        : name.includes(' ') ? `'${name}'` : name
+      const expectedRanges = name === 'Theme tints'
+        ? Array.from({ length: 8 }, (_, index) => {
+          const row = index + 2
+          return [`${source}!$A$${row}`, `${source}!$B$1:$D$1`, `${source}!$B$${row}:$D$${row}`, undefined, undefined]
+        })
+        : [...columns].map((col) => {
+          const values = `${source}!$${col}$2:$${col}$${lastRow}`
+          return kind === 'scatter'
+            ? [`${source}!$${col}$1`, undefined, undefined, undefined, values]
+            : [`${source}!$${col}$1`, `${source}!$A$2:$A$${lastRow}`, values, undefined, undefined]
+        })
+      assert.deepEqual(ranges, expectedRanges, label)
+      if (name === 'Revenue trend') {
+        assert.equal(sheet.kind, 'chartsheet')
+        assert.equal(resolveSeries(chart, book.sheets, book)[0][0].val?.points.get(0), 38950)
+      }
+      if (name === 'Lost source') {
+        const resolved = resolveSeries(chart, book.sheets, book)[0]
+        assert.deepEqual(resolved.map((series) => [...series.val!.points.values()]), [
+          [42, 47, 45, 51, 55, 58], [31, 29, 34, 36, 33, 38], [22, 26, 25, 24, 29, 31],
+        ])
+      }
+      if (name === 'Theme tints') assert.deepEqual(series.map(({ shape }) => shape?.fill),
+        ['#70AD47', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47', '#264478', '#9E480E'])
+      if (name === 'Set colours') assert.deepEqual(series.map(({ shape }) => shape?.fill),
+        ['#1F6F78', '#E07A2E', '#9AA0A6'])
+      if (name === 'Automatic') {
+        assert.ok(series.every(({ shape }) => shape === undefined))
+        assert.deepEqual(series.map(({ automaticColor }) => automaticColor), ['#4472C4', '#ED7D31', '#A5A5A5'])
+      }
+      report(label, chart)
+    }
+  }
 }
 
 async function main() {
@@ -151,6 +249,24 @@ async function main() {
   assert.equal(themed.plots[0].series[0].shape?.fill, '#999999')
   assert.equal(themed.accentColors[0], '#808080')
 
+  const transformed = readChart(column.replace(/<a:schemeClr val="accent1">[\s\S]*?<\/a:schemeClr>/,
+    '<a:prstClr val="red"><a:shade val="50000"/><a:tint val="50000"/><a:satMod val="0"/>'
+    + '<a:lumOff val="25000"/><a:lumMod val="50000"/></a:prstClr>'))
+  assert.ok(transformed.supported)
+  assert.equal(transformed.plots[0].series[0].shape?.fill, '#707070')
+  for (const [system, expected] of [['val="windowText" lastClr="123456"', '#123456'], ['val="windowText"', '#000000']]) {
+    const chart = readChart(column.replace('<a:srgbClr val="112233"/>', `<a:sysClr ${system}/>`))
+    assert.ok(chart.supported)
+    assert.equal(chart.plots[0].series[0].shape?.line, expected)
+  }
+  const oneSeries = /<c:ser>[\s\S]*?<\/c:ser>/.exec(column)![0]
+  const automatic = readChart(column.replace(oneSeries, Array.from({ length: 13 }, (_, index) =>
+    oneSeries.replace('<c:order val="0"/>', `<c:order val="${index}"/>`).replace(/<c:spPr>[\s\S]*?<\/c:spPr>/, '')).join('')))
+  assert.ok(automatic.supported)
+  assert.deepEqual(automatic.plots[0].series.slice(0, 6).map(({ automaticColor }) => automaticColor), automatic.accentColors)
+  assert.equal(automatic.plots[0].series[6].automaticColor, '#264478')
+  assert.equal(automatic.plots[0].series[12].automaticColor, '#698ED0')
+
   for (const file of ['rich.xlsx', 'rich-excelish.xlsx']) {
     const book = await readWorkbook(readFileSync(new URL(file, fixtures)))
     const drawings = book.sheets.flatMap((sheet) => sheet.layout.drawings).filter(({ what }) => what === 'chart')
@@ -174,7 +290,37 @@ async function main() {
   const drawing = extended.sheets.flatMap((sheet) => sheet.layout.drawings).find(({ what }) => what === 'chart')
   assert.deepEqual(drawing?.chart, { supported: false, kind: 'chartex' })
 
-  if (!proof) console.log('readChart: all 21 synthetic parts and both workbooks passed')
+  zip.file(relsPath, relations)
+  zip.file('xl/charts/chart1.xml', column.replace('<c:v>12</c:v>', '<c:v>&#x110000;</c:v>'))
+  const malformed = await readWorkbook(await zip.generateAsync({ type: 'uint8array' }))
+  const brokenCard = malformed.sheets.flatMap((sheet) => sheet.layout.drawings).find(({ what }) => what === 'chart')
+  assert.ok(brokenCard?.anchor)
+  assert.deepEqual(brokenCard.chart, { supported: false, kind: 'unknown' })
+
+  const rich = '<c:rich><a:p><a:r><a:t xml:space="preserve">First</a:t></a:r><a:br/><a:r><a:t>line</a:t></a:r></a:p>'
+    + '<a:p><a:r><a:t>Second</a:t></a:r></a:p></c:rich>'
+  const richChartXml = column.replace(/<c:tx>[\s\S]*?<\/c:tx>/, `<c:tx>${rich}</c:tx>`)
+  const richChart = readChart(richChartXml)
+  assert.ok(richChart.supported)
+  assert.equal(richChart.title?.text, 'First line Second')
+  assert.equal(chartTitle(richChartXml), 'First line Second')
+
+  await checkExcelCharts()
+  const sales = await readWorkbook(readFileSync(chartsKeepFixtures.find(({ file }) => file.endsWith('/sales-report.xlsx'))!.file))
+  for (const [sheetName, expectedTitle] of [['Sales 2026', 'Revenue by region'], ['Revenue trend', 'Revenue per month']]) {
+    const chart = sales.sheets.find(({ name }) => name === sheetName)?.layout.drawings[0].chart
+    assert.ok(chart?.supported)
+    assert.equal(chart.title?.text, expectedTitle)
+    const [[series]] = resolveSeries(chart, sales.sheets, sales)
+    if (sheetName === 'Sales 2026') assert.deepEqual([...series.cat!.points.values()], ['North', 'South', 'Baltics'])
+    else {
+      assert.equal(series.cat?.points.get(0), 46023)
+      assert.equal(series.cat?.pointCount, 10)
+      assert.equal(series.cat?.formatCode, 'mmm yy')
+    }
+  }
+
+  if (!proof) console.log('readChart: all synthetic parts and chart workbooks passed')
 }
 
 main().catch((error) => {

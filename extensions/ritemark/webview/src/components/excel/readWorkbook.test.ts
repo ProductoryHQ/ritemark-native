@@ -3,6 +3,7 @@
  * Run: npx tsx webview/src/components/excel/readWorkbook.test.ts
  */
 import assert from 'node:assert/strict'
+import { serialize } from 'node:v8'
 import { createHash } from 'node:crypto'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -46,7 +47,10 @@ async function main() {
     assert.equal(hash(), before, `${label}: reading the workbook and its chart parts changes no byte`)
     for (const sheet of model.sheets) {
       for (const drawing of sheet.layout.drawings) {
-        if (drawing.chart) resolveSeries(drawing.chart, model.sheets, model)
+        if (!drawing.chart) continue
+        const before = sha256(serialize([drawing.chart, model.sheets]))
+        resolveSeries(drawing.chart, model.sheets, model)
+        assert.equal(sha256(serialize([drawing.chart, model.sheets])), before, `${label}: resolveSeries changed the chart or sheets`)
       }
     }
     assert.equal(hash(), before, `${label}: resolving chart series changes no byte`)

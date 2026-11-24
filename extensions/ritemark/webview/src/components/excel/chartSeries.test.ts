@@ -32,8 +32,8 @@ const before = hash()
 const [[series]] = resolveSeries(chart, book.sheets, book)
 assert.equal(series.tx?.points.get(0), 'Edited title')
 assert.equal(series.cat?.points.get(0), 'Edited category')
-assert.equal(series.cat?.points.get(1), 'Beta')
-assert.deepEqual(series.val?.points, new Map([[0, 45], [1, 0], [2, 36]]))
+assert.equal(series.cat?.points.get(1), undefined)
+assert.deepEqual(series.val?.points, new Map([[0, 45], [1, 0]]))
 assert.equal(hash(), before)
 
 const editedSheet = { ...sheet, cells: new Map(sheet.cells) }
@@ -48,7 +48,20 @@ assert.equal(resolveSeries(external, book.sheets, book)[0][0].val?.points.get(0)
 const wholeColumn = readChart(xml.replace('$B$2:$B$4', '$B:$B'))
 assert.deepEqual(resolveSeries(wholeColumn, book.sheets, book)[0][0].val?.points, new Map([[1, 45], [2, 0]]))
 const wholeRow = readChart(xml.replace("'Sample Sheet'!$B$2:$B$4", '$2:$2'))
-assert.deepEqual(resolveSeries(wholeRow, book.sheets, book)[0][0].val?.points, new Map([[1, 45], [2, 36]]))
+assert.deepEqual(resolveSeries(wholeRow, book.sheets, book)[0][0].val?.points, new Map([[1, 45]]))
+const shorter = readChart(xml.replace('$B$2:$B$4', '$B$2'))
+assert.deepEqual(resolveSeries(shorter, book.sheets, book)[0][0].val?.points, new Map([[0, 45]]))
+assert.equal(resolveSeries(shorter, book.sheets, book)[0][0].val?.pointCount, 1)
+
+const multiLevel = readChart(xml.replace(/<c:cat>[\s\S]*?<\/c:cat>/,
+  `<c:cat><c:multiLvlStrRef><c:f>'Sample Sheet'!$A$2:$B$4</c:f><c:multiLvlStrCache>
+    <c:ptCount val="3"/><c:lvl><c:pt idx="1"><c:v>Depot</c:v></c:pt></c:lvl>
+    <c:lvl><c:pt idx="0"><c:v>Region</c:v></c:pt></c:lvl>
+  </c:multiLvlStrCache></c:multiLvlStrRef></c:cat>`))
+assert.deepEqual(resolveSeries(multiLevel, book.sheets, book)[0][0].cat?.levels,
+  [new Map([[1, 'Depot']]), new Map([[0, 'Region']])])
+assert.deepEqual(resolveSeries(multiLevel, book.sheets, book)[0][0].cat?.points, new Map([[1, 'Depot']]))
+
 const named = readChart(xml.replace("'Sample Sheet'!$B$2:$B$4", 'Amounts'))
 assert.equal(resolveSeries(named, book.sheets, book)[0][0].val?.points.get(0), 12)
 assert.deepEqual(resolveSeries({ supported: false, kind: 'chartex' }, book.sheets, book), [])
