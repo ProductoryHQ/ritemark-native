@@ -173,6 +173,14 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
             // Webview encountered an error (display in VS Code)
             vscode.window.showErrorMessage(`Excel Preview: ${message.message}`);
             break;
+
+          case 'copyToClipboard':
+            // The sheet grid's Cmd/Ctrl+C (Sprint 158) sends the copied cells here, as the Markdown editor's code
+            // blocks do; nothing handled it in this editor, so cell Copy did nothing (found in Sprint 174's test window)
+            if (typeof message.text === 'string') {
+              void vscode.env.clipboard.writeText(message.text);
+            }
+            break;
         }
       },
       undefined,
