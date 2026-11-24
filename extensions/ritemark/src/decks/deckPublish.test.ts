@@ -10,6 +10,7 @@
  *
  * Run: npx tsx src/decks/deckPublish.test.ts
  */
+import { trackLiveDeckTurn } from '../views/liveDeckTurn';
 import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -284,6 +285,8 @@ async function main(): Promise<void> {
   let manualStarted: (() => void) | undefined;
   let liveHtml = '';
   let liveDigest = '';
+  let expectUnchanged = false;
+  let unchangedSaves = 0;
   let diagnosis: LiveIssue | undefined;
   let nextResult: (() => void) | undefined;
   const liveFeature = {
@@ -308,6 +311,10 @@ async function main(): Promise<void> {
         return { kind: 'paused', pause };
       },
       updateLive: async (page: { realPath: string }, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
+        if (expectUnchanged && liveDigest === input.digest) {
+          unchangedSaves++;
+          return { kind: 'unchanged' };
+        }
         liveDigest = input.digest;
         liveHtml = fs.readFileSync(page.realPath, 'utf8');
         const plan = await gatherPage(page.realPath, root);
@@ -343,17 +350,23 @@ async function main(): Promise<void> {
     await livePublisher.stateOf(document as never);
     await new Promise(resolve => setTimeout(resolve, 50));
     assert.equal(liveHtml, '', 'opening a deck while its switch is on sends nothing');
-    const timed = new Promise<void>(resolve => { nextResult = resolve; });
+    const timetableTurn = trackLiveDeckTurn(livePublisher, 500);
+    expectUnchanged = true;
     text = text.replace('deck: 1', 'deck: 1\nritemark-length: 180').replace('id: a1', 'id: a1\ntime: 25');
     fs.writeFileSync(deckPath, text);
     savedListeners.at(-1)?.(document);
-    await timed;
+    assert.deepEqual(await timetableTurn.finish([deckPath]), []);
+    assert.equal(unchangedSaves, 1);
+    expectUnchanged = false;
     assert.equal(liveDigest, beforeTimetable, 'minutes and session changes have no public digest');
     const changed = new Promise<void>(resolve => { nextResult = resolve; });
+    const chatTurn = trackLiveDeckTurn(livePublisher, 500);
     text = text.replace('Welcome, everyone.', 'An external save.');
     fs.writeFileSync(deckPath, text);
     watchListeners.at(-1)?.(uri);
+    const chatSteps = chatTurn.finish([deckPath]);
     await changed;
+    assert.equal((await chatSteps)?.[0]?.message, 'Updated the page');
     assert.match(liveHtml, /An external save/);
     const saved = new Promise<void>(resolve => { nextResult = resolve; });
     text = text.replace('An external save.', 'An editor save.');

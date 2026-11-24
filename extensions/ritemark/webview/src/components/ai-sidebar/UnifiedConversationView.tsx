@@ -133,6 +133,7 @@ export function UnifiedConversationView() {
   // end above; the person's scroll is then kept, as if they had scrolled there.
   const revealVersion = useTurnRevealVersion();
   const turnIds = merged.map((item) => item.turn.id).join('\n');
+  const unmergedBoundaries = transcriptBoundaries.filter((boundary) => !merged.some((item) => item.turn.id === boundary.turnId)).length;
   useEffect(() => {
     const turnId = takeTurnReveal(activeConversation.id, turnIds ? turnIds.split('\n') : []);
     if (!turnId) return;
@@ -239,7 +240,13 @@ export function UnifiedConversationView() {
           .map((boundary) => <TranscriptBoundary key={boundary.id} boundary={boundary} />)}
 
         {/* Sprint 103 R7: single truthful status line under the transcript. */}
-        {merged.length > 0 && <ActivityStatusLine />}
+        {merged.length > 0 && (
+          <ActivityStatusLine
+            // Sprint 175 PR 8 (the Experience lead): a last turn ending in Ritemark's live-page step and Done read as the
+            // turn's closing pair, with the gap between the AI's own meta lines rather than the gap between turns.
+            closesLiveStep={unmergedBoundaries === 0 && Boolean(merged[merged.length - 1]?.turn.result?.liveDeckSteps?.length)}
+          />
+        )}
 
         <div ref={endRef} />
       </div>
