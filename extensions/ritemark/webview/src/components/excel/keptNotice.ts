@@ -1,7 +1,7 @@
 import type { CellRules } from './cellRules'
 import { drawsChart } from './chartLayout'
 import type { ChartModel } from './chartModel'
-import type { SheetLayoutInfo } from './readWorkbook'
+import type { DrawingModel, SheetLayoutInfo } from './readWorkbook'
 
 const chartKinds = new Map([
   ['radarChart', 'radar'], ['stockChart', 'stock'], ['surfaceChart', 'surface'],
@@ -28,14 +28,17 @@ function unsupportedKinds(chart: ChartModel | undefined): string[] {
  * Charts the preview draws (Sprint 174 PR 2 on) and colour rules it draws (PR 6) aren't named; chart kinds it can't
  * draw are named by kind (PR 4), and icon sets and rules it can't read are named (PR 6).
  */
-export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings'>, rules?: CellRules): string | undefined {
+export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings'>, rules?: CellRules, failed?: { has(drawing: DrawingModel): boolean }): string | undefined {
   const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
   const things: string[] = []
   const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
   const charts = new Map<string, number>()
   for (const drawing of layout.drawings) {
-    if (drawing.what !== 'chart' || drawsChart(drawing.chart)) continue
-    for (const kind of new Set(unsupportedKinds(drawing.chart))) charts.set(kind, (charts.get(kind) ?? 0) + 1)
+    if (drawing.what !== 'chart') continue
+    const drawable = drawsChart(drawing.chart)
+    if (drawable && !failed?.has(drawing)) continue
+    const kinds = drawable ? [''] : unsupportedKinds(drawing.chart)
+    for (const kind of new Set(kinds)) charts.set(kind, (charts.get(kind) ?? 0) + 1)
   }
   for (const [kind, count] of charts) {
     if (kind) things.push(name(count, `${kind} chart`, `${kind} charts`))

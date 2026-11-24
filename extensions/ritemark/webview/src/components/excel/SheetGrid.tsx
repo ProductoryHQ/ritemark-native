@@ -17,12 +17,13 @@ import { writeClipboard, readClipboard } from '../../lib/clipboard'
 import { compareCells } from '../sheetSort'
 import { installFontFallbacks, installOfficeFontAliases, isOfficeFontMissing } from '../viewers/docx/officeFonts'
 import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './readWorkbook'
-import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
+import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sheetRowAt, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
 import { columnScale, type ExcelGeometry } from './columnWidth'
 import { isMac } from '../../hooks/usePlatform'
 import { ruleFont, ruleTextColor, visibleCellRules, type CellRules } from './cellRules'
 import type { CellStyle, DifferentialStyle } from './excelStyles'
-import { DrawingView } from './DrawingView'
+import { DrawingView, type ChartFailureReporter } from './DrawingView'
+import { noteKeyboardNavigation } from '../ui/input-mode'
 import { chartShortcutDescription, chartTarget, isChartShortcut, useChartSelection } from './chartSelection'
 import { measure, forgetMeasures } from './gridTextMeasure'
 
@@ -32,6 +33,7 @@ export interface SheetGridProps {
   /** Raised by every edit, so the grid draws the model again. */
   version: number
   cellRules: CellRules
+  onChartFailure?: ChartFailureReporter
   editable: boolean
   /** A cell typed into, by its sheet row and column (0-based). */
   onEdit: (row: number, col: number, text: string) => void
@@ -78,6 +80,7 @@ export function SheetGrid({
   sheet,
   version,
   cellRules,
+  onChartFailure,
   editable,
   onEdit,
   getInput,
@@ -467,7 +470,7 @@ export function SheetGrid({
     const live = editingRef.current
     if (live) {
       setEditing(null)
-      const row = rowOf[live.pos.i]
+      const row = sheetRowAt(rowOf, live.pos.i)
       // the text a cell shows as its value, or its formula shown in the bar and not changed, is no edit
       if (live.value !== getInput(row, live.pos.c) && live.value !== getFormula(row, live.pos.c)) onEdit(row, live.pos.c, live.value)
     }
@@ -529,6 +532,8 @@ export function SheetGrid({
       }).sort((a, b) => a.y - b.y || a.x - b.x)
       if (!charts.length) return
       e.preventDefault()
+      // Reached by the keyboard: the chart's ring shows even when the last input was a click
+      if (objectShortcut) noteKeyboardNavigation()
       const fromId = fromChart?.getAttribute('data-sheet-chart')
       const targets = [grid, ...charts.map(({ element }) => element)]
       const current = charts.findIndex(({ element }) => element.id === fromId) + 1
@@ -824,7 +829,7 @@ export function SheetGrid({
       if (!reaches[kind]) return
       const primary = y0 < FH ? (x0 < FW ? 'corner' : 'top') : (x0 < FW ? 'left' : 'body')
       out.push(<DrawingView key={`o${n}`} drawing={d} style={place(HW + x0, HH + y0, w, h)} workbook={model} version={version} width={w} height={h}
-        selection={d.what === 'chart' ? chartSelection.bind(n, kind === primary) : undefined} sheetName={sheet.name} />)
+        selection={d.what === 'chart' ? chartSelection.bind(n, kind === primary) : undefined} sheetName={sheet.name} onChartFailure={onChartFailure} />)
     })
     return out
   }
