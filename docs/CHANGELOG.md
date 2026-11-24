@@ -15,9 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Claude, ChatGPT, and OpenCode can now read Word and PDF files in your project, including selected PDF pages (#991).
 - Claude, ChatGPT, and OpenCode can now read PowerPoint files in your project, with speaker notes kept under the slide they belong to (#993).
+- Deck files can store planned minutes for each slide and use the presenter’s session length. These timings stay private when you publish the deck (#1001).
 
 ### Fixed
 
+- Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
 - Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).

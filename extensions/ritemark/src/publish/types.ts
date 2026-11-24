@@ -14,12 +14,14 @@ export interface GatheredFile {
   relPath: string;
   /** Its path from the project folder, with `/` separators (for the sheet's folder and for the records). */
   projectPath: string;
-  /** The file on disk, by real path: the bytes that are read and uploaded. */
+  /** The file on disk, by real path: the source read during gather and upload. */
   realPath: string;
   kind: FileKind;
   size: number;
-  /** sha256 of its bytes, hex. Absent only for a file over the size limit, which is never read. */
+  /** sha256 of the bytes sent, hex. Absent only for a file over the size limit, which is never read. */
   sha256?: string;
+  /** Local bytes before cleaning, for the upload's second read. */
+  sourceSha256?: string;
 }
 
 /**
@@ -31,9 +33,10 @@ export interface GatheredFile {
  * - `otherPage`: another `.html` page (one page per publish), so its link won't work;
  * - `link`: a file the page only links to (`<a href="notes.md">`), not one it uses (R3; Opus review of #669);
  * - `gitUnchecked`: Git can't say whether it ignores the path (a path behind a linked folder), so it stays behind
- *   (fail closed, one file at a time).
+ *   (fail closed, one file at a time);
+ * - `uncleanable`: picture metadata could not be safely removed.
  */
-export type LeftOutReason = 'outside' | 'hidden' | 'toolFolder' | 'gitIgnored' | 'otherPage' | 'link' | 'gitUnchecked';
+export type LeftOutReason = 'outside' | 'hidden' | 'toolFolder' | 'gitIgnored' | 'otherPage' | 'link' | 'gitUnchecked' | 'uncleanable';
 
 export interface LeftOut {
   /** What the person recognises: the reference as written for `outside`, else its path in the project. Never a query. */

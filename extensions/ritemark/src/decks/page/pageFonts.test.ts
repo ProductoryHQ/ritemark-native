@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { PNG } from '../../publish/testing/pictures';
 import { gatherPage } from '../../publish/gather';
 import { cssReferences, pageReferences } from '../../publish/references';
 import { BUILT_IN_THEME, DECK_FONTS, DECK_FONT_LIST, DECK_FONT_SUBSETS, deckFont, deckFontFile, deckFontStack, parseTheme, themeFonts } from '../deckTheme';
@@ -118,7 +119,7 @@ async function main(): Promise<void> {
   const project = path.join(root, 'Training');
   const folder = path.join(project, 'Harbour Logistics');
   fs.mkdirSync(path.join(folder, 'images'), { recursive: true });
-  fs.writeFileSync(path.join(folder, 'images', 'which-stays.png'), Buffer.from('89504e470d0a1a0a', 'hex'));
+  fs.writeFileSync(path.join(folder, 'images', 'which-stays.png'), PNG);
   const deckPath = path.join(folder, 'Fonts.deck.md');
   fs.writeFileSync(deckPath, PRIVATE_DECK);
   try {
