@@ -3,7 +3,7 @@
 Track: SDD (auto-detected: more than three user-facing requirements, a parser-heavy domain with edge cases, and a bytes-in/bytes-out guarantee on a person's file). Override with: "use plain full track".
 Branch: sprint-174-excel-charts
 Release tier: **extension** (no shell-tier path; no new dependency in the recommendation)
-Status: Phase 2 (PLAN), written 24 November 2026. **Not approved.** Jarmo approves this plan himself; nothing starts until he does.
+Status: **Approved 24 November 2026** through the 2.4 roadmap. Jarmo: "roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi" (roadmap deck: https://claude.ai/artifact/Lsbc9YDNmC6eWXvYmaZ5H8; ritemark-dev decisions/log.md). The open questions below are settled by the Development manager by their recommendations (Jarmo, 24 Nov: sprint questions are the head of development's).
 
 Parent release: v2.4.0 (`../release-plan.md`, row "Excel charts and colour rules"). Issue: [#971](https://github.com/ProductoryHQ/ritemark-native/issues/971). Drawing: experience 47, step 2 (`product/design/experience/experiences/excel/README.md`, frames 9 and 10, Experience lead, 22 November 2026). The issue's research is in [research/issue-971.md](research/issue-971.md).
 
@@ -73,7 +73,10 @@ One line per drawn thing, in plain words, with the `release-notes` skill. For ex
 - **Large sheets and big series**: rules computed for the window, series thinned; the measurements are in PR 7's proof.
 - **`SheetGrid.tsx` is a shared hot file**: PRs touching it merge one at a time.
 
-## Open questions for Jarmo
+## Cut line (Jarmo, 24 November)
+If 2.4 runs short, drawing the colour rules in the cells (PRs 6 and 7) moves to 2.5; charts stay in 2.4.
+
+## Open questions (settled by the recommendations, 24 November)
 Each with a recommendation. Everything else the drawing already decided.
 
 1. **A chart library, or our own drawing?** Recommendation: our own SVG drawing from the chart's own part, no library. A file's look comes from its XML, which a library's defaults would have to be bent to match; it adds nothing to the bundle or the licence list. A free library (uPlot, Chart.js, ECharts) is possible, at a bundle and licence-line cost.
@@ -85,4 +88,4 @@ Each with a recommendation. Everything else the drawing already decided.
 7. **A sheet's data bars use Excel 2010's look (gradient by default, solid when the file says).** Recommendation: draw what the file's x14 part asks for, as Excel does. Say so if you want the simpler 2007 bar only.
 
 ## Approval
-- [ ] Jarmo approved this sprint plan (pending)
+- [x] Jarmo approved this sprint plan, through the 2.4 roadmap, 24 November 2026: "roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi"
