@@ -6,6 +6,9 @@
 import * as vscode from 'vscode';
 import { startingPlaceFrom, type StartingPlace } from '../guidance/startingPlace';
 import * as fs from 'fs';
+import { basename } from 'node:path';
+import { pickerFolder } from '../utils/dialogDefaults';
+import { CHAT_ATTACHMENT_EXTENSIONS, splitPickedFiles, type ChatFilesPickedMessage, type PickedChatFile } from './chatAttachmentProtocol';
 import * as os from 'os';
 import { randomBytes, randomUUID } from 'crypto';
 import { decodeReportMailMessage, reportResult } from '../reporting/protocol';
@@ -636,6 +639,10 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           await this._openWebLink(typeof message.url === 'string' ? message.url : '');
           break;
         }
+
+        case 'chat:pick-files':
+          await this._pickChatFiles(webviewView.webview, viewGeneration);
+          break;
 
         case 'open-source': // legacy name from inline-code path clicks (was silently dropped)
         case 'chat:open-file': {
@@ -2969,6 +2976,39 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   public toggleHistoryPanel() {
     this._view?.webview.postMessage({ type: 'toggle-history-panel' });
+  }
+
+  private async _pickChatFiles(webview: vscode.Webview, viewGeneration: number) {
+    try {
+      const picked = await vscode.window.showOpenDialog({
+        canSelectMany: true,
+        canSelectFiles: true,
+        canSelectFolders: false,
+        defaultUri: vscode.Uri.file(pickerFolder([this._workspacePath, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath])),
+        openLabel: 'Attach',
+        filters: { 'Supported files': CHAT_ATTACHMENT_EXTENSIONS },
+      });
+      if (!picked?.length || !this._isCurrentSidebarView(webview, viewGeneration)) return;
+
+      const { officePaths, inlineFiles } = splitPickedFiles(picked.map((uri) => uri.fsPath));
+      if (officePaths.length) this.sendFilePaths(officePaths);
+
+      const files: PickedChatFile[] = [];
+      for (const { path, mimeType } of inlineFiles) {
+        try {
+          const data = await fs.promises.readFile(path);
+          files.push({ name: basename(path), mimeType, base64: data.toString('base64') });
+        } catch (error) {
+          console.error('Failed to read file:', error);
+        }
+      }
+
+      if (files.length && this._isCurrentSidebarView(webview, viewGeneration)) {
+        await webview.postMessage({ type: 'chat:files-picked', files } satisfies ChatFilesPickedMessage);
+      }
+    } catch (error) {
+      console.error('Failed to pick chat attachments:', error);
+    }
   }
 
   public sendFilePaths(paths: string[]) {

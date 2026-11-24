@@ -3251,6 +3251,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           get().toggleHistoryPanel();
           break;
 
+        case 'chat:files-picked':
+          window.dispatchEvent(new CustomEvent('ritemark:chat-files-picked', { detail: message.files }));
+          break;
+
         case 'files-dropped':
           // Dispatch to ChatInput via DOM event (ChatInput manages its own pathChips state)
           window.dispatchEvent(new CustomEvent('ritemark:files-dropped', { detail: message.paths }));
