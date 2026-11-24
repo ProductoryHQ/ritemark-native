@@ -20,6 +20,7 @@ export interface DataBarStyle {
   /** Left edge of the visible bar, as a fraction of the cell width. */
   from: number
   color: string
+  growsLeft: boolean
   negative: boolean
   gradient: boolean
   borderColor?: string
@@ -137,6 +138,7 @@ function barAt(value: number, low: number, high: number, bar: DataBarRule): Data
   return {
     fraction, from: rtl ? 1 - from - fraction : from,
     color: negative && onAxis ? bar.negativeColor ?? '#FF0000' : bar.color,
+    growsLeft: (onAxis && negative) !== rtl,
     negative, gradient: bar.gradient, showValue: bar.showValue,
     borderColor: bar.border ? (negative && onAxis ? bar.negativeBorderColor ?? bar.negativeColor ?? '#FF0000' : bar.borderColor ?? bar.color) : undefined,
     axis: showAxis ? rtl ? 1 - axis : axis : undefined,
@@ -316,6 +318,10 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
     return cached
   }
   const compiled = [...rules].sort((a, b) => a.priority - b.priority).flatMap((rule) => {
+    if (rule.type === 'unreadable') {
+      unreadable.push(rule)
+      return []
+    }
     if (rule.type === 'iconSet') {
       iconSets.push(rule)
       return []

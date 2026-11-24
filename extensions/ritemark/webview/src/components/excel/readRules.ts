@@ -28,7 +28,7 @@ export interface DataBarRule {
 }
 
 export interface ConditionalRule {
-  type: typeof kinds[number]
+  type: typeof kinds[number] | 'unreadable'
   priority: number
   stopIfTrue: boolean
   dxfId?: number
@@ -71,38 +71,49 @@ const stopsOf = (body: string): RuleThreshold[] => each(body, 'cfvo').map(([a, i
 export function readRules(xml: string, ctx: ColorContext): RuleSet {
   const prefix = rootPrefix(xml, 'worksheet')
   const blocks = new RegExp(`<${prefix}conditionalFormatting(?=[\\s>])([^>]*)>([\\s\\S]*?)</${prefix}conditionalFormatting>`, 'g')
+  const extensions = []
   const twins = new Map<string, [string, string]>()
   for (const [, , body] of xml.matchAll(/<([\w.-]+:)conditionalFormattings(?=[\s>])[^>]*>([\s\S]*?)<\/\1conditionalFormattings>/g)) {
-    for (const [a, rule] of each(body, 'cfRule')) {
-      const id = attr(a, 'id')?.trim().toUpperCase()
-      const bar = each(rule, 'dataBar')[0]
-      if (id && attr(a, 'type') === 'dataBar' && bar) twins.set(id, bar)
+    for (const [, block] of each(body, 'conditionalFormatting')) {
+      const sqref = decodeXmlEntities(each(block, 'sqref')[0]?.[1] ?? '')
+      for (const [a, rule] of each(block, 'cfRule')) {
+        const id = attr(a, 'id')?.trim().toUpperCase()
+        extensions.push({ a, sqref, id })
+        const bar = each(rule, 'dataBar')[0]
+        if (id && attr(a, 'type') === 'dataBar' && bar) twins.set(id, bar)
+      }
     }
   }
+  const linked = new Set<string>()
+  const areasOf = (sqref: string) => sqref.trim().split(/\s+/).flatMap((item) => {
+    const ref = parseFormulaRef(item)
+    const area = ref && !ref.sheet ? referenceBounds(ref) : undefined
+    return area ? [area] : []
+  })
+  const basicRule = (type: ConditionalRule['type'], sqref: string, areas: RefArea[], a: string): ConditionalRule => ({
+    type, sqref, areas,
+    priority: number(a, 'priority', Infinity),
+    stopIfTrue: flag(a, 'stopIfTrue'),
+    dxfId: attr(a, 'dxfId') === undefined ? undefined : number(a, 'dxfId', -1),
+    formulas: [],
+    operator: attr(a, 'operator'), text: decoded(a, 'text'),
+    rank: number(a, 'rank', 10), percent: flag(a, 'percent'), bottom: flag(a, 'bottom'),
+    aboveAverage: flag(a, 'aboveAverage', true), equalAverage: flag(a, 'equalAverage'),
+    stdDev: number(a, 'stdDev', 0), timePeriod: attr(a, 'timePeriod'),
+  })
 
   const rules: RuleSet = []
   for (const [, attrs, body] of xml.matchAll(blocks)) {
     const sqref = decoded(attrs, 'sqref') ?? ''
-    const areas = sqref.trim().split(/\s+/).flatMap((item) => {
-      const ref = parseFormulaRef(item)
-      const area = ref && !ref.sheet ? referenceBounds(ref) : undefined
-      return area ? [area] : []
-    })
+    const areas = areasOf(sqref)
     if (!areas.length) continue
     for (const [a, content] of each(body, 'cfRule')) {
       const type = kinds.find((kind) => kind === attr(a, 'type'))
       if (!type) continue
-      const rule: ConditionalRule = {
-        type, sqref, areas,
-        priority: number(a, 'priority', Infinity),
-        stopIfTrue: flag(a, 'stopIfTrue'),
-        dxfId: attr(a, 'dxfId') === undefined ? undefined : number(a, 'dxfId', -1),
-        formulas: each(content, 'formula').map(([, f]) => decodeXmlEntities(f)),
-        operator: attr(a, 'operator'), text: decoded(a, 'text'),
-        rank: number(a, 'rank', 10), percent: flag(a, 'percent'), bottom: flag(a, 'bottom'),
-        aboveAverage: flag(a, 'aboveAverage', true), equalAverage: flag(a, 'equalAverage'),
-        stdDev: number(a, 'stdDev', 0), timePeriod: attr(a, 'timePeriod'),
-      }
+      const rule = basicRule(type, sqref, areas, a)
+      rule.formulas = each(content, 'formula').map(([, f]) => decodeXmlEntities(f))
+      const id = each(each(content, 'extLst')[0]?.[1] ?? '', 'id')[0]?.[1].trim()
+      if (id) linked.add(id.toUpperCase())
       const scale = each(content, 'colorScale')[0]
       if (type === 'colorScale' && scale) {
         rule.scale = { stops: stopsOf(scale[1]), colors: each(scale[1], 'color').map(([tag]) => colorOf(tag, ctx)) }
@@ -114,7 +125,6 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
       }
       const bar = each(content, 'dataBar')[0]
       if (type === 'dataBar' && bar) {
-        const id = each(each(content, 'extLst')[0]?.[1] ?? '', 'id')[0]?.[1].trim()
         const twin = twins.get(id?.toUpperCase() ?? '')
         const [ta, tb] = twin ?? ['', '']
         const color = (tag: string) => colorOf(each(tb, tag)[0]?.[0], ctx)
@@ -137,6 +147,9 @@ export function readRules(xml: string, ctx: ColorContext): RuleSet {
       }
       rules.push(rule)
     }
+  }
+  for (const { a, sqref, id } of extensions) {
+    if (!id || !linked.has(id)) rules.push(basicRule('unreadable', sqref, areasOf(sqref), a))
   }
   return rules
 }

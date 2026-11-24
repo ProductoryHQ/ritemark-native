@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { cellRulesForVersion, compileCellRules, dataBarPaint, ruleCellStyle, ruleCellText, visibleCellRules } from './cellRules'
+import { cellRulesForVersion, compileCellRules, dataBarPaint, ruleCellStyle, ruleCellText, ruleTextColor, visibleCellRules } from './cellRules'
 import { keptNotice } from './keptNotice'
 import { cellKey, readWorkbook } from './readWorkbook'
-import { buildLayout, styleIndexOf, styleOf } from './sheetLayout'
+import { buildLayout, fontCss } from './sheetLayout'
+import { compileRules } from './ruleEngine'
+import { readRules } from './readRules'
+import { colorContext } from './excelStyles'
 import { modelSource } from './sheetSource'
 
 const load = async (name: string) => readWorkbook(await readFile(new URL(
@@ -17,12 +20,11 @@ async function main() {
   const lookup = (name: string) => {
     const sheet = model.sheets.find((item) => item.name === name)!
     const layout = buildLayout(sheet, model.styles, { minWidth: 0, minHeight: 0 })
-    const at = visibleCellRules(rulesFor(sheet), layout,
-      { i0: 0, i1: layout.rows - 1, c0: 0, c1: layout.cols - 1 })
+    const { at } = visibleCellRules(rulesFor(sheet), layout,
+      { i0: 0, i1: layout.rows - 1, c0: 0, c1: layout.cols - 1 }, sheet, model)
     return (row: number, col: number) => {
-      const rule = at(layout.displayOf.get(row)!, col)
-      const base = styleOf(model.styles, styleIndexOf(sheet, row, col))
-      return { style: ruleCellStyle(base, rule, model.styles.baseFont), bar: rule?.dataBar }
+      const entry = at(layout.displayOf.get(row)!, col)
+      return { style: entry?.style, bar: entry?.rule.dataBar }
     }
   }
   const cellValue = lookup('Cell value')
@@ -80,13 +82,58 @@ async function main() {
   const format = { dxf: { numberFormat: { id: 0, code: '0.000' } } }
   assert.equal(ruleCellText(cell, format, model).text, Number(cell.value).toFixed(3))
 
+  // Open Excel question: does the number format's [Red] override a conditional font colour?
+  const red = { dxf: { numberFormat: { id: 0, code: '[Red]0' }, font: { color: '#008000' } } }
+  const redCell = ruleCellText(cell, red, model)
+  assert.equal(redCell.color?.toLowerCase(), '#ff0000')
+  const redStyle = ruleCellStyle(undefined, red, model.styles.baseFont)
+  const styleColor = fontCss(redStyle?.font, model.styles.baseFont).color
+  assert.equal(ruleTextColor(redCell, undefined, styleColor), redCell.color)
+  assert.equal(ruleTextColor(redCell, red.dxf.font, styleColor), '#008000')
+
+  const colors = colorContext(model.styles, '')
+  const extensionOnly = readRules(`<worksheet xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+      xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">
+    <extLst><ext><x14:conditionalFormattings><x14:conditionalFormatting>
+      <x14:cfRule type="expression" priority="1" id="{ABC}"><xm:f>A1&gt;0</xm:f></x14:cfRule>
+      <xm:sqref>A1</xm:sqref>
+    </x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst>
+  </worksheet>`, colors)
+  assert.equal(extensionOnly.length, 1)
+  const ctx = { today, date1904: model.date1904, styles: model.styles }
+  const unsupported = compileRules(sheet, extensionOnly, ctx)
+  assert.deepEqual(unsupported.styleAt(0, 0), {})
+  assert.equal(keptNotice({ drawings: [] }, unsupported),
+    "This sheet has a colour rule it can't read. It's kept in the file; Open in Excel to see it.")
+
+  for (const [direction, sign] of [['leftToRight', -1], ['rightToLeft', 1]] as const) {
+    const rules = readRules(`<worksheet><conditionalFormatting sqref="A1:A3">
+      <cfRule type="dataBar"><dataBar minLength="0" maxLength="100">
+        <cfvo type="min"/><cfvo type="max"/><color rgb="FF008000"/>
+      </dataBar><extLst><ext><x14:id>bar</x14:id></ext></extLst></cfRule>
+      </conditionalFormatting><extLst><ext><x14:conditionalFormattings><x14:conditionalFormatting>
+        <x14:cfRule type="dataBar" id="BAR"><x14:dataBar direction="${direction}"/></x14:cfRule>
+      </x14:conditionalFormatting></x14:conditionalFormattings></ext></extLst>
+    </worksheet>`, colors)
+    const cells = new Map([1, 5, 10].map((value, row) =>
+      [cellKey(row, 0), { ...cell, kind: 'n' as const, value: sign * value }]))
+    const compiled = compileRules({ name: 'Bars', cells }, rules, ctx)
+    assert.equal(compiled.unreadable.length, 0)
+    for (let row = 0; row < 3; row++) {
+      const bar = compiled.styleAt(row, 0).dataBar!
+      assert.equal(bar.growsLeft, true)
+      assert.match(String(dataBarPaint(bar).fill.background), /^linear-gradient\(to left,/)
+      if (row === 2) assert.equal(bar.from, 0)
+    }
+  }
+
   const calls: number[][] = []
-  const at = visibleCellRules({ iconSets: [], unreadable: [], styleAt: (r, c) => { calls.push([r, c]); return {} } },
+  const { at } = visibleCellRules({ iconSets: [], unreadable: [], styleAt: (r, c) => { calls.push([r, c]); return { dxf: { font: { bold: true } } } } },
     { rowOf: Int32Array.of(0, 10, 11, 12, 13), rowH: Float64Array.of(20, 20, 20, 0, 20),
       colW: Float64Array.of(80, 80, 80, 0, 80), frozenRows: 1, frozenCols: 1 },
-    { i0: 2, i1: 3, c0: 2, c1: 3 })
-  at(2, 2)
-  at(2, 2)
+    { i0: 2, i1: 3, c0: 2, c1: 3 }, sheet, model)
+  const painted = at(2, 2)
+  assert.equal(at(2, 2), painted)
   at(1, 2)
   at(2, 1)
   at(4, 2)
@@ -95,7 +142,10 @@ async function main() {
   at(2, 3)
   at(0, 2)
   at(2, 0)
-  assert.deepEqual(calls, [[11, 2], [0, 2], [11, 0]])
+  const spilled = at(2, 1, 11, 1, true)
+  assert.equal(spilled?.style?.font.bold, true)
+  assert.equal(at(2, 1, 11, 1, true), spilled)
+  assert.deepEqual(calls, [[11, 2], [0, 2], [11, 0], [11, 1]])
 
   assert.equal(keptNotice(sheet.layout, compileCellRules(model, sheet, today)), undefined)
   const deferred = await load('rules-icons-unreadable')
