@@ -1,3 +1,5 @@
+import type { DeckPublisher } from '../decks/deckPublish';
+import { trackLiveDeckTurn } from './liveDeckTurn';
 import { decodeSourcePassage } from '../../webview/src/utils/sourcePassage';
 import { openSourcePassage, type ReadSource } from './openSourcePassage';
 /**
@@ -338,6 +340,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   private readonly _runtimeSessions = new Map<string, Map<AgentId, RuntimeSession>>();
   /** Latest accepted execution per conversation; stale provider callbacks are ignored. */
+  private _liveDeckPublisher?: DeckPublisher;
+  private readonly _liveDeckTurns = new Map<string, ReturnType<typeof trackLiveDeckTurn>>();
   private readonly _activeRuntimeTurnTokens = new Map<string, symbol>();
   /** Sprint 127 R6: conversations whose transcript already names a model substitution. */
   private readonly _modelSubstitutionNamed = new Set<string>();
@@ -1598,7 +1602,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               }
             },
             onExit: () => {
-              if (!isCurrentRuntimeTurn()) return;
+              if (completing || !isCurrentRuntimeTurn()) return;
               // Codex app-server died mid-turn — finalize the turn so the webview
               // isn't stuck on "running" forever. Sprint 139 (R3): the chat, the
               // record and a restored chat say the same one sentence.
@@ -1686,6 +1690,18 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               }
               : undefined,
           };
+          let liveDeckTurn: ReturnType<typeof trackLiveDeckTurn> | undefined;
+          let completing = false;
+          const afterLiveDeck = <Result extends { filesModified?: string[] }>(complete: (result: Result) => void) =>
+            (result: Result) => {
+              if (completing || !isCurrentRuntimeTurn()) return;
+              completing = true;
+              this._finishAfterLiveDeck(conversationId, agentId as AgentId, liveDeckTurn, result.filesModified,
+                isCurrentRuntimeTurn, () => complete(result));
+            };
+          sessionConfig.onComplete = afterLiveDeck(sessionConfig.onComplete!);
+          sessionConfig.onCodexComplete = afterLiveDeck(sessionConfig.onCodexComplete!);
+
           if (runtimeUnavailable) {
             sessionConfig.onContinuationState?.({
               mode: 'runtime-unavailable',
@@ -1743,6 +1759,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                   timestamp: Date.now(),
                 });
               }
+              liveDeckTurn = this._startLiveDeckTurn(conversationId);
               await session.prompt({
                 prompt,
                 attachments: turnAttachments,
@@ -4192,6 +4209,45 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** Sprint 162 PR 5: the AI's theme changes (`decks/themeAi.ts`), once decks are composed. */
   private _themeChanges: Pick<ThemeAi, 'undo' | 'show' | 'openTheme'> | null = null;
 
+  public connectLiveDeckPublisher(publisher: DeckPublisher): void {
+    this._liveDeckPublisher = publisher;
+  }
+
+  private _startLiveDeckTurn(conversationId: string) {
+    this._liveDeckTurns.get(conversationId)?.dispose();
+    if (!this._liveDeckPublisher) return;
+    const turn = trackLiveDeckTurn(this._liveDeckPublisher);
+    this._liveDeckTurns.set(conversationId, turn);
+    return turn;
+  }
+
+  private _finishAfterLiveDeck(
+    conversationId: string,
+    agentId: AgentId,
+    turn: ReturnType<typeof trackLiveDeckTurn> | undefined,
+    files: string[] | undefined,
+    isCurrent: () => boolean,
+    complete: () => void,
+  ): void {
+    if (!isCurrent()) return;
+    const waiting = turn?.finish(files ?? []);
+    const close = () => {
+      if (this._liveDeckTurns.get(conversationId) === turn) this._liveDeckTurns.delete(conversationId);
+      if (isCurrent()) complete();
+    };
+    if (!waiting) {
+      close();
+      return;
+    }
+    void waiting.then(steps => {
+      if (!isCurrent()) return;
+      const type = agentId === 'claude-code' ? 'agent-progress' : 'codex-progress';
+      for (const progress of steps) {
+        void this._view?.webview.postMessage({ type, conversationId, agentId, progress });
+      }
+    }).finally(close);
+  }
+
   /**
    * Sprint 162 PR 5 (step-3-themes.md, frame 13): a theme change the AI made is shown under its reply in the chat it came
    * from (See what changed, Undo, Open the theme), and what Undo did is said there.
@@ -4443,6 +4499,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   ): import('../agent/types').AgentLiveHooks {
     const post = (message: Record<string, unknown>) => this._view?.webview.postMessage({ conversationId, agentId, ...message });
     let runtimeTurnId: string | null = null;
+    let liveDeckTurn: ReturnType<typeof trackLiveDeckTurn> | undefined;
     return {
       onTaskProgress: (progress) => post({ type: 'agent-task-progress', progress }),
       onBackgroundTasks: (tasks) => post({ type: 'agent-background-tasks', tasks }),
@@ -4450,6 +4507,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       onRuntimeTurnStart: () => {
         const turnId = randomUUID();
         runtimeTurnId = turnId;
+        liveDeckTurn = this._startLiveDeckTurn(conversationId);
         this._activeConversationTurnIds.set(conversationId, turnId);
         post({ type: 'agent-turn-started', turnId, origin: 'background-task' });
         this._runConversationCheckpoint(conversationId, () => this._conversationController.beginRuntimeInitiatedTurn({
@@ -4484,52 +4542,57 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
       onRuntimeTurnComplete: (result) => {
         const turnId = runtimeTurnId ?? undefined;
         runtimeTurnId = null;
-        if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
-          this._activeConversationTurnIds.delete(conversationId);
-        }
-        const errorPresentation = isCancelledError(result.error)
-          ? (result.error ? { message: result.error } : undefined)
-          : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, usesApiKey, names: modelNamesFor(agentId) });
-        const error = errorPresentation?.message;
-        const failureKind = errorPresentation?.failureKind;
-        const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
-        const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
-        // Read the person's Stop before the result is posted, so a stopped follow-up says Stopped
-        // in the sheet too, not Done (Sprint 139, as the person's own turns).
-        const cancelled = this._consumeCancelIntent(conversationId, turnId);
-        post({
-          type: 'agent-result',
-          text: result.text ?? '',
-          filesModified: result.filesModified ?? [],
-          metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
-          error,
-          failureKind,
-          ...(errorKind ? { errorKind } : {}),
-          ...(errorDetail ? { errorDetail } : {}),
-          ...(cancelled ? { stopped: true } : {}),
+        const tracking = liveDeckTurn;
+        liveDeckTurn = undefined;
+        const isCurrent = () => !turnId || this._activeConversationTurnIds.get(conversationId) === turnId;
+        this._finishAfterLiveDeck(conversationId, agentId, tracking, result.filesModified, isCurrent, () => {
+          if (turnId && this._activeConversationTurnIds.get(conversationId) === turnId) {
+            this._activeConversationTurnIds.delete(conversationId);
+          }
+          const errorPresentation = isCancelledError(result.error)
+            ? (result.error ? { message: result.error } : undefined)
+            : presentRuntimeError(agentId, result.error, undefined, { code: result.errorCode, usesApiKey, names: modelNamesFor(agentId) });
+          const error = errorPresentation?.message;
+          const failureKind = errorPresentation?.failureKind;
+          const errorKind = errorPresentation && 'errorKind' in errorPresentation ? errorPresentation.errorKind : undefined;
+          const errorDetail = errorPresentation && 'errorDetail' in errorPresentation ? errorPresentation.errorDetail : undefined;
+          // Read the person's Stop before the result is posted, so a stopped follow-up says Stopped
+          // in the sheet too, not Done (Sprint 139, as the person's own turns).
+          const cancelled = this._consumeCancelIntent(conversationId, turnId);
+          post({
+            type: 'agent-result',
+            text: result.text ?? '',
+            filesModified: result.filesModified ?? [],
+            metrics: result.metrics ?? { durationMs: 0, costUsd: null, model: null },
+            error,
+            failureKind,
+            ...(errorKind ? { errorKind } : {}),
+            ...(errorDetail ? { errorDetail } : {}),
+            ...(cancelled ? { stopped: true } : {}),
+          });
+          this._refreshExplorerForAgentWrites(result.filesModified);
+          const status: 'completed' | 'failed' | 'cancelled' = cancelled ? 'cancelled' : error ? 'failed' : 'completed';
+          // No title generation: the conversation already has its title.
+          this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
+            conversationId,
+            bindingGeneration,
+            runtimeId: agentId,
+            turnId,
+            text: result.text ?? '',
+            status,
+            error,
+            failureKind,
+            ...(status === 'failed' && errorKind ? { errorKind } : {}),
+            ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
+            activeDurationMs: turnActiveDurationMs(result.metrics),
+            filesModified: result.filesModified ?? [],
+          }), hostConversationEnabled);
+          if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
+            this._disposeRuntimeSessionsForAgent('claude-code');
+            clearSetupCache();
+            emitClaudeStatusInvalidated('authentication-failed');
+          }
         });
-        this._refreshExplorerForAgentWrites(result.filesModified);
-        const status: 'completed' | 'failed' | 'cancelled' = cancelled ? 'cancelled' : error ? 'failed' : 'completed';
-        // No title generation: the conversation already has its title.
-        this._runConversationCheckpoint(conversationId, () => this._conversationController.completeRuntimeTurn({
-          conversationId,
-          bindingGeneration,
-          runtimeId: agentId,
-          turnId,
-          text: result.text ?? '',
-          status,
-          error,
-          failureKind,
-          ...(status === 'failed' && errorKind ? { errorKind } : {}),
-          ...(status === 'failed' && errorDetail ? { errorDetail } : {}),
-          activeDurationMs: turnActiveDurationMs(result.metrics),
-          filesModified: result.filesModified ?? [],
-        }), hostConversationEnabled);
-        if (failureKind === 'authentication' || failureKind === 'api-key-authentication') {
-          this._disposeRuntimeSessionsForAgent('claude-code');
-          clearSetupCache();
-          emitClaudeStatusInvalidated('authentication-failed');
-        }
       },
     };
   }
@@ -4544,6 +4607,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     this._runtimeSessions.delete(conversationId);
     this._runtimeSessionLastUsed.delete(conversationId);
     this._activeRuntimeTurnTokens.delete(conversationId);
+    this._liveDeckTurns.get(conversationId)?.dispose();
+    this._liveDeckTurns.delete(conversationId);
     this._liveThinkingEffortCapabilities.delete(conversationId);
   }
 

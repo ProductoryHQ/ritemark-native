@@ -45,6 +45,7 @@ const ALLOWED: Array<{ file: string; line: RegExp; why: string }> = [
   { file: 'components/settings/AdvancedSection.tsx', line: /bg: 'bg-ritemark-success', ariaLabel: 'Status: ready'/, why: "Settings' runtime ready dot, in Ritemark's parts" },
   { file: 'components/settings/AiAccountsSection.tsx', line: /rounded-full bg-ritemark-success" \/>$/, why: "AI accounts' Ready mark on an AI's row (frame 2)" },
   { file: 'components/transcribe/TranscribePanel.tsx', line: /engine\.readiness\.ready \? 'bg-ritemark-success'/, why: "a Transcribe engine's ready dot" },
+  { file: 'components/ai-sidebar/ActivityCard.tsx', line: /updated.*--r-success.*--r-warning-ink/, why: "Sprint 175 frame 3 marks a live page update with a green globe" },
   { file: 'components/agent/ProvenanceBadge.tsx', line: /label: 'ChatGPT'/, why: "ChatGPT's provenance badge says which, not done" },
 ]
 

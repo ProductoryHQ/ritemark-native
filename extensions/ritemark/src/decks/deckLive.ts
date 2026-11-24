@@ -9,9 +9,17 @@ export type DeckLiveState = {
   resumeBlocked?: string;
 };
 
+export interface LiveSaveReceipt {
+  file: string;
+  superseded?: boolean;
+  settled: Promise<void>;
+  settle: () => void;
+}
+
 interface Update {
   run: (resume: boolean, sending: () => void) => Promise<LiveResult>;
   resume: boolean;
+  receipt?: LiveSaveReceipt;
 }
 
 interface Activity {
@@ -32,7 +40,7 @@ const OFFLINE = 'The page is offline. Your changes are saved on this computer.';
 export class DeckLive {
   private readonly pages = new Map<string, Activity>();
 
-  constructor(private readonly changed: (page: string, result?: LiveResult) => void) {}
+  constructor(private readonly changed: (page: string, result?: LiveResult, receipt?: LiveSaveReceipt) => void) {}
 
   state(page: string, preference: LivePreference): DeckLiveState {
     const activity = this.pages.get(page);
@@ -48,10 +56,11 @@ export class DeckLive {
     return { on: true, state: 'live', tooltip: `Open pages catch up within about 15 seconds.${pictures}` };
   }
 
-  request(page: string, run: Update['run'], resume = false): Promise<void> {
+  request(page: string, run: Update['run'], resume = false, receipt?: LiveSaveReceipt): Promise<void> {
     const activity = this.pages.get(page) ?? { generation: 0 };
     this.pages.set(page, activity);
-    activity.pending = { run, resume: resume || activity.pending?.resume === true };
+    activity.pending?.receipt?.settle();
+    activity.pending = { run, resume: resume || activity.pending?.resume === true, receipt };
     if (activity.retry && !resume) return Promise.resolve();
     if (activity.retry) clearTimeout(activity.retry);
     activity.retry = undefined;
@@ -73,8 +82,11 @@ export class DeckLive {
         const result = await update.run(update.resume, sending).catch((): LiveResult => ({
           kind: 'offline', detail: "Ritemark couldn't prepare the page for an update.",
         }));
-        if (this.pages.get(page) !== activity) return;
-        if (activity.generation !== generation) continue;
+        if (this.pages.get(page) !== activity || activity.generation !== generation) {
+          update.receipt?.settle();
+          if (this.pages.get(page) !== activity) return;
+          continue;
+        }
         if (result.kind === 'paused') this.dropPendingSave(activity);
         activity.offline = result.kind === 'offline' ? result.detail : undefined;
         if (result.kind === 'updated') activity.pictures = result.pictures;
@@ -82,6 +94,7 @@ export class DeckLive {
           this.keepPending(activity, update);
           if (result.until) {
             this.changed(page, result);
+            if (activity.pending !== update) update.receipt?.settle();
             await result.until;
             continue;
           }
@@ -92,7 +105,8 @@ export class DeckLive {
           this.keepPending(activity, update);
           this.retry(page, activity, OFFLINE_RETRY_MS);
         }
-        this.changed(page, result);
+        this.changed(page, result, update.resume ? undefined : update.receipt);
+        if (activity.pending !== update) update.receipt?.settle();
         if (activity.retry || result.kind === 'offline') break;
       }
     };
@@ -121,7 +135,10 @@ export class DeckLive {
   }
 
   private dropPendingSave(activity: Activity): void {
-    if (!activity.pending?.resume) activity.pending = undefined;
+    if (!activity.pending?.resume) {
+      activity.pending?.receipt?.settle();
+      activity.pending = undefined;
+    }
   }
 
   /** In-flight work still owns the page until it settles. Each attempt checks consent again before sending. */
@@ -131,6 +148,7 @@ export class DeckLive {
     activity.generation++;
     activity.updating = false;
     clearTimeout(activity.retry);
+    activity.pending?.receipt?.settle();
     activity.pending = undefined;
     activity.retry = undefined;
     activity.offline = undefined;

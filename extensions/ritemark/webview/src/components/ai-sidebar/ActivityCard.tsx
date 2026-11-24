@@ -50,6 +50,16 @@ interface ActivityCardProps {
 }
 
 export function ActivityCard({ activity }: ActivityCardProps) {
+  if (activity.type === 'live_deck_updated' || activity.type === 'live_deck_paused') {
+    const updated = activity.type === 'live_deck_updated';
+    return (
+      <div className="flex items-start gap-2 rounded px-1 py-0.5 text-[11px] text-[var(--r-ink-muted)]">
+        <Icon name={updated ? 'globe' : 'pause'} size={14}
+          className={`mt-0.5 shrink-0 ${updated ? 'text-[var(--r-success)]' : 'text-[var(--r-warning-ink)]'}`} />
+        <span>{activity.message}</span>
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-2 rounded px-1 py-0.5 text-[11px]">
       <span className="shrink-0 mt-0.5 opacity-50">

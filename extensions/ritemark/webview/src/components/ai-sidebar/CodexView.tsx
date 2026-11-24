@@ -6,6 +6,7 @@
  * approval dialogs for shell commands and file changes.
  */
 
+import { ActivityCard } from './ActivityCard';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -379,6 +380,9 @@ function ActivitySection({
 }
 
 function ActivityLine({ activity }: { activity: AgentProgress }) {
+  if (activity.type === 'live_deck_updated' || activity.type === 'live_deck_paused') {
+    return <ActivityCard activity={activity} />;
+  }
   const icon = activity.tool === 'shell' ? (
     <Icon name="terminal" size={12} className="shrink-0" />
   ) : activity.tool === 'apply_patch' ? (

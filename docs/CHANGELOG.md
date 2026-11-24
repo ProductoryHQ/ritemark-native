@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - Source links in AI answers can open the quoted passage in Word, PDF, or Markdown, or jump to a slide in PowerPoint.
 
 ### Added
