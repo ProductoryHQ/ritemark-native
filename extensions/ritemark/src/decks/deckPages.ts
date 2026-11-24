@@ -14,6 +14,8 @@ import { openInBrowser } from './openInLink';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { readTimetable } from './timetable';
+import { timetableStatus } from './timetableDisplay';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
@@ -186,25 +188,53 @@ export class DeckPages implements vscode.Disposable {
     return slidesOfText(document.getText()).length > 0;
   }
 
+  private timetableItem: vscode.StatusBarItem | undefined;
+
+  private refreshTimetable(): void {
+    const active = [...this.views].find(view => view.panel.active);
+    const status = active && this.deckModeFor(active.document, true)
+      ? timetableStatus(readTimetable(active.document.getText())) : null;
+    if (!status) {
+      this.timetableItem?.hide();
+      return;
+    }
+    // The same status-bar position as the document word count, just left of AI status.
+    const item = this.timetableItem ??= vscode.window.createStatusBarItem(
+      'ritemark.deckLength', vscode.StatusBarAlignment.Right, 101,
+    );
+    item.name = 'Ritemark Deck Length';
+    item.text = status.text;
+    item.tooltip = status.tooltip;
+    item.color = status.over ? new vscode.ThemeColor('editorWarning.foreground') : undefined;
+    item.show();
+  }
+
   /** A deck's panel, while it is open: the active one is where the library inserts. */
   connect(document: vscode.TextDocument, panel: vscode.WebviewPanel): vscode.Disposable {
     const view: DeckView = { document, panel, current: 0, count: 0, slides: [], slideCount: 0 };
     this.views.add(view);
     if (panel.active) this.active = view;
     const state = panel.onDidChangeViewState(() => {
+      this.refreshTimetable();
       if (panel.active && this.active !== view) {
         this.active = view;
         this.changed.fire();
       }
     });
     this.changed.fire();
+    this.refreshTimetable();
+    const edits = vscode.workspace.onDidChangeTextDocument(event => {
+      if (event.document === document && event.contentChanges.length && panel.active) this.refreshTimetable();
+    });
     // The bar's Publish control hears the page's state while this view is open.
     const seat = this.publisher?.attach(document, message => this.post(panel.webview, message));
     return {
       dispose: () => {
         seat?.dispose();
         state.dispose();
+        edits.dispose();
         this.views.delete(view);
+        this.refreshTimetable();
         if (this.active === view) this.active = [...this.views].find(other => other.panel.active) ?? null;
         this.changed.fire();
         if (view.slides.length > 0) this.slideChanged.fire();
@@ -630,6 +660,7 @@ export class DeckPages implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.timetableItem?.dispose();
     for (const timer of this.selectTitle.values()) clearTimeout(timer);
     this.selectTitle.clear();
     for (const pending of this.pendingNotice.values()) clearTimeout(pending.timer);

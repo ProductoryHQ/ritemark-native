@@ -1,6 +1,5 @@
 import { parseDeck, slideDataOf } from './deckFormat';
-import { lengthMinutesOf } from './present/presentProtocol';
-import { frontMatterValue } from './present/presentSession';
+import { frontMatterValue, lengthMinutesOf } from './present/presentSession';
 import { minutesIn, stepsLabelOf } from '../../webview/src/components/decks/present/pointerTimer';
 
 export interface TimetableSlide {
