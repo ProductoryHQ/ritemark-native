@@ -4,8 +4,10 @@
  */
 
 import * as assert from 'assert';
+import { readFileSync } from 'node:fs';
 import type * as vscode from 'vscode';
 import { BUNDLED_CATALOG } from './bundledCatalog';
+import { validateCatalog } from './schema';
 import { fetchRemoteCatalog, getCachedCatalog, REMOTE_URL } from './remoteSource';
 
 let failures = 0;
@@ -55,11 +57,18 @@ async function main(): Promise<void> {
   let reply: { status: number; body?: string; etag?: string } = { status: 200, body: FEED_V1, etag: '"v1"' };
   const fetchImpl = stubFetch(calls, () => reply);
 
+  await test('the checked-in model feed passes the app schema', async () => {
+    const raw = readFileSync(new URL('../../../../../feeds/model-catalog.json', import.meta.url), 'utf8');
+    validateCatalog(JSON.parse(raw));
+  });
+
   await test('first fetch stores the catalog and its ETag', async () => {
     const result = await fetchRemoteCatalog(storage, fetchImpl);
     assert.ok(result);
     assert.strictEqual(result!.changed, true);
     assert.strictEqual(calls[0].url, REMOTE_URL);
+    assert.strictEqual(REMOTE_URL,
+      'https://raw.githubusercontent.com/ProductoryHQ/ritemark-native/main/feeds/model-catalog.json');
     assert.strictEqual(calls[0].ifNoneMatch, null, 'nothing cached yet');
     assert.strictEqual(getCachedCatalog(storage)?.updatedAt, '2026-09-24T00:00:00Z');
   });

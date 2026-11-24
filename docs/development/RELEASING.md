@@ -44,6 +44,23 @@ Operator commands and evidence requirements are in [Building and Verifying the W
 
 This is the slower path on purpose — it's changing the actual signed app, so it gets the full test-then-harden-then-publish treatment.
 
+## Where releases are published
+
+From 2.4, [Ritemark Native on GitHub](https://github.com/ProductoryHQ/ritemark-native)
+hosts releases, the stable and canary update feeds, and the model catalog at
+`feeds/model-catalog.json`. Keep extension releases and the rolling canary
+release marked as prereleases so the latest full release serves the downloads
+and stable feed.
+
+For the 2.4 cutover, use the previous release’s versioned feed on the old
+repository to seed the new feed. After publishing and verifying 2.4 on Ritemark
+Native, run `./scripts/publish-legacy-2.4-release.sh 2.4.0 --also-legacy-repo`
+so pre-2.4 installs can find it. The script copies the published files,
+including `update-feed.json`, byte for byte. Verify the copied release before
+archiving `jarmo-productory/ritemark-public`. Archived releases and raw files
+remain available. Keep the cutover PR open until just before the first 2.4
+candidate.
+
 ## After a shell release: closing out
 
 Building a shell release leaves a big folder behind on the Mac — the release worktree. For v1.10.1 it was about 15 GB: the two built Mac apps, the installers, and a full copy of VS Code. The cleanup script deliberately refuses to remove that folder while the installers are still inside it, because until they are published it is the only copy.

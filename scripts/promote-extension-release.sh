@@ -30,9 +30,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
-REPO_OWNER="jarmo-productory"
-REPO_NAME="ritemark-public"
-REPO="$REPO_OWNER/$REPO_NAME"
+REPO="ProductoryHQ/ritemark-native"
 
 VERSION=""
 MODE="promote"

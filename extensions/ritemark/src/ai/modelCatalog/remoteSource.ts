@@ -1,7 +1,7 @@
 /**
  * Remote catalog source (Sprint 89, GH #109).
  *
- * Fetches the published catalog from ritemark-public over HTTPS, validates it
+ * Fetches the published catalog from Ritemark’s repository over HTTPS, validates it
  * (fail-closed), size-caps it, and caches the last good copy to globalState so
  * the app survives offline. Trust model v1: HTTPS + origin allowlist + strict
  * schema + size cap (pinned-key signature deferred — see architecture.md).
@@ -11,10 +11,10 @@ import type * as vscode from 'vscode';
 import { validateCatalog, type ModelCatalog } from './schema';
 
 export const REMOTE_URL =
-  'https://raw.githubusercontent.com/jarmo-productory/ritemark-public/main/feeds/model-catalog.json';
+  'https://raw.githubusercontent.com/ProductoryHQ/ritemark-native/main/feeds/model-catalog.json';
 
-/** Origin allowlist: the URL must live under our public repo's raw host + org. */
-const ALLOWED_PREFIX = 'https://raw.githubusercontent.com/jarmo-productory/';
+/** Origin allowlist: the URL must live under our repository's raw GitHub path. */
+const ALLOWED_PREFIX = 'https://raw.githubusercontent.com/ProductoryHQ/ritemark-native/';
 const SIZE_CAP_BYTES = 512 * 1024;
 const FETCH_TIMEOUT_MS = 8_000;
 

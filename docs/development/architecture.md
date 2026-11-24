@@ -1,7 +1,7 @@
 # Ritemark Extension Architecture
 
 **Status:** Living document — updated at the end of each sprint that changes extension architecture.
-**Last updated:** 2026-11-24 (Sprint 173, PR 5: source hover card and fallback navigation). Before: 2026-11-21 (Sprint 172, PRs 1–3: one rule names new decks `<name>.rtms` and keeps older `.deck.md` names working, macOS release builds stamp the Ritemark Deck file type and Finder badge, and the Windows installer registers the file type and Explorer icon). Before: 2026-11-20, Sprint 169 closed out: a box's icon is any Phosphor regular icon, drawn the same on every surface, found with the icon menu's Search icons, and an unknown name opens that search with its name (see *Decks*). Before: 2026-11-17, Sprint 161: block slides, the slide editor on the stage, and comments on the slide for Claude, in the handout's own notation (see *Decks*). Before: Sprints 159 and 160 closed out. Sprint 159: Decks on main behind `ritemark.features.decks` — a frame place's `setting` (patch 002), New → Deck, Present with the presenter view and the shell's `_ritemark.present.*` (patches 004, 018, 019), the handout page and Publish on the deck's bar; Sprint 160: Claude's readiness has one source per state (one sign-in decision in `agent/setup.ts`, the saved key read on every check, `claudeLogin.ts` the only writer of signing-in), the AI's sheet follows a running sign-in, and a usage limit says so; Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
+**Last updated:** 2026-11-24 (2.4 moves update feeds and the model catalog into `ProductoryHQ/ritemark-native`). Before: 2026-11-24 (Sprint 173, PR 5: source hover card and fallback navigation). Before: 2026-11-21 (Sprint 172, PRs 1–3: one rule names new decks `<name>.rtms` and keeps older `.deck.md` names working, macOS release builds stamp the Ritemark Deck file type and Finder badge, and the Windows installer registers the file type and Explorer icon). Before: 2026-11-20, Sprint 169 closed out: a box's icon is any Phosphor regular icon, drawn the same on every surface, found with the icon menu's Search icons, and an unknown name opens that search with its name (see *Decks*). Before: 2026-11-17, Sprint 161: block slides, the slide editor on the stage, and comments on the slide for Claude, in the handout's own notation (see *Decks*). Before: Sprints 159 and 160 closed out. Sprint 159: Decks on main behind `ritemark.features.decks` — a frame place's `setting` (patch 002), New → Deck, Present with the presenter view and the shell's `_ritemark.present.*` (patches 004, 018, 019), the handout page and Publish on the deck's bar; Sprint 160: Claude's readiness has one source per state (one sign-in decision in `agent/setup.ts`, the saved key read on every check, `claudeLogin.ts` the only writer of signing-in), the AI's sheet follows a running sign-in, and a usage limit says so; Sprint 158: the Excel editor saves only the edited cells (`src/excel/`, the `cellEdit` message), behind the kill switch `excel-editing`, and draws a workbook as Excel does (`webview/src/components/excel/`); Sprint 156: with no AI ready, Home's first card signs in, and the AI last seen ready in its own key, with its three counts; Sprint 155: test keys in the test channel, `ai/providerKeys.ts`; Sprint 152: the shell's startup contract, the frame drawn from one description and one loading look in every slot; Sprint 137: the editor's Markdown pipeline, files as written, a refused save goes to Ritemark first; Sprint 139: the AI you chose keeps working — one failure classifier and card, a chat's model kept, the turn counts; Sprint 140: the first day's guidance and the feedback door; Sprint 138: equations, typeset, edited in place and exported)
 **Owner:** Jarmo (decisions) · Claude (maintenance)
 
 ---
@@ -1353,7 +1353,7 @@ gulp darwin-arm64-min   VS Code full build against submodule
 codesign                Apple Developer ID + Hardened Runtime + agent binary re-signing (JKBSC3ZDT5)
 xcrun notarytool        Apple notarization (pull log with --id before assuming outage)
 create-dmg              Sparkle-compatible .dmg
-update-feed.json        Sparkle update feed → jarmo-productory/ritemark-public
+update-feed.json        Stable and canary update feeds → ProductoryHQ/ritemark-native
 ```
 
 Build prerequisites (not enforceable at commit time): arm64 Node at the exact `vscode/.nvmrc` pin for production, the repo-root `.nvmrc` pin for development, and the `arch -arm64` shell wrapper. Full commands and gotchas in `.claude/skills/vscode-development/SKILL.md`.
@@ -1678,7 +1678,7 @@ resolving model lists + per-surface defaults for every runtime and view:
 | Layer | Source |
 |---|---|
 | Live | Anthropic `GET /v1/models` (primary, API-key); OpenAI `models.list()`; Gemini `/v1/models`; Codex `~/.codex/models_cache.json`; OpenCode: its own list, the `model` option of ACP `session/new` (Sprint 141, below) |
-| Remote | `feeds/model-catalog.json` in `jarmo-productory/ritemark-public` — edit to add a model with **no app release** (HTTPS + strict schema v1 + 512 KB cap + origin allowlist) |
+| Remote | `feeds/model-catalog.json` in `ProductoryHQ/ritemark-native` — edit to add a model with **no app release** (HTTPS + strict schema v1 + 512 KB cap + origin allowlist) |
 | Cache | last good remote fetch in `globalState` (offline survival) |
 | Bundled | `bundledCatalog.ts` typed baseline shipped in the VSIX (offline floor) |
 
@@ -1739,7 +1739,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 - Before each release, `npm run check:anthropic-models` reads Anthropic's catalog (`downloads.claude.ai/model-catalog/v1/catalog.json`, undocumented) through `anthropicCatalogCheck.ts`. That module is pure and not bundled.
 - The check raises an alert when the catalog cannot be read, has changed shape or has expired, or when a model needs a newer Claude Code than the runtime manifest bundles. It warns when a `main` model is missing from the bundled lineup.
 - The app itself never reads this catalog.
-- The feed in `ritemark-public` is edited by hand when needed. There is no publisher: the automatic one was withdrawn with D4.
+- The feed in `ProductoryHQ/ritemark-native` is edited by hand when needed. There is no publisher: the automatic one was withdrawn with D4.
 - A feed row may declare a model only when the bundled Claude Code meets Anthropic's minimum for that model.
 - Release steps are in `.claude/skills/release/SKILL.md` ## Claude Code and model currency.
 
@@ -1756,7 +1756,7 @@ Decision D4, the same day, adds one fact that shapes all three: **Anthropic ties
 - `scripts/export-bundled-model-catalog.ts --merge` makes the candidate. `feedExport.ts` carries a curated feed row's `claudeCode` and `minAppVersion` onto a bundled row that has none (1.12.0's Sonnet 5.5 declaration), and adds the gates in `feedGates.ts`.
 - **No bundled row carries `minAppVersion`.** The catalog resolves as app version 0.0.0 before activation, so a bundled gate would hide the row from the build itself.
 - `npm run check:model-feed` (`scripts/check-model-feed.ts`) resolves the current and the candidate feed with each release's own `schema.ts`, `resolver.ts`, `bundledCatalog.ts` and `runtimeDeclarations.ts`, taken with `git archive`. It reports rows, defaults and declarations, and fails on a rejected candidate, an empty provider, or a default that newly falls back.
-- The publish is a release step in `ritemark-public` (`.claude/skills/release/SKILL.md`, *The model feed*).
+- The publish is a release step in `ProductoryHQ/ritemark-native` (`.claude/skills/release/SKILL.md`, *The model feed*).
 
 **Declarations for bundled models.** A Claude model this build bundles is declared as its bundled row says, whatever a feed row of the same id carries (`withBundledDeclarations`, `computeDeclarations`). The build knows what its own Claude Code knows natively, so a declaration an older release needs can't cap a newer one's sessions.
 

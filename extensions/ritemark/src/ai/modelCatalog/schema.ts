@@ -7,7 +7,7 @@
  *
  * The SAME schema describes three things:
  *   - the bundled baseline (`bundledCatalog.ts`, shipped in the VSIX),
- *   - the remote catalog (`feeds/model-catalog.json` in ritemark-public),
+ *   - the remote catalog (`feeds/model-catalog.json` in ProductoryHQ/ritemark-native),
  *   - the on-disk cache of the last good remote fetch.
  *
  * `validateCatalog()` is fail-closed: on any structural violation it THROWS, so
@@ -28,7 +28,7 @@ export interface ModelThinkingEffort {
 
 /**
  * Who wrote a catalog row (Sprint 127 R3/R4). `auto` rows come from the
- * ritemark-public publisher: they may add a model, never become a default.
+ * catalog publisher: they may add a model, never become a default.
  */
 export type ModelProvenance = 'curated' | 'auto';
 

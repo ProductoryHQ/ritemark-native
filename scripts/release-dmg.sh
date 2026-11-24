@@ -8,9 +8,9 @@
 #
 # This script:
 #   1. Runs verify-notarization.sh (MUST pass)
-#   2. Creates stable Ritemark.dmg copy
+#   2. Creates stable Ritemark-arm64.dmg copy
 #   3. Verifies release notes exist
-#   4. Uploads to GitHub (jarmo-productory/ritemark-public)
+#   4. Uploads to GitHub
 #
 # The verify-notarization.sh check is MANDATORY and cannot be skipped.
 #
@@ -132,7 +132,7 @@ fi
 echo ""
 echo "[4/6] Creating stable DMG filename..."
 
-STABLE_DMG="$PROJECT_ROOT/dist/Ritemark.dmg"
+STABLE_DMG="$PROJECT_ROOT/dist/Ritemark-arm64.dmg"
 cp "$DMG_PATH" "$STABLE_DMG"
 echo "  Created: $STABLE_DMG"
 
@@ -148,7 +148,7 @@ FEED_ARGS=(
     --mode full
     --version "$VERSION"
     --output "$UPDATE_FEED"
-    --asset "$STABLE_DMG|darwin|arm64|Ritemark.dmg"
+    --asset "$STABLE_DMG|darwin|arm64|Ritemark-arm64.dmg"
 )
 
 if [ -n "$NOTES_FLAG" ]; then
@@ -165,7 +165,7 @@ echo "  Created: $UPDATE_FEED"
 echo ""
 echo "[6/6] Uploading to GitHub..."
 
-REPO="jarmo-productory/ritemark-public"
+REPO="ProductoryHQ/ritemark-native"
 TAG="v$VERSION"
 
 # Check if tag already exists
@@ -224,6 +224,6 @@ else
     echo "URL: https://github.com/$REPO/releases/tag/$TAG"
     echo ""
     echo "Stable download URL:"
-    echo "  https://github.com/$REPO/releases/latest/download/Ritemark.dmg"
+    echo "  https://github.com/$REPO/releases/latest/download/Ritemark-arm64.dmg"
     echo ""
 fi

@@ -1,5 +1,5 @@
 /**
- * Print the bundled model catalog as ritemark-public's feed document
+ * Print the bundled model catalog as the repository's model feed document
  * (Sprint 127, R4/R8). Bootstraps `feeds/model-catalog.json` and, at each
  * shell release, refreshes it so clients on older builds stay current.
  *

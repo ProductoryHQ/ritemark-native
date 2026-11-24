@@ -10,7 +10,7 @@
 <p align="center"><strong>Ritemark turns a folder on your computer into a workspace where ChatGPT or Claude work with you.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0"><img src="https://img.shields.io/badge/version-2.3.0-1e2a4a" alt="Version 2.3.0"></a>
+  <a href="https://github.com/ProductoryHQ/ritemark-native/releases/latest"><img src="https://img.shields.io/github/v/release/ProductoryHQ/ritemark-native?label=version&amp;color=1e2a4a" alt="Latest release version"></a>
   <img src="https://img.shields.io/badge/Mac%20and%20Windows-1e2a4a" alt="Mac and Windows">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-1e2a4a" alt="MIT licence"></a>
 </p>
@@ -19,7 +19,7 @@
   <a href="https://ritemark.app">Website</a> ·
   <a href="#download">Download</a> ·
   <a href="docs/user/getting-started.md">Getting started</a> ·
-  <a href="https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0">What's new in 2.3</a>
+  <a href="https://github.com/ProductoryHQ/ritemark-native/releases/latest">What's new</a>
 </p>
 
 ![Ritemark 2.3 with a deck open: the slide and its handout on the desk, the project's files on the left, and Claude's answer beside it after it added the slide](docs/assets/readme/ritemark-2.3-deck-hero.jpg)
@@ -32,7 +32,7 @@ Your documents stay plain Markdown files on your computer, and you need no Ritem
 
 ## New in 2.3: slides
 
-You can now make slides in Ritemark, present them, and give every participant a page to work through. Write a deck as you write a document, with a handout beside the slides. 2.3 also lets you edit Excel files and keep their look, change pictures yourself or with ChatGPT, and change tables with the mouse. [Read the 2.3 release notes](https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0).
+You can now make slides in Ritemark, present them, and give every participant a page to work through. Write a deck as you write a document, with a handout beside the slides. 2.3 also lets you edit Excel files and keep their look, change pictures yourself or with ChatGPT, and change tables with the mouse. [Read the latest release notes](https://github.com/ProductoryHQ/ritemark-native/releases/latest).
 
 ## What you can do
 
@@ -61,11 +61,9 @@ You can now make slides in Ritemark, present them, and give every participant a 
 
 | Platform | Download |
 | --- | --- |
-| Mac with Apple silicon (M1 and later) | [Ritemark-arm64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v2.3.0/Ritemark-arm64.dmg) |
-| Mac with Intel | [Ritemark-x64.dmg](https://github.com/jarmo-productory/ritemark-public/releases/download/v2.3.0/Ritemark-x64.dmg) |
-| Windows | [Microsoft Store](https://apps.microsoft.com/detail/xp9k8sp24trnk4), or the installer [Ritemark-Setup.exe](https://github.com/jarmo-productory/ritemark-public/releases/download/v2.3.0/Ritemark-Setup.exe) |
-
-<!-- Links are pinned to a specific release tag on purpose. `releases/latest/download/...` resolves against whatever release is newest, so a platform-partial release (one that ships an installer for some platforms but not others) turns the missing platform's link into a 404. -->
+| Mac with Apple silicon (M1 and later) | [Ritemark-arm64.dmg](https://github.com/ProductoryHQ/ritemark-native/releases/latest/download/Ritemark-arm64.dmg) |
+| Mac with Intel | [Ritemark-x64.dmg](https://github.com/ProductoryHQ/ritemark-native/releases/latest/download/Ritemark-x64.dmg) |
+| Windows | [Microsoft Store](https://apps.microsoft.com/detail/xp9k8sp24trnk4), or the installer [Ritemark-Setup.exe](https://github.com/ProductoryHQ/ritemark-native/releases/latest/download/Ritemark-Setup.exe) |
 
 Ritemark tells you when a new version is out. A version from the Microsoft Store updates from the Store.
 

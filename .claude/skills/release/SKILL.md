@@ -379,12 +379,15 @@ cp dist/Ritemark-X.Y.Z-darwin-x64.dmg   dist/Ritemark-x64.dmg
    `git show origin/main:docs/releases/vX.Y.Z/release-notes.md > /tmp/body.md`.
 2. **Rewrite relative image paths to absolute URLs.** A release body is rendered
    standalone, so `![](screenshots/foo.png)` renders as a broken link even
-   though it is correct inside the repo. Copy the referenced images into
-   `images/` in `jarmo-productory/ritemark-public`, push, and rewrite the body
-   (leave the repo document's relative paths alone):
+   though it is correct inside the repo. Use the screenshots already committed
+   alongside the notes in `ProductoryHQ/ritemark-native`. They must be on
+   `main` before the first candidate is cut: `main` is frozen from then until
+   publish, so notes merged in the closeout would leave the release's pictures
+   broken until then. Rewrite the release body and keep the relative paths in
+   the repo document:
 
 ```bash
-sed -E 's#\]\(screenshots/#](https://raw.githubusercontent.com/jarmo-productory/ritemark-public/main/images/#g' \
+sed -E 's#\]\(screenshots/#](https://raw.githubusercontent.com/ProductoryHQ/ritemark-native/main/docs/releases/vX.Y.Z/screenshots/#g' \
   /tmp/body.md > /tmp/release-body.md
 ```
 
@@ -406,21 +409,26 @@ release's own feed, or from nothing if none is attached: the generated feed
 silently contains only the new version, wiping every older per-platform entry:
 
 ```bash
+PREVIOUS_TAG=vX.Y.Z  # set this to the previous full release tag
 node ./scripts/generate-update-feed.mjs --mode full --version X.Y.Z \
   --output dist/update-feed.json \
-  --existing-feed-url https://github.com/jarmo-productory/ritemark-public/releases/download/v<PREV>/update-feed.json \
+  --existing-feed-url "https://github.com/ProductoryHQ/ritemark-native/releases/download/$PREVIOUS_TAG/update-feed.json" \
   --notes-file docs/releases/vX.Y.Z/release-notes.md \
   --asset "dist/Ritemark-arm64.dmg|darwin|arm64|Ritemark-arm64.dmg" \
   --asset "dist/Ritemark-x64.dmg|darwin|x64|Ritemark-x64.dmg" \
   --asset "dist/Ritemark-Setup.exe|win32|x64|Ritemark-Setup.exe"
 ```
 
+For the first 2.4 release, the previous feed still lives on the legacy release
+repository. Use its versioned feed URL as the seed and keep the generated
+2.4 asset URLs on `ProductoryHQ/ritemark-native`.
+
 Confirm `fullReleases` grew by exactly one; 8.5 checks the new entry's hashes.
 
 #### 8.4 Create the draft, then upload the binaries and the feed
 
 ```bash
-V=X.Y.Z; TAG=v$V; REPO=jarmo-productory/ritemark-public
+V=X.Y.Z; TAG=v$V; REPO=ProductoryHQ/ritemark-native
 gh release create $TAG --repo $REPO --draft \
   --title "Ritemark v$V" \
   --notes-file /tmp/release-body.md
@@ -488,6 +496,19 @@ re-checks the published release.
 
 If the feed is stale or missing, the release is BLOCKED — even if the binaries are uploaded.
 
+#### 8.7 One-time 2.4 migration
+
+After the native release and its latest feed are verified, copy the published
+2.4 release to the legacy repository so older installs can discover it:
+
+```bash
+./scripts/publish-legacy-2.4-release.sh 2.4.0 --also-legacy-repo
+```
+
+The script requires the flag and accepts only full 2.4.x versions. It uploads
+the published assets and feed unchanged. Verify the legacy latest tag and
+asset digests against native before archiving the legacy repository.
+
 ### Step 9 — Post-release
 
 1. Surface to user: "Recommend invoking `product-marketer` for changelog, release notes, landing-page copy." The notes and every copy follow the `release-notes` skill's wording and checks before anyone else reads them.
@@ -527,7 +548,7 @@ and diff the two lists. An empty diff is the pass condition.
 
 ```bash
 cd .worktrees/release-<commit>          # the release worktree, not the main checkout
-V=X.Y.Z; TAG=v$V; REPO=jarmo-productory/ritemark-public
+V=X.Y.Z; TAG=v$V; REPO=ProductoryHQ/ritemark-native
 T=$(mktemp -d)
 
 # Published: GitHub's own digest + size per asset
@@ -720,23 +741,25 @@ cd extensions/ritemark && npm run check:anthropic-models
   - `./scripts/verify-agent-runtimes.sh` on the release Mac
 - Record the results in the compatibility matrix. Pre-commit check 11 requires it.
 
-**3. The model feed.** `feeds/model-catalog.json` in `jarmo-productory/ritemark-public` adds or hides models without a release. It is the only remote channel for OpenAI, Gemini, Codex and OpenCode.
+**3. The model feed.** `feeds/model-catalog.json` in `ProductoryHQ/ritemark-native` adds or hides models without a release. It is the only remote channel for OpenAI, Gemini, Codex and OpenCode.
 
-**Who reads it.** Every Ritemark from 1.8.1 reads the same document (Sprint 141, `releases/v2.1.0/sprint-141-model-lineup/research/feed-readers-audit.md`), with two resolvers:
-- 1.8.1–1.11.0 take it whole;
-- 1.12.0 and later merge it row by row, and a fresher document's row wins for an id both have.
+**Who reads it.** Ritemark 2.4 and later read this catalog. The app merges
+rows with its bundled catalog and prefers the fresher row for an ID both
+contain. Older versions read `feeds/model-catalog.json` on
+`jarmo-productory/ritemark-public`: until that repository is archived after
+2.4, publish every catalog change to both repositories, or installs that
+haven't taken 2.4 yet miss it. After the archive, they keep its last copy. `npm run check:model-feed` compares how different resolver versions
+handle the proposed changes.
 
-So one edit reaches every release at once, and `npm run check:model-feed` shows what each one will see before you publish.
-
-**The refresh at each shell release** (publish with the release, after Gate 2; it is a cross-repo release step):
+**The refresh at each shell release** (publish with the release, after Gate 2):
 
 ```bash
-cd extensions/ritemark                          # in the release worktree
+cd extensions/ritemark                          # in the checkout for the catalog edit
 git fetch --tags                                # the check reads every release tag
-npx tsx scripts/export-bundled-model-catalog.ts --merge <ritemark-public>/feeds/model-catalog.json > /tmp/model-catalog.json
+npx tsx scripts/export-bundled-model-catalog.ts --merge ../../feeds/model-catalog.json > /tmp/model-catalog.json
 npm run check:model-feed -- --candidate /tmp/model-catalog.json \
-  --current <ritemark-public>/feeds/model-catalog.json --accept legacy:codex --out /tmp/model-feed-report.md
-cp /tmp/model-catalog.json <ritemark-public>/feeds/model-catalog.json   # then commit as jarmo-productory
+  --current ../../feeds/model-catalog.json --accept legacy:codex --out /tmp/model-feed-report.md
+cp /tmp/model-catalog.json ../../feeds/model-catalog.json   # then commit to ritemark-native
 ```
 
 - **The export** starts from the release's bundled lineup and keeps what older apps need:

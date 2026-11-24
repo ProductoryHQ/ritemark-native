@@ -7,7 +7,7 @@
  *
  * Shipped inside the VSIX as a typed const (NOT a .json import — tsconfig has no
  * `resolveJsonModule`, and a compiled const is type-checked and needs no runtime
- * file read). The PUBLISHED catalog (`feeds/model-catalog.json` in ritemark-public)
+ * file read). The PUBLISHED catalog (`feeds/model-catalog.json` in ProductoryHQ/ritemark-native)
  * mirrors this shape and is what gets edited to add a model without an app release.
  *
  * Keep this seed in sync with the published catalog at publish time (Phase 4).

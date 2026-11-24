@@ -3,10 +3,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 
-import { getNotesSummary } from './generate-update-feed.mjs';
+import { CHANNELS, getNotesSummary } from './generate-update-feed.mjs';
 
 function notesFile(text) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feed-notes-'));
@@ -32,4 +34,38 @@ test('notes with no plain line fall back to the version', () => {
 
 test('a summary given on the command line wins', () => {
   assert.equal(getNotesSummary({ 'notes-summary': '  Given.  ', version: '9.9.9' }, null), 'Given.');
+});
+
+test('uses the native repository for both update channels', () => {
+  assert.deepEqual(CHANNELS, {
+    stable: 'https://github.com/ProductoryHQ/ritemark-native/releases/latest/download/update-feed.json',
+    canary: 'https://github.com/ProductoryHQ/ritemark-native/releases/download/canary/update-feed.json',
+  });
+});
+
+test('generates a versioned native download URL for each full release asset', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ritemark-feed-assets-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const output = path.join(dir, 'update-feed.json');
+  const script = fileURLToPath(new URL('./generate-update-feed.mjs', import.meta.url));
+  const assets = [
+    ['Ritemark-arm64.dmg', 'darwin', 'arm64'],
+    ['Ritemark-x64.dmg', 'darwin', 'x64'],
+    ['Ritemark-Setup.exe', 'win32', 'x64'],
+  ];
+  const args = assets.flatMap(([name, platform, arch]) => {
+    const asset = path.join(dir, name);
+    fs.writeFileSync(asset, name);
+    return ['--asset', `${asset}|${platform}|${arch}|${name}`];
+  });
+  const emptyFeed = JSON.stringify({ fullReleases: [], extensionReleases: [] });
+  execFileSync(process.execPath, [
+    script, '--mode', 'full', '--version', '2.4.0', '--output', output,
+    '--existing-feed-url', `data:application/json,${encodeURIComponent(emptyFeed)}`, ...args,
+  ]);
+  const feed = JSON.parse(fs.readFileSync(output, 'utf8'));
+  assert.deepEqual(
+    feed.fullReleases[0].platforms.map(asset => asset.downloadUrl),
+    assets.map(([name]) => `https://github.com/ProductoryHQ/ritemark-native/releases/download/v2.4.0/${name}`),
+  );
 });
