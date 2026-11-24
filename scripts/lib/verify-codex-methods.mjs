@@ -1,0 +1,179 @@
+// Probe the same outbound JSONL requests as Ritemark, against the binary on disk.
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createInterface } from 'node:readline';
+import { pathToFileURL } from 'node:url';
+
+export function collectMethods() {
+  const ts = createRequire(new URL('../../extensions/ritemark/package.json', import.meta.url))('typescript');
+  const client = new URL('../../extensions/ritemark/src/codex/codexAppServer.ts', import.meta.url);
+  const source = ts.createSourceFile('codexAppServer.ts', readFileSync(client, 'utf8'), ts.ScriptTarget.Latest);
+  const methods = new Set();
+  function visit(node) {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.expression.kind === ts.SyntaxKind.ThisKeyword && node.expression.name.text === 'rpc') {
+      const [method] = node.arguments;
+      if (!method || !ts.isStringLiteralLike(method)) throw new Error('Expected a literal method in this.rpc()');
+      methods.add(method.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  if (!methods.delete('initialize') || !methods.size) throw new Error('Could not discover the app-server handshake and requests');
+  return ['initialize', ...methods];
+}
+
+function probeParams(method) {
+  if (method === 'initialize') return {
+    clientInfo: { name: 'ritemark-native', title: 'Ritemark Native', version: '1.4.0' },
+    capabilities: { experimentalApi: true },
+  };
+  // {} is a valid thread/start. Force a parameter error before a session (or a login) can start.
+  if (method === 'thread/start') return { cwd: false };
+  if (method === 'account/login/start') return { type: false };
+  return {};
+}
+
+function probeEnvironment(home) {
+  // Omit inherited credentials and route any background HTTP traffic to a closed local port.
+  const env = { CODEX_HOME: home, HTTP_PROXY: 'http://127.0.0.1:1', HTTPS_PROXY: 'http://127.0.0.1:1' };
+  for (const name of ['HOME', 'PATH', 'SystemRoot', 'USERPROFILE', 'LOCALAPPDATA', 'TEMP', 'TMP', 'TMPDIR']) {
+    if (process.env[name]) env[name] = process.env[name];
+  }
+  return env;
+}
+
+// 0.171.0 uses -32600 for BOTH unknown methods and ordinary parameter errors.
+// Its dispatcher names the rejected method and supplies its accepted method list.
+// A parameter error can mention an unknown enum variant within a valid method.
+function dispatcherRejects(method, { code, message }) {
+  const quotedMethod = '`' + method + '`';
+  const prefix = 'Invalid request: unknown variant ' + quotedMethod + ', expected one of ';
+  if (code !== -32600 || !message.startsWith(prefix)) return false;
+  const accepted = message.slice(prefix.length);
+  return accepted.includes('`initialize`') && !accepted.includes(quotedMethod);
+}
+
+export async function probeMethods(binary, methods, {
+  args = ['-c', 'cli_auth_credentials_store="file"', '-c', 'analytics.enabled=false'],
+  timeoutMs = 10000, log = console.log,
+} = {}) {
+  const home = mkdtempSync(path.join(tmpdir(), 'ritemark-codex-methods-'));
+  let child, reader, closed, failure, interruptedBy;
+  function killTree() {
+    // On Windows a killed app-server can leave helpers holding files in its home.
+    if (process.platform === 'win32' && child?.pid) spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    child?.kill('SIGKILL');
+  }
+  function stop(error) {
+    failure ??= error;
+    killTree();
+    reader?.close();
+  }
+  const onSigint = () => { interruptedBy ??= 'SIGINT'; stop(new Error('interrupted')); };
+  const onSigterm = () => { interruptedBy ??= 'SIGTERM'; stop(new Error('interrupted')); };
+  let index = 0;
+  try {
+    child = spawn(binary, args, { cwd: tmpdir(), env: probeEnvironment(home), stdio: ['pipe', 'pipe', 'ignore'] });
+    closed = new Promise(resolve => child.once('close', resolve));
+    child.on('error', stop);
+    child.stdin.on('error', stop);
+    process.on('SIGINT', onSigint);
+    process.on('SIGTERM', onSigterm);
+    reader = createInterface({ input: child.stdout, crlfDelay: Infinity });
+    const lines = reader[Symbol.asyncIterator]();
+    const send = message => child.stdin.write(JSON.stringify({ jsonrpc: '2.0', ...message }) + '\n');
+
+    async function request(id, method) {
+      const timer = setTimeout(() => stop(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+      try {
+        send({ id, method, params: probeParams(method) });
+        for (;;) {
+          const { value, done } = await lines.next();
+          if (failure) throw failure;
+          if (done) throw new Error('app-server closed stdout before replying');
+          let reply;
+          try { reply = JSON.parse(value); } catch { continue; } // a log line, not a reply
+          if (reply?.id === id && !('method' in reply)) return reply;
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    let ok = true;
+    for (; index < methods.length; index++) {
+      const method = methods[index];
+      const reply = await request(index + 1, method);
+      if ('result' in reply && !('error' in reply)) {
+        if (method === 'initialize') send({ method: 'initialized' });
+        log(`  ${method} PRESENT (result)`);
+        continue;
+      }
+      if ('result' in reply || !Number.isInteger(reply.error?.code) || typeof reply.error.message !== 'string') {
+        throw new Error('invalid response: expected a result or JSON-RPC error');
+      }
+      const { code, message } = reply.error;
+      const rejectedByDispatcher = dispatcherRejects(method, reply.error);
+      const missing = code === -32601 || rejectedByDispatcher;
+      if (method === 'initialize' && !missing) throw new Error(`handshake rejected (${code}: ${message})`);
+      const reason = rejectedByDispatcher ? 'absent from app-server dispatch list' : message;
+      log(`  ${method} ${missing ? 'MISSING' : 'PRESENT'} (${code}: ${reason})`);
+      if (method === 'initialize') {
+        index++;
+        throw new Error('could not initialize app-server');
+      }
+      if (missing) ok = false;
+    }
+    return ok;
+  } catch (error) {
+    for (const method of methods.slice(index)) log(`  ${method} FAIL (${error.message})`);
+    return false;
+  } finally {
+    try {
+      killTree();
+      child?.stdout.destroy();
+      child?.stdin.destroy();
+      await closed;
+      try {
+        rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+      } catch (error) {
+        // The answers are already judged; a leftover empty-of-credentials temp folder is not a failed check.
+        log(`  warning: could not remove the temporary CODEX_HOME ${home} (${error.code || error.message})`);
+      }
+    } finally {
+      process.off('SIGINT', onSigint);
+      process.off('SIGTERM', onSigterm);
+      // Ctrl-C or a CI cancel stops the whole verification, not just this probe.
+      if (interruptedBy) process.kill(process.pid, interruptedBy);
+    }
+  }
+}
+
+// A method that can't exist. It must come back MISSING, or the check can't tell
+// a missing method from a present one and fails rather than passing unchecked.
+export const ABSENT_METHOD = 'ritemark/absentMethodProbe';
+
+export async function verifyBinary(binary, methods, options = {}) {
+  const log = options.log ?? console.log;
+  const lines = [];
+  await probeMethods(binary, [...methods, ABSENT_METHOD], { ...options, log: line => { lines.push(line); log(line); } });
+  const control = lines.find(line => line.startsWith(`  ${ABSENT_METHOD} `)) ?? '';
+  // The probe itself failed before an answer (its FAIL lines already say why).
+  if (control.includes(' FAIL ')) return false;
+  if (!control.includes(' MISSING ')) {
+    log(`  FAIL: the control method ${ABSENT_METHOD} was not reported MISSING, so a missing method can't be told apart`);
+    return false;
+  }
+  // The control is meant to be missing: judge the real methods alone.
+  return lines.filter(line => !line.startsWith(`  ${ABSENT_METHOD} `)).every(line => !/ (MISSING|FAIL) /.test(line));
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const binary = process.argv[2];
+  if (!binary) throw new Error('usage: verify-codex-methods.mjs <codex-app-server>');
+  if (!await verifyBinary(path.resolve(binary), collectMethods())) process.exitCode = 1;
+}
