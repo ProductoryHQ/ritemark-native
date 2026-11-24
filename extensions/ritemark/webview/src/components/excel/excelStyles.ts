@@ -161,6 +161,17 @@ function adjustHsl([r, g, b]: number[], adjust: (s: number, l: number) => [numbe
   return [r, g, b]
 }
 
+// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
+const style201Variations = [
+  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
+  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
+]
+
+export function chartColorVariation(cycle: number): ColorTransform[] {
+  const [mod, off] = style201Variations[cycle % style201Variations.length]
+  return [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }]
+}
+
 /** Apply SpreadsheetML tint and ordered DrawingML colour transforms. */
 export function applyTint(hex: string, tint: number, transforms: readonly ColorTransform[] = []): string {
   if (!tint && !transforms.length) return hex

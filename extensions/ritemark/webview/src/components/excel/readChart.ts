@@ -1,10 +1,10 @@
 import { attr, decodeXmlEntities } from '../../../../src/excel/sheetXml'
 import {
-  colorOf, readTheme, section, type ColorContext, type ColorTransform,
+  chartColorVariation, colorOf, readTheme, section, type ColorContext, type ColorTransform,
 } from './excelStyles'
 import { drawingPresets } from './drawingColorNames'
 import type {
-  ChartAxis, ChartData, ChartLabels, ChartMarker, ChartModel, ChartNumberFormat,
+  ChartAxis, ChartData, ChartLabels, ChartMarker, ChartManualLayout, ChartModel, ChartNumberFormat,
   ChartPlot, ChartSeries, ChartShape, ChartTextStyle, ChartTitle, ChartValue,
 } from './chartModel'
 
@@ -124,25 +124,51 @@ function shape(el: Element | undefined, ctx: ColorContext): ChartShape | undefin
   }
 }
 
-function textStyle(container: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
-  if (!container) return undefined
-  const props = fields(container.body)
-  const body = props.get('bodyPr')
-  const para = fields(props.get('p')?.body)
-  const run = fields(para.get('r')?.body).get('rPr')
-  const pr = ['rPr', 'defRPr', 'endParaRPr'].includes(container.name) ? container
-    : fields(para.get('pPr')?.body).get('defRPr') ?? run ?? para.get('endParaRPr')
-  const tag = pr?.tag ?? ''
-  const style = fields(pr?.body)
-  const size = number(attr(tag, 'sz'))
-  const rotation = number(attr(body?.tag ?? '', 'rot'))
+function runStyle(pr: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
+  if (!pr) return undefined
+  const style = fields(pr.body)
+  const size = number(attr(pr.tag, 'sz'))
   return {
-    size: size === undefined ? undefined : size / 100,
-    bold: bool(attr(tag, 'b')),
-    italic: bool(attr(tag, 'i')),
+    size: size === undefined || size <= 0 ? undefined : size / 100,
+    bold: bool(attr(pr.tag, 'b')),
+    italic: bool(attr(pr.tag, 'i')),
     font: attr(style.get('latin')?.tag ?? '', 'typeface'),
     color: drawingColor(style.get('solidFill'), ctx),
-    rotation: rotation === undefined || Math.abs(rotation) > 5_400_000 ? undefined : rotation / 60_000,
+  }
+}
+
+function paragraphStyle(list: Fields, paragraph: Fields, ctx: ColorContext): ChartTextStyle | undefined {
+  const props = paragraph.get('pPr')
+  const level = number(attr(props?.tag ?? '', 'lvl')) ?? 0
+  const defaults = (el?: Element) => runStyle(fields(el?.body).get('defRPr'), ctx)
+  return mergeTextStyles(defaults(list.get('defPPr')), defaults(list.get(`lvl${level + 1}pPr`)), defaults(props))
+}
+
+function bodyStyle(props: Fields): ChartTextStyle | undefined {
+  const rotation = number(attr(props.get('bodyPr')?.tag ?? '', 'rot'))
+  return rotation === undefined || Math.abs(rotation) > 5_400_000 ? undefined : { rotation: rotation / 60_000 }
+}
+
+function textStyle(container: Element | undefined, ctx: ColorContext): ChartTextStyle | undefined {
+  const props = fields(container?.body)
+  const para = fields(props.get('p')?.body)
+  return mergeTextStyles(
+    runStyle(para.get('endParaRPr'), ctx),
+    paragraphStyle(fields(props.get('lstStyle')?.body), para, ctx),
+    bodyStyle(props),
+  )
+}
+
+function manualLayout(props: Fields): ChartManualLayout | undefined {
+  const manual = fields(props.get('layout')?.body).get('manualLayout')
+  if (!manual) return undefined
+  const layout = fields(manual.body)
+  return {
+    target: layout.val('layoutTarget'),
+    xMode: layout.val('xMode'), yMode: layout.val('yMode'),
+    widthMode: layout.val('wMode'), heightMode: layout.val('hMode'),
+    x: layout.num('x'), y: layout.num('y'),
+    width: layout.num('w'), height: layout.num('h'),
   }
 }
 
@@ -217,19 +243,37 @@ function title(el: Element | undefined, ctx: ColorContext): ChartTitle | undefin
   const tx = props.get('tx')
   const rich = fields(tx?.body).get('rich')
   const reference = rich ? undefined : data(tx)
-  const runs = fields(rich?.body).all('p').flatMap((p) =>
-    fields(p.body).elements.filter((run) => run.name === 'r' || run.name === 'fld').map((run) => {
-      const runFields = fields(run.body)
-      return { text: runFields.text('t') ?? '', style: textStyle(runFields.get('rPr'), ctx) }
-    }))
+  const richProps = fields(rich?.body)
+  const list = fields(richProps.get('lstStyle')?.body)
+  const paragraphs = richProps.all('p')
+  const runs = paragraphs.flatMap((p, index) => {
+    const para = fields(p.body)
+    const style = paragraphStyle(list, para, ctx)
+    return [
+      ...(index ? [{ text: ' ' }] : []),
+      ...para.elements.flatMap((run) => {
+        if (run.name === 'br') return [{ text: ' ', style }]
+        if (run.name !== 'r' && run.name !== 'fld') return []
+        const props = fields(run.body)
+        return [{ text: props.text('t') ?? '', style: mergeTextStyles(style, runStyle(props.get('rPr'), ctx)) }]
+      }),
+    ]
+  })
+  // Keep the existing single-line title, including its outer whitespace trimming.
+  while (runs.length && !runs[0].text.trim()) runs.shift()
+  while (runs.length && !runs[runs.length - 1].text.trim()) runs.pop()
+  if (runs.length) {
+    runs[0].text = runs[0].text.trimStart()
+    runs[runs.length - 1].text = runs[runs.length - 1].text.trimEnd()
+  }
   return {
-    text: rich ? richTitleText(rich.body) ?? (runs.map((run) => run.text).join('') || undefined) : reference?.points.get(0)?.toString(),
+    text: rich ? runs.map((run) => run.text).join('') || undefined : reference?.points.get(0)?.toString(),
     reference,
     automatic: !tx || undefined,
     runs: rich ? runs : undefined,
-    style: mergeTextStyles(textStyle(rich, ctx), textStyle(props.get('txPr'), ctx),
-      runs.find(({ text }) => text.trim())?.style),
+    style: mergeTextStyles(textStyle(props.get('txPr'), ctx), bodyStyle(richProps)),
     overlay: props.bool('overlay'),
+    layout: manualLayout(props),
   }
 }
 
@@ -374,15 +418,8 @@ function plot(kind: ChartPlot['kind'], props: Fields, ctx: ColorContext): ChartP
   }
 }
 
-// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
-const style201Variations = [
-  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
-  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
-]
-
 function automaticSeriesColor(index: number, ctx: ColorContext): string | undefined {
-  const [mod, off] = style201Variations[Math.floor(index / 6) % style201Variations.length]
-  return colorOf(`theme="${4 + index % 6}"`, ctx, [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }])
+  return colorOf(`theme="${4 + index % 6}"`, ctx, chartColorVariation(Math.floor(index / 6)))
 }
 
 export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }): ChartModel {
@@ -430,10 +467,12 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
     kind: plots.length > 1 ? 'combo' : plots[0].kind,
     plots,
     axes,
+    plotLayout: manualLayout(plotArea),
     plotShape: shape(plotArea.get('spPr'), ctx),
     chartShape: shape(space.get('spPr'), ctx),
     title: title(chart.get('title'), ctx),
     legend: legendEl ? {
+      layout: manualLayout(legend),
       position: legend.val('legendPos'),
       overlay: legend.bool('overlay'),
       textStyle: textStyle(legend.get('txPr'), ctx),

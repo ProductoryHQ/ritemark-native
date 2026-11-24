@@ -53,6 +53,8 @@ No PR touches `App.tsx`, `src/editorSync/`, `ritemarkEditor.ts`, `excelDocument.
 ## Release notes
 One line per drawn thing, in plain words, with the `release-notes` skill. For example: "A workbook's charts show where they sit, as in Excel." and "A workbook's colour rules, scales and bars colour its cells, as in Excel."
 
+PR 2’s chart text formatting and manual layout are covered by the chart entry in the unreleased changelog. Fold that entry into the v2.4.0 release notes when they are drafted.
+
 ## Out of scope
 - Editing a chart or a rule; creating either; changing a chart's kind, colours or data.
 - Recalculating formulas: charts and rules read the values the file holds, plus typed values.

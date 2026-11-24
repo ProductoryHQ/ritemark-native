@@ -187,6 +187,7 @@ test('3-D lines use ribbon fill for flat strokes and ignore the series axis', ()
   const layout = forSheet(threeD, threeD.sheets[2])
   const lines = markupOf(layout).querySelectorAll('polyline')
   assert.equal(lines.length, 3)
+  assert.deepEqual([layout.scale.min, layout.scale.max], [0, 70])
   assert.ok(lines.every((line) => line.getAttribute('stroke') !== 'none'))
   assert.deepEqual(layout.axisLabels.filter(({ text }) => /^[A-Z]/.test(text)).map(({ text }) => text),
     ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'])
@@ -210,9 +211,9 @@ test('explicit plot and axis shape properties, and rich title overrides', () => 
     </plotArea></chart></chartSpace>`)
   assert.ok(drawsChart(model))
   const layout = draw(model)
-  assert.equal(layout.titles[0].style.size, 18)
-  assert.equal(layout.titles[0].style.bold, true)
-  assert.equal(layout.titles[0].style.italic, true)
+  assert.equal(layout.titles[0].runs![0].style.size, 18)
+  assert.equal(layout.titles[0].runs![0].style.bold, true)
+  assert.equal(layout.titles[0].runs![0].style.italic, true)
   const svg = markupOf(layout)
   const outline = svg.querySelector(chartGroup('plot-area'))!
   assert.equal(outline.getAttribute('stroke'), '#123456')
@@ -367,9 +368,7 @@ test('pie follows point order, rotation, colour and explosion with category lege
   close(Math.hypot(slices[1].center.x - slices[0].center.x, slices[1].center.y - slices[0].center.y), slices[1].radius / 5)
   assert.deepEqual(slices.map(({ color }) => color), model.accentColors.slice(0, 3))
   assert.deepEqual(layout.legend?.entries.map(({ label }) => label.text), ['Category 1', 'Category 2', 'Category 3'])
-  assert.equal(layout.dataLabels.reduce((sum, { text }) => sum + parseInt(text, 10), 0), 100)
-  assert.equal(layout.leaders?.length, 3)
-  assert.equal(markupOf(layout).querySelectorAll('[data-chart="leader-lines"] line').length, 3)
+  assert.deepEqual(layout.dataLabels.map(({ text }) => text), ['33%', '33%', '33%'])
 })
 
 test('doughnut has a real hole and a single point draws two arcs per edge', () => {
@@ -387,7 +386,7 @@ test('area closes its fill at the configured crossing and handles blanks and sta
   for (const displayBlanksAs of ['gap', 'span', 'zero']) {
     const layout = layoutChart({ ...crossing, displayBlanksAs }, series, 480, 288, measure)
     const segments = layout.areas![0].segments
-    assert.deepEqual(segments.map(({ top }) => top.length), displayBlanksAs === 'gap' ? [1, 2] : displayBlanksAs === 'span' ? [3] : [4])
+    assert.deepEqual(segments.map(({ top }) => top.length), displayBlanksAs === 'span' ? [3] : [4])
     for (const { base } of segments) for (const p of base) close(p.y, layout.axes[0].from.y)
     assert.match(markupOf(layout).querySelector('[data-chart="areas"] path')!.getAttribute('d')!, / Z$/)
   }
@@ -457,7 +456,7 @@ test('pie label positions use the slice centre, inner edge or an outside leader'
     if (position === 'ctr') close(distance(large, first), large.radius / 2)
     if (position === 'inEnd') assert.ok(distance(small, second) < small.radius)
     if (position === 'outEnd') assert.ok(distance(large, first) > large.radius)
-    assert.equal(layout.leaders?.length, position === 'outEnd' ? 2 : position === 'bestFit' ? 1 : 0)
+    assert.equal(layout.leaders?.length, position === 'bestFit' ? 1 : 0)
   }
 })
 
@@ -466,4 +465,212 @@ test('a single plot with an additional value axis keeps its card', () => {
   const extra = { ...normal, axes: [...normal.axes, { kind: 'value' as const, id: 3 }],
     plots: [{ ...normal.plots[0], axisIds: [1, 2, 3] }] }
   assert.equal(drawsChart(extra), false)
+})
+
+test('Excel chart typography uses saved formatting and Excel defaults', () => {
+  const check = (text: { style: { size?: number; color?: string; bold?: boolean } }, size: number, color: string, bold: boolean) => {
+    assert.equal(text.style.size, size)
+    assert.equal(text.style.color, color)
+    assert.equal(text.style.bold, bold)
+  }
+  const styled = forSheet(kinds, kinds.sheets[0])
+  for (const tick of styled.axisLabels) check(tick, 9, '#595959', false)
+  for (const { label } of styled.legend!.entries) check(label, 9, '#595959', false)
+  check(styled.titles[0].runs![0], 14, '#595959', false)
+  const bar = forSheet(kinds, kinds.sheets[3])
+  check(bar.titles.find(({ text }) => text === 'Trucks')!.runs![0], 10, '#595959', false)
+  for (const tick of automatic.axisLabels) check(tick, 10, '#000000', false)
+  for (const { label } of automatic.legend!.entries) check(label, 10, '#000000', false)
+  check(automatic.titles[0].runs![0], 18, '#000000', true)
+  assert.match(markupOf(styled).querySelector('[data-chart="axis-labels"] text')!.getAttribute('style')!, /font-size:12px/)
+  assert.match(markupOf(automatic).querySelector('[data-chart="titles"] tspan')!.getAttribute('style')!, /font-size:24px/)
+})
+
+test('chart space, list, paragraph and run styles cascade independently', () => {
+  const chart = readChart(`<c:chartSpace>
+    <c:txPr><a:bodyPr rot="60000"/><a:lstStyle><a:defPPr><a:defRPr sz="1100" i="1">
+      <a:solidFill><a:srgbClr val="123456"/></a:solidFill>
+    </a:defRPr></a:defPPr></a:lstStyle><a:p><a:pPr><a:defRPr b="1"/></a:pPr></a:p></c:txPr>
+    <c:chart><c:title><c:tx><c:rich><a:p>
+      <a:pPr><a:defRPr sz="1300"/></a:pPr>
+      <a:r><a:t>First </a:t></a:r><a:r><a:rPr b="0" i="0"/><a:t>second</a:t></a:r>
+    </a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:barDir val="col"/></c:barChart></c:plotArea></c:chart>
+  </c:chartSpace>`)
+  assert.ok(drawsChart(chart))
+  const layout = layoutChart(chart, [], 480, 288, measure)
+  assert.deepEqual(layout.axisLabels[0].style, { size: 11, color: '#123456', bold: true, italic: true, rotation: 1 })
+  assert.deepEqual(layout.titles[0].runs, [
+    { text: 'First ', style: { size: 13, color: '#123456', bold: true, italic: true, rotation: 1 } },
+    { text: 'second', style: { size: 13, color: '#123456', bold: false, italic: false, rotation: 1 } },
+  ])
+})
+
+test('manual plot layout affects the plotted geometry and supports inner and outer targets', () => {
+  const read = (target: string, modes = '<c:xMode val="edge"/><c:yMode val="edge"/><c:wMode val="edge"/>') => {
+    const layout = target ? `<c:layout><c:manualLayout><c:layoutTarget val="${target}"/>${modes}
+      <c:x val="0.2"/><c:y val="0.1"/><c:w val="0.7"/><c:h val="0.5"/>
+    </c:manualLayout></c:layout>` : ''
+    const chart = readChart(`<c:chartSpace><c:chart><c:plotArea>${layout}<c:barChart><c:barDir val="col"/>
+      <c:ser><c:val><c:numLit><c:pt idx="0"><c:v>20</c:v></c:pt></c:numLit></c:val></c:ser>
+    </c:barChart></c:plotArea></c:chart></c:chartSpace>`)
+    assert.ok(drawsChart(chart))
+    return layoutChart(chart, chart.plots[0].series, 500, 300, measure)
+  }
+  const inner = read('inner')
+  assert.deepEqual(inner.plot, { x: 100, y: 30, width: 250, height: 150 })
+  assert.equal(inner.bars[0].x + inner.bars[0].width / 2, 225)
+  const outer = read('outer').plot
+  assert.ok(outer.x > inner.plot.x && outer.width < inner.plot.width && outer.height < inner.plot.height)
+  const auto = read('').plot
+  const factor = read('inner', '<c:xMode val="factor"/><c:yMode val="factor"/>').plot
+  assert.deepEqual(factor, { x: auto.x + 100, y: auto.y + 30, width: 350, height: 150 })
+})
+
+test('manual title and legend bounds position their rendered text and keys', () => {
+  const manual = (x: number, y: number) => `<layout><manualLayout><xMode val="edge"/><yMode val="edge"/>
+    <x val="${x}"/><y val="${y}"/><w val="0.2"/><h val="0.1"/>
+  </manualLayout></layout>`
+  const chart = readChart(`<chartSpace><chart><title>${manual(.1, .05)}</title>
+    <legend><legendPos val="r"/>${manual(.7, .2)}</legend>
+    <plotArea><barChart><ser/></barChart></plotArea>
+  </chart></chartSpace>`)
+  assert.ok(drawsChart(chart))
+  const layout = layoutChart(chart, chart.plots[0].series, 500, 300, measure)
+  assert.deepEqual([layout.titles[0].x, layout.titles[0].y], [100, 30])
+  assert.deepEqual(layout.legend?.bounds, { x: 350, y: 60, width: 100, height: 30 })
+  assert.equal(layout.legend?.entries[0].key.x, 350)
+})
+
+test('negative stacked area contributions lower the preceding total', () => {
+  for (const grouping of ['stacked', 'percentStacked']) {
+    const layout = layoutChart({ ...areaChart, plots: [{ ...areaChart.plots[0], grouping }] },
+      [seriesOf([10, 10]), seriesOf([-3, -3])], 480, 288, measure)
+    const [first, second] = layout.areas!.map(({ segments }) => segments[0])
+    assert.deepEqual(second.base, first.top)
+    const value = layout.scale.max - (second.top[0].y - layout.plot.y) / layout.plot.height * (layout.scale.max - layout.scale.min)
+    close(value, grouping === 'stacked' ? 7 : 7 / 13)
+  }
+})
+
+test('stacked area gaps taper to the previous total', () => {
+  const model = { ...areaChart, displayBlanksAs: 'gap', plots: [{ ...areaChart.plots[0], grouping: 'stacked' }] }
+  const layout = layoutChart(model, [seriesOf([5, 5, 5]), seriesOf([5, undefined, 5]), seriesOf([5, 5, 5])], 480, 288, measure)
+  const [first, middle, last] = layout.areas!.map(({ segments }) => segments[0])
+  assert.deepEqual(middle.top[1], first.top[1])
+  assert.deepEqual(last.base, middle.top)
+})
+
+test('scatter uses point numbers for text and mixed X data', () => {
+  const yVal = seriesOf([1, 4, 2]).val
+  const expected = layoutChart(scatterChart, [{ yVal, pointStyles: [] }], 480, 288, measure)
+  for (const type of ['string', 'number'] as const) {
+    const xVal = { type, points: new Map<number, string | number>([[0, 100], [1, 'b'], [2, 300]]) }
+    assert.deepEqual(layoutChart(scatterChart, [{ xVal, yVal, pointStyles: [] }], 480, 288, measure).markers, expected.markers)
+  }
+})
+
+test('scatter applies the automatic minimum independently to both axes', () => {
+  const layout = layoutChart(scatterChart, [{ xVal: seriesOf([2000, 2010, 2020]).val,
+    yVal: seriesOf([21, 22, 25]).val, pointStyles: [] }], 480, 288, measure)
+  assert.ok(layout.xScale!.min > 1900 && layout.xScale!.min <= 2000)
+  assert.ok(layout.scale.min > 0 && layout.scale.min <= 21)
+})
+
+test('scatter keeps zero when positive values are below the five-sixths threshold', () => {
+  const layout = layoutChart(scatterChart, [{ xVal: seriesOf([60, 90, 100]).val,
+    yVal: seriesOf([60, 90, 100]).val, pointStyles: [] }], 480, 288, measure)
+  assert.equal(layout.xScale!.min, 0)
+  assert.equal(layout.scale.min, 0)
+})
+
+test('legend lists categories only for a single series with varyColors enabled', () => {
+  for (const chart of [synthetic('column'), synthetic('bar'), pieChart, { ...pieChart, kind: 'doughnut' as const }]) {
+    for (const varyColors of [true, false]) {
+      const model = { ...chart, legend: { position: 'r', entries: [] }, plots: [{ ...chart.plots[0], varyColors }] }
+      const data = [seriesOf([1, 2], 'Revenue')]
+      const names = layoutChart(model, data, 480, 288, measure).legend!.entries.map(({ label }) => label.text)
+      assert.deepEqual(names, varyColors ? ['Category 1', 'Category 2'] : ['Revenue'])
+      const multi = layoutChart(model, [...data, seriesOf([2, 3], 'Cost')], 480, 288, measure)
+      assert.deepEqual(multi.legend!.entries.map(({ label }) => label.text).sort(), ['Cost', 'Revenue'])
+    }
+  }
+})
+
+test('crowded outside pie labels stay apart and clear the legend and SVG edge', () => {
+  const model = { ...pieChart, legend: { position: 'r', entries: [] }, plots: [{ ...pieChart.plots[0], varyColors: true,
+    labels: { showCatName: true, position: 'outEnd' } }] }
+  const layout = layoutChart(model, [seriesOf([100, 1, 1, 1, 1, 1, 1])], 480, 288, measure)
+  const small = layout.dataLabels.slice(1).sort((a, b) => a.y - b.y)
+  assert.equal(small.length, 6)
+  for (const [i, label] of small.entries()) {
+    assert.ok(label.x - label.width / 2 >= 0)
+    assert.ok(label.x + label.width / 2 <= layout.legend!.bounds.x)
+    assert.ok(label.y - label.height / 2 >= 0 && label.y + label.height / 2 <= layout.height)
+    if (i) assert.ok(label.y - small[i - 1].y >= (label.height + small[i - 1].height) / 2 - 1e-9)
+  }
+  assert.ok(layout.leaders!.length > 0)
+  for (const { to } of layout.leaders!) assert.ok(to.x >= 0 && to.x <= layout.width && to.y >= 0 && to.y <= layout.height)
+})
+
+test('large scatter series keep line extrema and at most one marker per pixel', () => {
+  const values = Array<number>(6001).fill(3)
+  values[121] = -10
+  values[122] = 20
+  const model = { ...scatterChart, plots: [{ ...scatterChart.plots[0], scatterStyle: 'lineMarker' }] }
+  const layout = layoutChart(model, [{ yVal: seriesOf(values).val, pointStyles: [] }], 480, 288, measure)
+  const points = layout.lines[0].segments.flat()
+  assert.ok(points.length <= 5000)
+  const positions = points.map(({ y }) => y)
+  const valueAtY = (y: number) =>
+    layout.scale.max - (y - layout.plot.y) / layout.plot.height * (layout.scale.max - layout.scale.min)
+  close(valueAtY(Math.max(...positions)), -10)
+  close(valueAtY(Math.min(...positions)), 20)
+  const pixels = new Set(layout.markers.map(({ x, y }) => `${Math.floor(x)},${Math.floor(y)}`))
+  assert.equal(layout.markers.length, pixels.size)
+})
+
+test('deleted pie labels reserve no space and unstyled slices cycle through shades and tints', () => {
+  const series = seriesOf(Array<number>(13).fill(1))
+  const model = { ...pieChart, plots: [{ ...pieChart.plots[0], varyColors: true, labels: undefined }] }
+  const plain = layoutChart(model, [series], 480, 288, measure)
+  const deleted = layoutChart({ ...model, plots: [{ ...model.plots[0],
+    labels: { entries: [{ index: 0, deleted: true, showVal: true, position: 'outEnd' }] } }] }, [series], 480, 288, measure)
+  assert.equal(deleted.slices![0].radius, plain.slices![0].radius)
+  assert.equal(deleted.dataLabels.length, 0)
+  assert.notEqual(plain.slices![0].color, plain.slices![6].color)
+  assert.notEqual(plain.slices![6].color, plain.slices![12].color)
+})
+
+test('default doughnut labels sit at the centre of their ring', () => {
+  const model = { ...pieChart, kind: 'doughnut' as const, plots: [{ ...pieChart.plots[0], holeSize: 50,
+    labels: { showVal: true } }] }
+  const layout = layoutChart(model, [seriesOf([1, 2, 3])], 480, 288, measure)
+  layout.slices!.forEach(({ center, innerRadius, radius }, i) =>
+    close(Math.hypot(layout.dataLabels[i].x - center.x, layout.dataLabels[i].y - center.y), (innerRadius + radius) / 2))
+})
+
+test('pie keeps saved chart text, rich label runs and the manual plot', () => {
+  const chart = readChart(`<chartSpace>
+    <txPr><a:bodyPr rot="120000"/><a:p><a:pPr><a:defRPr sz="1200"/></a:pPr></a:p></txPr>
+    <chart><title/><legend/><plotArea>
+      <layout><manualLayout><layoutTarget val="inner"/>
+        <xMode val="edge"/><yMode val="edge"/><x val=".1"/><y val=".1"/>
+        <w val=".5"/><h val=".5"/>
+      </manualLayout></layout>
+      <pieChart><varyColors val="1"/><ser><val><numLit><pt idx="0"><v>2</v></pt></numLit></val></ser>
+        <dLbls><dLbl><idx val="0"/><dLblPos val="ctr"/><tx><rich><a:p>
+          <a:r><a:rPr b="1"/><a:t>Saved label</a:t></a:r>
+        </a:p></rich></tx></dLbl></dLbls>
+      </pieChart>
+    </plotArea></chart>
+  </chartSpace>`)
+  assert.ok(drawsChart(chart))
+  const layout = layoutChart(chart, chart.plots[0].series, 400, 300, measure)
+  assert.deepEqual(layout.plot, { x: 40, y: 30, width: 200, height: 150 })
+  assert.equal(layout.titles[0].style.size, 12)
+  assert.equal(layout.legend!.entries[0].label.style.size, 12)
+  const label = layout.dataLabels[0]
+  assert.equal(label.style.rotation, 2)
+  assert.deepEqual(label.runs, [{ text: 'Saved label', style: { size: 12, rotation: 2, bold: true, italic: false, color: '#000000' } }])
+  assert.equal(markupOf(layout).querySelector('[data-chart="data-labels"] tspan')!.textContent, 'Saved label')
 })
