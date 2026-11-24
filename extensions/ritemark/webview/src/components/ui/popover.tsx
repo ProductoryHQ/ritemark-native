@@ -77,6 +77,14 @@ export function AnchoredHoverPopover({
           }
         }}
         onKeyDown={(event) => {
+          // One Esc closes the card even while its action's tooltip shows (that tooltip is a layer of its own, and
+          // would otherwise take the first press), and gives focus back to the link.
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            if (anchor.isConnected) anchor.focus()
+            onClose()
+            return
+          }
           if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return
           // Return to the anchor so normal tab order can continue from there.
           anchor.focus()
