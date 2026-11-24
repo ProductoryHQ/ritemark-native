@@ -68,6 +68,8 @@ async function main() {
     for (let page = 1; page <= 12; page++) {
       if (page > 1) doc.addPage();
       doc.text(pageText(page));
+      if (page === 4) doc.text('One line\ncontinues here');
+
     }
   });
   await writeFile(path.join(project, 'Report.pdf'), pages);
@@ -144,6 +146,17 @@ async function main() {
     assert.deepEqual(await client.read({ path: name }, [project]), report);
     const request = { path: 'Report.pdf', from: 3, to: 4 };
     assert.deepEqual(await client.read(request, [project]), selection);
+    // S24/S25/S27: passage lookups use the read handler without a search index.
+    const lookup = async (path: string, text: string, page?: number) =>
+      (await client.read({ path, passage: { text, page } }, [project]))?.location;
+    assert.deepEqual(await lookup(name, 'LISTEN   first', 4), { text: 'Listen first', occurrence: 0 });
+    assert.deepEqual(await lookup(name, 'North | East'), { text: 'North | East', occurrence: 0 });
+    assert.deepEqual(await lookup('Report.pdf', pageText(4), 4), { text: pageText(4), occurrence: 0, page: 4 });
+    assert.match((await lookup('Report.pdf', 'One line continues here', 4) as { text: string }).text, /^One line ?continues here$/);
+    assert.deepEqual(await lookup('Report.pdf', pageText(5), 4), { page: 4 });
+    assert.equal(await lookup('Report.pdf', 'made-up quotation', 4), undefined);
+    assert.deepEqual(await lookup('README.md', 'fixture'), { text: 'Fixture', occurrence: 0 });
+    assert.equal((await client.read({ path: '../outside.docx', passage: { text: 'Operations' } }, [project]))?.isError, true);
     await writeFile(path.join(project, 'Report.pdf'), Buffer.from('damaged'));
     assert.match((await client.read(request, [project]))?.text ?? '', /damaged/);
   } finally {

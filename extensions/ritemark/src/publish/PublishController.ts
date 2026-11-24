@@ -780,6 +780,7 @@ export class PublishController {
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
     const record = await this.liveRecord(pagePath);
+    if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     const live = consent === 'live-update' ? this.livePlans.get(plan) : undefined;
     if (consent === 'live-update' && (!record?.live?.on || !live || !this.matchesLive(record, live.record) || !live.active())) {
@@ -811,10 +812,12 @@ export class PublishController {
           throw new PublishError('changed', 'Live publishing stopped.');
         }
         if (this.deps.host.accountId() !== accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
-        const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record) });
+        const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record), lastDeckVersion: current?.deckVersion ?? record?.deckVersion });
         this.gone.delete(site.name);
         try {
           const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
+          const deckVersion = site.deckVersion ?? current?.deckVersion ?? record?.deckVersion;
+          if (deckVersion !== undefined) next.deckVersion = deckVersion;
           const html = upload.files.find(file => file.urlPath === upload.pageUrlPath);
           if (html) {
             const head = Buffer.from(html.bytes.subarray(0, 4096)).toString('utf8');

@@ -164,9 +164,8 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
         // `ready` comes before `load`, when only the waiting page is listening.
         case 'getOpenStatus':
           await this.postOpenStatus(webviewPanel.webview);
-          // Sprint 148 (R9): the viewer is listening now; a search result's find bar waits for this (Word only:
-          // search reads no presentations).
-          if (this.format.viewType === 'ritemark.docxViewer') {
+          // Find and slide requests wait until their viewer is listening.
+          if (this.format.viewType === 'ritemark.docxViewer' || this.format.viewType === 'ritemark.pptxViewer') {
             findRequests.ready(document.uri.toString(), webviewPanel, (find) => webviewPanel.webview.postMessage(find));
           }
           break;

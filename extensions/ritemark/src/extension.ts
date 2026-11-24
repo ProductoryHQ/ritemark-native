@@ -559,6 +559,8 @@ export function activate(context: vscode.ExtensionContext) {
     },
   });
 
+  unifiedViewProvider.setSourceReader((request) => projectSearch.host.readDocument(request));
+
   // ── Google Docs publishing (Sprint 119) ────────────────────────────────────
   // Always composed, even with the flag off: flag-off hides the surfaces but
   // keeps the account and document links readable, so turning it back on

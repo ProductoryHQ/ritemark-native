@@ -54,6 +54,7 @@ export interface PublishRecord {
   live?: LivePreference;
   /** ISO date of the last publish or update. */
   publishedAt: string;
+  deckVersion?: number;
   /**
    * Taken down, with the record not removed (Sprint 149, PR 4 round 3): the page is gone from the host, so it never
    * shows as online, here or after a restart, and Unpublish's Try again removes it.

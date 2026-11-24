@@ -11,11 +11,12 @@ import { useEffect, useRef, useState } from 'react';
 import { vscode } from '../../lib/vscode';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
+import type { SourcePassage } from '../../utils/sourcePassage';
 import { chatLinkMenu, type ChatLinkAction, type ChatLinkMenuItem, type ChatLocalKind } from './chatLinks';
 
 export type ChatLinkMenuTarget =
   | { kind: 'external'; url: string }
-  | { kind: 'file'; path: string }
+  | { kind: 'file'; path: string; passage?: SourcePassage }
   | { kind: 'unsupported'; href: string };
 
 export interface ChatLinkMenuRequest {
@@ -48,6 +49,8 @@ function run(item: ChatLinkMenuItem, target: ChatLinkMenuTarget): void {
     vscode.postMessage({ type: 'chat:link-action', action: 'copy', text: textOf(target) });
   } else if (item.action === 'open-web' && target.kind === 'external') {
     vscode.postMessage({ type: 'chat:link-action', action: 'open-web', url: target.url });
+  } else if (item.action === 'open' && target.kind === 'file' && target.passage) {
+    vscode.postMessage({ type: 'chat:open-file', filePath: target.path, passage: target.passage });
   } else if (target.kind === 'file') {
     vscode.postMessage({ type: 'chat:link-action', action: item.action, path: target.path });
   }
