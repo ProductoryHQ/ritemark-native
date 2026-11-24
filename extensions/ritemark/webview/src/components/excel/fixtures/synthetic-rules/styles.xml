@@ -1,0 +1,8 @@
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dxfs count="4">
+    <dxf><fill><patternFill><bgColor rgb="FFFF0000"/></patternFill></fill></dxf>
+    <dxf><font><b/><i val="0"/><u val="double"/><strike/><color theme="4"/></font><border><bottom style="thin"><color rgb="FF123456"/></bottom></border><numFmt numFmtId="165" formatCode="0.00 &quot;units&quot;"/></dxf>
+    <dxf><font><b val="0"/><i/><u val="none"/></font><fill><patternFill><bgColor rgb="FFFFBF00"/></patternFill></fill><border><top style="dashed"/></border></dxf>
+    <dxf><font><b/></font></dxf>
+  </dxfs>
+</styleSheet>

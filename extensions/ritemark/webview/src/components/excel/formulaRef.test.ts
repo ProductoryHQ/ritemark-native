@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { parseFormulaRef, referenceBounds } from './formulaRef'
+import { parseFormulaRef, refArea, referenceBounds } from './formulaRef'
 
 assert.deepEqual(parseFormulaRef('A1')?.start, { row: 0, col: 0, absoluteRow: false, absoluteCol: false })
 assert.deepEqual(parseFormulaRef('=Sheet1!$C7')?.start, { row: 6, col: 2, absoluteRow: false, absoluteCol: true })
@@ -17,3 +17,8 @@ for (const bad of ['XFE1', 'A1048577', 'A0', 'A', '1', 'A:5', 'A1:B', 'A1,B2', '
   assert.equal(parseFormulaRef(bad), undefined, bad)
 }
 console.log('formulaRef: all passed')
+
+const anchored = parseFormulaRef("'Other sheet'!$B2:C$5")!
+assert.deepEqual(refArea(anchored, 2, 3), { top: 3, bottom: 4, left: 1, right: 5 })
+assert.equal(refArea(anchored, -2), undefined)
+assert.deepEqual(refArea(parseFormulaRef('$B:$C')!, 20, 20), { top: 0, bottom: 1048575, left: 1, right: 2 })
