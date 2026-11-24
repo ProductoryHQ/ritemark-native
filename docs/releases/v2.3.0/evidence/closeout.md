@@ -1,0 +1,21 @@
+# v2.3.0 release closeout
+
+- **Release worktree:** `.worktrees/release-e4e642cca402`, detached at source commit `e4e642cca402d40fa6fc9fbe1b8c347d0d45dd06` (RC4). Tag `v2.3.0` (annotated) points at it.
+- **Release:** https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0, published 23 November 2026 at 18:50:19 UTC, on Jarmo's "aga siis avalda 2.3". It is `latest`.
+- **CI runs:**
+  - `build-windows.yml` run 45200964871, success. Its Windows round-trip evidence is in `win32-roundtrip/`. The only path in it is the runner's user folder (`rmci-<run id>`).
+  - `build-macos-x64.yml` run 45200955347, success.
+- **10.1, on 24 November 2026:** every blocking check came back empty.
+  - Local `dist/` matches GitHub's published digests and sizes for `Ritemark-arm64.dmg`, `Ritemark-x64.dmg`, `Ritemark-Setup.exe` and `update-feed.json`.
+  - The versioned feed's 2.3.0 entry matches local.
+  - `dist/update-feed.json` is byte-identical to the published feed.
+  - The staged installer is the CI artifact (`cmp`).
+  - `published-assets.txt` is the authoritative published record.
+- **Sidecar hashes:** the `*.dmg.sha256` sidecars here carry the stapled, published hashes, and they match `published-assets.txt`. The un-notarized hashes that passed the gates are in `gate-results.md`.
+- **Earlier candidates:** RC2 `b95a240b` was set aside for #974 and RC3 `1f43c73c` for #978. Neither was notarized or published.
+- **Windows hosting:** Jarmo uploaded the installer to `https://getritemark.com/windows/v2.3.0/Ritemark-Setup.exe` with `publish-store-installer-interactive.sh` on 24 November (the script's check at 06:21:14 UTC: 200, `immutable`). The manager downloaded it again: 589,440,960 bytes, SHA-256 `8eb804c6…54a6`, the same file as the release asset.
+- **Microsoft Store:** Growth prepares the update draft. Submit waits for Jarmo's sign-in and word.
+- **Gate results and deferrals:** `gate-results.md` and `../TEST-CHECKLIST.md`.
+- **Not archived:** the DMGs and the installer, because the GitHub Release holds the same bytes.
+- **10.3, on 24 November 2026:** cleared on Jarmo's word ("sa võid puhastada"), after this evidence was pushed (#985) and the installer upload had finished. `VSCode-darwin-arm64/`, `VSCode-darwin-x64/` and `dist/` were deleted by name in this worktree and in RC3's (`.worktrees/release-1f43c73caf3f`, never published), about 15 GB. The re-audit (`worktree-hygiene.mjs --report`) read `verified disposable release worktree ((detached))` for both.
+- **10.4, on 24 November 2026:** on the same word, `worktree-hygiene.mjs --clean` removed the four `REVIEW` entries: RC3's and RC4's release worktrees, `fix-978` (merged as #979) and `codex-582` (merged). Free disk went from 9.3 GB to 50 GB. Branches were kept.

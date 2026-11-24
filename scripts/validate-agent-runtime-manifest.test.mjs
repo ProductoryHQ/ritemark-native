@@ -51,8 +51,19 @@ test('requires the exact Codex package member set for every target', () => {
   const errors = validateMutation(({ manifest }) => {
     manifest.runtimes.find(row => row.agent === 'codex' && row.platform === 'win32').members.pop();
   });
-  assert.ok(errors.some(error => error.includes('member count must be 6')));
+  assert.ok(errors.some(error => error.includes('member count must be 7')));
   assert.ok(errors.some(error => error.includes('is missing windows-sandbox-setup')));
+});
+
+test('requires the Codex exec-server on every target (0.171.0 package layout)', () => {
+  for (const platform of ['darwin', 'win32']) {
+    const errors = validateMutation(({ manifest }) => {
+      for (const row of manifest.runtimes.filter(entry => entry.agent === 'codex' && entry.platform === platform)) {
+        row.members = row.members.filter(member => member.component !== 'exec-server');
+      }
+    });
+    assert.ok(errors.some(error => error.includes('is missing exec-server')), platform);
+  }
 });
 
 test('requires supported Codex smoke arguments', () => {

@@ -1138,13 +1138,13 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '</div>',
     count ? '' : '<p class="empty">This deck has no slides to show.</p>',
     `<footer class="line" id="line">${who}`
-      + `<button class="fb" id="morebtn" type="button" aria-expanded="false" aria-controls="side" ${tip('The text for this slide')} hidden>${iconSvg('notebook', 16)}<span class="lbl">More</span></button>`
+      + `<button class="fb" id="morebtn" type="button" aria-label="More" aria-expanded="false" aria-controls="side" ${tip('The text for this slide')} hidden>${iconSvg('notebook', 16)}<span class="lbl">More</span></button>`
       + '<span class="sep" id="moresep" hidden></span>'
       + `<button class="fb ic" id="prev" type="button" aria-label="Previous slide" ${tip('Previous slide')} disabled>${iconSvg('caret-left', 16)}</button>`
       + `<span class="pos" id="pos" aria-live="polite">${count ? `1 / ${count}` : ''}</span>`
       + `<button class="fb ic" id="next" type="button" aria-label="Next slide" ${tip('Next slide')}${count > 1 ? '' : ' disabled'}>${iconSvg('caret-right', 16)}</button>`
       + '<span class="sep"></span>'
-      + `<button class="fb" id="tocbtn" type="button" aria-expanded="false" aria-controls="toc" ${tip('Every slide, to jump to one')}>${iconSvg('list', 16)}<span class="lbl">Contents</span></button></footer>`,
+      + `<button class="fb" id="tocbtn" type="button" aria-label="Contents" aria-expanded="false" aria-controls="toc" ${tip('Every slide, to jump to one')}>${iconSvg('list', 16)}<span class="lbl">Contents</span></button></footer>`,
     `<div class="prog" aria-hidden="true"><i id="bar" style="width:${count ? (100 / count).toFixed(4) : 0}%"></i></div>`,
     contentsHtml(deck.slides),
     // "Start from the beginning" (small details 7): shown by the script for 5 s when the page returns to a reader's place.
