@@ -16,6 +16,7 @@ export interface ChartData {
 export interface ChartShape {
   fill?: string
   line?: string
+  hasLine?: boolean
   lineWidth?: number
   dash?: string
   noFill?: boolean
@@ -32,6 +33,7 @@ export interface ChartTextStyle {
 }
 
 export interface ChartTitle {
+  automatic?: boolean
   text?: string
   reference?: ChartData
   style?: ChartTextStyle
@@ -137,6 +139,8 @@ export type ChartModel =
       kind: PlotKind | 'combo'
       plots: ChartPlot[]
       axes: ChartAxis[]
+  plotShape?: ChartShape
+  chartShape?: ChartShape
       title?: ChartTitle
       legend?: {
         position?: string

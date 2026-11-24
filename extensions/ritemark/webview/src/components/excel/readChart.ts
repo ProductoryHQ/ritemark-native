@@ -116,6 +116,7 @@ function shape(el: Element | undefined, ctx: ColorContext): ChartShape | undefin
   return {
     fill: drawingColor(props.get('solidFill'), ctx),
     line: drawingColor(lineProps.get('solidFill'), ctx),
+    hasLine: line ? true : undefined,
     lineWidth: width === undefined ? undefined : width / 9525,
     dash: lineProps.val('prstDash'),
     noFill: props.get('noFill') ? true : undefined,
@@ -141,7 +142,7 @@ function textStyle(container: Element | undefined, ctx: ColorContext): ChartText
     italic: bool(attr(tag, 'i')),
     font: attr(style.get('latin')?.tag ?? '', 'typeface'),
     color: drawingColor(style.get('solidFill'), ctx),
-    rotation: rotation === undefined ? undefined : rotation / 60_000,
+    rotation: rotation === undefined || Math.abs(rotation) > 5_400_000 ? undefined : rotation / 60_000,
   }
 }
 
@@ -205,6 +206,11 @@ function richTitleText(body: string): string | undefined {
   return words || undefined
 }
 
+function mergeTextStyles(...styles: (ChartTextStyle | undefined)[]): ChartTextStyle | undefined {
+  const entries = styles.flatMap((style) => Object.entries(style ?? {}).filter(([, value]) => value !== undefined))
+  return entries.length ? Object.fromEntries(entries) : undefined
+}
+
 function title(el: Element | undefined, ctx: ColorContext): ChartTitle | undefined {
   if (!el) return undefined
   const props = fields(el.body)
@@ -219,8 +225,10 @@ function title(el: Element | undefined, ctx: ColorContext): ChartTitle | undefin
   return {
     text: rich ? richTitleText(rich.body) ?? (runs.map((run) => run.text).join('') || undefined) : reference?.points.get(0)?.toString(),
     reference,
+    automatic: !tx || undefined,
     runs: rich ? runs : undefined,
-    style: textStyle(props.get('txPr') ?? rich, ctx),
+    style: mergeTextStyles(textStyle(rich, ctx), textStyle(props.get('txPr'), ctx),
+      runs.find(({ text }) => text.trim())?.style),
     overlay: props.bool('overlay'),
   }
 }
@@ -387,12 +395,25 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
   }
   const space = fields(root.body)
   const chart = fields(space.get('chart')?.body)
+  const plotArea = fields(chart.get('plotArea')?.body)
   const plots: ChartPlot[] = []
   const axes: ChartAxis[] = []
-  for (const element of children(chart.get('plotArea')?.body ?? '')) {
+  for (const element of plotArea.elements) {
     const plotKind = plotKinds.get(element.name)
     const axisKind = axisKinds.get(element.name)
-    if (plotKind) plots.push(plot(plotKind, fields(element.body), ctx))
+    if (plotKind) {
+      const parsed = plot(plotKind, fields(element.body), ctx)
+      if (element.name === 'line3DChart') {
+        // Excel styles the ribbon as a filled surface. Use that fill for the flat line.
+        for (const entry of parsed.series) {
+          const ribbon = entry.shape
+          if (ribbon && !ribbon.noFill && (ribbon.noLine || !ribbon.line)) {
+            entry.shape = { line: ribbon.fill }
+          }
+        }
+      }
+      plots.push(parsed)
+    }
     else if (axisKind) axes.push(axis(axisKind, fields(element.body), ctx))
     else if (element.name.endsWith('Chart')) return { supported: false, kind: element.name as `${string}Chart` }
   }
@@ -409,6 +430,8 @@ export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''
     kind: plots.length > 1 ? 'combo' : plots[0].kind,
     plots,
     axes,
+    plotShape: shape(plotArea.get('spPr'), ctx),
+    chartShape: shape(space.get('spPr'), ctx),
     title: title(chart.get('title'), ctx),
     legend: legendEl ? {
       position: legend.val('legendPos'),

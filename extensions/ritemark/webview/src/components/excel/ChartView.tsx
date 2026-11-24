@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Component, memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { layoutChart, type ChartLayout } from './chartLayout'
 import type { ChartMarker, ChartShape, ChartTextStyle } from './chartModel'
 import { resolveSeries } from './chartSeries'
@@ -64,13 +64,18 @@ function smoothPath(points: ChartLayout['lines'][number]['segments'][number]): s
   }).join(' ')
 }
 
-export function ChartView({ layout }: { layout: ChartLayout }) {
+export const ChartView = memo(function ChartView({ layout }: { layout: ChartLayout }) {
   const clip = useId()
-  const { width, height, plot, legend } = layout
+  const { width, height, plot, legend, plotShape, chartShape } = layout
+  const borderInset = Math.min((chartShape?.lineWidth ?? 1) / 2, width / 2, height / 2)
   return (
     <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={layout.name}
       style={{ display: 'block', background: '#ffffff', forcedColorAdjust: 'none' }}>
       <defs><clipPath id={clip}><rect {...plot} /></clipPath></defs>
+      <rect data-chart="chart-border" x={borderInset} y={borderInset}
+        width={width - 2 * borderInset} height={height - 2 * borderInset}
+        fill={chartShape?.noFill ? 'none' : chartShape?.fill ?? 'none'} {...stroke(chartShape, '#898989')} />
+      {plotShape && !plotShape.noFill && plotShape.fill && <rect {...plot} fill={plotShape.fill} />}
       <g data-chart="gridlines"><Rules rules={layout.gridlines} color="#d9d9d9" /></g>
       <g clipPath={`url(#${clip})`}>
         <g data-chart="bars">{layout.bars.map(({ x, y, width, height, color, shape, index, series }) =>
@@ -80,7 +85,8 @@ export function ChartView({ layout }: { layout: ChartLayout }) {
             : <polyline key={`${i}:${j}`} points={points.map(({ x, y }) => `${x},${y}`).join(' ')} fill="none" {...stroke(shape, color, 2.25)} />,
         ))}</g>
       </g>
-      <g data-chart="axes"><Rules rules={layout.axes} color="#bfbfbf" /></g>
+      {plotShape && <rect data-chart="plot-area" {...plot} fill="none" {...stroke(plotShape, plotShape.hasLine ? '#898989' : 'none')} />}
+      <g data-chart="axes"><Rules rules={layout.axes} color="#898989" /></g>
       <g data-chart="markers">{layout.markers.map((marker, i) => <Marker key={i} {...marker} />)}</g>
       <g data-chart="axis-labels">{layout.axisLabels.map((label, i) => <Text key={i} {...label} />)}</g>
       <g data-chart="titles">{layout.titles.map((label, i) => <Text key={i} {...label} />)}</g>
@@ -107,14 +113,38 @@ export function ChartView({ layout }: { layout: ChartLayout }) {
       </g>}
     </svg>
   )
-}
+})
 
 interface ChartProps {
   chart: Parameters<typeof layoutChart>[0]
   workbook: WorkbookModel
   version: number
 }
-export function PositionedChart({ chart, workbook, version, width, height }: ChartProps & { width?: number; height?: number }) {
+interface PositionedChartProps extends ChartProps {
+  width?: number
+  height?: number
+}
+
+export class ChartErrorBoundary extends Component<ChartProps & { children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+
+  componentDidUpdate(previous: ChartProps) {
+    if (this.state.failed && (previous.chart !== this.props.chart ||
+      previous.workbook !== this.props.workbook || previous.version !== this.props.version)) {
+      this.setState({ failed: false })
+    }
+  }
+
+  render() {
+    return this.state.failed ? this.props.fallback : this.props.children
+  }
+}
+
+export const PositionedChart = memo(function PositionedChart({ chart, workbook, version, width, height }: PositionedChartProps) {
   const container = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [fontVersion, setFontVersion] = useState(0)
@@ -147,4 +177,4 @@ export function PositionedChart({ chart, workbook, version, width, height }: Cha
     [chart, series, w, h, workbook.date1904, fontVersion])
   const style: CSSProperties = { width: '100%', height: '100%', background: '#fff', overflow: 'hidden' }
   return <div ref={container} style={style}>{layout && <ChartView layout={layout} />}</div>
-}
+})

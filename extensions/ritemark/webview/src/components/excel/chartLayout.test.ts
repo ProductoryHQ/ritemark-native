@@ -1,3 +1,5 @@
+import { test } from 'node:test'
+import { createDocument } from '@mixmark-io/domino'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { serialize } from 'node:v8'
@@ -7,6 +9,7 @@ import { parse } from 'node-html-parser'
 import { ChartView } from './ChartView'
 import { DrawingView } from './DrawingView'
 import { drawsChart, layoutChart } from './chartLayout'
+import { readChart } from './readChart'
 import { resolveSeries } from './chartSeries'
 import { keptNotice } from './keptNotice'
 import { readWorkbook, type SheetModel, type WorkbookModel } from './readWorkbook'
@@ -125,18 +128,6 @@ const sales = await readWorkbook(readFileSync(new URL(
   '../../../../../../docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures/sales-report.xlsx', import.meta.url,
 )))
 const salesSheet = sales.sheets.find(({ name }) => name === 'Sales 2026')!
-const drawing = drawingOf(salesSheet)
-const renderDrawing = (version: number) => parse(renderToStaticMarkup(React.createElement(DrawingView, {
-  drawing, style: {}, workbook: sales, version, width: 480, height: 288,
-})))
-assert.equal(renderDrawing(0).querySelector('svg')!.getAttribute('aria-label'), 'Column chart: Revenue by region')
-const bar = (version: number) => Number(renderDrawing(version).querySelector(chartGroup('bars'))!.querySelectorAll('rect')[1].getAttribute('height'))
-const oldHeight = bar(0)
-const source = modelSource(sales)
-source.write(salesSheet.name, 5, 16, source.valueFor(salesSheet.name, 5, 16, '9,999'))
-assert.ok(bar(1) < oldHeight)
-assert.equal(forSheet(sales, salesSheet).bars[1].to, 9999)
-
 const chartSheets = await open('chart-sheet')
 const revenue = chartSheets.sheets.find(({ name }) => name === 'Revenue trend')!
 assert.equal(revenue.kind, 'chartsheet')
@@ -159,4 +150,197 @@ assert.ok(thinned.axisLabels.length < 50, 'category labels thin as the bands shr
 assert.ok(Math.min(...positions) < thinned.plot.y + thinned.plot.height / 2)
 assert.ok(Math.max(...positions) > thinned.plot.y + thinned.plot.height / 2)
 
-console.log('chartLayout and ChartView: all passed')
+const synthetic = (kind: 'column' | 'bar' | 'line', plot = '', cat = '', val = '', extra = '') => {
+  const node = kind === 'line' ? 'lineChart' : 'barChart'
+  const chart = readChart(`<chartSpace><chart><plotArea><${node}>
+    <barDir val="${kind === 'bar' ? 'bar' : 'col'}"/>${plot}<axId val="1"/><axId val="2"/>
+    </${node}><catAx><axId val="1"/>${cat}</catAx><valAx><axId val="2"/>${val}</valAx></plotArea>${extra}</chart></chartSpace>`)
+  assert.ok(drawsChart(chart))
+  return chart
+}
+const seriesOf = (values: (number | undefined)[], name = 'Revenue', category = 'Category') => ({
+  pointStyles: [],
+  tx: { type: 'string' as const, points: new Map([[0, name]]) },
+  cat: { type: 'string' as const, points: new Map(values.map((_, i) => [i, `${category} ${i + 1}`])) },
+  val: { type: 'number' as const, pointCount: values.length,
+    points: new Map(values.flatMap((value, i) => value === undefined ? [] : [[i, value] as const])) },
+})
+const draw = (model: ReturnType<typeof synthetic>, series = [seriesOf([30, 80, 60])], width = 480) =>
+  layoutChart(model, series, width, 288, measure)
+
+test('automatic rotation fits horizontal labels or tilts crowded categories', () => {
+  for (const rotation of [-60000000, 5400001]) {
+    const model = synthetic('column', '', `<txPr><bodyPr rot="${rotation}"/></txPr>`)
+    const wide = draw(model)
+    assert.ok(wide.axisLabels.every(({ style }) => !style.rotation))
+    const narrow = draw(model, undefined, 150)
+    const categories = narrow.axisLabels.filter(({ text }) => text.startsWith('Category'))
+    assert.ok(categories.length > 1 && categories.every(({ style }) => style.rotation === -45))
+    assert.ok(narrow.plot.y + narrow.plot.height < wide.plot.y + wide.plot.height)
+  }
+  assert.ok(forSheet(chartSheets, revenue).axisLabels.every(({ style }) => !style.rotation))
+  const explicit = draw(synthetic('column', '', '<txPr><bodyPr rot="1800000"/></txPr>'))
+  assert.equal(explicit.axisLabels.find(({ text }) => text === 'Category 1')!.style.rotation, 30)
+})
+
+test('3-D lines use ribbon fill for flat strokes and ignore the series axis', () => {
+  const layout = forSheet(threeD, threeD.sheets[2])
+  const lines = markupOf(layout).querySelectorAll('polyline')
+  assert.equal(lines.length, 3)
+  assert.ok(lines.every((line) => line.getAttribute('stroke') !== 'none'))
+  assert.deepEqual(layout.axisLabels.filter(({ text }) => /^[A-Z]/.test(text)).map(({ text }) => text),
+    ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'])
+})
+
+test('Automatic fixture draws the right legend, title and default outlines', () => {
+  const svg = markupOf(automatic)
+  assert.deepEqual(svg.querySelector(chartGroup('legend'))!.querySelectorAll('text').map(({ text }) => text), ['North', 'Riverside', 'East'])
+  assert.equal(automatic.titles[0].style.bold, true)
+  assert.ok(svg.querySelector(chartGroup('chart-border')))
+  assert.ok(svg.querySelector(chartGroup('axes'))!.querySelectorAll('line').every((line) => line.getAttribute('stroke') !== 'none'))
+})
+
+test('explicit plot and axis shape properties, and rich title overrides', () => {
+  const model = readChart(`<chartSpace><chart><title><tx><rich><p><r><rPr b="1" sz="1800"/><t>Styled</t></r></p></rich></tx>
+    <txPr><p><pPr><defRPr sz="1200" i="1"/></pPr></p></txPr></title>
+    <plotArea><spPr><ln w="19050"><solidFill><srgbClr val="123456"/></solidFill></ln></spPr>
+    <barChart><axId val="1"/><axId val="2"/></barChart>
+    <catAx><axId val="1"/><spPr><ln><noFill/></ln></spPr></catAx>
+    <valAx><axId val="2"/><spPr><ln><solidFill><srgbClr val="654321"/></solidFill></ln></spPr></valAx>
+    </plotArea></chart></chartSpace>`)
+  assert.ok(drawsChart(model))
+  const layout = draw(model)
+  assert.equal(layout.titles[0].style.size, 18)
+  assert.equal(layout.titles[0].style.bold, true)
+  assert.equal(layout.titles[0].style.italic, true)
+  const svg = markupOf(layout)
+  const outline = svg.querySelector(chartGroup('plot-area'))!
+  assert.equal(outline.getAttribute('stroke'), '#123456')
+  assert.equal(outline.getAttribute('stroke-width'), '2')
+  assert.deepEqual(svg.querySelector(chartGroup('axes'))!.querySelectorAll('line').map((line) => line.getAttribute('stroke')), ['none', '#654321'])
+})
+
+test('line labels default to the right and support explicit dLblPos', () => {
+  for (const [i, label] of labels.dataLabels.entries()) {
+    assert.ok(label.x > labels.markers[i].x)
+    close(label.y, labels.markers[i].y)
+  }
+  for (const [position, xDirection, yDirection] of [
+    ['r', 1, 0], ['l', -1, 0], ['t', 0, -1], ['b', 0, 1],
+    ['ctr', 0, 1], ['outEnd', 0, -1], ['inEnd', 0, 1], ['inBase', 0, 1],
+  ] as const) {
+    const layout = draw(synthetic('column', `<dLbls><showVal val="1"/><dLblPos val="${position}"/></dLbls>`))
+    const bar = layout.bars[1]
+    const label = layout.dataLabels[1]
+    close(Math.sign(label.x - (bar.x + bar.width / 2)), xDirection)
+    close(Math.sign(label.y - bar.y), yDirection)
+    if (position === 'ctr') close(label.y, bar.y + bar.height / 2)
+    if (position === 'inBase') assert.ok(label.y > bar.y + bar.height / 2)
+  }
+  const centred = draw(synthetic('line', '<dLbls><showVal val="1"/><dLblPos val="ctr"/></dLbls>'))
+  close(centred.dataLabels[1].y, centred.lines[0].segments[0][1].y)
+})
+
+test('unstacked bars start at the clamped category-axis crossing', () => {
+  for (const kind of ['bar', 'column'] as const) {
+    const layout = draw(synthetic(kind, '', '<crossesAt val="50"/>', '<scaling><min val="10"/><max val="90"/></scaling>'))
+    assert.equal(layout.bars[0].from, 50)
+    for (const bar of layout.bars) {
+      const cross = layout.axes[0].from
+      const ends = kind === 'column' ? [bar.y, bar.y + bar.height] : [bar.x, bar.x + bar.width]
+      assert.ok(ends.some((end) => Math.abs(end - (kind === 'column' ? cross.y : cross.x)) < 1e-8))
+    }
+  }
+})
+
+test('stacked lines run through negative values and blanks at the stack level', () => {
+  for (const [grouping, expected] of [['stacked', [3, 5]], ['percentStacked', [3 / 7, 1]]] as const) {
+    const layout = draw(synthetic('line', `<grouping val="${grouping}"/>`, '', '', '<dispBlanksAs val="zero"/>'),
+      [seriesOf([5, 5]), seriesOf([-2, undefined])])
+    const { min, max } = layout.scale
+    layout.lines[1].segments[0].forEach(({ y }, i) =>
+      close(min + (1 - (y - layout.plot.y) / layout.plot.height) * (max - min), expected[i]))
+  }
+})
+
+test('category reversal reverses order within each bar cluster', () => {
+  for (const kind of ['bar', 'column'] as const) {
+    const series = [seriesOf([10, 20]), seriesOf([15, 25])]
+    const normal = draw(synthetic(kind), series)
+    const reversed = draw(synthetic(kind, '', '<scaling><orientation val="maxMin"/></scaling>'), series)
+    const offset = ({ bars }: typeof normal) => kind === 'bar' ? bars[2].y - bars[0].y : bars[2].x - bars[0].x
+    close(offset(normal), -offset(reversed))
+    assert.ok(offset(normal) !== 0)
+  }
+})
+
+test('automatic chart titles are visible and accessible', () => {
+  const model = synthetic('column', '', '', '', '<title/>')
+  for (const [series, title] of [[[seriesOf([2])], 'Revenue'], [[seriesOf([2]), seriesOf([3])], 'Chart Title']] as const) {
+    const layout = draw(model, [...series])
+    assert.equal(layout.titles[0]?.text, title)
+    assert.equal(markupOf(layout).querySelector('svg')!.getAttribute('aria-label'), `Column chart: ${title}`)
+  }
+})
+
+test('value axis crosses at the near boundary of the specified category', () => {
+  for (const reversed of [false, true]) {
+    const layout = draw(synthetic('column', '', reversed ? '<scaling><orientation val="maxMin"/></scaling>' : '', '<crossesAt val="2"/>'))
+    close(layout.axes[1].from.x, layout.plot.x + layout.categoryBand * (reversed ? 2 : 1))
+  }
+})
+
+async function withMountedDrawing(run: (render: (version: number, drawing?: ReturnType<typeof drawingOf>) => void, host: HTMLElement) => void) {
+  const doc = createDocument('<!doctype html><html><body></body></html>') as unknown as Document
+  const createElement = doc.createElement.bind(doc)
+  doc.createElement = ((tag: string) => tag === 'canvas' ? { getContext: () => null } : createElement(tag)) as typeof doc.createElement
+  Object.assign(globalThis, { document: doc, window: globalThis, HTMLIFrameElement: class {} })
+  const { createRoot } = await import('react-dom/client')
+  const { flushSync } = await import('react-dom')
+  const host = doc.createElement('div')
+  doc.body.appendChild(host)
+  const root = createRoot(host)
+  const style = {}
+  try {
+    run((version, drawing = drawingOf(salesSheet)) => {
+      flushSync(() => root.render(React.createElement('section', null,
+        React.createElement('span', null, 'Worksheet still visible'),
+        React.createElement(DrawingView, { drawing, style, workbook: sales, version, width: 480, height: 288 }),
+      )))
+    }, host)
+  } finally {
+    root.unmount()
+    delete (globalThis as { document?: Document }).document
+  }
+}
+
+test('R7 redraws the mounted SVG after a version bump', async () => {
+  await withMountedDrawing((render, host) => {
+    render(0)
+    const svg = host.querySelector('svg')!
+    assert.equal(svg.getAttribute('aria-label'), 'Column chart: Revenue by region')
+    const bar = () => Number(host.querySelector(chartGroup('bars'))!.querySelectorAll('rect')[1].getAttribute('height'))
+    const oldHeight = bar()
+    const source = modelSource(sales)
+    source.write(salesSheet.name, 5, 16, source.valueFor(salesSheet.name, 5, 16, '9,999'))
+    render(0)
+    close(bar(), oldHeight)
+    render(1)
+    assert.equal(host.querySelector('svg'), svg)
+    assert.ok(bar() < oldHeight)
+    assert.equal(forSheet(sales, salesSheet).bars[1].to, 9999)
+  })
+})
+
+test('drawing failure falls back to the existing card and preserves the worksheet', async () => {
+  const drawing = drawingOf(salesSheet)
+  assert.ok(drawsChart(drawing.chart))
+  const broken = { ...drawing, chart: { ...drawing.chart, plots: [] } }
+  await withMountedDrawing((render, host) => {
+    render(0, broken)
+    assert.match(host.querySelector('.sg-object')!.textContent!, /Kept in the file/)
+    assert.match(host.textContent!, /Worksheet still visible/)
+    render(1)
+    assert.equal(host.querySelector('svg[role=img]')?.getAttribute('aria-label'), 'Column chart: Revenue by region')
+  })
+})

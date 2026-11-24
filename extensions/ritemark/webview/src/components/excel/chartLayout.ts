@@ -34,6 +34,8 @@ export interface ChartLayout {
   height: number
   name: string
   plot: Rect
+  plotShape?: ChartShape
+  chartShape?: ChartShape
   categoryBand: number
   scale: { min: number; max: number; step: number; ticks: number[] }
   bars: (Rect & { index: number; series: number; from: number; to: number; color: string; shape?: ChartShape })[]
@@ -115,7 +117,7 @@ function styleOf(size: number, ...styles: (ChartTextStyle | undefined)[]): Chart
   return mergeDefined({ size, color: '#595959' }, ...styles)
 }
 
-function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, percent: boolean, blanksAsZero: boolean) {
+function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, percent: boolean, blanksAsZero: boolean, line: boolean, count: number) {
   const totals = new Map<number, number>()
   if (percent) {
     for (const entry of series) for (const [index, value] of entry.val?.points ?? []) {
@@ -131,7 +133,7 @@ function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, perc
     const add = (index: number, raw: ChartValue) => {
       if (typeof raw !== 'number' || !Number.isFinite(raw)) return
       const value = percent ? raw / (totals.get(index) || 1) : raw
-      const stack = value < 0 ? negative : positive
+      const stack = !line && value < 0 ? negative : positive
       const from = stacked ? stack.get(index) ?? 0 : 0
       const to = from + value
       if (stacked) stack.set(index, to)
@@ -140,7 +142,13 @@ function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, perc
       values.set(index, { raw, from, to })
     }
     for (const [index, raw] of entry.val?.points ?? []) add(index, raw)
-    if (blanksAsZero && values.size < (entry.val?.pointCount ?? 0)) {
+    if (blanksAsZero && stacked && values.size < count) {
+      // Empty points inherit the running total. Keep categories with no total sparse.
+      for (const [index, total] of positive) {
+        if (!values.has(index) && total !== 0) add(index, 0)
+      }
+    }
+    if (blanksAsZero && values.size < count) {
       low = Math.min(low, 0)
       high = Math.max(high, 0)
     }
@@ -231,12 +239,8 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const axes = model.axes.filter((axis) => plotModel.axisIds.includes(axis.id ?? -1))
   const valueAxis = axes.find((axis) => axis.kind === 'value')
   const categoryAxis = axes.find((axis) => axis.kind === 'category' || axis.kind === 'date')
-  const { points, low, high } = boundsByCategory(series, stacked, percent, blanksAsZero)
+  const { points, low, high } = boundsByCategory(series, stacked, percent, blanksAsZero, line, count)
   const pad = Math.min(12, width / 10, height / 10)
-  const title = titleText(model.title)
-  const titleStyle = styleOf(14, model.textStyle, model.title?.style)
-  const titleHeight = title ? px(titleStyle.size ?? 14) + 10 : 0
-  const titleBottom = pad + (model.title?.overlay ? 0 : titleHeight)
   const entries = series.map((entry, index) => {
     const shape = entry.shape
     const automatic = entry.automaticColor ?? model.accentColors[index % model.accentColors.length] ?? '#4472C4'
@@ -245,6 +249,10 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     const name = valueText(entry.tx?.points.get(0), entry.tx?.formatCode, date1904) || `Series ${index + 1}`
     return { name, color, marker, shape, index: entry.index ?? index }
   })
+  const title = model.title?.automatic ? (entries.length === 1 ? entries[0].name : 'Chart Title') : titleText(model.title)
+  const titleStyle = mergeDefined({ size: 16, bold: true, color: '#222222' }, model.textStyle, model.title?.style)
+  const titleHeight = title ? px(titleStyle.size ?? 16) + 10 : 0
+  const titleBottom = pad + (model.title?.overlay ? 0 : titleHeight)
   const legend = layoutLegend(model, horizontal && !stacked ? [...entries].reverse() : entries, width, height, pad, titleBottom, measure)
   const reserve = (positions: string[], size: 'width' | 'height') =>
     legend && !model.legend?.overlay && positions.includes(legend.position) ? legend.bounds[size] + 8 : 0
@@ -277,24 +285,33 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const verticalLabelsRight = verticalAxis?.tickLabelPosition === 'high' || (verticalAxis?.position === 'r' && verticalAxis.tickLabelPosition !== 'low')
   const horizontalLabelsTop = horizontalAxis?.tickLabelPosition === 'high' || (horizontalAxis?.position === 't' && horizontalAxis.tickLabelPosition !== 'low')
   const verticalLabels = hideLabels(verticalAxis) ? 0 : verticalLabelWidth
-  const horizontalLabels = hideLabels(horizontalAxis) ? 0 : textHeight(horizontal ? valueStyle : categoryStyle) + 8
   left += Number(verticalTitleSpace) + (verticalLabelsRight ? 0 : verticalLabels)
   right -= verticalLabelsRight ? verticalLabels : horizontal ? valueWidth / 2 : 0
+  const between = !line || valueAxis?.crossBetween !== 'midCat' || count === 1
+  const availableBand = Math.max(1, right - left) / (between ? count : count - 1)
+  const categoryHeight = textHeight(categoryStyle)
+  const autoTilt = !horizontal && !hideLabels(categoryAxis) && categoryStyle.rotation === undefined
+    && categoryWidth + 5 > availableBand * (categoryAxis?.tickLabelSkip ?? 1)
+  if (autoTilt) categoryStyle.rotation = -45
+  const angle = (categoryStyle.rotation ?? 0) * Math.PI / 180
+  const tiltedHeight = categoryWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))
+  const horizontalLabels = hideLabels(horizontalAxis) ? 0
+    : (horizontal ? textHeight(valueStyle) : Math.min(tiltedHeight, Math.max(categoryHeight, (bottom - top) / 2))) + 8
   const plotTop = top + (horizontalLabelsTop ? horizontalLabels : 0)
   bottom -= Number(horizontalTitleSpace) + (horizontalLabelsTop ? 0 : horizontalLabels)
   const plot = { x: left, y: plotTop, width: Math.max(1, right - left), height: Math.max(1, bottom - plotTop) }
   const layout: ChartLayout = {
     width, height, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
-    plot, categoryBand: 0, scale, bars: [], lines: [], markers: [], gridlines: [], axes: [], axisLabels: [],
+    plot, plotShape: model.plotShape, chartShape: model.chartShape, categoryBand: 0, scale, bars: [], lines: [], markers: [], gridlines: [], axes: [], axisLabels: [],
     titles: [], dataLabels: [], legend,
   }
 
   const categoryLength = horizontal ? plot.height : plot.width
   const valueLength = horizontal ? plot.width : plot.height
-  const between = !line || valueAxis?.crossBetween !== 'midCat' || count === 1
   const band = categoryLength / (between ? count : count - 1)
   layout.categoryBand = band
   const categoryReversed = (categoryAxis?.orientation === 'maxMin') !== horizontal
+  const categoryDirection = categoryReversed ? -1 : 1
   const categoryAt = (i: number) => ((categoryReversed ? count - 1 - i : i) + (between ? .5 : 0)) * band
   const log = valueAxis?.logBase && valueAxis.logBase > 1
   const unit = log ? Math.log : (v: number) => v
@@ -309,11 +326,12 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const valueRule = (position: number, shape?: ChartShape) => rule(point(0, position), point(categoryLength, position), shape)
   const categoryRule = (position: number, shape?: ChartShape) => rule(point(position, 0), point(position, valueLength), shape)
   const crossValue = categoryAxis?.crossesAt ?? (categoryAxis?.crosses === 'max' ? scale.max : categoryAxis?.crosses === 'min' ? scale.min : 0)
-  const baseline = valueAt(clamp(crossValue, scale.min, scale.max))
+  const crossBase = clamp(crossValue, scale.min, scale.max)
+  const baseline = valueAt(crossBase)
   const crossCategory = valueAxis?.crossesAt ?? (valueAxis?.crosses === 'max' ? count : 1)
   const categoryCross = valueAxis?.crossesAt === undefined
     ? ((valueAxis?.crosses === 'max') !== categoryReversed ? categoryLength : 0)
-    : clamp(categoryAt(crossCategory - 1), 0, categoryLength)
+    : clamp(categoryAt(crossCategory - 1) - (between ? categoryDirection * band / 2 : 0), 0, categoryLength)
   if (categoryAxis && !categoryAxis.deleted) layout.axes.push(valueRule(baseline, categoryAxis.shape))
   if (valueAxis && !valueAxis.deleted) layout.axes.push(categoryRule(categoryCross, valueAxis.shape))
   const axisTick = (at: Point, axis: ChartAxis | undefined, horizontalRule: boolean, minor = false) => {
@@ -352,14 +370,26 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
       ? { ...at, y: at.y + (horizontalLabelsTop ? -1 : 1) * (textHeight(valueStyle) / 2 + 6), text: valueLabel(tick), anchor: 'middle', style: valueStyle }
       : { ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text: valueLabel(tick), anchor: verticalLabelsRight ? 'start' : 'end', style: valueStyle })
   }
-  const skip = Math.max(1, categoryAxis?.tickLabelSkip ??
-    Math.ceil(((horizontal ? textHeight(categoryStyle) : categoryWidth) + 5) / band))
+  const categorySpacing = horizontal ? categoryHeight : Math.min(
+    categoryWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle)),
+    Math.abs(Math.sin(angle)) > 0 ? categoryHeight / Math.abs(Math.sin(angle)) : Infinity,
+  )
+  const skip = Math.max(1, categoryAxis?.tickLabelSkip ?? Math.ceil((categorySpacing + 5) / band))
   for (let i = 0; !hideLabels(categoryAxis) && i < count; i += Math.max(skip, sampleStride)) {
     const at = point(categoryAt(i), categoryLabelCross)
     const text = categoryText(i)
-    if (text) layout.axisLabels.push(horizontal
-      ? { ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text, anchor: verticalLabelsRight ? 'start' : 'end', style: categoryStyle }
-      : { ...at, y: at.y + (horizontalLabelsTop ? -1 : 1) * (textHeight(categoryStyle) / 2 + 6), text, anchor: 'middle', style: categoryStyle })
+    if (!text) continue
+    if (horizontal) {
+      layout.axisLabels.push({ ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text,
+        anchor: verticalLabelsRight ? 'start' : 'end', style: categoryStyle })
+    } else {
+      const labelWidth = measure(text, categoryStyle)
+      const halfWidth = Math.min(width / 2, (labelWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle))) / 2)
+      const halfHeight = (labelWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))) / 2
+      const x = clamp(at.x, halfWidth, width - halfWidth)
+      const y = at.y + (horizontalLabelsTop ? -1 : 1) * (halfHeight + 6)
+      layout.axisLabels.push({ x, y, text, anchor: 'middle', style: categoryStyle })
+    }
   }
   if (categoryAxis && (categoryAxis.majorGridlines || categoryAxis.majorTickMark && categoryAxis.majorTickMark !== 'none')) {
     const marks = count + (between ? 1 : 0)
@@ -404,9 +434,9 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
         continue
       }
       const override = pointStyles.get(index)
-      const cat = categoryAt(index) + (line ? 0 : (seriesIndex * spacing - (cluster - 1) / 2) * barWidth * (horizontal ? -1 : 1))
+      const cat = categoryAt(index) + (line ? 0 : (seriesIndex * spacing - (cluster - 1) / 2) * barWidth * categoryDirection)
       const endpoint = point(cat, valueAt(value.to))
-      const startValue = stacked ? value.from : clamp(0, scale.min, scale.max)
+      const startValue = stacked ? value.from : crossBase
       const start = point(cat, valueAt(clamp(startValue, scale.min, scale.max)))
       const inRange = value.to >= scale.min && value.to <= scale.max
       if (line) {
@@ -418,7 +448,7 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
         const barShape = override?.shape ? mergeDefined(shape, override.shape) : shape
         const end = point(cat, valueAt(clamp(value.to, scale.min, scale.max)))
         layout.bars.push({
-          index, series: seriesIndex, from: value.from, to: value.to,
+          index, series: seriesIndex, from: startValue, to: value.to,
           x: horizontal ? Math.min(start.x, end.x) : cat + left - barWidth / 2,
           y: horizontal ? cat + plotTop - barWidth / 2 : Math.min(start.y, end.y),
           width: horizontal ? Math.abs(end.x - start.x) : barWidth,
@@ -442,10 +472,16 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
       const w = measure(text, style)
       const distance = horizontal ? w / 2 + 4 : h / 2 + 3
       const direction = horizontal ? Math.sign(endpoint.x - start.x) || 1 : Math.sign(endpoint.y - start.y) || -1
-      const offset = label.position === 'inEnd' ? -distance : distance
+      const position = label.position ?? (line ? 'r' : 'outEnd')
+      const offset = position === 'inEnd' ? -distance : distance
       let { x, y } = endpoint
-      switch (label.position) {
-        case 'ctr': x = (x + start.x) / 2; y = (y + start.y) / 2; break
+      switch (position) {
+        case 'ctr':
+          if (!line) {
+            x = (x + start.x) / 2
+            y = (y + start.y) / 2
+          }
+          break
         case 'inBase': x = start.x + (horizontal ? distance * direction : 0); y = start.y + (horizontal ? 0 : distance * direction); break
         case 'l': x -= w / 2 + 4; break
         case 'r': x += w / 2 + 4; break
