@@ -1,3 +1,4 @@
+import { sourcePage } from '../../utils/sourcePassage'
 import { useState, useEffect, useDeferredValue, useCallback, useRef, useMemo } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -157,6 +158,7 @@ function LazyPage({
 }
 
 export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveAsMarkdown }: PDFViewerProps) {
+  const [sourcePageTarget, setSourcePageTarget] = useState<number | null>(null)
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
@@ -244,10 +246,19 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
       if (message.type === 'openStatus') {
         const reported = parsePlatform(message.platform)
         if (reported) setPlatform(reported)
+      } else if (message.type === 'find:top' || message.type === 'find:page') {
+        landing.current = null
+        landedAt.current = null
+        revealMatch.current = false
+        setQuery('')
+        setSearchOpen(false)
+        setSourcePageTarget(message.type === 'find:top' ? 0 : sourcePage(message.page) ?? null)
+        setLandingVersion((v) => v + 1)
       } else if (message.type === 'find:open') {
         // Sprint 148 (R9): opened from a search result. The find bar only: the document isn't touched.
         const request = decodeFindOpen(message, Date.now())
         if (!request) return
+        setSourcePageTarget(request.source ? request.page ?? null : null)
         landing.current = request
         setSearchAutoFocus(false)
         setSearchOpen(true)
@@ -448,6 +459,14 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
     if (searchOpen && numPages > 0) ensureSearchIndex()
   }, [searchOpen, numPages, ensureSearchIndex])
 
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !numPages || sourcePageTarget === null) return
+    if (sourcePageTarget === 0) container.scrollTo({ top: 0 })
+    else scrollPageIntoView(container, sourcePageTarget)
+    setSourcePageTarget(null)
+  }, [numPages, sourcePageTarget, landingVersion])
+
   // Pick the first match at or after the page the reader is on; a search result's match when it opened the bar.
   useEffect(() => {
     if (!searchIndex || matches.length === 0) {
@@ -455,12 +474,13 @@ export function PDFViewer({ content, filename, workerSrc, workerSource, canSaveA
       return
     }
     const wanted = landing.current
+    if (wanted?.source && !isRequestQuery(wanted, deferredQuery)) return
     if (wanted && isRequestQuery(wanted, deferredQuery)) {
       landing.current = null
       const index = landingIndex(wanted, matches.length, (i) => searchIndex.locations[matches[i].start.chunk].page)
       landedAt.current = index
       setCurrentMatch(index)
-      revealMatch.current = true
+      revealMatch.current = index >= 0
       return
     }
     const startPage = currentPageRef.current
