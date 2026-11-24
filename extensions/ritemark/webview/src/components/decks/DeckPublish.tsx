@@ -435,10 +435,10 @@ function PublishMenuItem({ tip, ...props }: React.ComponentProps<typeof Dropdown
 }
 
 const LIVE_CHIPS = {
-  live: { label: 'Live', icon: 'globe', className: 'text-ink-strong', tip: LIVE_TIP },
-  updating: { label: 'Live', icon: 'circle-notch', className: 'text-ink-strong', tip: 'Updating the published page…' },
+  live: { label: 'Live', icon: 'globe', className: 'is-plain text-ink-strong', tip: LIVE_TIP },
+  updating: { label: 'Live', icon: 'circle-notch', className: 'is-plain text-ink-strong', tip: 'Updating the published page…' },
   paused: { label: 'Paused', icon: 'pause', className: 'border-[var(--r-warning-line)] bg-[var(--r-warning-surface)] text-[var(--r-warning-ink)] hover:bg-[var(--r-warning-surface)] hover:text-[var(--r-warning-ink)]', tip: 'Open pages keep what they had.' },
-  offline: { label: 'Offline', icon: 'circle', className: 'text-ink-muted', tip: 'Saves stay on this computer. The page catches up when the connection is back.' },
+  offline: { label: 'Offline', icon: 'circle', className: 'is-plain text-ink-muted', tip: 'Saves stay on this computer. The page catches up when the connection is back.' },
 } as const
 
 export function publishedChip(state: DeckPageState) {
