@@ -48,6 +48,7 @@
 import { AgendaContext, useAgendaDrawing } from '../slide/agendaContext'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import type { WallLine, WallPoint, WallSlide, WallState, WallTimer } from '../../../../../src/decks/present/presentProtocol'
+import { withTab } from '../../../../../src/decks/present/wallTabs'
 import { onMessage, sendToExtension } from '../../../bridge'
 import { usePageDrawn } from '../../../lib/pageDrawn'
 import { Button } from '../../ui/button'
@@ -65,6 +66,7 @@ import { opensOnward, rowPlays, slideArrivalOf, type SlideArrival } from '../../
 import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spotlight'
 import { dotPlace, pointerKeyStep, pointOnSlide, timerLook } from './pointerTimer'
 import { useTimerNow } from './useTimerNow'
+import { wallTabHit } from './tabHit'
 import { PRESENT_CODE_ACTIONS, useCodeToolsClicks } from '../slide/codeToolsClick'
 import '../decks.css'
 import './wall.css'
@@ -99,6 +101,8 @@ const NO_SLIDES: WallSlide[] = []
 
 export function DeckWall() {
   const [state, setState] = useState<WallState | null>(null)
+  // Show the wall's tab choices while the host catches up.
+  const [chosenTabs, setChosenTabs] = useState<{ slide: number; tabs: number[] } | null>(null)
   // The slide before the last move, going as the new one comes (README 19, the deck's transition, or 17's smooth move).
   // A move during a step first jumps that step to its end (`MotionRun`), so the slide going is always the whole one.
   // README item 20: how the new slide arrived (the host's `arrival`), and whether the wall was covered (blank, the QR
@@ -174,6 +178,11 @@ export function DeckWall() {
       const next = message as unknown as WallState
       askedBlank.current = settleAsked(askedBlank.current, next.blank, next.page !== null)
       const previous = stateRef.current
+      setChosenTabs(chosen => {
+        if (!chosen || next.presenter.on || next.arrival !== null || chosen.slide !== next.slide.number) return null
+        if (JSON.stringify(previous?.slide) !== JSON.stringify(next.slide)) return null
+        return chosen.tabs.every((tab, block) => next.tabs[block] === tab) ? null : chosen
+      })
       // Another slide has no spotlight: an ask made on the one before is let go.
       focus.settle(next, !previous || previous.slide.number === next.slide.number)
       if (previous && previous.slide.number !== next.slide.number) {
@@ -460,7 +469,8 @@ export function DeckWall() {
     showBar()
   }, [showBar])
 
-  // A click acts on what it hits (not on the bar, the box or the grid): an item spotlights, the spotlit picture fills
+  // A tab takes the click when the presenter view is off. Otherwise a click acts on what it hits (not on the bar,
+  // the box or the grid): an item spotlights, the spotlit picture fills
   // the wall, outside any item it clears the spotlight or, with none, goes on. On a blank or filled wall it only
   // brings the slide back.
   const onWallClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
@@ -470,6 +480,15 @@ export function DeckWall() {
     if (!current) return
     if (blankNow(current.blank, askedBlank.current)) { askBlank(null); return }
     if (fillNow(current.fill, fillShown.current) !== null) { askFill(null); return }
+    const tab = wallTabHit(event.target, enteringRef.current, current.presenter.on)
+    if (tab) {
+      setChosenTabs(chosen => ({
+        slide: current.slide.number,
+        tabs: withTab(chosen?.slide === current.slide.number ? chosen.tabs : current.tabs, tab.block, tab.tab),
+      }))
+      sendToExtension('present/tab', tab)
+      return
+    }
     const hit = spotHit(frameRef.current?.querySelector(SLIDE_NOW) ?? null, event.clientX, event.clientY)
     actOnClick(spotClickOf(hit, spotNow(current.spot), 'next'))
   }, [askBlank, askFill, actOnClick, spotNow, fillNow])
@@ -497,10 +516,12 @@ export function DeckWall() {
   const dotShownAt = dot ?? lastDot.current
   const dotAt = dotShownAt ? dotPlace(dotShownAt, frame) : null
 
-  // Sprint 163: the slide on the wall shows the tabs chosen on the presenter view's Now (a leaving one, its first).
+  const tabsPickable = !state.presenter.on
+  const tabs = tabsPickable && chosenTabs?.slide === state.slide.number ? chosenTabs.tabs : state.tabs
+  // The shown slide draws the chosen tabs. A leaving slide shows its first tabs.
   const layer = (slide: WallSlide, className: string, key: string, going: boolean, reveal: number | undefined) => (
     <div key={key} ref={going ? leavingRef : enteringRef} className={`wall-slide ${className}`}>
-      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} tabs={going ? undefined : state.tabs} />
+      <SlideCanvas kind={slide.kind} data={slide.data} width={frame.width} theme={state.theme} borderless={state.borderless} assets={state.assets} at={slide.number} reveal={reveal} openIn={state.openIn} tabs={going ? undefined : tabs} />
     </div>
   )
 
@@ -522,7 +543,7 @@ export function DeckWall() {
         aria-label={blank === 'page' ? 'The page’s QR code' : blank ? 'The wall is blank' : fillUrl ? 'A picture fills the wall' : `Slide ${countLabel(state.position, state.count, state.skipped)}: ${state.slide.title}`}
       >
         {leaving?.slide ? layer(leaving.slide, 'is-leaving', `leaving-${leaving.serial}`, true, leaving.reveal) : null}
-        {layer(state.slide, '', `slide-${serial}`, false, state.reveal?.shown)}
+        {layer(state.slide, tabsPickable ? 'tabs-pickable' : '', `slide-${serial}`, false, state.reveal?.shown)}
       </div>
 
       {/* Item 11: the picture whole and uncropped on the theme's ground, over the whole screen, under the blank. */}

@@ -46,6 +46,7 @@ import { fillUrlIn, spotHit, spotItems, useFocusAsks, useSpotlight } from './spo
 import { revealLabel } from '../../../../../src/decks/present/revealSteps'
 import { dotPlace, pointerKeyStep, pointOnSlide, samePoint, timerLook, timerOfferOf, TIMER_MINUTES } from './pointerTimer'
 import { useTimerNow } from './useTimerNow'
+import { tabHit } from './tabHit'
 import '../decks.css'
 import './presenter.css'
 
@@ -124,19 +125,6 @@ function useClock(startedAt: number | null): { now: number; elapsed: number; pau
 }
 
 const NO_SLIDES: WallSlide[] = []
-
-/**
- * Sprint 163: the tab a click on Now hits: its Tabs block's place among the slide's Tabs blocks and its own place in
- * the band, as the renderer numbers them; null for a click anywhere else.
- */
-function tabHit(target: EventTarget | null): { block: number; tab: number } | null {
-  const tab = target instanceof Element ? target.closest('.blk-tab') : null
-  const block = tab?.closest('.blk-tabs')
-  if (!tab || !block) return null
-  const index = Number(block.getAttribute('data-tabs-index'))
-  const place = Array.from(tab.parentElement?.children ?? []).indexOf(tab)
-  return Number.isInteger(index) && index >= 0 && place >= 0 ? { block: index, tab: place } : null
-}
 
 export function DeckPresenterView() {
   const [state, setState] = useState<PresenterState | null>(null)
