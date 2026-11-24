@@ -3,6 +3,7 @@ import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
 import { Input } from '../ui/input'
 import { Tooltip } from '../ui/tooltip'
+import { MAX_LENGTH_MINUTES } from '../../../../src/decks/present/presentSession'
 
 export function DeckMinutes({ label, minutes, addFromCount, onCommit }: {
   label: string
@@ -24,7 +25,8 @@ export function DeckMinutes({ label, minutes, addFromCount, onCommit }: {
     }
   }, [draft])
 
-  const valid = draft === '' || (draft !== null && /^\d+$/.test(draft) && Number.isSafeInteger(Number(draft)))
+  // A slide's minutes stay within a day, as the session's do: a slip of the keyboard never plans 2500000 minutes.
+  const valid = draft === '' || (draft !== null && /^\d{1,4}$/.test(draft) && Number(draft) <= MAX_LENGTH_MINUTES)
   return draft === null ? (
     <Tooltip label={minutes === null ? 'Set slide minutes' : 'Edit slide minutes'} className="deck-minutes">
       <Button
@@ -40,7 +42,7 @@ export function DeckMinutes({ label, minutes, addFromCount, onCommit }: {
       </Button>
     </Tooltip>
   ) : (
-    <Tooltip label={valid ? 'Whole minutes. Press Return to save.' : 'Enter a whole number of minutes.'}>
+    <Tooltip label={valid ? 'Whole minutes. Press Return to save.' : `Enter whole minutes, up to ${MAX_LENGTH_MINUTES}.`}>
       <Input
         ref={input}
         className="deck-minutes-input"

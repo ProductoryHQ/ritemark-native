@@ -674,8 +674,8 @@ export function DeckView({
   const canEditMinutes = shownTiming && shownTiming.sectionMinutes === null
     && (shownTiming.labelMinutes === null || slide?.data.time !== undefined)
   const countLabel = count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`
-  // A draft belongs to the current slide, including older slides without IDs.
-  const minutesKey = `${shown}:${slide?.data.id ?? slide?.node.attrs.body ?? ''}`
+  // A draft belongs to the current slide. Not keyed on the body: saving the time changes it, and the box would lose focus.
+  const minutesKey = `${shown}:${slide?.data.id ?? ''}`
 
   // The desk's own box decides what fits: never the window's, which holds the left column and the AI column too.
   useLayoutEffect(() => {
