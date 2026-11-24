@@ -30,3 +30,40 @@ export function timetableStatus(timetable: Timetable): { text: string; over: boo
       ? '1 slide has no time yet' : `${untimedCount} slides have no time yet`,
   };
 }
+
+/** Clock times wrap at midnight. Elapsed starts keep counting hours. */
+export function timetableTime(minutes: number, clock = false): string {
+  const value = clock ? minutes % 1440 : minutes;
+  const hours = String(Math.floor(value / 60)).padStart(clock ? 2 : 1, '0');
+  return `${hours}:${String(value % 60).padStart(2, '0')}`;
+}
+
+export function timetableRows({ slides, sessionStart }: Timetable) {
+  return slides.map(slide => ({
+    ...slide,
+    start: slide.sectionMinutes === null
+      ? timetableTime((sessionStart ?? 0) + slide.startMinutes, sessionStart != null)
+      : null,
+  }));
+}
+
+export function nextMinutesRow(slides: readonly TimetableSlide[], index: number, backwards: boolean): number | null {
+  const step = backwards ? -1 : 1;
+  for (let at = index + step; at >= 0 && at < slides.length; at += step) {
+    if (slides[at].sectionMinutes === null) return at;
+  }
+  return null;
+}
+
+export function timetableFoot({ slides, totalMinutes, sessionStart, sessionMinutes, untimedCount }: Timetable) {
+  const delta = sessionMinutes === null ? null : totalMinutes - sessionMinutes;
+  return {
+    count: `${slides.length} ${slides.length === 1 ? 'slide' : 'slides'}`,
+    total: duration(totalMinutes),
+    start: sessionStart == null ? null : timetableTime(sessionStart, true),
+    end: sessionMinutes === null ? null : timetableTime((sessionStart ?? 0) + sessionMinutes, true),
+    comparison: delta === null ? null : delta === 0 ? 'fits' : `${duration(Math.abs(delta))} ${delta > 0 ? 'over' : 'under'}`,
+    over: delta !== null && delta > 0,
+    untimed: untimedCount === 0 ? null : untimedCount === 1 ? '1 slide has no time yet' : `${untimedCount} slides have no time yet`,
+  };
+}

@@ -22,8 +22,8 @@ import { getState, saveState } from '../../bridge'
 export type DeckFold = 'slide' | 'handout' | null
 
 /** What this deck's view keeps: the slide's share of the width beside the handout (`deckRatio`) and its share of the
- *  height above it (`deckAboveRatio`). Never the file, and never the view: a `deckFold` an older build kept is not read. */
-export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckConversionNoticed?: unknown }
+ *  height above it (`deckAboveRatio`), and thumbnails or list (`deckStripMode`). A `deckFold` an older build kept is not read. */
+export interface DeckViewState { deckRatio?: unknown; deckAboveRatio?: unknown; deckConversionNoticed?: unknown; deckStripMode?: unknown }
 
 /** This deck's kept view state, or nothing when the view has none. */
 export function deckViewState(): DeckViewState {

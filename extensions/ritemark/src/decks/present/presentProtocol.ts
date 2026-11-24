@@ -7,12 +7,13 @@
  * and went there), never the `id`, `from`, `kept` or `skip` lines. `wallStateOf` builds it field by field, so nothing
  * new reaches the wall by accident.
  */
+import { clockMinutes, sessionLengthFromEnd, SESSION_LENGTH, SESSION_START } from '../timetable';
 import type { SlideData, SlideItem } from '../deckFormat';
 import { publicSlide } from '../page/publicDeck';
 import { slidePicturePaths } from '../blocks/slideRenderer';
 import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
-import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
+import { frontMatterValue, presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 import { transitionOf, type DeckTransition } from './deckTransition';
 import { slideArrivalOf, type SlideArrival } from './slideArrival';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
@@ -557,6 +558,20 @@ export function decodeDeckPresentMenuRequest(value: unknown): DeckPresentMenuReq
   if (input.type === 'deck/present-options') return exactKeys(input, ['type']) ? { type: 'deck/present-options' } : null;
   if (input.type === 'deck/present-presenter' && exactKeys(input, ['type', 'on']) && typeof input.on === 'boolean') return { type: 'deck/present-presenter', on: input.on };
   return null;
+}
+
+/** A session boundary writes one line, using the same edit as the presenter. */
+export function sessionTimeEdit(text: string, field: 'start' | 'end', value: string): ReturnType<typeof frontMatterEdit> | null {
+  const minutes = clockMinutes(value);
+  if (minutes === null) return null;
+  const offset = text.startsWith('\uFEFF') ? 1 : 0;
+  const body = text.slice(offset);
+  const start = clockMinutes(frontMatterValue(body, SESSION_START));
+  const key = field === 'start' ? SESSION_START : SESSION_LENGTH;
+  const next = field === 'start' ? value : String(sessionLengthFromEnd(start, minutes));
+  if (frontMatterValue(body, key) === next) return null;
+  const edit = frontMatterEdit(body, key, next);
+  return { ...edit, start: edit.start + offset, end: edit.end + offset };
 }
 
 export { lengthMinutesOf, MAX_LENGTH_MINUTES } from './presentSession';

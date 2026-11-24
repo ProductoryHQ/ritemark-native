@@ -1,6 +1,20 @@
 import { parseDeck, slideDataOf } from './deckFormat';
-import { frontMatterValue, lengthMinutesOf } from './present/presentSession';
+import { frontMatterValue, lengthMinutesOf, MAX_LENGTH_MINUTES } from './present/presentSession';
 import { minutesIn, stepsLabelOf } from '../../webview/src/components/decks/present/pointerTimer';
+
+export const SESSION_START = 'ritemark-start';
+export const SESSION_LENGTH = 'ritemark-length';
+
+export function clockMinutes(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+export function sessionLengthFromEnd(start: number | null, end: number): number {
+  const length = end - (start ?? 0);
+  return length > 0 ? length : length + MAX_LENGTH_MINUTES;
+}
 
 export interface TimetableSlide {
   /** Position in the file, from zero, including skipped slides. */
@@ -16,6 +30,7 @@ export interface TimetableSlide {
 export interface Timetable {
   slides: TimetableSlide[];
   sessionMinutes: number | null;
+  sessionStart?: number | null;
   totalMinutes: number;
   untimedCount: number;
 }
@@ -29,7 +44,7 @@ export function explicitMinutes(value: string | undefined): number | null {
 /** Read planned timing from saved or in-memory deck text. Skipped slides remain addressable in file order. */
 export function readTimetable(input: string): Timetable {
   const text = input.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const sessionMinutes = lengthMinutesOf(frontMatterValue(text, 'ritemark-length'));
+  const sessionMinutes = lengthMinutesOf(frontMatterValue(text, SESSION_LENGTH));
   // Recognize an empty front matter before looking for slide fences.
   const deck = parseDeck(text.replace(/^---[ \t]*\n---[ \t]*(?:\n|$)/, ''));
   let totalMinutes = 0;
@@ -57,5 +72,6 @@ export function readTimetable(input: string): Timetable {
     }
     return slide;
   });
-  return { slides, sessionMinutes, totalMinutes, untimedCount };
+  const sessionStart = clockMinutes(frontMatterValue(text, SESSION_START));
+  return { slides, sessionMinutes, totalMinutes, untimedCount, ...(sessionStart === null ? {} : { sessionStart }) };
 }
