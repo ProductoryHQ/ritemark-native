@@ -13,6 +13,8 @@ import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
 import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 import { SheetGrid } from './excel/SheetGrid'
+import { cellRulesForVersion } from './excel/cellRules'
+import { keptNotice } from './excel/keptNotice'
 import { Tooltip } from './ui/tooltip'
 import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 
@@ -70,23 +72,6 @@ async function openWorkbook(content: string, encoding: string | undefined, filen
   const workbook = XLSX.read(content, { type: encoding === 'base64' ? 'base64' : 'string', cellStyles: true })
   if (workbook.SheetNames.length === 0) throw new Error('Workbook contains no sheets')
   return sheetJsSource(workbook)
-}
-
-/** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
-function keptNotice(layout: { drawings: Array<{ what: string }>; conditionalFormats: number }): string | undefined {
-  const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
-  const things: string[] = []
-  const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
-  if (count('chart')) things.push(name(count('chart'), 'chart', 'charts'))
-  if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
-  if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
-  if (layout.conditionalFormats) things.push('colour rules')
-  if (!things.length) return undefined
-  const list = things.length === 1 ? things[0] : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`
-  const one = things.length === 1 && /^an? /.test(list)
-  return one
-    ? `This sheet has ${list}. It's kept in the file; Open in Excel to see it.`
-    : `This sheet has ${list}. They're kept in the file; Open in Excel to see them.`
 }
 
 /** A chart sheet's card title (frame 8). */
@@ -528,14 +513,18 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  const model = source?.model
+  const sheetModel = model?.sheets.find((s) => s.name === selectedSheet)
+  // The model is edited in place. A new version invalidates all range and formula facts.
+  const rulesForSheet = useMemo(() => model && cellRulesForVersion(model), [model, version])
+  const cellRules = sheetModel && rulesForSheet?.(sheetModel)
   const excelNotice = fileType !== 'xlsx'
     ? undefined
     : isEditable && editingFormula
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout, cellRules) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -658,6 +647,7 @@ export function SpreadsheetViewer({
           model={source.model}
           sheet={sheetModel}
           version={version}
+          cellRules={cellRules}
           editable={isEditable}
           onEdit={editCell}
           getInput={gridInput}

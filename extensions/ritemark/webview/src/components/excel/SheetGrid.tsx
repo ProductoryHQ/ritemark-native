@@ -20,7 +20,9 @@ import { cellKey, type CellModel, type SheetModel, type WorkbookModel } from './
 import { GRID_SANS, cellPadding, GRID_SERIF, buildLayout, fontCss, fontShorthand, indexAt, mergeIndex, setFontTwins, sortRefusal, sortedRows, styleIndexOf, styleOf, type SheetLayout } from './sheetLayout'
 import { columnScale, type ExcelGeometry } from './columnWidth'
 import { isMac } from '../../hooks/usePlatform'
-import type { CellStyle } from './excelStyles'
+import { dataBarPaint, ruleCellStyle, ruleCellText, ruleFont, visibleCellRules, type CellRules } from './cellRules'
+import type { RuleStyle } from './ruleEngine'
+import type { CellStyle, DifferentialStyle } from './excelStyles'
 import './sheetGrid.css'
 
 export interface SheetGridProps {
@@ -28,6 +30,7 @@ export interface SheetGridProps {
   sheet: SheetModel
   /** Raised by every edit, so the grid draws the model again. */
   version: number
+  cellRules: CellRules
   editable: boolean
   /** A cell typed into, by its sheet row and column (0-based). */
   onEdit: (row: number, col: number, text: string) => void
@@ -93,6 +96,7 @@ export function SheetGrid({
   model,
   sheet,
   version,
+  cellRules,
   editable,
   onEdit,
   getInput,
@@ -290,6 +294,7 @@ export function SheetGrid({
     return { c0, c1, i0, i1 }
   }, [layout, scroll, viewport, X, Y, fc, fr, FW, FH, HW, HH])
 
+  const ruleAt = useMemo(() => visibleCellRules(cellRules, layout, view), [cellRules, layout, view])
   const cellAt = (i: number, c: number) => sheet.cells.get(cellKey(rowOf[i], c))
   const styleAt = (i: number, c: number) => styleOf(styles, styleIndexOf(sheet, rowOf[i], c))
   const mergeOf = (i: number, c: number) => {
@@ -332,9 +337,13 @@ export function SheetGrid({
       if (!layout.rowH[i]) continue
       const r = rowOf[i]
       for (let c = 0; c <= lastC; c++) {
-        const cell = sheet.cells.get(cellKey(r, c))
-        if (!cell || cell.text === '' || !layout.colW[c] || layout.mergeAt.has(cellKey(r, c))) continue
-        const style = styleOf(styles, cell.s)
+        const original = sheet.cells.get(cellKey(r, c))
+        if (!original || !layout.colW[c] || layout.mergeAt.has(cellKey(r, c))) continue
+        const rule = ruleAt(i, c)
+        if (rule?.dataBar?.showValue === false) continue
+        const cell = ruleCellText(original, rule, model)
+        if (!cell.text) continue
+        const style = ruleCellStyle(styleOf(styles, cell.s), rule, base)
         const a = style?.align
         if (a && (a.wrap || a.rotation || a.shrink)) continue
         const h = horizontalOf(cell, style)
@@ -369,7 +378,7 @@ export function SheetGrid({
     }
     return { spans, hashes }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layout, view, sheet, styles, version, fontsReady])
+  }, [layout, view, sheet, styles, version, fontsReady, ruleAt, model])
 
   const selectedRow = rowOf[selected.i] ?? 0
   const selectedCell = cellAt(selected.i, selected.c)
@@ -592,8 +601,8 @@ export function SheetGrid({
     }
 
     const drawn = new Set<number>()
-    const slot = (i: number, c: number, i2: number, c2: number, r: number) => {
-      const style = styleAt(i, c)
+    const slot = (i: number, c: number, i2: number, c2: number, r: number, rule: RuleStyle | undefined) => {
+      const style = ruleCellStyle(styleAt(i, c), rule, base)
       const R = rect(i, c, i2, c2)
       const k = cellKey(r, c)
       if (style?.fill) {
@@ -608,7 +617,7 @@ export function SheetGrid({
       if (i2 !== i || c2 !== c) {
         const right = styleAt(i, c2)?.border
         const bottom = styleAt(i2, c)?.border
-        if (b || right || bottom) b = { left: b?.left, top: b?.top, right: right?.right ?? b?.right, bottom: bottom?.bottom ?? b?.bottom }
+        if (b || right || bottom) b = { left: b?.left, top: b?.top, right: rule?.dxf?.border?.right ?? right?.right ?? b?.right, bottom: rule?.dxf?.border?.bottom ?? bottom?.bottom ?? b?.bottom }
       }
       if (b && (b.left || b.right || b.top || b.bottom)) {
         out.push(
@@ -625,8 +634,23 @@ export function SheetGrid({
           />,
         )
       }
-      const cell = sheet.cells.get(k)
-      if (cell && cell.text !== '') out.push(text(cell, style, R, k, place))
+      const bar = rule?.dataBar
+      if (bar) {
+        const paint = dataBarPaint(bar)
+        out.push(
+          <div key={`db${k}`} className="sg-data-bar" style={place(R.x, R.y, R.w, R.h)} aria-hidden>
+            <div className="sg-data-bar-track">
+              {bar.fraction > 0 && <div className="sg-data-bar-fill" style={paint.fill} />}
+              {paint.axis && <div className="sg-data-bar-axis" style={paint.axis} />}
+            </div>
+          </div>,
+        )
+      }
+      const original = sheet.cells.get(k)
+      if (original && bar?.showValue !== false) {
+        const cell = ruleCellText(original, rule, model)
+        if (cell.text !== '') out.push(text(cell, style, R, k, place, rule?.dxf?.font))
+      }
     }
 
     for (let i = Math.max(i0, 0); i <= i1; i++) {
@@ -642,10 +666,10 @@ export function SheetGrid({
           const a = layout.displayOf.get(mr1)
           const z = layout.displayOf.get(mr2)
           if (a === undefined || z === undefined) continue
-          slot(a, mc1, z, mc2, mr1)
+          slot(a, mc1, z, mc2, mr1, ruleAt(i, c, mr1, mc1))
           continue
         }
-        slot(i, c, i, c, r)
+        slot(i, c, i, c, r, ruleAt(i, c))
       }
     }
     // text that runs in from a cell left or right of the view
@@ -679,7 +703,7 @@ export function SheetGrid({
     return out
   }
 
-  const text = (cell: CellModel, style: CellStyle | undefined, R: { x: number; y: number; w: number; h: number }, k: number, place: (x: number, y: number, w: number, h: number) => CSSProperties) => {
+  const text = (cell: CellModel, style: CellStyle | undefined, R: { x: number; y: number; w: number; h: number }, k: number, place: (x: number, y: number, w: number, h: number) => CSSProperties, font?: DifferentialStyle['font']) => {
     const a = style?.align
     const h = horizontalOf(cell, style)
     const span = textBoxes.spans.get(k)
@@ -696,7 +720,7 @@ export function SheetGrid({
       textAlign: h as CSSProperties['textAlign'],
       padding: `0 ${CELL_PADDING}px 1px`,
     }
-    if (cell.color) css.color = cell.color
+    if (font?.color === undefined && cell.color) css.color = cell.color
     if (a?.indent) css[h === 'right' ? 'paddingRight' : 'paddingLeft'] = CELL_PADDING + a.indent * 9
     const hash = textBoxes.hashes.get(k)
     let inner: ReactNode
@@ -705,7 +729,7 @@ export function SheetGrid({
       inner = (
         <span>
           {cell.runs.map((run, n) => (
-            <span key={n} style={run.font ? fontCss({ ...style?.font, ...run.font }, base) : undefined}>
+            <span key={n} style={run.font ? fontCss(ruleFont({ ...(style?.font ?? base), ...run.font }, font), base) : undefined}>
               {run.text}
             </span>
           ))}
