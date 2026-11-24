@@ -620,7 +620,8 @@ svg { flex: none; }
 .deck-follow-note button { height: auto; margin-left: 8px; padding: 0 2px; font: 600 13.5px/18px 'Sofia Sans', sans-serif; color: var(--lstrong); text-decoration: underline; text-underline-offset: 3px; }
 .deck-removed-slide { opacity: .8; }
 .deck-changed-block { position: relative; isolation: isolate; }
-.deck-changed-block::after { content: ''; position: absolute; inset: -6px; z-index: -1; pointer-events: none;
+/* 6 px above and below; not to the sides, where the slide's column (.blk-flow, overflow hidden) would clip it square. */
+.deck-changed-block::after { content: ''; position: absolute; inset: -6px 0; z-index: -1; pointer-events: none;
   border-radius: 6px; background: color-mix(in srgb, var(--accent) 16%, transparent); animation: deck-change-fade .5s linear 1.5s forwards; }
 @keyframes deck-change-fade { to { opacity: 0; } }
 .empty { position: fixed; inset: 0 0 var(--line-h); display: grid; place-items: center; margin: 0; color: var(--lmuted); }
@@ -633,7 +634,9 @@ svg { flex: none; }
    page scrolls when a slide is taller than the window, and the text follows under it. */
 @media screen and (max-width: 860px) {
   .deck-follow-note { position: relative; left: auto; bottom: auto; transform: none; margin: 8px 0 0;
-    width: 100%; max-width: none; padding-inline: 0; text-align: left; }
+    width: 100%; max-width: none; text-align: left; }
+  /* On a phone "Go on to" starts its own line at the note's left edge, never a wrapped, indented half line. */
+  .deck-follow-note button { display: block; margin: 4px 0 0; padding: 0; }
   body { overflow: auto; }
   .ground { position: fixed; }
   .view { position: relative; inset: auto; padding: 16px 16px calc(var(--line-h) + 12px); min-height: 100vh; }

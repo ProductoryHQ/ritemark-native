@@ -115,11 +115,13 @@ assert.ok(!/@media print[\s\S]*\.blk-flow \{[^}]*left: 64px/.test(html));
   ]) assert.ok(narrow.includes(`.layer.flow .deck-sl.is-blocks ${rule}`), rule);
   assert.ok(!/\.layer(?:\.flow)? \.layer\b/.test(PAGE_CSS), 'no slide inside a slide');
   assert.match(narrow, /\.view \{[^}]*padding: 16px 16px /);
-  assert.match(narrow, /\.deck-follow-note \{[^}]*margin: 8px 0 0;\s*width: 100%; max-width: none; padding-inline: 0; text-align: left;/);
+  assert.match(narrow, /\.deck-follow-note \{[^}]*margin: 8px 0 0;\s*width: 100%; max-width: none; text-align: left;/);
+  // The note keeps its inner padding (text never on the box's edge); "Go on to" takes its own line on a phone.
+  assert.match(narrow, /\.deck-follow-note button \{ display: block; margin: 4px 0 0; padding: 0; \}/);
 }
 {
   const fill = /\.deck-changed-block::after \{([^}]+)\}/.exec(PAGE_CSS)![1];
-  assert.match(fill, /position: absolute; inset: -6px; z-index: -1; pointer-events: none;/);
+  assert.match(fill, /position: absolute; inset: -6px 0; z-index: -1; pointer-events: none;/);
   assert.match(fill, /border-radius: 6px; background: color-mix\(in srgb, var\(--accent\) 16%, transparent\);/);
   assert.match(fill, /animation: deck-change-fade \.5s linear 1\.5s forwards;/);
   assert.match(PAGE_CSS, /@keyframes deck-change-fade \{ to \{ opacity: 0; \} \}/);
