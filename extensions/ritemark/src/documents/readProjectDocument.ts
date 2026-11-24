@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { lstat, open, realpath } from 'node:fs/promises';
 import * as path from 'node:path';
+import { OFFICE_PREVIEW_LIMITS } from '../officePreview/officePackageCheck';
 import { DEFAULT_SEARCH_LIMITS } from '../search/protocol';
 import { cloudState, oneDriveRootsFromEnv } from '../search/worker/cloudFiles';
 import { samePath } from '../utils/pathIdentity';
@@ -31,19 +32,23 @@ export async function readProjectDocument(
   const unavailable = { text: `Couldn't open ${name}. Check that the file is still in the project and that you can open it.` };
   try {
     const before = await lstat(target);
-    if (!before.isFile()) return { text: 'Choose a Word (.docx) or PDF file inside the project folder.' };
+    if (!before.isFile()) return { text: 'Choose a Word (.docx), PDF, or PowerPoint (.pptx) file inside the project folder.' };
     if (extension === '.doc') {
       return { text: `${name} is an older Word format. Open it in Word and save a .docx copy.` };
     }
-    if (extension !== '.docx' && extension !== '.pdf') {
-      return { text: 'This tool reads Word (.docx) and PDF files. You can open Markdown files in the Ritemark editor.' };
+    if (extension === '.ppt') {
+      return { text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
+    }
+    if (extension !== '.docx' && extension !== '.pdf' && extension !== '.pptx') {
+      return { text: 'This tool reads Word (.docx), PDF, and PowerPoint (.pptx) files. You can open Markdown files in the Ritemark editor.' };
     }
 
-    const kind = extension === '.docx' ? 'word' : 'pdf';
+    const kind = extension === '.docx' ? 'word' : extension === '.pdf' ? 'pdf' : 'powerpoint';
     if (kind === 'word' && (request.from !== undefined || request.to !== undefined)) {
-      return { text: 'Page ranges are for PDFs. Read a Word document by passing its path alone.', isError: true };
+      return { text: 'Read a Word document by passing its path alone.', isError: true };
     }
-    const maxBytes = kind === 'word' ? DEFAULT_SEARCH_LIMITS.docxBytes : DEFAULT_SEARCH_LIMITS.pdfBytes;
+    const maxBytes = kind === 'powerpoint' ? OFFICE_PREVIEW_LIMITS.maxFileBytes
+      : kind === 'word' ? DEFAULT_SEARCH_LIMITS.docxBytes : DEFAULT_SEARCH_LIMITS.pdfBytes;
     const oneDriveRoots = oneDriveRootsFromEnv(process.env);
     const cloud = cloudState(resolved.candidate, before, platform, oneDriveRoots)
       ?? cloudState(target, before, platform, oneDriveRoots);

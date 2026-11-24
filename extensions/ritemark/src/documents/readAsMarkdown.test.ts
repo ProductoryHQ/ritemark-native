@@ -124,7 +124,7 @@ async function main() {
   }
   await writeFile(path.join(project, 'README.md'), '# Fixture');
   assert.match((await read('README.md')).text, /Markdown files in the Ritemark editor/);
-  assert.match((await read('.')).text, /Choose a Word \(\.docx\) or PDF file/);
+  assert.match((await read('.')).text, /Choose a Word \(\.docx\), PDF, or PowerPoint \(\.pptx\) file/);
   // Exercise the actual bundled worker's read handler before any init message.
   const bundled = await build({
     entryPoints: [path.join(__dirname, '../search/worker/searchWorker.ts')],

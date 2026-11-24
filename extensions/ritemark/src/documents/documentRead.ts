@@ -4,7 +4,7 @@ export interface DocumentReadRequest {
   to?: number;
 }
 
-export type DocumentKind = 'word' | 'pdf';
+export type DocumentKind = 'word' | 'pdf' | 'powerpoint';
 
 export interface DocumentReadResult {
   text: string;
