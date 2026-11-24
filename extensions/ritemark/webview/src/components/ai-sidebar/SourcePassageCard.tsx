@@ -16,7 +16,8 @@ export function SourcePreviewBody({ preview, onOpen }: { preview: SourcePreview 
             <p className="font-semibold">{preview.name}</p>
             {preview.unit && <p className="text-ink-muted">{preview.unit}</p>}
           </div>
-          {preview.quote && <blockquote>“{preview.quote}”</blockquote>}
+          {/* A quiet line beside the passage, no ground of its own (VS Code's webview blockquote ground read as a black bar in dark); the line as the Insights rail draws its quotes. */}
+          {preview.quote && <blockquote className="m-0 border-l-2 border-accent-fainter bg-transparent py-0 pl-2 pr-0 text-ink">“{preview.quote}”</blockquote>}
           {preview.missing && <p>These words couldn't be found in the document.</p>}
           <div>
             <Tooltip label="Open at this passage">
