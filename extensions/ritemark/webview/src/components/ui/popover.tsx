@@ -13,6 +13,7 @@ import * as React from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 import { cn } from '../../lib/utils'
+import { focusOpensTooltip } from './tooltip'
 
 const Popover = PopoverPrimitive.Root
 const PopoverTrigger = PopoverPrimitive.Trigger
@@ -39,3 +40,86 @@ const PopoverContent = React.forwardRef<
 PopoverContent.displayName = PopoverPrimitive.Content.displayName
 
 export { Popover, PopoverTrigger, PopoverAnchor, PopoverContent }
+
+/** A hover/focus popover anchored to an element rendered outside React. */
+export function AnchoredHoverPopover({
+  anchor, contentRef, children, onClose, onPointerEnter, onPointerLeave, label,
+}: {
+  anchor: HTMLElement
+  contentRef: React.Ref<HTMLDivElement>
+  children: React.ReactNode
+  onClose: () => void
+  label: string
+  onPointerEnter: () => void
+  onPointerLeave: () => void
+}) {
+  const virtualRef = { current: anchor }
+  return (
+    <Popover open onOpenChange={(open) => { if (!open) onClose() }}>
+      <PopoverAnchor virtualRef={virtualRef} />
+      <PopoverContent
+        ref={contentRef}
+        aria-label={label}
+        align="start"
+        sideOffset={2}
+        collisionPadding={8}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onEscapeKeyDown={() => {
+          if (anchor.isConnected && anchor.ownerDocument.activeElement?.closest('[role="dialog"]')) {
+            anchor.focus()
+          }
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return
+          // Return to the anchor so normal tab order can continue from there.
+          anchor.focus()
+          if (event.shiftKey) event.preventDefault()
+          onClose()
+        }}
+        onFocusOutside={(event) => {
+          if (anchor.contains(event.target as Node)) event.preventDefault()
+        }}
+        onPointerEnter={onPointerEnter}
+        onPointerLeave={onPointerLeave}
+      >
+        {children}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+
+/** Pointer grace period across the gap to the card, plus keyboard entry into its first action. */
+export function useAnchoredHover<T extends { anchor: HTMLElement; content: string }>(content: string) {
+  const [target, setTarget] = React.useState<T | null>(null)
+  const active = target?.content === content ? target : null
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  const timer = React.useRef<ReturnType<typeof setTimeout>>()
+  const keepOpen = React.useCallback(() => clearTimeout(timer.current), [])
+  React.useEffect(() => keepOpen, [content, keepOpen])
+  const close = React.useCallback(() => {
+    keepOpen()
+    setTarget(null)
+  }, [keepOpen])
+  const leave = () => {
+    keepOpen()
+    timer.current = setTimeout(() => {
+      const focus = active?.anchor.ownerDocument.activeElement
+      if (!contentRef.current?.contains(focus ?? null) && !(focus === active?.anchor && focusOpensTooltip(focus ?? null))) close()
+    }, 180)
+  }
+  const show = (next: T) => {
+    keepOpen()
+    setTarget((previous) => previous?.anchor === next.anchor ? previous : next)
+  }
+  const enterWithKeyboard = (event: React.KeyboardEvent) => {
+    if (event.key !== 'Tab' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.target !== active?.anchor) return
+    const action = contentRef.current?.querySelector('button:not(:disabled)')
+    if (action instanceof HTMLElement) {
+      event.preventDefault()
+      action.focus()
+    }
+  }
+  return { active, contentRef, close, leave, show, keepOpen, enterWithKeyboard }
+}

@@ -5,12 +5,25 @@
  * that integrate with VS Code's theme variables.
  */
 
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useState, useId, useLayoutEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
 import { classifyChatHref, rewriteCodexCitations, stripLineSuffix } from './chatLinks';
 import { ChatLinkMenu, type ChatLinkMenuRequest } from './ChatLinkMenu';
+import { SourcePassageCard } from './SourcePassageCard';
+import { useAISidebarStore } from './store';
+import { focusOpensTooltip } from '../ui/tooltip';
+import { useAnchoredHover } from '../ui/popover';
+import type { SourcePassage } from '../../utils/sourcePassage';
+
+interface HoveredSource {
+  anchor: HTMLAnchorElement;
+  path: string;
+  passage: SourcePassage;
+  content: string;
+  id: string;
+}
 
 // Configure marked for safety + good defaults
 marked.setOptions({
@@ -33,6 +46,42 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     }
   }, [content]);
 
+  const markdownRef = useRef<HTMLDivElement>(null);
+  const id = useId();
+  const { active: hovered, contentRef, close: closeCard, leave: leaveCard, show, keepOpen, enterWithKeyboard } =
+    useAnchoredHover<HoveredSource>(html);
+  const currentSourceId = useAISidebarStore((state) => {
+    const { frontDocumentPath: front, openedSourceLink: source } = state;
+    if (source && front && (source.path === front ||
+      (/^[a-z]:[\\/]/i.test(front) && source.path.toLowerCase() === front.toLowerCase()))) return source.id;
+    return null;
+  });
+
+  useLayoutEffect(() => {
+    markdownRef.current?.querySelectorAll('a').forEach((anchor, index) => {
+      const link = classifyChatHref(anchor.getAttribute('href'));
+      if (link.kind !== 'file' || !link.passage) return;
+      anchor.dataset.sourceLink = `${id}-${index}`;
+      if (anchor.dataset.sourceLink === currentSourceId) anchor.setAttribute('aria-current', 'true');
+      else anchor.removeAttribute('aria-current');
+    });
+  }, [html, id, currentSourceId]);
+
+  const showSource = (target: EventTarget) => {
+    const anchor = (target as HTMLElement).closest<HTMLAnchorElement>('a[data-source-link]');
+    if (!anchor) return;
+    const link = classifyChatHref(anchor.getAttribute('href'));
+    if (link.kind !== 'file' || !link.passage || !anchor.dataset.sourceLink) return;
+    const { path, passage } = link;
+    const sourceId = anchor.dataset.sourceLink;
+    show({ anchor, path, passage, content: html, id: sourceId });
+  };
+
+  const openSource = useCallback((path: string, passage: SourcePassage, sourceLinkId?: string) => {
+    closeCard();
+    vscode.postMessage({ type: 'chat:open-file', filePath: path, passage, sourceLinkId });
+  }, [closeCard]);
+
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
 
@@ -45,7 +94,8 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
       if (link.kind === 'external') {
         vscode.postMessage({ type: 'openExternal', url: link.url });
       } else if (link.kind === 'file') {
-        vscode.postMessage({ type: 'chat:open-file', filePath: link.path, passage: link.passage });
+        if (link.passage) openSource(link.path, link.passage, anchor.dataset.sourceLink);
+        else vscode.postMessage({ type: 'chat:open-file', filePath: link.path });
       } else if (link.kind === 'unsupported') {
         // Sprint 122 (#282): never followed, but never silent — the host says why.
         vscode.postMessage({ type: 'chat:link-unsupported', scheme: link.scheme, href: link.href });
@@ -65,7 +115,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
       e.preventDefault();
       vscode.postMessage({ type: 'chat:open-file', filePath: stripLineSuffix(text) });
     }
-  }, []);
+  }, [openSource]);
 
   // Sprint 122 (#282): right-click on a link — or Shift+F10 / the menu key
   // while it has focus — offers what can be done with that destination.
@@ -74,35 +124,54 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
   const openLinkMenu = useCallback((target: EventTarget, point: { x: number; y: number } | null): boolean => {
     const anchor = (target as HTMLElement).closest('a');
     if (!anchor) return false;
+    closeCard();
     const link = classifyChatHref(anchor.getAttribute('href'));
     if (link.kind === 'none') return false;
     // Without a pointer position (keyboard), the menu sits under the link.
     const rect = anchor.getBoundingClientRect();
     setLinkMenu({ x: point?.x ?? rect.left, y: point?.y ?? rect.bottom, target: link, anchor });
     return true;
-  }, []);
+  }, [closeCard]);
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const fromKeyboard = e.clientX === 0 && e.clientY === 0;
     if (openLinkMenu(e.target, fromKeyboard ? null : { x: e.clientX, y: e.clientY })) e.preventDefault();
   }, [openLinkMenu]);
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    enterWithKeyboard(e);
     // macOS has no keyboard context-menu key of its own, so Shift+F10 is handled
     // here on every platform (as VS Code does), along with the Menu key.
     if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return;
     if (openLinkMenu(e.target, null)) e.preventDefault();
-  }, [openLinkMenu]);
+  }, [openLinkMenu, enterWithKeyboard]);
 
   if (!html) return null;
 
   return (
     <>
       <div
+        ref={markdownRef}
         className={cn('rendered-markdown', className)}
+        onPointerOver={(event) => { if (event.pointerType !== 'touch') showSource(event.target); }}
+        onPointerOut={(event) => {
+          if (hovered?.anchor.contains(event.target as Node) && !hovered.anchor.contains(event.relatedTarget as Node | null)) leaveCard();
+        }}
+        onFocus={(event) => { if (focusOpensTooltip(event.target)) showSource(event.target); }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         onKeyDown={handleKeyDown}
         dangerouslySetInnerHTML={{ __html: html }}
       />
+      {hovered && <SourcePassageCard
+        key={hovered.id}
+        anchor={hovered.anchor}
+        path={hovered.path}
+        passage={hovered.passage}
+        contentRef={contentRef}
+        onClose={closeCard}
+        onOpen={() => openSource(hovered.path, hovered.passage, hovered.id)}
+        onPointerEnter={keepOpen}
+        onPointerLeave={leaveCard}
+      />}
       {linkMenu && <ChatLinkMenu key={`${linkMenu.x},${linkMenu.y}`} request={linkMenu} onClose={() => setLinkMenu(null)} />}
     </>
   );
@@ -155,6 +224,17 @@ export const markdownStyles = `
 }
 .rendered-markdown a:hover {
   text-decoration: underline;
+}
+
+.rendered-markdown a[data-source-link] {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--r-accent) 45%, transparent);
+  text-underline-offset: 2px;
+}
+.rendered-markdown a[data-source-link]:is(:hover, :focus-visible, [aria-current="true"]) {
+  color: var(--r-accent);
+  text-decoration-color: currentColor;
 }
 
 /* Bold & italic */

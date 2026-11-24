@@ -23,3 +23,7 @@ export function decodeSourcePassage(value: unknown): SourcePassage | undefined {
   if (!text && safePage === undefined) return
   return { ...(text ? { text: sourceText(text) } : {}), ...(safePage === undefined ? {} : { page: safePage }) }
 }
+
+export type SourcePreview =
+  | { error: string }
+  | { name: string; unit?: string; quote?: string; missing: boolean }

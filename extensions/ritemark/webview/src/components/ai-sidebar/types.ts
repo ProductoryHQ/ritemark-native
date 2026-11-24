@@ -519,6 +519,7 @@ export type ExtensionMessage =
   | { type: 'acp-providers'; enabled: boolean; providers: AcpProviderFlags; generation?: number; revision?: number; error?: string }
   | { type: 'selection-update'; selection: EditorSelection; activeFilePath?: string; activeFileLabel?: string | null; activeSlide?: CurrentSlide | null }
   /** `label`: a task card's title, shown in the chip instead of its file (#477). */
+  | { type: 'chat:source/opened'; id: string; path: string }
   | { type: 'active-file-changed'; path: string | null; label?: string | null; slide?: CurrentSlide | null }
   // Sprint 155 (PR 2): each chat's document and its icon, and the document in front (All chats' order)
   | { type: 'chat-documents'; documents: Record<string, ChatDocumentView>; front: string | null }
