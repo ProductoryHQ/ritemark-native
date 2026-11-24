@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.
+
 - Source links in AI answers can open the quoted passage in Word, PDF, or Markdown, or jump to a slide in PowerPoint.
 
 ### Added

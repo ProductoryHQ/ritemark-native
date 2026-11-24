@@ -387,6 +387,7 @@ interface AISidebarState {
    */
   chatDocuments: Record<string, ChatDocumentView>;
   frontDocumentPath: string | null;
+  openedSourceLink: { id: string; path: string } | null;
   /** Sprint 155 (PR 2): the person's click on the head's icon; the host brings the chat's document forward. */
   bringChatDocumentForward: (conversationId: string) => void;
 
@@ -1140,6 +1141,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     conversationStoreNotice: null,
     chatDocuments: {},
     frontDocumentPath: null,
+    openedSourceLink: null,
 
     promptQueues: {},
     composerDrafts: {},
@@ -3088,6 +3090,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           });
           break;
 
+        case 'chat:source/opened':
+          set({ openedSourceLink: { id: message.id, path: message.path } });
+          break;
         case 'active-file-changed':
           set({ activeFilePath: message.path, activeFileLabel: message.label ?? null, activeSlide: message.slide ?? null });
           break;
