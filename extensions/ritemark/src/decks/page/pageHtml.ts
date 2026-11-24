@@ -613,8 +613,10 @@ svg { flex: none; }
 .layer .deck-sl.is-blocks .blk-tab:focus-visible { outline: 2px solid var(--s-acc, #F2B544); outline-offset: -2px; }
 .foot { display: none; }
 .deck-follow-note { position: fixed; left: 50%; bottom: calc(var(--line-h) + 8px); transform: translateX(-50%); z-index: 21;
-  width: max-content; max-width: calc(100% - 32px); padding: 8px 12px; border-radius: 8px; background: var(--lbar); color: var(--lstrong); }
-.deck-follow-note button { margin-left: 8px; text-decoration: underline; }
+  width: max-content; max-width: calc(100% - 32px); padding: 8px 12px; border-radius: 8px; background: var(--lbar); color: var(--lstrong);
+  font: 500 13.5px/18px 'Sofia Sans', sans-serif; }
+/* The note's words and its "Go on to" in the bar's type: the page's body font is the slide's, never the note's. */
+.deck-follow-note button { height: auto; margin-left: 8px; padding: 0 2px; font: 600 13.5px/18px 'Sofia Sans', sans-serif; color: var(--lstrong); text-decoration: underline; text-underline-offset: 3px; }
 .deck-removed-slide { opacity: .8; }
 .deck-changed-block { box-shadow: 0 0 0 2px var(--accent), 0 0 12px var(--accent); border-radius: 3px; }
 .empty { position: fixed; inset: 0 0 var(--line-h); display: grid; place-items: center; margin: 0; color: var(--lmuted); }
