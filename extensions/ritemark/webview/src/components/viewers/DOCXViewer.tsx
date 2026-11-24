@@ -18,6 +18,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { renderAsync } from 'docx-preview'
 import { sendToExtension } from '../../bridge'
 import { stripExt } from '../../utils/imageNaming'
+import { sourcePage } from '../../utils/sourcePassage'
 import { matchCountLabel, stepMatch } from '../../utils/textSearch'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -231,13 +232,20 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
         sendToExtension('refresh')
       } else if (message.type === 'fileDeleted') {
         setDeleted(true)
-      } else if (message.type === 'find:top') {
+      } else if (message.type === 'find:top' || message.type === 'find:page') {
+        const page = message.type === 'find:top' ? 1 : sourcePage(message.page)
+        if (page === undefined) return
         landing.current = null
         revealMatch.current = false
         setQuery('')
         setSearchOpen(false)
-        pageToRestore.current = null
-        scrollerRef.current?.scrollTo({ top: 0 })
+        if (message.type === 'find:top') {
+          pageToRestore.current = null
+          scrollerRef.current?.scrollTo({ top: 0 })
+        } else {
+          pageToRestore.current = page - 1
+          setLandingVersion((v) => v + 1)
+        }
       } else if (message.type === 'find:open') {
         // Sprint 148 (R9): opened from a search result. The find bar only: the document isn't touched.
         const request = decodeFindOpen(message, Date.now())
@@ -417,7 +425,7 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
       pageToRestore.current = null
       requestAnimationFrame(() => goToPage(page))
     }
-  }, [phase, renderVersion, naturalSizes, goToPage])
+  }, [phase, renderVersion, naturalSizes, goToPage, landingVersion])
 
   // Fit width / fit page follow the window until the user zooms by hand.
   useEffect(() => {

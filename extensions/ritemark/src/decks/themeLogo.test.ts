@@ -556,7 +556,7 @@ async function main(): Promise<void> {
       // Sprint 170: the page's input is read once, `pageInput`, for Publish and Save as PDF alike).
       const publish = fs.readFileSync(path.join(extension, 'src/decks/deckPublish.ts'), 'utf8');
       assert.match(publish, /pageLogoOf\(theme, frontMatterLook\(text\) === 'borderless', read\.logo, read\.secondLogo\)/);
-      assert.match(publish, /logoFiles = input\.logo \? \[input\.logo\] : \[\];/);
+      assert.match(publish, /logoFiles(?: = |: )input\.logo \? \[input\.logo\] : \[\]/); // Sprint 175 PR 6: built once in buildPage
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

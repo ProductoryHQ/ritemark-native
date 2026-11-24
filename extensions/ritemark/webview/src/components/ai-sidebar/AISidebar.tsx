@@ -341,7 +341,7 @@ export function AISidebar() {
             opens from it has to fit this column or be drawn above the rail.
           */}
           <div className="flex-1 min-h-0 flex overflow-hidden rm-ai-ground">{/* Ritemark 2.0: the AI's sheet on the ground, the rail beside it */}
-            <div ref={setConversationColumn} className="flex-1 min-w-0 flex flex-col overflow-hidden rm-ai-sheet">
+            <div ref={setConversationColumn} data-chat-column className="flex-1 min-w-0 flex flex-col overflow-hidden rm-ai-sheet">
               {/* Sprint 122 (#282): the conversation you are in, named, with History's actions. */}
               <ConversationHeader />
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

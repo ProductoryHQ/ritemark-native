@@ -156,7 +156,9 @@ async function main() {
     assert.deepEqual(await lookup(name, 'North | East'), { text: 'North | East', occurrence: 0 });
     assert.deepEqual(await lookup('Report.pdf', pageText(4), 4), { text: pageText(4), occurrence: 0, page: 4 });
     assert.match((await lookup('Report.pdf', 'One line continues here', 4) as { text: string }).text, /^One line ?continues here$/);
-    assert.deepEqual(await lookup('Report.pdf', pageText(5), 4), { page: 4 });
+    // A stale page number still finds the real page and keeps the mark.
+    assert.deepEqual(await lookup('Report.pdf', pageText(5), 4), { text: pageText(5), occurrence: 0, page: 5 });
+    assert.deepEqual(await lookup('Report.pdf', pageText(5), 99), { text: pageText(5), occurrence: 0, page: 5 });
     assert.equal(await lookup('Report.pdf', 'made-up quotation', 4), undefined);
     assert.deepEqual(await lookup('README.md', 'fixture'), { text: 'Fixture', occurrence: 0 });
     assert.equal((await client.read({ path: '../outside.docx', passage: { text: 'Operations' } }, [project]))?.isError, true);

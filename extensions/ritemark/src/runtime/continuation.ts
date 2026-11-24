@@ -189,6 +189,7 @@ export interface RuntimeCompatibilityFingerprintInput {
    * other runtimes, whose fingerprints stay what they were.
    */
   toolSet?: string;
+  capabilityContextVersion?: number;
 }
 
 /**
@@ -210,6 +211,7 @@ export function createRuntimeCompatibilityFingerprint(
     input.approvalPolicy,
     input.authBinding,
     ...(input.toolSet !== undefined ? [input.toolSet] : []),
+    ...(input.capabilityContextVersion === undefined ? [] : [{ capabilityContextVersion: input.capabilityContextVersion }]),
   ]);
   return createHmac('sha256', hostSecret).update(canonical).digest('hex');
 }

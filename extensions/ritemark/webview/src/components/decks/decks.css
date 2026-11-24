@@ -666,3 +666,36 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-notice { display: flex; align-items: center; gap: 10px; }
 .deck-lib-notice-text { flex: 1; min-width: 0; }
 .deck-lib-notice .deck-lib-notice-undo { flex: none; height: auto; padding: 0; color: var(--r-surface); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+
+/* A slide's time beside its number, and in the lower corner of its thumbnail. */
+.deck-bar .deck-minutes-run, .deck-bar .deck-minutes-edit {
+  height: 28px;
+  padding: 0 4px;
+  font: inherit;
+  color: inherit;
+}
+.deck-bar .deck-minutes-edit { display: inline-flex; align-items: center; gap: 4px; }
+.deck-bar .deck-minutes-input {
+  /* Four digits (up to 1440) with room inside the border. */
+  width: 42px;
+  height: 24px;
+  padding: 0 3px;
+  border: 1px solid var(--r-hairline-strong);
+  border-radius: 6px;
+  background: var(--r-surface);
+  color: var(--r-ink-strong);
+  font: inherit;
+  font-variant-numeric: inherit;
+}
+.deck-thumb-minutes {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--ritemark-dark-surface);
+  color: var(--ritemark-dark-ink-strong);
+  font: 600 10px/14px 'Sofia Sans', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.deck-thumb .deck-thumb-comments.has-minutes { bottom: 24px; }
