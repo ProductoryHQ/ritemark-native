@@ -13,6 +13,7 @@ import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
 import { readWorkbook } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 import { SheetGrid } from './excel/SheetGrid'
+import { cellRulesForVersion } from './excel/cellRules'
 import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
 import { drawsChart } from './excel/chartLayout'
 import { keptNotice } from './excel/keptNotice'
@@ -514,7 +515,11 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  const model = source?.model
+  const sheetModel = model?.sheets.find((s) => s.name === selectedSheet)
+  // The model is edited in place. A new version invalidates all range and formula facts.
+  const rulesForSheet = useMemo(() => model && cellRulesForVersion(model), [model, version])
+  const cellRules = sheetModel && rulesForSheet?.(sheetModel)
   const sheetChart = sheetModel?.kind === 'chartsheet'
     ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart')?.chart : undefined
   const excelNotice = fileType !== 'xlsx'
@@ -523,7 +528,7 @@ export function SpreadsheetViewer({
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout, cellRules) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -658,6 +663,7 @@ export function SpreadsheetViewer({
           model={source.model}
           sheet={sheetModel}
           version={version}
+          cellRules={cellRules}
           editable={isEditable}
           onEdit={editCell}
           getInput={gridInput}

@@ -101,10 +101,11 @@ const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
 assert.match(fallback, /class="sg-object"/)
 assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
 const worksheet = kinds.sheets[0]
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo], conditionalFormats: 0 }),
+assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo] }),
   "This sheet has a chart. It's kept in the file; Open in Excel to see it.")
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }], conditionalFormats: 1 }),
-  "This sheet has a picture and colour rules. They're kept in the file; Open in Excel to see them.")
+// Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
+assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
+  "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
 
 const colours = await open('charts-colours')
 const tints = forSheet(colours, colours.sheets[0])
