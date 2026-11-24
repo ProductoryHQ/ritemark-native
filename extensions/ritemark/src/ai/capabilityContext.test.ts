@@ -252,6 +252,25 @@ test('deck guidance says what "this slide" means', () => {
   }
 });
 
+test('deck guidance says how to describe an edit in a reply (#967)', () => {
+  for (const runtime of ['claude-code', 'codex', 'opencode'] as const) {
+    const context = renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true }));
+    const decks = context.split('\n\n').find((section) => section.startsWith('DECKS:'));
+    assert.ok(decks, `${runtime}: has a DECKS section`);
+    for (const needle of [
+      'In a reply, name a slide by its number and title',
+      '"slide 6\'s handout"',
+      'If you edited the file yourself, count its slides in order to get the number; a skipped slide counts.',
+      'If you still can\'t tell the number, use the title and where the slide is',
+      'Never put a slide\'s `id:`, header or front matter, the deck\'s `deck:` line, a fence, a `:::` block, a `{.label}` attribute or a Markdown heading marker (`#`, `##`) in a reply. These are for the file and the tools only, unless the person asks to see the file\'s text.',
+      'Say what you changed, slide by slide. Don\'t say whether you opened the deck view.',
+      'name the slide and what to check ("check that the three boxes fit on slide 5")',
+    ]) {
+      assert.ok(decks.includes(needle), `${runtime}: ${needle}`);
+    }
+  }
+});
+
 // ── Sprint 162 PR 5: themes, taught the same way to every AI with the deck tools ──
 test('deck guidance teaches themes: the folder, the fields, the six fonts and the contrast rule', () => {
   const renders = (['claude-code', 'codex', 'opencode'] as const).map((runtime) => renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: false, board: false, deck: true })));

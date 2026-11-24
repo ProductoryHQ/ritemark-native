@@ -26,9 +26,19 @@ import type { Provider } from './schema';
 
 export const FEED_MIN_APP_VERSION: Partial<Record<Provider, Record<string, string>>> = {
   // Codex 0.161.0 made GPT-6.1 Sol its own default; 1.14.0 is the first release with it (0.162.1).
-  codex: { [CODEX_MODEL_IDS.SOL_6_1]: '1.14.0' },
+  codex: {
+    [CODEX_MODEL_IDS.SOL_6_1]: '1.14.0',
+    // 2.3.0 first bundles Codex 0.171.0, which supports GPT-6.2.
+    [CODEX_MODEL_IDS.SOL_6_2]: '2.3.0',
+    [CODEX_MODEL_IDS.ASTRA_6_2]: '2.3.0',
+    [CODEX_MODEL_IDS.TERRA_6_1]: '2.3.0',
+    [CODEX_MODEL_IDS.LUNA_6]: '2.3.0',
+  },
+  // OpenAI API rows (Flows with a key): an app whose modelConfig.ts lacks a model calls it through
+  // Chat Completions without reasoning (LLMNodeExecutor's usesResponsesAPI), so GPT-6.2 needs 2.3.0.
+  openai: { [OPENAI_MODEL_IDS.SOL_6_2]: '2.3.0', [OPENAI_MODEL_IDS.ASTRA_6_2]: '2.3.0' },
   // Claude Code 2.1.296 (1.14.0) is the first bundled CLI that knows Haiku 5.5.
-  anthropic: { [CLAUDE_MODEL_IDS.HAIKU_5_5]: '1.14.0' },
+  anthropic: { [CLAUDE_MODEL_IDS.HAIKU_5_5]: '1.14.0', [CLAUDE_MODEL_IDS.FABLE_5_2]: '2.3.0' },
   // OpenCode rows from 2.0.0 (OpenCode 1.19.3), the version Argon was run on (c4808be).
   opencode: Object.fromEntries([
     toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4),
@@ -39,5 +49,14 @@ export const FEED_MIN_APP_VERSION: Partial<Record<Provider, Record<string, strin
     toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)),
     toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5),
     toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1)),
-  ].map((id) => [id, '2.0.0'])),
+  ].map((id) => [id, '2.0.0']).concat([
+    toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_2),
+    toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA_6_2),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_2)),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.ASTRA_6_2)),
+    toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA_6_1),
+    toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA_6),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.TERRA_6_1)),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA_6)),
+  ].map((id) => [id, '2.3.0']))),
 };

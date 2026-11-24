@@ -17,7 +17,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 - **Format words on a slide from the toolbar.** Select words on a slide, in columns too. The toolbar's bold, italic, headings, lists, quote, code and link change them.
 - **Headings on a slide go big, medium, small.** Heading 1 is the largest, then Heading 2, then Heading 3, as in a document. Type / and choose one.
 - **The toolbar steps aside for a link.** On a slide, the toolbar hides while you type the link's address, so it covers nothing. It comes back when you're done.
-- **Open a deck from Finder or Explorer.** A deck is its own kind of file, with its own icon. Double-click it, and it opens in Ritemark as a deck.
+- **Open a deck from Finder or Explorer.** Double-click a `.rtms` file with the deck icon to open it in Ritemark. Older `.deck.md` files still open as decks in Ritemark.
 
 ### What you can put on a slide
 
@@ -51,6 +51,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 ### Reuse slides from the Slide library
 
+- **Open the Slide library.** Click **+** by the slide thumbnails and choose **From the library…** or **From another deck…**. You can also choose **Slide library** in the sidebar.
 - **Find an earlier deck by its folder.** The Slide library lists your other decks under the folders they're in, newest first. Each deck shows its date and number of slides.
 - **Take a whole section at once.** Open a deck in the Slide library and it shows its sections. **Take section** puts all of a section's slides after the slide you're on, with their handout and prompts. One undo takes them out again.
 - **Search shows each slide once.** A slide that is in several of your decks shows once, at its newest copy, with the deck it's in. It also says how many older decks have it. A tick marks the slides already in your deck.
@@ -60,6 +61,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 - **Present from Ritemark.** Choose **Present** to show only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
 - **Lead the room while you present.** Use a clicker, blank the screen or light up one item. Show a timer for an exercise, or a QR code for the page.
+- **Switch tabs while you present.** Click a tab on the slide to show it. With a second display, click it on your laptop's slide, and the projector follows.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 
 ### Share the deck
@@ -105,11 +107,13 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 - **Add a button that opens a web page.** Type / and choose **Button**, then give it a full address that starts with https://. It opens the page in your browser.
 - **The / menu knows more words.** Type /photo or /pilt, and Picture comes up. Image is now called Picture.
 - **Give a comment to ChatGPT.** Write @chatgpt in the comment, or pick ChatGPT from the list of names.
+- **Pick from new ChatGPT and Claude models.** With ChatGPT, pick GPT-6.2 Sol, now the default, or GPT-6.2 Astra, OpenAI’s most capable model for complex work. With Claude, pick Fable 5.2.
 - **Claude works with an API key alone.** Save an Anthropic API key in Settings, and Claude is ready without a Claude.ai sign-in. If you have both, Claude uses the sign-in.
 - **An AI's usage limit says so.** The chat says when the AI can answer again, and offers another model or AI. The chat list shows "Limit reached".
 
 ## Fixes
 
+- **A document you double-click opens in Ritemark.** With Ritemark closed, double-click a deck, or a Markdown file that opens with Ritemark, in Finder or Explorer: it opens in Ritemark’s editor. Before, it could open as plain text.
 - **On Windows, Claude asks you to sign in when it needs to.** Before, Claude could look ready, and the first question failed.
 - **One sign-in at a time.** While a sign-in runs, the AI's sheet shows "Signing in…" with **Cancel**. Before, it offered a second sign-in.
 - **A web page that failed to load opens again.** Open its file once it's back, and the page loads. Before, you saw the failed page again.
@@ -126,6 +130,6 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 ## Known issues
 
-- **OpenCode can show "Working" for about a minute** before it says it has reached a limit. It tries again by itself first.
+- **A usage limit can take time to show.** Some chats can stay on "Working" for about a minute when a model reaches a temporary usage limit. The chat tries again on its own and shows the limit if it still can’t answer.
 - **Sorting is off when merged cells cross the rows.** Ritemark says why.
 - **Windows may warn about the new installer** until Microsoft knows it better. Installing from the Microsoft Store avoids this. [Read more](https://github.com/ProductoryHQ/ritemark-native/blob/main/docs/user/windows-smart-app-control.md).
