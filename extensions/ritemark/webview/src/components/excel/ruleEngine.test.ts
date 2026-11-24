@@ -75,7 +75,7 @@ assert.equal(negative.color, '#FF0000')
 assert.equal(styleAt(3, 20).dataBar?.fraction, 0)
 assert.ok(Math.abs(styleAt(4, 20).dataBar!.fraction - 2 / 3) < 1e-12)
 assert.deepEqual(styleAt(1, 21).dataBar, {
-  fraction: 0.25, from: 0.25, negative: true, gradient: false, color: '#FFAA00', showValue: false,
+  fraction: 0.25, from: 0.25, growsLeft: true, negative: true, gradient: false, color: '#FFAA00', showValue: false,
   borderColor: '#987654', axis: 0.5, axisColor: '#000000',
 })
 assert.equal(styleAt(4, 21).dataBar?.borderColor, '#123456')
