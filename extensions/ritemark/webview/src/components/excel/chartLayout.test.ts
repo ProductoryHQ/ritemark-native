@@ -93,17 +93,17 @@ for (const sheet of threeD.sheets.slice(0, 3)) {
   if (sheet.name.endsWith('line')) assert.equal(markup.querySelectorAll('polyline').length, 3)
   else assert.equal(markup.querySelector(chartGroup('bars'))!.querySelectorAll('rect').length, 18)
 }
-const pie = drawingOf(threeD.sheets[3])
+const combo = drawingOf(kinds.sheets.find(({ name }) => name === 'Combo') ?? kinds.sheets[kinds.sheets.length - 1])
+assert.equal(combo.chart?.kind, 'combo')
 const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
-  drawing: pie, style: {}, workbook: threeD, version: 0, width: 480, height: 288,
+  drawing: combo, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
 }))
 assert.match(fallback, /class="sg-object"/)
-assert.match(fallback, /Chart: Handovers by depot/)
 assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
 const worksheet = kinds.sheets[0]
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), pie], conditionalFormats: 0 }),
+assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo], conditionalFormats: 0 }),
   "This sheet has a chart. It's kept in the file; Open in Excel to see it.")
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...pie, what: 'image' }], conditionalFormats: 1 }),
+assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }], conditionalFormats: 1 }),
   "This sheet has a picture and colour rules. They're kept in the file; Open in Excel to see them.")
 
 const colours = await open('charts-colours')
@@ -343,4 +343,127 @@ test('drawing failure falls back to the existing card and preserves the workshee
     render(1)
     assert.equal(host.querySelector('svg[role=img]')?.getAttribute('aria-label'), 'Column chart: Revenue by region')
   })
+})
+
+const sheetNamed = (name: string) => kinds.sheets.find((sheet) => sheet.name === name)!
+const pieChart = drawingOf(sheetNamed('Pie')).chart
+assert.ok(drawsChart(pieChart))
+const scatterChart = drawingOf(sheetNamed('Scatter')).chart
+assert.ok(drawsChart(scatterChart))
+const areaChart = drawingOf(sheetNamed('Area')).chart
+assert.ok(drawsChart(areaChart))
+
+test('pie follows point order, rotation, colour and explosion with category legend and percent labels', () => {
+  const model = { ...pieChart, plots: [{ ...pieChart.plots[0], firstSliceAng: 90, varyColors: true,
+    labels: { showPercent: true, position: 'outEnd' } }] }
+  const series = seriesOf([1, 1, 1])
+  series.val.points = new Map([...series.val.points].reverse())
+  const layout = layoutChart(model, [{ ...series, pointStyles: [{ index: 1, explosion: 20 }] }], 480, 288, measure)
+  const slices = layout.slices!
+  assert.deepEqual(slices.map(({ index }) => index), [0, 1, 2])
+  close(slices[0].start, 0)
+  close(slices[1].start, 2 * Math.PI / 3)
+  close(slices[2].end, 2 * Math.PI)
+  close(Math.hypot(slices[1].center.x - slices[0].center.x, slices[1].center.y - slices[0].center.y), slices[1].radius / 5)
+  assert.deepEqual(slices.map(({ color }) => color), model.accentColors.slice(0, 3))
+  assert.deepEqual(layout.legend?.entries.map(({ label }) => label.text), ['Category 1', 'Category 2', 'Category 3'])
+  assert.equal(layout.dataLabels.reduce((sum, { text }) => sum + parseInt(text, 10), 0), 100)
+  assert.equal(layout.leaders?.length, 3)
+  assert.equal(markupOf(layout).querySelectorAll('[data-chart="leader-lines"] line').length, 3)
+})
+
+test('doughnut has a real hole and a single point draws two arcs per edge', () => {
+  const model = { ...pieChart, kind: 'doughnut' as const, plots: [{ ...pieChart.plots[0], kind: 'doughnut' as const, holeSize: 65 }] }
+  const layout = layoutChart(model, [seriesOf([1])], 480, 288, measure)
+  close(layout.slices![0].innerRadius / layout.slices![0].radius, .65)
+  assert.equal(markupOf(layout).querySelector('[data-chart="slices"] path')!.getAttribute('d')!.match(/A /g)?.length, 4)
+  const fixture = forSheet(kinds, sheetNamed('Doughnut'))
+  close(fixture.slices![0].innerRadius / fixture.slices![0].radius, .5)
+})
+
+test('area closes its fill at the configured crossing and handles blanks and stacks', () => {
+  const crossing = { ...areaChart, axes: areaChart.axes.map((axis) => axis.kind === 'category' ? { ...axis, crossesAt: 15 } : axis) }
+  const series = [seriesOf([20, undefined, 30, 40])]
+  for (const displayBlanksAs of ['gap', 'span', 'zero']) {
+    const layout = layoutChart({ ...crossing, displayBlanksAs }, series, 480, 288, measure)
+    const segments = layout.areas![0].segments
+    assert.deepEqual(segments.map(({ top }) => top.length), displayBlanksAs === 'gap' ? [1, 2] : displayBlanksAs === 'span' ? [3] : [4])
+    for (const { base } of segments) for (const p of base) close(p.y, layout.axes[0].from.y)
+    assert.match(markupOf(layout).querySelector('[data-chart="areas"] path')!.getAttribute('d')!, / Z$/)
+  }
+  const stacked = forSheet(kinds, sheetNamed('Stacked area'))
+  assert.deepEqual(stacked.areas![1].segments[0].base, stacked.areas![0].segments[0].top)
+  const percentModel = { ...areaChart, plots: [{ ...areaChart.plots[0], grouping: 'percentStacked' }] }
+  const percent = layoutChart(percentModel, [seriesOf([1, 3]), seriesOf([2, 1])], 480, 288, measure)
+  assert.equal(percent.scale.max, 1)
+  percent.areas![1].segments[0].top.forEach(({ y }) => close(y, percent.plot.y))
+})
+
+test('scatter uses two numeric scales and draws each scatter style', () => {
+  const { val: xVal } = seriesOf([10, 50, 30])
+  const { val: yVal } = seriesOf([1, 4, 2])
+  for (const [scatterStyle, markers, path] of [
+    ['marker', 3, undefined], ['lineMarker', 3, 'polyline'], ['line', 0, 'polyline'],
+    ['smooth', 0, 'path'], ['smoothMarker', 3, 'path'],
+  ] as const) {
+    const model = { ...scatterChart, plots: [{ ...scatterChart.plots[0], scatterStyle }] }
+    const layout = layoutChart(model, [{ xVal, yVal, pointStyles: [] }], 480, 288, measure)
+    assert.ok(layout.xScale!.ticks.length > 2 && layout.scale.ticks.length > 2)
+    assert.notDeepEqual(layout.xScale!.ticks, layout.scale.ticks)
+    assert.equal(layout.markers.length, markers)
+    const svg = markupOf(layout)
+    const rendered = svg.querySelector(chartGroup('lines'))!.children
+    assert.equal(rendered[0]?.rawTagName, path)
+    if (path === 'path') assert.match(rendered[0].getAttribute('d')!, / C /)
+    if (markers) assert.ok(layout.markers[1].x > layout.markers[2].x && layout.markers[2].x > layout.markers[0].x)
+  }
+  const fixture = forSheet(kinds, sheetNamed('Scatter'))
+  assert.equal(fixture.markers.length, 24)
+  assert.equal(new Set(fixture.markers.map(({ x }) => x)).size, 12)
+})
+
+test('the quiet line skips the new chart kinds, including flat 3-D pie', () => {
+  for (const name of ['Pie', 'Doughnut', 'Area', 'Stacked area', 'Scatter']) {
+    assert.equal(keptNotice(sheetNamed(name).layout), undefined)
+  }
+  const flat = forSheet(threeD, threeD.sheets[3])
+  assert.equal(flat.slices?.length, 4)
+  assert.equal(keptNotice(threeD.sheets[3].layout), undefined)
+})
+
+test('zero and nonfinite pie values draw no SVG and show a card with a reason', () => {
+  const series = seriesOf([0, NaN, Infinity])
+  const layout = layoutChart(pieChart, [series], 480, 288, measure)
+  assert.equal(layout.slices?.length, 0)
+  assert.equal(markupOf(layout).querySelector('svg'), null)
+  const drawing = { ...drawingOf(sheetNamed('Pie')), chart: {
+    ...pieChart, plots: [{ ...pieChart.plots[0], series: [series] }],
+  } }
+  const card = renderToStaticMarkup(React.createElement(DrawingView, {
+    drawing, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
+  }))
+  assert.match(card, /sg-object/)
+  assert.match(card, /no nonzero values/)
+  assert.doesNotMatch(card, /<svg[^>]*role="img"/)
+})
+
+test('pie label positions use the slice centre, inner edge or an outside leader', () => {
+  for (const position of ['ctr', 'inEnd', 'outEnd', 'bestFit']) {
+    const model = { ...pieChart, plots: [{ ...pieChart.plots[0], labels: { showCatName: true, position } }] }
+    const layout = layoutChart(model, [seriesOf([100, 1], 'Total', 'Depot')], 480, 288, measure)
+    const [large, small] = layout.slices!
+    const [first, second] = layout.dataLabels
+    const distance = (slice: typeof large, label: typeof first) => Math.hypot(label.x - slice.center.x, label.y - slice.center.y)
+    if (position === 'ctr') close(distance(large, first), large.radius / 2)
+    if (position === 'inEnd') assert.ok(distance(small, second) < small.radius)
+    if (position === 'outEnd') assert.ok(distance(large, first) > large.radius)
+    assert.equal(layout.leaders?.length, position === 'outEnd' ? 2 : position === 'bestFit' ? 1 : 0)
+  }
+})
+
+test('a single plot with an additional value axis keeps its card', () => {
+  const normal = synthetic('column')
+  const extra = { ...normal, axes: [...normal.axes, { kind: 'value' as const, id: 3 }],
+    plots: [{ ...normal.plots[0], axisIds: [1, 2, 3] }] }
+  assert.equal(drawsChart(extra), false)
 })

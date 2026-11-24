@@ -536,6 +536,22 @@ export function SpreadsheetViewer({
     return { rowCount, colCount, truncated }
   }, [parsedData, sizeBytes, source])
 
+  const chartSheetCard = useCallback((reason?: string) => sheetModel?.kind === 'chartsheet' && (
+    <div className="flex h-full flex-1 items-center justify-center">
+      <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
+        <Icon name="chart-bar" size={20} tone="inherit" />
+        <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
+        <span>{reason ?? "The preview doesn't draw this kind of chart."} It's kept in the file as it is.</span>
+        <Tooltip label={`${openInLabel}, where the chart is drawn`}>
+          <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
+            <Icon name="arrow-square-out" size={14} tone="inherit" />
+            <span>{openInLabel}</span>
+          </Button>
+        </Tooltip>
+      </div>
+    </div>
+  ), [sheetModel, openInLabel, hasExcel, handleOpenInExcel, handleOpenInNumbers])
+
   // Size warning (checked first: no data is parsed while it's showing)
   if (showSizeWarning) {
     const sizeMB = sizeBytes ? (sizeBytes / (1024 * 1024)).toFixed(1) : '?'
@@ -578,22 +594,6 @@ export function SpreadsheetViewer({
   }
 
   const isEmpty = parsedData.rows.length === 0
-
-  const chartSheetCard = sheetModel?.kind === 'chartsheet' && (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
-        <Icon name="chart-bar" size={20} tone="inherit" />
-        <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
-        <span>It's kept in the file as it is. The preview doesn't draw this kind of chart.</span>
-        <Tooltip label={`${openInLabel}, where the chart is drawn`}>
-          <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
-            <Icon name="arrow-square-out" size={14} tone="inherit" />
-            <span>{openInLabel}</span>
-          </Button>
-        </Tooltip>
-      </div>
-    </div>
-  )
 
   return (
     <>
@@ -644,15 +644,15 @@ export function SpreadsheetViewer({
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
       {source?.model && drawsChart(sheetChart) ? (
-        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard}>
+        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard()}>
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0">
-              <PositionedChart chart={sheetChart} workbook={source.model} version={version} />
+              <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard} />
             </div>
           </div>
         </ChartErrorBoundary>
       ) : source?.model && sheetModel?.kind === 'chartsheet' ? (
-        chartSheetCard
+        chartSheetCard()
       ) : source?.model && sheetModel ? (
         <SheetGrid
           model={source.model}
