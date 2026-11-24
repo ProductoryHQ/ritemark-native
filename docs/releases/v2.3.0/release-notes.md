@@ -61,6 +61,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 - **Present from Ritemark.** Choose **Present** to show only the slide on the projector. With a second display, your laptop shows this slide, the next one, your comments and the clock.
 - **Lead the room while you present.** Use a clicker, blank the screen or light up one item. Show a timer for an exercise, or a QR code for the page.
+- **Switch tabs while you present.** Click a tab on the slide to show it. With a second display, click it on your laptop's slide, and the projector follows.
 - **The Present bar stays clear of your slide.** Move the mouse while presenting, and the bar shows at the bottom of the screen, below the slide's words.
 
 ### Share the deck
@@ -112,6 +113,7 @@ Write a deck as you write a document, with a handout beside the slides. 2.3 also
 
 ## Fixes
 
+- **A document you double-click opens in Ritemark.** With Ritemark closed, double-click a deck, or a Markdown file that opens with Ritemark, in Finder or Explorer: it opens in Ritemark’s editor. Before, it could open as plain text.
 - **On Windows, Claude asks you to sign in when it needs to.** Before, Claude could look ready, and the first question failed.
 - **One sign-in at a time.** While a sign-in runs, the AI's sheet shows "Signing in…" with **Cancel**. Before, it offered a second sign-in.
 - **A web page that failed to load opens again.** Open its file once it's back, and the page loads. Before, you saw the failed page again.
