@@ -1,5 +1,6 @@
 import type { LivePause, LivePreference } from '../publish/publishRecords';
 import type { LiveResult } from '../publish/liveUpdate';
+import { LIVE_TIP, pausedTip } from './deckLiveCopy';
 
 export type DeckLiveState = {
   on: true;
@@ -48,12 +49,12 @@ export class DeckLive {
     if (preference.pause) {
       return {
         on: true, state: 'paused', pause: preference.pause,
-        tooltip: `${preference.pause.detail} Open pages keep what they had.`,
+        tooltip: pausedTip(preference.pause),
       };
     }
     if (activity?.offline) return { on: true, state: 'offline', tooltip: `${OFFLINE} ${activity.offline}` };
     const pictures = activity?.pictures?.length ? ` Sent with new pictures: ${activity.pictures.join(', ')}.` : '';
-    return { on: true, state: 'live', tooltip: `Open pages catch up within about 15 seconds.${pictures}` };
+    return { on: true, state: 'live', tooltip: `${LIVE_TIP}${pictures}` };
   }
 
   hasPendingResume(page: string): boolean {

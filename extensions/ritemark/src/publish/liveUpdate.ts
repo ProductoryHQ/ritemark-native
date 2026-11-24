@@ -18,6 +18,7 @@ export interface LiveIssue {
   outsideFiles?: LivePause['outsideFiles'];
   slide?: number;
   location?: LivePause['location'];
+  keyPreview?: LivePause['keyPreview'];
 }
 
 /** Sprint 149's project boundary still applies even after the person presses Go on. */

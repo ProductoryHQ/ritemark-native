@@ -47,6 +47,7 @@ const ALLOWED: Array<{ file: string; line: RegExp; why: string }> = [
   { file: 'components/transcribe/TranscribePanel.tsx', line: /engine\.readiness\.ready \? 'bg-ritemark-success'/, why: "a Transcribe engine's ready dot" },
   { file: 'index.css', line: /^\s*--r-live-page-updated-icon:/, why: 'the live page globe token' },
   { file: 'components/ai-sidebar/LiveDeckSteps.tsx', line: /updated.*--r-live-page-updated-icon/, why: 'Sprint 175 frame 3 marks a live page update with a green globe' },
+  { file: 'components/decks/DeckPublish.tsx', line: /rounded-full bg-\[var\(--r-success\)\] ring-2/, why: "Sprint 175 frame 1: a live page's dot on the deck bar's Live chip says the page is following the deck" },
   { file: 'components/agent/ProvenanceBadge.tsx', line: /label: 'ChatGPT'/, why: "ChatGPT's provenance badge says which, not done" },
 ]
 

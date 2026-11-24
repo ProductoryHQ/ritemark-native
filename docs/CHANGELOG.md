@@ -10,17 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v2.4.0
 
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
+- When you open a deck, the status bar shows its slide count in place of the word count.
 - Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.
 - Source links in AI answers can open the quoted passage in Word, PDF, or Markdown, or jump to a slide in PowerPoint.
 
 ### Added
 
+- Equations in Word stay as math when AI reads the document or you save a Markdown copy (#1011).
+- Switch the slide strip to a timed list to enter slide minutes in order. Set a session length to see whether the deck fits, and add a start to see clock times for each slide.
 - Set slide minutes while editing a deck and see how the total fits your session (#1004).
 - After you update a published deck, open pages catch up when readers pause, keeping each reader on their slide (#1005).
 - Claude, ChatGPT, and OpenCode can now read Word and PDF files in your project, including selected PDF pages (#991).
 - Claude, ChatGPT, and OpenCode can now read PowerPoint files in your project, with speaker notes kept under the slide they belong to (#993).
 - Deck files can store planned minutes for each slide and use the presenter’s session length. These timings stay private when you publish the deck (#1001).
 - Turn on Update on every save to keep a published deck’s page up to date (#1007).
+- The deck’s publish button shows when a page is live, updating, paused, or offline, and explains what to do when an update pauses.
 
 ### Fixed
 

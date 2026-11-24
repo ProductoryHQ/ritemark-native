@@ -1,5 +1,6 @@
 import { DOMParser } from '@xmldom/xmldom';
 import { checkOfficePackage, OFFICE_PREVIEW_LIMITS, readZipDirectory, readZipEntry } from '../officePreview/officePackageCheck';
+import { equationMarkdown, isOmmlEquation, ommlToLatex, type WordEquation } from './ommlToLatex';
 
 export class WordXmlTooLarge extends Error {}
 
@@ -41,42 +42,70 @@ function skip(node: Element): boolean {
 }
 
 /** Text runs, including text in drawings/text boxes, in their document order. */
-function plainText(node: Element): string {
-  let text = '';
+function paragraphContent(node: Element, parts: (string | WordEquation)[]): void {
   for (const child of children(node)) {
     if (skip(child)) continue;
+    if (isOmmlEquation(child)) {
+      parts.push(ommlToLatex(child));
+      continue;
+    }
     if (isWord(child)) {
       if (child.localName === 't') {
-        text += child.textContent ?? '';
+        parts.push(child.textContent ?? '');
         continue;
       }
       if (['tab', 'br', 'cr'].includes(child.localName)) {
-        text += ' ';
+        parts.push(' ');
         continue;
       }
-      if (child.localName === 'noBreakHyphen') text += '-';
+      if (child.localName === 'noBreakHyphen') parts.push('-');
     }
-    text += plainText(child);
-    if (isWord(child) && child.localName === 'p') text += ' ';
+    paragraphContent(child, parts);
+    if (isWord(child) && child.localName === 'p') parts.push(' ');
   }
-  return text;
 }
 
 function escapeInline(text: string): string {
-  return text.trim().replace(/[\r\n]+/g, ' ').replace(/[\\`*_\[\]<>~]/g, '\\$&');
+  return text.replace(/[\r\n]+/g, ' ').replace(/[\\`*_\[\]<>~]/g, '\\$&');
 }
 
-function* blocks(node: Element, names: readonly string[]): Generator<Element> {
+function* blocks(node: Element, names: readonly string[], includeEquations = false): Generator<Element> {
   for (const child of children(node)) {
     if (skip(child)) continue;
-    if (isWord(child) && names.includes(child.localName)) yield child;
-    else yield* blocks(child, names);
+    if ((isWord(child) && names.includes(child.localName)) || (includeEquations && isOmmlEquation(child))) yield child;
+    else yield* blocks(child, names, includeEquations);
   }
 }
 
-function tableMarkdown(table: Element, limit: number): string {
+function contentMarkdown(node: Element, tally: { approximate: number }, inTable = false) {
+  const parts: (string | WordEquation)[] = [];
+  paragraphContent(node, parts);
+  if (parts.every(part => typeof part === 'string')) {
+    return { text: escapeInline(parts.join('').trim()), display: false };
+  }
+  let text = '';
+  const display = !inTable && parts.some(part => typeof part !== 'string' && part.display)
+    && parts.every(part => typeof part !== 'string' ? part.display : !part.trim());
+  let previousWasInline = false;
+  for (const part of parts) {
+    if (typeof part === 'string') {
+      text += escapeInline(part).replace(/\$/g, '\\$');
+      if (part) previousWasInline = false;
+      continue;
+    }
+    if (part.approximate) tally.approximate++;
+    const inline = inTable || !part.display;
+    if (previousWasInline && inline) text += ' ';
+    const math = equationMarkdown(part, inline);
+    text += inline ? math : `\n\n${math}\n\n`;
+    previousWasInline = inline;
+  }
+  return { text: text.trim(), display };
+}
+
+function tableMarkdown(table: Element, limit: number, tally: { approximate: number }): string {
   const rows = [...blocks(table, ['tr'])].map((row) =>
-    [...blocks(row, ['tc'])].map((cell) => escapeInline(plainText(cell)).replace(/\|/g, '\\|')));
+    [...blocks(row, ['tc'])].map((cell) => contentMarkdown(cell, tally, true).text.replace(/\|/g, '\\|')));
   const width = rows.reduce((max, row) => Math.max(max, row.length), 0);
   if (width === 0 || !rows.some((row) => row.some(Boolean))) return '';
   const line = (row: string[]) => '|' + row.map((cell) => ` ${cell} |`).join('') + '  |'.repeat(width - row.length);
@@ -119,7 +148,7 @@ function numberingOf(root: Element | undefined): Map<string, Numbering> {
   return result;
 }
 
-function* markdownBlocks(body: Element, numbering: Map<string, Numbering>, styles: Element | undefined, limit: number): Generator<{ text: string; list?: true }> {
+function* markdownBlocks(body: Element, numbering: Map<string, Numbering>, styles: Element | undefined, limit: number, tally: { approximate: number }): Generator<{ text: string; list?: true }> {
   const properties = new Map<string | null, Element>();
   if (styles) {
     for (const style of children(styles)) {
@@ -127,15 +156,25 @@ function* markdownBlocks(body: Element, numbering: Map<string, Numbering>, style
     }
   }
   const counters = new Map<string, number>();
-  for (const block of blocks(body, ['p', 'tbl'])) {
+  for (const block of blocks(body, ['p', 'tbl'], true)) {
+    if (isOmmlEquation(block)) {
+      const equation = ommlToLatex(block);
+      if (equation.approximate) tally.approximate++;
+      yield { text: equationMarkdown(equation) };
+      continue;
+    }
     if (block.localName === 'tbl') {
-      const table = tableMarkdown(block, limit);
+      const table = tableMarkdown(block, limit, tally);
       if (table) yield { text: table };
       continue;
     }
 
-    const text = escapeInline(plainText(block));
+    const { text, display } = contentMarkdown(block, tally);
     if (!text) continue;
+    if (display) {
+      yield { text };
+      continue;
+    }
     const props = first(block, 'pPr');
     const styleId = attribute(first(props, 'pStyle'));
     let outline = attribute(first(props, 'outlineLvl'));
@@ -190,5 +229,7 @@ export async function wordMarkdown(bytes: Uint8Array, limit: number) {
   }
   const body = first(await part('document', true), 'body');
   if (!body) throw new Error('Missing Word body');
-  return { ok: true as const, blocks: markdownBlocks(body, numberingOf(await part('numbering')), await part('styles'), limit) };
+  const tally = { approximate: 0 };
+  const documentBlocks = markdownBlocks(body, numberingOf(await part('numbering')), await part('styles'), limit, tally);
+  return { ok: true as const, blocks: documentBlocks, tally };
 }

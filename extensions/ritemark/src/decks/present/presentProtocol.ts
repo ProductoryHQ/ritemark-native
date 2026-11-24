@@ -7,12 +7,13 @@
  * and went there), never the `id`, `from`, `kept` or `skip` lines. `wallStateOf` builds it field by field, so nothing
  * new reaches the wall by accident.
  */
+import { clockMinutes, sessionLengthFromEnd, SESSION_LENGTH, SESSION_START, type SessionTimeField } from '../timetable';
 import type { SlideData, SlideItem } from '../deckFormat';
 import { publicSlide } from '../page/publicDeck';
 import { slidePicturePaths } from '../blocks/slideRenderer';
 import { partComments, type PartComment } from './partComments';
 import type { DeckTheme } from '../deckTheme';
-import { presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
+import { frontMatterValue, lengthMinutesOf, presentTitleOf, type PresentSlide, type PresentView } from './presentSession';
 import { transitionOf, type DeckTransition } from './deckTransition';
 import { slideArrivalOf, type SlideArrival } from './slideArrival';
 import { revealCountOf, revealOf, revealOnArrival, type WallReveal } from './revealSteps';
@@ -559,6 +560,28 @@ export function decodeDeckPresentMenuRequest(value: unknown): DeckPresentMenuReq
   return null;
 }
 
+/** Write or remove a session field through the deck's front-matter edit. */
+export function sessionTimeEdit(text: string, field: SessionTimeField, value: string): ReturnType<typeof frontMatterEdit> | null {
+  const offset = text.startsWith('\uFEFF') ? 1 : 0;
+  const body = text.slice(offset);
+  const key = field === 'start' ? SESSION_START : SESSION_LENGTH;
+  let edit;
+  if (value === '' && field !== 'end') {
+    edit = frontMatterRemove(body, key);
+  } else {
+    const minutes = field === 'length' ? lengthMinutesOf(value) : clockMinutes(value);
+    if (minutes === null) return null;
+    const length = field === 'end'
+      ? sessionLengthFromEnd(clockMinutes(frontMatterValue(body, SESSION_START)), minutes)
+      : minutes;
+    if (length === null) return null;
+    const next = field === 'start' ? value : String(length);
+    if (frontMatterValue(body, key) === next) return null;
+    edit = frontMatterEdit(body, key, next);
+  }
+  return edit && { ...edit, start: edit.start + offset, end: edit.end + offset };
+}
+
 export { lengthMinutesOf, MAX_LENGTH_MINUTES } from './presentSession';
 
 /**
@@ -585,6 +608,14 @@ export function frontMatterEdit(text: string, key: string, value: string): { sta
   // Before the closing line: after the body's last line.
   const bodyEnd = bodyStart + body.length;
   return { start: bodyEnd, end: bodyEnd, text: `${newline}${key}: ${value}` };
+}
+
+/** Remove one field and its own line ending. */
+function frontMatterRemove(text: string, key: string): ReturnType<typeof frontMatterEdit> | null {
+  const { start, end } = frontMatterEdit(text, key, '');
+  if (start === end) return null;
+  const newlineLength = text.startsWith('\r\n', end) ? 2 : 1;
+  return { start, end: end + newlineLength, text: '' };
 }
 
 /** A display, as the shell's `_ritemark.present.displays` gives it. */
