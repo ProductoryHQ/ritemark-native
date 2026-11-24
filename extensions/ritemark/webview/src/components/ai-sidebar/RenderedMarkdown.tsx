@@ -77,9 +77,9 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     show({ anchor, path, passage, content: html, id: sourceId });
   };
 
-  const openSource = useCallback((path: string, passage: SourcePassage, sourceLinkId?: string) => {
+  const openSource = useCallback((path: string, passage: SourcePassage, sourceLinkId?: string, openLinkLocation = false) => {
     closeCard();
-    vscode.postMessage({ type: 'chat:open-file', filePath: path, passage, sourceLinkId });
+    vscode.postMessage({ type: 'chat:open-file', filePath: path, passage, sourceLinkId, openLinkLocation });
   }, [closeCard]);
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -168,7 +168,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
         passage={hovered.passage}
         contentRef={contentRef}
         onClose={closeCard}
-        onOpen={() => openSource(hovered.path, hovered.passage, hovered.id)}
+        onOpen={(openLinkLocation) => openSource(hovered.path, hovered.passage, hovered.id, openLinkLocation)}
         onPointerEnter={keepOpen}
         onPointerLeave={leaveCard}
       />}

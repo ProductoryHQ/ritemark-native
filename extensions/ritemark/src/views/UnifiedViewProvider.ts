@@ -656,7 +656,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const rawPath = typeof message.filePath === 'string' ? message.filePath.trim() : '';
           const passage = decodeSourcePassage(message.passage);
           if (rawPath && passage && this._readSource) {
-            const path = await openSourcePassage(rawPath, passage, this._readSource);
+            const path = await openSourcePassage(rawPath, passage, this._readSource, message.openLinkLocation === true);
             if (path && typeof message.sourceLinkId === 'string') {
               void webviewView.webview.postMessage({ type: 'chat:source/opened', id: message.sourceLinkId, path });
             }

@@ -26,4 +26,4 @@ export function decodeSourcePassage(value: unknown): SourcePassage | undefined {
 
 export type SourcePreview =
   | { error: string }
-  | { name: string; unit?: string; quote?: string; missing: boolean }
+  | { name: string; extension: string; page?: number; quote?: string; missing: boolean }

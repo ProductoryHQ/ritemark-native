@@ -28,16 +28,22 @@ export async function previewSourcePassage(rawPath: string, passage: SourcePassa
     const { location } = await read({ path: resolved.path, passage });
     const current = await resolveProjectDocument(rawPath, roots());
     if (!current.ok || !samePath(current.path, resolved.path)) return { error: projectOnly };
-    const page = location?.page ?? passage.page;
-    const unit = page ? `${extname(resolved.path).toLowerCase() === '.pptx' ? 'Slide' : 'Page'} ${page}` : undefined;
+    const suffix = extname(resolved.path);
     const quote = location && 'text' in location ? location.displayText ?? location.text : undefined;
-    return { name: basename(resolved.path), unit, quote, missing: !!passage.text && !quote };
+    const missing = !!passage.text && !quote;
+    return {
+      name: basename(resolved.path, suffix),
+      extension: suffix.toLowerCase(),
+      page: missing ? undefined : location?.page ?? passage.page,
+      quote,
+      missing,
+    };
   } catch {
     return { error: sourceUnavailable };
   }
 }
 
-export async function openSourcePassage(rawPath: string, passage: SourcePassage, read: ReadSource): Promise<string | undefined> {
+export async function openSourcePassage(rawPath: string, passage: SourcePassage, read: ReadSource, openLinkLocation = false): Promise<string | undefined> {
   const resolved = await resolveSource(rawPath);
   if ('error' in resolved) {
     void vscode.window.showWarningMessage(resolved.error);
@@ -49,6 +55,10 @@ export async function openSourcePassage(rawPath: string, passage: SourcePassage,
   let missing = false;
   if (extension === '.pptx' && passage.page) {
     navigation = { type: 'find:slide', page: passage.page };
+  } else if (openLinkLocation) {
+    if (passage.page && (extension === '.pdf' || extension === '.docx')) {
+      navigation = { type: 'find:page', page: passage.page };
+    }
   } else if (extension === '.pdf' || (passage.text && ['.docx', '.md', '.markdown'].includes(extension))) {
     const { location } = await read({ path: resolved.path, passage });
     if (location) {

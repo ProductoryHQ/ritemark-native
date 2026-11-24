@@ -68,19 +68,39 @@ async function main() {
   const opensBeforePreview = opens.length;
   assert.deepEqual(await previewSourcePassage('Word.docx', { text: 'words', page: 4 }, async () =>
     ({ text: '', location: { text: 'Words', occurrence: 0 } })), {
-    name: 'Word.docx', unit: 'Page 4', quote: 'Words', missing: false,
+    name: 'Word', extension: '.docx', page: 4, quote: 'Words', missing: false,
   });
   assert.deepEqual(await previewSourcePassage('Report.pdf', { text: 'moved words', page: 4 }, async () =>
     ({ text: '', location: { text: 'Movedwords', displayText: 'Moved words', occurrence: 0, page: 5 } })), {
-    name: 'Report.pdf', unit: 'Page 5', quote: 'Moved words', missing: false,
+    name: 'Report', extension: '.pdf', page: 5, quote: 'Moved words', missing: false,
+  });
+  assert.deepEqual(await previewSourcePassage('Deck.pptx', { text: 'notes', page: 4 }, async () =>
+    ({ text: '', location: { text: 'Notes', occurrence: 0, page: 4 } })), {
+    name: 'Deck', extension: '.pptx', page: 4, quote: 'Notes', missing: false,
   });
   assert.deepEqual(await previewSourcePassage('Deck.pptx', { text: 'made-up words', page: 5 }, async () => ({ text: '' })), {
-    name: 'Deck.pptx', unit: 'Slide 5', quote: undefined, missing: true,
+    name: 'Deck', extension: '.pptx', page: undefined, quote: undefined, missing: true,
   });
   assert.deepEqual(await previewSourcePassage('../Outside.docx', { text: 'words' }, noRead), {
     error: 'Choose a source file inside the project folder.',
   });
   assert.equal(opens.length, opensBeforePreview);
+
+  // Missing-card actions use the link location without re-running the quote search.
+  for (const [file, page, navigation] of [
+    ['No match.docx', 4, { type: 'find:page', page: 4 }],
+    ['Report.pdf', 2, { type: 'find:page', page: 2 }],
+    ['Deck.pptx', 4, { type: 'find:slide', page: 4 }],
+    ['Word.docx', undefined, null],
+  ] as const) {
+    const filePath = join(root, file);
+    const panel = {};
+    findRequests.ready(filePath, panel, () => {});
+    findRequests.gone(filePath, panel);
+    assert.equal(await openSourcePassage(file, { text: 'made-up words', page }, noRead, true), filePath);
+    assert.deepEqual(findRequests.waiting(filePath), navigation);
+  }
+  assert.equal(info.length, 1);
 
   const windowsRealpath = async (file: string) => file.toLowerCase();
   assert.equal((await resolveProjectDocument('c:/REVIEW/Report.pdf', ['C:\\Review'], windowsRealpath, win32)).ok, true);
