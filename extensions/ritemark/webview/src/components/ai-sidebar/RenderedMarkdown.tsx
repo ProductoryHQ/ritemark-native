@@ -45,7 +45,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
       if (link.kind === 'external') {
         vscode.postMessage({ type: 'openExternal', url: link.url });
       } else if (link.kind === 'file') {
-        vscode.postMessage({ type: 'chat:open-file', filePath: link.path });
+        vscode.postMessage({ type: 'chat:open-file', filePath: link.path, passage: link.passage });
       } else if (link.kind === 'unsupported') {
         // Sprint 122 (#282): never followed, but never silent — the host says why.
         vscode.postMessage({ type: 'chat:link-unsupported', scheme: link.scheme, href: link.href });
