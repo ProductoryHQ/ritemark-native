@@ -666,6 +666,7 @@ export class PublishController {
     const pagePath = plan.pagePath;
     if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     const record = await this.liveRecord(pagePath);
+    if (this.publishing.has(pagePath)) throw new PublishError('failed', PAGE_BEING_PUBLISHED);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     if (plan.keyHits.length > 0 && consent !== 'sheet-anyway') throw new PublishError('failed', KEY_NEEDS_SHEET);
     if (consent === 'unchanged-update' && (!record || sheetNeeded(record, plan))) {
@@ -682,10 +683,13 @@ export class PublishController {
     try {
       // Verify the source checked by the scan and the cleaned bytes the record will hash.
       const upload = await this.readUpload(plan);
-      const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record) });
+      const site = await this.deps.host.publish(siteName, upload, { replacing: Boolean(record), lastDeckVersion: record?.deckVersion });
       this.gone.delete(site.name);
       try {
-        await this.deps.records.put(recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now())));
+        const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
+        const deckVersion = site.deckVersion ?? record?.deckVersion;
+        if (deckVersion !== undefined) next.deckVersion = deckVersion;
+        await this.deps.records.put(next);
       } catch {
         this.deps.log('[publish] published, but the record could not be written');
         this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
