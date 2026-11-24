@@ -162,6 +162,8 @@ export async function verifyBinary(binary, methods, options = {}) {
   const lines = [];
   await probeMethods(binary, [...methods, ABSENT_METHOD], { ...options, log: line => { lines.push(line); log(line); } });
   const control = lines.find(line => line.startsWith(`  ${ABSENT_METHOD} `)) ?? '';
+  // The probe itself failed before an answer (its FAIL lines already say why).
+  if (control.includes(' FAIL ')) return false;
   if (!control.includes(' MISSING ')) {
     log(`  FAIL: the control method ${ABSENT_METHOD} was not reported MISSING, so a missing method can't be told apart`);
     return false;

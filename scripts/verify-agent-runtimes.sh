@@ -26,7 +26,8 @@
 # SDK not installed) report SKIP rather than failing — a skip is an honest "not
 # proven" and must reach the matrix as such rather than being counted as a pass.
 #
-# The permission gate and Codex RPC check report FAIL when a probe gets no answer.
+# The permission gate and Codex RPC check report FAIL when a probe gets no answer,
+# and the Codex RPC check also fails when codex-app-server is not installed.
 #
 set -u
 
