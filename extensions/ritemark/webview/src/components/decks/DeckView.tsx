@@ -11,6 +11,9 @@
  * to its part; writing in a part makes its slide the current one.
  */
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { explicitMinutes, readTimetable } from '../../../../src/decks/timetable'
+import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
+import { DeckMinutes } from './DeckMinutes'
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
@@ -665,6 +668,13 @@ export function DeckView({
   const iconsInUse = useCallback(() => deckIconsInUse(slidesRef.current), [])
   const shown = count === 0 ? 0 : Math.min(current, count - 1)
   const slide = slides[shown]
+  const timing = useMemo(() => readTimetable(slides.map(entry =>
+    writeSlideBlock(entry.kind, entry.node.attrs.body)).join('\n\n')), [slides])
+  const hasSlideMinutes = timing.slides.some(entry => entry.minutes !== null)
+  const shownTiming = timing.slides[shown]
+  const countLabel = count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`
+  // A draft belongs to the current slide. Not keyed on the body: saving the time changes it, and the box would lose focus.
+  const minutesKey = `${shown}:${slide?.data.id ?? ''}`
 
   // The desk's own box decides what fits: never the window's, which holds the left column and the AI column too.
   useLayoutEffect(() => {
@@ -1583,6 +1593,7 @@ export function DeckView({
     const entry = slidesOf(editor.state.doc)[shown]
     if (entry) dispatch(updateSlide(editor.state, shown, change(entry.data), kind))
   }, [editor, dispatch, shown])
+  const commitMinutes = (time: string | undefined) => changeSlide(data => ({ ...data, time }))
 
   // A picture pasted or dropped on a slide: saved beside the deck by the host, then the slide shows it. A slide that
   // places no picture beside or behind its words becomes a Picture slide.
@@ -2075,7 +2086,13 @@ export function DeckView({
         </Tooltip>
         {/* Under 600 px the slide normally has the desk. Show it can open the handout in its place. */}
         {deskWidth >= NARROWEST_DESK || showHandoutInNarrowView ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}
-        <span className="deck-count">{count === 0 ? 'No slides yet' : `Slide ${shown + 1} of ${count}`}</span>
+        <span className="deck-count">
+          {shownTiming && shownTiming.sectionMinutes === null ? (
+            <DeckMinutes key={minutesKey} count={countLabel} timing={shownTiming}
+              fromLabel={shownTiming.labelMinutes !== null && explicitMinutes(slide?.data.time) === null}
+              onCommit={commitMinutes} />
+          ) : slideCountWithMinutes(countLabel, shownTiming)}
+        </span>
         <span className="deck-notice" role="status" aria-live="polite">
           {notice ? (
             <>
@@ -2155,6 +2172,7 @@ export function DeckView({
           <SlideStrip
             slides={slides}
             current={shown}
+            timing={hasSlideMinutes ? timing.slides : undefined}
             theme={theme}
             borderless={borderless}
             assets={assets}

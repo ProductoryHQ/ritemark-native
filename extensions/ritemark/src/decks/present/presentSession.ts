@@ -86,6 +86,18 @@ export function presentTitleOf(slide: PresentSlide): string {
   return title || `slide ${slide.index + 1}`;
 }
 
+/** The longest session the clock is set for, in minutes. */
+export const MAX_LENGTH_MINUTES = 24 * 60;
+
+/** A session length as written (`45`, `"90"`): whole minutes from 1 to a day, or null. */
+export function lengthMinutesOf(value: string | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  const text = value.trim();
+  if (!/^\d{1,4}$/.test(text)) return null;
+  const minutes = Number(text);
+  return minutes >= 1 && minutes <= MAX_LENGTH_MINUTES ? minutes : null;
+}
+
 /** One value of the deck's front matter (`look`, `ritemark-length`), as written, or null. */
 export function frontMatterValue(text: string, key: string): string | null {
   // An empty front matter (`---` then `---`) first, so a later `---` in the deck is never taken for its closing line.

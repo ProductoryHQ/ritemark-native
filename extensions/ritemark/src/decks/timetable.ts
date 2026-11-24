@@ -1,6 +1,5 @@
 import { parseDeck, slideDataOf } from './deckFormat';
-import { lengthMinutesOf } from './present/presentProtocol';
-import { frontMatterValue } from './present/presentSession';
+import { frontMatterValue, lengthMinutesOf } from './present/presentSession';
 import { minutesIn, stepsLabelOf } from '../../webview/src/components/decks/present/pointerTimer';
 
 export interface TimetableSlide {
@@ -21,7 +20,7 @@ export interface Timetable {
   untimedCount: number;
 }
 
-function explicitMinutes(value: string | undefined): number | null {
+export function explicitMinutes(value: string | undefined): number | null {
   if (value === undefined || !/^\d+$/.test(value)) return null;
   const minutes = Number(value);
   return Number.isSafeInteger(minutes) ? minutes : null;

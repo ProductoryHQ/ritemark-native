@@ -559,17 +559,7 @@ export function decodeDeckPresentMenuRequest(value: unknown): DeckPresentMenuReq
   return null;
 }
 
-/** The longest session the clock is set for, in minutes. */
-export const MAX_LENGTH_MINUTES = 24 * 60;
-
-/** A session length as written (`45`, `"90"`): whole minutes from 1 to a day, or null. */
-export function lengthMinutesOf(value: string | null | undefined): number | null {
-  if (value === null || value === undefined) return null;
-  const text = value.trim();
-  if (!/^\d{1,4}$/.test(text)) return null;
-  const minutes = Number(text);
-  return minutes >= 1 && minutes <= MAX_LENGTH_MINUTES ? minutes : null;
-}
+export { lengthMinutesOf, MAX_LENGTH_MINUTES } from './presentSession';
 
 /**
  * The edit that sets one plain value in the deck's front matter (`ritemark-length: 45`): the line replaced when it is
