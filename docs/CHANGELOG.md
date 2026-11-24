@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased] — v2.4.0
+
+### Fixed
+
+- Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
+
 ## [Unreleased] — v2.3.0
 
 ### A document opened from Finder or Explorer (#978)

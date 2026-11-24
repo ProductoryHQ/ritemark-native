@@ -59,6 +59,16 @@ assert.ok(!root.querySelector('body')!.text.includes('Ritemark'), 'nothing of Ri
 assert.equal(root.querySelector('.who b')!.text, 'Harbour Logistics');
 assert.equal(root.querySelector('body')!.getAttribute('class'), 'bl', 'the deck\'s look (Borderless) holds');
 
+// At phone widths the toolbar buttons show only icons, so their names must survive without visible text.
+for (const [id, name] of Object.entries({
+  morebtn: 'More',
+  prev: 'Previous slide',
+  next: 'Next slide',
+  tocbtn: 'Contents',
+})) {
+  assert.equal(root.querySelector(`#line button#${id}`)?.getAttribute('aria-label'), name, `#${id} has an accessible name`);
+}
+
 // Sprint 163 PR 4: every shown slide is drawn once, in order, one at a time (the first one on), as the wall draws it;
 // each has its part in More, and each is a slide to a screen reader, named by its number and title.
 const layers = root.querySelectorAll('#frame > .layer');
