@@ -1,6 +1,8 @@
 import { parseDeck, slideDataOf } from './deckFormat';
-import { frontMatterValue, lengthMinutesOf, MAX_LENGTH_MINUTES } from './present/presentSession';
+import { frontMatterValue, lengthMinutesOf } from './present/presentSession';
 import { minutesIn, stepsLabelOf } from '../../webview/src/components/decks/present/pointerTimer';
+
+export type SessionTimeField = 'start' | 'end' | 'length';
 
 export const SESSION_START = 'ritemark-start';
 export const SESSION_LENGTH = 'ritemark-length';
@@ -11,9 +13,8 @@ export function clockMinutes(value: unknown): number | null {
   return hours * 60 + minutes;
 }
 
-export function sessionLengthFromEnd(start: number | null, end: number): number {
-  const length = end - (start ?? 0);
-  return length > 0 ? length : length + MAX_LENGTH_MINUTES;
+export function sessionLengthFromEnd(start: number | null, end: number): number | null {
+  return start !== null && end > start ? end - start : null;
 }
 
 export interface TimetableSlide {

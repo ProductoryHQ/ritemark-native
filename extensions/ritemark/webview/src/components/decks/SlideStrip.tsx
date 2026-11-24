@@ -20,12 +20,13 @@
  *  - A skipped slide is dimmed with an eye. A library copy carries the library's badge at its bottom left (17 November,
  *    replacing PR 4's amber dot): quiet, and amber when it was changed here or the library has a newer version.
  */
-import { clockMinutes, explicitMinutes, type Timetable } from '../../../../src/decks/timetable'
+import { clockMinutes, explicitMinutes, sessionLengthFromEnd, type SessionTimeField, type Timetable } from '../../../../src/decks/timetable'
 import { nextMinutesRow, slideMinutesText, timetableFoot, timetableRows } from '../../../../src/decks/timetableDisplay'
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { isBlockSlide, type SlideData } from '../../../../src/decks/deckFormat'
 import { slideCommentCount } from '../../../../src/decks/blocks/slideComments'
 import type { DeckTheme } from '../../../../src/decks/deckTheme'
+import { lengthMinutesOf } from '../../../../src/decks/present/presentSession'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { useDismissOnOutside } from '../../lib/dismissOnOutside'
@@ -297,7 +298,7 @@ interface SlideStripProps {
   onMode: (mode: 'thumbnails' | 'list') => void
   onPickTimedSlide: (index: number) => void
   onMinutes: (index: number, value: string | undefined) => void
-  onSession: (field: 'start' | 'end', value: string) => void
+  onSession: (field: SessionTimeField, value: string) => void
   current: number
   theme: DeckTheme
   borderless: boolean
@@ -315,11 +316,18 @@ interface SlideStripProps {
   flash?: { index: number; serial: number } | null
 }
 
-function SessionTime({ field, value, onSave, tip }: {
-  field: 'start' | 'end'
+const sessionFields = {
+  start: { placeholder: 'Start', tip: "Set the session's start. The rows then show clock times." },
+  length: { placeholder: 'Length', tip: "The session's length in minutes. The presenter view uses it too." },
+  end: { placeholder: 'End', tip: "Set the session's end. Ritemark keeps it as the session's length." },
+}
+
+function SessionTime({ field, value, display, start, onSave }: {
+  field: SessionTimeField
   value: string | null
-  onSave: (value: string) => void
-  tip?: string
+  display?: string | null
+  start?: number | null
+  onSave: (field: SessionTimeField, value: string) => void
 }) {
   const [draft, setDraft] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -340,35 +348,43 @@ function SessionTime({ field, value, onSave, tip }: {
   useDismissOnOutside(input, () => input.current?.blur(), { enabled: editing })
 
   const label = `Session ${field}`
+  const { placeholder, tip } = sessionFields[field]
   if (draft === null) return (
-    <Tooltip label={tip ?? `Set session ${field}`}>
+    <Tooltip label={tip}>
       <Button ref={trigger} variant="ghost" size="compact" className="deck-session-time" aria-label={`${label}${value ? ` ${value}` : ''}`} onClick={() => setDraft(value ?? '')}>
-        {value ?? `Set ${field}`}
+        {display ?? value ?? placeholder}
       </Button>
     </Tooltip>
   )
 
-  const valid = clockMinutes(draft) !== null
+  const minutes = clockMinutes(draft)
+  const valid = field === 'length' ? draft === '' || lengthMinutesOf(draft) !== null
+    : field === 'start' ? draft === '' || minutes !== null
+    : minutes !== null && sessionLengthFromEnd(start ?? null, minutes) !== null
   const close = (save: boolean) => {
     if (closing.current) return
     closing.current = true
     setDraft(null)
-    if (save && valid && draft !== value) onSave(draft)
+    if (save && valid && draft !== value) onSave(field, draft)
   }
   return (
-    <Tooltip label="Use HH:MM in 24-hour time. Press Return or click away to save." hoverOnly>
-      <Input ref={input} className="deck-session-clock" aria-label={label} aria-invalid={!valid && draft !== ''} placeholder="HH:MM"
-        value={draft} onChange={event => setDraft(event.target.value)} onBlur={() => close(true)}
-        onKeyDown={event => {
-          if (event.nativeEvent.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return
-          event.preventDefault()
-          event.stopPropagation()
-          if (event.key === 'Enter' && !valid) return
-          returnFocus.current = true
-          close(event.key === 'Enter')
-        }}
-      />
-    </Tooltip>
+    <>
+      <Tooltip label={tip} hoverOnly>
+        <Input ref={input} className="deck-session-input" aria-label={label} aria-invalid={!valid}
+          inputMode={field === 'length' ? 'numeric' : undefined} placeholder={field === 'length' ? placeholder : 'HH:MM'}
+          value={draft} onChange={event => setDraft(event.target.value)} onBlur={() => close(true)}
+          onKeyDown={event => {
+            if (event.nativeEvent.isComposing || (event.key !== 'Enter' && event.key !== 'Escape')) return
+            event.preventDefault()
+            event.stopPropagation()
+            if (event.key === 'Enter' && !valid) return
+            returnFocus.current = true
+            close(event.key === 'Enter')
+          }}
+        />
+      </Tooltip>
+      {field === 'length' && <span>min</span>}
+    </>
   )
 }
 
@@ -462,12 +478,14 @@ function TimedRows({ slides, timing, current, onPickTimedSlide, onMinutes, onSes
         })}
       </div>
       <div className="deck-list-foot">
-        <div className="deck-list-total"><span>{foot.count}</span><span>{foot.total}</span></div>
+        <div className="deck-list-total">{foot.count} · {foot.total}</div>
         <div className="deck-list-session">
           <span className="deck-list-times">
-            Session <SessionTime field="start" value={foot.start} onSave={value => onSession('start', value)} /> to{' '}
-            <SessionTime field="end" value={foot.end}
-              tip={foot.start === null ? 'Set session end. Until a start is set, the session starts at 00:00.' : undefined} onSave={value => onSession('end', value)} />
+            Session{' '}
+            {foot.start === null && <SessionTime field="length" display={foot.length}
+              value={timing.sessionMinutes === null ? null : String(timing.sessionMinutes)} onSave={onSession} />}
+            <SessionTime field="start" value={foot.start} onSave={onSession} />
+            {foot.start !== null && <> to <SessionTime field="end" value={foot.end} start={timing.sessionStart} onSave={onSession} /></>}
           </span>
           {foot.comparison && <span className={foot.over ? 'is-over' : undefined}>{foot.comparison}</span>}
         </div>

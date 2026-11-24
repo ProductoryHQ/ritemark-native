@@ -11,7 +11,8 @@ import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
 import type { DeckLiveState } from './deckLive';
 import type { ThemeChangeView } from './themeChange';
-import { clockMinutes } from './timetable';
+import { clockMinutes, type SessionTimeField } from './timetable';
+import { lengthMinutesOf } from './present/presentSession';
 import { isDeckPath } from './deckFileName';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
@@ -25,7 +26,7 @@ export const MAX_DECK_TEXT = 8 * 1024 * 1024;
 export const MAX_DECK_SLIDES = 10_000;
 
 export type DeckRequest =
-  | { type: 'deck/session-time'; field: 'start' | 'end'; value: string }
+  | { type: 'deck/session-time'; field: SessionTimeField; value: string }
   /** Sprint 163 PR 1: a slide's ↗ Open in Claude or ChatGPT, in the person's own browser (only `openInAddresses`' own). */
   | { type: 'deck/open-in'; url: string }
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
@@ -257,8 +258,13 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     }
     case 'deck/session-time': {
       exactKeys(input, ['type', 'field', 'value']);
-      if (input.field !== 'start' && input.field !== 'end') throw new DeckProtocolError('field must be start or end');
-      if (typeof input.value !== 'string' || clockMinutes(input.value) === null) throw new DeckProtocolError('value must be an HH:MM clock time');
+      if (input.field !== 'start' && input.field !== 'end' && input.field !== 'length') throw new DeckProtocolError('field must be start, end or length');
+      if (typeof input.value !== 'string') throw new DeckProtocolError('value must be text');
+      if (input.field === 'length') {
+        if (input.value !== '' && lengthMinutesOf(input.value) === null) throw new DeckProtocolError('value must be whole session minutes');
+      } else if (!(input.field === 'start' && input.value === '') && clockMinutes(input.value) === null) {
+        throw new DeckProtocolError('value must be an HH:MM clock time');
+      }
       return { type: input.type, field: input.field, value: input.value };
     }
     case 'deck/current': {
