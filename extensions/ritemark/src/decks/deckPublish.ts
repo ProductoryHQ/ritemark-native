@@ -227,7 +227,13 @@ export class DeckPublisher implements vscode.Disposable {
       const roots = await projectRoots();
       const project = roots.find(root => isInside(page, root));
       if (!project || !isInside(realFile, project) || !samePath(path.dirname(realFile), path.dirname(page))) {
-        return { kind: 'offline', detail: OUTSIDE_PROJECT_MESSAGE };
+        const release = feature.controller.holdPage(page);
+        if (!release) return { kind: 'busy' };
+        try {
+          return await feature.controller.pauseLivePage(page, { preference: current.live, resume: goOn, active: open }, OUTSIDE_PROJECT_MESSAGE);
+        } finally {
+          release();
+        }
       }
       const saved = await fs.promises.readFile(realFile, 'utf8');
       const body = splitFrontMatter(saved).content;
@@ -287,9 +293,17 @@ export class DeckPublisher implements vscode.Disposable {
       ? (await this.feature?.controller.recordFor(pageKey))?.live : undefined;
     const live = preference && this.live.state(normalizeForCompare(pageKey), preference);
     if (live?.state === 'paused' && live.pause?.kind === 'key') {
+      if (live.pause.location) {
+        // Stored scan coordinates include front matter. The deck editor holds just the body.
+        const fullText = document.getText();
+        const body = splitFrontMatter(fullText).content;
+        const headLines = fullText.slice(0, fullText.length - body.length).split('\n').length - 1;
+        live.pause = { ...live.pause, location: { ...live.pause.location, line: live.pause.location.line - headLines } };
+      }
       live.resumeBlocked = await this.stillHasKey(document, pagePath) ? 'Take the key out first.' : undefined;
     }
-    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(live && { live }) }, bar };
+    const address = publishedAddress(bar);
+    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(address && { address }), ...(live && { live }) }, bar };
   }
 
   /**
@@ -488,7 +502,7 @@ export class DeckPublisher implements vscode.Disposable {
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
       if (live) {
         const location = await locatePage(pagePath, live.roots);
-        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return offline(OUTSIDE_PROJECT_MESSAGE);
+        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return await feature.controller.pauseLivePage(pageKey, live, OUTSIDE_PROJECT_MESSAGE);
         const describe = await locateLiveIssues(deckPath, text, built);
         return await feature.controller.updateLive(location, {
           ...live, digest: built.digest, legacyDigest, describe,

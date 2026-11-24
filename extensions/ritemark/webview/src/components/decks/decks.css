@@ -15,9 +15,15 @@
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
+/* In dark, Live, Updating and Offline sit on the bar's own ground with only their hairline, as the light chip does on the
+   white bar (the Experience lead, Experience 52); hover keeps the bar's usual hover ground. Paused keeps its amber and
+   Published · changed its accent. */
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-bar .deck-page-state-chip.is-plain:not(:hover) { background: transparent; }
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
 .deck-theme-swatch { position: relative; display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .14); overflow: hidden; }
+/* On a dark bar the swatch's edge is the dark hairline: a dark theme's ground (Evening) would otherwise vanish into it. */
+:is(body.vscode-dark, body.ritemark-dark, body.vscode-high-contrast, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-theme-swatch { box-shadow: inset 0 0 0 1px var(--r-hairline-strong); }
 .deck-theme-swatch > i { position: absolute; left: 4px; height: 2px; border-radius: 1px; }
 .deck-theme-swatch > i:first-child { top: 4px; width: 7px; }
 .deck-theme-swatch > i:last-child { top: 8px; width: 11px; }
@@ -699,3 +705,36 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
   font-variant-numeric: tabular-nums;
 }
 .deck-thumb .deck-thumb-comments.has-minutes { bottom: 24px; }
+
+/* The slide strip's two views share a fixed head; long lists and thumbnails scroll beneath it. */
+.deck-strip-panel { position: absolute; inset: 0 auto 0 0; width: var(--deck-strip); display: flex; flex-direction: column; }
+.deck-strip-panel .deck-strip { position: relative; flex: 1; min-height: 0; }
+.deck-strip-panel.is-list { border-right: 1px solid var(--r-hairline); }
+.deck-strip-head { display: grid; grid-template-columns: minmax(0, 1fr) 48px 44px; gap: 8px; align-items: center; padding: 6px 14px 6px 8px; color: var(--r-ink-muted); font-size: 12px; }
+.deck-strip-panel.is-list .deck-strip-head { border-bottom: 1px solid var(--r-hairline); }
+.deck-strip-head > span { text-align: right; }
+.deck-strip-switch { justify-self: start; display: inline-flex; gap: 2px; padding: 2px; border-radius: 6px; background: var(--r-surface-soft); }
+.deck-list-rows { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+.deck-list-row { display: grid; grid-template-columns: minmax(0, 1fr) 48px 44px; gap: 8px; align-items: center; min-height: 30px; padding: 0 6px; border-radius: 5px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.deck-list-row[aria-current="true"] { background: var(--r-surface-soft); }
+.deck-list-row.is-skip { opacity: .55; }
+.deck-list-title { min-width: 0; }
+.deck-list-row .deck-list-pick { width: 100%; height: 26px; justify-content: flex-start; gap: 8px; padding: 0; font-size: inherit; font-weight: 400; color: var(--r-ink-body); }
+.deck-list-row.is-section .deck-list-pick { color: var(--r-ink-strong); font-weight: 600; }
+.deck-list-no { min-width: 14px; text-align: right; color: var(--r-ink-muted); }
+.deck-list-row[aria-current="true"] .deck-list-no { color: var(--r-accent); font-weight: 700; }
+.deck-list-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-list-start, .deck-list-sum { text-align: right; color: var(--r-ink-muted); }
+.deck-list-sum { padding-right: 7px; } /* the digits inside a minutes box: 1 px border + 6 px padding */
+.deck-list-row .deck-list-minutes, .deck-list-foot .deck-session-input { height: 22px; padding: 0 6px; border: 1px solid var(--r-hairline-strong); background: var(--r-surface); color: var(--r-ink-strong); font: inherit; text-align: right; box-shadow: none; }
+.deck-list-row .deck-list-minutes:focus, .deck-list-foot .deck-session-input:focus { border-color: var(--r-accent); }
+:where(:root:not([data-input-mode="pointer"])) .deck-list-minutes:focus-visible, :where(:root:not([data-input-mode="pointer"])) .deck-session-input:focus-visible { outline: 1px solid var(--r-accent); }
+.deck-list-row .deck-list-minutes[aria-invalid="true"], .deck-list-foot .deck-session-input[aria-invalid="true"] { border-color: var(--destructive); }
+.deck-list-foot { margin: 0 8px; padding: 9px 8px 12px; border-top: 1px solid var(--r-hairline); display: grid; gap: 3px; font-size: 12px; color: var(--r-ink-muted); }
+.deck-list-total, .deck-list-session { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; column-gap: 8px; }
+.deck-list-total { color: var(--r-ink-strong); font-size: 13px; font-weight: 600; }
+.deck-list-times { display: inline-flex; align-items: baseline; gap: 3px; }
+.deck-list-foot .deck-session-time { height: 22px; padding: 0 2px; font-size: inherit; white-space: nowrap; text-decoration: underline; text-underline-offset: 2px; }
+.deck-list-foot .deck-session-input { width: 55px; text-align: center; }
+.deck-list-foot .is-over { color: var(--vscode-ritemark-deckLengthOver, #92400e); }
+:is(body.vscode-dark, body.ritemark-dark, body.vscode-high-contrast, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-list-foot .is-over { color: var(--vscode-ritemark-deckLengthOver, #eab308); }

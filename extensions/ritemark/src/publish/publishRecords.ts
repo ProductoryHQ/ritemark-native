@@ -32,6 +32,8 @@ export interface LivePause {
   /** Project-relative display names for the files covered by scope. */
   outsideFiles?: string[];
   slide?: number;
+  /** Only the key prefix and last four characters, separated by an ellipsis. */
+  keyPreview?: string;
   location?: { line: number; column?: number; endColumn?: number };
 }
 
