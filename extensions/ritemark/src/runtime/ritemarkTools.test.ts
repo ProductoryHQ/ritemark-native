@@ -38,6 +38,24 @@ const {
   toolSetKey,
 } = tools;
 
+/** Sprint 175: publishing is available from the person's deck view only. */
+function assertNoPublishingTools(groups: ReturnType<typeof toolGroupsFor>): void {
+  const publishingTool = /publish|update[_-](?:the[_-])?page|(?:deck[_-])?live[_-](?:action|switch)|go[_-]on/i;
+  for (const group of groups) {
+    for (const tool of group.tools) {
+      assert.doesNotMatch(claudeAllowName(group, tool), publishingTool);
+      assert.doesNotMatch(tools.codexToolName(group, tool), publishingTool);
+      assert.doesNotMatch(mcpToolDefinition(tool).name, publishingTool);
+    }
+  }
+}
+assertNoPublishingTools([tools.BROWSER_TOOL_GROUP, tools.BOARD_TOOL_GROUP, tools.DECK_TOOL_GROUP]);
+const deckGroup = tools.DECK_TOOL_GROUP;
+assert.throws(() => assertNoPublishingTools([{
+  ...deckGroup,
+  tools: [...deckGroup.tools, { ...deckGroup.tools[0]!, name: 'publish_deck' }],
+}]), assert.AssertionError, 'the tool-list check catches a planted publish tool');
+
 /** The OpenCode adapter's hand-written browser tools before Sprint 130 (git HEAD
  *  at the start of W5). The registry must produce exactly these. */
 const OLD_ADAPTER_TOOLS = [
@@ -674,6 +692,7 @@ async function main(): Promise<void> {
       const groups = documentGroups();
       assert.equal(groups.length, 1);
       assert.equal(toolGroupById('documents'), groups[0]);
+      assertNoPublishingTools(toolGroupsFor({ browser: true }));
       const params = { path: 'Interview.docx' };
       const [dynamic] = injector.codexDynamicTools(groups)!;
       assert.equal(dynamic.name, 'read_document');

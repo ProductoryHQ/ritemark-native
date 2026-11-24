@@ -12,6 +12,8 @@ import { changedSincePublish, LOCK_STALE_MS, LOCK_WAIT_MS, type PublishRecord, P
 import { isSheetWebviewMessage } from './sheetProtocol';
 import { sheetModelOf } from './sheetModel';
 import type { PublishPlan } from './types';
+import { mock } from 'node:test';
+import { PublishError } from './host';
 import { makeTempDir } from '../testing/tempDir';
 
 function plan(files: [string, string][], extra: Partial<PublishPlan> = {}): PublishPlan {
@@ -96,6 +98,21 @@ async function crossHostWrites(record: PublishRecord): Promise<void> {
     await waiting;
     assert.ok(await a.get(page(201).pagePath));
 
+    // Deploys can overlap across pages, while this page has one lease across stores.
+    let entered!: () => void;
+    let finish!: () => void;
+    const ready = new Promise<void>(resolve => { entered = resolve; });
+    const finishFirst = new Promise<void>(resolve => { finish = resolve; });
+    const first = a.withPageDeploy(record.pagePath, async () => { entered(); await finishFirst; });
+    await ready;
+    let secondEntered = false;
+    const second = b.withPageDeploy(record.pagePath, async () => { secondEntered = true; });
+    await b.withPageDeploy('/other/page.html', async () => {});
+    assert.equal(secondEntered, false);
+    finish();
+    await Promise.all([first, second]);
+    assert.equal(secondEntered, true);
+
     // Two real processes, each its own store, publishing at once
     const script = path.join(shared, 'writer.ts');
     fs.writeFileSync(script, [
@@ -105,9 +122,9 @@ async function crossHostWrites(record: PublishRecord): Promise<void> {
       `const base = ${JSON.stringify(record)};`,
       'void Promise.all(Array.from({ length: 15 }, (_, i) => store.put({ ...base, pagePath: `/p/${tag}${i}.html`, siteName: `${tag}-${i}` })));',
     ].join('\n'));
-    const tsx = require.resolve('tsx/cli');
+    const tsx = require.resolve('tsx');
     const run = (tag: string) => new Promise<number>((resolve) => {
-      execFile(process.execPath, [tsx, script, shared, tag], (error) => resolve(error ? 1 : 0));
+      execFile(process.execPath, ['--import', tsx, script, shared, tag], (error) => resolve(error ? 1 : 0));
     });
     assert.deepEqual(await Promise.all([run('x'), run('y')]), [0, 0]);
     const both = await a.list();
@@ -171,6 +188,19 @@ async function main(): Promise<void> {
 
     await crossHostWrites(record);
     await deadHostLockMidWait(record);
+
+    await store.withPageDeploy(first.pagePath, async () => {
+      let clockReads = 0;
+      mock.method(Date, 'now', () => new Date().getTime() + LOCK_WAIT_MS * clockReads++);
+      try {
+        await assert.rejects(new PublishRecordStore(storage).withPageDeploy(first.pagePath, async () => {
+          assert.fail('a live owner still holds the lock');
+        }), (error: unknown) => error instanceof PublishError && error.code === 'busy'
+          && error.message === 'This page is being published from another window.');
+      } finally {
+        mock.restoreAll();
+      }
+    });
 
     // Windows keys ignore case
     const win = new PublishRecordStore(makeTempDir('publish-records-win-'), 'win32');
