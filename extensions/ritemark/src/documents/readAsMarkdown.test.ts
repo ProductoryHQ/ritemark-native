@@ -11,6 +11,7 @@ import { SearchWorkerClient, type WorkerLike } from '../search/searchWorkerClien
 import { makeTempDir } from '../testing/tempDir';
 import { readAsMarkdown } from './readAsMarkdown';
 import { readProjectDocument } from './readProjectDocument';
+import { WORD_EQUATION_MARKDOWN, wordEquationFixture } from './wordEquationFixture.test-helper';
 
 const pause = async () => undefined;
 
@@ -29,6 +30,8 @@ function pdf(build: (doc: PDFKit.PDFDocument) => void): Promise<Uint8Array> {
 const pageText = (page: number) => `Page ${page} contains the synthetic observations from the operations review.`;
 
 async function main() {
+  const equationRead = await readAsMarkdown(await wordEquationFixture(), 'Equations.docx', 'word', {}, pause);
+  assert.equal(equationRead.text, `Equations.docx · Word · 4 blocks · whole text · 2 equations approximate\n\n${WORD_EQUATION_MARKDOWN}`);
   const base = makeTempDir('rm-document-read-');
   const project = path.join(base, 'project');
   await mkdir(project);

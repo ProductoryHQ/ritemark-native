@@ -13,6 +13,7 @@ Write and edit markdown with a visual editor.
 | Feature | Description |
 |---------|-------------|
 | [Core Editor](editor.md) | WYSIWYG markdown editing with auto-save |
+| [Decks](decks.md) | Plan slide times, present, and share a page that follows your deck |
 | [Text Formatting](formatting.md) | Bold, italic, links, and inline styles |
 | [Block Types](blocks.md) | Headings, lists, tables, code blocks |
 | [Comments](comments.md) | Margin notes on any passage, and handing one to an agent |

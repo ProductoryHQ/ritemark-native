@@ -158,6 +158,8 @@
      as one system rather than two near-misses. */
   --r-rail-active: var(--vscode-activityBar-activeBackground, rgba(67, 56, 202, 0.1));
   --r-accent-fainter: var(--ritemark-indigo-fainter);
+  --r-live-page-updated-icon: #16a34a;
+  --r-live-page-paused-icon: #b45309;
   --r-success: var(--ritemark-success);
   --r-success-soft: var(--ritemark-success-soft);
   --r-warning: var(--ritemark-warning);
@@ -245,6 +247,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-accent-soft: var(--ritemark-dark-indigo-soft);
   --r-rail-active: var(--vscode-activityBar-activeBackground, var(--ritemark-dark-indigo-soft));
   --r-accent-fainter: var(--ritemark-dark-indigo-fainter);
+  --r-live-page-paused-icon: #eab308;
   --r-success: var(--ritemark-dark-success);
   --r-success-soft: var(--ritemark-dark-success-soft);
   --r-warning: var(--ritemark-dark-warning);

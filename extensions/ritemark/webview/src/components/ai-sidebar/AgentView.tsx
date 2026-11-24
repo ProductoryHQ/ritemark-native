@@ -6,6 +6,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { StartingPoints } from './StartingPoints';
+import { LiveDeckSteps } from './LiveDeckSteps';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
@@ -135,6 +136,7 @@ export function AgentTurnBlock({
 
       {/* Result */}
       {turn.result && <AgentResponse turn={turn} />}
+      <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
     </div>
   );
 }

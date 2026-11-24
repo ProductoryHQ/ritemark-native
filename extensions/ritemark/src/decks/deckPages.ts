@@ -25,7 +25,7 @@ import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, them
 import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
 import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
-import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
+import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, sessionTimeEdit, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { frontMatterField, parseFrom } from './deckFormat';
 import { slidesOfText } from './deckLibraryFormat';
 import { deckName, type DeckLibrary, type LibraryWrite } from './DeckLibrary';
@@ -79,6 +79,7 @@ export class DeckPages implements vscode.Disposable {
   private readonly writes = new Map<string, LibraryWrite>();
   private readonly waiting = new Map<string, (ok: boolean) => void>();
   private requests = 0;
+  private readonly sessionEdits = new WeakMap<vscode.TextDocument, Promise<void>>();
   /** Present on the deck's bar (Sprint 159): the presenter, set once at activation (`decksHost.ts`). */
   presenter: {
     start: (origin: { document: vscode.TextDocument; panel: vscode.WebviewPanel }, request: DeckPresentRequest) => Promise<void>;
@@ -425,6 +426,25 @@ export class DeckPages implements vscode.Disposable {
       throw error;
     }
     switch (request.type) {
+      case 'deck/session-time': {
+        const { field, value } = request;
+        // The end is relative to the start as written. A start and then an end committed in quick succession
+        // must use the new start, even when the document has not sent it back to the view yet.
+        const pending = (this.sessionEdits.get(document) ?? Promise.resolve()).then(async () => {
+          if (document.isClosed) return;
+          const change = sessionTimeEdit(document.getText(), field, value);
+          if (!change) return;
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
+          if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+        }).catch(async () => {
+          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.` });
+        });
+        this.sessionEdits.set(document, pending);
+        await pending;
+        if (this.sessionEdits.get(document) === pending) this.sessionEdits.delete(document);
+        return;
+      }
       case 'deck/open-in':
         openInBrowser(request.url);
         return;

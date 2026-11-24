@@ -297,31 +297,21 @@ Every scripted test launch of a candidate follows the same launch rule as item 4
 
 Per-platform sections: macOS arm64, macOS x64 (Rosetta NOT required — native Intel binary; where no Intel Mac is at hand, run it under Rosetta on the release Mac with `open --arch x86_64` and say so), Windows x64.
 
-## Post-Release: Marketing Handoff
+## Release Materials: Growth's Work Order
 
-**MANDATORY:** After Gate 2 passes and the GitHub release is complete, surface a routing recommendation to the user:
+Release materials are not routed to `product-marketer` after Gate 2. They start at the release candidate (Jarmo, 22 and 24 November 2026; ritemark-dev `governance/growth-manager.md` §6):
 
-> "Release vX.Y.Z is published. Recommend invoking `product-marketer` for changelog, release notes, and landing-page updates."
+1. When `gates.rc` is recorded, the Development manager copies ritemark-dev `releases/materials-template.md` to `releases/v<version>/materials.md`, fills in its work order (the candidate's commit, the notes' and the plan's paths), and sends Growth the work order.
+2. Growth drafts the six pieces before Gate 2: the blog post (EN and ET), the social post, the pictures, the Store's What's new and listing, the site's version label, and this repository's GitHub front page (README, About, topics).
+3. An independent agent ticks the package check in `materials.md`. Jarmo decides the package once, at Gate 2.
 
-(Subagents cannot invoke other subagents — the user routes via the main session.)
+This agent's part: at Gate 2, check that `materials.md` exists and its package check is ticked, and name what is missing. Never recommend or invoke `product-marketer` for release content.
 
-Include this handoff payload:
-
-```plaintext
-version: "1.5.0"
-release_type: "major" | "minor" | "patch" | "extension"
-features: ["List of new features from sprint"]
-fixes: ["List of bug fixes"]
-sprint_ref: "sprint-XX"
-github_release_url: "https://github.com/jarmo-productory/ritemark-public/releases/tag/vX.Y.Z"
-release_date: "YYYY-MM-DD"
-```
-
-**Skip conditions:** hotfix with no user-facing changes, OR Jarmo says "skip marketing". Otherwise, always recommend product-marketer routing after a successful release.
+The front page (README) merges before the first candidate or in the closeout, never between: `main` is frozen from the candidate to publish.
 
 ## Post-Release: Closeout Gate (MANDATORY)
 
-Runs after the marketing handoff and the issue sweep, for every full release.
+Runs after the release materials and the issue sweep, for every full release.
 The release worktree still holds everything it built — v1.10.1 sat at 15.7 GB
 four days after publication — and `worktree-hygiene.mjs` correctly refuses to
 remove a worktree whose `dist/` or `VSCode-<target>/` is non-empty. That

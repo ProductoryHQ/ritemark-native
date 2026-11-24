@@ -29,7 +29,7 @@ import { createHash } from 'node:crypto';
 import { locatePage, isInside } from '../browser/localPage';
 import { OUTSIDE_PROJECT_MESSAGE } from '../browser/pageCommands';
 import { trackEvent } from '../analytics/posthog';
-import { DeckLive } from './deckLive';
+import { DeckLive, type LiveSaveReceipt } from './deckLive';
 import { locateLiveIssues } from './deckLiveIssues';
 import type { LiveResult } from '../publish/liveUpdate';
 import type { LivePreference } from '../publish/publishRecords';
@@ -41,6 +41,8 @@ import type { PublishFeature } from '../publish/vscodePublish';
 import { COPY_LINK_COMMAND, PAGE_STATE_COMMAND, UNPUBLISH_PAGE_COMMAND } from '../publish/vscodePublish';
 import { PAGE_BEING_PUBLISHED, WORKERS_DEV_ADDRESS, type PageBarState, type PublishOutcome } from '../publish/PublishController';
 import { splitFrontMatter } from '../editorSync/frontMatter';
+import { readRitemarkSavedLogicalHash } from '../editorSync/saveReceipt';
+import { normalizeLogicalText } from '../editorSync/state';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { frontMatterLook, parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
@@ -97,6 +99,10 @@ export function publishedAddress(bar: PageBarState | undefined): string | null {
   return bar.address && WORKERS_DEV_ADDRESS.test(bar.address) ? bar.address : null;
 }
 
+function liveSnapshot(text: string): string {
+  return createHash('sha256').update(normalizeLogicalText(text)).digest('hex');
+}
+
 export class DeckPublisher implements vscode.Disposable {
   private readonly seats = new Set<DeckSeat>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -110,11 +116,15 @@ export class DeckPublisher implements vscode.Disposable {
   /** A page's state changed in Publish (by its real path): Present asks again whether the deck is published. */
   private readonly pageChanged = new vscode.EventEmitter<string>();
   readonly onDidChangePage = this.pageChanged.event;
-  private readonly liveChanged = new vscode.EventEmitter<{ pagePath: string; result: LiveResult }>();
+  private readonly liveSaved = new vscode.EventEmitter<LiveSaveReceipt>();
+  readonly onDidSaveLive = this.liveSaved.event;
+  private readonly liveChanged = new vscode.EventEmitter<{ pagePath: string; result: LiveResult; receipt?: LiveSaveReceipt }>();
   readonly onDidUpdateLive = this.liveChanged.event;
   private readonly liveUsage = new Set<string>();
-  private readonly live = new DeckLive((pagePath, result) => {
-    if (result?.kind === 'updated' || result?.kind === 'paused') this.liveChanged.fire({ pagePath, result });
+  private readonly live = new DeckLive((pagePath, result, receipt) => {
+    if (result?.kind === 'updated' || result?.kind === 'paused') {
+      this.liveChanged.fire({ pagePath, result, ...(receipt && !receipt.superseded ? { receipt } : {}) });
+    }
     if (result?.kind === 'updated' && !this.liveUsage.has(pagePath)) {
       this.liveUsage.add(pagePath);
       void trackEvent('feature_used', { feature: 'live_deck_update', source: 'deck' });
@@ -134,7 +144,7 @@ export class DeckPublisher implements vscode.Disposable {
       }),
       vscode.workspace.onDidSaveTextDocument(document => {
         const seat = [...this.seats].find(item => item.document === document);
-        if (seat) void this.requestLive(seat).catch(() => undefined);
+        if (seat) this.savedForLive(seat, readRitemarkSavedLogicalHash(document));
       }),
       // Decks turned off or on in Settings: the control hides or shows at once.
       vscode.workspace.onDidChangeConfiguration(event => {
@@ -163,7 +173,7 @@ export class DeckPublisher implements vscode.Disposable {
       const file = document.uri.fsPath;
       const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(path.dirname(file), path.basename(file)), false, false, true);
       const saved = (uri: vscode.Uri) => {
-        if (samePath(uri.fsPath, file)) void this.requestLive(seat).catch(() => undefined);
+        if (samePath(uri.fsPath, file)) this.savedForLive(seat);
       };
       watcher.onDidChange(saved);
       watcher.onDidCreate(saved);
@@ -205,31 +215,69 @@ export class DeckPublisher implements vscode.Disposable {
     await this.requestLive(seat, action === 'resume');
   }
 
-  private async requestLive(seat: DeckSeat, resume = false): Promise<void> {
+  private savedForLive(seat: DeckSeat, savedHash?: string): void {
+    if (!this.ready() || seat.document.uri.scheme !== 'file') return;
+    const file = seat.document.uri.fsPath;
+    const snapshot = savedHash
+      ? Promise.resolve(savedHash)
+      : fs.promises.readFile(file, 'utf8').then(liveSnapshot, () => undefined);
+    let settle!: () => void;
+    const settled = new Promise<void>(resolve => { settle = resolve; });
+    const receipt: LiveSaveReceipt = { file, settled, settle };
+    this.liveSaved.fire(receipt);
+    void this.requestLive(seat, false, receipt, snapshot).catch(settle);
+  }
+
+  private async requestLive(
+    seat: DeckSeat, resume = false, receipt?: LiveSaveReceipt, snapshot?: Promise<string | undefined>,
+  ): Promise<void> {
     const feature = this.ready();
     const file = seat.document.uri.fsPath;
-    if (!feature || seat.document.uri.scheme !== 'file' || !this.seats.has(seat)) return;
+    if (!feature || seat.document.uri.scheme !== 'file' || !this.seats.has(seat)) {
+      receipt?.settle();
+      return;
+    }
     const page = await pageKeyOf(pagePathFor(file));
     const record = await feature.controller.recordFor(page);
-    if (!record?.live?.on || !this.seats.has(seat)) return;
-    if (record.live.pause && !resume) {
+    if (!record?.live?.on || !this.seats.has(seat)) {
+      receipt?.settle();
+      return;
+    }
+    const pageId = normalizeForCompare(page);
+    if (record.live.pause && !resume && !this.live.hasPendingResume(pageId)) {
+      receipt?.settle();
       void this.refreshDocument(seat.document);
       return;
     }
     const preference = record.live;
     const openSeats = [...this.seats].filter(item => samePath(item.document.uri.fsPath, file));
     const open = () => Boolean(this.ready()) && openSeats.some(item => this.seats.has(item));
-    if (!open()) return;
-    await this.live.request(normalizeForCompare(page), async (goOn, sending) => {
+    if (!open()) {
+      receipt?.settle();
+      return;
+    }
+    await this.live.request(pageId, async (goOn, sending) => {
       const current = await feature.controller.recordFor(page);
       if (!open() || current?.live?.id !== preference.id || (current.live.pause && !goOn)) return { kind: 'stopped' };
       const realFile = await fs.promises.realpath(file);
       const roots = await projectRoots();
       const project = roots.find(root => isInside(page, root));
       if (!project || !isInside(realFile, project) || !samePath(path.dirname(realFile), path.dirname(page))) {
-        return { kind: 'offline', detail: OUTSIDE_PROJECT_MESSAGE };
+        const release = feature.controller.holdPage(page);
+        if (!release) return { kind: 'busy' };
+        try {
+          return await feature.controller.pauseLivePage(page, { preference: current.live, resume: goOn, active: open }, OUTSIDE_PROJECT_MESSAGE);
+        } finally {
+          release();
+        }
       }
       const saved = await fs.promises.readFile(realFile, 'utf8');
+      // The queue reads the latest bytes. Credit only the snapshot observed
+      // by this save, even when another write raced its live update.
+      if (receipt && snapshot && await snapshot !== liveSnapshot(saved)) {
+        receipt.superseded = true;
+        receipt.settle();
+      }
       const body = splitFrontMatter(saved).content;
       const look = frontMatterLook(saved);
       const matches = (item: DeckSeat) => item.liveInput?.text === body && item.liveInput.look === look;
@@ -243,7 +291,7 @@ export class DeckPublisher implements vscode.Disposable {
         await feature.controller.startTokenEntry();
       }
       return result;
-    }, resume);
+    }, resume, receipt);
   }
 
   // ------------------------------------------------------------------ the chip
@@ -287,9 +335,17 @@ export class DeckPublisher implements vscode.Disposable {
       ? (await this.feature?.controller.recordFor(pageKey))?.live : undefined;
     const live = preference && this.live.state(normalizeForCompare(pageKey), preference);
     if (live?.state === 'paused' && live.pause?.kind === 'key') {
+      if (live.pause.location) {
+        // Stored scan coordinates include front matter. The deck editor holds just the body.
+        const fullText = document.getText();
+        const body = splitFrontMatter(fullText).content;
+        const headLines = fullText.slice(0, fullText.length - body.length).split('\n').length - 1;
+        live.pause = { ...live.pause, location: { ...live.pause.location, line: live.pause.location.line - headLines } };
+      }
       live.resumeBlocked = await this.stillHasKey(document, pagePath) ? 'Take the key out first.' : undefined;
     }
-    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(live && { live }) }, bar };
+    const address = publishedAddress(bar);
+    return { state: { ready: true, kind, changed, pdf: await this.pdfKinds(), ...(address && { address }), ...(live && { live }) }, bar };
   }
 
   /**
@@ -488,7 +544,7 @@ export class DeckPublisher implements vscode.Disposable {
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
       if (live) {
         const location = await locatePage(pagePath, live.roots);
-        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return offline(OUTSIDE_PROJECT_MESSAGE);
+        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return await feature.controller.pauseLivePage(pageKey, live, OUTSIDE_PROJECT_MESSAGE);
         const describe = await locateLiveIssues(deckPath, text, built);
         return await feature.controller.updateLive(location, {
           ...live, digest: built.digest, legacyDigest, describe,
@@ -699,6 +755,7 @@ export class DeckPublisher implements vscode.Disposable {
     this.timers.clear();
     this.disposables.forEach(disposable => disposable.dispose());
     this.pageChanged.dispose();
+    this.liveSaved.dispose();
     this.liveChanged.dispose();
     this.live.dispose();
     for (const seat of this.seats) seat.watcher?.dispose();

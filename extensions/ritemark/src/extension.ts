@@ -581,6 +581,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
   // Sprint 159 PR 4: Publish on a deck's bar is this Publish, on the page written beside the deck.
   decks.publisher.connect(publish);
+  unifiedViewProvider.connectLiveDeckPublisher(decks.publisher);
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
   // → remote catalog (ProductoryHQ/ritemark-native) → on-disk cache → bundled baseline. The live
