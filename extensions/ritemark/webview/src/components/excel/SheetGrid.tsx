@@ -504,14 +504,23 @@ export function SheetGrid({
     if (editing || !grid?.contains(e.target as Node)) return
     const move: Record<string, [number, number]> = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     const fromChart = chartTarget(e.target)
+    if (fromChart && e.key === 'Escape') {
+      e.preventDefault()
+      chartSelection.clear()
+      focusGrid()
+      return
+    }
     if (move[e.key] && (!fromChart || chartSelection.chosen)) {
       e.preventDefault()
       select(step(selected, ...move[e.key]))
       if (fromChart) focusGrid()
       return
     }
-    const cycleCharts = e.key === 'F6' || (fromChart && e.key === 'Tab')
-    if (cycleCharts && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    // The webview forwards even canceled keydowns to the workbench, where F6 moves between parts.
+    // Excel's object shortcut uses the physical 5 key because Option can change the typed character.
+    const objectShortcut = e.code === 'Digit5' && e.ctrlKey && e.altKey && !e.metaKey && !e.getModifierState('AltGraph')
+    const chartTab = fromChart && e.key === 'Tab' && !e.altKey && !e.ctrlKey && !e.metaKey
+    if (objectShortcut || chartTab) {
       const charts = sheet.layout.drawings.flatMap(({ what, anchor }, index) => {
         if (what !== 'chart') return []
         const origin = drawingOrigin(anchor)
