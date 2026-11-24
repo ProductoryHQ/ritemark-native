@@ -14,6 +14,8 @@ import { strict as assert } from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import Module from 'node:module';
+import { mock } from 'node:test';
+import { liveFileDisplay } from './deckLiveIssues';
 import type { LivePreference } from '../publish/publishRecords';
 import { gatherPage } from '../publish/gather';
 import { liveIssue, type LiveIssue } from '../publish/liveUpdate';
@@ -22,6 +24,8 @@ import { makeTempDir } from '../testing/tempDir';
 
 // ── A small vscode for the host module: a project folder on disk, one open deck, 2.2's page state ──
 const root = fs.realpathSync(makeTempDir('ritemark-deck-publish-'));
+let workspaceRoot = root;
+let rootChecks = 0;
 const none = () => ({ dispose() {} });
 const savedListeners: Array<(document: unknown) => void> = [];
 const watchListeners: Array<(uri: { fsPath: string }) => void> = [];
@@ -42,7 +46,7 @@ const vscodeStub = {
   RelativePattern: class {},
   Uri: { file: (fsPath: string) => ({ scheme: 'file', fsPath, toString: () => `file://${fsPath}` }) },
   workspace: {
-    get workspaceFolders() { return [{ uri: { scheme: 'file', fsPath: root } }]; },
+    get workspaceFolders() { rootChecks++; return [{ uri: { scheme: 'file', fsPath: workspaceRoot } }]; },
     getWorkspaceFolder: () => ({ uri: { scheme: 'file', fsPath: root } }),
     textDocuments: [],
     onDidChangeTextDocument: (listener: (event: { document: unknown }) => void) => { changeListeners.push(listener); return { dispose() {} }; },
@@ -366,6 +370,8 @@ async function main(): Promise<void> {
     assert.equal(diagnosis?.kind, 'key');
     assert.equal(diagnosis?.slide, 1);
     assert.equal(diagnosis?.location?.line, text.slice(0, text.indexOf(fixtureKey)).split('\n').length);
+    assert.equal(diagnosis?.keyPreview, 'sk-ant-…A1A1');
+    assert.equal(diagnosis?.detail, 'Slide 1 has what looks like a key.');
     assert.equal(JSON.stringify(diagnosis).includes(fixtureKey), false);
 
     const foundPicture = new Promise<void>(resolve => { nextResult = resolve; });
@@ -375,6 +381,20 @@ async function main(): Promise<void> {
     await foundPicture;
     assert.equal(diagnosis?.kind, 'outside');
     assert.equal(diagnosis?.slide, 1);
+
+    assert.match(diagnosis?.detail ?? '', /shows (?:~\/.*|…\/)elsewhere\.png, which is outside/);
+    const limited = new Promise<void>(resolve => { nextResult = resolve; });
+    const logo = path.join(root, 'Shared', 'logo.png');
+    fs.mkdirSync(path.dirname(logo));
+    fs.closeSync(fs.openSync(logo, 'w'));
+    fs.truncateSync(logo, 26 * 1024 * 1024);
+    text = deckText('Paper').replace('Welcome, everyone.', '![Logo](../Shared/logo.png)');
+    fs.writeFileSync(deckPath, text);
+    savedListeners.at(-1)?.(document);
+    await limited;
+    assert.equal(diagnosis?.kind, 'limits');
+    assert.equal(diagnosis?.slide, 1);
+    assert.equal(diagnosis?.detail, 'logo.png is too big to publish (26 MB). A file can be up to 25 MB.');
 
     const usageForFirstPage = [...usage];
     const otherDeck = path.join(path.dirname(deckPath), 'Other.rtms');
@@ -424,6 +444,29 @@ async function main(): Promise<void> {
     assert.equal(sentPromptly, true, 'the pending save follows the manual publish immediately');
     assert.equal(liveHtml.includes('Latest save.'), true);
     assert.equal(liveHtml.includes('First save.'), false);
+
+    assert.equal(liveFileDisplay('/Users/example/Project/Shared/logo.png', '/Users/example/Project', '/Users/example'), 'Shared/logo.png');
+    assert.equal(liveFileDisplay('/Users/example/Shared/logo.png', '/Users/example/Project', '/Users/example'), '~/Shared/logo.png');
+    assert.equal(liveFileDisplay('C:/Users/Example/Shared/logo.png', 'c:/users/example/Project', 'c:/users/example'), '~/Shared/logo.png');
+    assert.equal(liveFileDisplay('/Users/another/Shared/logo.png', '/Users/example/Project', '/Users/example'), '…/logo.png');
+
+    workspaceRoot = path.join(root, 'unrelated-project');
+    fs.mkdirSync(workspaceRoot);
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      await livePublisher.liveAction(document as never, 'on');
+      const state = (await livePublisher.stateOf(document as never)).live;
+      assert.equal(state?.state, 'paused');
+      assert.equal(state?.pause?.kind, 'page');
+      assert.match(state?.pause?.detail ?? '', /project/);
+      const checks = rootChecks;
+      mock.timers.tick(60_000);
+      await new Promise<void>(resolve => setImmediate(resolve));
+      assert.equal(rootChecks, checks, 'the outside-project refusal never rechecks on a timer');
+    } finally {
+      mock.timers.reset();
+      workspaceRoot = root;
+    }
 
   } finally {
     livePublisher.dispose();

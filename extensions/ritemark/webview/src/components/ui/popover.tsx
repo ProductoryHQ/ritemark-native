@@ -13,9 +13,9 @@ import * as React from 'react'
 import * as PopoverPrimitive from '@radix-ui/react-popover'
 
 import { cn } from '../../lib/utils'
-import { focusOpensTooltip } from './tooltip'
+import { focusOpensTooltip, popupWithTooltipEscape } from './tooltip'
 
-const Popover = PopoverPrimitive.Root
+const Popover = popupWithTooltipEscape(PopoverPrimitive.Root)
 const PopoverTrigger = PopoverPrimitive.Trigger
 const PopoverAnchor = PopoverPrimitive.Anchor
 

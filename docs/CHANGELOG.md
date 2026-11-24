@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Claude, ChatGPT, and OpenCode can now read PowerPoint files in your project, with speaker notes kept under the slide they belong to (#993).
 - Deck files can store planned minutes for each slide and use the presenter’s session length. These timings stay private when you publish the deck (#1001).
 - Turn on Update on every save to keep a published deck’s page up to date (#1007).
+- The deck’s publish button shows when a page is live, updating, paused, or offline, and explains what to do when an update pauses.
 
 ### Fixed
 
