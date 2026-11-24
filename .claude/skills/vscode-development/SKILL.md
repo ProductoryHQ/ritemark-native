@@ -253,8 +253,6 @@ Because the host is one flat bundle, new code must not reintroduce the layout as
 2. **Native / runtime-asset / dynamically-`require()`d-by-path packages → esbuild `external`.** A new pure-JS dependency is auto-inlined; a package with a `.node` binary, a `binding.gyp`, or one that reads its own data files at runtime (like `pdfkit`) must be added to the `external` list in `esbuild.config.mjs` instead.
 3. **Separately-spawned processes need their own esbuild entry point.** Code launched as its own OS process (like `browserMcpAdapter`) cannot live in the main bundle — add it as a second entry point.
 
-(This rule + the build description above are mirrored to the Codex canon by the scheduled `harness-equalizer` — do not hand-edit `.codex/**` / `AGENTS.md`.)
-
 ## Node Versions
 
 | Context | Required | Why |
