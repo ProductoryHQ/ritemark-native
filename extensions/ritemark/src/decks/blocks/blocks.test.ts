@@ -528,7 +528,8 @@ test('Label: an empty one is never drawn, on the strip, the wall or the page', (
   for (const markdown of ['[]{.label}\n\n# T', '[   ]{.label}\n\n# T']) {
     assert.ok(!blockSlideHtml(markdown).includes('blk-label'), markdown);
     const deck = publicDeck(`---\ndeck: 2\n---\n\n\`\`\`slide\n${markdown}\n\`\`\`\n`, { folderName: 'Demo', deckName: 'Demo', theme: BUILT_IN_THEME });
-    assert.ok(!pageHtml(deck, { slideCss: '', fonts: [] }, { digest: deckDigest(deck), pictureUrl: () => null }).includes('blk-label'), `the page: ${markdown}`);
+    // A drawn Label, not the class name: the page's follower script names `.blk-label` among the words it compares.
+    assert.ok(!pageHtml(deck, { slideCss: '', fonts: [] }, { digest: deckDigest(deck), pictureUrl: () => null }).includes('class="blk-label"'), `the page: ${markdown}`);
   }
 });
 

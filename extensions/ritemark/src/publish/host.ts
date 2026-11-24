@@ -51,6 +51,8 @@ export interface PublishedSite {
   name: string;
   /** The public address of the page. */
   address: string;
+  /** The version stamped into a deck page and its deployed version file. */
+  deckVersion?: number;
 }
 
 export type PublishErrorCode =
@@ -98,7 +100,7 @@ export interface PublishHost {
    * Publish or Update: the same call with the same `siteName` keeps the address (M8). `replacing` is false for a
    * first publish, which refuses a name already on the account (`address-taken`).
    */
-  publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean }): Promise<PublishedSite>;
+  publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean; lastDeckVersion?: number }): Promise<PublishedSite>;
   /** Unpublish; resolves only after the address has stopped answering (R7, M9). */
   unpublish(siteName: string, address: string, options?: { onSlow?: () => void }): Promise<void>;
   /**
