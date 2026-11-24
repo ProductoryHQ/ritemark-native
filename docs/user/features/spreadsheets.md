@@ -84,6 +84,31 @@ Excel workbooks with multiple sheets show tabs at the top:
 - Current sheet is highlighted
 - Sheet data loads instantly (cached locally)
 
+### Charts
+
+In .xlsx workbooks, Ritemark draws these charts in the same place and size as Excel, using the workbook's colours, titles, legends, axes and labels. Charts and cells stay on white in dark mode. A chart with its own sheet fills that sheet.
+
+- Column and bar charts, including clustered, stacked and 100% stacked
+- Line charts, with or without markers
+- Pie and doughnut charts
+- Scatter charts
+- Area charts, including stacked and 100% stacked
+- Column-and-line charts, including a line with a second axis
+
+Ritemark draws 3-D columns, bars, lines, pies and areas flat. Waterfall, treemap, histogram, funnel, box and whisker, sunburst, map, radar, stock, bubble and surface charts appear as cards in their original places. A pie with all zero values also appears as a card. The line below the formula bar lists what the sheet keeps for Excel to show, including undrawn charts, pictures, shapes, icon sets and colour rules Ritemark can't read. The line goes away when everything on the sheet can be shown.
+
+Click a drawn chart to choose it, or press Cmd+Option+5 on Mac or Ctrl+Alt+5 on Windows. The chart gets an outline and the formula bar shows its title, kind and source cells when available.
+
+> Chart · Revenue by region · a column chart from Q5:Q7. Change it in Excel.
+
+With the chart chosen, press Cmd+C on Mac or Ctrl+C on Windows to copy it as a picture. Press Esc to return to the cells.
+
+### Colour rules
+
+In .xlsx workbooks, Ritemark shows the workbook's cell highlights, two- and three-colour scales, and data bars. For example, you can see overdue values highlighted, numbers shaded from low to high, or positive and negative bars growing from an axis. Cells with icon sets show their values. Other colour rules on those cells still apply.
+
+Type a new value and any charts and colour rules that use it update right away. Formula results keep their last saved values until Excel recalculates them. Viewing a workbook, switching sheets and choosing or copying a chart leave the file unchanged. Saving a cell edit keeps the workbook's charts and colour rules.
+
 ### Limitations
 
 - Basic cell editing only: formulas, cell styles, and merged-cell layouts are not edited (untouched cells and sheets are preserved on save)
@@ -116,7 +141,7 @@ This opens the actual file in the external app, not a copy.
 | Extension | Mode | Features |
 |-----------|------|----------|
 | `.csv` | Edit | Full editing, auto-save |
-| `.xlsx` | Edit | Basic cell editing, multi-sheet, save with Cmd+S |
+| `.xlsx` | Edit | Basic cell editing, multiple sheets, charts and colour rules |
 | `.xls` | Preview | Read-only, multi-sheet |
 
 ### CSV Format Notes
@@ -128,8 +153,8 @@ This opens the actual file in the external app, not a copy.
 ### Excel Format Notes
 
 - **Formulas:** Not evaluated (shows stored values)
-- **Formatting:** Not preserved (data only)
-- **Charts:** Not displayed
+- **Formatting:** The .xlsx grid shows the workbook’s formatting and preserves it on save.
+- **Charts and colour rules:** Available in the .xlsx grid.
 
 ---
 
