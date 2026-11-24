@@ -18,6 +18,8 @@
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
 .deck-theme-swatch { position: relative; display: inline-block; flex: none; width: 20px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(30, 27, 75, .14); overflow: hidden; }
+/* On a dark bar the swatch's edge is the dark hairline: a dark theme's ground (Evening) would otherwise vanish into it. */
+:is(body.vscode-dark, body.ritemark-dark, body.vscode-high-contrast, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-theme-swatch { box-shadow: inset 0 0 0 1px var(--r-hairline-strong); }
 .deck-theme-swatch > i { position: absolute; left: 4px; height: 2px; border-radius: 1px; }
 .deck-theme-swatch > i:first-child { top: 4px; width: 7px; }
 .deck-theme-swatch > i:last-child { top: 8px; width: 11px; }
