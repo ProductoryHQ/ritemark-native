@@ -1,5 +1,6 @@
-import type { ChartAxis, ChartData, ChartLabels, ChartMarker, ChartModel, ChartShape, ChartTextStyle, ChartTitle, ChartSeries, ChartValue } from './chartModel'
+import type { ChartAxis, ChartData, ChartLabels, ChartManualLayout, ChartMarker, ChartModel, ChartShape, ChartTextStyle, ChartTitle, ChartSeries, ChartValue } from './chartModel'
 import { formatCellValue } from './numberFormat'
+import { fontPointsToPixels } from './sheetLayout'
 
 type DrawableChart = Extract<ChartModel, { supported: true }> & { kind: 'column' | 'bar' | 'line' }
 export function drawsChart(chart: ChartModel | undefined): chart is DrawableChart {
@@ -12,6 +13,7 @@ interface Text extends Point {
   text: string
   anchor?: 'start' | 'middle' | 'end'
   style: ChartTextStyle
+  runs?: { text: string; style: ChartTextStyle }[]
 }
 interface Rule {
   from: Point
@@ -50,7 +52,6 @@ export interface ChartLayout {
 }
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
-const px = (pt: number) => pt * 4 / 3
 const hideLabels = (axis?: ChartAxis) => axis?.deleted || axis?.tickLabelPosition === 'none'
 
 function niceStep(span: number, divisions: number): number {
@@ -113,8 +114,33 @@ function mergeDefined<T extends object>(...layers: (T | undefined)[]): T {
   )))
 }
 
-function styleOf(size: number, ...styles: (ChartTextStyle | undefined)[]): ChartTextStyle {
-  return mergeDefined({ size, color: '#595959' }, ...styles)
+function styleOf(...styles: (ChartTextStyle | undefined)[]): ChartTextStyle {
+  return mergeDefined({ size: 10, color: '#000000', bold: false, italic: false }, ...styles)
+}
+
+const textHeight = (style: ChartTextStyle) => fontPointsToPixels(style.size ?? 10)
+
+function titleFormat(title: ChartTitle | undefined, style: ChartTextStyle) {
+  const runs = title?.runs?.map((run) => ({ text: run.text, style: mergeDefined(style, run.style) }))
+  return { style, runs, height: runs?.length ? Math.max(...runs.map((run) => textHeight(run.style))) : textHeight(style) }
+}
+
+function textWidth(text: string, format: ReturnType<typeof titleFormat>, measure: Measure) {
+  return format.runs?.length ? format.runs.reduce((sum, run) => sum + measure(run.text, run.style), 0)
+    : measure(text, format.style)
+}
+
+function manualBounds(auto: Rect, layout: ChartManualLayout | undefined, width: number, height: number): Rect {
+  if (!layout) return auto
+  // Factor positions offset the automatic position; edge positions start at the chart origin.
+  const position = (automatic: number, value: number | undefined, mode: string | undefined, extent: number) =>
+    value === undefined ? automatic : (mode === 'edge' ? 0 : automatic) + value * extent
+  const x = position(auto.x, layout.x, layout.xMode, width)
+  const y = position(auto.y, layout.y, layout.yMode, height)
+  const length = (automatic: number, value: number | undefined, mode: string | undefined, extent: number, start: number) =>
+    value === undefined ? automatic : Math.max(1, value * extent - (mode === 'edge' ? start : 0))
+  return { x, y, width: length(auto.width, layout.width, layout.widthMode, width, x),
+    height: length(auto.height, layout.height, layout.heightMode, height, y) }
 }
 
 function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, percent: boolean, blanksAsZero: boolean, line: boolean, count: number) {
@@ -183,15 +209,17 @@ function layoutLegend(model: DrawableChart, entries: { name: string; color: stri
   const side = ['l', 'r', 'tr'].includes(position)
   const rows: LegendEntry[][] = []
   const sizes: { width: number; height: number }[] = []
+  const wrapWidth = legend.layout?.width !== undefined && legend.layout.widthMode !== 'edge'
+    ? legend.layout.width * width : width - 2 * pad
   for (const entry of entries) {
     const override = legend.entries.find(({ index }) => index === entry.index)
     if (override?.deleted) continue
-    const style = styleOf(9, model.textStyle, legend.textStyle, override?.textStyle)
+    const style = styleOf(model.textStyle, legend.textStyle, override?.textStyle)
     const keyWidth = model.kind === 'line' ? 24 : 7
     const w = measure(entry.name, style) + keyWidth + 4
-    const h = px(style.size ?? 9) + 4
+    const h = textHeight(style) + 4
     let row = sizes[sizes.length - 1]
-    if (!row || side || row.width + w + 10 > width - 2 * pad) {
+    if (!row || side || row.width + w + 10 > wrapWidth) {
       row = { width: 0, height: 0 }
       sizes.push(row)
       rows.push([])
@@ -210,9 +238,10 @@ function layoutLegend(model: DrawableChart, entries: { name: string; color: stri
   const x = position === 'l' ? pad : side ? width - pad - w : (width - w) / 2
   const y = position === 'b' ? height - pad - h : position === 't' || position === 'tr' ? titleBottom
     : Math.max(titleBottom, (height - h) / 2)
-  let nextY = y
+  const bounds = manualBounds({ x, y, width: w, height: h }, legend.layout, width, height)
+  let nextY = bounds.y
   rows.forEach((row, index) => {
-    const offset = x + (side ? 0 : (w - sizes[index].width) / 2)
+    const offset = bounds.x + (side ? 0 : (bounds.width - sizes[index].width) / 2)
     const center = nextY + sizes[index].height / 2
     for (const entry of row) {
       entry.key.x += offset
@@ -222,7 +251,7 @@ function layoutLegend(model: DrawableChart, entries: { name: string; color: stri
     }
     nextY += sizes[index].height
   })
-  return { position, bounds: { x, y, width: w, height: h }, shape: legend.shape, entries: rows.flat() }
+  return { position, bounds, shape: legend.shape, entries: rows.flat() }
 }
 
 export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries[], width: number, height: number,
@@ -250,20 +279,21 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     return { name, color, marker, shape, index: entry.index ?? index }
   })
   const title = model.title?.automatic ? (entries.length === 1 ? entries[0].name : 'Chart Title') : titleText(model.title)
-  const titleStyle = mergeDefined({ size: 16, bold: true, color: '#222222' }, model.textStyle, model.title?.style)
-  const titleHeight = title ? px(titleStyle.size ?? 16) + 10 : 0
-  const titleBottom = pad + (model.title?.overlay ? 0 : titleHeight)
+  const chartTitle = titleFormat(model.title, styleOf({ size: 18, bold: true }, model.textStyle, model.title?.style))
+  const titleWidth = model.title?.layout ? textWidth(title, chartTitle, measure) : 0
+  const titleBounds = manualBounds({ x: (width - titleWidth) / 2, y: pad, width: titleWidth, height: chartTitle.height },
+    model.title?.layout, width, height)
+  const titleBottom = title && !model.title?.overlay ? Math.max(pad, titleBounds.y + titleBounds.height + 10) : pad
   const legend = layoutLegend(model, horizontal && !stacked ? [...entries].reverse() : entries, width, height, pad, titleBottom, measure)
-  const reserve = (positions: string[], size: 'width' | 'height') =>
-    legend && !model.legend?.overlay && positions.includes(legend.position) ? legend.bounds[size] + 8 : 0
-  const top = titleBottom + reserve(['t'], 'height')
-  let bottom = height - pad - reserve(['b'], 'height')
-  let left = pad + reserve(['l'], 'width')
-  let right = width - pad - reserve(['r', 'tr'], 'width')
-  const labelStyle = (axis?: ChartAxis) => styleOf(9, model.textStyle, axis?.textStyle)
+  const legendBounds = model.legend?.overlay ? undefined : legend?.bounds
+  const top = legendBounds && legend?.position === 't' ? Math.max(titleBottom, legendBounds.y + legendBounds.height + 8) : titleBottom
+  const bottom = legendBounds && legend?.position === 'b' ? Math.min(height - pad, legendBounds.y - 8) : height - pad
+  const left = legendBounds && legend?.position === 'l' ? Math.max(pad, legendBounds.x + legendBounds.width + 8) : pad
+  const right = legendBounds && (legend?.position === 'r' || legend?.position === 'tr')
+    ? Math.min(width - pad, legendBounds.x - 8) : width - pad
+  const labelStyle = (axis?: ChartAxis) => styleOf(model.textStyle, axis?.textStyle)
   const categoryStyle = labelStyle(categoryAxis)
   const valueStyle = labelStyle(valueAxis)
-  const textHeight = (style: ChartTextStyle) => px(style.size ?? 9)
   const categoryText = (index: number) => valueText(category?.points.get(index) ?? (category ? undefined : index + 1),
     categoryAxis?.numberFormat?.formatCode === 'General' ? category?.formatCode : categoryAxis?.numberFormat?.formatCode ?? category?.formatCode, date1904)
   const scale = valueScale(low, high, valueAxis, percent, line, horizontal ? right - left : bottom - top - 20)
@@ -273,33 +303,48 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const sampleStride = Math.max(1, Math.ceil(count / 5000))
   let categoryWidth = 0
   for (let i = 0; i < count; i += sampleStride) categoryWidth = Math.max(categoryWidth, measure(categoryText(i), categoryStyle))
-  const categoryTitleStyle = styleOf(10, model.textStyle, categoryAxis?.title?.style)
-  const valueTitleStyle = styleOf(10, model.textStyle, valueAxis?.title?.style)
-  const categoryTitle = categoryAxis?.deleted ? '' : titleText(categoryAxis?.title)
-  const valueTitle = valueAxis?.deleted ? '' : titleText(valueAxis?.title)
-  const verticalTitleSpace = horizontal ? categoryTitle && textHeight(categoryTitleStyle) + 6 : valueTitle && textHeight(valueTitleStyle) + 6
-  const horizontalTitleSpace = horizontal ? valueTitle && textHeight(valueTitleStyle) + 6 : categoryTitle && textHeight(categoryTitleStyle) + 6
+  const axisTitleFormat = (axis?: ChartAxis) =>
+    titleFormat(axis?.title, styleOf({ bold: true }, model.textStyle, axis?.title?.style))
+  const xTitleAxis = horizontal ? valueAxis : categoryAxis
+  const yTitleAxis = horizontal ? categoryAxis : valueAxis
+  const xTitle = xTitleAxis?.deleted ? '' : titleText(xTitleAxis?.title)
+  const yTitle = yTitleAxis?.deleted ? '' : titleText(yTitleAxis?.title)
+  const xTitleFormat = axisTitleFormat(xTitleAxis)
+  const yTitleFormat = axisTitleFormat(yTitleAxis)
+  const verticalTitleSpace = yTitle && !yTitleAxis?.title?.layout ? yTitleFormat.height + 6 : 0
+  const horizontalTitleSpace = xTitle && !xTitleAxis?.title?.layout ? xTitleFormat.height + 6 : 0
   const verticalAxis = horizontal ? categoryAxis : valueAxis
   const horizontalAxis = horizontal ? valueAxis : categoryAxis
   const verticalLabelWidth = Math.min(width * .35, horizontal ? categoryWidth : valueWidth) + 8
   const verticalLabelsRight = verticalAxis?.tickLabelPosition === 'high' || (verticalAxis?.position === 'r' && verticalAxis.tickLabelPosition !== 'low')
   const horizontalLabelsTop = horizontalAxis?.tickLabelPosition === 'high' || (horizontalAxis?.position === 't' && horizontalAxis.tickLabelPosition !== 'low')
   const verticalLabels = hideLabels(verticalAxis) ? 0 : verticalLabelWidth
-  left += Number(verticalTitleSpace) + (verticalLabelsRight ? 0 : verticalLabels)
-  right -= verticalLabelsRight ? verticalLabels : horizontal ? valueWidth / 2 : 0
+  const insetLeft = verticalTitleSpace + (verticalLabelsRight ? 0 : verticalLabels)
+  const insetRight = verticalLabelsRight ? verticalLabels : horizontal ? valueWidth / 2 : 0
   const between = !line || valueAxis?.crossBetween !== 'midCat' || count === 1
-  const availableBand = Math.max(1, right - left) / (between ? count : count - 1)
   const categoryHeight = textHeight(categoryStyle)
+  const plotLayout = model.plotLayout
+  const inner = plotLayout?.target === 'inner'
+  const inset = (rect: Rect, top: number, bottom: number): Rect => ({
+    x: rect.x + insetLeft, y: rect.y + top,
+    width: Math.max(1, rect.width - insetLeft - insetRight),
+    height: Math.max(1, rect.height - top - bottom),
+  })
+  const outer = { x: left, y: top, width: right - left, height: bottom - top }
+  const manualOuter = manualBounds(outer, inner ? undefined : plotLayout, width, height)
+  const provisional = manualBounds(inset(manualOuter, 0, 0), inner ? plotLayout : undefined, width, height)
+  const availableBand = provisional.width / (between ? count : count - 1)
   const autoTilt = !horizontal && !hideLabels(categoryAxis) && categoryStyle.rotation === undefined
     && categoryWidth + 5 > availableBand * (categoryAxis?.tickLabelSkip ?? 1)
   if (autoTilt) categoryStyle.rotation = -45
   const angle = (categoryStyle.rotation ?? 0) * Math.PI / 180
   const tiltedHeight = categoryWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))
   const horizontalLabels = hideLabels(horizontalAxis) ? 0
-    : (horizontal ? textHeight(valueStyle) : Math.min(tiltedHeight, Math.max(categoryHeight, (bottom - top) / 2))) + 8
-  const plotTop = top + (horizontalLabelsTop ? horizontalLabels : 0)
-  bottom -= Number(horizontalTitleSpace) + (horizontalLabelsTop ? 0 : horizontalLabels)
-  const plot = { x: left, y: plotTop, width: Math.max(1, right - left), height: Math.max(1, bottom - plotTop) }
+    : (horizontal ? textHeight(valueStyle) : Math.min(tiltedHeight, Math.max(categoryHeight, manualOuter.height / 2))) + 8
+  const plot = manualBounds(inset(manualOuter, horizontalLabelsTop ? horizontalLabels : 0,
+    horizontalTitleSpace + (horizontalLabelsTop ? 0 : horizontalLabels)), inner ? plotLayout : undefined, width, height)
+  const plotLeft = plot.x
+  const plotTop = plot.y
   const layout: ChartLayout = {
     width, height, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
     plot, plotShape: model.plotShape, chartShape: model.chartShape, categoryBand: 0, scale, bars: [], lines: [], markers: [], gridlines: [], axes: [], axisLabels: [],
@@ -320,8 +365,8 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     return (valueAxis?.orientation === 'maxMin' ? 1 - fraction : fraction) * valueLength
   }
   const point = (cat: number, val: number): Point => horizontal
-    ? { x: left + val, y: plotTop + cat }
-    : { x: left + cat, y: plotTop + plot.height - val }
+    ? { x: plotLeft + val, y: plotTop + cat }
+    : { x: plotLeft + cat, y: plotTop + plot.height - val }
   const rule = (from: Point, to: Point, shape?: ChartShape): Rule => ({ from, to, shape })
   const valueRule = (position: number, shape?: ChartShape) => rule(point(0, position), point(categoryLength, position), shape)
   const categoryRule = (position: number, shape?: ChartShape) => rule(point(position, 0), point(position, valueLength), shape)
@@ -399,19 +444,25 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
       axisTick(point(at, baseline), categoryAxis, !horizontal)
     }
   }
-  if (title) layout.titles.push({ x: width / 2, y: pad + textHeight(titleStyle) / 2, text: title, anchor: 'middle', style: titleStyle })
-  const xTitle = horizontal ? valueTitle : categoryTitle
-  const yTitle = horizontal ? categoryTitle : valueTitle
-  if (xTitle) {
-    const style = horizontal ? valueTitleStyle : categoryTitleStyle
-    layout.titles.push({ x: left + plot.width / 2, y: height - pad - reserve(['b'], 'height') - textHeight(style) / 2,
-      text: xTitle, anchor: 'middle', style })
+  const addTitle = (text: string, format: ReturnType<typeof titleFormat>, center: Point, title?: ChartTitle) => {
+    if (title?.layout) {
+      const w = textWidth(text, format, measure)
+      const bounds = manualBounds({ x: center.x - w / 2, y: center.y - format.height / 2, width: w, height: format.height },
+        title.layout, width, height)
+      center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+    }
+    layout.titles.push({ ...center, text, anchor: 'middle', style: format.style, runs: format.runs })
   }
-  if (yTitle) {
-    const style = horizontal ? categoryTitleStyle : valueTitleStyle
-    layout.titles.push({ x: pad + reserve(['l'], 'width') + textHeight(style) / 2, y: plotTop + plot.height / 2,
-      text: yTitle, anchor: 'middle', style: { ...style, rotation: style.rotation ?? -90 } })
-  }
+  if (title) addTitle(title, chartTitle, {
+    x: titleBounds.x + titleBounds.width / 2, y: titleBounds.y + titleBounds.height / 2,
+  })
+  if (xTitle) addTitle(xTitle, xTitleFormat,
+    { x: plotLeft + plot.width / 2, y: plotTop + plot.height + (horizontalLabelsTop ? 0 : horizontalLabels) + 6 + xTitleFormat.height / 2 },
+    xTitleAxis?.title)
+  if (yTitle) addTitle(yTitle, {
+    ...yTitleFormat, style: { ...yTitleFormat.style, rotation: yTitleFormat.style.rotation ?? -90 },
+  }, { x: plotLeft - (verticalLabelsRight ? 0 : verticalLabels) - 6 - yTitleFormat.height / 2, y: plotTop + plot.height / 2 },
+  yTitleAxis?.title)
 
   const spacing = 1 - clamp(plotModel.overlap ?? (stacked ? 100 : 0), -100, 100) / 100
   const cluster = 1 + (series.length - 1) * spacing
@@ -420,7 +471,10 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     const { color, marker, shape, name } = entries[seriesIndex]
     const pointStyles = new Map(entry.pointStyles.map((style) => [style.index, style]))
     const overrides = new Map<number, ChartLabels & { text?: ChartTitle }>()
-    for (const label of [...(plotModel.labels?.entries ?? []), ...(entry.labels?.entries ?? [])]) overrides.set(label.index, mergeDefined(overrides.get(label.index), label))
+    for (const label of [...(plotModel.labels?.entries ?? []), ...(entry.labels?.entries ?? [])]) {
+      const previous = overrides.get(label.index)
+      overrides.set(label.index, mergeDefined(previous, label, { style: mergeDefined(previous?.style, label.style) }))
+    }
     const values = points[seriesIndex]
     const segments: Point[][] = [[]]
     let segment = segments[0]
@@ -449,7 +503,7 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
         const end = point(cat, valueAt(clamp(value.to, scale.min, scale.max)))
         layout.bars.push({
           index, series: seriesIndex, from: startValue, to: value.to,
-          x: horizontal ? Math.min(start.x, end.x) : cat + left - barWidth / 2,
+          x: horizontal ? Math.min(start.x, end.x) : cat + plotLeft - barWidth / 2,
           y: horizontal ? cat + plotTop - barWidth / 2 : Math.min(start.y, end.y),
           width: horizontal ? Math.abs(end.x - start.x) : barWidth,
           height: horizontal ? barWidth : Math.abs(end.y - start.y),
@@ -467,9 +521,10 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
         label.showPercent && percent && valueText(Math.abs(value.to - value.from), '0%', date1904),
       ].filter(Boolean).join(label.separator ?? ', ')
       if (!text) continue
-      const style = styleOf(9, model.textStyle, plotModel.labels?.style, entry.labels?.style, custom?.style, custom?.text?.style)
-      const h = textHeight(style)
-      const w = measure(text, style)
+      const style = styleOf(model.textStyle, plotModel.labels?.style, entry.labels?.style, custom?.style, custom?.text?.style)
+      const format = titleFormat(custom?.text, style)
+      const h = format.height
+      const w = textWidth(text, format, measure)
       const distance = horizontal ? w / 2 + 4 : h / 2 + 3
       const direction = horizontal ? Math.sign(endpoint.x - start.x) || 1 : Math.sign(endpoint.y - start.y) || -1
       const position = label.position ?? (line ? 'r' : 'outEnd')
@@ -489,7 +544,7 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
         case 't': y -= h / 2 + 3; break
         default: x += horizontal ? offset * direction : 0; y += horizontal ? 0 : offset * direction
       }
-      layout.dataLabels.push({ x, y, text, anchor: 'middle', style, width: w, height: h, shape: label.shape,
+      layout.dataLabels.push({ x, y, text, anchor: 'middle', style, runs: format.runs, width: w, height: h, shape: label.shape,
         keyColor: label.showLegendKey ? color : undefined })
     }
     if (line) layout.lines.push({ segments: segments.filter((part) => part.length), color, shape, smooth: entry.smooth ?? plotModel.smooth })

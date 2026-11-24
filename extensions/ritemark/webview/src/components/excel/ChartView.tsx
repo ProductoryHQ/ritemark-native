@@ -6,7 +6,7 @@ import { measure, forgetMeasures } from './gridTextMeasure'
 import type { WorkbookModel } from './readWorkbook'
 import { fontCss, fontShorthand, GRID_SANS } from './sheetLayout'
 
-const chartFont = { name: GRID_SANS, size: 9, bold: false, italic: false, strike: false }
+const chartFont = { name: GRID_SANS, size: 10, bold: false, italic: false, strike: false }
 const fontOf = (style: ChartTextStyle) => ({
   name: !style.font || style.font === 'Calibri' || style.font.startsWith('+') ? GRID_SANS : style.font,
   size: style.size, bold: style.bold, italic: style.italic, color: style.color,
@@ -42,10 +42,15 @@ function Marker({ x, y, marker, color }: { x: number; y: number; marker: ChartMa
   }
 }
 
-function Text({ x, y, text, anchor, style }: ChartLayout['axisLabels'][number]) {
+function Text({ x, y, text, anchor, style, runs }: ChartLayout['axisLabels'][number]) {
   const { color, ...font } = fontCss(fontOf(style), chartFont)
   return <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fill={color}
-    transform={style.rotation ? `rotate(${style.rotation} ${x} ${y})` : undefined} style={font}>{text}</text>
+    transform={style.rotation ? `rotate(${style.rotation} ${x} ${y})` : undefined} style={font}>
+    {runs?.length ? runs.map((run, index) => {
+      const { color, ...font } = fontCss(fontOf(run.style), chartFont)
+      return <tspan key={index} fill={color} style={font}>{run.text}</tspan>
+    }) : text}
+  </text>
 }
 
 function Rules({ rules, color }: { rules: ChartLayout['gridlines']; color: string }) {

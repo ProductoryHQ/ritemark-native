@@ -187,6 +187,7 @@ test('3-D lines use ribbon fill for flat strokes and ignore the series axis', ()
   const layout = forSheet(threeD, threeD.sheets[2])
   const lines = markupOf(layout).querySelectorAll('polyline')
   assert.equal(lines.length, 3)
+  assert.deepEqual([layout.scale.min, layout.scale.max], [0, 70])
   assert.ok(lines.every((line) => line.getAttribute('stroke') !== 'none'))
   assert.deepEqual(layout.axisLabels.filter(({ text }) => /^[A-Z]/.test(text)).map(({ text }) => text),
     ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'])
@@ -210,9 +211,9 @@ test('explicit plot and axis shape properties, and rich title overrides', () => 
     </plotArea></chart></chartSpace>`)
   assert.ok(drawsChart(model))
   const layout = draw(model)
-  assert.equal(layout.titles[0].style.size, 18)
-  assert.equal(layout.titles[0].style.bold, true)
-  assert.equal(layout.titles[0].style.italic, true)
+  assert.equal(layout.titles[0].runs![0].style.size, 18)
+  assert.equal(layout.titles[0].runs![0].style.bold, true)
+  assert.equal(layout.titles[0].runs![0].style.italic, true)
   const svg = markupOf(layout)
   const outline = svg.querySelector(chartGroup('plot-area'))!
   assert.equal(outline.getAttribute('stroke'), '#123456')
@@ -343,4 +344,78 @@ test('drawing failure falls back to the existing card and preserves the workshee
     render(1)
     assert.equal(host.querySelector('svg[role=img]')?.getAttribute('aria-label'), 'Column chart: Revenue by region')
   })
+})
+
+test('Excel chart typography uses saved formatting and Excel defaults', () => {
+  const check = (text: { style: { size?: number; color?: string; bold?: boolean } }, size: number, color: string, bold: boolean) => {
+    assert.equal(text.style.size, size)
+    assert.equal(text.style.color, color)
+    assert.equal(text.style.bold, bold)
+  }
+  const styled = forSheet(kinds, kinds.sheets[0])
+  for (const tick of styled.axisLabels) check(tick, 9, '#595959', false)
+  for (const { label } of styled.legend!.entries) check(label, 9, '#595959', false)
+  check(styled.titles[0].runs![0], 14, '#595959', false)
+  const bar = forSheet(kinds, kinds.sheets[3])
+  check(bar.titles.find(({ text }) => text === 'Trucks')!.runs![0], 10, '#595959', false)
+  for (const tick of automatic.axisLabels) check(tick, 10, '#000000', false)
+  for (const { label } of automatic.legend!.entries) check(label, 10, '#000000', false)
+  check(automatic.titles[0].runs![0], 18, '#000000', true)
+  assert.match(markupOf(styled).querySelector('[data-chart="axis-labels"] text')!.getAttribute('style')!, /font-size:12px/)
+  assert.match(markupOf(automatic).querySelector('[data-chart="titles"] tspan')!.getAttribute('style')!, /font-size:24px/)
+})
+
+test('chart space, list, paragraph and run styles cascade independently', () => {
+  const chart = readChart(`<c:chartSpace>
+    <c:txPr><a:bodyPr rot="60000"/><a:lstStyle><a:defPPr><a:defRPr sz="1100" i="1">
+      <a:solidFill><a:srgbClr val="123456"/></a:solidFill>
+    </a:defRPr></a:defPPr></a:lstStyle><a:p><a:pPr><a:defRPr b="1"/></a:pPr></a:p></c:txPr>
+    <c:chart><c:title><c:tx><c:rich><a:p>
+      <a:pPr><a:defRPr sz="1300"/></a:pPr>
+      <a:r><a:t>First </a:t></a:r><a:r><a:rPr b="0" i="0"/><a:t>second</a:t></a:r>
+    </a:p></c:rich></c:tx></c:title><c:plotArea><c:barChart><c:barDir val="col"/></c:barChart></c:plotArea></c:chart>
+  </c:chartSpace>`)
+  assert.ok(drawsChart(chart))
+  const layout = layoutChart(chart, [], 480, 288, measure)
+  assert.deepEqual(layout.axisLabels[0].style, { size: 11, color: '#123456', bold: true, italic: true, rotation: 1 })
+  assert.deepEqual(layout.titles[0].runs, [
+    { text: 'First ', style: { size: 13, color: '#123456', bold: true, italic: true, rotation: 1 } },
+    { text: 'second', style: { size: 13, color: '#123456', bold: false, italic: false, rotation: 1 } },
+  ])
+})
+
+test('manual plot layout affects the plotted geometry and supports inner and outer targets', () => {
+  const read = (target: string, modes = '<c:xMode val="edge"/><c:yMode val="edge"/><c:wMode val="edge"/>') => {
+    const layout = target ? `<c:layout><c:manualLayout><c:layoutTarget val="${target}"/>${modes}
+      <c:x val="0.2"/><c:y val="0.1"/><c:w val="0.7"/><c:h val="0.5"/>
+    </c:manualLayout></c:layout>` : ''
+    const chart = readChart(`<c:chartSpace><c:chart><c:plotArea>${layout}<c:barChart><c:barDir val="col"/>
+      <c:ser><c:val><c:numLit><c:pt idx="0"><c:v>20</c:v></c:pt></c:numLit></c:val></c:ser>
+    </c:barChart></c:plotArea></c:chart></c:chartSpace>`)
+    assert.ok(drawsChart(chart))
+    return layoutChart(chart, chart.plots[0].series, 500, 300, measure)
+  }
+  const inner = read('inner')
+  assert.deepEqual(inner.plot, { x: 100, y: 30, width: 250, height: 150 })
+  assert.equal(inner.bars[0].x + inner.bars[0].width / 2, 225)
+  const outer = read('outer').plot
+  assert.ok(outer.x > inner.plot.x && outer.width < inner.plot.width && outer.height < inner.plot.height)
+  const auto = read('').plot
+  const factor = read('inner', '<c:xMode val="factor"/><c:yMode val="factor"/>').plot
+  assert.deepEqual(factor, { x: auto.x + 100, y: auto.y + 30, width: 350, height: 150 })
+})
+
+test('manual title and legend bounds position their rendered text and keys', () => {
+  const manual = (x: number, y: number) => `<layout><manualLayout><xMode val="edge"/><yMode val="edge"/>
+    <x val="${x}"/><y val="${y}"/><w val="0.2"/><h val="0.1"/>
+  </manualLayout></layout>`
+  const chart = readChart(`<chartSpace><chart><title>${manual(.1, .05)}</title>
+    <legend><legendPos val="r"/>${manual(.7, .2)}</legend>
+    <plotArea><barChart><ser/></barChart></plotArea>
+  </chart></chartSpace>`)
+  assert.ok(drawsChart(chart))
+  const layout = layoutChart(chart, chart.plots[0].series, 500, 300, measure)
+  assert.deepEqual([layout.titles[0].x, layout.titles[0].y], [100, 30])
+  assert.deepEqual(layout.legend?.bounds, { x: 350, y: 60, width: 100, height: 30 })
+  assert.equal(layout.legend?.entries[0].key.x, 350)
 })
