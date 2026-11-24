@@ -1,14 +1,20 @@
 import { applyTint, chartColorVariation } from './excelStyles'
-import type { ChartAxis, ChartData, ChartLabels, ChartManualLayout, ChartMarker, ChartModel, ChartShape, ChartTextStyle, ChartTitle, ChartSeries, ChartValue, PlotKind } from './chartModel'
+import type { ChartAxis, ChartData, ChartLabels, ChartManualLayout, ChartMarker, ChartModel, ChartShape, ChartTextStyle, ChartTitle, ChartSeries, ChartValue, ChartPlot } from './chartModel'
 import { formatCellValue } from './numberFormat'
 import { fontPointsToPixels } from './sheetLayout'
 
-type DrawableChart = Extract<ChartModel, { supported: true }> & { kind: PlotKind }
+type DrawableChart = Extract<ChartModel, { supported: true }>
+
+function isCircularPlot(plot: ChartPlot) {
+  return plot.kind === 'pie' || plot.kind === 'doughnut'
+}
+
 export function drawsChart(chart: ChartModel | undefined): chart is DrawableChart {
-  if (!chart?.supported || chart.kind === 'combo') return false
-  const axisIds = chart.plots[0]?.axisIds
-  const valueAxes = chart.axes.filter(({ id, kind }) => kind === 'value' && axisIds?.includes(id ?? -1))
-  return valueAxes.length <= (chart.kind === 'scatter' ? 2 : 1)
+  if (!chart?.supported || !chart.plots.length || (chart.plots.length > 1 && chart.plots.some(isCircularPlot))) return false
+  return chart.plots.every((plot) => {
+    const valueAxes = chart.axes.filter(({ id, kind }) => kind === 'value' && plot.axisIds.includes(id ?? -1))
+    return valueAxes.length <= (plot.kind === 'scatter' ? 2 : 1)
+  })
 }
 
 interface Point { x: number; y: number }
@@ -40,12 +46,15 @@ export interface ChartLayout {
   width: number
   height: number
   name: string
+  chartTitle: string
   plot: Rect
   plotShape?: ChartShape
   chartShape?: ChartShape
   categoryBand: number
   scale: { min: number; max: number; step: number; ticks: number[] }
   xScale?: ChartLayout['scale']
+  plotLayers?: (Pick<ChartLayout, 'bars' | 'lines' | 'areas' | 'slices' | 'markers'> & { kind: ChartPlot['kind'] })[]
+  valueScales?: { axisId?: number; scale: ChartLayout['scale'] }[]
   emptyReason?: string
   slices?: Slice[]
   areas?: { segments: { top: Point[]; base: Point[] }[]; color: string; shape?: ChartShape }[]
@@ -206,19 +215,59 @@ function boundsByCategory(series: readonly ChartSeries[], stacked: boolean, perc
 }
 
 /** Keep extrema in each bucket, at their original category coordinates. */
-function sampledIndices(values: ReadonlyMap<number, { to: number }>, count: number): number[] {
-  if (count <= 5000) return Array.from({ length: count }, (_, index) => index)
-  const buckets = new Map<number, { min: number; max: number }>()
+const MAX_DRAWN_POINTS = 5000
+// Each bucket contributes up to two extrema per series, with room for the endpoints.
+const MAX_BUCKETS = (MAX_DRAWN_POINTS - 2) / 2
+
+function sampledIndices(values: ReadonlyMap<number, { to: number }>, count: number, missingAsZero = false,
+  bucketCount = MAX_BUCKETS): number[] {
+  if (count <= MAX_DRAWN_POINTS) return Array.from({ length: count }, (_, index) => index)
+  const buckets = new Map<number, { min: number; max: number; size: number }>()
   for (const [index, value] of values) {
-    const bucket = Math.floor(index * 2499 / count)
+    const bucket = Math.floor(index * bucketCount / count)
     const previous = buckets.get(bucket)
-    if (!previous) buckets.set(bucket, { min: index, max: index })
+    if (!previous) buckets.set(bucket, { min: index, max: index, size: 1 })
     else {
       if (value.to < values.get(previous.min)!.to) previous.min = index
       if (value.to > values.get(previous.max)!.to) previous.max = index
+      previous.size++
     }
   }
-  return [...new Set([0, count - 1, ...Array.from(buckets.values()).flatMap(({ min, max }) => [min, max])])].sort((a, b) => a - b)
+  const selected = new Set([0, count - 1])
+  for (let bucket = 0; bucket < bucketCount; bucket++) {
+    const extrema = buckets.get(bucket)
+    const start = Math.ceil(bucket * count / bucketCount)
+    const end = Math.ceil((bucket + 1) * count / bucketCount)
+    if (!extrema) {
+      if (missingAsZero) selected.add(start)
+      continue
+    }
+    let { min, max } = extrema
+    if (missingAsZero && extrema.size < end - start && (values.get(min)!.to > 0 || values.get(max)!.to < 0)) {
+      let zero = start
+      while (values.has(zero)) zero++
+      if (values.get(min)!.to > 0) min = zero
+      else max = zero
+    }
+    selected.add(min)
+    selected.add(max)
+  }
+  return [...selected].sort((a, b) => a - b)
+}
+
+/** Identify real gaps between sampled line points without walking the empty part of a sparse range. */
+function sampledLineRuns(values: ReadonlyMap<number, { to: number }>, indices: number[], log: boolean | 0 | undefined) {
+  const runs = new Map<number, number>()
+  const selected = new Set(indices)
+  let previous = -2
+  let run = 0
+  for (const index of [...values.keys()].sort((a, b) => a - b)) {
+    if (log && values.get(index)!.to <= 0) continue
+    if (index !== previous + 1) run++
+    if (selected.has(index)) runs.set(index, run)
+    previous = index
+  }
+  return runs
 }
 
 type Measure = (text: string, style: ChartTextStyle) => number
@@ -285,14 +334,13 @@ function layoutLegend(model: DrawableChart, entries: LegendItem[],
   return { position, bounds, shape: legend.shape, entries: rows.flat() }
 }
 
-export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries[], width: number, height: number,
-  measure: Measure, date1904 = false): ChartLayout {
-  const plotModel = model.plots[0]
-  const horizontal = model.kind === 'bar'
-  const line = model.kind === 'line'
-  const area = model.kind === 'area'
-  const scatter = model.kind === 'scatter'
-  const circular = model.kind === 'pie' || model.kind === 'doughnut'
+function preparePlot(model: DrawableChart, plotModel: ChartPlot, resolved: readonly ChartSeries[], date1904: boolean,
+  seriesOffset: number, sharedCount: number) {
+  const horizontal = plotModel.kind === 'bar'
+  const line = plotModel.kind === 'line'
+  const area = plotModel.kind === 'area'
+  const scatter = plotModel.kind === 'scatter'
+  const circular = isCircularPlot(plotModel)
   const scatterStyle = plotModel.scatterStyle ?? 'marker'
   const scatterLines = scatter && ['line', 'lineMarker', 'smooth', 'smoothMarker'].includes(scatterStyle)
   const scatterMarkers = scatter && ['marker', 'lineMarker', 'smoothMarker'].includes(scatterStyle)
@@ -300,8 +348,7 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const stacked = percent || plotModel.grouping === 'stacked'
   const blanksAsZero = area ? model.displayBlanksAs !== 'span' : model.displayBlanksAs === 'zero' && (line || scatter)
   const series = [...resolved].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-  const category = series.find((entry) => countOf(entry.cat))?.cat
-  const categoryCount = series.reduce((max, entry) => Math.max(max, countOf(entry.cat), countOf(entry.val)), 1)
+  const categoryCount = Math.max(sharedCount, series.reduce((max, entry) => Math.max(max, countOf(entry.cat), countOf(entry.val)), 1))
   const axes = model.axes.filter((axis) => plotModel.axisIds.includes(axis.id ?? -1))
   const numericAxes = axes.filter((axis) => axis.kind === 'value')
   const xAxis = scatter ? numericAxes.find(({ position }) => position === 'b' || position === 't')
@@ -310,25 +357,54 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const categoryAxis = scatter ? xAxis : axes.find((axis) => axis.kind === 'category' || axis.kind === 'date')
   const { points, low, high } = boundsByCategory(series, stacked, percent, blanksAsZero, line || area, categoryCount)
   const xy = scatter ? series.map((entry) => scatterPoints(entry, blanksAsZero)) : []
-  const pad = Math.min(12, width / 10, height / 10)
   const entries = series.map((entry, index) => {
     const shape = entry.shape
-    const automatic = entry.automaticColor ?? model.accentColors[index % model.accentColors.length] ?? '#4472C4'
+    const automatic = entry.automaticColor ?? model.accentColors[(seriesOffset + index) % model.accentColors.length] ?? '#4472C4'
     const color = (line || scatter ? shape?.line : shape?.fill) ?? automatic
     const marker = entry.marker?.symbol !== 'none' && (scatterMarkers || line && (entry.marker?.symbol || plotModel.marker))
       ? entry.marker ?? {} : undefined
-    const name = valueText(entry.tx?.points.get(0), entry.tx?.formatCode, date1904) || `Series ${index + 1}`
-    return { name, color, marker, shape, lineKey: scatter ? scatterLines && !shape?.noLine : undefined, index: entry.index ?? index }
+    const name = valueText(entry.tx?.points.get(0), entry.tx?.formatCode, date1904) || `Series ${seriesOffset + index + 1}`
+    return { name, color, marker, shape, lineKey: scatter ? scatterLines && !shape?.noLine : line || undefined, index: entry.index ?? seriesOffset + index }
   })
+  const category = series.find((entry) => countOf(entry.cat))?.cat
+  return { plotModel, series, category, categoryCount, horizontal, line, area, scatter, circular, scatterStyle, scatterLines,
+    scatterMarkers, percent, stacked, blanksAsZero, xAxis, valueAxis, categoryAxis, points, low, high, xy, entries }
+}
+
+type PlotData = ReturnType<typeof preparePlot>
+
+export function layoutChart(model: DrawableChart, resolved: readonly (readonly ChartSeries[])[], width: number, height: number,
+  measure: Measure, date1904 = false): ChartLayout {
+  const sharedCounts = new Map<number, number>()
+  if (model.plots.length > 1) {
+    model.plots.forEach((plot, i) => {
+      if (!['column', 'bar', 'line', 'area'].includes(plot.kind)) return
+      const id = model.axes.find((axis) => (axis.kind === 'category' || axis.kind === 'date') && plot.axisIds.includes(axis.id ?? -1))?.id
+      if (id === undefined) return
+      for (const entry of resolved[i] ?? []) {
+        sharedCounts.set(id, Math.max(sharedCounts.get(id) ?? 1, countOf(entry.cat), countOf(entry.val)))
+      }
+    })
+  }
+  let seriesOffset = 0
+  const plots = model.plots.map((plot, i) => {
+    const id = model.axes.find((axis) => (axis.kind === 'category' || axis.kind === 'date') && plot.axisIds.includes(axis.id ?? -1))?.id
+    const data = preparePlot(model, plot, resolved[i] ?? [], date1904, seriesOffset, sharedCounts.get(id ?? -1) ?? 1)
+    seriesOffset += data.entries.length
+    return data
+  })
+  const entries = plots.flatMap(({ entries }) => entries)
+  const pad = Math.min(12, width / 10, height / 10)
   const title = model.title?.automatic ? (entries.length === 1 ? entries[0].name : 'Chart Title') : titleText(model.title)
   const chartTitle = titleFormat(model.title, styleOf({ size: 18, bold: true }, model.textStyle, model.title?.style))
   const titleWidth = model.title?.layout ? textWidth(title, chartTitle, measure) : 0
   const titleBounds = manualBounds({ x: (width - titleWidth) / 2, y: pad, width: titleWidth, height: chartTitle.height },
     model.title?.layout, width, height)
   const titleBottom = title && !model.title?.overlay ? Math.max(pad, titleBounds.y + titleBounds.height + 10) : pad
-  const categoryLegend = plotModel.varyColors && series.length === 1
+  const { plotModel, series, circular, horizontal, stacked } = plots[0]
+  const categoryLegend = plots.length === 1 && plotModel.varyColors && series.length === 1
     ? categoryLegendItems(model, series[0], entries[0], date1904, circular) : undefined
-  const legend = layoutLegend(model, categoryLegend ?? (horizontal && !stacked ? [...entries].reverse() : entries), width, height, pad, titleBottom, measure)
+  const legend = layoutLegend(model, categoryLegend ?? (plots.length === 1 && horizontal && !stacked ? [...entries].reverse() : entries), width, height, pad, titleBottom, measure)
   const legendBounds = model.legend?.overlay ? undefined : legend?.bounds
   const top = legendBounds && legend?.position === 't' ? Math.max(titleBottom, legendBounds.y + legendBounds.height + 8) : titleBottom
   const bottom = legendBounds && legend?.position === 'b' ? Math.min(height - pad, legendBounds.y - 8) : height - pad
@@ -336,20 +412,67 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const right = legendBounds && (legend?.position === 'r' || legend?.position === 'tr')
     ? Math.min(width - pad, legendBounds.x - 8) : width - pad
   const makeLayout = (plot: Rect, scale: ChartLayout['scale']): ChartLayout => ({
-    width, height, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
+    width, height, chartTitle: title, name: model.kind[0].toUpperCase() + model.kind.slice(1) + ' chart' + (title ? `: ${title}` : ''),
     plot, plotShape: model.plotShape, chartShape: model.chartShape, categoryBand: 0, scale, bars: [], lines: [], markers: [], gridlines: [], axes: [], axisLabels: [],
     titles: title ? [{ x: titleBounds.x + titleBounds.width / 2, y: titleBounds.y + titleBounds.height / 2, text: title, anchor: 'middle', style: chartTitle.style, runs: chartTitle.runs }] : [],
     dataLabels: [], legend,
   })
-  if (circular) {
-    const layout = makeLayout(manualBounds({ x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) }, model.plotLayout, width, height),
-      { min: 0, max: 1, step: 1, ticks: [] })
-    layoutSlices(layout, model, series, entries, measure, date1904)
-    return layout
+  const shownAxes = new Set<ChartAxis>()
+  const painters = plots.map((data) => {
+    const { categoryAxis, valueAxis, xAxis } = data
+    const showCategory = !categoryAxis || !shownAxes.has(categoryAxis)
+    const showValue = !valueAxis || !shownAxes.has(valueAxis)
+    if (categoryAxis) shownAxes.add(categoryAxis)
+    if (valueAxis) shownAxes.add(valueAxis)
+    return preparePlotLayout(model, data, plots.filter((other) => valueAxis && other.valueAxis === valueAxis),
+      plots.filter((other) => xAxis && other.xAxis === xAxis),
+      { x: left, y: top, width: right - left, height: bottom - top }, width, height, measure, date1904, showCategory, showValue, makeLayout)
+  })
+  const bounds = painters.map(({ bounds }) => bounds)
+  const x = Math.max(...bounds.map((rect) => rect.x))
+  const y = Math.max(...bounds.map((rect) => rect.y))
+  const plot = { x, y, width: Math.max(1, Math.min(...bounds.map((rect) => rect.x + rect.width)) - x),
+    height: Math.max(1, Math.min(...bounds.map((rect) => rect.y + rect.height)) - y) }
+  if (plots.length === 1) return painters[0].draw(bounds[0])
+  const layers = painters.map(({ draw }) => draw(plot))
+  const layout = makeLayout(plot, layers.find((_, index) => !plots[index].circular)?.scale ?? layers[0].scale)
+  layout.valueScales = layers.flatMap(({ scale }, index) => !plots[index].circular && layers.findIndex((_, i) => plots[i].valueAxis === plots[index].valueAxis) === index
+    ? [{ axisId: plots[index].valueAxis?.id, scale }] : [])
+  layout.categoryBand = layers.find(({ categoryBand }) => categoryBand)?.categoryBand ?? 0
+  layout.plotLayers = layers.map(({ bars, lines, areas, slices, markers }, i) => ({ bars, lines, areas, slices, markers, kind: plots[i].plotModel.kind }))
+  for (const [index, layer] of layers.entries()) {
+    layout.gridlines.push(...layer.gridlines)
+    layout.axes.push(...layer.axes)
+    layout.axisLabels.push(...layer.axisLabels)
+    layout.titles.push(...layer.titles.slice(title ? 1 : 0))
+    layout.dataLabels.push(...layer.dataLabels)
+    if (layer.leaders) (layout.leaders ??= []).push(...layer.leaders)
+    layout.lines.push(...layer.lines)
+    layout.bars.push(...layer.bars.map((bar) => ({
+      ...bar, series: bar.series + plots.slice(0, index).reduce((sum, { series }) => sum + series.length, 0),
+    })))
+    layout.markers.push(...layer.markers)
+    if (layer.areas) (layout.areas ??= []).push(...layer.areas)
+    if (layer.slices) (layout.slices ??= []).push(...layer.slices)
   }
-  const xRange = numericExtent(xy, 'x')
-  const yRange = numericExtent(xy, 'y')
-  const xScale = scatter ? valueScale(xRange.min, xRange.max, xAxis, false, true, (right - left) / 3, .05, 5 / 6) : undefined
+  return layout
+}
+
+function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotData[], xGroup: PlotData[], outer: Rect,
+  width: number, height: number, measure: Measure, date1904: boolean, showCategory: boolean, showValue: boolean,
+  makeLayout: (plot: Rect, scale: ChartLayout['scale']) => ChartLayout) {
+  const { plotModel, series, category, categoryCount, horizontal, line, area, scatter, circular, scatterStyle, scatterLines,
+    scatterMarkers, percent, stacked, blanksAsZero, xAxis, categoryAxis, valueAxis, points, xy, entries } = data
+  if (circular) {
+    const bounds = manualBounds({ ...outer, width: Math.max(1, outer.width), height: Math.max(1, outer.height) }, model.plotLayout, width, height)
+    return { bounds, draw(plot: Rect) {
+      const layout = makeLayout(plot, { min: 0, max: 1, step: 1, ticks: [] })
+      layoutSlices(layout, { ...model, kind: plotModel.kind, plots: [plotModel] }, series, entries, measure, date1904)
+      return layout
+    } }
+  }
+  const xRange = numericExtent((xGroup.length ? xGroup : [data]).flatMap((plot) => plot.xy), 'x')
+  const xScale = scatter ? valueScale(xRange.min, xRange.max, xAxis, false, true, outer.width / 3, .05, 5 / 6) : undefined
   const count = xScale ? xScale.ticks.length : categoryCount
   const labelStyle = (axis?: ChartAxis) => styleOf(model.textStyle, axis?.textStyle)
   const categoryStyle = labelStyle(categoryAxis)
@@ -358,19 +481,27 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     ? valueText(xScale.ticks[index], xAxis?.numberFormat?.formatCode ?? series[0]?.xVal?.formatCode, date1904)
     : valueText(category?.points.get(index) ?? (category ? undefined : index + 1),
     categoryAxis?.numberFormat?.formatCode === 'General' ? category?.formatCode : categoryAxis?.numberFormat?.formatCode ?? category?.formatCode, date1904)
-  const scale = valueScale(scatter ? yRange.min : low, scatter ? yRange.max : high, valueAxis, percent, line || scatter, horizontal ? right - left : bottom - top - 20, scatter ? .05 : .08, scatter ? 5 / 6 : .5)
-  const valueCode = valueAxis?.numberFormat?.formatCode ?? (percent ? '0%' : (scatter ? series[0]?.yVal : series[0]?.val)?.formatCode)
+  const valueGroup = yGroup.length ? yGroup : [data]
+  const extents = valueGroup.map((plot) => plot.scatter ? numericExtent(plot.xy, 'y') : { min: plot.low, max: plot.high })
+  const scaleSource = valueGroup[0]
+  const lineScale = valueGroup.every((plot) => plot.line || plot.scatter)
+  const scale = valueScale(Math.min(...extents.map(({ min }) => min)), Math.max(...extents.map(({ max }) => max)),
+    valueAxis, valueGroup.every((plot) => plot.percent), lineScale, scaleSource.horizontal ? outer.width : outer.height - 20,
+    scaleSource.scatter ? .05 : .08, scaleSource.scatter ? 5 / 6 : .5)
+
+  const valueCode = valueAxis?.numberFormat?.formatCode ?? (scaleSource.percent ? '0%'
+    : (scaleSource.scatter ? scaleSource.series[0]?.yVal : scaleSource.series[0]?.val)?.formatCode)
   const valueLabel = (n: number) => valueText(n, valueCode, date1904)
   const valueWidth = scale.ticks.reduce((max, n) => Math.max(max, measure(valueLabel(n), valueStyle)), 0)
-  const sampleStride = Math.max(1, Math.ceil(count / 5000))
+  const sampleStride = Math.max(1, Math.ceil(count / MAX_DRAWN_POINTS))
   let categoryWidth = 0
   for (let i = 0; i < count; i += sampleStride) categoryWidth = Math.max(categoryWidth, measure(categoryText(i), categoryStyle))
   const axisTitleFormat = (axis?: ChartAxis) =>
     titleFormat(axis?.title, styleOf({ bold: true }, model.textStyle, axis?.title?.style))
   const xTitleAxis = horizontal ? valueAxis : categoryAxis
   const yTitleAxis = horizontal ? categoryAxis : valueAxis
-  const xTitle = xTitleAxis?.deleted ? '' : titleText(xTitleAxis?.title)
-  const yTitle = yTitleAxis?.deleted ? '' : titleText(yTitleAxis?.title)
+  const xTitle = xTitleAxis?.deleted || !(horizontal ? showValue : showCategory) ? '' : titleText(xTitleAxis?.title)
+  const yTitle = yTitleAxis?.deleted || !(horizontal ? showCategory : showValue) ? '' : titleText(yTitleAxis?.title)
   const xTitleFormat = axisTitleFormat(xTitleAxis)
   const yTitleFormat = axisTitleFormat(yTitleAxis)
   const verticalTitleSpace = yTitle && !yTitleAxis?.title?.layout ? yTitleFormat.height + 6 : 0
@@ -380,9 +511,11 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   const verticalLabelWidth = Math.min(width * .35, horizontal ? categoryWidth : valueWidth) + 8
   const verticalLabelsRight = verticalAxis?.tickLabelPosition === 'high' || (verticalAxis?.position === 'r' && verticalAxis.tickLabelPosition !== 'low')
   const horizontalLabelsTop = horizontalAxis?.tickLabelPosition === 'high' || (horizontalAxis?.position === 't' && horizontalAxis.tickLabelPosition !== 'low')
-  const verticalLabels = hideLabels(verticalAxis) ? 0 : verticalLabelWidth
-  const insetLeft = verticalTitleSpace + (verticalLabelsRight ? 0 : verticalLabels)
-  const insetRight = verticalLabelsRight ? verticalLabels : horizontal ? valueWidth / 2 : 0
+  const verticalLabels = hideLabels(verticalAxis) || !(horizontal ? showCategory : showValue) ? 0 : verticalLabelWidth
+  const rightTitle = model.kind === 'combo' && verticalLabelsRight
+  const topTitle = model.kind === 'combo' && horizontalLabelsTop
+  const insetLeft = (rightTitle ? 0 : verticalTitleSpace) + (verticalLabelsRight ? 0 : verticalLabels)
+  const insetRight = (rightTitle ? verticalTitleSpace : 0) + (verticalLabelsRight ? verticalLabels : horizontal ? valueWidth / 2 : 0)
   const between = !scatter && (area ? valueAxis?.crossBetween === 'between' || count === 1
     : !line || valueAxis?.crossBetween !== 'midCat' || count === 1)
   const categoryHeight = textHeight(categoryStyle)
@@ -393,7 +526,6 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
     width: Math.max(1, rect.width - insetLeft - insetRight),
     height: Math.max(1, rect.height - top - bottom),
   })
-  const outer = { x: left, y: top, width: right - left, height: bottom - top }
   const manualOuter = manualBounds(outer, inner ? undefined : plotLayout, width, height)
   const provisional = manualBounds(inset(manualOuter, 0, 0), inner ? plotLayout : undefined, width, height)
   const availableBand = provisional.width / Math.max(1, between ? count : count - 1)
@@ -402,289 +534,316 @@ export function layoutChart(model: DrawableChart, resolved: readonly ChartSeries
   if (autoTilt) categoryStyle.rotation = -45
   const angle = (categoryStyle.rotation ?? 0) * Math.PI / 180
   const tiltedHeight = categoryWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))
-  const horizontalLabels = hideLabels(horizontalAxis) ? 0
+  const horizontalLabels = hideLabels(horizontalAxis) || !(horizontal ? showValue : showCategory) ? 0
     : (horizontal ? textHeight(valueStyle) : Math.min(tiltedHeight, Math.max(categoryHeight, manualOuter.height / 2))) + 8
-  const plot = manualBounds(inset(manualOuter, horizontalLabelsTop ? horizontalLabels : 0,
-    horizontalTitleSpace + (horizontalLabelsTop ? 0 : horizontalLabels)), inner ? plotLayout : undefined, width, height)
-  const plotLeft = plot.x
-  const plotTop = plot.y
-  const layout = makeLayout(plot, scale)
-  layout.xScale = xScale
+  const bounds = manualBounds(inset(manualOuter, (topTitle ? horizontalTitleSpace : 0) + (horizontalLabelsTop ? horizontalLabels : 0),
+    (topTitle ? 0 : horizontalTitleSpace) + (horizontalLabelsTop ? 0 : horizontalLabels)), inner ? plotLayout : undefined, width, height)
+  return { bounds, draw: drawPlot }
 
-  const categoryLength = horizontal ? plot.height : plot.width
-  const valueLength = horizontal ? plot.width : plot.height
-  const band = categoryLength / Math.max(1, between ? count : count - 1)
-  layout.categoryBand = band
-  const categoryReversed = (categoryAxis?.orientation === 'maxMin') !== horizontal
-  const categoryDirection = categoryReversed ? -1 : 1
-  const xAt = (x: number) => {
-    const fraction = axisFraction(x, xScale!, xAxis)
-    return (categoryReversed ? 1 - fraction : fraction) * categoryLength
-  }
-  const categoryAt = (i: number) => xScale ? xAt(xScale.ticks[i])
-    : ((categoryReversed ? count - 1 - i : i) + (between ? .5 : 0)) * band
-  const log = valueAxis?.logBase && valueAxis.logBase > 1
-  const unit = log ? Math.log : (v: number) => v
-  const valueAt = (v: number) => {
-    const fraction = (unit(log ? Math.max(v, Number.MIN_VALUE) : v) - unit(scale.min)) / (unit(scale.max) - unit(scale.min))
-    return (valueAxis?.orientation === 'maxMin' ? 1 - fraction : fraction) * valueLength
-  }
-  const point = (cat: number, val: number): Point => horizontal
-    ? { x: plotLeft + val, y: plotTop + cat }
-    : { x: plotLeft + cat, y: plotTop + plot.height - val }
-  const rule = (from: Point, to: Point, shape?: ChartShape): Rule => ({ from, to, shape })
-  const valueRule = (position: number, shape?: ChartShape) => rule(point(0, position), point(categoryLength, position), shape)
-  const categoryRule = (position: number, shape?: ChartShape) => rule(point(position, 0), point(position, valueLength), shape)
-  const crossValue = categoryAxis?.crossesAt ?? (categoryAxis?.crosses === 'max' ? scale.max : categoryAxis?.crosses === 'min' ? scale.min : 0)
-  const crossBase = clamp(crossValue, scale.min, scale.max)
-  const baseline = valueAt(crossBase)
-  const crossCategory = valueAxis?.crossesAt ?? (valueAxis?.crosses === 'max' ? count : 1)
-  const categoryCross = xScale
-    ? xAt(clamp(valueAxis?.crossesAt ?? (valueAxis?.crosses === 'max' ? xScale.max : valueAxis?.crosses === 'min' ? xScale.min : 0), xScale.min, xScale.max))
-    : valueAxis?.crossesAt === undefined
-    ? ((valueAxis?.crosses === 'max') !== categoryReversed ? categoryLength : 0)
-    : clamp(categoryAt(crossCategory - 1) - (between ? categoryDirection * band / 2 : 0), 0, categoryLength)
-  if (categoryAxis && !categoryAxis.deleted) layout.axes.push(valueRule(baseline, categoryAxis.shape))
-  if (valueAxis && !valueAxis.deleted) layout.axes.push(categoryRule(categoryCross, valueAxis.shape))
-  const axisTick = (at: Point, axis: ChartAxis | undefined, horizontalRule: boolean, minor = false) => {
-    const mark = minor ? axis?.minorTickMark : axis?.majorTickMark
-    if (!axis || axis.deleted || !mark || mark === 'none') return
-    const size = minor ? 2 : 4
-    const sign = axis.position === 't' || axis.position === 'l' ? -1 : 1
-    const shift = (n: number) => ({ x: at.x + (horizontalRule ? 0 : sign * n), y: at.y + (horizontalRule ? sign * n : 0) })
-    layout.axes.push(rule(shift(mark === 'in' || mark === 'cross' ? -size : 0), shift(mark === 'out' || mark === 'cross' ? size : 0), axis.shape))
-  }
-  const valueLabelCross = valueAxis?.tickLabelPosition === 'high' || valueAxis?.tickLabelPosition === 'low'
-    ? (horizontal ? (horizontalLabelsTop ? 0 : categoryLength) : (verticalLabelsRight ? categoryLength : 0))
-    : categoryCross
-  const categoryLabelCross = categoryAxis?.tickLabelPosition === 'high' || categoryAxis?.tickLabelPosition === 'low'
-    ? (horizontal ? (verticalLabelsRight ? valueLength : 0) : (horizontalLabelsTop ? valueLength : 0))
-    : baseline
-  const showValueAt = (tick: number, minor: boolean) => {
-    const v = valueAt(tick)
-    const grid = minor ? valueAxis?.minorGridlines : valueAxis?.majorGridlines
-    if (grid) layout.gridlines.push(valueRule(v, grid))
-    axisTick(point(categoryCross, v), valueAxis, horizontal, minor)
-  }
-  const minorUnit = valueAxis?.minorUnit ?? scale.step / 5
-  if (!log && minorUnit > 0 && (valueAxis?.minorGridlines || (valueAxis?.minorTickMark && valueAxis.minorTickMark !== 'none'))) {
-    for (let i = 1; i <= 500; i++) {
-      const offset = i * minorUnit
-      if (offset >= scale.max - scale.min) break
-      if (Math.abs(offset / scale.step - Math.round(offset / scale.step)) > 1e-8) showValueAt(scale.min + offset, true)
-    }
-  }
-  for (const tick of scale.ticks) {
-    showValueAt(tick, false)
-    if (hideLabels(valueAxis)) continue
-    const at = point(valueLabelCross, valueAt(tick))
-    layout.axisLabels.push(horizontal
-      ? { ...at, y: at.y + (horizontalLabelsTop ? -1 : 1) * (textHeight(valueStyle) / 2 + 6), text: valueLabel(tick), anchor: 'middle', style: valueStyle }
-      : { ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text: valueLabel(tick), anchor: verticalLabelsRight ? 'start' : 'end', style: valueStyle })
-  }
-  const categorySpacing = horizontal ? categoryHeight : Math.min(
-    categoryWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle)),
-    Math.abs(Math.sin(angle)) > 0 ? categoryHeight / Math.abs(Math.sin(angle)) : Infinity,
-  )
-  const skip = Math.max(1, categoryAxis?.tickLabelSkip ?? Math.ceil((categorySpacing + 5) / band))
-  for (let i = 0; !hideLabels(categoryAxis) && i < count; i += Math.max(skip, sampleStride)) {
-    const at = point(categoryAt(i), categoryLabelCross)
-    const text = categoryText(i)
-    if (!text) continue
-    if (horizontal) {
-      layout.axisLabels.push({ ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text,
-        anchor: verticalLabelsRight ? 'start' : 'end', style: categoryStyle })
-    } else {
-      const labelWidth = measure(text, categoryStyle)
-      const halfWidth = Math.min(width / 2, (labelWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle))) / 2)
-      const halfHeight = (labelWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))) / 2
-      const x = clamp(at.x, halfWidth, width - halfWidth)
-      const y = at.y + (horizontalLabelsTop ? -1 : 1) * (halfHeight + 6)
-      layout.axisLabels.push({ x, y, text, anchor: 'middle', style: categoryStyle })
-    }
-  }
-  if (xScale && xAxis && !(xAxis.logBase && xAxis.logBase > 1) &&
-    (xAxis.minorGridlines || (xAxis.minorTickMark && xAxis.minorTickMark !== 'none'))) {
-    const minor = xAxis.minorUnit ?? xScale.step / 5
-    for (let i = 1; minor > 0 && i <= 500; i++) {
-      const offset = i * minor
-      if (offset >= xScale.max - xScale.min) break
-      if (Math.abs(offset / xScale.step - Math.round(offset / xScale.step)) <= 1e-8) continue
-      const at = xAt(xScale.min + offset)
-      if (xAxis.minorGridlines) layout.gridlines.push(categoryRule(at, xAxis.minorGridlines))
-      axisTick(point(at, baseline), xAxis, true, true)
-    }
-  }
-  if (categoryAxis && (categoryAxis.majorGridlines || categoryAxis.majorTickMark && categoryAxis.majorTickMark !== 'none')) {
-    const marks = count + (between ? 1 : 0)
-    for (let i = 0; i < marks; i += Math.max(sampleStride, categoryAxis.tickMarkSkip ?? 1)) {
-      const at = scatter ? categoryAt(i) : i * band
-      if (categoryAxis.majorGridlines) layout.gridlines.push(categoryRule(at, categoryAxis.majorGridlines))
-      axisTick(point(at, baseline), categoryAxis, !horizontal)
-    }
-  }
-  const addTitle = (text: string, format: ReturnType<typeof titleFormat>, center: Point, title?: ChartTitle) => {
-    if (title?.layout) {
-      const w = textWidth(text, format, measure)
-      const bounds = manualBounds({ x: center.x - w / 2, y: center.y - format.height / 2, width: w, height: format.height },
-        title.layout, width, height)
-      center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
-    }
-    layout.titles.push({ ...center, text, anchor: 'middle', style: format.style, runs: format.runs })
-  }
-  if (xTitle) addTitle(xTitle, xTitleFormat,
-    { x: plotLeft + plot.width / 2, y: plotTop + plot.height + (horizontalLabelsTop ? 0 : horizontalLabels) + 6 + xTitleFormat.height / 2 },
-    xTitleAxis?.title)
-  if (yTitle) addTitle(yTitle, {
-    ...yTitleFormat, style: { ...yTitleFormat.style, rotation: yTitleFormat.style.rotation ?? -90 },
-  }, { x: plotLeft - (verticalLabelsRight ? 0 : verticalLabels) - 6 - yTitleFormat.height / 2, y: plotTop + plot.height / 2 },
-  yTitleAxis?.title)
+  function drawPlot(plot: Rect): ChartLayout {
+    const plotLeft = plot.x
+    const plotTop = plot.y
+    const layout = makeLayout(plot, scale)
+    layout.xScale = xScale
 
-  const addDataLabel = (entry: ChartSeries, index: number, value: { raw: number; from: number; to: number },
-    endpoint: Point, start: Point, name: string, color: string, category: string, overrides: LabelOverrides) => {
-    const custom = overrides.get(index)
-    const label = mergeDefined<ChartLabels>(plotModel.labels, entry.labels, custom)
-    if (label.deleted) return
-    const code = label.numberFormat?.formatCode ?? (scatter ? entry.yVal ?? entry.val : entry.val)?.formatCode
-    const text = titleText(custom?.text) || [
-      label.showSerName && name, label.showCatName && category,
-      label.showVal && valueText(value.raw, code, date1904),
-      label.showPercent && percent && valueText(Math.abs(value.to - value.from), '0%', date1904),
-    ].filter(Boolean).join(label.separator ?? ', ')
-    if (!text) return
-    const style = styleOf(model.textStyle, plotModel.labels?.style, entry.labels?.style, custom?.style, custom?.text?.style)
-    const format = titleFormat(custom?.text, style)
-    const h = format.height
-    const w = textWidth(text, format, measure)
-    const distance = horizontal ? w / 2 + 4 : h / 2 + 3
-    const direction = horizontal ? Math.sign(endpoint.x - start.x) || 1 : Math.sign(endpoint.y - start.y) || -1
-    const position = label.position ?? (line || scatter ? 'r' : 'outEnd')
-    const offset = position === 'inEnd' ? -distance : distance
-    let { x, y } = endpoint
-    switch (position) {
-      case 'ctr':
-        if (!line && !scatter) {
-          x = (x + start.x) / 2
-          y = (y + start.y) / 2
-        }
-        break
-      case 'inBase': x = start.x + (horizontal ? distance * direction : 0); y = start.y + (horizontal ? 0 : distance * direction); break
-      case 'l': x -= w / 2 + 4; break
-      case 'r': x += w / 2 + 4; break
-      case 'b': y += h / 2 + 3; break
-      case 't': y -= h / 2 + 3; break
-      default: x += horizontal ? offset * direction : 0; y += horizontal ? 0 : offset * direction
+    const categoryLength = horizontal ? plot.height : plot.width
+    const valueLength = horizontal ? plot.width : plot.height
+    const band = categoryLength / Math.max(1, between ? count : count - 1)
+    layout.categoryBand = band
+    const categoryReversed = (categoryAxis?.orientation === 'maxMin') !== horizontal
+    const categoryDirection = categoryReversed ? -1 : 1
+    const xAt = (x: number) => {
+      const fraction = axisFraction(x, xScale!, xAxis)
+      return (categoryReversed ? 1 - fraction : fraction) * categoryLength
     }
-    layout.dataLabels.push({ x, y, text, anchor: 'middle', style, runs: format.runs, width: w, height: h, shape: label.shape,
-      keyColor: label.showLegendKey ? color : undefined })
-  }
-
-  if (scatter) {
-    series.forEach((entry, i) => {
-      const { color, shape, marker, name } = entries[i]
-      const labels = labelsFor(entry, plotModel.labels)
-      const overrides = new Map(entry.pointStyles.map((style) => [style.index, style.marker]))
-      const segments: Point[][] = []
-      const drawLine = scatterLines && !shape?.noLine
-      const coordinates = xy[i]
-      const thin = coordinates.length > 5000
-      const valid = (x: number, y: number) => !(log && y <= 0) && !(xAxis?.logBase && xAxis.logBase > 1 && x <= 0)
-      const firstIndex = coordinates[0]?.index ?? 0
-      const indexSpan = (coordinates[coordinates.length - 1]?.index ?? 0) - firstIndex + 1
-      const selected = thin && drawLine ? new Set(sampledIndices(new Map(coordinates.flatMap(({ index, x, y }) =>
-        valid(x, y) ? [[index - firstIndex, { to: y }]] : [])), indexSpan)) : undefined
-      const markerPixels = new Set<string>()
-      let segment: Point[] | undefined
-      let previous = -1
-      for (const { index, x, y } of coordinates) {
-        const at = point(xAt(x), valueAt(y))
-        if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !valid(x, y)) {
-          previous = -1
-          continue
-        }
-        if (drawLine) {
-          if (!segment || (index !== previous + 1 && model.displayBlanksAs !== 'span')) {
-            segment = []
-            segments.push(segment)
-          }
-          if (!selected || selected.has(index - firstIndex)) segment.push(at)
-        }
-        previous = index
-        const symbol = overrides.get(index) ?? marker
-        if (x < xScale!.min || x > xScale!.max || y < scale.min || y > scale.max) continue
-        if (scatterMarkers && symbol && symbol.symbol !== 'none') {
-          const pixel = thin ? `${Math.floor(at.x)},${Math.floor(at.y)}` : undefined
-          if (pixel === undefined || !markerPixels.has(pixel)) {
-            layout.markers.push({ ...at, marker: symbol, color })
-            if (pixel !== undefined) markerPixels.add(pixel)
-          }
-        }
-        if (labels) addDataLabel(entry, index, { raw: y, from: 0, to: y }, at, at, name, color,
-          valueText(x, entry.xVal?.formatCode, date1904), labels)
+    const categoryAt = (i: number) => xScale ? xAt(xScale.ticks[i])
+      : ((categoryReversed ? count - 1 - i : i) + (between ? .5 : 0)) * band
+    const log = valueAxis?.logBase && valueAxis.logBase > 1
+    const unit = log ? Math.log : (v: number) => v
+    const valueAt = (v: number) => {
+      const fraction = (unit(log ? Math.max(v, Number.MIN_VALUE) : v) - unit(scale.min)) / (unit(scale.max) - unit(scale.min))
+      return (valueAxis?.orientation === 'maxMin' ? 1 - fraction : fraction) * valueLength
+    }
+    const point = (cat: number, val: number): Point => horizontal
+      ? { x: plotLeft + val, y: plotTop + cat }
+      : { x: plotLeft + cat, y: plotTop + plot.height - val }
+    const rule = (from: Point, to: Point, shape?: ChartShape): Rule => ({ from, to, shape })
+    const valueRule = (position: number, shape?: ChartShape) => rule(point(0, position), point(categoryLength, position), shape)
+    const categoryRule = (position: number, shape?: ChartShape) => rule(point(position, 0), point(position, valueLength), shape)
+    const crossValue = categoryAxis?.crossesAt ?? (categoryAxis?.crosses === 'max' ? scale.max : categoryAxis?.crosses === 'min' ? scale.min : 0)
+    const crossBase = clamp(crossValue, scale.min, scale.max)
+    const baseline = valueAt(crossBase)
+    const crossCategory = valueAxis?.crossesAt ?? (valueAxis?.crosses === 'max' ? count : 1)
+    const crossesAtEnd = valueAxis?.crosses === 'max' ||
+      (model.kind === 'combo' && valueAxis?.crosses === undefined && valueAxis?.position === (horizontal ? 'b' : 'r'))
+    const categoryCross = xScale
+      ? xAt(clamp(valueAxis?.crossesAt ?? (valueAxis?.crosses === 'max' ? xScale.max : valueAxis?.crosses === 'min' ? xScale.min : 0), xScale.min, xScale.max))
+      : valueAxis?.crossesAt === undefined
+      ? (crossesAtEnd !== categoryReversed ? categoryLength : 0)
+      : clamp(categoryAt(crossCategory - 1) - (between ? categoryDirection * band / 2 : 0), 0, categoryLength)
+    if (showCategory && categoryAxis && !categoryAxis.deleted) layout.axes.push(valueRule(baseline, categoryAxis.shape))
+    if (showValue && valueAxis && !valueAxis.deleted) layout.axes.push(categoryRule(categoryCross, valueAxis.shape))
+    const axisTick = (at: Point, axis: ChartAxis | undefined, horizontalRule: boolean, minor = false) => {
+      const mark = minor ? axis?.minorTickMark : axis?.majorTickMark
+      if (!axis || axis.deleted || !mark || mark === 'none') return
+      const size = minor ? 2 : 4
+      const sign = axis.position === 't' || axis.position === 'l' ? -1 : 1
+      const shift = (n: number) => ({ x: at.x + (horizontalRule ? 0 : sign * n), y: at.y + (horizontalRule ? sign * n : 0) })
+      layout.axes.push(rule(shift(mark === 'in' || mark === 'cross' ? -size : 0), shift(mark === 'out' || mark === 'cross' ? size : 0), axis.shape))
+    }
+    const valueLabelCross = valueAxis?.tickLabelPosition === 'high' || valueAxis?.tickLabelPosition === 'low'
+      ? (horizontal ? (horizontalLabelsTop ? 0 : categoryLength) : (verticalLabelsRight ? categoryLength : 0))
+      : categoryCross
+    const categoryLabelCross = categoryAxis?.tickLabelPosition === 'high' || categoryAxis?.tickLabelPosition === 'low'
+      ? (horizontal ? (verticalLabelsRight ? valueLength : 0) : (horizontalLabelsTop ? valueLength : 0))
+      : baseline
+    const showValueAt = (tick: number, minor: boolean) => {
+      const v = valueAt(tick)
+      const grid = minor ? valueAxis?.minorGridlines : valueAxis?.majorGridlines
+      if (grid) layout.gridlines.push(valueRule(v, grid))
+      axisTick(point(categoryCross, v), valueAxis, horizontal, minor)
+    }
+    const minorUnit = valueAxis?.minorUnit ?? scale.step / 5
+    if (showValue && !log && minorUnit > 0 && (valueAxis?.minorGridlines || (valueAxis?.minorTickMark && valueAxis.minorTickMark !== 'none'))) {
+      for (let i = 1; i <= 500; i++) {
+        const offset = i * minorUnit
+        if (offset >= scale.max - scale.min) break
+        if (Math.abs(offset / scale.step - Math.round(offset / scale.step)) > 1e-8) showValueAt(scale.min + offset, true)
       }
-      if (drawLine) layout.lines.push({ segments: segments.filter((part) => part.length), color, shape,
-        smooth: entry.smooth ?? (scatterStyle === 'smooth' || scatterStyle === 'smoothMarker') })
-    })
-    return layout
-  }
+    }
+    for (const tick of showValue ? scale.ticks : []) {
+      showValueAt(tick, false)
+      if (hideLabels(valueAxis)) continue
+      const at = point(valueLabelCross, valueAt(tick))
+      layout.axisLabels.push(horizontal
+        ? { ...at, y: at.y + (horizontalLabelsTop ? -1 : 1) * (textHeight(valueStyle) / 2 + 6), text: valueLabel(tick), anchor: 'middle', style: valueStyle }
+        : { ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text: valueLabel(tick), anchor: verticalLabelsRight ? 'start' : 'end', style: valueStyle })
+    }
+    const categorySpacing = horizontal ? categoryHeight : Math.min(
+      categoryWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle)),
+      Math.abs(Math.sin(angle)) > 0 ? categoryHeight / Math.abs(Math.sin(angle)) : Infinity,
+    )
+    const skip = Math.max(1, categoryAxis?.tickLabelSkip ?? Math.ceil((categorySpacing + 5) / band))
+    for (let i = 0; showCategory && !hideLabels(categoryAxis) && i < count; i += Math.max(skip, sampleStride)) {
+      const at = point(categoryAt(i), categoryLabelCross)
+      const text = categoryText(i)
+      if (!text) continue
+      if (horizontal) {
+        layout.axisLabels.push({ ...at, x: at.x + (verticalLabelsRight ? 7 : -7), text,
+          anchor: verticalLabelsRight ? 'start' : 'end', style: categoryStyle })
+      } else {
+        const labelWidth = measure(text, categoryStyle)
+        const halfWidth = Math.min(width / 2, (labelWidth * Math.abs(Math.cos(angle)) + categoryHeight * Math.abs(Math.sin(angle))) / 2)
+        const halfHeight = (labelWidth * Math.abs(Math.sin(angle)) + categoryHeight * Math.abs(Math.cos(angle))) / 2
+        const x = clamp(at.x, halfWidth, width - halfWidth)
+        const y = at.y + (horizontalLabelsTop ? -1 : 1) * (halfHeight + 6)
+        layout.axisLabels.push({ x, y, text, anchor: 'middle', style: categoryStyle })
+      }
+    }
+    if (showCategory && xScale && xAxis && !(xAxis.logBase && xAxis.logBase > 1) &&
+      (xAxis.minorGridlines || (xAxis.minorTickMark && xAxis.minorTickMark !== 'none'))) {
+      const minor = xAxis.minorUnit ?? xScale.step / 5
+      for (let i = 1; minor > 0 && i <= 500; i++) {
+        const offset = i * minor
+        if (offset >= xScale.max - xScale.min) break
+        if (Math.abs(offset / xScale.step - Math.round(offset / xScale.step)) <= 1e-8) continue
+        const at = xAt(xScale.min + offset)
+        if (xAxis.minorGridlines) layout.gridlines.push(categoryRule(at, xAxis.minorGridlines))
+        axisTick(point(at, baseline), xAxis, true, true)
+      }
+    }
+    if (showCategory && categoryAxis && (categoryAxis.majorGridlines || categoryAxis.majorTickMark && categoryAxis.majorTickMark !== 'none')) {
+      const marks = count + (between ? 1 : 0)
+      for (let i = 0; i < marks; i += Math.max(sampleStride, categoryAxis.tickMarkSkip ?? 1)) {
+        const at = scatter ? categoryAt(i) : i * band
+        if (categoryAxis.majorGridlines) layout.gridlines.push(categoryRule(at, categoryAxis.majorGridlines))
+        axisTick(point(at, baseline), categoryAxis, !horizontal)
+      }
+    }
+    const addTitle = (text: string, format: ReturnType<typeof titleFormat>, center: Point, title?: ChartTitle) => {
+      if (title?.layout) {
+        const w = textWidth(text, format, measure)
+        const bounds = manualBounds({ x: center.x - w / 2, y: center.y - format.height / 2, width: w, height: format.height },
+          title.layout, width, height)
+        center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }
+      }
+      layout.titles.push({ ...center, text, anchor: 'middle', style: format.style, runs: format.runs })
+    }
+    if (xTitle) addTitle(xTitle, xTitleFormat,
+      { x: plotLeft + plot.width / 2, y: topTitle ? plotTop - horizontalLabels - 6 - xTitleFormat.height / 2
+        : plotTop + plot.height + (horizontalLabelsTop ? 0 : horizontalLabels) + 6 + xTitleFormat.height / 2 },
+      xTitleAxis?.title)
+    if (yTitle) addTitle(yTitle, {
+      ...yTitleFormat, style: { ...yTitleFormat.style, rotation: yTitleFormat.style.rotation ?? -90 },
+    }, { x: rightTitle ? plotLeft + plot.width + verticalLabels + 6 + yTitleFormat.height / 2
+      : plotLeft - (verticalLabelsRight ? 0 : verticalLabels) - 6 - yTitleFormat.height / 2, y: plotTop + plot.height / 2 },
+    yTitleAxis?.title)
 
-  const areas: NonNullable<ChartLayout['areas']> = []
-  const spacing = 1 - clamp(plotModel.overlap ?? (stacked ? 100 : 0), -100, 100) / 100
-  const cluster = 1 + (series.length - 1) * spacing
-  const barWidth = band / (cluster + clamp(plotModel.gapWidth ?? 150, 0, 500) / 100)
-  series.forEach((entry, seriesIndex) => {
-    const { color, marker, shape, name } = entries[seriesIndex]
-    const pointStyles = new Map(entry.pointStyles.map((style) => [style.index, style]))
-    const overrides = labelsFor(entry, plotModel.labels)
-    const values = points[seriesIndex]
-    const segments: Point[][] = [[]]
-    let segment = segments[0]
-    const bases: Point[][] = [[]]
-    let base = bases[0]
-    for (const index of sampledIndices(values, count)) {
-      const value = values.get(index) ?? (blanksAsZero ? { raw: 0, from: 0, to: 0 } : undefined)
-      if (!value || (log && value.to <= 0)) {
-        if (segment.length && model.displayBlanksAs !== 'span') {
+    const addDataLabel = (entry: ChartSeries, index: number, value: { raw: number; from: number; to: number },
+      endpoint: Point, start: Point, name: string, color: string, category: string, overrides: LabelOverrides) => {
+      const custom = overrides.get(index)
+      const label = mergeDefined<ChartLabels>(plotModel.labels, entry.labels, custom)
+      if (label.deleted) return
+      const code = label.numberFormat?.formatCode ?? (scatter ? entry.yVal ?? entry.val : entry.val)?.formatCode
+      const text = titleText(custom?.text) || [
+        label.showSerName && name, label.showCatName && category,
+        label.showVal && valueText(value.raw, code, date1904),
+        label.showPercent && percent && valueText(Math.abs(value.to - value.from), '0%', date1904),
+      ].filter(Boolean).join(label.separator ?? ', ')
+      if (!text) return
+      const style = styleOf(model.textStyle, plotModel.labels?.style, entry.labels?.style, custom?.style, custom?.text?.style)
+      const format = titleFormat(custom?.text, style)
+      const h = format.height
+      const w = textWidth(text, format, measure)
+      const distance = horizontal ? w / 2 + 4 : h / 2 + 3
+      const direction = horizontal ? Math.sign(endpoint.x - start.x) || 1 : Math.sign(endpoint.y - start.y) || -1
+      const position = label.position ?? (line || scatter ? 'r' : 'outEnd')
+      const offset = position === 'inEnd' ? -distance : distance
+      let { x, y } = endpoint
+      switch (position) {
+        case 'ctr':
+          if (!line && !scatter) {
+            x = (x + start.x) / 2
+            y = (y + start.y) / 2
+          }
+          break
+        case 'inBase': x = start.x + (horizontal ? distance * direction : 0); y = start.y + (horizontal ? 0 : distance * direction); break
+        case 'l': x -= w / 2 + 4; break
+        case 'r': x += w / 2 + 4; break
+        case 'b': y += h / 2 + 3; break
+        case 't': y -= h / 2 + 3; break
+        default: x += horizontal ? offset * direction : 0; y += horizontal ? 0 : offset * direction
+      }
+      layout.dataLabels.push({ x, y, text, anchor: 'middle', style, runs: format.runs, width: w, height: h, shape: label.shape,
+        keyColor: label.showLegendKey ? color : undefined })
+    }
+
+    if (scatter) {
+      series.forEach((entry, i) => {
+        const { color, shape, marker, name } = entries[i]
+        const labels = labelsFor(entry, plotModel.labels)
+        const overrides = new Map(entry.pointStyles.map((style) => [style.index, style.marker]))
+        const segments: Point[][] = []
+        const drawLine = scatterLines && !shape?.noLine
+        const coordinates = xy[i]
+        const thin = coordinates.length > MAX_DRAWN_POINTS
+        const valid = (x: number, y: number) => !(log && y <= 0) && !(xAxis?.logBase && xAxis.logBase > 1 && x <= 0)
+        const firstIndex = coordinates[0]?.index ?? 0
+        const indexSpan = (coordinates[coordinates.length - 1]?.index ?? 0) - firstIndex + 1
+        const selected = thin ? new Set(sampledIndices(new Map(coordinates.flatMap(({ index, x, y }) =>
+          valid(x, y) ? [[index - firstIndex, { to: y }]] : [])), indexSpan)) : undefined
+        const markerPixels = new Set<string>()
+        let segment: Point[] | undefined
+        let previous = -1
+        for (const { index, x, y } of coordinates) {
+          const at = point(xAt(x), valueAt(y))
+          if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !valid(x, y)) {
+            previous = -1
+            continue
+          }
+          if (drawLine) {
+            if (!segment || (index !== previous + 1 && model.displayBlanksAs !== 'span')) {
+              segment = []
+              segments.push(segment)
+            }
+            if (!selected || selected.has(index - firstIndex)) segment.push(at)
+          }
+          previous = index
+          const symbol = overrides.get(index) ?? marker
+          if (selected && !selected.has(index - firstIndex)) continue
+        if (x < xScale!.min || x > xScale!.max || y < scale.min || y > scale.max) continue
+          if (scatterMarkers && symbol && symbol.symbol !== 'none') {
+            const pixel = thin ? `${Math.floor(at.x)},${Math.floor(at.y)}` : undefined
+            if (pixel === undefined || !markerPixels.has(pixel)) {
+              layout.markers.push({ ...at, marker: symbol, color })
+              if (pixel !== undefined) markerPixels.add(pixel)
+            }
+          }
+          if (labels) addDataLabel(entry, index, { raw: y, from: 0, to: y }, at, at, name, color,
+            valueText(x, entry.xVal?.formatCode, date1904), labels)
+        }
+        if (drawLine) layout.lines.push({ segments: segments.filter((part) => part.length), color, shape,
+          smooth: entry.smooth ?? (scatterStyle === 'smooth' || scatterStyle === 'smoothMarker') })
+      })
+      return layout
+    }
+
+    const areas: NonNullable<ChartLayout['areas']> = []
+    const spacing = 1 - clamp(plotModel.overlap ?? (stacked ? 100 : 0), -100, 100) / 100
+    const cluster = 1 + (series.length - 1) * spacing
+    const barWidth = band / (cluster + clamp(plotModel.gapWidth ?? 150, 0, 500) / 100)
+    // Grouped marks share categories, including the extrema that only one series needs.
+    let sharedIndices: number[] | undefined
+    if (points.length > 1 && (stacked || plotModel.kind === 'column' || horizontal)) {
+      if (count <= MAX_DRAWN_POINTS) sharedIndices = Array.from({ length: count }, (_, index) => index)
+      else {
+        const bucketCount = Math.max(1, Math.floor(MAX_BUCKETS / points.length))
+        const union = new Set<number>()
+        for (const values of points) {
+          for (const index of sampledIndices(values, count, blanksAsZero, bucketCount)) union.add(index)
+        }
+        sharedIndices = [...union].sort((a, b) => a - b)
+      }
+    }
+    series.forEach((entry, seriesIndex) => {
+      const { color, marker, shape, name } = entries[seriesIndex]
+      const pointStyles = new Map(entry.pointStyles.map((style) => [style.index, style]))
+      const overrides = labelsFor(entry, plotModel.labels)
+      const values = points[seriesIndex]
+      const segments: Point[][] = [[]]
+      let segment = segments[0]
+      const bases: Point[][] = [[]]
+      let base = bases[0]
+      const indices = sharedIndices ?? sampledIndices(values, count, blanksAsZero)
+      const runs = line && !blanksAsZero && model.displayBlanksAs !== 'span' && count > MAX_DRAWN_POINTS
+        ? sampledLineRuns(values, indices, log) : undefined
+      let previousRun: number | undefined
+      for (const index of indices) {
+        const value = values.get(index) ?? (blanksAsZero ? { raw: 0, from: 0, to: 0 } : undefined)
+        const drawable = value && !(log && value.to <= 0)
+        const run = runs?.get(index)
+        if ((!drawable && model.displayBlanksAs !== 'span' || runs && run !== previousRun) && segment.length) {
           segment = []
           segments.push(segment)
           base = []
           bases.push(base)
         }
-        continue
+        if (!drawable) continue
+        previousRun = run
+        const override = pointStyles.get(index)
+        const cat = categoryAt(index) + (line || area ? 0 : (seriesIndex * spacing - (cluster - 1) / 2) * barWidth * categoryDirection)
+        const endpoint = point(cat, valueAt(value.to))
+        const startValue = stacked ? value.from : crossBase
+        const start = point(cat, valueAt(clamp(startValue, scale.min, scale.max)))
+        const inRange = value.to >= scale.min && value.to <= scale.max
+        if (area) {
+          segment.push(endpoint)
+          base.push(start)
+        } else if (line) {
+          segment.push(endpoint)
+          const symbol = override?.marker ?? marker
+          if (symbol && symbol.symbol !== 'none' && inRange) layout.markers.push({ ...endpoint, color, marker: symbol })
+        } else {
+          const varied = plotModel.varyColors && series.length === 1 ? model.accentColors[index % model.accentColors.length] : undefined
+          const barShape = override?.shape ? mergeDefined(shape, override.shape) : shape
+          const end = point(cat, valueAt(clamp(value.to, scale.min, scale.max)))
+          layout.bars.push({
+            index, series: seriesIndex, from: startValue, to: value.to,
+            x: horizontal ? Math.min(start.x, end.x) : cat + plotLeft - barWidth / 2,
+            y: horizontal ? cat + plotTop - barWidth / 2 : Math.min(start.y, end.y),
+            width: horizontal ? Math.abs(end.x - start.x) : barWidth,
+            height: horizontal ? barWidth : Math.abs(end.y - start.y),
+            color: override?.shape?.fill ?? varied ?? color, shape: barShape,
+          })
+        }
+        if (inRange && overrides) addDataLabel(entry, index, value, endpoint, start, name, color, categoryText(index), overrides)
       }
-      const override = pointStyles.get(index)
-      const cat = categoryAt(index) + (line || area ? 0 : (seriesIndex * spacing - (cluster - 1) / 2) * barWidth * categoryDirection)
-      const endpoint = point(cat, valueAt(value.to))
-      const startValue = stacked ? value.from : crossBase
-      const start = point(cat, valueAt(clamp(startValue, scale.min, scale.max)))
-      const inRange = value.to >= scale.min && value.to <= scale.max
-      if (area) {
-        segment.push(endpoint)
-        base.push(start)
-      } else if (line) {
-        segment.push(endpoint)
-        const symbol = override?.marker ?? marker
-        if (symbol && symbol.symbol !== 'none' && inRange) layout.markers.push({ ...endpoint, color, marker: symbol })
-      } else {
-        const varied = plotModel.varyColors && series.length === 1 ? model.accentColors[index % model.accentColors.length] : undefined
-        const barShape = override?.shape ? mergeDefined(shape, override.shape) : shape
-        const end = point(cat, valueAt(clamp(value.to, scale.min, scale.max)))
-        layout.bars.push({
-          index, series: seriesIndex, from: startValue, to: value.to,
-          x: horizontal ? Math.min(start.x, end.x) : cat + plotLeft - barWidth / 2,
-          y: horizontal ? cat + plotTop - barWidth / 2 : Math.min(start.y, end.y),
-          width: horizontal ? Math.abs(end.x - start.x) : barWidth,
-          height: horizontal ? barWidth : Math.abs(end.y - start.y),
-          color: override?.shape?.fill ?? varied ?? color, shape: barShape,
-        })
-      }
-      if (inRange && overrides) addDataLabel(entry, index, value, endpoint, start, name, color, categoryText(index), overrides)
-    }
-    if (area) areas.push({ segments: segments.flatMap((top, i) => top.length ? [{ top, base: bases[i] }] : []), color, shape })
-    if (line) layout.lines.push({ segments: segments.filter((part) => part.length), color, shape, smooth: entry.smooth ?? plotModel.smooth })
-  })
-  if (area) layout.areas = areas
-  return layout
+      if (area) areas.push({ segments: segments.flatMap((top, i) => top.length ? [{ top, base: bases[i] }] : []), color, shape })
+      if (line) layout.lines.push({ segments: segments.filter((part) => part.length), color, shape, smooth: entry.smooth ?? plotModel.smooth })
+    })
+    if (area) layout.areas = areas
+    return layout
+  }
 }
 
 interface Slice {
