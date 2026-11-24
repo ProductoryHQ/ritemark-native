@@ -121,6 +121,7 @@ export const NEEDS_NO_ROW: Record<string, string> = {
   DialogOverlay: 'the scrim DialogContent draws under every dialog',
   DialogClose: "Radix's close behaviour, with no look of its own (DialogHeader's close draws it)",
   PopoverAnchor: "Radix's anchor for a popover placed by another element, with no look of its own",
+  AnchoredHoverPopover: "PopoverContent opened on hover or focus of a link drawn outside React (a chat's source link); the Popover row draws its look",
 }
 
 const MENU_ROOM = 200
