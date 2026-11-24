@@ -3,14 +3,15 @@ import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import { basename } from 'node:path'
 import { chartsKeepFixtures } from '../../../../src/excel/chartsKeepFixtures.test'
-import { cellRulesForVersion, compileCellRules, dataBarPaint, ruleCellStyle, ruleCellText, ruleTextColor, visibleCellRules } from './cellRules'
+import { createCellRuleCache, watchRuleDay, compileCellRules, dataBarPaint, ruleCellStyle, ruleCellText, ruleTextColor, visibleCellRules } from './cellRules'
 import { drawsChart } from './chartLayout'
 import { keptNotice } from './keptNotice'
 import { cellKey, readWorkbook } from './readWorkbook'
 import { buildLayout, fontCss } from './sheetLayout'
-import { compileRules } from './ruleEngine'
+import { compileRules, createRuleCache } from './ruleEngine'
 import { readRules } from './readRules'
 import { colorContext } from './excelStyles'
+import { calendarDay, excelDay } from './ruleFormula'
 import { modelSource } from './sheetSource'
 
 const load = async (name: string) => readWorkbook(await readFile(new URL(
@@ -20,7 +21,8 @@ const today = new Date(2026, 10, 24)
 
 async function main() {
   const model = await load('rules-all-kinds')
-  let rulesFor = cellRulesForVersion(model, today)
+  const cache = createCellRuleCache(model)
+  const rulesFor = (sheet: (typeof model.sheets)[number]) => cache.forSheet(sheet, today)
   const lookup = (name: string) => {
     const sheet = model.sheets.find((item) => item.name === name)!
     const layout = buildLayout(sheet, model.styles, { minWidth: 0, minHeight: 0 })
@@ -76,10 +78,10 @@ async function main() {
   const originalRules = rulesFor(sheet)
   assert.equal(rulesFor(sheet), originalRules)
   const previous = source.write(sheet.name, 0, 1, source.valueFor(sheet.name, 0, 1, '99999'))
-  rulesFor = cellRulesForVersion(model, today)
+  cache.invalidate(sheet.name, 0, 1)
   assert.equal(lookup(sheet.name)(3, 2).style?.fill, '#FFD966')
   source.restore(sheet.name, 0, 1, previous)
-  rulesFor = cellRulesForVersion(model, today)
+  cache.invalidate(sheet.name, 0, 1)
   assert.equal(lookup(sheet.name)(3, 2).style?.fill, '#FFC7CE')
 
   const cell = sheet.cells.get(cellKey(3, 2))!
@@ -182,6 +184,17 @@ test('scenario 31: icon sets keep cell values and do not block a colour rule', a
   }
   assert.equal(at(1, 3)?.style?.fill, '#C6EFCE')
   const [icons, , colour] = sheet.layout.rules
+  const extension = readRules(`<worksheet xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"
+    xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main"><extLst><ext>
+    <x14:conditionalFormattings><x14:conditionalFormatting><x14:cfRule type="iconSet" priority="4">
+    <x14:iconSet iconSet="3Stars" showValue="0"><x14:cfvo type="percent"><xm:f>0</xm:f></x14:cfvo></x14:iconSet>
+    </x14:cfRule><xm:sqref>B2:B11</xm:sqref></x14:conditionalFormatting></x14:conditionalFormattings>
+    </ext></extLst></worksheet>`, colorContext(model.styles, ''))
+  const x14 = compileRules(sheet, extension, { today, date1904: model.date1904, styles: model.styles })
+  assert.equal(x14.iconSets[0]?.icons?.name, '3Stars')
+  assert.equal(keptNotice(sheet.layout, x14),
+    "This sheet has an icon set. It's kept in the file; Open in Excel to see it.")
+  assert.equal(visibleCellRules(x14, layout, window, sheet, model).at(1, 1), undefined)
   const overlap = compileRules(sheet, [{ ...icons, areas: colour.areas, sqref: colour.sqref, stopIfTrue: true }, colour],
     { today, date1904: model.date1904, styles: model.styles })
   assert.equal(visibleCellRules(overlap, layout, window, sheet, model).at(1, 3)?.style?.fill, '#C6EFCE')
@@ -228,4 +241,111 @@ test('quiet line combines undrawn charts, pictures and shapes', async () => {
   const undrawn = { ...drawn, chart: { supported: false, kind: 'unknown' } } as const
   assert.equal(keptNotice({ drawings: [drawn, undrawn, { ...drawn, what: 'image' }, { ...drawn, what: 'shape' }] }),
     "This sheet has a chart, a picture and a shape. They're kept in the file; Open in Excel to see them.")
+})
+
+test('a chart-sheet notice counts drawing failures and unsupported charts', async () => {
+  const model = await load('chart-sheet')
+  const sheet = model.sheets.find((item) => item.kind === 'chartsheet')!
+  const [drawing] = sheet.layout.drawings
+  const notice = "This sheet has a chart. It's kept in the file; Open in Excel to see it."
+  assert.ok(drawsChart(drawing.chart))
+  assert.equal(keptNotice(sheet.layout), undefined)
+  assert.equal(keptNotice({ drawings: [{ ...drawing, chart: undefined }] }), notice)
+  assert.equal(keptNotice(sheet.layout, undefined, new Set([drawing])), notice)
+})
+
+test('edits evict the touched facts and cross-sheet formula ranges only', async () => {
+  const model = await load('rules-all-kinds')
+  const [sheet, sourceSheet] = model.sheets
+  sheet.layout.rules = readRules(`<worksheet>
+    <conditionalFormatting sqref="A1:A2"><cfRule type="duplicateValues" priority="1" dxfId="0"/></conditionalFormatting>
+    <conditionalFormatting sqref="B1:B2"><cfRule type="expression" priority="2" dxfId="0">
+    <formula>SUM('${sourceSheet.name}'!$A$1:$A$2)=3</formula></cfRule></conditionalFormatting>
+    </worksheet>`, colorContext(model.styles, ''))
+  const source = modelSource(model)
+  source.write(sheet.name, 0, 0, 1)
+  source.write(sheet.name, 1, 0, 1)
+  source.write(sourceSheet.name, 0, 0, 1)
+  source.write(sourceSheet.name, 1, 0, 2)
+  const cache = createCellRuleCache(model)
+  const initial = cache.forSheet(sheet, today)!
+  assert.ok(initial.styleAt(0, 0).dxf)
+  assert.ok(initial.styleAt(0, 1).dxf)
+  cache.invalidate(sheet.name, 0, 2)
+  assert.equal(cache.forSheet(sheet, today), initial)
+  source.write(sourceSheet.name, 0, 0, 2)
+  cache.invalidate(sourceSheet.name, 0, 0)
+  assert.equal(cache.forSheet(sheet, today)?.styleAt(0, 1).dxf, undefined)
+  const previous = source.write(sheet.name, 0, 0, 0)
+  cache.invalidate(sheet.name, 0, 0)
+  assert.equal(cache.forSheet(sheet, today)?.styleAt(1, 0).dxf, undefined)
+  source.restore(sheet.name, 0, 0, previous)
+  cache.invalidate(sheet.name, 0, 0)
+  assert.ok(cache.forSheet(sheet, today)?.styleAt(1, 0).dxf)
+})
+
+test('recompiling a threshold keeps the unrelated matcher and range facts', async () => {
+  const model = await load('rules-all-kinds')
+  const [sheet, other] = model.sheets
+  const source = modelSource(model)
+  source.write(sheet.name, 0, 0, 5)
+  source.write(sheet.name, 1, 0, 10)
+  source.write(sheet.name, 0, 1, 1)
+  source.write(sheet.name, 1, 1, 1)
+  source.write(other.name, 0, 0, 10)
+  const rules = readRules(`<worksheet>
+    <conditionalFormatting sqref="A1:A2"><cfRule type="colorScale" priority="1"><colorScale>
+    <cfvo type="num" val="0"/><cfvo type="formula"><f>MAX('${other.name}'!$A$1:$A$1)</f></cfvo>
+    <color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale></cfRule></conditionalFormatting>
+    <conditionalFormatting sqref="B1:B2"><cfRule type="duplicateValues" priority="2" dxfId="0"/></conditionalFormatting>
+    </worksheet>`, colorContext(model.styles, ''))
+  const cache = createRuleCache(sheet.name)
+  const context = { ...model, today }
+  const first = compileRules(sheet, rules, context, cache)
+  assert.equal(first.styleAt(0, 0).colorScale, '#808080')
+  const unaffected = cache.matchers.get(rules[1])
+  const facts = cache.facts.get(rules[0].sqref)
+  assert.ok(unaffected && facts)
+  source.write(other.name, 0, 0, 5)
+  assert.ok(cache.invalidate(other.name, 0, 0))
+  const updated = compileRules(sheet, rules, context, cache)
+  assert.equal(updated.styleAt(0, 0).colorScale, '#FFFFFF')
+  assert.equal(cache.matchers.get(rules[1]), unaffected)
+  assert.equal(cache.facts.get(rules[0].sqref), facts)
+})
+
+test('the local rule day refreshes at midnight and on focus', async () => {
+  const model = await load('rules-all-kinds')
+  const sheet = model.sheets[0]
+  const source = modelSource(model)
+  const cache = createCellRuleCache(model)
+  sheet.layout.rules = readRules(`<worksheet><conditionalFormatting sqref="A1:A2">
+    <cfRule type="timePeriod" timePeriod="today" priority="1" dxfId="0"/>
+    </conditionalFormatting></worksheet>`, colorContext(model.styles, ''))
+  source.write(sheet.name, 0, 0, excelDay(calendarDay(today), model.date1904))
+  source.write(sheet.name, 1, 0, excelDay(calendarDay(new Date(2026, 10, 25)), model.date1904))
+  let now = new Date(2026, 10, 24, 23, 59, 59, 900)
+  let tick: (() => void) | undefined
+  const events = new EventTarget()
+  const days: Array<[number, boolean, boolean]> = []
+  const stop = watchRuleDay((day) => {
+    const rules = cache.forSheet(sheet, day)!
+    days.push([day.getDate(), !!rules.styleAt(0, 0).dxf, !!rules.styleAt(1, 0).dxf])
+  }, {
+    addEventListener: events.addEventListener.bind(events),
+    removeEventListener: events.removeEventListener.bind(events),
+    setTimeout(callback, delay) {
+      assert.equal(delay, new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime())
+      tick = callback
+      return 1
+    },
+    clearTimeout() { tick = undefined },
+  }, () => now)
+  now = new Date(2026, 10, 25)
+  tick!()
+  now = new Date(2026, 10, 27, 10)
+  events.dispatchEvent(new Event('focus'))
+  assert.deepEqual(days, [[24, true, false], [25, false, true], [27, false, false]])
+  stop()
+  assert.equal(tick, undefined)
 })

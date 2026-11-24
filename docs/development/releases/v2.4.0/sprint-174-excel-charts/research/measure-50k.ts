@@ -1,6 +1,6 @@
 /**
  * Node-side preview timings. Pass the generated rules-50k.xlsx and a source root.
- * Use --before for the pre-PR 6 checkout, which has no cell rule rendering.
+ * Use --before for the pre-PR 6 checkout or --whole-columns for eight full-column rules.
  */
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -28,6 +28,15 @@ async function main() {
   const sheet = model.sheets[model.activeSheet]
   assert.equal(sheet.cells.size, 1_000_000)
   assert.equal(sheet.maxR, 49_999)
+  if (mode === '--whole-columns') {
+    const original = sheet.layout.rules
+    sheet.layout.rules = Array.from({ length: 8 }, (_, i) => {
+      const col = i + 1
+      const letter = String.fromCharCode(65 + col)
+      return { ...original[i % original.length], priority: i + 1, sqref: `${letter}:${letter}`,
+        areas: [{ top: 0, bottom: 1_048_575, left: col, right: col }] }
+    })
+  }
   const source = modelSource(model)
 
   const options = { minWidth: 1400, minHeight: 900 }
@@ -35,13 +44,14 @@ async function main() {
   let layout = buildLayout(sheet, model.styles, options)
   const layoutMs = performance.now() - layoutStart
   const compileStart = performance.now()
-  let rulesFor = rulesModule?.cellRulesForVersion(model, today)
-  const initialRules = rulesFor?.(sheet)
+  const cache = rulesModule?.createCellRuleCache(model)
+  const rulesFor = () => cache?.forSheet(sheet, today)
+  const initialRules = rulesFor()
   const compileMs = performance.now() - compileStart
 
   function windowAt(first: number) {
     const window = { i0: first, i1: first + 39, c0: 0, c1: 19 }
-    const rules = rulesFor?.(sheet)
+    const rules = rulesFor()
     const painted = rulesModule?.visibleCellRules(rules, layout, window, sheet, model)
     // SheetGrid asks for cells and fonts during measurement, then reuses the paint when drawing.
     let checksum = 0
@@ -68,26 +78,32 @@ async function main() {
   const scrollStart = performance.now()
   assert.ok(windowAt(lastFirst))
   const scroll = performance.now() - scrollStart
-  assert.equal(rulesFor?.(sheet), initialRules, 'the last window reuses the initial range facts')
+  assert.equal(rulesFor(), initialRules, 'the last window reuses the initial range facts')
   if (rulesModule) {
     assert.ok(initialRules?.styleAt(lastRow, 1).colorScale)
     assert.ok(initialRules?.styleAt(lastRow, 2).dataBar)
     assert.equal(initialRules?.styleAt(lastRow, 3).dxf?.fill, '#FFC7CE')
   }
 
-  const editStart = performance.now()
-  const value = source.valueFor(sheet.name, lastRow, 1, '20000')
-  source.write(sheet.name, lastRow, 1, value)
-  rulesFor = rulesModule?.cellRulesForVersion(model, today)
-  layout = buildLayout(sheet, model.styles, options)
-  assert.ok(windowAt(lastFirst))
-  const edit = performance.now() - editStart
-  assert.equal(sheet.cells.get(cellKey(lastRow, 1))?.value, 20000)
-  if (rulesModule) {
-    assert.notEqual(rulesFor?.(sheet), initialRules)
-    assert.equal(rulesFor?.(sheet)?.styleAt(lastRow, 1).colorScale, '#63BE7B')
+  function editAt(col: number) {
+    const start = performance.now()
+    const value = source.valueFor(sheet.name, lastRow, col, '20000')
+    source.write(sheet.name, lastRow, col, value)
+    cache?.invalidate(sheet.name, lastRow, col)
+    layout = buildLayout(sheet, model.styles, options)
+    assert.ok(windowAt(lastFirst))
+    const elapsed = performance.now() - start
+    assert.equal(sheet.cells.get(cellKey(lastRow, col))?.value, 20000)
+    return elapsed
   }
-  console.log(JSON.stringify({ read, layout: layoutMs, compile: compileMs, first, scroll, edit }))
+  const outside = editAt(9)
+  assert.equal(rulesFor(), initialRules, 'outside edits reuse the compiled rules')
+  const inside = editAt(1)
+  if (rulesModule) {
+    assert.notEqual(rulesFor(), initialRules)
+    assert.equal(rulesFor()?.styleAt(lastRow, 1).colorScale, '#63BE7B')
+  }
+  console.log(JSON.stringify({ read, layout: layoutMs, compile: compileMs, first, scroll, outside, inside }))
 }
 
 main().catch((error) => {

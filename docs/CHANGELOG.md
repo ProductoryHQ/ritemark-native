@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
 - Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
-- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values.
+- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values. Today rules follow the local date, and the notice identifies Excel icon sets kept in the file.
 - Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use. They follow the workbook’s text formatting and chart layout.
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - When you open a deck, the status bar shows its slide count in place of the word count.

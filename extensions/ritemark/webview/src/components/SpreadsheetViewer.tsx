@@ -10,11 +10,13 @@ import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
 import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
-import { readWorkbook } from './excel/readWorkbook'
+import { readWorkbook, type DrawingModel } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
 import { SheetGrid } from './excel/SheetGrid'
-import { cellRulesForVersion } from './excel/cellRules'
+import { createCellRuleCache, watchRuleDay } from './excel/cellRules'
 import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
+import { FailedChart, type ChartFailureReporter } from './excel/DrawingView'
+import { calendarDay } from './excel/ruleFormula'
 import { drawsChart } from './excel/chartLayout'
 import { keptNotice } from './excel/keptNotice'
 import { Tooltip } from './ui/tooltip'
@@ -130,10 +132,29 @@ export function SpreadsheetViewer({
   // Sprint 158 PR 3: raised by every edit, so the sheet grid draws the model again
   const [version, setVersion] = useState(0)
 
-  // Check if Excel is installed on mount and listen for messages
+  const model = source?.model
+  const ruleCache = useMemo(() => model && createCellRuleCache(model), [model])
+  const [ruleDay, setRuleDay] = useState(() => new Date())
   useEffect(() => {
-    sendToExtension('checkExcel', {})
+    if (!model?.sheets.some((sheet) => sheet.layout.rules.length)) return
+    return watchRuleDay((day) => setRuleDay((previous) => calendarDay(previous) === calendarDay(day) ? previous : day))
+  }, [model])
 
+  // A worksheet chart can have a fallback in more than one frozen-pane region.
+  const [failedCharts, setFailedCharts] = useState(() => new Map<DrawingModel, number>())
+  const reportChartFailure = useCallback<ChartFailureReporter>((drawing, change) => {
+    setFailedCharts((previous) => {
+      const next = new Map(previous)
+      const count = (previous.get(drawing) ?? 0) + change
+      if (count > 0) next.set(drawing, count)
+      else next.delete(drawing)
+      return next
+    })
+  }, [])
+
+  useEffect(() => { sendToExtension('checkExcel', {}) }, [])
+
+  useEffect(() => {
     const unsubscribe = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
@@ -166,13 +187,14 @@ export function SpreadsheetViewer({
         }
         // Refused (the host said why): put the cell back as it was
         current.restore(pending.sheet, pending.row, pending.col, pending.previous)
+        if (current.model === model) ruleCache?.invalidate(pending.sheet, pending.row, pending.col)
         setVersion((v) => v + 1)
         if (pending.sheet === selectedSheetRef.current && !current.model) setParsedData(current.extract(pending.sheet))
       }
     })
 
     return unsubscribe
-  }, [syncEnabled])
+  }, [syncEnabled, model, ruleCache])
 
   // Check file size before parsing
   useEffect(() => {
@@ -441,6 +463,7 @@ export function SpreadsheetViewer({
     const value = source.valueFor(selectedSheet, row, col, text)
     const id = nextEditId.current++
     const previous = source.write(selectedSheet, row, col, value)
+    ruleCache?.invalidate(selectedSheet, row, col)
     pendingEdits.current.set(id, { sheet: selectedSheet, row, col, previous })
     // the cell is drawn as its format draws it (14 in a money cell: 14.00 €)
     setVersion((v) => v + 1)
@@ -449,7 +472,7 @@ export function SpreadsheetViewer({
 
     const edit: CellEdit = { sheet: selectedSheet, ref: XLSX.utils.encode_cell({ r: row, c: col }), value }
     sendToExtension('cellEdit', { id, edit })
-  }, [source, selectedSheet, isEditable])
+  }, [source, selectedSheet, isEditable, ruleCache])
 
   const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
     editCell(sheetRowOf(rowIndex), XLSX.utils.decode_col(columnId), text)
@@ -515,20 +538,18 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const model = source?.model
   const sheetModel = model?.sheets.find((s) => s.name === selectedSheet)
-  // The model is edited in place. A new version invalidates all range and formula facts.
-  const rulesForSheet = useMemo(() => model && cellRulesForVersion(model), [model, version])
-  const cellRules = sheetModel && rulesForSheet?.(sheetModel)
-  const sheetChart = sheetModel?.kind === 'chartsheet'
-    ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart')?.chart : undefined
+  const cellRules = sheetModel && ruleCache?.forSheet(sheetModel, ruleDay)
+  const sheetDrawing = sheetModel?.kind === 'chartsheet'
+    ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart') : undefined
+  const sheetChart = sheetDrawing?.chart
   const excelNotice = fileType !== 'xlsx'
     ? undefined
     : isEditable && editingFormula
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel ? keptNotice(sheetModel.layout, cellRules) : undefined
+        : sheetModel ? keptNotice(sheetModel.layout, cellRules, failedCharts) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -648,8 +669,8 @@ export function SpreadsheetViewer({
 
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
           grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
-      {source?.model && drawsChart(sheetChart) ? (
-        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={chartSheetCard()}>
+      {source?.model && sheetDrawing && drawsChart(sheetChart) ? (
+        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={<FailedChart drawing={sheetDrawing} report={reportChartFailure}>{chartSheetCard()}</FailedChart>}>
           <div className="relative min-h-0 flex-1">
             <div className="absolute inset-0">
               <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard} />
@@ -664,6 +685,7 @@ export function SpreadsheetViewer({
           sheet={sheetModel}
           version={version}
           cellRules={cellRules}
+          onChartFailure={reportChartFailure}
           editable={isEditable}
           onEdit={editCell}
           getInput={gridInput}

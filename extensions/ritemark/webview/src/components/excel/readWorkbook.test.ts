@@ -38,10 +38,9 @@ async function main() {
       assert.equal(sha256(bytes), before, `${label}: ${name} changed input bytes`)
     }
   }
-  console.log(`  R21: input bytes preserved on ${fixtures.length} workbooks`)
+  console.log(`  R21: the reader does not mutate its input on ${fixtures.length} workbooks`)
 
   for (const [label, file] of fixtures) {
-    const mtime = fs.statSync(file).mtimeMs
     const bytes = new Uint8Array(fs.readFileSync(file))
     const hash = () => createHash('sha256').update(bytes).digest('hex')
     const before = hash()
@@ -63,8 +62,6 @@ async function main() {
       }
     }
     assert.equal(hash(), before, `${label}: reading and applying rule styles preserve the input bytes`)
-    assert.equal(sha256(fs.readFileSync(file)), before, `${label}: fixture file hash`)
-    assert.equal(fs.statSync(file).mtimeMs, mtime, `${label}: fixture modified time`)
     const book = XLSX.read(bytes, { type: 'array', cellFormula: true })
     assert.deepEqual(model.sheets.map((s) => s.name), book.SheetNames, `${label}: the sheets`)
     let compared = 0

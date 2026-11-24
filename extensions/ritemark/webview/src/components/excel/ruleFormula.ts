@@ -12,6 +12,7 @@ export interface FormulaContext {
   date1904: boolean
   cellAt(sheet: string | undefined, row: number, col: number): Scalar
   rangeCache?: FormulaRangeCache
+  onRead?: (sheet: string | undefined, area: RefArea) => void
   cellsIn(sheet: string | undefined, area: RefArea): Iterable<Scalar>
 }
 
@@ -233,6 +234,8 @@ interface RangeSummary {
 }
 
 interface CachedRange {
+  sheet: string | undefined
+  area: RefArea
   summary?: RangeSummary
   counts?: Map<Scalar, number>
 }
@@ -246,7 +249,7 @@ function staticRange(ref: FormulaRef, area: RefArea, ctx: FormulaContext): Cache
   const key = JSON.stringify([ref.sheet?.toUpperCase(), area.top, area.left, area.bottom, area.right])
   let entry = cache.get(key)
   if (!entry) {
-    entry = {}
+    entry = { sheet: ref.sheet, area }
     cache.set(key, entry)
   }
   return entry
@@ -314,7 +317,11 @@ export function primeFormulaRanges(expr: Expression, ctx: FormulaContext): void 
 }
 
 export function runRuleFormula(expr: Expression, ctx: FormulaContext): Scalar {
-  const areaOf = (ref: FormulaRef) => refArea(ref, ctx.row - ctx.anchor.top, ctx.col - ctx.anchor.left)
+  const areaOf = (ref: FormulaRef) => {
+    const area = refArea(ref, ctx.row - ctx.anchor.top, ctx.col - ctx.anchor.left)
+    if (area) ctx.onRead?.(ref.sheet, area)
+    return area
+  }
   const read = (node: Expression): Scalar => {
     switch (node.kind) {
       case 'literal': return node.value

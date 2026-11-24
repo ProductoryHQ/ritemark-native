@@ -182,7 +182,8 @@ function compileRule(
   rule: ConditionalRule, area: RefArea,
   formulas: Parsed[], thresholds: Array<Parsed | undefined>,
   context: RuleContext, getSheet: (name?: string) => RuleSheet | undefined,
-  factsFor: () => RangeFacts, cache: FormulaRangeCache, window?: [number, number],
+  factsFor: () => RangeFacts, cache: FormulaRangeCache,
+  onThresholdRead: NonNullable<FormulaContext['onRead']>, window?: [number, number],
 ): MatchAt | undefined {
   const formulaContext = (row: number, col: number): FormulaContext => ({
     row, col, anchor: area, today: context.today, date1904: context.date1904, rangeCache: cache,
@@ -205,7 +206,8 @@ function compileRule(
   for (const formula of [...formulas, ...thresholds]) {
     if (formula && formula !== UNREADABLE) primeFormulaRanges(formula, atAnchor)
   }
-  const limits = thresholds.map((formula) => run(formula, area.top, area.left))
+  const limits = thresholds.map((formula) => formula === undefined || formula === UNREADABLE
+    ? FORMULA_ERROR : runRuleFormula(formula, { ...atAnchor, onRead: onThresholdRead }))
   if (limits.some((limit, i) => thresholds[i] !== undefined && !isNumber(limit))) return undefined
 
   switch (rule.type) {
@@ -299,23 +301,89 @@ function compileRule(
   return () => false
 }
 
-/** Compile once for a sheet version. Call styleAt only for the cells the caller needs. */
-export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext) {
+interface CachedMatcher {
+  day: number
+  match?: MatchAt
+  unreadable?: boolean
+  usesFacts?: boolean
+  thresholdReads: Array<{ sheet: string; area: RefArea }>
+}
+
+/** Facts and static formula ranges outlive the compiled matchers. */
+export function createRuleCache(sheetName: string) {
+  const facts = new Map<string, { areas: readonly RefArea[]; value: RangeFacts }>()
+  const ranges: FormulaRangeCache = new Map()
+  const matchers = new Map<ConditionalRule, CachedMatcher>()
+  const localSheet = sheetName.toUpperCase()
+  return {
+    facts, ranges, matchers,
+    invalidate(sheet: string, row: number, col: number) {
+      const name = sheet.toUpperCase()
+      const touchedFacts = new Set<string>()
+      if (name === localSheet) {
+        for (const [key, entry] of facts) {
+          if (!entry.areas.some((area) => inside(area, row, col))) continue
+          facts.delete(key)
+          touchedFacts.add(key)
+        }
+      }
+      for (const [key, entry] of ranges) {
+        if ((entry.sheet?.toUpperCase() ?? localSheet) === name && inside(entry.area, row, col)) ranges.delete(key)
+      }
+      let recompile = false
+      for (const [rule, entry] of matchers) {
+        if ((entry.usesFacts && touchedFacts.has(rule.sqref)) ||
+          entry.thresholdReads.some((read) => read.sheet === name && inside(read.area, row, col))) {
+          matchers.delete(rule)
+          recompile = true
+        }
+      }
+      return recompile
+    },
+  }
+}
+
+/** Call styleAt only for the cells the caller needs. */
+export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext, cache = createRuleCache(sheet.name)) {
   const unreadable: ConditionalRule[] = []
   const iconSets: ConditionalRule[] = []
   const sheets = new Map(ctx.sheets?.map((target) => [target.name.toUpperCase(), target]))
   sheets.set(sheet.name.toUpperCase(), sheet)
   const getSheet = (name?: string) => name === undefined ? sheet : sheets.get(name.toUpperCase())
-  const facts = new Map<string, RangeFacts>()
-  const cache: FormulaRangeCache = new Map()
   const factsFor = (rule: ConditionalRule) => {
     const key = rule.sqref
-    let cached = facts.get(key)
+    let cached = cache.facts.get(key)
     if (!cached) {
-      cached = collectFacts(sheet, rule.areas)
-      facts.set(key, cached)
+      cached = { areas: rule.areas, value: collectFacts(sheet, rule.areas) }
+      cache.facts.set(key, cached)
     }
-    return cached
+    return cached.value
+  }
+  const day = calendarDay(ctx.today)
+  const buildMatcher = (rule: ConditionalRule): CachedMatcher => {
+    const entry: CachedMatcher = { day, thresholdReads: [] }
+    // Excel commonly stores generated SEARCH/ISERROR formulas on built-in text,
+    // error and blank rules. Their declared type and attributes define the test.
+    const formulas = rule.type === 'cellIs' || rule.type === 'expression' ? rule.formulas.map(readRuleFormula) : []
+    const thresholds = (rule.scale?.stops ?? rule.bar?.stops ?? []).map((stop) =>
+      ['formula', 'num', 'percent', 'percentile'].includes(stop.type) ? readRuleFormula(stop.value ?? '') : undefined)
+    const required = rule.type === 'expression' || rule.type === 'cellIs'
+      ? rule.operator === 'between' || rule.operator === 'notBetween' ? 2 : 1 : 0
+    if (formulas.length < required || [...formulas, ...thresholds].includes(UNREADABLE)) {
+      entry.unreadable = true
+      return entry
+    }
+    const window = rule.type === 'timePeriod' ? dateWindow(rule.timePeriod, ctx) : undefined
+    const anchor = rule.areas[0]
+    if (!anchor) return entry
+    entry.match = compileRule(rule, anchor, formulas, thresholds, ctx, getSheet, () => {
+      entry.usesFacts = true
+      return factsFor(rule)
+    }, cache.ranges, (name, area) => {
+      entry.thresholdReads.push({ sheet: (name ?? sheet.name).toUpperCase(), area })
+    }, window)
+    entry.unreadable = !entry.match
+    return entry
   }
   const compiled = [...rules].sort((a, b) => a.priority - b.priority).flatMap((rule) => {
     if (rule.type === 'unreadable') {
@@ -326,28 +394,15 @@ export function compileRules(sheet: RuleSheet, rules: RuleSet, ctx: RuleContext)
       iconSets.push(rule)
       return []
     }
-    // Excel commonly stores generated SEARCH/ISERROR formulas on built-in text,
-    // error and blank rules. Their declared type and attributes define the test.
-    const formulas = rule.type === 'cellIs' || rule.type === 'expression' ? rule.formulas.map(readRuleFormula) : []
-    const thresholds = (rule.scale?.stops ?? rule.bar?.stops ?? []).map((stop) =>
-      ['formula', 'num', 'percent', 'percentile'].includes(stop.type) ? readRuleFormula(stop.value ?? '') : undefined)
-    const required = rule.type === 'expression' || rule.type === 'cellIs'
-      ? rule.operator === 'between' || rule.operator === 'notBetween' ? 2 : 1 : 0
-    if (formulas.length < required || [...formulas, ...thresholds].includes(UNREADABLE)) {
-      unreadable.push(rule)
-      return []
+    let entry = cache.matchers.get(rule)
+    if (entry?.day !== day) {
+      entry = buildMatcher(rule)
+      cache.matchers.set(rule, entry)
     }
-    const window = rule.type === 'timePeriod' ? dateWindow(rule.timePeriod, ctx) : undefined
-    const anchor = rule.areas[0]
-    if (!anchor) return []
-    const match = compileRule(rule, anchor, formulas, thresholds, ctx, getSheet, () => factsFor(rule), cache, window)
-    if (!match) {
-      unreadable.push(rule)
-      return []
-    }
-    return [{
-      rule, match, dxf: rule.dxfId === undefined ? undefined : ctx.styles.dxfs[rule.dxfId],
-    }]
+    if (entry.unreadable) unreadable.push(rule)
+    return entry.match ? [{
+      rule, match: entry.match, dxf: rule.dxfId === undefined ? undefined : ctx.styles.dxfs[rule.dxfId],
+    }] : []
   })
   return {
     unreadable, iconSets,
