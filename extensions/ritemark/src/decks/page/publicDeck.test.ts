@@ -244,4 +244,16 @@ for (const front of frontMatters) {
   assert.equal(publicMarkdown(markdown), out.data.markdown);
 }
 
+// Timing stays private, including when time is the only key in a block slide's header.
+{
+  const slide = (header = '') => ['```slide', ...header.split('\n').filter(Boolean), '# Welcome', '```', ''].join('\n');
+  const deck = (length: number, body: string) => `---\nritemark-length: ${length}\n---\n\n${body}`;
+  const digest = (length: number, body: string) => deckDigest(publicDeck(deck(length, body), options));
+  const timed = slide('---\ntime: 25\n---');
+  assert.equal(digest(60, timed), digest(60, slide('---\ntime: 30\n---')), 'changing slide minutes stays private');
+  assert.equal(digest(60, timed), digest(60, slide()), 'adding slide minutes stays private');
+  assert.equal(digest(60, timed), digest(90, timed), 'changing session length stays private');
+  assert.equal(digest(60, timed), deckDigest(publicDeck(timed, options)), 'adding session length stays private');
+}
+
 console.log('publicDeck: passed');
