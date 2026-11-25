@@ -84,23 +84,39 @@ check('S, M, L and Full document bars sit inside the picture row', () => {
   }
 })
 
-check('a centred M picture folds to stay inside its row', () => {
-  const picture = { left: 430, top: 140, width: 480, height: 240 }
-  const row = { picture, left: 250, right: 1090 }
-  const widths = [660, 650, 630]
-  assert.equal(pictureBarFold(0, widths, 36, 1200, row), 1)
-  assert.equal(pictureBarFold(1, widths, 36, 1200, row), 2)
-  assert.equal(pictureBarFold(2, widths, 36, 1200, row), 2)
-  assert.deepEqual(pictureBarPlacement(380, 36, 600, false, { ...row, width: widths[2] }), {
-    left: 442, top: 336, room: 0,
-  })
+check('right-aligned S → M → S keeps the full bar inside the 840 px row', () => {
+  const column = { left: 250, right: 1090 }
+  const widths = [638, 520, 490, 420]
+  let fold = 1
+  for (const width of [320, 480, 320]) {
+    const picture = { left: column.right - width, top: 140, width, height: width / 2 }
+    const row = { ...column, picture }
+    fold = pictureBarFold(fold, widths, 1200, row)
+    assert.equal(fold, 0)
+    const bottom = picture.top + picture.height
+    assert.deepEqual(pictureBarPlacement(bottom, 36, 600, false, { ...row, width: widths[fold] }), {
+      left: column.right - widths[0], top: bottom - 44, room: 0,
+    })
+  }
 })
 
-check('a document picture bar needs spare width before unfolding', () => {
-  const row = { picture: { left: 250, top: 140, width: 480, height: 240 }, left: 250, right: 902 }
-  assert.equal(pictureBarFold(1, [640, 620], 36, 1200, row), 1)
-  assert.equal(pictureBarFold(1, [640, 620], 36, 1200, { ...row, right: 918 }), 1)
-  assert.equal(pictureBarFold(1, [640, 620], 36, 1200, { ...row, right: 922 }), 0)
+check('a narrow row folds before reserving room', () => {
+  const row = { picture: { left: 250, top: 140, width: 400, height: 200 }, left: 250, right: 670 }
+  const widths = [638, 520, 490, 420]
+  for (const fold of [0, 1, 2]) assert.equal(pictureBarFold(fold, widths, 1200, row), fold + 1)
+  assert.equal(pictureBarFold(3, widths, 1200, row), 3)
+  assert.equal(pictureBarPlacement(340, 36, 600, false, { ...row, width: widths[3] }).room, 0)
+  assert.equal(pictureBarPlacement(340, 36, 600, false, { ...row, right: 669, width: widths[3] }).room, 47)
+})
+
+check('unfolding needs spare width only while the bar reserves room', () => {
+  const row = { picture: { left: 250, top: 140, width: 480, height: 24 }, left: 250, right: 890 }
+  const widths = [640, 620]
+  assert.equal(pictureBarFold(1, widths, 1200, row), 0)
+  assert.equal(pictureBarFold(1, widths, 1200, row, true), 1)
+  assert.equal(pictureBarFold(1, widths, 1200, { ...row, right: 907 }, true), 1)
+  assert.equal(pictureBarFold(1, widths, 1200, { ...row, right: 910 }, true), 0)
+  assert.equal(pictureBarFold(0, widths, 1200, { ...row, right: 893 }, true), 0)
 })
 
 check('crop keeps the room already reserved for the picture bar', () => {
@@ -120,14 +136,14 @@ check('a short picture reserves left-aligned room below, including near the view
   }
 })
 
-check('a narrow table cell or a right-aligned picture uses the fallback within its row', () => {
+check('a narrow table cell reserves room and a wider row clamps the bar inside', () => {
   const picture = { left: 80, top: 180, width: 60, height: 100 }
   assert.deepEqual(pictureBarPlacement(280, 36, 600, false, { picture, width: 320, left: 80, right: 320 }), {
     left: 80, top: 290, room: 47,
   })
   assert.deepEqual(pictureBarPlacement(280, 36, 600, false, {
     picture: { ...picture, left: 500 }, width: 320, left: 260, right: 708,
-  }), { left: 388, top: 290, room: 47 })
+  }), { left: 388, top: 236, room: 0 })
   assert.deepEqual(pictureBarPlacement(280, 36, 600, false, {
     picture, width: 320, left: 100, right: 600,
   }), { left: 100, top: 236, room: 0 })

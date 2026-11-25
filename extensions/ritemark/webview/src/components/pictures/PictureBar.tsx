@@ -251,10 +251,11 @@ export function PictureBar(props: PictureBarProps) {
       left: Math.max(0, rowRect.left),
       right: Math.min(window.innerWidth, rowRect.right),
     }
+    const reservedRoom = parseFloat(roomHost?.style.getPropertyValue('--picture-bar-room') ?? '') || 0
     if (!crop || !documentRow) {
       widths.current[fold] = width
       const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
-      const nextFold = pictureBarFold(fold, widths.current, height, room, row)
+      const nextFold = pictureBarFold(fold, widths.current, room, row, reservedRoom > 0)
       if (nextFold !== fold) {
         setFold(nextFold)
         return
@@ -264,8 +265,7 @@ export function PictureBar(props: PictureBarProps) {
     const rightEdge = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - 8
     const maxX = rightEdge - width
     const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
-    const retainedRoom = crop && roomHost ? parseFloat(roomHost.style.getPropertyValue('--picture-bar-room')) || 0 : 0
-    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, row, retainedRoom)
+    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, row, crop ? reservedRoom : 0)
     if (placement.room) roomHost?.style.setProperty('--picture-bar-room', `${placement.room}px`)
     else roomHost?.style.removeProperty('--picture-bar-room')
     setLeft(placement.left ?? Math.round(x))

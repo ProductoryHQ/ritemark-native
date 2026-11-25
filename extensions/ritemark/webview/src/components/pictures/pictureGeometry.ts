@@ -15,18 +15,18 @@ export interface Box {
 
 type PictureRow = { picture: Box; left: number; right: number }
 
-function insideBarLeft(row: PictureRow, height: number): number | undefined {
-  if (row.picture.height >= height + 16) return Math.max(row.left, row.picture.left + 12)
-}
-
-export function pictureBarFold(fold: number, widths: readonly number[], height: number, room: number, row?: PictureRow): number {
-  if (row) {
-    room = Math.min(room, row.right - (insideBarLeft(row, height) ?? row.left))
-  }
+export function pictureBarFold(
+  fold: number,
+  widths: readonly number[],
+  room: number,
+  row?: PictureRow,
+  roomReserved = false,
+): number {
+  if (row) room = Math.min(room, row.right - row.left)
   if (widths[fold] > room && fold < 3) return fold + 1
   // More than a classic scrollbar's width: reserved room can bring a scrollbar that narrows the row, and the
   // bar must not fold and unfold in turn (Windows' always-shown scrollbars are about 17 px).
-  const unfoldSlack = row ? 20 : 0
+  const unfoldSlack = roomReserved ? 20 : 0
   if (fold > 0 && widths[fold - 1] + unfoldSlack <= room) return fold - 1
   return fold
 }
@@ -43,8 +43,8 @@ export function pictureBarPlacement(
   const below = bottom + 10
   if (row) {
     const { picture, width, left, right } = row
-    const inset = insideBarLeft(row, height)
-    if (inset !== undefined && inset + width <= right) {
+    if (picture.height >= height + 16 && width <= right - left) {
+      const inset = Math.max(left, Math.min(picture.left + 12, right - width))
       return { left: inset, top: picture.top + picture.height - height - 8, room: 0 }
     }
     // Under the picture, from its left edge, kept inside the row.
