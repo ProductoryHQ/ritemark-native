@@ -7,6 +7,21 @@ export function slideBubblePopperOptions(stage: HTMLElement): Props['popperOptio
     modifiers: [
       { name: 'flip', options: { boundary: stage, fallbackPlacements: ['bottom-start'], altAxis: false } },
       { name: 'preventOverflow', options: { boundary: stage, tether: false, altAxis: true } },
+      {
+        name: 'hide',
+        fn: ({ state }) => {
+          // The DOM range and stage use screen coordinates, including the slide transform.
+          const selection = state.elements.reference.getBoundingClientRect()
+          const bounds = stage.getBoundingClientRect()
+          state.attributes.popper = {
+            ...state.attributes.popper,
+            'data-popper-reference-hidden': selection.right <= bounds.left
+              || selection.left >= bounds.right
+              || selection.bottom <= bounds.top
+              || selection.top >= bounds.bottom,
+          }
+        },
+      },
       { name: 'computeStyles', options: { adaptive: false } },
     ],
   }
