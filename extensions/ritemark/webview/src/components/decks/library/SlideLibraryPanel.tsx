@@ -494,13 +494,13 @@ export function SlideLibraryPanel() {
           <Tooltip label={deck.topic ? 'Open topic' : 'Open deck'} asChild>
             <Button
               type="button"
-              variant="ghost"
-              size="icon-xs"
-              className="deck-lib-open size-6"
-              aria-label={`Open deck ${deck.name}`}
+              variant="toolbar"
+              size="icon-2xs"
+              className="deck-lib-open"
+              aria-label={`${deck.topic ? 'Open topic' : 'Open deck'} ${deck.name}`}
               onClick={() => sendToExtension('library/open', { path: deck.path })}
             >
-              <Icon name="arrow-square-out" size={14} tone="inherit" className="size-3.5" />
+              <Icon name="arrow-square-out" size={14} tone="inherit" />
             </Button>
           </Tooltip>
         </div>

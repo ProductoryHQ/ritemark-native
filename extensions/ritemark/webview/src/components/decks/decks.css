@@ -373,7 +373,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-search input::placeholder { color: var(--r-ink-muted); opacity: 1; }
 .deck-lib-search input::-webkit-search-cancel-button { display: none; }
 .deck-lib-row { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: 400 13.5px/30px var(--ritemark-ui-font-family); color: var(--r-ink-strong); text-align: left; white-space: nowrap; }
-.deck-lib-row:hover { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
 .deck-lib-row > svg { flex-shrink: 0; color: var(--r-ink-body); }
 .deck-lib-row > svg.deck-lib-caret { color: var(--r-ink-muted); }
 .deck-lib-name { overflow: hidden; text-overflow: ellipsis; }
@@ -393,7 +392,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-row-actions { position: relative; }
 /* Keep the 24px action and its two 8px gaps clear even when the action is hidden. */
 .deck-lib-row-actions > .deck-lib-row { padding-right: 40px; }
-.deck-lib-row-actions > .deck-lib-open { position: absolute; right: 8px; top: 50%; translate: 0 -50%; color: var(--r-ink-strong); opacity: 0; pointer-events: none; }
+.deck-lib-row-actions:hover > .deck-lib-row,
+:where(:root:not([data-input-mode="pointer"])) .deck-lib-row-actions:has(> .deck-lib-open:focus-visible) > .deck-lib-row { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
+.deck-lib-row-actions > .deck-lib-open { position: absolute; right: 8px; top: 50%; translate: 0 -50%; opacity: 0; pointer-events: none; }
 .deck-lib-row-actions:hover > .deck-lib-open,
 :where(:root:not([data-input-mode="pointer"])) .deck-lib-row-actions:has(> :focus-visible) > .deck-lib-open { opacity: 1; pointer-events: auto; }
 .deck-lib-row.deck-lib-row-two > svg { margin-top: 2px; }
