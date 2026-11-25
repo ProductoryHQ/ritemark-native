@@ -1478,6 +1478,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
             <SelectTrigger
               className="h-6 w-36 max-w-[42vw] min-w-0 shrink gap-1 border-transparent bg-transparent px-1.5 py-0 text-[11px] font-medium text-[var(--r-ink-muted)] hover:bg-[var(--r-surface-soft)] focus-visible:ring-0 focus-visible:border-[var(--r-hairline)] [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0 max-[531px]:w-auto max-[531px]:max-w-none max-[531px]:px-1 max-[531px]:[&>svg]:hidden max-[238px]:basis-0 max-[238px]:grow max-[238px]:max-w-max"
               title={runtimeFooterLabel}
+              data-model-value={runtimeSelectValue}
             >
               <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
                 <span className="max-[531px]:hidden">{runtimeFooterLabel}</span>
@@ -1574,6 +1575,7 @@ export function ChatInput({ onReport, menuBoundary, notice }: ChatInputProps) {
                       <SelectItem
                         key={entry.compositeValue}
                         value={entry.compositeValue}
+                        data-model-value={entry.compositeValue}
                         className="items-start py-1.5"
                       >
                         <div className="block w-full">

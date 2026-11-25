@@ -17,7 +17,9 @@ RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-reading-claude
   --user-data-dir=/private/tmp/rm-reading-claude-1
 ```
 
-For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
+For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The runner selects a Google model for this run. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
+
+Use `--question "<text>"` to run the three S38 prompts. The automatic scores still measure the fixed whole-folder question. Judge each S38 answer against its requested scope. Regenerate older fixtures to pick up the additional accepted facts for criterion 1.
 
 1. All 13 documents have a matching fact or an explicit, valid unread reason. The fixture has two known unread cases (the scan and the confidential appendix).
 2. The notes belong to their own slides and slide 5 is explicitly reported as having none.

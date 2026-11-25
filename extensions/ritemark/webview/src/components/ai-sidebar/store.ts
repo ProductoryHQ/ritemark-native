@@ -65,7 +65,7 @@ import {
   type PromptQueues,
   type QueueItem,
 } from './promptQueue';
-import { updateStep } from './stepLabel';
+import { isHiddenToolActivity, updateStep } from './stepLabel';
 import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
@@ -3270,6 +3270,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const targetId = routeInbound(message);
           if (!targetId) break;
           const progress = message.progress as AgentProgress;
+          if (isHiddenToolActivity(progress)) break;
 
           patchLastAgentTurn(targetId, (lastTurn) => {
             if (progress.type === 'text' || progress.type === 'plan_text') {

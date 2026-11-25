@@ -2,7 +2,7 @@
  * ActivityDetails — collapsible tool call list using native <details>/<summary>.
  */
 
-import { readSummary, stepLabel } from './stepLabel';
+import { isHiddenToolActivity, readSummary, stepLabel } from './stepLabel';
 import { ActivityCard } from './ActivityCard';
 import { activeDurationMs } from './types';
 import { formatSeconds } from './activityState';
@@ -23,9 +23,10 @@ export function ActivityDetails({ activities, metrics, running }: ActivityDetail
       </div>
     ) : null;
   }
-  if (!activities.length) return null;
+  const visible = activities.filter((activity) => !isHiddenToolActivity(activity));
+  if (!visible.length) return null;
 
-  const stepCount = activities.length;
+  const stepCount = visible.length;
   // Sprint 103 R7: report agent working time, not human wait time — in the
   // same format the status line uses (one vocabulary for one fact).
   const activeMs = metrics ? activeDurationMs(metrics) : 0;
@@ -40,7 +41,7 @@ export function ActivityDetails({ activities, metrics, running }: ActivityDetail
         {readSummary(activities, activeMs) ?? `Activity (${summaryParts.join(' · ')})`}
       </summary>
       <div className="mt-1.5 ml-1 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
-        {activities.map((a, i) => (
+        {visible.map((a, i) => (
           <ActivityCard key={`${a.timestamp}-${i}`} activity={a} />
         ))}
       </div>

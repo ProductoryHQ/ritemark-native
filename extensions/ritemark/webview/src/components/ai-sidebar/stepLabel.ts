@@ -24,6 +24,13 @@ function documentCounts(paths: Iterable<string>): string {
   return [...kinds].map(([kind, count]) => `${count} ${names[kind][count === 1 ? 0 : 1]}`).join(', ');
 }
 
+/** Structured document steps and subagent/plan events have their own presentation. */
+export function isHiddenToolActivity(activity: AgentProgress): boolean {
+  return !activity.step && !isDocumentReadTool(activity.tool)
+    && (activity.type === 'tool_use' || activity.type === 'subagent_progress')
+    && /^(?:(?:ToolSearch|TodoWrite|Task|Agent|EnterPlanMode|ExitPlanMode)$|mcp__)/i.test(activity.tool ?? '');
+}
+
 function stepOf(activity: AgentProgress): Omit<ToolStep, 'id'> | undefined {
   if (activity.step) return activity.step;
   // Older transcripts did not persist the step payload.
@@ -67,6 +74,7 @@ export function stepLabel(activity: AgentProgress) {
 }
 
 export function updateStep(activities: AgentProgress[], incoming: AgentProgress): AgentProgress[] {
+  if (isHiddenToolActivity(incoming)) return activities;
   const step = incoming.step;
   const index = step ? activities.findIndex((a) => a.step?.id === step.id) : -1;
   if (!step || index < 0) return [...activities, incoming];
@@ -95,5 +103,5 @@ export function readSummary(activities: AgentProgress[], activeMs = 0): string |
 }
 
 export function activityHeadline(activity?: AgentProgress): string {
-  return activity ? stepLabel(activity)?.label ?? activity.message : '';
+  return activity && !isHiddenToolActivity(activity) ? stepLabel(activity)?.label ?? activity.message : '';
 }

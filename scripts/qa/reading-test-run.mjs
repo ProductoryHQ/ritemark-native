@@ -12,7 +12,7 @@ const template = path.join(repo, 'docs/development/releases/v2.4.0/sprint-173-wo
 const runtimes = {
   claude: { label: 'Claude', key: 'ANTHROPIC' },
   chatgpt: { label: 'ChatGPT', key: 'OPENAI' },
-  opencode: { label: 'OpenCode', key: 'GOOGLE' },
+  opencode: { label: 'OpenCode', key: 'GOOGLE', modelPrefix: 'opencode:google/' },
 };
 
 const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
@@ -24,7 +24,7 @@ const containsFact = (text, words) => words.some((word) => {
 });
 const pathText = /(?:\bfile:\/\/|\b[A-Z]:[\\/]|(?:^|[\s`"'(])(?:~|\.{1,2})?[\\/]\S|(?:[\w.-]+[\\/])+[\w.-]+\.(?:docx|pdf|pptx)\b)/im;
 const passwordReason = /\b(?:has a password|password[- ]protected|encrypted with a password|requires a password)\b/i;
-const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted)\s+copy\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
+const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted)\s+copy\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+(?:the|a|its)\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
 const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can't) (?:open|read|extract)\b[^\n]*\b(?:corrupt(?:ed)?|damaged|unsupported|permission denied|access denied|missing|not found|timed out)\b/i;
 const scanReason = /\b(?:no (?:searchable |selectable |extractable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
@@ -69,10 +69,11 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     result: deckRead ? 'read' : deckRows.some((line) => otherUnreadReason.test(line)) ? 'unread' : 'missing',
   });
 
-  const names = [facts.folder, ...coverage.flatMap(({ file }) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
+  const names = ['the project folder', facts.folder, ...coverage.flatMap(({ file }) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
     .filter((name) => name && name !== '.');
   const badSteps = stepLabels.filter((label) => {
-    const match = /^(?:Read|Looked in|Couldn't open|Could not open)\s+(.+?)(?:\s+·\s+|:\s+|$)/i.exec(label.trim());
+    if (/^Reading documents$/i.test(label.trim())) return false;
+    const match = /^(?:Read|Reading|Looked in|Looking in|Couldn't look in|Couldn't open|Could not open)\s+(.+?)(?:\s+·\s+|:\s+|$)/i.exec(label.trim());
     return !match || pathText.test(label) || !names.some((name) => normalize(match[1]) === normalize(name));
   });
 
@@ -224,7 +225,7 @@ const lastTurn = `
   if (turn?.hasAttribute('data-turn-anchor')) turn = null;
 `;
 
-async function ask(ui, ai, runtime, question) {
+async function ask(ui, ai, runtime, question, report) {
   if (!(await ui.frame())) {
     await ui.press('F1', 'F1', 112);
     await ui.waitFor(async () => ui.evaluate(await ui.page(), '!!document.querySelector(".quick-input-widget input:focus")'),
@@ -236,23 +237,29 @@ async function ask(ui, ai, runtime, question) {
   }
   await ui.waitFor(ui.frame, 60, 'The AI composer did not open.');
   const modelButton = `d.querySelector(${JSON.stringify(modelSelector)})`;
-  const selected = () => ui.chat(`return ${modelButton}?.title;`);
-  if (!(await selected())?.startsWith(`${runtime.label} · `)) {
+  const selected = () => ui.chat(`return {title: ${modelButton}?.title, value: ${modelButton}?.dataset.modelValue};`);
+  const matchesRuntime = (model) => model?.title?.startsWith(`${runtime.label} · `)
+    && (!runtime.modelPrefix || model.value?.startsWith(runtime.modelPrefix));
+  if (!matchesRuntime(await selected())) {
     await ui.waitFor(() => ui.clickChat(modelButton), 20, 'The AI model picker is unavailable.');
+    const selector = '[role="option"]:not([aria-disabled="true"])'
+      + (runtime.modelPrefix ? `[data-model-value^="${runtime.modelPrefix}"]` : '');
     const option = `[...d.querySelectorAll('[role="group"]')].find(el =>
       d.getElementById(el.getAttribute('aria-labelledby'))?.textContent.trim() === ${JSON.stringify(runtime.label)}
-    )?.querySelector('[role="option"]:not([aria-disabled="true"])')`;
-    await ui.waitFor(() => ui.clickChat(option), 30, 'The requested AI has no selectable model. Check the test build and vault setup.');
+    )?.querySelector(${JSON.stringify(selector)})`;
+    await ui.waitFor(() => ui.clickChat(option), 30, runtime.modelPrefix
+      ? 'OpenCode has no selectable Google model. Check Google key readiness and the model catalog.'
+      : 'The requested AI has no selectable model. Check the test build and vault setup.');
   }
-  const model = await ui.waitFor(async () => {
+  report.model = await ui.waitFor(async () => {
     const current = await selected();
-    return current?.startsWith(`${runtime.label} · `) && current;
-  }, 15, 'The composer switched to a different AI.');
+    return matchesRuntime(current) && current.title;
+  }, 15, 'The composer did not select the requested AI and provider.');
   const textarea = 'd.querySelector(\'textarea[aria-label="Message"]\')';
   if (!(await ui.clickChat(textarea))) throw new Error('The message box could not be focused.');
   await ui.insert(question);
   await ui.waitFor(() => ui.chat(`return ${textarea}?.value === ${JSON.stringify(question)};`),
-    10, 'The fixed question did not reach the message box.');
+    10, 'The question did not reach the message box.');
   if (!(await ui.clickChat('d.querySelector(\'button[aria-label="Send"]:not(:disabled)\')'))) throw new Error('Send is unavailable.');
 
   const answer = await ui.waitFor(() => ui.chat(`
@@ -267,10 +274,12 @@ async function ask(ui, ai, runtime, question) {
     return fiber ? {
       answer:fiber.memoizedProps.content,
       visibleAnswer:markdown.innerText,
+      readFold:[...turn.querySelectorAll('details:not([open]) > summary, button[aria-expanded="false"]')]
+        .find(el => /^Read /.test(el.innerText))?.innerText ?? null,
       links:[...markdown.querySelectorAll('a[href]')].map(a=>({label:a.innerText, href:a.getAttribute('href')})),
     } : null;
   `), 240, 'The turn did not produce a completed answer within 240 seconds.');
-  if (answer.failed) throw new Error('The selected AI returned a turn failure. Check API-key readiness in the test build.');
+  if (answer.failed) throw new Error('The selected model returned a turn failure.');
 
   await ui.chat(`
     ${lastTurn}
@@ -294,10 +303,10 @@ async function ask(ui, ai, runtime, question) {
       return activity && /^(init|thinking|text|done|error)$/.test(activity.type) ? [] : [row.innerText.trim()];
     });
   `);
-  return { ...answer, stepLabels, model };
+  return { ...answer, stepLabels };
 }
 
-async function tryLinks(ui, folder, facts, links, results) {
+export async function tryLinks(ui, folder, facts, links, results) {
   const files = [...facts.documents.map(({ file }) => file), facts.deck.file, facts.passwordDocument];
   const front = async () => ui.evaluate(await ui.page(), `(() => {
     const tab = document.querySelector(${JSON.stringify(activeTab)});
@@ -317,24 +326,41 @@ async function tryLinks(ui, folder, facts, links, results) {
     const filePath = path.join(folder, targetFile);
     if (!fs.existsSync(filePath) || fs.realpathSync(filePath).normalize('NFC') !== filePath.normalize('NFC')) continue;
 
-    // Close the last fixture before the next click so a stale tab or highlight cannot count.
-    const isFixtureActive = async () => {
-      const open = await front();
-      return files.some((file) => path.posix.basename(file).normalize('NFC') === open.normalize('NFC'));
-    };
-    if (await isFixtureActive()) {
-      await ui.evaluate(await ui.page(), `document.querySelector(${JSON.stringify(activeTab + ' .action-label.codicon-close')})?.click()`);
-      await ui.waitFor(async () => !(await isFixtureActive()), 5,
-        'Could not close the last fixture tab.');
+    // Close the destination even if it is inactive, so a previous open or find mark
+    // cannot satisfy the next check (including repeated links to the same deck).
+    const fileName = path.posix.basename(targetFile).normalize('NFC');
+    const fixtureTabs = `[...document.querySelectorAll('.part.editor .tab[data-resource-name]')]
+      .filter(tab => tab.getAttribute('data-resource-name').normalize('NFC') === ${JSON.stringify(fileName)})`;
+    await ui.evaluate(await ui.page(), `(${fixtureTabs}).forEach(tab =>
+      tab.dispatchEvent(new MouseEvent('auxclick', {button: 1, bubbles: true, cancelable: true})))`);
+    if (!(await ui.waitFor(async () => ui.evaluate(await ui.page(), `(${fixtureTabs}).length === 0`), 5))) {
+      entry.error = 'Could not close the existing destination tab.';
+      continue;
     }
-    const anchor = `(() => {${lastTurn} return [...(turn?.querySelectorAll('.rendered-markdown') ?? [])].at(-1)?.querySelectorAll('a[href]')[${index}];})()`;
-    if (!(await ui.clickChat(anchor))) continue;
+    // Invoke the rendered anchor itself. Coordinate clicks can land on the
+    // hover preview or the composer when the sidebar scrolls to a wrapped link.
+    const previous = await front();
+    const clicked = await ui.chat(`
+      ${lastTurn}
+      const anchor = [...(turn?.querySelectorAll('.rendered-markdown') ?? [])].at(-1)?.querySelectorAll('a[href]')[${index}];
+      if (anchor?.getAttribute('href') !== ${JSON.stringify(link.href)}) return false;
+      anchor.click();
+      return true;
+    `);
+    if (!clicked) {
+      entry.error = 'The rendered link was unavailable.';
+      continue;
+    }
     entry.openedDocument = await ui.waitFor(async () => {
       const open = await front();
+      if (open === previous) return null;
       return files.find((file) => path.posix.basename(file).normalize('NFC') === open.normalize('NFC'));
     }, 10);
     entry.opensRightDocument = Boolean(expectedFile && entry.openedDocument === expectedFile);
-    if (!entry.openedDocument) continue;
+    if (!entry.openedDocument) {
+      entry.error = 'No fixture tab opened after the rendered link click.';
+      continue;
+    }
     entry.findMarkedPassage = Boolean(await ui.waitFor(async () => {
       for (const target of (await ui.targets()).filter(({ type, url }) => type === 'iframe' && url.startsWith('vscode-webview://'))) {
         const found = await ui.evaluate(target, ui.frameCode(`
@@ -365,6 +391,7 @@ function formatRun(run) {
 - Build — ${run.build ?? 'unavailable'}
 - Model — ${run.model ?? 'unavailable'}
 - Question — ${run.question}
+- Completed read fold — ${run.readFold ?? 'None recorded.'}
 - Password document's line — ${run.passwordLine ?? 'None recorded.'}
 ${run.error ? `- Run error — ${run.error}\n` : ''}
 **Answer (verbatim)**
@@ -379,7 +406,7 @@ ${bullets(run.stepLabels)}
 
 **Links tried**
 
-${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim to check`))}
+${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim to check${link.error ? ` — ${link.error}` : ''}`))}
 
 **Criteria**
 
@@ -389,7 +416,7 @@ ${Object.entries(run.criteria).map(([n, status]) => `${n}. ${criteriaLabels[Numb
 
 async function main() {
   const { values } = parseArgs({ options: { ai: { type: 'string' }, folder: { type: 'string' }, out: { type: 'string' },
-    'user-data-dir': { type: 'string' } } });
+    question: { type: 'string' }, 'user-data-dir': { type: 'string' } } });
   const runtime = Object.hasOwn(runtimes, values.ai) && runtimes[values.ai];
   if (!runtime || !values.folder || !values.out) throw new Error('Use --ai claude|chatgpt|opencode --folder <dir> --out <dir>.');
   const profile = values['user-data-dir'];
@@ -401,8 +428,8 @@ async function main() {
   const folder = fs.realpathSync(values.folder);
   const facts = JSON.parse(fs.readFileSync(path.join(folder, '..', 'facts.json'), 'utf8'));
   facts.folder = path.basename(folder);
-  const question = fs.readFileSync(template, 'utf8').match(/^> (Review the whole folder[^\r\n]*)/m)?.[1];
-  if (!question) throw new Error('The fixed question is missing from reading-test.md.');
+  const question = values.question?.trim() ?? fs.readFileSync(template, 'utf8').match(/^> (Review the whole folder[^\r\n]*)/m)?.[1];
+  if (!question) throw new Error('Pass a nonempty --question or restore the fixed question in reading-test.md.');
   const output = path.resolve(values.out);
   const insideFolder = (dir) => dir === folder || dir.startsWith(folder + path.sep);
   if (insideFolder(output)) throw new Error('Keep evidence outside the workspace.');
@@ -440,7 +467,7 @@ async function main() {
     const revision = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: buildRoot, encoding: 'utf8' });
     report.build = `${version} dev (${revision.stdout?.trim() || 'revision unavailable'})`;
     const ui = browser(port, abort.signal);
-    Object.assign(report, await ask(ui, values.ai, runtime, question));
+    Object.assign(report, await ask(ui, values.ai, runtime, question, report));
     const anchors = report.links;
     report.links = [];
     await tryLinks(ui, folder, facts, anchors, report.links);

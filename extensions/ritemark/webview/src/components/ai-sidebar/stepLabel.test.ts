@@ -55,3 +55,8 @@ for (const tool of ['Glob', 'LS']) {
 }
 
 console.log('stepLabel: S17–S20 passed');
+
+for (const tool of ['ToolSearch', 'TodoWrite', 'Task', 'Agent', 'ExitPlanMode', 'EnterPlanMode', 'mcp__server__lookup']) {
+  assert.equal(updateStep(activities, { type: 'tool_use', tool, message: `Using ${tool}`, timestamp: 0 }), activities);
+}
+assert.equal(stepLabel(progress(locked, 'mcp__ritemark_documents__read_document'))?.warning, true);

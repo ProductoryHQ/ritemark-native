@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { scoreRun } from './reading-test-run.mjs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { scoreRun, tryLinks } from './reading-test-run.mjs';
 
 const facts = JSON.parse(`{
   "folder": "Review",
@@ -75,4 +78,55 @@ test('each read source needs a link and duplicate slide rows fail the notes chec
   }, facts);
   assert.equal(result.criteria[2], 'fail');
   assert.equal(result.criteria[4], 'fail');
+});
+
+test('accepts a password-free copy and the project folder label from the Claude run', () => {
+  const result = scoreRun({
+    ...sample,
+    visibleAnswer: answer.replace('Please provide the password.', 'Open it in Word and save a copy without the password.'),
+    stepLabels: ['Looked in the project folder: 10 Word documents, 2 PDFs, 1 PowerPoint deck', 'Reading documents'],
+  }, facts);
+  assert.equal(result.criteria[5], 'pass');
+  assert.equal(result.criteria[3], 'pass');
+  assert.equal(scoreRun({ ...sample, stepLabels: ['ToolSearchUsing ToolSearch'] }, facts).criteria[3], 'fail');
+});
+
+test('checks later links after a tab close fails and closes repeated destinations', async (t) => {
+  const folder = realpathSync(mkdtempSync(join(tmpdir(), 'reading-links-')));
+  t.after(() => rmSync(folder, { recursive: true, force: true }));
+  writeFileSync(join(folder, facts.passwordDocument), '');
+  writeFileSync(join(folder, facts.deck.file), '');
+
+  const seen = [];
+  let front = facts.deck.file;
+  let tabToClose;
+  const ui = {
+    page: async () => ({}),
+    async evaluate(_target, expression) {
+      if (expression.includes("new MouseEvent('auxclick'")) {
+        tabToClose = expression.includes(facts.deck.file) ? facts.deck.file : facts.passwordDocument;
+        seen.push(tabToClose);
+        if (tabToClose === facts.deck.file && front === tabToClose) front = '';
+        return;
+      }
+      if (expression.endsWith('.length === 0')) return tabToClose === facts.deck.file;
+      return front;
+    },
+    async chat(expression) {
+      assert.match(expression, /anchor\.click\(\)/);
+      front = facts.deck.file;
+      return true;
+    },
+    waitFor: async (probe) => (await probe()) || null,
+    targets: async () => [],
+  };
+  const results = [];
+  await tryLinks(ui, folder, facts, [
+    { label: 'Locked appendix', href: 'Locked%20appendix.docx#q=test' },
+    { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=1' },
+    { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=2' },
+  ], results);
+  assert.deepEqual(seen, [facts.passwordDocument, facts.deck.file, facts.deck.file]);
+  assert.match(results[0].error, /Could not close/);
+  assert.deepEqual(results.map(({ opensRightDocument }) => opensRightDocument), [false, true, true]);
 });

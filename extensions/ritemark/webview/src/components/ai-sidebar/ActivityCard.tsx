@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
-import { stepLabel } from './stepLabel';
+import { isHiddenToolActivity, stepLabel } from './stepLabel';
 import { Icon } from '../ui/Icon';
 import type { AgentProgress } from './types';
 
@@ -57,6 +57,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
   const step = stepLabel(activity);
   const [expanded, setExpanded] = useState(false);
   const id = useId();
+  if (isHiddenToolActivity(activity)) return null;
   if (step) {
     const indicator = step.warning ? 'warning' : activity.step?.status === 'completed' ? 'check' : 'circle-notch';
     const row = (

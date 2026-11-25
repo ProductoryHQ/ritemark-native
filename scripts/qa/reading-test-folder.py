@@ -25,7 +25,7 @@ BASE = [
     ('02 Interviews/Interview – branch manager, Riverside.docx',
      'Riverside receives about 140 visits a day, with queues peaking on Mondays.', ['140 visits']),
     ('02 Interviews/Interview – customer service lead.docx',
-     'Calls about card disputes doubled after the May app change.', ['card disputes']),
+     'Calls about card disputes doubled after the May app change.', ['card disputes', 'card-dispute calls doubled']),
     ('02 Interviews/Interview – head of operations.docx',
      'A visit costs €18.40, compared with €3.10 for a call.', ['18.40', '18.4']),
     ('02 Interviews/Interview – two tellers, Harbour Street.docx',
