@@ -10,7 +10,8 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { Fragment as ReactFragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { updateDeckFailures } from './deckFailures'
 import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
 import { clockMinutes, explicitMinutes, readTimetable, SESSION_LENGTH, SESSION_START } from '../../../../src/decks/timetable'
 import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
@@ -29,7 +30,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
-import { fitNotice } from './noticeCut'
+import { cutName, fitNotice, hideClippedNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -181,17 +182,29 @@ interface Notice {
  */
 function NoticeWords({ text, name, after }: { text: string; name: string; after: ReactNode }) {
   const boxRef = useRef<HTMLSpanElement>(null)
+  const lineRef = useRef<HTMLSpanElement>(null)
   const shownRef = useRef<HTMLSpanElement>(null)
   const afterRef = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const box = boxRef.current
+    const line = lineRef.current
     const shown = shownRef.current
-    if (!box || !shown) return
+    if (!box || !line || !shown) return
     const prefix = text.slice(0, text.length - name.length)
+    const measure = document.createElement('canvas').getContext('2d')
+    const shortestCut = prefix + cutName(name, 2)
     let live = true
     const fit = () => {
       if (!live) return // a fonts' answer that comes after this notice was replaced
-      const room = box.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      const room = line.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      if (measure) {
+        const hidden = hideClippedNotice(text, room, shown.dataset.noteHidden, noticeMeasure(shown, measure), shortestCut)
+        if (hidden) {
+          shown.dataset.noteHidden = text
+          return
+        }
+        delete shown.dataset.noteHidden
+      }
       shown.textContent = fitNotice(prefix, name, words => {
         shown.textContent = words
         return shown.scrollWidth <= room
@@ -208,8 +221,8 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
   }, [text, name])
   return (
     <span ref={boxRef} className="deck-notice-cut">
-      <span className="deck-notice-sizer" aria-hidden="true">{text}<span className="deck-notice-room" /></span>
-      <span className="deck-notice-line">
+      <span className="deck-notice-sizer" aria-hidden="true"><span>{text}</span><span className="deck-notice-room" /></span>
+      <span ref={lineRef} className="deck-notice-line">
         <Tooltip label={text} className="deck-notice-words">
           <span ref={shownRef} className="deck-notice-shown" aria-hidden="true" />
         </Tooltip>
@@ -222,6 +235,42 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 
 /** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
 const NOTICE_ACTION_GAP = 8
+
+function noticeMeasure(words: HTMLElement, measure: CanvasRenderingContext2D) {
+  const style = getComputedStyle(words)
+  measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  return (text: string) => measure.measureText(text).width
+}
+
+/** Check the bar with full controls and room reserved for its warning icons and actions. */
+function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRenderingContext2D | null) {
+  notice.setAttribute('data-measure-words', '')
+  bar.removeAttribute('data-theme-compact')
+  notice.setAttribute('data-measure-min', '')
+  const minimum = notice.getBoundingClientRect().width
+  notice.removeAttribute('data-measure-min')
+  notice.style.setProperty('--deck-notice-min', `${minimum}px`)
+
+  roomChanged() // Ask Publish and Present to measure again with the bar's controls at full width.
+  const last = bar.lastElementChild
+  const right = bar.getBoundingClientRect().right - parseFloat(getComputedStyle(bar).paddingRight)
+  if (last && last.getBoundingClientRect().right > right + 0.01) {
+    bar.setAttribute('data-theme-compact', '')
+    roomChanged()
+  }
+
+  // Measure with all words in flow so a collapsed note can return when there is room.
+  if (measure) {
+    for (const words of notice.querySelectorAll<HTMLElement>(':scope > .deck-notice-words > .deck-notice-text')) {
+      const text = words.textContent ?? ''
+      const room = words.getBoundingClientRect().width
+      const hidden = hideClippedNotice(text, room, words.dataset.noteHidden, noticeMeasure(words, measure))
+      if (hidden) words.dataset.noteHidden = text
+      else delete words.dataset.noteHidden
+    }
+  }
+  notice.removeAttribute('data-measure-words')
+}
 
 const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
@@ -392,6 +441,29 @@ export function DeckView({
   const settingsReturn = useRef<HTMLElement | null>(null)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [failures, setFailures] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const failuresRef = useRef(failures)
+  const startCardGone = useRef(false)
+  const reportFailure = useCallback((operation: string, text: string) => {
+    if (operation === 'start-card' && startCardGone.current) return
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'failure', text })
+    if (next === failuresRef.current) return
+    failuresRef.current = next
+    setFailures(next)
+    setNotice(null)
+  }, [])
+  const clearFailure = useCallback((operation: string) => {
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'success' })
+    failuresRef.current = next
+    setFailures(next)
+  }, [])
+  const hostNotice = useCallback((text: string, kind: unknown, operation: unknown) => {
+    if (typeof operation === 'string') {
+      if (kind === 'failure') { reportFailure(operation, text); return }
+      if (kind === 'success') clearFailure(operation)
+    }
+    if (text) setNotice({ text })
+  }, [reportFailure, clearFailure])
   // The Slide library (PR 4): each copy's source, by the slide's id; the copy just written to the library; and the
   // copies whose library write or read is on its way.
   const [sources, setSources] = useState<Record<string, CopySource>>({})
@@ -427,6 +499,8 @@ export function DeckView({
   // Beside or above (deckLayout.ts): decided from the room once it is measured, and again whenever it changes.
   const [orientation, setOrientation] = useState<DeckOrientation | null>(null)
   const [dragging, setDragging] = useState(false)
+  const barRef = useRef<HTMLElement>(null)
+  const barNoticeRef = useRef<HTMLSpanElement>(null)
   const deskRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -483,7 +557,10 @@ export function DeckView({
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
-  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => setNotice({ text, action, name }), [])
+  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => {
+    if (name) clearFailure('save-pdf')
+    setNotice({ text, action, name })
+  }, [clearFailure])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -621,19 +698,29 @@ export function DeckView({
     if (!editor) return
     const off = onMessage(message => {
       if (message.type !== 'deck/start-card' || !message.state || typeof message.state !== 'object') return
-      setStartState(message.state as StartCardState)
+      const state = message.state as StartCardState
+      if (state.fresh === false) {
+        startCardGone.current = true
+        clearFailure('start-card')
+      }
+      setStartState(state)
       setStartBusy(false)
     })
     sendToExtension('deck/start-card')
     return off
-  }, [editor])
+  }, [editor, clearFailure])
+  const hideStart = useCallback(() => {
+    startCardGone.current = true
+    clearFailure('start-card')
+    setStartGone(true)
+    sendToExtension('deck/start-card-gone')
+  }, [clearFailure])
   // The card goes for good once the deck is started (a second slide, words in the handout), and the host forgets it.
   const started = count > 0 && deckStarted(count, handoutText)
   useEffect(() => {
     if (!startState?.fresh || startGone || !started) return
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [startState, startGone, started])
+    hideStart()
+  }, [startState, startGone, started, hideStart])
   // While it shows without an Ask row, the AI's sign-in is read again when the window comes back (the person may have
   // signed in meanwhile).
   const startShown = !!startRows
@@ -644,10 +731,6 @@ export function DeckView({
     window.addEventListener('focus', again)
     return () => window.removeEventListener('focus', again)
   }, [askAgain])
-  const hideStart = useCallback(() => {
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [])
   const startWith = useCallback((type: 'deck/start-draft' | 'deck/start-copy', fields: Record<string, unknown>) => {
     setStartBusy(true)
     sendToExtension(type, fields)
@@ -1064,9 +1147,11 @@ export function DeckView({
       const index = Math.max(0, Math.min(message.index, countRef.current - 1))
       requestAnimationFrame(() => pick(index))
     } else if (message.type === 'deck/present-failed' && typeof message.message === 'string') {
-      setNotice({ text: message.message })
+      reportFailure('present', message.message)
+    } else if (message.type === 'deck/present-started') {
+      clearFailure('present')
     }
-  }), [pick])
+  }), [pick, reportFailure, clearFailure])
   const startNumber = slides.find(entry => entry.data.skip !== true)?.index
 
   // The line between the slide and the handout is dragged to change the widths.
@@ -1354,10 +1439,11 @@ export function DeckView({
       inserted = dispatchStepRef.current(insertPictureSlides(target.state, at, saved, textHandoutRef.current))
       if (inserted) requestAnimationFrame(() => pickRef.current(at))
     }
-    if (saved.length && !inserted) setNotice({ text: 'The pictures are saved in images/, but their slides could not be added.' })
-    else if (failed) setNotice({ text: failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.` })
+    if (saved.length && !inserted) reportFailure('drop-pictures', 'The pictures are saved in images/, but their slides could not be added.')
+    else if (failed) reportFailure('drop-pictures', failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.`)
+    else clearFailure('drop-pictures')
     return true
-  }, [])
+  }, [reportFailure, clearFailure])
 
   /** Part `from` to stand before part `to`, its slide then current: a drag's drop and Cmd+↑ / Cmd+↓ alike. */
   const moveTo = useCallback((from: number, to: number) => {
@@ -1456,7 +1542,11 @@ export function DeckView({
       // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
       const agenda = { entries: agendaRef.current.entries, hint: false }
       void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda, openIn })
-        .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
+        .then(copied => {
+          if (!copied) { reportFailure('copy-picture', COPY_FAILED_NOTE); return }
+          clearFailure('copy-picture')
+          setNotice({ text: copiedNote(index + 1) })
+        })
     },
     // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
     dropPictures: (at, files) => {
@@ -1475,7 +1565,7 @@ export function DeckView({
         )
       })
     },
-  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo, pictureSaved])
+  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo, pictureSaved, reportFailure, clearFailure])
 
   // Cmd+D, Cmd+↑ and Cmd+↓ (Ctrl on Windows) with a slide chosen on the stage: the focus on the stage outside its words,
   // or on nothing (17 November). The strip takes the same keys itself (stripKeys.ts); words keep their editor's keys.
@@ -1532,14 +1622,30 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [flash])
 
-  // Sprint 170: a notice that comes or goes changes the bar's room: Publish and Present, folded to their icons for a
-  // long one, show their words again once it has gone (ui/button.tsx, `roomChanged`).
-  useLayoutEffect(() => { roomChanged() }, [notice])
+  useLayoutEffect(() => {
+    const bar = barRef.current
+    const notice = barNoticeRef.current
+    if (!bar || !notice) return
+    const measure = document.createElement('canvas').getContext('2d')
+    const fit = () => fitDeckBar(bar, notice, measure)
+    fit()
+    const resize = new ResizeObserver(fit)
+    resize.observe(bar)
+    // Controls can gain or lose room at the same width (for example, when Publish becomes a split button).
+    const content = new MutationObserver(fit)
+    content.observe(bar, { childList: true, characterData: true, subtree: true })
+    document.fonts?.addEventListener('loadingdone', fit)
+    return () => {
+      resize.disconnect()
+      content.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fit)
+    }
+  }, [])
 
-  // A notice in the bar fades after a while.
+  // Only the passing notice expires. Failures live separately until the corresponding action succeeds.
   useEffect(() => {
     if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), NOTICE_MS)
+    const timer = window.setTimeout(() => setNotice(current => current === notice ? null : current), NOTICE_MS)
     return () => window.clearTimeout(timer)
   }, [notice])
 
@@ -1663,10 +1769,11 @@ export function DeckView({
       && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null)) return
     if (!editor || editor.isDestroyed) return
     if (message.type === 'deck/image-failed') {
-      setNotice({ text: typeof message.message === 'string' ? message.message : 'The picture could not be saved.' })
+      reportFailure('save-image', typeof message.message === 'string' ? message.message : 'The picture could not be saved.')
       return
     }
     if (message.type !== 'deck/image-saved' || typeof message.slideId !== 'string' || typeof message.path !== 'string') return
+    clearFailure('save-image')
     if (caretPictureFor.current === message.slideId) {
       caretPictureFor.current = null
       if (stageSlideId.current === message.slideId && typeof message.url === 'string') {
@@ -1686,7 +1793,7 @@ export function DeckView({
     }
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
     dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
-  }), [editor, dispatch, pictureSaved])
+  }), [editor, dispatch, pictureSaved, reportFailure, clearFailure])
 
   // ---- the Slide library (PR 4)
 
@@ -1758,8 +1865,8 @@ export function DeckView({
   useEffect(() => onMessage(message => {
     if (message.type === 'deck/select-title') setSelectTitle(true)
     // The start card's line: "This deck is now a copy of <name>.", or why it couldn't be
-    else if (message.type === 'deck/notice' && typeof message.text === 'string') setNotice({ text: message.text })
-  }), [])
+    else if (message.type === 'deck/notice' && typeof message.text === 'string') hostNotice(message.text, message.kind, message.operation)
+  }), [hostNotice])
   useEffect(() => {
     if (!selectTitle || slides.length === 0) return
     setSelectTitle(false)
@@ -1838,6 +1945,7 @@ export function DeckView({
     if (!editor || editor.isDestroyed) return
     switch (message.type) {
       case 'deck/source-states': {
+        clearFailure('deck/source-states')
         if (!Array.isArray(message.states)) return
         const next: Record<string, CopySource> = {}
         for (const state of message.states as CopySource[]) if (state && typeof state.id === 'string') next[state.id] = state
@@ -1845,6 +1953,7 @@ export function DeckView({
         return
       }
       case 'deck/library-undone': {
+        clearFailure('deck/undo-library')
         const back = typeof message.token === 'string' ? undoneFrom.current.get(message.token) : undefined
         if (!back) return
         undoneFrom.current.delete(message.token as string)
@@ -1853,15 +1962,19 @@ export function DeckView({
         return
       }
       case 'deck/library-topics': {
+        clearFailure('deck/library-topics')
         if (Array.isArray(message.topics)) setTopics((message.topics as LibraryTopic[]).filter(topic => topic && typeof topic.path === 'string' && typeof topic.name === 'string'))
         return
       }
       case 'deck/library-failed': {
         done(typeof message.id === 'string' ? message.id : null)
-        setNotice({ text: typeof message.message === 'string' ? message.message : 'The Slide library could not do that.' })
+        const text = typeof message.message === 'string' ? message.message : 'The Slide library could not do that.'
+        if (typeof message.operation === 'string') reportFailure(message.operation, text)
+        else setNotice({ text })
         return
       }
       case 'deck/library-written': {
+        clearFailure(message.verb === 'added' ? 'deck/add-to-library' : 'deck/update-library')
         const id = typeof message.id === 'string' ? message.id : null
         done(id)
         const entry = id ? slideById(id) : null
@@ -1905,9 +2018,10 @@ export function DeckView({
           content = Fragment.fromArray(nodes)
         }
         if (!previous || !content || !dispatch(replacePart(editor.state, entry.index, content))) {
-          setNotice({ text: "The library's version could not be put in." })
+          reportFailure('deck/use-library', "The library's version could not be put in.")
           return
         }
+        clearFailure('deck/use-library')
         const hadChange = !!sources[id]?.changed
         // Undo is always offered: words typed while the library was being read are in `previous` too.
         setNotice({
@@ -1946,10 +2060,11 @@ export function DeckView({
         })
         const content = partsFragment(editor, fresh.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
         if (!content || !dispatch(restoreSlide(editor.state, at, content))) {
-          setNotice({ text: 'The slides could not be put in.' })
+          reportFailure('insert-slides', 'The slides could not be put in.')
           answer(false)
           return
         }
+        clearFailure('insert-slides')
         answer(true)
         requestAnimationFrame(() => pick(at))
         return
@@ -1963,7 +2078,7 @@ export function DeckView({
         return
       }
     }
-  }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
+  }), [editor, dispatch, done, slideById, sources, imageMappings, pick, reportFailure, clearFailure])
 
   const status = documentBarStatus(syncState, syncAction)
 
@@ -1977,7 +2092,7 @@ export function DeckView({
       const changes = propertyChangesOf(transaction)
       if (changes.length === 0) return
       const { apply, stale } = applicableChanges(propertiesRef.current, changes)
-      if (stale.length > 0) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
+      if (stale.length) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
       if (apply.length === 0) return
       const next = withPropertyChanges(propertiesRef.current, apply)
       propertiesRef.current = next
@@ -2089,7 +2204,7 @@ export function DeckView({
     <DeckIconsContext.Provider value={iconsInUse}>
     <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
-      <header className="deck-bar">
+      <header className="deck-bar" ref={barRef}>
         <Tooltip label={stripShown ? 'Hide the slides' : 'Show the slides'}>
           <Button
             variant="toolbar"
@@ -2112,7 +2227,19 @@ export function DeckView({
               onCommit={time => commitMinutes(shown, time)} />
           ) : slideCountWithMinutes(countLabel, shownTiming)}
         </span>
-        <span className="deck-notice" role="status" aria-live="polite">
+        <span className="deck-notice" ref={barNoticeRef} role="status" aria-live="polite">
+          {Array.from(failures).map(([operation, text]) => (
+            <ReactFragment key={operation}>
+              <Tooltip label={text} className="deck-notice-warning">
+                <span role="img" tabIndex={0} aria-label={text}>
+                  <Icon name="warning" size={16} tone="inherit" />
+                </span>
+              </Tooltip>
+              <span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">
+                <span className="deck-notice-text">{text}</span>
+              </span>
+            </ReactFragment>
+          ))}
           {notice ? (
             <>
               {notice.name && notice.text.endsWith(notice.name) ? (
@@ -2162,7 +2289,7 @@ export function DeckView({
             </>
           ) : slideFull && slideShown ? fullLine : null}
         </span>
-        <span className="flex-1" />
+        <span className="deck-bar-spacer" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
@@ -2174,7 +2301,7 @@ export function DeckView({
           // #931: while "Saved as <name>" shows, the deck's own Saved steps aside, so the note has its room
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
-        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} onShowPause={showPause} />
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} onPageNotice={hostNotice} onShowPause={showPause} />
         <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 
