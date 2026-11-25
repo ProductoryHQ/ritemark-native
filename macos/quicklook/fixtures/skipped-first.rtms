@@ -1,0 +1,14 @@
+```slide title
+title: Hidden Slide
+skip: true
+```
+
+```slide
+# First Visible
+```
+
+Private handout marker.
+
+```slide
+# Second Visible
+```

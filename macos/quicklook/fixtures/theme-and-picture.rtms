@@ -1,0 +1,17 @@
+---
+title: Shape study
+theme: Slide library/Themes/Lagoon.theme.md
+---
+
+```slide
+---
+picture: right
+image: shapes.png
+alt: Two synthetic shapes
+---
+# Lagoon Shapes
+
+A picture beside the deck.
+```
+
+Private handout marker.

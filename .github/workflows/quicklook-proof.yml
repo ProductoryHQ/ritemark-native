@@ -1,0 +1,66 @@
+# Sprint 177 (#953) runner harness. It ships nothing and is outside the build- workflows.
+# LaunchServices discovery belongs on disposable runners so no dev build ever
+# registers on Jarmo's Mac. This public repo uses free standard macOS runners.
+# Push the harness branch to run it. Dispatch requires the workflow on the default branch.
+name: Quick Look runner proof (macOS)
+
+'on':
+  push:
+    branches: ['ql-proof/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 retired on 2026-11-02 (actions/runner-images#13518).
+        # Use the latest standard Intel image to keep x86_64 runtime coverage.
+        runner: [macos-15, macos-26, macos-26-intel]
+        variant: [sandbox, read-exception]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install renderer dependencies
+        working-directory: extensions/ritemark
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Build both universal Quick Look bundles
+        run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build"
+
+      - name: Stamp, sign, register and measure Quick Look
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          bash macos/quicklook/Proof/run.sh "$RUNNER_TEMP/quicklook-build" "$VARIANT" \
+            "$RUNNER_TEMP/quicklook-proof" "$RUNNER_TEMP/quicklook-work"
+
+      - name: Publish job summary
+        if: always()
+        env:
+          RUNNER_LABEL: ${{ matrix.runner }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          PROOF="$RUNNER_TEMP/quicklook-proof"
+          mkdir -p "$PROOF"
+          if [[ ! -s "$PROOF/results.md" ]]; then
+            printf '# Quick Look proof on %s (%s)\n\nInconclusive. See the failed workflow step and available artifacts.\n' \
+              "$RUNNER_LABEL" "$VARIANT" > "$PROOF/results.md"
+          fi
+          cat "$PROOF/results.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quicklook-${{ matrix.runner }}-${{ matrix.variant }}
+          path: ${{ runner.temp }}/quicklook-proof
+          retention-days: 30
