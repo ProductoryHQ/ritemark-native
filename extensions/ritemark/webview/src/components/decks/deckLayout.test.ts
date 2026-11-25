@@ -128,7 +128,7 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   // The deck view measures it from the stage as drawn, above only, and only a real change moves the slide.
   const viewSource = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(viewSource.includes('slideWidthFor(stageWidth, stageHeight, above, aboveUnder)'))
-  assert.ok(viewSource.includes('const under = rowsUnder(group.offsetHeight, big.offsetHeight)') && viewSource.includes('if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)'))
+  assert.ok(viewSource.includes('const under = rowsUnder(group.offsetHeight - (settingsSlot?.offsetHeight ?? 0), big.offsetHeight)') && viewSource.includes('if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)'))
   // Above, the slide always fits its pane's height, with 32 to spare.
   for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + ABOVE_STAGE_ROOM <= height)
 }
