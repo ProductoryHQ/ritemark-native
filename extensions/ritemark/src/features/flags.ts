@@ -69,6 +69,7 @@ export type FlagId =
   | 'project-search'
   // Sprint 157 (experience 46): a deck (`.rtms` since Sprint 172, or an older `.deck.md`) opens as a deck, with the Slide library and the AI's deck tools
   | 'decks'
+  | 'deck-quick-look'
   // Sprint 158 (#711): editing an .xlsx in place, saved cell by cell; the kill switch for it
   | 'excel-editing'
   // Experience 48: a table's grips, menus, + bars and column widths, in a Text document and on a slide; the kill switch
@@ -92,6 +93,14 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
+  'deck-quick-look': {
+    id: 'deck-quick-look',
+    label: 'Deck Quick Look',
+    description: 'Draw local deck previews for Finder.',
+    status: 'stable',
+    platforms: ['darwin'],
+  },
+
   // Sprint 157 (experience 46, README decision 10): Decks. Off by default until 2.3 on Jarmo's word (14 November
   // 2026: "behind a feature flag, in dev runs, not on main at first"). ON from 2.3 (#916; Jarmo, 20 November 2026:
   // "Decks läheb 2.3 sisse"): `ritemark.features.decks` defaults to true (HARD RULE #2) and stays as the off switch,

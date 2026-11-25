@@ -41,6 +41,10 @@ The runner evidence behind decision 3 is round 3, run 45683909718, on macOS 15 a
 - **Experience lead.** Answered on 25 November: the slide edge to edge, no badge or shadow, the deck icon below 64 px; the system's type icon first, else a bundled icon from the decks file-icon design; the comparison list in S1; the Settings note, Help line and release-notes line in R6 and S11.
 - **Development manager.** Answered above. Still open until the proof: what a warmed Finder shows after a later draw, and macOS 26 Intel's election (`pluginkit -e use` was needed in round 2).
 
+## PR 2 · App-side cache
+
+Branch `sprint-177-quick-look-pr2` implements the v1 writer and project lifecycle for R1–R5. It reuses the Slides-as-PDF renderer and enables background drawing on macOS with Decks and the offline print command available. `npm run test:quick-look` runs under `test:decks` and `npm test`. The launched-app print and Finder proof are still due. Finder-facing release notes and S11 guidance follow the native extensions and proof.
+
 ## Release notes draft
 
 On Mac, Finder can show a saved deck’s first slide, and pressing Space lets you look through the slides. Ritemark keeps the previews on this Mac.

@@ -630,8 +630,13 @@ export class DeckPublisher implements vscode.Disposable {
   async pageInput(document: Pick<vscode.TextDocument, 'uri' | 'getText'>, body: string, look: 'card' | 'borderless', steps: readonly number[]): Promise<{ deckPath: string; text: string; theme: DeckTheme; steps: readonly number[]; fonts: PageFontFile[]; logo: PageFile | null }> {
     const deckPath = document.uri.fsPath;
     const { text, steps: fit } = this.textAndFit(document, body, look, steps);
-    const read = await this.lookFor(deckPath, text);
-    return { deckPath, text, theme: read.theme, steps: fit, fonts: await this.fontFilesFor(read.theme), logo: read.logo };
+    return { ...await this.savedPageInput(deckPath, text, false), steps: fit };
+  }
+
+  /** Resolve the saved deck's look and local assets without opening a document. */
+  async savedPageInput(deckPath: string, text: string, fresh = true) {
+    const { theme, logo, themeBytes, themeFiles } = await this.lookFor(deckPath, text, fresh);
+    return { deckPath, text, theme, themeBytes, themeFiles, steps: [], fonts: await this.fontFilesFor(theme), logo };
   }
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish
@@ -743,11 +748,11 @@ export class DeckPublisher implements vscode.Disposable {
    * the page's file (Sprint 162 PR 4), only when the theme has one and its file is there and can go. The page carries
    * the one logo its slides draw (18 November, `pageLogoOf`): the second version only when the deck's look uses it.
    */
-  private async lookFor(deckPath: string, text: string): Promise<{ theme: DeckTheme; logo: PageFile | null }> {
+  private async lookFor(deckPath: string, text: string, fresh = false): Promise<{ theme: DeckTheme; logo: PageFile | null; themeBytes: Buffer | null; themeFiles: string[] }> {
     const named = parseDeck(text.replace(/^\uFEFF/, '')).theme;
-    const read = await deckThemeAndLogo(deckPath, themePathOf(named));
+    const read = await deckThemeAndLogo(deckPath, themePathOf(named), fresh);
     const theme = read.text === null ? BUILT_IN_THEME : parseTheme(read.text);
-    return { theme, logo: pageLogoOf(theme, frontMatterLook(text) === 'borderless', read.logo, read.secondLogo) };
+    return { theme, themeBytes: read.bytes, themeFiles: read.files, logo: pageLogoOf(theme, frontMatterLook(text) === 'borderless', read.logo, read.secondLogo) };
   }
 
   dispose(): void {
