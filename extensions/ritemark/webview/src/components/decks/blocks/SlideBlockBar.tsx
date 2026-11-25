@@ -222,7 +222,7 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
           <Button
             ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
             onMouseDown={event => event.preventDefault()}
-            onPointerDownCapture={() => { if (!open) openedByKeyboard.current = false }}
+            onPointerDownCapture={() => { if (open) closeReason.current = 'trigger'; else openedByKeyboard.current = false }}
             onKeyDownCapture={event => {
               if (!open && ['Enter', ' ', 'ArrowDown'].includes(event.key)) openedByKeyboard.current = true
             }}
