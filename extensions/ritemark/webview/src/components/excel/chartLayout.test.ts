@@ -11,6 +11,7 @@ import { DrawingView } from './DrawingView'
 import { drawsChart, layoutChart as layoutPlots } from './chartLayout'
 import { readChart } from './readChart'
 import { resolveSeries } from './chartSeries'
+import { compileCellRules } from './cellRules'
 import { keptNotice } from './keptNotice'
 import { readWorkbook, type SheetModel, type WorkbookModel } from './readWorkbook'
 import { modelSource } from './sheetSource'
@@ -136,7 +137,7 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
     assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
   }
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
-    "This sheet has 2 waterfall charts, a treemap, a histogram, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
+    "This sheet has 10 charts it doesn't draw yet: waterfall, treemap, histogram, funnel, box and whisker, radar, stock, surface and bubble. They're kept in the file; Open in Excel to see them.")
   const [treemap, histogram] = extended
   const unknown = draw('<chartSpace><chart><plotArea/></chart></chartSpace>', true)
   assert.equal(keptNotice({ drawings: [treemap, treemap] }),
@@ -148,6 +149,35 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
   // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
     "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
+})
+
+test('the long quiet line counts drawings and lists each chart kind in order', () => {
+  const draw = (plots: string) => ({ ...combo, chart: readChart(`<chartSpace><chart><plotArea>${plots}</plotArea></chart></chartSpace>`) })
+  const radar = draw('<radarChart/>')
+  const bubble = draw('<bubbleChart/>')
+  const stock = draw('<stockChart/>')
+  const unnamed = { ...combo, chart: undefined }
+  assert.equal(keptNotice({ drawings: [unnamed, radar, bubble] }),
+    "This sheet has 3 charts it doesn't draw yet: radar, bubble and other kinds. They're kept in the file; Open in Excel to see them.")
+  const failed = drawingOf(worksheet)
+  assert.equal(keptNotice({ drawings: [failed, radar, bubble] }, undefined, new Set([failed])),
+    "This sheet has 3 charts it doesn't draw yet: radar, bubble and other kinds. They're kept in the file; Open in Excel to see them.")
+  assert.equal(keptNotice({ drawings: [radar, bubble, radar, stock] }),
+    "This sheet has 4 charts it doesn't draw yet: radar, bubble and stock. They're kept in the file; Open in Excel to see them.")
+  const circularCombo = draw('<barChart><barDir val="col"/></barChart><pieChart/><doughnutChart/>')
+  assert.equal(keptNotice({ drawings: [radar, circularCombo, bubble] }),
+    "This sheet has 3 charts it doesn't draw yet: radar, pie, doughnut and bubble. They're kept in the file; Open in Excel to see them.")
+})
+
+test('the long quiet line puts pictures and icon sets in a second sentence', async () => {
+  const charts = await open('charts-out-of-scope')
+  const [, radar, bubble, waterfall] = charts.sheets[0].layout.drawings
+  const rulesBook = await open('rules-icons-unreadable')
+  const iconSheet = rulesBook.sheets.find(({ name }) => name === 'Icon sets')!
+  const rules = compileCellRules(rulesBook, iconSheet)!
+  const iconSets = rules.iconSets.slice(0, 1)
+  assert.equal(keptNotice({ drawings: [radar, bubble, waterfall, { ...combo, what: 'image' }] }, { ...rules, iconSets }),
+    "This sheet has 3 charts it doesn't draw yet: radar, bubble and waterfall. It also has a picture and an icon set. They're kept in the file; Open in Excel to see them.")
 })
 
 test('scenario 13: Excel out-of-scope charts keep titled cards and the quiet line names each kind', async () => {
@@ -163,7 +193,7 @@ test('scenario 13: Excel out-of-scope charts keep titled cards and the quiet lin
         ['Hours by area', 'chartex', 'treemap'],
         ['Hours by area and group', 'chartex', 'sunburst'],
       ],
-      notice: "This sheet has a radar chart, a bubble chart, a waterfall chart, a treemap and a sunburst chart. They're kept in the file; Open in Excel to see them.",
+      notice: "This sheet has 5 charts it doesn't draw yet: radar, bubble, waterfall, treemap and sunburst. They're kept in the file; Open in Excel to see them.",
     },
     {
       name: 'More kinds',
@@ -174,7 +204,7 @@ test('scenario 13: Excel out-of-scope charts keep titled cards and the quiet lin
         ['From booking to leaving', 'chartex', 'funnel'],
         ['Handover minutes, spread', 'chartex', 'boxWhisker'],
       ],
-      notice: "This sheet has a stock chart, a surface chart, a histogram, a funnel chart and a box and whisker chart. They're kept in the file; Open in Excel to see them.",
+      notice: "This sheet has 5 charts it doesn't draw yet: stock, surface, histogram, funnel and box and whisker. They're kept in the file; Open in Excel to see them.",
     },
   ]
   assert.deepEqual(book.sheets.map(({ name }) => name), expected.map(({ name }) => name))
