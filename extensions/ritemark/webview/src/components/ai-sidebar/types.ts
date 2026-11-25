@@ -296,6 +296,7 @@ export interface AgentConversationTurn {
   activeFileLabel?: string;
   attachments?: FileAttachment[];
   activities: AgentProgress[];
+  assistantText?: string;
   /** Subagents spawned during this turn */
   subagents?: SubagentProgress[];
   result?: {
