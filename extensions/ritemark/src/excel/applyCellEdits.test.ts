@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { checkOfficePackage } from '../officePreview/officePackageCheck';
 import { CellEditRefused, applyCellEdits, indexWorkbook, checkCellEdit, isWellFormedXml } from './applyCellEdits';
 import { openPackage, storedPart, readTextPart } from './xlsxPackage';
+import { chartsKeepFixtures } from './chartsKeepFixtures.test';
 import { cellValueFromText, coalesceEdits, type CellEdit } from './cellEdit';
 
 const fixture = (name: string) => new Uint8Array(fs.readFileSync(path.join(__dirname, 'fixtures', name)));
@@ -389,8 +390,9 @@ async function main() {
 
   // ── The fuzz test, ported from the study: seeded random edits, read back with SheetJS ─
   console.log('fuzz:');
-  await fuzz('rich-excelish (shared strings)', excelish, 'Budget', 25, 9, 200);
-  await fuzz('rich (inline strings)', rich, 'Budget', 25, 9, 200);
+  for (const { file, sheet, rows, cols, edits } of chartsKeepFixtures) {
+    await fuzz(path.basename(file), new Uint8Array(fs.readFileSync(file)), sheet, rows, cols, edits);
+  }
   await fuzz('Excel for Mac', excelMac, 'Sales', 10, 8, 100);
   await fuzz('shared formulas', shared, 'Sales', 10, 8, 60);
   const prefixed = await rezip(excelMac, (files) => {

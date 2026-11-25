@@ -6,6 +6,7 @@ import { DEFAULT_SEARCH_LIMITS } from '../search/protocol';
 import { cloudState, oneDriveRootsFromEnv } from '../search/worker/cloudFiles';
 import { samePath } from '../utils/pathIdentity';
 import type { DocumentReadRequest, DocumentReadResult } from './documentRead';
+import { locateSourcePassage } from './locateSourcePassage';
 import { resolveProjectDocument } from './projectPath';
 import { documentTooLarge, readAsMarkdown } from './readAsMarkdown';
 
@@ -39,7 +40,8 @@ export async function readProjectDocument(
     if (extension === '.ppt') {
       return { reason: 'legacy', text: `${name} is an older PowerPoint format. Open it in PowerPoint and save a .pptx copy.` };
     }
-    if (extension !== '.docx' && extension !== '.pdf' && extension !== '.pptx') {
+    const markdownPassage = request.passage && (extension === '.md' || extension === '.markdown');
+    if (!markdownPassage && extension !== '.docx' && extension !== '.pdf' && extension !== '.pptx') {
       return { text: 'This tool reads Word (.docx), PDF, and PowerPoint (.pptx) files. You can open Markdown files in the Ritemark editor.' };
     }
 
@@ -47,7 +49,7 @@ export async function readProjectDocument(
     if (kind === 'word' && (request.from !== undefined || request.to !== undefined)) {
       return { text: 'Read a Word document by passing its path alone.', isError: true };
     }
-    const maxBytes = kind === 'powerpoint' ? OFFICE_PREVIEW_LIMITS.maxFileBytes
+    const maxBytes = markdownPassage ? DEFAULT_SEARCH_LIMITS.markdownBytes : kind === 'powerpoint' ? OFFICE_PREVIEW_LIMITS.maxFileBytes
       : kind === 'word' ? DEFAULT_SEARCH_LIMITS.docxBytes : DEFAULT_SEARCH_LIMITS.pdfBytes;
     const oneDriveRoots = oneDriveRootsFromEnv(process.env);
     const cloud = cloudState(resolved.candidate, before, platform, oneDriveRoots)
@@ -73,7 +75,7 @@ export async function readProjectDocument(
       const current = await lstat(target);
       if (!current.isFile() || current.dev !== stat.dev || current.ino !== stat.ino) return unavailable;
       if (stat.size > maxBytes) return documentTooLarge(name, kind);
-      key = JSON.stringify([target, stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, request.from, request.to]);
+      key = JSON.stringify([target, stat.dev, stat.ino, stat.size, stat.mtimeMs, stat.ctimeMs, request.from, request.to, request.passage]);
       if (lastRead?.key === key) return lastRead.result;
 
       const buffer = new Uint8Array(stat.size);
@@ -90,7 +92,9 @@ export async function readProjectDocument(
     } finally {
       await handle.close();
     }
-    const result = await readAsMarkdown(bytes, name, kind, request, pause);
+    const result = request.passage
+      ? { text: '', location: await locateSourcePassage(bytes, extension, request.passage, pause) }
+      : await readAsMarkdown(bytes, name, kind, request, pause);
     lastRead = { key, result };
     return result;
   } catch {

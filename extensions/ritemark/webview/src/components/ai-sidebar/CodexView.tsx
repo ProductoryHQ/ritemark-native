@@ -9,6 +9,7 @@
 import { ActivityCard } from './ActivityCard';
 import { ActivityDetails } from './ActivityDetails';
 import { activityHeadline, readSummary, stepLabel } from './stepLabel';
+import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -197,28 +198,6 @@ export function CodexTurn({
         />
       )}
 
-      {/* Approval dialog */}
-      {turn.approval && (
-        <ApprovalCard
-          approval={turn.approval}
-          onApprove={onApprove}
-          onReject={onReject}
-          agentLabel={runtimeLabel}
-        />
-      )}
-
-      {turn.pendingQuestion && (
-        <AgentQuestion
-          turnId={turn.id}
-          question={{
-            toolUseId: String(turn.pendingQuestion.requestId),
-            questions: turn.pendingQuestion.questions,
-          }}
-          providerLabel={runtimeLabel}
-          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
-        />
-      )}
-
       {showPlanCard && !needsPlanReview && (
         <PlanCard explanation={turn.planExplanation} planSteps={turn.planSteps} planText={displayPlanText} />
       )}
@@ -241,6 +220,28 @@ export function CodexTurn({
       {/* Streaming text */}
       {turn.streamingText && !shouldHideStreamingBubble && (
         <AIResponseBubble content={turn.streamingText} />
+      )}
+
+      {/* Approval dialog */}
+      {turn.approval && (
+        <ApprovalCard
+          approval={turn.approval}
+          onApprove={onApprove}
+          onReject={onReject}
+          agentLabel={runtimeLabel}
+        />
+      )}
+
+      {turn.pendingQuestion && (
+        <AgentQuestion
+          turnId={turn.id}
+          question={{
+            toolUseId: String(turn.pendingQuestion.requestId),
+            questions: turn.pendingQuestion.questions,
+          }}
+          providerLabel={runtimeLabel}
+          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
+        />
       )}
 
       {/* The conversation-level ActivityStatusLine covers the starting state —
@@ -281,6 +282,7 @@ export function CodexTurn({
           activeMs={turn.result?.activityDurationMs}
         />
       )}
+      <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
 
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
           the conversation-level ActivityStatusLine is the single status point
@@ -356,7 +358,7 @@ function ActivitySection({
   const actions = activities.filter((activity) => activity.type !== 'error').length;
   const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
   const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
-  const latestMessage = activityHeadline(lastActivity);
+  const latestMessage = activityHeadline(lastActivity ?? undefined);
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">

@@ -124,7 +124,7 @@ function lex(text: string): Token[] {
 }
 
 /** `deck`: the document is a deck (`.rtms`, or an older `.deck.md`), whose ```slide blocks are its slides. */
-export function readMarkdown(source: string, budget: number, options: { deck?: boolean } = {}): ReadOutcome {
+export function readMarkdown(source: string, budget: number, options: { deck?: boolean; preserveSpacing?: boolean } = {}): ReadOutcome {
   const text = source.replace(FRONT_MATTER, '');
   let tokens: Token[];
   try {
@@ -132,7 +132,7 @@ export function readMarkdown(source: string, budget: number, options: { deck?: b
   } catch {
     return { ok: false, reason: 'unreadable' };
   }
-  const sink = new PassageSink(budget);
+  const sink = new PassageSink(budget, options.preserveSpacing);
   const walk = (list: Token[], block: () => number, top = false) => {
     for (const token of list) {
       if (sink.full) return;

@@ -1,0 +1,3 @@
+- You can now see Excel charts in place on your sheets in Ritemark.
+- You can now see Excel’s cell highlights, colour scales and data bars in Ritemark.
+- You can now choose an Excel chart in Ritemark and copy it as a picture.

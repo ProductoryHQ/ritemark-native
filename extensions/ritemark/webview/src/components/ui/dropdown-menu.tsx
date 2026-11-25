@@ -21,9 +21,9 @@ import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu'
 import { cn } from '../../lib/utils'
 import { Button } from './button'
 import { Icon } from './Icon'
-import { Tooltip } from './tooltip'
+import { Tooltip, popupWithTooltipEscape } from './tooltip'
 
-const DropdownMenu = DropdownMenuPrimitive.Root
+const DropdownMenu = popupWithTooltipEscape(DropdownMenuPrimitive.Root)
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 

@@ -75,6 +75,10 @@ async function main() {
       `${name} · PowerPoint · 6 slides · slides 5–6`, expectedSlide(5, false), expectedSlide(6, notes[5] !== null),
     ].join('\n\n'));
     assert.equal((await read(7)).isError, true);
+    const lookup = async (page: number, text: string) =>
+      (await readProjectDocument({ path: name, passage: { page, text } }, [project], pause)).location;
+    assert.deepEqual(await lookup(5, 'slide 5 & its text'), { page: 5, text: 'Slide 5 & its text', occurrence: 0 });
+    assert.equal(await lookup(5, 'Speaker notes for slide 4.'), undefined);
     const cut = await readAsMarkdown(bytes, name, 'powerpoint', {}, pause, expectedSlide(1, notes[0] !== null).length);
     assert.equal(cut.text, [
       `${name} · PowerPoint · 6 slides · cut after slide 1 of 6`,

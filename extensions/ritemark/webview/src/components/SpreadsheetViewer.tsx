@@ -10,9 +10,17 @@ import { sendToExtension, onMessage } from '../bridge'
 import type { DocumentSyncAction } from './header/DocumentSyncAction'
 import type { DocumentApplyTarget } from '../types/documentSync'
 import { isCellEdit, type CellEdit } from '../../../src/excel/cellEdit'
-import { readWorkbook } from './excel/readWorkbook'
+import { readWorkbook, type DrawingModel } from './excel/readWorkbook'
 import { MAX_DISPLAY_ROWS, modelSource, sheetJsSource, type SheetSource } from './excel/sheetSource'
-import { SheetGrid } from './excel/SheetGrid'
+import { SheetFormulaBar, SheetGrid } from './excel/SheetGrid'
+import { useChartSelection } from './excel/chartSelection'
+import { createCellRuleCache, watchRuleDay } from './excel/cellRules'
+import './excel/sheetGrid.css'
+import { ChartErrorBoundary, PositionedChart } from './excel/ChartView'
+import { FailedChart, type ChartFailureReporter } from './excel/DrawingView'
+import { calendarDay } from './excel/ruleFormula'
+import { drawsChart } from './excel/chartLayout'
+import { keptNotice } from './excel/keptNotice'
 import { Tooltip } from './ui/tooltip'
 import { defaultSpreadsheetApp } from '../hooks/usePlatform'
 
@@ -72,23 +80,6 @@ async function openWorkbook(content: string, encoding: string | undefined, filen
   return sheetJsSource(workbook)
 }
 
-/** What a sheet keeps that the preview doesn't draw, said once on the line under the bar (experience 47, frame 7). */
-function keptNotice(layout: { drawings: Array<{ what: string }>; conditionalFormats: number }): string | undefined {
-  const count = (what: string) => layout.drawings.filter((d) => d.what === what).length
-  const things: string[] = []
-  const name = (n: number, one: string, many: string) => (n === 1 ? `a ${one}` : `${n} ${many}`)
-  if (count('chart')) things.push(name(count('chart'), 'chart', 'charts'))
-  if (count('image')) things.push(name(count('image'), 'picture', 'pictures'))
-  if (count('shape')) things.push(name(count('shape'), 'shape', 'shapes'))
-  if (layout.conditionalFormats) things.push('colour rules')
-  if (!things.length) return undefined
-  const list = things.length === 1 ? things[0] : `${things.slice(0, -1).join(', ')} and ${things[things.length - 1]}`
-  const one = things.length === 1 && /^an? /.test(list)
-  return one
-    ? `This sheet has ${list}. It's kept in the file; Open in Excel to see it.`
-    : `This sheet has ${list}. They're kept in the file; Open in Excel to see them.`
-}
-
 /** A chart sheet's card title (frame 8). */
 function chartSheetTitle(name: string): string {
   return `${name} is a chart.`
@@ -113,6 +104,7 @@ export function SpreadsheetViewer({
   const [showSizeWarning, setShowSizeWarning] = useState(false)
   const [proceedWithLargeFile, setProceedWithLargeFile] = useState(false)
   const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const chartSelection = useChartSelection()
   const [source, setSource] = useState<SheetSource | null>(null)
   const [hasExcel, setHasExcel] = useState(false)
   const [parsedSyncTarget, setParsedSyncTarget] = useState<DocumentApplyTarget | undefined>()
@@ -143,10 +135,29 @@ export function SpreadsheetViewer({
   // Sprint 158 PR 3: raised by every edit, so the sheet grid draws the model again
   const [version, setVersion] = useState(0)
 
-  // Check if Excel is installed on mount and listen for messages
+  const model = source?.model
+  const ruleCache = useMemo(() => model && createCellRuleCache(model), [model])
+  const [ruleDay, setRuleDay] = useState(() => new Date())
   useEffect(() => {
-    sendToExtension('checkExcel', {})
+    if (!model?.sheets.some((sheet) => sheet.layout.rules.length)) return
+    return watchRuleDay((day) => setRuleDay((previous) => calendarDay(previous) === calendarDay(day) ? previous : day))
+  }, [model])
 
+  // A worksheet chart can have a fallback in more than one frozen-pane region.
+  const [failedCharts, setFailedCharts] = useState(() => new Map<DrawingModel, number>())
+  const reportChartFailure = useCallback<ChartFailureReporter>((drawing, change) => {
+    setFailedCharts((previous) => {
+      const next = new Map(previous)
+      const count = (previous.get(drawing) ?? 0) + change
+      if (count > 0) next.set(drawing, count)
+      else next.delete(drawing)
+      return next
+    })
+  }, [])
+
+  useEffect(() => { sendToExtension('checkExcel', {}) }, [])
+
+  useEffect(() => {
     const unsubscribe = onMessage((message) => {
       if (message.type === 'excelStatus') {
         setHasExcel(message.hasExcel as boolean)
@@ -179,13 +190,14 @@ export function SpreadsheetViewer({
         }
         // Refused (the host said why): put the cell back as it was
         current.restore(pending.sheet, pending.row, pending.col, pending.previous)
+        if (current.model === model) ruleCache?.invalidate(pending.sheet, pending.row, pending.col)
         setVersion((v) => v + 1)
         if (pending.sheet === selectedSheetRef.current && !current.model) setParsedData(current.extract(pending.sheet))
       }
     })
 
     return unsubscribe
-  }, [syncEnabled])
+  }, [syncEnabled, model, ruleCache])
 
   // Check file size before parsing
   useEffect(() => {
@@ -454,6 +466,7 @@ export function SpreadsheetViewer({
     const value = source.valueFor(selectedSheet, row, col, text)
     const id = nextEditId.current++
     const previous = source.write(selectedSheet, row, col, value)
+    ruleCache?.invalidate(selectedSheet, row, col)
     pendingEdits.current.set(id, { sheet: selectedSheet, row, col, previous })
     // the cell is drawn as its format draws it (14 in a money cell: 14.00 €)
     setVersion((v) => v + 1)
@@ -462,7 +475,7 @@ export function SpreadsheetViewer({
 
     const edit: CellEdit = { sheet: selectedSheet, ref: XLSX.utils.encode_cell({ r: row, c: col }), value }
     sendToExtension('cellEdit', { id, edit })
-  }, [source, selectedSheet, isEditable])
+  }, [source, selectedSheet, isEditable, ruleCache])
 
   const handleExcelCellChange = useCallback((rowIndex: number, columnId: string, text: string) => {
     editCell(sheetRowOf(rowIndex), XLSX.utils.decode_col(columnId), text)
@@ -528,14 +541,19 @@ export function SpreadsheetViewer({
 
   // Sprint 158 (#711; experience 47, frame 2): once a cell is edited, the line under the bar says what a save does;
   // while a formula cell is typed over, what that typing does
-  const sheetModel = source?.model?.sheets.find((s) => s.name === selectedSheet)
+  const sheetModel = model?.sheets.find((s) => s.name === selectedSheet)
+  useEffect(() => chartSelection.clear(), [sheetModel, chartSelection.clear])
+  const cellRules = sheetModel && ruleCache?.forSheet(sheetModel, ruleDay)
+  const sheetDrawing = sheetModel?.kind === 'chartsheet'
+    ? sheetModel.layout.drawings.find((drawing) => drawing.what === 'chart') : undefined
+  const sheetChart = sheetDrawing?.chart
   const excelNotice = fileType !== 'xlsx'
     ? undefined
     : isEditable && editingFormula
       ? 'Typing here replaces the formula with a value.'
       : isEditable && hasEdited
         ? 'Only the cells you change are saved; the rest of the workbook stays as it is. Totals that use them update when the file opens in Excel.'
-        : sheetModel && sheetModel.kind === 'worksheet' ? keptNotice(sheetModel.layout) : undefined
+        : sheetModel ? keptNotice(sheetModel.layout, cellRules, failedCharts) : undefined
   const openInLabel = `Open in ${hasExcel ? 'Excel' : defaultSpreadsheetApp}`
 
   // Status bar info
@@ -547,6 +565,22 @@ export function SpreadsheetViewer({
     const truncated = sizeBytes && rowCount === MAX_DISPLAY_ROWS && !source?.model
     return { rowCount, colCount, truncated }
   }, [parsedData, sizeBytes, source])
+
+  const chartSheetCard = useCallback((reason?: string) => sheetModel?.kind === 'chartsheet' && (
+    <div className="flex h-full flex-1 items-center justify-center">
+      <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
+        <Icon name="chart-bar" size={20} tone="inherit" />
+        <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
+        <span>{reason ?? "The preview doesn't draw this kind of chart."} It's kept in the file as it is.</span>
+        <Tooltip label={`${openInLabel}, where the chart is drawn`}>
+          <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
+            <Icon name="arrow-square-out" size={14} tone="inherit" />
+            <span>{openInLabel}</span>
+          </Button>
+        </Tooltip>
+      </div>
+    </div>
+  ), [sheetModel, openInLabel, hasExcel, handleOpenInExcel, handleOpenInNumbers])
 
   // Size warning (checked first: no data is parsed while it's showing)
   if (showSizeWarning) {
@@ -638,26 +672,29 @@ export function SpreadsheetViewer({
       )}
 
       {/* Sprint 158 PR 3 (#711; experience 47): a workbook our reader read is drawn as Excel draws it, in the sheet
-          grid; a chart sheet is a card (frame 8). .xls and the SheetJS fallback keep the table below. */}
-      {source?.model && sheetModel?.kind === 'chartsheet' ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="flex h-[320px] w-[560px] max-w-[calc(100%-32px)] flex-col items-center justify-center gap-1.5 rounded border border-dashed border-[#9aa3ae] bg-white text-center text-xs text-[#5f6b7a]">
-            <Icon name="chart-bar" size={20} tone="inherit" />
-            <b className="text-[15px] text-[#3b4452]">{chartSheetTitle(sheetModel.name)}</b>
-            <span>It's kept in the file as it is. The preview doesn't draw charts yet.</span>
-            <Tooltip label={`${openInLabel}, where the chart is drawn`}>
-              <Button type="button" variant="outline" size="compact" className="mt-2" onClick={hasExcel ? handleOpenInExcel : handleOpenInNumbers}>
-                <Icon name="arrow-square-out" size={14} tone="inherit" />
-                <span>{openInLabel}</span>
-              </Button>
-            </Tooltip>
+          grid or as a full-sheet chart. .xls and the SheetJS fallback keep the table below. */}
+      {sheetModel?.kind === 'chartsheet' && (
+        <SheetFormulaBar id={chartSelection.barId} reference={chartSelection.chosen ? 'Chart' : ''} showFormulaIcon={false}
+          aria-label="Chart details" value={chartSelection.chosen?.text ?? ''} readOnly />
+      )}
+      {source?.model && sheetDrawing && drawsChart(sheetChart) ? (
+        <ChartErrorBoundary chart={sheetChart} workbook={source.model} version={version} fallback={<FailedChart drawing={sheetDrawing} report={reportChartFailure}>{chartSheetCard()}</FailedChart>}>
+          <div className="relative min-h-0 flex-1">
+            <div className="absolute inset-0">
+              <PositionedChart chart={sheetChart} workbook={source.model} version={version} emptyFallback={chartSheetCard}
+                selection={chartSelection.bind(0)} sheetName={sheetModel?.name} />
+            </div>
           </div>
-        </div>
+        </ChartErrorBoundary>
+      ) : source?.model && sheetModel?.kind === 'chartsheet' ? (
+        chartSheetCard()
       ) : source?.model && sheetModel ? (
         <SheetGrid
           model={source.model}
           sheet={sheetModel}
           version={version}
+          cellRules={cellRules}
+          onChartFailure={reportChartFailure}
           editable={isEditable}
           onEdit={editCell}
           getInput={gridInput}

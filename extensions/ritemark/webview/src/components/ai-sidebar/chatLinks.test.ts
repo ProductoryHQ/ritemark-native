@@ -92,3 +92,28 @@ assert.deepEqual(classifyChatHref('D:/Notes/a.md:12'), { kind: 'file', path: 'D:
 assert.deepEqual(classifyChatHref('/private/tmp/s140/Training%20PDFs/Fernhollow%20tender.pdf'), { kind: 'file', path: '/private/tmp/s140/Training PDFs/Fernhollow tender.pdf' }, 'the link opens the file')
 
 console.log('chatLinks tests passed.')
+
+// Sprint 173 S24–S29: split before decoding, keep ordinary and unsupported links distinct.
+assert.deepEqual(classifyChatHref('Notes/Head%20of%20Ops%23A.docx#p=4&q=Listen%20first%20%26%20ask'), {
+  kind: 'file', path: 'Notes/Head of Ops#A.docx', passage: { page: 4, text: 'Listen first & ask' },
+})
+assert.deepEqual(classifyChatHref('c:%5CReview%5CREPORT.PDF#p=4&q=Ask%20first'), {
+  kind: 'file', path: 'c:\\Review\\REPORT.PDF', passage: { page: 4, text: 'Ask first' },
+})
+assert.deepEqual(classifyChatHref('file:///C:/Review/Report.pdf#p=4&q=Ask%20first'), {
+  kind: 'file', path: 'C:/Review/Report.pdf', passage: { page: 4, text: 'Ask first' },
+})
+assert.deepEqual(classifyChatHref('deck.pptx#p=5'), { kind: 'file', path: 'deck.pptx', passage: { page: 5 } })
+assert.deepEqual(classifyChatHref('notes.md#q=paragraph&p=0'), { kind: 'file', path: 'notes.md', passage: { text: 'paragraph' } })
+for (const quote of ['x'.repeat(201), '%00bad', '%0Abad', '%C2%85bad', '%C3', '']) {
+  assert.deepEqual(classifyChatHref('report.pdf#p=4&q=' + quote), { kind: 'file', path: 'report.pdf' })
+}
+for (const scheme of ['javascript', 'command']) {
+  assert.equal(classifyChatHref(scheme + ':open#p=4&q=quote').kind, 'unsupported')
+  assert.equal(classifyChatHref(scheme + ':42#p=4&q=quote').kind, 'unsupported')
+}
+assert.deepEqual(classifyChatHref('https://example.test/a#p=4&q=quote'), {
+  kind: 'external', url: 'https://example.test/a#p=4&q=quote',
+})
+const codex = rewriteCodexCitations(':codex-file-citation{path="docs/report#p=4.pdf" purpose="source"}')
+assert.deepEqual(classifyChatHref(codex.match(/\(([^)]*)\)/)?.[1]), { kind: 'file', path: 'docs/report#p=4.pdf' })

@@ -9,7 +9,7 @@ Common environment fixes: Rosetta/x64 Node -> re-exec under `arch -arm64`; missi
 
 Production build: create a new detached exact-main worktree with `./scripts/create-release-worktree.sh`, then run preflight and `./scripts/build-prod.sh`. The production path must reject local pre-patched/symlinked VS Code, shared dependency roots, stale output, and missing/mismatched provenance. Development trees are never promoted into RCs. Never pipe build output through `| tail`/`| head` (background-mode hang).
 
-Storage hygiene: run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before RC creation, and weekly. `--clean` is allowed only after reviewing classifications; never override dirty, unreadable, unpushed, upstream-less, active, current, primary, or locked worktrees.
+Storage hygiene: run `node ./scripts/worktree-hygiene.mjs --check` after merge/close, at sprint close, before RC creation, and weekly. `--clean` is human-authorized (Jarmo says go after reading the report) -- never run it yourself; never override dirty, unreadable, unpushed, upstream-less, active, current, primary, or locked worktrees.
 
 Patch system: customize VS Code only via numbered patches in `patches/vscode/`, never direct submodule edits. `./scripts/apply-patches.sh` (apply), `--dry-run` (status), `create-patch.sh` (new), `update-vscode.sh` (upstream bump). On conflict after an upstream bump, read the patch, reapply manually to the new location, recreate the patch.
 

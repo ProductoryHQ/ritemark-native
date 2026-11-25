@@ -9,7 +9,10 @@ import { isOpenInAddress } from './blocks/codeTools';
 import { BLOCK_MAX_STEP } from './blocks/slideRenderer';
 import { MAX_DRAFT_WORDS, type StartCardState } from './startCard';
 import { isThemePath, type ThemeEntry } from './deckTheme';
+import type { DeckLiveState } from './deckLive';
 import type { ThemeChangeView } from './themeChange';
+import { clockMinutes, type SessionTimeField } from './timetable';
+import { lengthMinutesOf } from './present/presentSession';
 import { isDeckPath } from './deckFileName';
 
 /** At most this many picture paths in one request: a deck's slides, with room to spare. */
@@ -23,6 +26,7 @@ export const MAX_DECK_TEXT = 8 * 1024 * 1024;
 export const MAX_DECK_SLIDES = 10_000;
 
 export type DeckRequest =
+  | { type: 'deck/session-time'; field: SessionTimeField; value: string }
   /** Sprint 163 PR 1: a slide's ↗ Open in Claude or ChatGPT, in the person's own browser (only `openInAddresses`' own). */
   | { type: 'deck/open-in'; url: string }
   /** The webview URIs of the slides' pictures, by the paths the slides name (relative to the deck's folder). */
@@ -83,6 +87,8 @@ export type DeckRequest =
   | { type: 'deck/publish'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /** The Published chip's menu: Copy link, See online, Unpublish (2.2's commands on the page). */
   | { type: 'deck/page-action'; action: DeckPageAction }
+  | { type: 'deck/live-action'; action: 'on' | 'off' | 'resume' }
+  | { type: 'deck/live-fit'; text: string; look: 'card' | 'borderless'; steps: number[] }
   /**
    * Sprint 170 (#881): Save as PDF from Publish's menu: the kind the item named (from the view at the press), and the
    * deck's text, look and fit as `deck/publish` sends them.
@@ -116,6 +122,8 @@ export interface DeckPageState {
   changed: boolean;
   /** Sprint 170: the PDF kinds this app can save, in Publish's menu; none in a shell without the print (patch 021). */
   pdf?: DeckPdfKind[];
+  address?: string;
+  live?: DeckLiveState;
 }
 
 /** The host's answers. */
@@ -249,6 +257,17 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
       if (typeof input.filename !== 'string' || input.filename.length === 0 || input.filename.length > 255) throw new DeckProtocolError('filename must be a name');
       return { type: 'deck/save-image', slideId: input.slideId, dataUrl: input.dataUrl, filename: input.filename };
     }
+    case 'deck/session-time': {
+      exactKeys(input, ['type', 'field', 'value']);
+      if (input.field !== 'start' && input.field !== 'end' && input.field !== 'length') throw new DeckProtocolError('field must be start, end or length');
+      if (typeof input.value !== 'string') throw new DeckProtocolError('value must be text');
+      if (input.field === 'length') {
+        if (input.value !== '' && lengthMinutesOf(input.value) === null) throw new DeckProtocolError('value must be whole session minutes');
+      } else if (!(input.field === 'start' && input.value === '') && clockMinutes(input.value) === null) {
+        throw new DeckProtocolError('value must be an HH:MM clock time');
+      }
+      return { type: input.type, field: input.field, value: input.value };
+    }
     case 'deck/current': {
       exactKeys(input, ['type', 'index', 'count']);
       if (!isCount(input.index) || !isCount(input.count)) throw new DeckProtocolError('index and count must be counts');
@@ -320,6 +339,15 @@ export function decodeDeckRequest(value: unknown): DeckRequest {
     case 'deck/page-state': {
       exactKeys(input, ['type']);
       return { type: 'deck/page-state' };
+    }
+    case 'deck/live-action': {
+      exactKeys(input, ['type', 'action']);
+      if (input.action !== 'on' && input.action !== 'off' && input.action !== 'resume') throw new DeckProtocolError('Unknown live action');
+      return { type: 'deck/live-action', action: input.action };
+    }
+    case 'deck/live-fit': {
+      exactKeys(input, ['type', 'text', 'look', 'steps']);
+      return { type: 'deck/live-fit', ...publishFields(input) };
     }
     case 'deck/publish': {
       exactKeys(input, ['type', 'text', 'look', 'steps']);

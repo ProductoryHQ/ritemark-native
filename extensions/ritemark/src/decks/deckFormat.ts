@@ -80,6 +80,8 @@ export interface SlideData {
    */
   valign?: string;
   skip?: boolean;
+  /** Planned whole minutes, as written. The timetable validates the value. */
+  time?: string;
   /** Keep it here: a changed library copy that stays changed (written by Keep it here). */
   kept?: boolean;
   /** `<project-relative path>#<source id> @<stamp>`: where a copy came from. */
@@ -116,7 +118,7 @@ export function isDefaultExerciseTag(data: SlideData): boolean {
 }
 
 /** The scalar keys, in the order the writer puts a new key. */
-const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'alt', 'focus', 'valign', 'skip', 'kept', 'from'] as const;
+const SCALAR_KEYS = ['id', 'section', 'title', 'subtitle', 'number', 'tag', 'look', 'picture', 'image', 'alt', 'focus', 'valign', 'skip', 'time', 'kept', 'from'] as const;
 type ScalarKey = (typeof SCALAR_KEYS)[number];
 const BOOLEAN_KEYS: ReadonlySet<string> = new Set(['skip', 'kept', 'section']);
 const ITEM_KEYS = ['heading', 'text', 'icon'] as const;
@@ -386,6 +388,7 @@ function sameRows(a: string[][] | undefined, b: string[][] | undefined): boolean
 }
 
 function scalarLine(key: ScalarKey, value: string | boolean): string {
+  if (key === 'time' && typeof value === 'string' && /^(?:0|[1-9]\d*)$/.test(value)) return `time: ${value}`;
   return `${key}: ${typeof value === 'boolean' ? String(value) : writeScalar(value)}`;
 }
 
@@ -713,7 +716,7 @@ export function sidePictureOf(data: SlideData): 'left' | 'right' | 'behind' | nu
 }
 
 /** The keys a block slide's header holds: what belongs to the slide as a whole, never its words. */
-export const HEADER_KEYS = ['id', 'from', 'skip', 'picture', 'image', 'alt', 'focus', 'kept', 'section', 'valign'] as const;
+export const HEADER_KEYS = ['id', 'from', 'skip', 'time', 'picture', 'image', 'alt', 'focus', 'kept', 'section', 'valign'] as const;
 
 /** Sprint 167 PR 3: the three places a slide's content can sit (`valign:`), from the top down. */
 export const CONTENT_PLACES = ['top', 'middle', 'bottom'] as const;

@@ -78,6 +78,14 @@ test('PDF: the occurrence when it is on the passage’s page, else the first mat
   assert.equal(landingIndex({ text: 'a', occurrence: 0, page: 9, id: 1 }, pages.length, pageOf), 0, 'no match that late: the occurrence')
 })
 
+test('PDF source links count on the cited page and never land on another page', () => {
+  const request = decodeFindOpen({ type: 'find:open', text: 'words', page: 4, occurrence: 1, source: true }, 1)
+  assert.ok(request)
+  const pages = [1, 4, 4, 5]
+  assert.equal(landingIndex(request, pages.length, (i) => pages[i]), 2)
+  assert.equal(landingIndex({ ...request, page: 3 }, pages.length, (i) => pages[i]), -1)
+})
+
 test('isRequestQuery: the same words, whatever their case or surrounding space; not other words', () => {
   const request = { text: 'Annual', occurrence: 0, id: 1 }
   assert.equal(isRequestQuery(request, ' annual '), true)

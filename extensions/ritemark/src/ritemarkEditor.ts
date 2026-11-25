@@ -1144,7 +1144,11 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
 
           case 'wordCountChanged':
             // Update word count in status bar
-            RitemarkEditorProvider._wordCounts.set(webviewPanel, message.wordCount || 0);
+            if (this.deckModeOfView(document, webview)) {
+              RitemarkEditorProvider._wordCounts.delete(webviewPanel);
+            } else {
+              RitemarkEditorProvider._wordCounts.set(webviewPanel, message.wordCount || 0);
+            }
             RitemarkEditorProvider._equationCounts.set(webviewPanel, Number(message.equationCount) || 0);
             RitemarkEditorProvider.refreshWordCountStatusBar();
             return;

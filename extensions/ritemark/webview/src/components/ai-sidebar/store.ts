@@ -388,6 +388,7 @@ interface AISidebarState {
    */
   chatDocuments: Record<string, ChatDocumentView>;
   frontDocumentPath: string | null;
+  openedSourceLink: { id: string; path: string } | null;
   /** Sprint 155 (PR 2): the person's click on the head's icon; the host brings the chat's document forward. */
   bringChatDocumentForward: (conversationId: string) => void;
 
@@ -1141,6 +1142,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     conversationStoreNotice: null,
     chatDocuments: {},
     frontDocumentPath: null,
+    openedSourceLink: null,
 
     promptQueues: {},
     composerDrafts: {},
@@ -1787,7 +1789,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (!conversation) return;
       patchConversation(conversation.id, (c) => ({
         agentConversation: c.agentConversation.map((turn) =>
-          turn.id === turnId ? { ...turn, pendingQuestion: undefined } : turn
+          turn.id === turnId ? { ...turn, pendingQuestion: undefined, assistantText: undefined } : turn
         ),
       }));
       vscode.postMessage({
@@ -3089,6 +3091,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           });
           break;
 
+        case 'chat:source/opened':
+          set({ openedSourceLink: { id: message.id, path: message.path } });
+          break;
         case 'active-file-changed':
           set({ activeFilePath: message.path, activeFileLabel: message.label ?? null, activeSlide: message.slide ?? null });
           break;
@@ -3267,10 +3272,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const progress = message.progress as AgentProgress;
 
           patchLastAgentTurn(targetId, (lastTurn) => {
-            if (progress.type === 'plan_text') {
+            if (progress.type === 'text' || progress.type === 'plan_text') {
+              if (progress.type === 'text' && !progress.message) {
+                return { ...lastTurn, assistantText: undefined };
+              }
               return {
                 ...lastTurn,
-                planText: `${lastTurn.planText || ''}${lastTurn.planText ? '\n\n' : ''}${progress.message}`,
+                assistantText: lastTurn.assistantText ? `${lastTurn.assistantText}\n\n${progress.message}` : progress.message,
+                ...(progress.type === 'plan_text' && {
+                  planText: `${lastTurn.planText || ''}${lastTurn.planText ? '\n\n' : ''}${progress.message}`,
+                }),
               };
             }
 
@@ -3287,6 +3298,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               };
               return {
                 ...lastTurn,
+                assistantText: undefined,
                 activities: updateStep(lastTurn.activities, progress),
                 subagents: [...(lastTurn.subagents || []), newSubagent],
               };
@@ -3315,8 +3327,14 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 ),
               };
             }
-            // Regular activity
-            return { ...lastTurn, activities: updateStep(lastTurn.activities, progress) };
+            // AskUserQuestion consumes the preceding text as context for its card.
+            const resetsQuestionContext = (progress.type === 'tool_use' && progress.tool !== 'AskUserQuestion')
+              || progress.type === 'plan_ready' || progress.type === 'plan_autonomous';
+            return {
+              ...lastTurn,
+              assistantText: resetsQuestionContext ? undefined : lastTurn.assistantText,
+              activities: updateStep(lastTurn.activities, progress),
+            };
           });
           break;
         }
@@ -3397,6 +3415,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               planHandled: false,
               planDecision: undefined,
               pendingPlanApproval,
+              assistantText: undefined,
               // ExitPlanMode's input.plan is the canonical plan text; streamed
               // plan_text events (lastTurn.planText) are only a fallback.
               planText: pendingPlanApproval.plan?.trim()
@@ -3424,7 +3443,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 pendingQuestion: undefined,
                 pendingPlanApproval: undefined,
                 approval: undefined,
+                assistantText: undefined,
                 result: {
+                  ...(message.liveDeckSteps?.length ? { liveDeckSteps: message.liveDeckSteps } : {}),
                   text: message.text || '',
                   filesModified: message.filesModified || [],
                   metrics: message.metrics || { durationMs: 0, costUsd: null, model: null },
@@ -3594,6 +3615,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 errorKind: message.errorKind,
                 errorDetail: message.errorDetail,
                 rawError: message.rawError,
+                liveDeckSteps: message.liveDeckSteps,
               });
             },
             { requireRunning: false },

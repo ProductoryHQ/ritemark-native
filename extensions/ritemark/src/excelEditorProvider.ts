@@ -173,6 +173,14 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
             // Webview encountered an error (display in VS Code)
             vscode.window.showErrorMessage(`Excel Preview: ${message.message}`);
             break;
+
+          case 'copyToClipboard':
+            // The sheet grid's Cmd/Ctrl+C (Sprint 158) sends the copied cells here, as the Markdown editor's code
+            // blocks do; nothing handled it in this editor, so cell Copy did nothing (found in Sprint 174's test window)
+            if (typeof message.text === 'string') {
+              void vscode.env.clipboard.writeText(message.text);
+            }
+            break;
         }
       },
       undefined,
@@ -407,7 +415,7 @@ export class ExcelEditorProvider implements vscode.CustomEditorProvider<ExcelDoc
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource} data:;">
+  <!-- Chart Copy loads its generated SVG through a local blob URL. --><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource}; font-src ${webview.cspSource} data:; img-src blob:;">
   <title>Excel Preview</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }

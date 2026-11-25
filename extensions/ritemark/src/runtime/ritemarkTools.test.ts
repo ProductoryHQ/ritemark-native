@@ -6,6 +6,9 @@
 
 import { strict as assert } from 'node:assert';
 import Module from 'node:module';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 
 // BrowserActionTools imports vscode; nothing here reaches the workbench.
 const moduleAny = Module as unknown as { _load: (request: string, parent: unknown, isMain?: boolean) => unknown };
@@ -37,6 +40,78 @@ const {
   toolGroupsFor,
   toolSetKey,
 } = tools;
+
+/** Sprint 175: publishing is available from the person's deck view only. */
+function assertNoPublishingTools(groups: ReturnType<typeof toolGroupsFor>): void {
+  const publishingTool = /publish|updatelive|update(?:the)?(?:deck)?page|(?:set|toggle|enable|disable|switch|start|stop|resume|turn)(?:on|off)?(?:deck|page)?live|live(?:action|switch|on|off|resume|toggle|update)|goon/i;
+  const publishingApi = /\b(?:setLive|liveAction|publishPage|unpublishPage|updateLive)\b/;
+  const injector = new RitemarkToolsInjector();
+  const names = [
+    ...injector.claudeAllowedTools(groups),
+    ...(injector.codexDynamicTools(groups) ?? []).map(tool => tool.name),
+    ...groups.flatMap(group => group.tools.map(tool => mcpToolDefinition(tool).name)),
+  ];
+  for (const name of names) {
+    assert.doesNotMatch(name.replace(/[_ -]/g, ''), publishingTool, `Publishing tool: ${name}`);
+  }
+  for (const tool of groups.flatMap(group => group.tools)) {
+    assert.doesNotMatch(tool.run.toString(), publishingApi, `Publishing API in tool: ${tool.name}`);
+  }
+}
+assertNoPublishingTools([tools.BROWSER_TOOL_GROUP, tools.BOARD_TOOL_GROUP, tools.DECK_TOOL_GROUP]);
+const deckGroup = tools.DECK_TOOL_GROUP;
+const plantedTool = (tool: Partial<(typeof deckGroup.tools)[number]>) => [{
+  ...deckGroup,
+  tools: [...deckGroup.tools, { ...deckGroup.tools[0]!, ...tool }],
+}];
+for (const name of ['publish_deck', 'update_page', 'unpublishDeck', 'set_live', 'turn_off_live', 'go_on']) {
+  assert.throws(() => assertNoPublishingTools(plantedTool({ name })), /Publishing tool:/);
+}
+// Exercise the same guard with an innocuous name, without running the planted handler.
+const rejectPublishCall = () => { throw new Error('Planted handlers must never run'); };
+const controller = {
+  setLive: rejectPublishCall,
+  liveAction: rejectPublishCall,
+  publishPage: rejectPublishCall,
+  updateLive: rejectPublishCall,
+};
+for (const run of [
+  async () => controller.setLive(),
+  async () => controller.liveAction(),
+  async () => controller.publishPage(),
+  async () => controller.updateLive(),
+]) {
+  assert.throws(() => assertNoPublishingTools(plantedTool({ name: 'review_deck', run })), /Publishing API in tool:/);
+}
+
+function assertDeckViewOwnsLiveAction(): void {
+  const root = join(__dirname, '..');
+  const callers: string[] = [];
+  const scan = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        scan(file);
+      } else if (file.endsWith('.ts') && !file.endsWith('.test.ts')) {
+        const text = readFileSync(file, 'utf8');
+        if (!text.includes('liveAction')) continue;
+        const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+        const visit = (node: ts.Node) => {
+          if ((ts.isPropertyAccessExpression(node) && node.name.text === 'liveAction') ||
+              (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) &&
+                node.argumentExpression.text === 'liveAction')) {
+            callers.push(relative(root, file).replaceAll('\\', '/'));
+          }
+          ts.forEachChild(node, visit);
+        };
+        visit(source);
+      }
+    }
+  };
+  scan(root);
+  assert.deepEqual(callers, ['decks/deckPages.ts']);
+}
+assertDeckViewOwnsLiveAction();
 
 /** The OpenCode adapter's hand-written browser tools before Sprint 130 (git HEAD
  *  at the start of W5). The registry must produce exactly these. */
@@ -674,6 +749,7 @@ async function main(): Promise<void> {
       const groups = documentGroups();
       assert.equal(groups.length, 1);
       assert.equal(toolGroupById('documents'), groups[0]);
+      assertNoPublishingTools(toolGroupsFor({ browser: true }));
       const params = { path: 'Interview.docx' };
       const [dynamic] = injector.codexDynamicTools(groups)!;
       assert.equal(dynamic.name, 'read_document');

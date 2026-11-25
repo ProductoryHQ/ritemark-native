@@ -50,7 +50,7 @@ export function stepLabel(activity: AgentProgress) {
     const where = folder && folder !== '.' && folder !== '..' && !folder.includes(':') ? folder : 'the project folder';
     const counts = status === 'completed' && documentCounts(step.listing ?? []);
     const label = warning ? `Couldn't look in ${where}` : status === 'completed' ? `Looked in ${where}` : `Looking in ${where}`;
-    return { label: counts ? `${label}: ${counts}` : label, detail, warning, icon: 'folder' as const };
+    return { label: counts ? `${label}: ${counts}` : label, detail, warning, icon: 'folder-simple' as const };
   }
   const base = basename(path ?? '');
   const file = base === '.' || base === '..' || /^[a-z]:$/i.test(base) ? '' : base;

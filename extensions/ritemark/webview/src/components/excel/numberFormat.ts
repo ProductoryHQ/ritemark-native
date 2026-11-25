@@ -194,5 +194,10 @@ export function valueFromInput(text: string, code: string, date1904 = false): Ce
   if (numfmt.isPercentFormat(code) && /^-?\d+(\.\d+)?\s*%$/.test(trimmed)) {
     return Number(trimmed.replace(/\s*%$/, '')) / 100
   }
+  // Accept the grouping the grid displays in a cell with an Excel grouping format.
+  const numberPattern = code.replace(/"[^"]*"|\\.|\[[^\]]*\]/g, '')
+  if (/[#0?],[#0?]/.test(numberPattern) && /^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(trimmed)) {
+    return cellValueFromText(trimmed.replace(/,/g, ''))
+  }
   return cellValueFromText(text)
 }

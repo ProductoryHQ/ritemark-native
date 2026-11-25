@@ -72,7 +72,10 @@ export async function readAsMarkdown(
       }
       if (!count) return { kind, reason: 'empty', text: `${name} has no readable text in its body. Open it in Word to see the document.` };
       if (cut) cut += ` of ${count}`;
-      return reading(name, kind, units(count, 'block'), cut ?? 'whole text', text, cut);
+      const { approximate } = word.tally;
+      const status = cut ?? 'whole text';
+      const equationNote = approximate ? ` · ${units(approximate, 'equation')} approximate` : '';
+      return reading(name, kind, units(count, 'block'), status + equationNote, text, cut);
     }
 
     if (kind === 'powerpoint') {

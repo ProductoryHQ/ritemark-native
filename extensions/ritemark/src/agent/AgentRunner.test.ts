@@ -83,7 +83,7 @@ async function testSynchronousPlanApprovalAnswer() {
   }
 }
 
-async function testSynchronousQuestionAnswer() {
+async function testSynchronousQuestionAnswer(splitFrames: boolean) {
   const session = new AgentSession({
     workspacePath: process.cwd(),
   }) as AgentSession & Record<string, unknown>;
@@ -101,18 +101,47 @@ async function testSynchronousQuestionAnswer() {
     ],
   };
 
+  const text = 'I will update the opening paragraph and keep the examples intact. '.repeat(3);
+  const emitted: Array<{ type: string; message: string; tool?: string }> = [];
+  session._turnResolve = () => {};
+  session._turnId = 1;
+  session._consumerTurnId = 1;
+  session._emitProgress = (type: string, message: string, tool?: string) => emitted.push({ type, message, tool });
+
   session._emitQuestion = (question: { toolUseId: string; questions: Array<{ question: string }> }) => {
+    assert.deepEqual(emitted.map(({ type, message }) => [type, message]), [
+      ['text', ''],
+      ['thinking', text.slice(0, 150) + '...'],
+      ['text', text],
+      ['tool_use', 'Using AskUserQuestion'],
+    ], 'tool result clears context, then both the snippet and full prose precede the question');
+    assert.equal(emitted[3].tool, 'AskUserQuestion');
     const answered = session.answerQuestion(question.toolUseId, {
       [question.questions[0].question]: 'A',
     });
     assert.equal(answered, true, 'synchronous question answer should be accepted');
   };
 
-  const result = await session._handleCanUseTool(
-    'AskUserQuestion',
-    questionInput,
-    { signal: new AbortController().signal, toolUseID: 'question-tool-1' }
-  );
+  let result: Awaited<ReturnType<AgentSession['_handleCanUseTool']>> | undefined;
+  session._queryStream = {
+    async *[Symbol.asyncIterator]() {
+      yield { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'earlier-tool' }] } };
+      const textBlock = { type: 'text', text };
+      const questionBlock = { type: 'tool_use', id: 'question-tool-1', name: 'AskUserQuestion', input: questionInput };
+      if (splitFrames) {
+        yield { type: 'assistant', message: { content: [textBlock] } };
+      }
+      yield { type: 'assistant', message: { content: splitFrames ? [questionBlock] : [textBlock, questionBlock] } };
+      result = await session._handleCanUseTool(
+        'AskUserQuestion',
+        questionInput,
+        { signal: new AbortController().signal, toolUseID: 'question-tool-1' },
+      );
+      yield { type: 'result', subtype: 'success', result: 'Continuing.' };
+    },
+  };
+  await session._consumeLoop();
+  assert.ok(result);
 
   assert.equal(result.behavior, 'allow');
   if (result.behavior === 'allow') {
@@ -532,7 +561,8 @@ async function main() {
   testDefaultToolsIncludePlanAndQuestionLifecycle();
   testClaudeLifecycleInstructionsAreIncluded();
   await testSynchronousPlanApprovalAnswer();
-  await testSynchronousQuestionAnswer();
+  await testSynchronousQuestionAnswer(false);
+  await testSynchronousQuestionAnswer(true);
   await testConcurrentToolApprovalsBothResolve();
   testSprint103ModeMapping();
   await testSprint103PlanPhaseMutatingDenied();
