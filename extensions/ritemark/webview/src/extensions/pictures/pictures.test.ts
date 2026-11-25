@@ -70,13 +70,34 @@ check('sizes: S, M, L and Full by context, and a drag snaps to them', () => {
   assert.equal(draggedWidth(5000, 832, 'slide'), '100%')
 })
 
-check('the S document bar clears the following block, including at the top and near the viewport bottom', () => {
+check('the S document bar sits 8 px beside the picture, bottom-aligned and without reserved room', () => {
+  const picture = { left: 80.5, top: 140.5, width: 160, height: 100 }
+  assert.deepEqual(pictureBarPlacement(260, 36, 600, false, { picture, width: 320, right: 600 }), {
+    left: 248.5, top: 204.5, room: 0,
+  })
+})
+
+check('the S bar reserves room below a narrow table cell picture, even near the viewport edges', () => {
   const barHeight = 36
   for (const bottom of [24.5, 280, 584]) {
-    const { top, room } = pictureBarPlacement(bottom, barHeight, 600, false, true)
+    const picture = { left: 80, top: bottom - 24, width: 60, height: 24 }
+    const { left, top, room } = pictureBarPlacement(bottom, barHeight, 600, false, { picture, width: 320, right: 320 })
+    assert.equal(left, undefined)
     assert.equal(top, Math.round(bottom + 10))
+    assert.equal(room, 47)
     assert.ok(top + barHeight <= bottom + room, 'the bar clears even a next block with no margin')
   }
+})
+
+check('the S bar in a deep list item uses the remaining row width after indentation and alignment', () => {
+  const picture = { left: 260, top: 180, width: 120, height: 100 }
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, { picture, width: 320, right: 708 }), {
+    left: 388, top: 244, room: 0,
+  })
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, { picture, width: 320, right: 707 }), { top: 290, room: 47 })
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, {
+    picture: { ...picture, left: 588 }, width: 320, right: 708,
+  }), { top: 290, room: 47 })
 })
 
 check('the M bar keeps its gap and its viewport fallback', () => {

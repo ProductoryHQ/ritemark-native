@@ -228,7 +228,8 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
 
   const hostRect = host.getBoundingClientRect()
   const scale = scaleOf(hostRect.width, host.offsetWidth)
-  const box = localBox(target.getBoundingClientRect(), hostRect, scale)
+  const pictureRect = target.getBoundingClientRect()
+  const box = localBox(pictureRect, hostRect, scale)
   const size = HANDLE * Math.max(1, MIN_SCREEN / scale)
   const aspect = image.naturalWidth && image.naturalHeight ? image.naturalWidth / image.naturalHeight : 0
 
@@ -372,7 +373,7 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
       <PictureBar
         anchor={resizing || barHidden ? null : anchor}
         bounds={context === 'slide' ? stageBounds(host) : undefined}
-        roomHost={context === 'document' ? host : undefined}
+        documentRow={context === 'document' ? { picture: pictureRect, host } : undefined}
         context={context}
         kind="flow"
         look={look}

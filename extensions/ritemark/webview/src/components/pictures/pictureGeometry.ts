@@ -13,8 +13,23 @@ export interface Box {
   height: number
 }
 
-/** A small document picture reserves room for its bar in its own block. */
-export function pictureBarPlacement(bottom: number, height: number, viewportHeight: number, inside: boolean, reserveRoom = false) {
+/** A small document picture uses the space beside it when the bar fits within the row and window. */
+export function pictureBarPlacement(
+  bottom: number,
+  height: number,
+  viewportHeight: number,
+  inside: boolean,
+  beside?: { picture: Box; width: number; right: number },
+): { left?: number; top: number; room: number } {
+  if (beside) {
+    const { picture, width, right } = beside
+    const left = Math.max(8, picture.left + picture.width + 8)
+    if (left + width <= right) {
+      const top = Math.max(8, Math.min(viewportHeight - height - 8, picture.top + picture.height - height))
+      return { left, top, room: 0 }
+    }
+  }
+  const reserveRoom = !!beside
   const below = bottom + 10
   const top = inside
     ? Math.max(8, bottom - height - 12)

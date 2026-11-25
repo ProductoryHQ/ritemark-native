@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { isMac } from '../../hooks/usePlatform'
-import { pictureBarPlacement } from './pictureGeometry'
+import { pictureBarPlacement, type Box } from './pictureGeometry'
 
 export type PicturePlace = 'text' | 'left' | 'right' | 'behind'
 
@@ -76,8 +76,8 @@ export interface PictureBarProps {
   bounds?: { left: number; right: number }
   /** A slide-wide place (a side or behind): the bar sits inside it at the bottom, 12 px up, over the picture. */
   inside?: boolean
-  /** The document picture block that can reserve room for an S bar. */
-  roomHost?: HTMLElement
+  /** The document picture's box and its full-width block, which can reserve room for an S bar. */
+  documentRow?: { picture: Box; host: HTMLElement }
   /** The bar's own element, so a press on it is never "outside". */
   barRef?: (element: HTMLDivElement | null) => void
 }
@@ -231,13 +231,14 @@ export function PictureBar(props: PictureBarProps) {
   const [fold, setFold] = useState(0)
   const widths = useRef<number[]>([])
   const size = sizeOf(look.width, context)
-  const roomHost = anchor && size === 'S' && !crop ? props.roomHost : undefined
+  const documentRow = anchor && size === 'S' && !crop ? props.documentRow : undefined
+  const roomHost = documentRow?.host
 
   useLayoutEffect(() => {
     return () => { roomHost?.style.removeProperty('--picture-bar-room') }
   }, [roomHost])
 
-  // Centre on the picture. An S document bar gets its own space below the picture in the block.
+  // Centre below the picture by default. An S document bar can sit beside the picture.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
@@ -254,12 +255,18 @@ export function PictureBar(props: PictureBarProps) {
     }
     const height = bar.offsetHeight
     const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
-    const maxX = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - width - 8
+    const rightEdge = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - 8
+    const maxX = rightEdge - width
     const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
-    const { top: y, room: reservedRoom } = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, !!roomHost)
-    roomHost?.style.setProperty('--picture-bar-room', `${reservedRoom}px`)
-    setLeft(Math.round(x))
-    setTop(y)
+    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, documentRow && {
+      picture: documentRow.picture,
+      width,
+      right: Math.min(documentRow.host.getBoundingClientRect().right, rightEdge),
+    })
+    if (placement.room) roomHost?.style.setProperty('--picture-bar-room', `${placement.room}px`)
+    else roomHost?.style.removeProperty('--picture-bar-room')
+    setLeft(placement.left ?? Math.round(x))
+    setTop(placement.top)
   })
 
   if (!anchor) return null
