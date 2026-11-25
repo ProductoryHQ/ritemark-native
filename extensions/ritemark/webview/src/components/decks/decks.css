@@ -224,10 +224,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
 /* A wide table scrolls sideways inside its own frame, never cut at the handout's edge (Jarmo, 17 November). The frame
    is the table's own place with room around it for its handles (TableHandlesLayer): 24 px on the left for the row
-   grips (the Text editor's), 24 px on the right for the + column bar, and 8 px above and under for the column grip and
-   the + row bar, so a table that fits never scrolls and no handle is cut. What scrolls under the left room stops 6 px
+   grips (the Text editor's), 24 px on the right for the + column bar, 8 px above and below. The table's own vertical margins
+   also leave room inside the frame for the column grip and + row bar. What scrolls under the left room stops 6 px
    in, clear of the number's rail. */
-.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-right: -24px; padding-right: 24px; margin-top: -8px; margin-bottom: -8px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); container-type: inline-size; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-inline: -24px; padding-inline: 24px; margin-block: -8px; padding-block: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); container-type: inline-size; }
 /* Now that a wide table scrolls, no column squeezes (the Experience lead on #780): each column keeps its widest word
    (the browser's own minimum), and a text column keeps about 200 px, or its stored share of the frame when larger, but
    never more than its longest note on one line, so a note wraps into two or three lines. The node view puts each
