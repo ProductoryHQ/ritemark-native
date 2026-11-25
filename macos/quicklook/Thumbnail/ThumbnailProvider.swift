@@ -7,6 +7,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
+        proofLog.notice("thumbnail started \(request.fileURL.lastPathComponent, privacy: .public)")
         let deadline = DispatchTime.now() + .seconds(2)
         let finish = ThumbnailCompletion(handler)
         // The timeout must also fire if WebKit or an asset read stalls the main thread.
@@ -40,7 +41,11 @@ final class ThumbnailProvider: QLThumbnailProvider {
                     return
                 }
                 let width = min(request.maximumSize.width, request.maximumSize.height * 960 / 540)
-                guard width > 0 else { finish.answer(nil); return }
+                guard width > 0 else {
+                    proofLog.notice("thumbnail empty \(request.fileURL.lastPathComponent, privacy: .public) invalid size")
+                    finish.answer(nil)
+                    return
+                }
                 let size = CGSize(width: width, height: width * 540 / 960)
                 let snapshot = WKSnapshotConfiguration()
                 snapshot.rect = DeckRenderer.canvas
@@ -52,6 +57,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
                     window.contentView = nil
                     self.idleRenderer = renderer
                     guard let cgImage = image?.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                        proofLog.notice("thumbnail empty \(request.fileURL.lastPathComponent, privacy: .public) snapshot unavailable")
                         finish.answer(nil)
                         return
                     }

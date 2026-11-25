@@ -14,37 +14,42 @@ func thumbnail(_ url: URL, output: URL, iconsOnly: Bool) {
     let start = DispatchTime.now().uptimeNanoseconds
     let done = DispatchSemaphore(value: 0)
     let name = url.lastPathComponent
+    var response: (QLThumbnailRepresentation?, Error?, UInt64)?
     QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, error in
         let elapsed = (DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-        defer { done.signal() }
-        guard let representation else {
-            print("\(name)\t\(elapsed)\tnone\t\(error?.localizedDescription ?? "no representation")")
-            return
-        }
-        let image = NSBitmapImageRep(cgImage: representation.cgImage)
-        let png = output.appendingPathComponent(name + ".png")
-        do {
-            try image.representation(using: .png, properties: [:])?.write(to: png)
-            let kind: String
-            switch representation.type {
-            case .icon: kind = "icon"
-            case .lowQualityThumbnail: kind = "low-quality-thumbnail"
-            case .thumbnail: kind = "thumbnail"
-            @unknown default: kind = "unknown"
-            }
-            print("\(name)\t\(elapsed)\t\(kind)\t\((try? recognizedText(png)) ?? "")")
-        } catch {
-            print("\(name)\t\(elapsed)\terror\t\(error)")
-        }
+        response = (representation, error, elapsed)
+        done.signal()
     }
     let deadline = DispatchTime.now() + .seconds(12)
     while done.wait(timeout: .now()) == .timedOut {
         if DispatchTime.now() >= deadline {
-            QLThumbnailGenerator.shared.cancel(request)
             print("\(name)\t12000\ttimeout\t")
+            fflush(stdout)
+            QLThumbnailGenerator.shared.cancel(request)
             return
         }
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
+    }
+    // Measure the Quick Look callback deadline independently of PNG writing and OCR.
+    guard let (representation, error, elapsed) = response else { return }
+    guard let representation else {
+        print("\(name)\t\(elapsed)\tnone\t\(error?.localizedDescription ?? "no representation")")
+        return
+    }
+    let image = NSBitmapImageRep(cgImage: representation.cgImage)
+    let png = output.appendingPathComponent(name + ".png")
+    do {
+        try image.representation(using: .png, properties: [:])?.write(to: png)
+        let kind: String
+        switch representation.type {
+        case .icon: kind = "icon"
+        case .lowQualityThumbnail: kind = "low-quality-thumbnail"
+        case .thumbnail: kind = "thumbnail"
+        @unknown default: kind = "unknown"
+        }
+        print("\(name)\t\(elapsed)\t\(kind)\t\((try? recognizedText(png)) ?? "")")
+    } catch {
+        print("\(name)\t\(elapsed)\terror\t\(error)")
     }
 }
 

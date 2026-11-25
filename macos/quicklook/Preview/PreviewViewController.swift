@@ -14,13 +14,14 @@ final class PreviewViewController: NSViewController, QLPreviewingController {
             handler(DeckRenderError.unsupportedFile)
             return
         }
+        let name = url.lastPathComponent
+        proofLog.notice("preview started \(name, privacy: .public)")
         renderer?.view.removeFromSuperview()
         let next = DeckRenderer()
         renderer = next
         next.view.frame = view.bounds
         next.view.autoresizingMask = [.width, .height]
         view.addSubview(next.view)
-        let name = url.lastPathComponent
         next.render(url, thumbnail: false) { result in
             switch result {
             case .success(let slides):
