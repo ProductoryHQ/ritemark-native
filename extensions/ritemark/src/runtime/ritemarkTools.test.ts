@@ -6,6 +6,9 @@
 
 import { strict as assert } from 'node:assert';
 import Module from 'node:module';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import ts from 'typescript';
 
 // BrowserActionTools imports vscode; nothing here reaches the workbench.
 const moduleAny = Module as unknown as { _load: (request: string, parent: unknown, isMain?: boolean) => unknown };
@@ -37,6 +40,78 @@ const {
   toolGroupsFor,
   toolSetKey,
 } = tools;
+
+/** Sprint 175: publishing is available from the person's deck view only. */
+function assertNoPublishingTools(groups: ReturnType<typeof toolGroupsFor>): void {
+  const publishingTool = /publish|updatelive|update(?:the)?(?:deck)?page|(?:set|toggle|enable|disable|switch|start|stop|resume|turn)(?:on|off)?(?:deck|page)?live|live(?:action|switch|on|off|resume|toggle|update)|goon/i;
+  const publishingApi = /\b(?:setLive|liveAction|publishPage|unpublishPage|updateLive)\b/;
+  const injector = new RitemarkToolsInjector();
+  const names = [
+    ...injector.claudeAllowedTools(groups),
+    ...(injector.codexDynamicTools(groups) ?? []).map(tool => tool.name),
+    ...groups.flatMap(group => group.tools.map(tool => mcpToolDefinition(tool).name)),
+  ];
+  for (const name of names) {
+    assert.doesNotMatch(name.replace(/[_ -]/g, ''), publishingTool, `Publishing tool: ${name}`);
+  }
+  for (const tool of groups.flatMap(group => group.tools)) {
+    assert.doesNotMatch(tool.run.toString(), publishingApi, `Publishing API in tool: ${tool.name}`);
+  }
+}
+assertNoPublishingTools([tools.BROWSER_TOOL_GROUP, tools.BOARD_TOOL_GROUP, tools.DECK_TOOL_GROUP]);
+const deckGroup = tools.DECK_TOOL_GROUP;
+const plantedTool = (tool: Partial<(typeof deckGroup.tools)[number]>) => [{
+  ...deckGroup,
+  tools: [...deckGroup.tools, { ...deckGroup.tools[0]!, ...tool }],
+}];
+for (const name of ['publish_deck', 'update_page', 'unpublishDeck', 'set_live', 'turn_off_live', 'go_on']) {
+  assert.throws(() => assertNoPublishingTools(plantedTool({ name })), /Publishing tool:/);
+}
+// Exercise the same guard with an innocuous name, without running the planted handler.
+const rejectPublishCall = () => { throw new Error('Planted handlers must never run'); };
+const controller = {
+  setLive: rejectPublishCall,
+  liveAction: rejectPublishCall,
+  publishPage: rejectPublishCall,
+  updateLive: rejectPublishCall,
+};
+for (const run of [
+  async () => controller.setLive(),
+  async () => controller.liveAction(),
+  async () => controller.publishPage(),
+  async () => controller.updateLive(),
+]) {
+  assert.throws(() => assertNoPublishingTools(plantedTool({ name: 'review_deck', run })), /Publishing API in tool:/);
+}
+
+function assertDeckViewOwnsLiveAction(): void {
+  const root = join(__dirname, '..');
+  const callers: string[] = [];
+  const scan = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const file = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        scan(file);
+      } else if (file.endsWith('.ts') && !file.endsWith('.test.ts')) {
+        const text = readFileSync(file, 'utf8');
+        if (!text.includes('liveAction')) continue;
+        const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+        const visit = (node: ts.Node) => {
+          if ((ts.isPropertyAccessExpression(node) && node.name.text === 'liveAction') ||
+              (ts.isElementAccessExpression(node) && ts.isStringLiteral(node.argumentExpression) &&
+                node.argumentExpression.text === 'liveAction')) {
+            callers.push(relative(root, file).replaceAll('\\', '/'));
+          }
+          ts.forEachChild(node, visit);
+        };
+        visit(source);
+      }
+    }
+  };
+  scan(root);
+  assert.deepEqual(callers, ['decks/deckPages.ts']);
+}
+assertDeckViewOwnsLiveAction();
 
 /** The OpenCode adapter's hand-written browser tools before Sprint 130 (git HEAD
  *  at the start of W5). The registry must produce exactly these. */
@@ -646,6 +721,89 @@ async function main(): Promise<void> {
     // Search finds a block slide by its Label's words, and by an old pill's words written on its Steps line.
     files['Clients/Harbour.deck.md'] = files['Clients/Harbour.deck.md'].replace('[Harjutus]{.label}\n\n# Plain\n\n::: steps', '# Plain\n\n::: {.steps tag="Exercise"}');
     assert.match((await runTool(tool('list_decks'), { where: 'other', query: 'exercise' }, context)).text, /Harbour\.deck\.md[^\n]*1 slide matching[^\n]*\n {2}slide 4 \([^)]*block slide\): Plain/);
+  }
+
+  // Sprint 173 (S1, S4, S37): all three projections expose the same definition
+  // and return the same text. The usage payload is built without caller data.
+  {
+    const injector = new RitemarkToolsInjector();
+    const documentGroups = () => toolGroupsFor({ browser: false }).filter((group) => group.id === 'documents');
+    const ipcList = () => injector.handleIpc({ id: '1', op: 'list', group: 'documents' });
+    assert.deepEqual(documentGroups(), []);
+    assert.equal(toolGroupById('documents'), null);
+    assert.equal((await ipcList()).tools, undefined);
+
+    const usage: unknown[] = [];
+    const requests: unknown[] = [];
+    const text = 'Interview.docx · Word · 1 block · whole text\n\n# Operations';
+    const slideText = 'Briefing.pptx · PowerPoint · 1 slide · whole text\n\n## Slide 1\n\nNotes: none';
+    tools.setDocumentToolHost(() => ({
+      async read(request) {
+        requests.push(request);
+        if (request.path === 'Briefing.pptx') return { kind: 'powerpoint', text: slideText };
+        return { kind: 'word', text };
+      },
+      trackUsage(properties) { usage.push(properties); },
+    }));
+    try {
+      const groups = documentGroups();
+      assert.equal(groups.length, 1);
+      assert.equal(toolGroupById('documents'), groups[0]);
+      assertNoPublishingTools(toolGroupsFor({ browser: true }));
+      const params = { path: 'Interview.docx' };
+      const [dynamic] = injector.codexDynamicTools(groups)!;
+      assert.equal(dynamic.name, 'read_document');
+      assert.match(dynamic.description, /PowerPoint/);
+      assert.deepEqual(injector.claudeAllowedTools(groups), ['mcp__ritemark_documents__read_document']);
+      assert.deepEqual(injector.acpMcpServers(groups, '/tmp/test.sock').map((server) =>
+        (server as { name: string }).name), ['ritemark_documents']);
+
+      const [openCode] = (await ipcList()).tools!;
+      assert.equal(openCode.name, dynamic.name);
+      assert.deepEqual({ ...openCode.inputSchema, additionalProperties: false }, dynamic.inputSchema);
+      assert.deepEqual(dynamic.inputSchema.required, ['path']);
+      assert.deepEqual(Object.keys(dynamic.inputSchema.properties as object), ['path', 'from', 'to']);
+
+      const servers = (await injector.claudeMcpServers(groups)) as Record<string, {
+        instance: { connect(transport: unknown): Promise<void> };
+      }>;
+      // Speak MCP to the same server the Claude SDK receives, without running Claude.
+      type Message = { id?: number; result?: unknown };
+      const responses = new Map<number, (message: Message) => void>();
+      const transport = {
+        start: async () => {},
+        close: async () => {},
+        send: async (message: Message) => { if (message.id !== undefined) responses.get(message.id)?.(message); },
+        onmessage: undefined as ((message: unknown) => void) | undefined,
+      };
+      await servers.ritemark_documents.instance.connect(transport);
+      const mcp = (id: number, method: string, params?: object) => new Promise<Message>((resolve) => {
+        responses.set(id, resolve);
+        transport.onmessage!({ jsonrpc: '2.0', id, method, params });
+      });
+      const claude = ((await mcp(1, 'tools/list')).result as { tools: Array<typeof openCode> }).tools[0];
+      assert.equal(claude.name, dynamic.name);
+      assert.deepEqual(claude.inputSchema.properties, dynamic.inputSchema.properties);
+      assert.deepEqual(claude.inputSchema.required, dynamic.inputSchema.required);
+      assert.deepEqual((await mcp(2, 'tools/call', { name: dynamic.name, arguments: params })).result,
+        { content: [{ type: 'text', text }] });
+      assert.deepEqual(await injector.codexToolCall(groups, dynamic.name, params), { text, success: true });
+      assert.deepEqual(await injector.handleIpc({ id: '2', op: 'call', group: 'documents', tool: dynamic.name, params }), { text });
+      assert.deepEqual(requests, [params, params, params]);
+      assert.deepEqual(usage, Array.from({ length: 3 }, () => ({ feature: 'read_document', source: 'word' })));
+
+      const invalid = await injector.codexToolCall(groups, dynamic.name, { ...params, from: 4, to: 3 });
+      assert.equal(invalid.success, false);
+      assert.equal(requests.length, 3);
+      assert.equal(usage.length, 3);
+
+      const slide = { path: 'Briefing.pptx', from: 1, to: 1 };
+      assert.deepEqual(await injector.codexToolCall(groups, dynamic.name, slide), { text: slideText, success: true });
+      assert.deepEqual(requests[3], slide);
+      assert.deepEqual(usage[3], { feature: 'read_document', source: 'powerpoint' });
+    } finally {
+      tools.setDocumentToolHost(() => null);
+    }
   }
 
   console.log('runtime/ritemarkTools: all assertions passed');

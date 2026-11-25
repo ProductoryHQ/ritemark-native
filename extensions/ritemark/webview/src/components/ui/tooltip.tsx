@@ -14,7 +14,7 @@
  */
 
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import type { FocusEvent, ReactNode } from 'react';
+import { createContext, useContext, useState, type ComponentType, type FocusEvent, type ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import { inputMode, type InputMode } from './input-mode';
 
@@ -63,6 +63,34 @@ function onTriggerFocusHoverOnly(event: FocusEvent<HTMLElement>): void {
   event.preventDefault();
 }
 
+const POPUP_DISMISS = createContext<(() => void) | null>(null);
+
+type PopupProps = {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: ReactNode;
+  modal?: boolean;
+};
+
+/** Keep the popup's normal dismissal available while a child tooltip is the top Radix layer. */
+export function popupWithTooltipEscape(Root: ComponentType<PopupProps>) {
+  return function Popup({ open, defaultOpen, onOpenChange, ...props }: PopupProps) {
+    const inheritedDismiss = useContext(POPUP_DISMISS);
+    const [localOpen, setLocalOpen] = useState(defaultOpen ?? false);
+    const shown = open ?? localOpen;
+    const change = (next: boolean) => {
+      if (open === undefined) setLocalOpen(next);
+      onOpenChange?.(next);
+    };
+    return (
+      <POPUP_DISMISS.Provider value={shown ? () => change(false) : inheritedDismiss}>
+        <Root {...props} open={shown} onOpenChange={change} />
+      </POPUP_DISMISS.Provider>
+    );
+  };
+}
+
 export function Tooltip({
   label,
   side = 'bottom',
@@ -89,6 +117,7 @@ export function Tooltip({
   onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }) {
+  const dismissPopup = useContext(POPUP_DISMISS);
   return (
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
       <TooltipPrimitive.Root open={suppressed ? false : open} onOpenChange={onOpenChange}>
@@ -97,6 +126,7 @@ export function Tooltip({
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
           <TooltipPrimitive.Content
+            onEscapeKeyDown={() => dismissPopup?.()}
             side={side}
             sideOffset={6}
             collisionPadding={8}

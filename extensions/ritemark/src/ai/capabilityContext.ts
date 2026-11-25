@@ -67,7 +67,7 @@ function themeLines(): string[] {
 }
 
 /** Bump when the capability text changes in a way runtimes should re-sync on. */
-export const CAPABILITY_CONTEXT_VERSION = 5;
+export const CAPABILITY_CONTEXT_VERSION = 6;
 
 /**
  * Per-runtime binding details. NOT capability content — just how a runtime names
@@ -162,6 +162,15 @@ const SECTIONS: CapabilitySection[] = [
       [
         'INTERNAL LINKS: link to another workspace file with a plain relative-path Markdown link, e.g. `[label](./other-file.md)`; use `#anchor` for a location in the same document. Targets must stay inside the workspace — no absolute filesystem paths, and never `javascript:`, `data:`, or `file:` URLs. There is no special wiki/`[[…]]` link syntax.',
       ].join('\n'),
+  },
+  {
+    id: 'sources',
+    render: () => [
+      'SOURCES IN ANSWERS: Use `read_document` first when reading Word, PDF, or PowerPoint files.',
+      '- Name the source in the sentence as you would in a report. Never use a number, a bracketed file name, or a path as the source label.',
+      '- Link the source name to the passage. Use a project-relative path, `p` for the viewer page or slide when known, and `q` for the passage’s own words (up to 200 characters before percent-encoding). If the page is unknown, use `#q=…`. Write a space in the path as `%20` (or put the whole target in `<…>`): a link with a bare space is not a link.',
+      '- Example: [the head of operations](Interviews/Operations.docx#p=4&q=start%20with%20the%20handover) would start with the handover.',
+    ].join('\n'),
   },
   {
     id: 'blocks',

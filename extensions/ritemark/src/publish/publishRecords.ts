@@ -14,12 +14,35 @@
  * No `vscode` import: the caller passes the global storage folder's path. Used by PR 4.
  */
 
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { PublishError } from './host';
 import type { PublishPlan } from './types';
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+export type LivePauseKind = 'key' | 'outside' | 'limits' | 'unchecked' | 'picture' | 'connection' | 'page';
+
+export interface LivePause {
+  kind: LivePauseKind;
+  at: number;
+  detail: string;
+  scope?: string;
+  /** Project-relative display names for the files covered by scope. */
+  outsideFiles?: string[];
+  slide?: number;
+  /** Only the key prefix and last four characters, separated by an ellipsis. */
+  keyPreview?: string;
+  location?: { line: number; column?: number; endColumn?: number };
+}
+
+export interface LivePreference {
+  on: true;
+  /** Each enable is a separate consent, including an off/on during a deploy. */
+  id: string;
+  pause?: LivePause;
+}
 
 export interface PublishRecord {
   /** The page's real path when it was published. */
@@ -32,8 +55,11 @@ export interface PublishRecord {
   /** Each file's published path and sha256 at the last publish. */
   files: { path: string; sha256: string }[];
   contentHash: string;
+  deckDigest?: string;
+  live?: LivePreference;
   /** ISO date of the last publish or update. */
   publishedAt: string;
+  deckVersion?: number;
   /**
    * Taken down, with the record not removed (Sprint 149, PR 4 round 3): the page is gone from the host, so it never
    * shows as online, here or after a restart, and Unpublish's Try again removes it.
@@ -136,47 +162,68 @@ export class PublishRecordStore {
    * Created exclusively; a lock older than `LOCK_STALE_MS` was left by a host that died and is taken over (moved aside
    * first, and put back if it turns out to be a fresh one); a fresh lock is waited for, never removed.
    */
-  private async locked<T>(fn: () => Promise<T>): Promise<T> {
+  private async locked<T>(fn: () => Promise<T>, lockFile = this.lockFile, deploy = false): Promise<T> {
     await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
     const token = `${process.pid} ${Date.now()} ${randomBytes(6).toString('hex')}`;
     const deadline = Date.now() + LOCK_WAIT_MS;
     for (;;) {
       try {
-        await fs.promises.writeFile(this.lockFile, token, { flag: 'wx' });
+        await fs.promises.writeFile(lockFile, token, { flag: 'wx' });
         break;
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
       }
-      const seen = await fs.promises.stat(this.lockFile).catch(() => null);
-      if (seen && Date.now() - seen.mtimeMs > LOCK_STALE_MS) {
-        await this.takeOverStale(seen);
+      const seen = await fs.promises.stat(lockFile).catch(() => null);
+      if (seen && Date.now() - seen.mtimeMs > LOCK_STALE_MS && (!deploy || await this.deployOwnerExited(lockFile))) {
+        await this.takeOverStale(lockFile, seen);
         continue;
       }
-      if (Date.now() > deadline) throw new Error('the list of published pages is busy');
+      if (Date.now() > deadline) {
+        if (deploy) throw new PublishError('busy', 'This page is being published from another window.');
+        throw new Error('the list of published pages is busy');
+      }
       await sleep(10 + Math.floor(Math.random() * 20));
     }
     try {
       return await fn();
     } finally {
       // Only our own lock: one taken over after a long stall belongs to the host that took it
-      const held = await fs.promises.readFile(this.lockFile, 'utf8').catch(() => null);
-      if (held === token) await fs.promises.unlink(this.lockFile).catch(() => undefined);
+      const held = await fs.promises.readFile(lockFile, 'utf8').catch(() => null);
+      if (held === token) await fs.promises.unlink(lockFile).catch(() => undefined);
     }
   }
 
-  private async takeOverStale(seen: fs.Stats): Promise<void> {
-    const aside = `${this.lockFile}.stale-${process.pid}-${randomBytes(4).toString('hex')}`;
+  private async takeOverStale(lockFile: string, seen: fs.Stats): Promise<void> {
+    const aside = `${lockFile}.stale-${process.pid}-${randomBytes(4).toString('hex')}`;
     try {
-      await fs.promises.rename(this.lockFile, aside);
+      await fs.promises.rename(lockFile, aside);
     } catch {
       return; // another host took it over first
     }
     const moved = await fs.promises.stat(aside).catch(() => null);
     if (moved && (moved.ino !== seen.ino || moved.mtimeMs !== seen.mtimeMs)) {
       // Another host's fresh lock was moved: put it back where it was (link fails if a lock is there again)
-      await fs.promises.link(aside, this.lockFile).catch(() => undefined);
+      await fs.promises.link(aside, lockFile).catch(() => undefined);
     }
     await fs.promises.unlink(aside).catch(() => undefined);
+  }
+
+  private async deployOwnerExited(lockFile: string): Promise<boolean> {
+    const owner = await fs.promises.readFile(lockFile, 'utf8').catch(() => '');
+    const pid = Number(owner.split(' ')[0]);
+    if (!Number.isSafeInteger(pid) || pid <= 0) return true;
+    try {
+      process.kill(pid, 0);
+      return false;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'ESRCH';
+    }
+  }
+
+  /** A deployment can outlast the records lock's stale timeout. An active host always keeps its page lease. */
+  withPageDeploy<T>(pagePath: string, deploy: () => Promise<T>): Promise<T> {
+    const name = createHash('sha256').update(this.key(pagePath)).digest('hex');
+    return this.locked(deploy, path.join(path.dirname(this.file), `deploy-${name}.lock`), true);
   }
 
   /** One read-modify-write at a time: in this host by the queue, across hosts by the lock, reading the file inside it. */
@@ -215,8 +262,32 @@ export class PublishRecordStore {
   put(record: PublishRecord): Promise<void> {
     return this.change((current) => {
       const records = current.filter((r) => !this.samePage(r, record.pagePath) || (r.siteName !== record.siteName && !r.unpublished));
-      records.push(record);
+      const previous = current.find(r => this.samePage(r, record.pagePath) && r.siteName === record.siteName && !r.unpublished);
+      records.push(previous?.live ? { ...record, live: previous.live } : record);
       return { records, result: undefined };
+    });
+  }
+
+  /** Preserve the verified digest of a pre-2.4 page before the next local build replaces it. */
+  rememberDeckDigest(record: PublishRecord, digest: string): Promise<void> {
+    return this.change(records => {
+      const current = records.find(r => this.samePage(r, record.pagePath) && r.siteName === record.siteName && !r.unpublished);
+      if (!current || current.contentHash !== record.contentHash || current.deckDigest) return { result: undefined };
+      current.deckDigest = digest;
+      return { records, result: undefined };
+    });
+  }
+
+  /** Change only consent, under the same lock as deploy record writes. */
+  changeLive(record: PublishRecord, next: LivePreference | undefined): Promise<boolean> {
+    return this.change(records => {
+      const current = records.find(r => this.samePage(r, record.pagePath) && r.siteName === record.siteName && !r.unpublished);
+      if (!current || current.live?.id !== record.live?.id || (next && JSON.stringify(current.live?.pause) !== JSON.stringify(record.live?.pause))) {
+        return { result: false };
+      }
+      if (next) current.live = next;
+      else delete current.live;
+      return { records, result: true };
     });
   }
 
@@ -228,7 +299,10 @@ export class PublishRecordStore {
   markUnpublished(pagePath: string, siteName?: string): Promise<boolean> {
     return this.change((records) => {
       const found = records.filter((r) => this.samePage(r, pagePath) && (siteName === undefined || r.siteName === siteName));
-      for (const r of found) r.unpublished = true;
+      for (const r of found) {
+        r.unpublished = true;
+        delete r.live;
+      }
       return found.length ? { records, result: true } : { result: false };
     });
   }
@@ -270,11 +344,12 @@ export function changedSincePublish(record: PublishRecord, plan: PublishPlan): b
 /**
  * Whether Update the page shows the sheet again (R5, R4): always the first time; again when the list of files that
  * would go differs from the last publish (S27); and whenever something looks like a key, since the scan runs again on
- * every update and its warning lives in the sheet. Otherwise Update goes straight up.
+ * every update and its warning lives in the sheet. A picture left out because it could not be cleaned also
+ * needs the sheet. Otherwise Update goes straight up.
  */
 export function sheetNeeded(record: PublishRecord | undefined, plan: PublishPlan): boolean {
   if (!record) return true;
-  if (plan.keyHits.length > 0 || plan.tooBig.length > 0 || plan.tooMany) return true;
+  if (plan.keyHits.length > 0 || plan.tooBig.length > 0 || plan.tooMany || plan.leftOut.some((row) => row.reason === 'uncleanable')) return true;
   const before = new Set(record.files.map((f) => f.path));
   const now = plan.files.map((f) => f.relPath);
   return before.size !== now.length || now.some((p) => !before.has(p));

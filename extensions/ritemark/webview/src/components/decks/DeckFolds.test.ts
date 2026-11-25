@@ -140,7 +140,7 @@ const draw = (view: DeckViewMode, above = false) =>
   const switchAt = bar.indexOf('<DeckViewSwitch')
   const count = bar.indexOf('className="deck-count"')
   assert.ok(strip >= 0 && switchAt > strip && count > switchAt, "after the strip's button, before Slide N of M")
-  assert.ok(bar.includes('{deskWidth >= NARROWEST_DESK ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}'), 'only where the handout has room (under 600 px: Slide only)')
+  assert.ok(bar.includes('{deskWidth >= NARROWEST_DESK || showHandoutInNarrowView ? <DeckViewSwitch view={viewShown} above={above} onView={chooseView} /> : null}'), 'where the handout has room or Show it opened the handout in a narrow view')
   assert.ok(view.includes("const viewShown: DeckViewMode = !handoutShown ? 'slide' : !slideShown ? 'handout' : 'both'"), 'the view as drawn')
   assert.ok(!view.includes('<DeckFolds') && !view.includes('toggleFold') && !view.includes('foldLine'), 'the fold arrows are gone')
   // The divider: a separator that drags, with no button on it or beside it.

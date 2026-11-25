@@ -1,0 +1,95 @@
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData/>
+  <conditionalFormatting sqref="A2:A5">
+    <cfRule type="cellIs" priority="3" operator="greaterThan" dxfId="2"><formula>0</formula></cfRule>
+    <cfRule type="cellIs" priority="2" operator="greaterThan" dxfId="1"><formula>0</formula></cfRule>
+    <cfRule type="cellIs" priority="1" operator="greaterThan" dxfId="0" stopIfTrue="1"><formula>$A$1</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="B2:B5">
+    <cfRule type="containsText" priority="4" operator="containsText" text="late" dxfId="0"><formula>NOT(ISERROR(SEARCH("late",B2)))</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="C2:C5">
+    <cfRule type="beginsWith" priority="5" operator="beginsWith" text="ab" dxfId="0"><formula>LEFT(C2,2)="ab"</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="D2:D5">
+    <cfRule type="endsWith" priority="6" operator="endsWith" text="xy" dxfId="0"><formula>RIGHT(D2,2)="xy"</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="E2:E5">
+    <cfRule type="containsBlanks" priority="7" dxfId="0"><formula>LEN(TRIM(E2))=0</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="F2:F5">
+    <cfRule type="notContainsBlanks" priority="8" dxfId="0"><formula>LEN(TRIM(F2))&gt;0</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="G2:G5">
+    <cfRule type="containsErrors" priority="9" dxfId="0"><formula>ISERROR(G2)</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="H2:H5">
+    <cfRule type="notContainsErrors" priority="10" dxfId="0"><formula>NOT(ISERROR(H2))</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="I2:I5">
+    <cfRule type="duplicateValues" priority="11" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="J2:J5">
+    <cfRule type="uniqueValues" priority="12" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="K2:K5">
+    <cfRule type="top10" priority="13" rank="1" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="L2:L5">
+    <cfRule type="top10" priority="14" rank="25" percent="1" bottom="1" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="M2:M5">
+    <cfRule type="aboveAverage" priority="15" aboveAverage="1" equalAverage="1" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="N2:N5">
+    <cfRule type="timePeriod" priority="16" timePeriod="last7Days" dxfId="0"></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="O2:P5 O8:P9">
+    <cfRule type="expression" priority="17" dxfId="2"><formula>$P2="Late"</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="Q2:Q5">
+    <cfRule type="expression" priority="18" dxfId="0"><formula>COUNTIF($Q$2:$Q$5,Q2)&gt;1</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="R2:R5">
+    <cfRule type="expression" priority="20" dxfId="3"><formula>ROW()=3</formula></cfRule>
+    <cfRule type="expression" priority="19" dxfId="0" stopIfTrue="1"><formula>INDIRECT("A2")&gt;0</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="S2:S5">
+    <cfRule type="cellIs" priority="22" operator="greaterThan" dxfId="2"><formula>0</formula></cfRule>
+    <cfRule type="colorScale" priority="21" ><colorScale><cfvo type="min"/><cfvo type="percentile" val="50"/><cfvo type="max"/><color rgb="FFFF0000"/><color rgb="FFFFFF00"/><color rgb="FF00FF00"/></colorScale></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="T2:T5">
+    <cfRule type="colorScale" priority="23" ><colorScale><cfvo type="percent" val="0"/><cfvo type="formula" val="$A$1*20"/><color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="U2:U5">
+    <cfRule type="dataBar" priority="24" ><dataBar minLength="0" maxLength="100"><cfvo type="min"/><cfvo type="max"/><color rgb="FF4472C4"/></dataBar></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="V2:V5">
+    <cfRule type="dataBar" priority="25" ><dataBar minLength="0" maxLength="100" showValue="0"><cfvo type="min"/><cfvo type="max"/><color rgb="FF4472C4"/></dataBar><extLst><ext uri="{B025F937-C7B1-47D3-B67F-A62EFF666E3E}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><x14:id>{819E1892-DB77-442E-A43A-1D8064E60E5F}</x14:id></ext></extLst></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="W2:W5">
+    <cfRule type="iconSet" priority="26" stopIfTrue="1"><iconSet iconSet="3Arrows" reverse="1"><cfvo type="percent" val="0"/><cfvo type="percent" val="33"/><cfvo type="percent" val="67"/></iconSet></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="X2:X5">
+    <cfRule type="notContainsText" priority="27" operator="notContains" text="late" dxfId="0"><formula>ISERROR(SEARCH("late",X2))</formula></cfRule>
+  </conditionalFormatting>
+  <conditionalFormatting sqref="Y2:Y5">
+    <cfRule type="colorScale" priority="28" ><colorScale><cfvo type="num" val="0"/><cfvo type="num" val="100"/><color rgb="FF000000"/><color rgb="FFFFFFFF"/></colorScale></cfRule>
+  </conditionalFormatting>
+  <extLst>
+    <ext uri="{78C0D931-6437-407D-A8EE-F0AAD7539E65}" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">
+      <x14:conditionalFormattings>
+        <x14:conditionalFormatting xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">
+          <x14:cfRule type="dataBar" id="{819E1892-DB77-442E-A43A-1D8064E60E5F}">
+            <x14:dataBar minLength="0" maxLength="100" gradient="0" border="1" axisPosition="middle" negativeBarBorderColorSameAsPositive="0">
+              <x14:cfvo type="autoMin"/><x14:cfvo type="autoMax"/>
+              <x14:borderColor rgb="FF123456"/><x14:negativeFillColor rgb="FFFFAA00"/>
+              <x14:negativeBorderColor rgb="FF987654"/><x14:axisColor rgb="FF000000"/>
+            </x14:dataBar>
+          </x14:cfRule>
+          <xm:sqref>V2:V5</xm:sqref>
+        </x14:conditionalFormatting>
+      </x14:conditionalFormattings>
+    </ext>
+  </extLst>
+</worksheet>

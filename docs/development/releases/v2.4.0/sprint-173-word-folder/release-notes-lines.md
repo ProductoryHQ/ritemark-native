@@ -1,0 +1,5 @@
+- You can now ask Claude, ChatGPT or OpenCode to read Word files and PDFs in your project, including selected PDF pages.
+- You can now ask those AIs to read PowerPoint files, with each slide’s speaker notes kept with that slide.
+- You can now follow a source link to the words it quotes or to the slide it cites.
+- You can now see the passage by hovering over a source the AI links by name in its answer.
+- You can now keep Word equations as math when the AI reads your file or when you make a Markdown copy.

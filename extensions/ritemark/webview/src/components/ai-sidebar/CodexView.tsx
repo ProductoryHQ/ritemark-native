@@ -6,6 +6,7 @@
  * approval dialogs for shell commands and file changes.
  */
 
+import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { Icon } from '../ui/Icon';
@@ -192,28 +193,6 @@ export function CodexTurn({
         />
       )}
 
-      {/* Approval dialog */}
-      {turn.approval && (
-        <ApprovalCard
-          approval={turn.approval}
-          onApprove={onApprove}
-          onReject={onReject}
-          agentLabel={runtimeLabel}
-        />
-      )}
-
-      {turn.pendingQuestion && (
-        <AgentQuestion
-          turnId={turn.id}
-          question={{
-            toolUseId: String(turn.pendingQuestion.requestId),
-            questions: turn.pendingQuestion.questions,
-          }}
-          providerLabel={runtimeLabel}
-          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
-        />
-      )}
-
       {showPlanCard && !needsPlanReview && (
         <PlanCard explanation={turn.planExplanation} planSteps={turn.planSteps} planText={displayPlanText} />
       )}
@@ -236,6 +215,28 @@ export function CodexTurn({
       {/* Streaming text */}
       {turn.streamingText && !shouldHideStreamingBubble && (
         <AIResponseBubble content={turn.streamingText} />
+      )}
+
+      {/* Approval dialog */}
+      {turn.approval && (
+        <ApprovalCard
+          approval={turn.approval}
+          onApprove={onApprove}
+          onReject={onReject}
+          agentLabel={runtimeLabel}
+        />
+      )}
+
+      {turn.pendingQuestion && (
+        <AgentQuestion
+          turnId={turn.id}
+          question={{
+            toolUseId: String(turn.pendingQuestion.requestId),
+            questions: turn.pendingQuestion.questions,
+          }}
+          providerLabel={runtimeLabel}
+          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
+        />
       )}
 
       {/* The conversation-level ActivityStatusLine covers the starting state —
@@ -266,6 +267,8 @@ export function CodexTurn({
           />
         </div>
       )}
+
+      <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
 
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
           the conversation-level ActivityStatusLine is the single status point

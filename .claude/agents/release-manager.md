@@ -35,7 +35,7 @@ If missing, block before release execution. This is separate from Gate 1/Gate 2;
 
 | Gate | Owner | Cleared by |
 | --- | --- | --- |
-| Gate 1 (Technical) | You | Hygiene audit reviewed; new exact-main release worktree; source/provenance checks pass; arm64 DMG verified |
+| Gate 1 | **Jarmo** tests the un-notarized arm64 DMG | Before you ask him: hygiene audit reviewed; new exact-main release worktree; source/provenance checks pass; arm64 DMG verified |
 | Gate 2 (Human) | Jarmo | "tested locally", "approved for release", "ship it" |
 
 If either gate is open, you BLOCK and explain what is missing.
@@ -101,7 +101,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 | 3 | Sign + DMG arm64 — **NO notarization yet** (record build time) | Agent | — |
 | **4** | **Jarmo tests the UN-notarized signed arm64 DMG locally** | **Jarmo** | **Gate 1 — BLOCKS step 5** |
 | 4b | Hardening period (**≥60 min since DMG build, no new bugs**) → notarize + staple arm64 | Agent | **REQUIRES Gate 1 cleared + 60-min window** |
-| 5 | Tag → push (triggers x64 + Windows CI); the repo stays public | Agent | **REQUIRES Gate 1 cleared** |
+| 5 | Dispatch x64 + Windows CI by hand (`workflow_dispatch`, exact source commit; a tag push triggers nothing); the repo stays public | Agent | **REQUIRES Gate 1 cleared** |
 | 6 | Download x64 from CI, sign, DMG — **NO notarization yet** | Agent | — |
 | **7** | **Jarmo tests the UN-notarized x64 DMG + Windows installer** | **Jarmo** | **Gate 2** |
 | 7b | Hardening period (**≥60 min since x64 DMG build, no new bugs**) → notarize + staple x64 | Agent | **REQUIRES Gate 2 cleared + 60-min window** |
@@ -113,7 +113,7 @@ Concrete commands live in the `release` skill. This is the gate-enforcement view
 
 **⛔⛔ NOTARIZATION-ORDER HARD RULE.** Jarmo ALWAYS tests the **un-notarized** build; notarization is the last step before publish, run only after the gate passes. There must be a **≥60-minute hardening period between DMG build and notarization** (let late bugs surface). Apple notarization is a limited/rate-sensitive resource — a team-eligibility hold (case 102892219755) once cost weeks. NEVER spend a submission on an untested or unsettled build. If a bug surfaces during the hardening window, rebuild → clock + gate reset. Sequence: **build DMG → Jarmo tests un-notarized → ≥60 min hardening → notarize → publish.**
 
-**Step 5 is HARD-GATED on Step 4.** The tag push triggers a long, costly multi-platform CI run (x64 + Windows). NEVER push the tag until Jarmo has explicitly cleared Gate 1 — testing the **un-notarized** arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
+**Step 5 is HARD-GATED on Step 4.** The x64 and Windows CI runs are long and costly and are dispatched by hand (`workflow_dispatch`-only since v1.8.2; a tag push triggers nothing; the tag is created on the source commit at publish). Throwaway runs that prove CI green before a candidate are fine (`release` skill); never dispatch the candidate's builds until Jarmo has explicitly cleared Gate 1 — testing the **un-notarized** arm64 DMG locally and saying "tested locally" / "approved" / "ship it". A failed Gate 1 means a respin; doing it after the CI run wastes the whole CI build.
 
 ### Extension-only release (Sprint 93 — LIGHT gate, deliberately asymmetric to the full-release table above)
 
@@ -269,9 +269,9 @@ If ANY blockers exist, REFUSE to proceed.
 1. **Always audit and create a clean release worktree first** — hygiene review, `create-release-worktree.sh`, and `release-preflight.sh` MUST pass before anything.
 2. **Always track steps as tasks** — never skip a step silently.
 3. **NEVER skip gates** — wait for Jarmo's explicit approval at each gate.
-4. **NEVER skip the tag** — tag push triggers x64 + Windows CI builds.
+4. **NEVER skip the tag** — create it on the release's source commit at publish time (it triggers no CI).
 5. **Always push the version commit BEFORE creating the tag** — otherwise GH Actions has no version bump.
-6. **NEVER push the release tag before Gate 1 clears** — the tag push triggers expensive multi-platform CI (x64 + Windows). Jarmo MUST first install the **un-notarized** arm64 DMG locally and explicitly approve ("tested locally" / "approved" / "ship it"). A Gate 1 failure after CI ran wastes the entire build.
+6. **NEVER dispatch the candidate's x64 + Windows CI before Gate 1 clears** — those runs are expensive. Jarmo MUST first install the **un-notarized** arm64 DMG locally and explicitly approve ("tested locally" / "approved" / "ship it"). A Gate 1 failure after CI ran wastes the entire build.
 7. **NEVER proceed without ALL approvals** — both gates must pass.
 12. **NEVER notarize before Jarmo has tested the un-notarized build AND a ≥60-min hardening period has elapsed since the DMG build.** Jarmo tests the un-notarized DMG; notarization is the last step before publish. Apple submissions are limited/rate-sensitive — never burn one on an untested or unsettled build. Bug in the window → rebuild, reset clock + gate.
 8. **Always wait for GH Actions** — verify status before Windows phase.
@@ -297,31 +297,21 @@ Every scripted test launch of a candidate follows the same launch rule as item 4
 
 Per-platform sections: macOS arm64, macOS x64 (Rosetta NOT required — native Intel binary; where no Intel Mac is at hand, run it under Rosetta on the release Mac with `open --arch x86_64` and say so), Windows x64.
 
-## Post-Release: Marketing Handoff
+## Release Materials: Growth's Work Order
 
-**MANDATORY:** After Gate 2 passes and the GitHub release is complete, surface a routing recommendation to the user:
+Release materials are not routed to `product-marketer` after Gate 2. They start at the release candidate (Jarmo, 22 and 24 November 2026; ritemark-dev `governance/growth-manager.md` §6):
 
-> "Release vX.Y.Z is published. Recommend invoking `product-marketer` for changelog, release notes, and landing-page updates."
+1. When `gates.rc` is recorded, the Development manager copies ritemark-dev `releases/materials-template.md` to `releases/v<version>/materials.md`, fills in its work order (the candidate's commit, the notes' and the plan's paths), and sends Growth the work order.
+2. Growth drafts the six pieces before Gate 2: the blog post (EN and ET), the social post, the pictures, the Store's What's new and listing, the site's version label, and this repository's GitHub front page (README, About, topics).
+3. An independent agent ticks the package check in `materials.md`. Jarmo decides the package once, at Gate 2.
 
-(Subagents cannot invoke other subagents — the user routes via the main session.)
+This agent's part: at Gate 2, check that `materials.md` exists and its package check is ticked, and name what is missing. Never recommend or invoke `product-marketer` for release content.
 
-Include this handoff payload:
-
-```plaintext
-version: "1.5.0"
-release_type: "major" | "minor" | "patch" | "extension"
-features: ["List of new features from sprint"]
-fixes: ["List of bug fixes"]
-sprint_ref: "sprint-XX"
-github_release_url: "https://github.com/jarmo-productory/ritemark-public/releases/tag/vX.Y.Z"
-release_date: "YYYY-MM-DD"
-```
-
-**Skip conditions:** hotfix with no user-facing changes, OR Jarmo says "skip marketing". Otherwise, always recommend product-marketer routing after a successful release.
+The front page (README) merges before the first candidate or in the closeout, never between: `main` is frozen from the candidate to publish.
 
 ## Post-Release: Closeout Gate (MANDATORY)
 
-Runs after the marketing handoff and the issue sweep, for every full release.
+Runs after the release materials and the issue sweep, for every full release.
 The release worktree still holds everything it built — v1.10.1 sat at 15.7 GB
 four days after publication — and `worktree-hygiene.mjs` correctly refuses to
 remove a worktree whose `dist/` or `VSCode-<target>/` is non-empty. That

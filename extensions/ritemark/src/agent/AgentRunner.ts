@@ -1458,6 +1458,11 @@ export class AgentSession {
         } else if (message.type === 'user') {
           this._handleUserMessage(message);
           processToolResultMessage(message, this._runtimeTurn ? this._runtimeTurn.filesModified : this._turnFilesModified);
+          const content = message.message?.content;
+          if (!message.parent_tool_use_id && Array.isArray(content) && content.some((block) => block.type === 'tool_result')) {
+            // Empty question context clears the text buffer at a tool result.
+            this._turnEmitter()('text', '');
+          }
         } else if (message.type === 'system' && message.subtype === 'status' && (message as any).status === 'compacting') {
           traceClaude('sdk', 'system:status', { status: (message as any).status });
           this._emitProgress?.('compacting', 'Vestlus on pikaks läinud — teen varasemast kokkuvõtte...');
@@ -1498,7 +1503,8 @@ export class AgentSession {
               this._emitterFor(message.parent_tool_use_id),
               message.parent_tool_use_id,
               planModeActive,
-              this._planFirst
+              this._planFirst,
+              true,
             );
             if (runtimeTurn) runtimeTurn.planModeActive = updatePlanModeState(message, planModeActive);
             else this._planModeActive = updatePlanModeState(message, this._planModeActive);
@@ -1902,7 +1908,8 @@ export function processAssistantMessage(
   emitProgress: ExtendedProgressEmitter,
   parentToolUseId?: string | null,
   planModeActive = false,
-  planFirstRequested = false
+  planFirstRequested = false,
+  emitQuestionContext = false,
 ) {
   const content = message.message?.content;
   if (!Array.isArray(content)) return;
@@ -1920,6 +1927,9 @@ export function processAssistantMessage(
       } else {
         const snippet = block.text.substring(0, 150);
         emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
+        if (emitQuestionContext && !parentToolUseId) {
+          emitProgress('text', block.text);
+        }
       }
     } else if (block.type === 'tool_use') {
       const input = block.input as {

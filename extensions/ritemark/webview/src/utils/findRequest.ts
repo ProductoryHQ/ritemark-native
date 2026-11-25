@@ -6,6 +6,7 @@
  * would. `text` is plain text: it only ever goes into the find bar's input and a literal `indexOf`, never into HTML,
  * a pattern or a URL. Nothing here reads or changes the document. Pure functions.
  */
+import { MAX_FIND_TEXT } from './sourcePassage'
 import { normalizeQuery } from './textSearch'
 
 export interface FindRequest {
@@ -13,11 +14,12 @@ export interface FindRequest {
   occurrence: number
   /** PDF only: the passage's page, for when the occurrence isn't there. */
   page?: number
+  source?: true
   /** A new id for each request, so the same words asked again land again. */
   id: number
 }
 
-export const MAX_FIND_TEXT = 200
+export { MAX_FIND_TEXT }
 const MAX_OCCURRENCE = 1_000_000
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/
@@ -25,7 +27,7 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f]/
 /** The request in a host message, or null when the message isn't a well-formed `find:open`. */
 export function decodeFindOpen(message: unknown, id: number): FindRequest | null {
   if (!message || typeof message !== 'object') return null
-  const m = message as { type?: unknown; text?: unknown; occurrence?: unknown; page?: unknown }
+  const m = message as { type?: unknown; text?: unknown; occurrence?: unknown; page?: unknown; source?: unknown }
   if (m.type !== 'find:open' || typeof m.text !== 'string') return null
   if (!m.text.trim() || m.text.length > MAX_FIND_TEXT || CONTROL.test(m.text)) return null
   const occurrence =
@@ -34,6 +36,7 @@ export function decodeFindOpen(message: unknown, id: number): FindRequest | null
       : 0
   const request: FindRequest = { text: m.text, occurrence, id }
   if (typeof m.page === 'number' && Number.isInteger(m.page) && m.page >= 1) request.page = m.page
+  if (m.source === true) request.source = true
   return request
 }
 
@@ -46,6 +49,13 @@ export function decodeFindOpen(message: unknown, id: number): FindRequest | null
 export function landingIndex(request: FindRequest, count: number, pageOf?: (index: number) => number): number {
   if (count <= 0) return -1
   if (pageOf && request.page) {
+    if (request.source) {
+      let occurrence = request.occurrence
+      for (let i = 0; i < count; i++) {
+        if (pageOf(i) === request.page && occurrence-- === 0) return i
+      }
+      return -1
+    }
     if (request.occurrence < count && pageOf(request.occurrence) === request.page) return request.occurrence
     for (let i = 0; i < count; i++) if (pageOf(i) >= request.page) return i
   }

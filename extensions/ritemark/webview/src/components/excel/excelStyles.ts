@@ -58,7 +58,15 @@ export interface ThemeInfo {
   majorFont?: string
 }
 
+export interface DifferentialStyle {
+  font?: Partial<{ [K in keyof FontStyle]: FontStyle[K] | null }>
+  fill?: string
+  border?: CellBorders
+  numberFormat?: { id: number; code?: string }
+}
+
 export interface WorkbookStyles {
+  dxfs: DifferentialStyle[]
   /** The workbook's own number formats, by numFmtId. */
   numFmts: Map<number, string>
   /** Each cell style's (cellXfs entry's) numFmtId, by the cell's `s`. */
@@ -87,7 +95,7 @@ export function section(xml: string, tag: string): string {
 }
 
 /** Each element named `tag`: its attributes and its content ('' when self-closing). */
-function each(xml: string, tag: string): Array<[string, string]> {
+export function each(xml: string, tag: string): Array<[string, string]> {
   const out: Array<[string, string]> = []
   for (const m of xml.matchAll(new RegExp(`<(?:\\w+:)?${tag}(?=[\\s/>])([^>]*?)(?:\\/>|>([\\s\\S]*?)</(?:\\w+:)?${tag}>)`, 'g'))) {
     out.push([m[1], m[2] ?? ''])
@@ -119,12 +127,14 @@ export function readTheme(xml: string): ThemeInfo {
   }
 }
 
-/** A colour lightened (tint > 0) or darkened (tint < 0) in HLS, as Excel does (§18.8.19). */
-export function applyTint(hex: string, tint: number): string {
-  if (!tint) return hex
-  let r = parseInt(hex.slice(0, 2), 16) / 255
-  let g = parseInt(hex.slice(2, 4), 16) / 255
-  let b = parseInt(hex.slice(4, 6), 16) / 255
+export interface ColorTransform {
+  kind: 'lumMod' | 'lumOff' | 'satMod' | 'shade' | 'tint'
+  value: number
+}
+
+const clampColor = (value: number) => Math.min(1, Math.max(0, value))
+
+function adjustHsl([r, g, b]: number[], adjust: (s: number, l: number) => [number, number]): number[] {
   const max = Math.max(r, g, b)
   const min = Math.min(r, g, b)
   let h = 0
@@ -136,7 +146,9 @@ export function applyTint(hex: string, tint: number): string {
     h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
     h /= 6
   }
-  l = tint < 0 ? l * (1 + tint) : l * (1 - tint) + tint
+  const [saturation, lightness] = adjust(s, l)
+  s = saturation
+  l = lightness
   const hue = (p: number, q: number, t: number) => {
     if (t < 0) t += 1
     if (t > 1) t -= 1
@@ -154,7 +166,45 @@ export function applyTint(hex: string, tint: number): string {
     g = hue(p, q, h)
     b = hue(p, q, h - 1 / 3)
   }
-  return [r, g, b].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
+  return [r, g, b]
+}
+
+// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
+const style201Variations = [
+  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
+  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
+]
+
+export function chartColorVariation(cycle: number): ColorTransform[] {
+  const [mod, off] = style201Variations[cycle % style201Variations.length]
+  return [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }]
+}
+
+/** Apply SpreadsheetML tint and ordered DrawingML colour transforms. */
+export function applyTint(hex: string, tint: number, transforms: readonly ColorTransform[] = []): string {
+  if (!tint && !transforms.length) return hex
+  let rgb = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16) / 255)
+  if (tint) rgb = adjustHsl(rgb, (s, l) => [s, tint < 0 ? l * (1 + tint) : l * (1 - tint) + tint])
+  for (const { kind, value } of transforms) {
+    switch (kind) {
+      case 'shade':
+        rgb = rgb.map((channel) => clampColor(channel * value))
+        break
+      case 'tint':
+        rgb = rgb.map((channel) => clampColor(channel * value + 1 - value))
+        break
+      case 'satMod':
+        rgb = adjustHsl(rgb, (s, l) => [clampColor(s * value), l])
+        break
+      case 'lumMod':
+        rgb = adjustHsl(rgb, (s, l) => [s, clampColor(l * value)])
+        break
+      case 'lumOff':
+        rgb = adjustHsl(rgb, (s, l) => [s, clampColor(l + value)])
+        break
+    }
+  }
+  return rgb.map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
 }
 
 export interface ColorContext {
@@ -163,7 +213,7 @@ export interface ColorContext {
 }
 
 /** A `<color>`, `<fgColor>`, `<tabColor>`… tag as a CSS colour; undefined for "automatic" or none. */
-export function colorOf(tag: string | undefined, ctx: ColorContext): string | undefined {
+export function colorOf(tag: string | undefined, ctx: ColorContext, transforms?: readonly ColorTransform[]): string | undefined {
   if (!tag) return undefined
   if (attr(tag, 'auto') === '1' || attr(tag, 'auto') === 'true') return undefined
   let hex: string | undefined
@@ -178,7 +228,7 @@ export function colorOf(tag: string | undefined, ctx: ColorContext): string | un
     hex = ctx.indexed[i]
   }
   if (!hex) return undefined
-  return '#' + applyTint(hex, Number(attr(tag, 'tint') ?? 0))
+  return '#' + applyTint(hex, Number(attr(tag, 'tint') ?? 0), transforms)
 }
 
 const BORDER: Record<string, [number, BorderSide['style']]> = {
@@ -214,11 +264,11 @@ export function fontOf(body: string, ctx: ColorContext, base?: FontStyle): FontS
   }
 }
 
-function fillOf(body: string, ctx: ColorContext): string | undefined {
+function fillOf(body: string, ctx: ColorContext, differential = false): string | undefined {
   const p = /<(?:\w+:)?patternFill(?=[\s/>])([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?patternFill>)/.exec(body)
   if (p) {
     const inner = p[2] ?? ''
-    const type = attr(p[1], 'patternType') ?? (inner.includes('fgColor') ? 'solid' : 'none')
+    const type = attr(p[1], 'patternType') ?? (differential || inner.includes('fgColor') ? 'solid' : 'none')
     if (type === 'none') return undefined
     const fg = colorOf(/<(?:\w+:)?fgColor(?=[\s/>])[^>]*\/?>/.exec(inner)?.[0], ctx)
     const bg = colorOf(/<(?:\w+:)?bgColor(?=[\s/>])[^>]*\/?>/.exec(inner)?.[0], ctx)
@@ -293,7 +343,33 @@ export function readStyles(xml: string, themeXml = ''): WorkbookStyles {
     })
   }
   const families = [...new Set(fonts.map((f) => f.name).filter((n): n is string => !!n))]
-  return { numFmts, xfNumFmt, xfs, baseFont, theme, families }
+  const dxfs = each(section(xml, 'dxfs'), 'dxf').map(([, body]): DifferentialStyle => {
+    const style: DifferentialStyle = {}
+    const font = section(body, 'font')
+    if (font) {
+      const parsed = fontOf(font, ctx)
+      const tags = {
+        b: 'bold', i: 'italic', u: 'underline', strike: 'strike', color: 'color',
+        name: 'name', rFont: 'name', scheme: 'name', sz: 'size', vertAlign: 'vertAlign',
+      } as const
+      style.font = Object.fromEntries(Object.entries(tags)
+        .filter(([tag]) => each(font, tag).length)
+        .map(([tag, key]) => [key, tag === 'vertAlign' || tag === 'u' || tag === 'color' ? parsed[key] ?? null : parsed[key]])
+        .filter(([, value]) => value !== undefined))
+    }
+    const fill = fillOf(section(body, 'fill'), ctx, true)
+    if (fill) style.fill = fill
+    const border = bordersOf(section(body, 'border'), ctx)
+    if (border) style.border = Object.fromEntries(Object.entries(border).filter(([, side]) => side))
+    const [format] = each(body, 'numFmt')
+    if (format) {
+      const id = Number(attr(format[0], 'numFmtId'))
+      const code = attr(format[0], 'formatCode')
+      if (Number.isInteger(id)) style.numberFormat = { id, code: code === undefined ? undefined : decodeXmlEntities(code) }
+    }
+    return style
+  })
+  return { numFmts, xfNumFmt, xfs, baseFont, theme, families, dxfs }
 }
 
 /** The colour context of a workbook's styles, for tab colours and rich-text runs. */

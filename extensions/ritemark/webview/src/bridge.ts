@@ -60,7 +60,7 @@ export interface Message {
 export function sendToExtension(type: string, data: Record<string, unknown> = {}) {
   if (vscode) {
     vscode.postMessage({ type, ...data })
-  } else {
+  } else if (type !== 'deck/live-fit') {
     console.log('[Bridge] Would send to extension:', { type, ...data })
   }
 }

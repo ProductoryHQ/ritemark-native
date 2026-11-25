@@ -61,7 +61,4 @@ export function customProperties(style: { length: number; item(index: number): s
   return out
 }
 
-/** The families a computed `font-family` names, without quotes. */
-export function familiesOf(fontFamily: string): string[] {
-  return fontFamily.split(',').map(name => name.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
-}
+export { familiesOf } from '../../lib/svgFontFaces'

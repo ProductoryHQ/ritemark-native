@@ -17,6 +17,8 @@ import Module from 'node:module';
 import * as fs from 'fs';
 import * as path from 'path';
 import { makeTempDir } from '../testing/tempDir';
+import { WORD_EQUATION_MARKDOWN, wordEquationFixture } from '../documents/wordEquationFixture.test-helper';
+import { docxToMarkdown } from '../../webview/src/components/viewers/docx/docxToMarkdown';
 
 // ── vscode + posthog stubs (installed before requiring the unit) ────────────
 let saveDialogResult: { fsPath: string } | undefined;
@@ -145,6 +147,25 @@ async function run() {
       'S9: all images should be written',
     );
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  // Sprint 173 S34/S35: the real preview conversion feeds the file writer.
+  {
+    const plain = await docxToMarkdown(await wordEquationFixture(false), 'source');
+    assert.deepEqual(plain, { markdown: 'Fixture text.', images: [], warnings: [] });
+    const { dir, sourceUri, saveUri } = tmpProject();
+    try {
+      saveDialogResult = saveUri;
+      failMarkdownWrite = false;
+      const conversion = await docxToMarkdown(await wordEquationFixture(), 'source');
+      assert.equal(conversion.markdown, WORD_EQUATION_MARKDOWN);
+      await saveAsMarkdownHandler(
+        { ...conversion, defaultFilename: 'source.md', source: 'docx' }, sourceUri as any, noopWebview,
+      );
+      assert.equal(fs.readFileSync(saveUri.fsPath, 'utf8'), WORD_EQUATION_MARKDOWN);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
 
   console.log('saveAsMarkdown.test.ts: all assertions passed');

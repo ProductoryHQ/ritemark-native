@@ -3,6 +3,7 @@
  * turned into the plain lines of spec R7. Every message it throws is already redacted by the client.
  */
 
+import { deckVersionAssets } from '../deckVersion';
 import type { ConnectionSnapshot, FirstAnswer, PublishHost, PublishedSite, TokenCheck, VerifiedUpload } from '../host';
 import { isVerifiedUpload, PublishError } from '../host';
 import type { CloudflareAccount } from './account';
@@ -38,6 +39,8 @@ export class CloudflareHost implements PublishHost {
   private disposed = false;
   /** The default sleeps still running, each ended early (its timer cleared) by `dispose`. */
   private readonly sleeping = new Set<() => void>();
+
+  private lastDeckVersion = 0;
 
   constructor(private readonly account: CloudflareAccount, private readonly options: CloudflareHostOptions = {}) {
     this.sleep = options.sleep ?? ((ms) => this.timerSleep(ms));
@@ -119,7 +122,7 @@ export class CloudflareHost implements PublishHost {
     }
   }
 
-  async publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean }): Promise<PublishedSite> {
+  async publish(siteName: string, upload: VerifiedUpload, options: { replacing: boolean; lastDeckVersion?: number }): Promise<PublishedSite> {
     const accountId = this.requireAccount();
     // Only bytes read again and matched to the plan's hashes go (PR 3's blocking item)
     if (!isVerifiedUpload(upload)) throw new PublishError('failed', 'Ritemark could not check what goes. Press Publish again.');
@@ -127,16 +130,22 @@ export class CloudflareHost implements PublishHost {
     if (!subdomain) throw new PublishError('failed', "Choose your pages' address first.");
     if (!upload.files.some((a) => a.urlPath === upload.pageUrlPath)) throw new PublishError('failed', 'The page itself is not among the files.');
     // Over a limit, nothing is sent (R3, S15): the manifest is built before any call
-    const { manifest, entries } = buildManifest(upload.files);
+    const previous = options.lastDeckVersion ?? 0;
+    const saved = Number.isSafeInteger(previous) ? previous : 0;
+    const v = Math.max(1, this.now(), saved + 1, this.lastDeckVersion + 1);
+    const deckFiles = deckVersionAssets(upload, v);
+    const { manifest, entries } = buildManifest(deckFiles ?? upload.files);
+    // A deploy can reach the asset PUT and fail later. Never reuse its stamp in this host.
+    if (deckFiles) this.lastDeckVersion = v;
     // A first publish never replaces a Worker already on the account, the person's own or another page's
     if (!options.replacing && (await this.siteExists(siteName))) throw new PublishError('address-taken', ADDRESS_TAKEN);
     try {
-      const { uploaded } = await this.account.client().deploy(accountId, siteName, manifest, entries);
+      const { uploaded } = await this.account.client().deploy(accountId, siteName, manifest, entries, Boolean(deckFiles));
       this.options.log?.(`[publish] ${siteName}: deployed, ${uploaded} of ${entries.length} files uploaded`);
     } catch (error) {
       throw this.plain(error, COULD_NOT_REACH_PUBLISH);
     }
-    return { name: siteName, address: siteAddress(siteName, subdomain, upload.pageUrlPath) };
+    return { name: siteName, address: siteAddress(siteName, subdomain, upload.pageUrlPath), ...(deckFiles ? { deckVersion: v } : {}) };
   }
 
   async unpublish(siteName: string, address: string, options: { onSlow?: () => void } = {}): Promise<void> {

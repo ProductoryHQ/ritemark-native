@@ -15,7 +15,8 @@
  *
  * Which groups a turn gets: the browser group with the `browser-agent-control`
  * flag, the board group whenever this window has a task board (a project
- * folder and the `task-board` flag). `RitemarkToolsInjector` turns the groups
+ * folder and the `task-board` flag), the deck group with a deck library, and
+ * the documents group with a local project folder. `RitemarkToolsInjector` turns the groups
  * into each runtime's own wiring.
  */
 
@@ -48,6 +49,7 @@ import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from
 import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
 import { DECK_FONT_LIST } from '../decks/deckTheme';
 import type { AiThemeFields } from '../decks/themeChange';
+import type { DocumentKind, DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
 
 export interface ToolResult {
   text: string;
@@ -68,7 +70,7 @@ export interface RitemarkTool {
   run(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult>;
 }
 
-export type ToolGroupId = 'browser' | 'board' | 'deck';
+export type ToolGroupId = 'browser' | 'board' | 'deck' | 'documents';
 
 export interface RitemarkToolGroup {
   id: ToolGroupId;
@@ -785,12 +787,55 @@ export function deckToolsAvailable(): boolean {
   return deckToolHost()?.library() != null;
 }
 
+export interface DocumentToolHost {
+  read(request: DocumentReadRequest): Promise<DocumentReadResult>;
+  /** The existing `feature_used` event, as its schema has it (`feature`, `source`): no new property, so the privacy text stays true. */
+  trackUsage(properties: { feature: 'read_document'; source: DocumentKind }): void;
+}
+
+let documentToolHost: () => DocumentToolHost | null = () => null;
+
+export function setDocumentToolHost(provider: () => DocumentToolHost | null): void {
+  documentToolHost = provider;
+}
+
+export function createDocumentToolGroup(host: () => DocumentToolHost | null): RitemarkToolGroup {
+  return {
+    id: 'documents',
+    server: 'ritemark_documents',
+    codexPrefix: '',
+    tools: [{
+      name: 'read_document',
+      description: 'Read a Word (.docx), PDF, or PowerPoint (.pptx) file in the project as Markdown. Use a project-relative or absolute path. Select PDF pages or PowerPoint slides by range. PowerPoint speaker notes are listed with their slides.',
+      input: {
+        path: z.string().min(1).describe('Path to the document inside the project'),
+        from: z.number().int().positive().optional().describe('First PDF page or PowerPoint slide (1-based, inclusive)'),
+        to: z.number().int().positive().optional().describe('Last PDF page or PowerPoint slide (1-based, inclusive)'),
+      },
+      async run(args) {
+        const current = host();
+        if (!current) return { text: 'Open a project folder to read a document.', isError: true };
+        const request = args as unknown as DocumentReadRequest;
+        if (request.from !== undefined && request.to !== undefined && request.from > request.to) {
+          return { text: 'Choose a start number less than or equal to the end number.', isError: true };
+        }
+        const { kind, ...result } = await current.read(request);
+        if (kind && !result.isError) current.trackUsage({ feature: 'read_document', source: kind });
+        return result;
+      },
+    }],
+  };
+}
+
+const DOCUMENT_TOOL_GROUP = createDocumentToolGroup(() => documentToolHost());
+
 /** The groups for one turn (Claude, Codex) or one OpenCode process. */
 export function toolGroupsFor(options: { browser: boolean }): RitemarkToolGroup[] {
   return [
     ...(options.browser ? [BROWSER_TOOL_GROUP] : []),
     ...(boardToolsAvailable() ? [BOARD_TOOL_GROUP] : []),
     ...(deckToolsAvailable() ? [DECK_TOOL_GROUP] : []),
+    ...(documentToolHost() ? [DOCUMENT_TOOL_GROUP] : []),
   ];
 }
 
@@ -798,5 +843,6 @@ export function toolGroupById(id: string): RitemarkToolGroup | null {
   if (id === BROWSER_TOOL_GROUP.id) return BROWSER_TOOL_GROUP;
   if (id === BOARD_TOOL_GROUP.id) return BOARD_TOOL_GROUP;
   if (id === DECK_TOOL_GROUP.id) return DECK_TOOL_GROUP;
+  if (id === DOCUMENT_TOOL_GROUP.id && documentToolHost()) return DOCUMENT_TOOL_GROUP;
   return null;
 }

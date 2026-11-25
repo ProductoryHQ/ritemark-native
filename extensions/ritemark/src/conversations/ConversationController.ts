@@ -511,6 +511,7 @@ export class ConversationController {
     appliedThinkingEffort?: import('../runtime/thinkingEffort').ExplicitThinkingEffort | null;
     /** Sprint 136 (#488): the turn's working time, kept so a restored chat shows it. */
     activeDurationMs?: number;
+    liveDeckSteps?: import('./types').LiveDeckStep[];
     /** Sprint 155: the workspace files the turn changed (never the ones it read). */
     filesModified?: readonly string[];
     turnId?: string;
@@ -518,7 +519,10 @@ export class ConversationController {
   }): Promise<ConversationRecordV1> {
     const filesModified = Array.from(new Set((input.filesModified ?? []).filter((file) => typeof file === 'string' && file.length > 0)))
       .slice(0, MAX_TURN_CHANGED_FILES);
-    const changed = filesModified.length ? { filesModified } : {};
+    const terminalDetails = {
+      ...(filesModified.length ? { filesModified } : {}),
+      ...(input.liveDeckSteps?.length ? { liveDeckSteps: input.liveDeckSteps } : {}),
+    };
     const initial = await this.requireCurrentScope(input.conversationId);
     const firstUserMessage = initial.events.find((event) => event.kind === 'user-message');
     const turnId = input.turnId ?? (
@@ -541,7 +545,7 @@ export class ConversationController {
         // content or make the newer runtime look idle.
         if (!activeTurnMatches || activeUser?.runtimeId !== input.runtimeId) return null;
         const sequence = (current.events[current.events.length - 1]?.sequence ?? -1) + 1;
-        const appendEvents = input.text
+        const appendEvents = input.text || (input.status === 'completed' && input.liveDeckSteps?.length)
           ? [{
               kind: 'assistant-message' as const,
               eventId: terminalEventId,
@@ -557,7 +561,7 @@ export class ConversationController {
               ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
               appliedThinkingEffort: input.appliedThinkingEffort ?? null,
               ...(input.activeDurationMs === undefined ? {} : { activeDurationMs: input.activeDurationMs }),
-              ...changed,
+              ...terminalDetails,
             }]
           : [{
               kind: 'boundary' as const,
@@ -571,7 +575,7 @@ export class ConversationController {
               ...(input.failureKind ? { failureKind: input.failureKind } : {}),
               ...(input.error && input.errorKind ? { errorKind: input.errorKind } : {}),
               ...(input.error && input.errorKind && input.errorDetail ? { errorDetail: input.errorDetail } : {}),
-              ...changed,
+              ...terminalDetails,
             }];
         const assistantEvent = appendEvents[0];
         const currentDescriptor = current.continuations?.[input.runtimeId];

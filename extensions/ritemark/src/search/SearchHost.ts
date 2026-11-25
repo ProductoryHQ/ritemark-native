@@ -23,6 +23,9 @@ import * as path from 'node:path';
 import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
 import { Worker } from 'node:worker_threads';
 import * as vscode from 'vscode';
+import { trackEvent } from '../analytics/posthog';
+import type { DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
+import { setDocumentToolHost } from '../runtime/ritemarkTools';
 import { conversationStoreDir } from '../conversations/ConversationStore';
 import { resolveProjectScope } from '../conversations/projectScope';
 import { isEnabled } from '../features';
@@ -72,6 +75,7 @@ export interface SearchHostDependencies {
 
 export class SearchHost implements vscode.Disposable {
   private client: SearchWorkerClient | null = null;
+  private documentClient: SearchWorkerClient | null = null;
   private readonly running: vscode.Disposable[] = [];
   private readonly disposables: vscode.Disposable[] = [];
   private batch: FsEvent[] = [];
@@ -95,6 +99,8 @@ export class SearchHost implements vscode.Disposable {
       }),
       // A folder added to or removed from the project: a running index starts again over the new folders.
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.documentClient?.dispose();
+        this.documentClient = null;
         if (!this.client) return;
         this.stop();
         this.ensureStarted();
@@ -104,6 +110,23 @@ export class SearchHost implements vscode.Disposable {
 
   get enabled(): boolean {
     return isEnabled('project-search') && this.roots().length > 0;
+  }
+
+  get canReadDocuments(): boolean {
+    return this.roots().length > 0;
+  }
+
+  async readDocument(request: DocumentReadRequest): Promise<DocumentReadResult> {
+    const roots = this.roots().map((folder) => folder.uri.fsPath);
+    if (!roots.length) return { text: 'Open a project folder to read a document.', isError: true };
+    this.documentClient ??= new SearchWorkerClient(() => this.createWorker(), null);
+    try {
+      const result = await this.documentClient.read(request, roots);
+      if (result) return result;
+    } catch {
+      // A worker that cannot start should give the same answer as one that stops.
+    }
+    return { text: "Ritemark couldn't finish reading this file. Try again or open it in its usual app." };
   }
 
   get status(): IndexStatus | null {
@@ -289,6 +312,8 @@ export class SearchHost implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.documentClient?.dispose();
+    this.documentClient = null;
     this.stop();
     for (const disposable of this.disposables.splice(0)) disposable.dispose();
   }
@@ -321,6 +346,10 @@ function idOf(result: SearchResult): string | null {
  */
 export function registerProjectSearch(deps: SearchHostDependencies & { opens: SearchOpenDependencies }): ProjectSearch {
   const host = new SearchHost(deps);
+  setDocumentToolHost(() => host.canReadDocuments ? {
+    read: (request) => host.readDocument(request),
+    trackUsage: (properties) => { void trackEvent('feature_used', properties); },
+  } : null);
   const { context, opens } = deps;
 
   const open = async (result: SearchResult): Promise<void> => {
@@ -394,6 +423,7 @@ export function registerProjectSearch(deps: SearchHostDependencies & { opens: Se
 
   context.subscriptions.push(
     host,
+    { dispose: () => setDocumentToolHost(() => null) },
     { dispose: () => panel.dispose() },
     vscode.window.registerWebviewViewProvider(SearchViewProvider.viewType, view, { webviewOptions: { retainContextWhenHidden: true } }),
     host.onStatus((status) => panel.onStatus(status)),
