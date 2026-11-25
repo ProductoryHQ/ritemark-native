@@ -57,6 +57,15 @@ const state = EditorState.create({ doc: edgeDoc, selection: TextSelection.create
 const decorations = (plugin.props.decorations!.call(plugin, state) as DecorationSet).find()
 assert.deepEqual(decorations.map(({ from, to }) => [from, to]), [[1, 2], [15, 16]])
 
+const authored = '<br>Start<br>\n\n> Quote<br>\n\nEnd'
+const authoredDoc = loadSlide(authored)
+const authoredState = EditorState.create({ doc: authoredDoc })
+const authoredEdges = (plugin.props.decorations!.call(plugin, authoredState) as DecorationSet).find()
+assert.equal(authoredDoc.firstChild?.firstChild?.attrs.mdBreak, 'html')
+assert.deepEqual(authoredEdges.map(({ from }) => authoredDoc.resolve(from).parent.textContent), ['Start', 'Quote'])
+assert.equal(saveSlide(authoredState.tr.insertText('!', authoredDoc.content.size - 1).doc), authored + '!')
+assert.match(blockSlideHtml(authored), /<p><br>Start<br><\/p>/)
+
 const nestedCases = [
   [columns, 'Right', '.blk-column .blk-empty-line'],
   ['::: box\nBox text\n:::', 'Box text', '.blk-box .blk-empty-line'],
@@ -152,7 +161,11 @@ for (const markdown of ['One paragraph.\n\nAnother paragraph.', 'Before\nAfter',
 }
 const adjacent = openDocument('Before\n<br>\nAfter').doc
 const adjacentWritten = editorMarkdown(adjacent)
-assert.equal(adjacentWritten, 'Before\\\n\\\n\\\nAfter')
+assert.equal(adjacentWritten, 'Before\n\\\n\\\nAfter')
 assert.equal(openDocument(adjacentWritten).doc.toString(), adjacent.toString())
+
+assert.equal(editorMarkdown(openDocument('Before\n<br>After').doc), 'Before\n\\\nAfter')
+const markedNeighbor = editorMarkdown(openDocument('**A<br>**\nB').doc)
+assert.equal(markedNeighbor, '**A**\\\n\\\nB')
 
 console.log('slideEmptyLines: passed')

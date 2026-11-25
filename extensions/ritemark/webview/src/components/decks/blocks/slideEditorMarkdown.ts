@@ -80,12 +80,25 @@ export const slideDivMarkedExtension = {
   ],
 }
 
-/** Remember an inline tag at the end of a textblock so it doesn't save as a standalone line. */
-function markTrailingInlineBreak(token: Token): void {
+/** Keep inline HTML breaks at textblock edges separate from editable spacer paragraphs. */
+function markEdgeInlineBreaks(token: Token): void {
   if (token.type !== 'paragraph' && token.type !== 'heading' && token.type !== 'text') return
-  let tail = (token as { tokens?: Token[] }).tokens?.slice(-1)[0]
-  while (tail && 'tokens' in tail) tail = (tail.tokens as Token[] | undefined)?.slice(-1)[0]
-  if (tail?.type === 'html' && isLineBreakTag(tail.raw)) tail.type = 'slideTrailingBreak'
+  const tokens = (token as { tokens?: Token[] }).tokens
+  const markBreak = (inline: Token): boolean => {
+    if (inline.type === 'html' && isLineBreakTag(inline.raw)) inline.type = 'slideInlineBreak'
+    return inline.type === 'slideInlineBreak'
+  }
+  const markLeading = (inline: Token): boolean => {
+    const children = (inline as { tokens?: Token[] }).tokens
+    return children?.length ? children.every(markLeading) : markBreak(inline)
+  }
+  tokens?.every(markLeading)
+  let tail = tokens?.[tokens.length - 1]
+  while (tail && 'tokens' in tail) {
+    const children = tail.tokens as Token[] | undefined
+    tail = children?.[children.length - 1]
+  }
+  if (tail) markBreak(tail)
 }
 
 /** The slide editor's own `marked`: the document editor's configuration, and the `:::` blocks. */
@@ -94,9 +107,9 @@ slideEditorMarked.use(asWrittenMarkedExtension)
 slideEditorMarked.use({
   extensions: [
     slideEmptyLineExtension(true),
-    { name: 'slideTrailingBreak', renderer: () => '<br data-md-break="html">' },
+    { name: 'slideInlineBreak', renderer: () => '<br data-md-break="html">' },
   ],
-  walkTokens: markTrailingInlineBreak,
+  walkTokens: markEdgeInlineBreaks,
 })
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
@@ -391,16 +404,19 @@ export const SlideEmptyLines = Extension.create({
               decorations.push(Decoration.node(from, to, { class: className }))
               return false
             }
-            if (parent !== doc || !/^(paragraph|heading)$/.test(block.type.name)) return
-            const first = from === firstDrawn
-            const last = from === lastDrawn
+            if (!/^(paragraph|heading)$/.test(block.type.name)) return
+            const first = parent === doc && from === firstDrawn
+            const last = parent === doc && from === lastDrawn
             let leading = 0
             let trailing = block.childCount
-            while (first && block.maybeChild(leading)?.type.name === 'hardBreak') leading++
+            while (first && block.maybeChild(leading)?.type.name === 'hardBreak' &&
+              block.child(leading).attrs.mdBreak !== 'html') leading++
             while (last && trailing > leading && block.child(trailing - 1).type.name === 'hardBreak' &&
               block.child(trailing - 1).attrs.mdBreak !== 'html') trailing--
+            const trailingHtmlBreak = trailing === block.childCount &&
+              block.lastChild?.type.name === 'hardBreak' && block.lastChild.attrs.mdBreak === 'html'
             block.forEach((child, offset, index) => {
-              if (index >= leading && index < trailing) return
+              if (index >= leading && index < trailing && !(trailingHtmlBreak && index === trailing - 1)) return
               const start = from + 1 + offset
               const caret = selection.from === start || selection.from === start + child.nodeSize
               decorations.push(Decoration.node(start, start + child.nodeSize, {
@@ -433,7 +449,7 @@ function withSlideEmptyLines(html: string): HTMLElement {
       let edge: globalThis.Node = block
       while (edge[side]) edge = edge[side]!
       if (edge.nodeName !== 'BR' ||
-        (side === 'lastChild' && (edge as Element).getAttribute('data-md-break') === 'html')) return false
+        (edge as Element).getAttribute('data-md-break') === 'html') return false
       // A break can carry marks. Remove wrappers emptied by taking it out.
       do {
         const parent = edge.parentNode!

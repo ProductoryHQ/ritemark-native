@@ -842,9 +842,22 @@ function isHeadingRow(row: Element): boolean {
   return firstRow && firstSection && childElements(row).every(cell => cell.nodeName === 'TH')
 }
 
+const INLINE_BLOCK_BOUNDARY = /^(P|H[1-6]|TD|TH|LI|BLOCKQUOTE|DIV|X-TURNDOWN|BODY)$/
+
+/** Find the previous inline leaf, crossing mark wrappers within the same block. */
+function previousInline(node: Node): Node | null {
+  for (let current: Node | null = node; current && !INLINE_BLOCK_BOUNDARY.test(current.nodeName); current = current.parentNode) {
+    let previous = current.previousSibling
+    if (!previous) continue
+    while (previous.lastChild) previous = previous.lastChild
+    return previous
+  }
+  return null
+}
+
 /** Is there text or an element after `node` inside its block (paragraph, heading or cell)? */
 function hasContentAfter(node: Element): boolean {
-  for (let current: Node | null = node; current && !/^(P|H[1-6]|TD|TH|LI|BLOCKQUOTE|DIV|X-TURNDOWN|BODY)$/.test(current.nodeName); current = current.parentNode) {
+  for (let current: Node | null = node; current && !INLINE_BLOCK_BOUNDARY.test(current.nodeName); current = current.parentNode) {
     for (let next = current.nextSibling; next; next = next.nextSibling) {
       if (next.nodeType === 1 || (next.nodeType === 3 && next.nodeValue?.trim())) return true
     }
@@ -923,17 +936,16 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
     filter: 'br',
     replacement(_content, node) {
       const element = node as Element
-      // A break with nothing after it in its block has no Markdown form; it
-      // would be a literal backslash or trailing spaces.
       const form = element.getAttribute('data-md-break')
-      if (!hasContentAfter(element)) return form === 'html' ? '<br>' : ''
+      if (form === 'html') return '<br>'
+      // A terminal Markdown break would be a literal backslash or trailing spaces.
+      if (!hasContentAfter(element)) return ''
       // A line break inside a table cell would end the row, and one inside a
       // heading would end the heading: an ATX heading is one line, so `\\` and a
       // newline there read back as a literal `\\` and a paragraph (#923).
       // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
       if (insideOneLineBlock(element)) return '<br>'
-      if (form === 'soft' && element.previousSibling?.nodeName !== 'BR' &&
-        element.nextSibling?.nodeName !== 'BR') return '\n'
+      if (form === 'soft' && previousInline(element)?.nodeName !== 'BR') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
       if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).
