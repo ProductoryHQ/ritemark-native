@@ -649,7 +649,12 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
           <span
             aria-hidden="true"
             className="rm-table-menu-anchor"
-            style={{ left: anchor.left, top: anchor.top, width: anchor.width, height: anchor.height }}
+            style={{
+              left: anchor.left,
+              width: anchor.width,
+              top: `clamp(8px, ${anchor.top}px, 100dvh - 8px)`,
+              bottom: `clamp(8px, 100dvh - ${anchor.top + anchor.height}px, 100dvh - 8px)`,
+            }}
           />
         </DropdownMenuTrigger>,
         document.body,
@@ -657,8 +662,9 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
       <DropdownMenuContent
         align="start"
         side="bottom"
-        // A long menu (a cell's, with Cut, Copy and Paste) scrolls inside the room the window has (the app run on #772).
-        className="rm-table-menu w-[236px] max-w-none max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
+        avoidCollisions
+        collisionPadding={8}
+        className="rm-table-menu w-[236px] max-w-none"
         onInteractOutside={() => { outside.current = true }}
         onCloseAutoFocus={event => event.preventDefault()}
       >
