@@ -18,9 +18,9 @@ const runtimes = {
 const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
 const title = (file) => path.posix.basename(file, path.posix.extname(file));
 const titleWords = (text) => normalize(text).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-const titleAliases = (text) => {
-  const name = titleWords(text);
-  return [name, name.replace(/ (?:v ?\d+|draft \d+)$/, '')].filter(Boolean);
+const titleAliases = (name) => {
+  const stripped = name.replace(/ (?:v ?\d+|draft \d+)$/, '');
+  return stripped !== name && stripped.includes(' ') ? [name, stripped] : [name];
 };
 const containsFact = (text, words) => words.some((word) => {
   const escaped = normalize(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -49,9 +49,10 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   const entries = new Map(files.map((file) => [file, []]));
   const namesByFile = new Map(files.map((file) => {
     const heading = facts.documents.find((document) => document.file === file)?.heading;
-    return [file, [...new Set([title(file), heading].filter(Boolean).flatMap(titleAliases))]];
+    return [file, [...new Set([title(file), heading].filter(Boolean).map(titleWords).filter(Boolean))]];
   }));
-  const titles = [...namesByFile].flatMap(([file, names]) => names.map((name) => ({ file, name })))
+  const titles = [...namesByFile].flatMap(([file, names]) =>
+    names.flatMap(titleAliases).map((name) => ({ file, name })))
     .sort((a, b) => b.name.length - a.name.length);
   let entryFile;
   let entry;
@@ -63,7 +64,7 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
       entry = [line];
       entries.get(file).push(entry);
     } else if (!line || /^(?:[-*+] |\d+[.)] |slide\s+\d+\b)/i.test(line)
-      || (entry && files.some((other) => other !== entryFile && containsFact(titleWords(line), namesByFile.get(other).flatMap((name) => [name, name.replace(/^interview /, '')]))))) {
+      || (entry && files.some((other) => other !== entryFile && containsFact(heading, namesByFile.get(other))))) {
       entry = undefined;
     } else {
       entry?.push(line);

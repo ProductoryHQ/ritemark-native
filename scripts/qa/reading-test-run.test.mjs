@@ -127,16 +127,51 @@ test('matches the Claude title variants and headings without crediting another d
     { file: '04 Drafts/Proposal phase 2 v3.docx', words: ['79,000'] },
     { file: 'Steering group minutes 21 October.docx', words: ['18 November'] },
     { file: '01 Brief/Engagement brief.docx', heading: 'Branch network review', words: ['42 branches'] },
-    { file: 'Findings draft 2.docx', words: ['six times'] },
+    { file: 'Findings draft v2.docx', heading: 'Findings, draft 2', words: ['six times'] },
   ] };
   const visibleAnswer = `- Proposal: phase 2 asks for €79,000 plus VAT.
 - Steering group minutes, 21 October set the board date at 18 November.
 - BRANCH NETWORK REVIEW covers 42 branches.
-- Findings says it costs six times as much.`;
+- Findings, draft 2 says it costs six times as much.`;
   const coverage = (text) => scoreRun({ ...sample, visibleAnswer: text }, fixture).coverage.slice(0, 4)
     .map(({ result }) => result);
   assert.deepEqual(coverage(visibleAnswer), ['read', 'read', 'read', 'read']);
   assert.equal(coverage(visibleAnswer.replace('Proposal: phase 2', 'Findings draft 2'))[0], 'missing');
+});
+
+test('generic findings headings and prose do not reassign document coverage', () => {
+  const fixture = { ...facts, documents: [
+    { file: 'Findings draft v2.docx', heading: 'Findings, draft 2', words: ['six times'] },
+    { file: 'Interview – head of operations.docx', words: ['€18.40'] },
+    { file: 'Branch visit v 2.docx', words: ['blue cabinet'] },
+  ] };
+  const visibleAnswer = `**Findings overview**
+A branch visit costs about six times as much as a call.
+
+**Interview – head of operations**
+His findings: a visit costs €18.40 against €3.10 for a call.`;
+  const coverage = (text) => scoreRun({ ...sample, visibleAnswer: text }, fixture).coverage
+    .slice(0, fixture.documents.length).map(({ result }) => result);
+  assert.deepEqual(coverage(visibleAnswer), ['missing', 'read', 'missing']);
+  assert.equal(coverage(visibleAnswer.replace('His findings: a visit', 'He reported that a branch visit'))[1], 'read');
+  assert.equal(coverage(visibleAnswer.replace('His findings: a visit', 'He reported that a branch visit v 2'))[1], 'missing');
+});
+
+test('every version-stripped fixture title that becomes one word is rejected as an alias', () => {
+  const fixture = { ...facts, documents: [
+    { file: 'Findings draft v2.docx', heading: 'Findings, draft 2', words: ['six times'] },
+    { file: 'Summary v3.docx', heading: 'Review, v 4', words: ['three counters'] },
+  ] };
+  for (const { file, heading, words: [fact] } of fixture.documents) {
+    for (const name of [file.replace(/\.docx$/, ''), heading]) {
+      const shortName = /^(\p{L}+)[ ,]+(?:v ?\d+|draft \d+)$/u.exec(name)?.[1];
+      if (!shortName) continue;
+      const result = (label) => scoreRun({ ...sample, visibleAnswer: `**${label}**\n${fact}` }, fixture)
+        .coverage.find((row) => row.file === file).result;
+      assert.equal(result(name), 'read', name);
+      assert.equal(result(`${shortName} overview`), 'missing', shortName);
+    }
+  }
 });
 
 test('rejects facts attributed to the wrong fixture document', () => {
@@ -147,7 +182,7 @@ test('rejects facts attributed to the wrong fixture document', () => {
     { file: findings + '.docx', words: ['end of their life', 'rely on branches for help with the app'] },
     { file: tellers + '.docx', words: ['app desk near the door'] },
     { file: brief + '.docx', words: ['branches in three sizes'] },
-    { file: 'Interview – head of operations.docx', words: ['11 years old'] },
+    { file: 'Interview – head of operations.docx', heading: 'Head of operations', words: ['11 years old'] },
   ] };
   for (const [document, detail] of [
     [findings, 'Cash machines are 11 years old on average.'],
