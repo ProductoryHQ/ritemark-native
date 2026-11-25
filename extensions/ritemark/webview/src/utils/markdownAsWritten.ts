@@ -945,7 +945,9 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       // newline there read back as a literal `\\` and a paragraph (#923).
       // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
       if (insideOneLineBlock(element)) return '<br>'
-      if (form === 'soft' && previousInline(element)?.nodeName !== 'BR') return '\n'
+      // A spaces-only line after another break would end the paragraph.
+      if (previousInline(element)?.nodeName === 'BR') return '\\\n'
+      if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
       if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).

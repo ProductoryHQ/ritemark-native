@@ -139,7 +139,44 @@ export function ensureSlideCommentPipeline(): void {
 
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  return withoutCodeEndBreak(withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked, markSlideEmptyLines)))
+  const html = markdownToEditorHTML(markdown, imageMappings, slideEditorMarked, markSlideEmptyLines)
+  return withoutCodeEndBreak(withColumnPlaces(splitPictureParagraphs(html)))
+}
+
+/** A block picture supplies its own line boundary. Split before ProseMirror can add an empty paragraph. */
+function splitPictureParagraphs(html: string): string {
+  if (!html.includes('<img')) return html
+  const root = document.createElement('div')
+  root.innerHTML = html
+  for (const paragraph of Array.from(root.querySelectorAll('p'))) {
+    if (paragraph.closest('table')) continue
+    if (!Array.from(paragraph.children).some(child => child.nodeName === 'IMG')) continue
+    const parent = paragraph.parentNode!
+    let text = paragraph.cloneNode(false) as HTMLElement
+    while (paragraph.firstChild) {
+      const child = paragraph.firstChild
+      if (child.nodeName !== 'IMG') {
+        text.appendChild(child)
+        continue
+      }
+      if (text.lastChild?.nodeName === 'BR') text.removeChild(text.lastChild)
+      if (text.children.length || text.textContent?.trim()) parent.insertBefore(text, paragraph)
+      else {
+        const tight = text.getAttribute('data-md-tight')
+        if (tight !== null) (child as HTMLElement).setAttribute('data-md-tight', tight)
+      }
+      if (child.nextSibling?.nodeName === 'BR') paragraph.removeChild(child.nextSibling)
+      parent.insertBefore(child, paragraph)
+      text = document.createElement('p')
+      // Extra breaks after the boundary stay inline with the caption.
+      for (let next: ChildNode | null = paragraph.firstChild; next?.nodeName === 'BR'; next = next.nextSibling) {
+        (next as HTMLElement).setAttribute('data-md-break', 'html')
+      }
+    }
+    if (text.children.length || text.textContent?.trim()) parent.insertBefore(text, paragraph)
+    paragraph.remove()
+  }
+  return root.innerHTML
 }
 
 /**

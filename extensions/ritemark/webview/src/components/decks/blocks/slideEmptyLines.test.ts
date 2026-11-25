@@ -10,6 +10,7 @@ import { buildDeckPage, buildPrintPage } from '../../../../../src/decks/page/pag
 import { editorHTML, editorMarkdown, fidelitySchema, openDocument } from '../../../utils/markdownFidelity'
 import { saveSlideMarkdown, SlideEmptyLines } from './slideEditorMarkdown'
 import { loadSlide, saveSlide, slideSchema } from './slideEditorHarness'
+import { SlideSync } from './slideSync'
 
 const columns = ':::: columns\n\n::: column\nLeft\n:::\n\n::: column\nRight\n:::\n\n::::'
 const { doc, paragraph, hardBreak } = slideSchema.nodes
@@ -112,6 +113,41 @@ const inline = loadSlide('Before<br>\n\nAfter')
 const editedInline = EditorState.create({ doc: inline }).tr.insertText('!', inline.content.size - 1).doc
 assert.equal(saveSlide(editedInline), 'Before<br>\n\nAfter!')
 assert.equal(parse(blockSlideHtml(saveSlide(editedInline))).querySelectorAll('.blk-empty-line').length, 0)
+
+const picture = '![](images/a.png)'
+const pictureCases = [
+  ...['\n', '\\\n', '  \n', '<br>'].map(separator => [
+    picture + separator + 'Caption', picture + '\n\nCaption',
+  ]),
+  [picture + '<br>\nCaption', picture + '\n\n<br>Caption'],
+  ['Intro\n' + picture, 'Intro\n\n' + picture],
+  ['<br>\n\n' + picture + '\n\n<br>\n\nCaption', '<br>\n\n' + picture + '\n\n<br>\n\nCaption'],
+]
+for (const [body, savedBody] of pictureCases) {
+  for (const wrap of [
+    (content: string) => '# Title\n\n' + content,
+    (content: string) => '# Title\n\n:::: columns\n\n::: column\nLeft\n:::\n\n::: column\n' + content + '\n:::\n\n::::',
+  ]) {
+    const markdown = wrap(body)
+    const original = loadSlide(markdown)
+    const write = (doc: typeof original) => saveSlideMarkdown(doc, editorHTML(doc), loadSlide)
+    const sync = new SlideSync(loadSlide, write, markdown, original)
+    assert.equal(sync.markdownOf(original), markdown)
+    assert.equal(sync.toWrite(original), null)
+    const edited = EditorState.create({ doc: original }).tr.insertText('!', 6).doc
+    const expected = wrap(savedBody).replace('# Title', '# Title!')
+    assert.equal(sync.toWrite(edited), expected, markdown)
+    assert.equal(write(loadSlide(expected)), expected)
+  }
+}
+
+for (const spaces of [' ', '  ']) {
+  const source = '# Title\n\nA<br>' + spaces + '\nB'
+  const original = loadSlide(source)
+  const written = saveSlide(original)
+  assert.equal(written, '# Title\n\nA\\\n\\\nB')
+  assert.equal(loadSlide(written).toString(), original.toString())
+}
 
 const css = readFileSync(new URL('../slide/slide.css', import.meta.url), 'utf8')
 assert.match(css, /\.blk-flow \{[^}]*font: 400 calc\(24px \* var\(--fit, 1\)\)\/1\.42/)
