@@ -34,7 +34,8 @@ import { loadSlide, loadSlideWithComments, saveSlide } from './slideEditorHarnes
 import { saveSlideMarkdown } from './slideEditorMarkdown'
 import { editorHTML } from '../../../utils/markdownFidelity'
 import { SlideSync } from './slideSync'
-import { markableBox } from './slideDivView'
+import { caretBoxIcon, markableBox } from './slideDivView'
+import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
@@ -667,6 +668,39 @@ stable(COLUMNS, 'three columns')
   // A box's icon handle: centred on its top edge, 12 px of the slide in from its right, the handles' size.
   const icon = iconSpot({ left: 100, top: 200, width: 300, height: 120 }, 0.5)
   assert.deepEqual(icon, { left: 400 - 6 - HANDLE_SIZE, top: 200 - HANDLE_SIZE / 2 })
+}
+
+// ---- #910: the Icon control follows the caret's box and uses the shared picker.
+{
+  const markdown = [
+    '# Outside', '', ':::: boxes', '::: {.box icon="lightbulb"}', 'Known', ':::', '',
+    '::: {.box icon="trukc"}', 'Unknown', ':::', '', '::: box', 'Empty', ':::', '::::',
+  ].join('\n')
+  assert.equal(caretBoxIcon(stateWith(markdown, 'Outside')), null)
+  for (const [text, current, glyph] of [
+    ['Known', 'lightbulb', 'lightbulb'], ['Unknown', 'trukc', 'circle-dashed'], ['Empty', null, 'circle-dashed'],
+  ] as const) {
+    const box = caretBoxIcon(stateWith(markdown, text))
+    assert.ok(box)
+    assert.equal(box.current, current)
+    assert.equal(box.glyph, glyph)
+  }
+
+  const state = stateWith(markdown, 'Unknown')
+  const box = caretBoxIcon(state)!
+  const query = iconMenuStartQuery(box.current)
+  assert.equal(query, 'trukc')
+  const [choice] = iconMenuChoices(query, []).icons
+  assert.equal(choice.phosphor, 'truck')
+  const picked = after(setBlockValue(state, box.pos, 'icon', choice.name))
+  assert.equal(caretBoxIcon(stateWith(picked, 'Unknown'))?.glyph, 'truck')
+  assert.equal(caretBoxIcon(stateWith(picked, 'Known'))?.glyph, 'lightbulb')
+
+  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  assert.match(bar, /placed\.caretBox \? \([\s\S]*?<BoxIconButton/)
+  assert.match(bar, /<SlideIconGlyph name=\{box\.glyph\}/)
+  assert.match(bar, /<SlideIconPickerContent current=\{box\.current\} onPick=\{onPick\}/)
+  assert.match(bar, /apply\(setBlockValue\(editor\.state, box\.pos, 'icon', name\)\)/)
 }
 
 // ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.

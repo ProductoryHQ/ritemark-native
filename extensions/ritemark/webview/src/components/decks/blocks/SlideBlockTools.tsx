@@ -8,7 +8,7 @@
  *    page is drawn: the sprint plan's "same place as a Picture with a link").
  *  - `UnknownIconHint` (#850): pointing at a box's unknown icon shows No icon named “xyz” with Choose an icon.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
@@ -37,11 +37,17 @@ export function SlideIconPicker({ pick, onPick, onClose }: { pick: IconPick | nu
           style={{ position: 'fixed', left: pick.rect.left, top: pick.rect.top, width: pick.rect.width, height: pick.rect.height, pointerEvents: 'none' }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-auto max-w-none" onCloseAutoFocus={event => event.preventDefault()}>
-        <IconGridItems current={pick.current} onPick={name => onPick(pick.pos, name)} />
-      </DropdownMenuContent>
+      <SlideIconPickerContent current={pick.current} onPick={name => onPick(pick.pos, name)} onCloseAutoFocus={event => event.preventDefault()} />
     </DropdownMenu>,
     document.body,
+  )
+}
+
+export function SlideIconPickerContent({ current, onPick, onCloseAutoFocus }: ComponentProps<typeof IconGridItems> & Pick<ComponentProps<typeof DropdownMenuContent>, 'onCloseAutoFocus'>) {
+  return (
+    <DropdownMenuContent align="start" className="w-auto max-w-none" onCloseAutoFocus={onCloseAutoFocus}>
+      <IconGridItems current={current} onPick={onPick} />
+    </DropdownMenuContent>
   )
 }
 

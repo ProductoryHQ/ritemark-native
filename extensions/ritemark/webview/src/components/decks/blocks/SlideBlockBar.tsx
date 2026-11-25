@@ -30,8 +30,10 @@ import {
   dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
-import { caretBoxPos, markableBox } from './slideDivView'
+import { caretBoxIcon, caretBoxPos, markableBox } from './slideDivView'
 import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
+import { SlideIconPickerContent } from './SlideBlockTools'
+import { SlideIconGlyph } from '../slide/SlideIconGlyph'
 import { SlideItemHandle } from './SlideItemHandle'
 import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
@@ -66,6 +68,7 @@ interface Placed {
   markerX: number | null
   /** The slide's pane on the screen: the bar stays inside it. */
   pane: { left: number; right: number }
+  caretBox: ReturnType<typeof caretBoxIcon>
   /** The icon handle: on the caret's box while it has no icon (its empty place is drawn), at its spot in the frame. */
   icon: { pos: number; left: number; top: number } | null
   /** Sprint 167 PR 5 (README item B): the block's boxes, columns, steps or list items in the frame, and the caret's. */
@@ -77,6 +80,7 @@ function samePlace(a: Placed, b: Placed): boolean {
   const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
   return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
     && a.markerX === b.markerX && a.pane.left === b.pane.left && a.pane.right === b.pane.right && JSON.stringify(a.lines) === JSON.stringify(b.lines)
+    && a.caretBox?.pos === b.caretBox?.pos && a.caretBox?.current === b.caretBox?.current && a.caretBox?.glyph === b.caretBox?.glyph
     && JSON.stringify(a.icon) === JSON.stringify(b.icon) && a.caretItem === b.caretItem && JSON.stringify(a.items) === JSON.stringify(b.items)
 }
 
@@ -183,6 +187,29 @@ function SmilePlusGlyph() {
   )
 }
 
+function BoxIconButton({ box, trigger, onPick }: {
+  box: NonNullable<ReturnType<typeof caretBoxIcon>>
+  trigger: { current: HTMLButtonElement | null }
+  onPick: (name: string | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <Tooltip label="Icon (Alt+F10): Choose or remove the box icon" suppressed={open}>
+        <DropdownMenuTrigger asChild>
+          <Button ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10" onMouseDown={event => event.preventDefault()}>
+            <SlideIconGlyph name={box.glyph} size={16} />
+          </Button>
+        </DropdownMenuTrigger>
+      </Tooltip>
+      <SlideIconPickerContent current={box.current} onPick={onPick} onCloseAutoFocus={event => {
+        event.preventDefault()
+        trigger.current?.focus({ preventScroll: true })
+      }} />
+    </DropdownMenu>
+  )
+}
+
 export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
   const [open, setOpen] = useState(false)
@@ -195,6 +222,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const placedRef = useRef<Placed | null>(null)
   const dragRef = useRef(false)
   const barRef = useRef<HTMLDivElement | null>(null)
+  const iconTrigger = useRef<HTMLButtonElement | null>(null)
+  const focusIcon = useRef(false)
   const chosenKey = useRef<string | null>(null)
   // The handles' layer, the frame's last child while the frame is there.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null)
@@ -247,7 +276,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     // The caret's box shows the icon handle while it has no icon: its view draws the empty place (hidden on the stage)
     // only then, and only under the looks that draw icons.
     let icon: Placed['icon'] = null
-    const boxPos = block.kind === 'boxes' ? caretBoxPos(editor.state) : null
+    const caretBox = caretBoxIcon(editor.state)
+    const boxPos = block.kind === 'boxes' ? caretBox?.pos ?? null : null
     const box = boxPos === null ? null : markableBox(editor.view.nodeDOM(boxPos) as HTMLElement | null)
     if (boxPos !== null && box && dom.contains(box) && box.querySelector(':scope > .blk-icon.is-place')) {
       const rect = box.getBoundingClientRect()
@@ -270,7 +300,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       }
     }
     const caretItem = caretItemIndex(editor.state, block)
-    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, icon, items, caretItem }
+    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, caretBox, icon, items, caretItem }
     // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
     setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
@@ -286,6 +316,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const dom = editor.view.dom
     // A press the stage took for the picture Behind (between the words, cancelled on its way down) opens nothing here.
     const press = (event: PointerEvent) => { if (event.defaultPrevented) return; setOpen(true); later() }
+    // Tab moves between boxes. Alt+F10 moves from the text to its Icon control.
+    const focusToolbar = (event: KeyboardEvent) => {
+      if (event.key !== 'F10' || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return
+      if (!frame || !caretBoxIcon(editor.state) || !chosenBlockAt(editor.state) || buttonAt(editor.state)) return
+      event.preventDefault()
+      if (iconTrigger.current) {
+        iconTrigger.current.focus({ preventScroll: true })
+      } else {
+        focusIcon.current = true
+        setOpen(true)
+        measure()
+      }
+    }
+    dom.addEventListener('keydown', focusToolbar)
     dom.addEventListener('pointerdown', press)
     window.addEventListener('resize', later)
     // The stage scrolls, so the bar in `document.body` follows its block.
@@ -296,6 +340,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       cancelAnimationFrame(frameId)
       editor.off('transaction', later)
       editor.off('focus', later)
+      dom.removeEventListener('keydown', focusToolbar)
       dom.removeEventListener('pointerdown', press)
       window.removeEventListener('resize', later)
       document.removeEventListener('scroll', later, true)
@@ -342,6 +387,10 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   useLayoutEffect(() => {
     const bar = barRef.current
     if (!showing || !placed || !bar || !chosen) { setBarAt(null); return }
+    if (focusIcon.current && iconTrigger.current) {
+      focusIcon.current = false
+      iconTrigger.current.focus({ preventScroll: true })
+    }
     const width = bar.offsetWidth
     const height = bar.offsetHeight
     const room = window.innerHeight
@@ -621,6 +670,21 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
+              {placed.caretBox ? (
+                <>
+                  <Sep />
+                  <BoxIconButton
+                    box={placed.caretBox}
+                    trigger={iconTrigger}
+                    onPick={name => {
+                      const box = caretBoxIcon(editor.state)
+                      if (box && box.pos === placed.caretBox?.pos) {
+                        apply(setBlockValue(editor.state, box.pos, 'icon', name))
+                      }
+                    }}
+                  />
+                </>
+              ) : null}
               {look ? (
                 <>
                   <Sep />

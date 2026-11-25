@@ -23,7 +23,7 @@ import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconBadge } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg } from '../slide/pageIcons'
-import { boxIconOf } from '../slide/iconSet'
+import { boxIconOf, UNKNOWN_ICON } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
 import { divAttributesOf, revealWrappedList } from './blockBar'
 
@@ -234,6 +234,15 @@ export function caretBoxPos(state: EditorState): number | null {
     if (node.type.name === 'slideDiv' && slideBlockClassOf(attributesOf(node)) === 'box') return $head.before(depth)
   }
   return null
+}
+
+/** The caret's box and its icon, including an unknown name as written. */
+export function caretBoxIcon(state: EditorState) {
+  const pos = caretBoxPos(state)
+  const node = pos === null ? null : state.doc.nodeAt(pos)
+  if (pos === null || !node) return null
+  const icon = boxIconOf(attributesOf(node).values.icon)
+  return { pos, current: icon?.name ?? null, glyph: icon?.phosphor ?? UNKNOWN_ICON }
 }
 
 /**
