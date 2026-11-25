@@ -43,7 +43,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { choosePlace } from './frame-places.mjs';
+import { choosePlace, placeName } from './frame-places.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -416,9 +416,9 @@ const PLACES_ROW = '.part.sidebar .composite-bar .action-item .action-label';
 const MORE_MENU = '.ritemark-more-menu[role="menu"][aria-label="More places"]';
 const MORE_ROWS = `${MORE_MENU} [role="menuitem"]`;
 const visiblePlaces = selector => `[...document.querySelectorAll(${JSON.stringify(selector)})].filter(element => element.getBoundingClientRect().width)`;
-const placeName = `element => (element.getAttribute('aria-label') || '').split(', ')[0].replace(/ \\(.*\\)$/, '')`;
-const placeNames = selector => evaluate(`${visiblePlaces(selector)}.map(${placeName})`);
-const placeLabel = (selector, name) => `${visiblePlaces(selector)}.find(element => (${placeName})(element) === ${JSON.stringify(name)})`;
+const readPlaceName = `element => (${placeName})(element.getAttribute('aria-label') || '')`;
+const placeNames = selector => evaluate(`${visiblePlaces(selector)}.map(${readPlaceName})`);
+const placeLabel = (selector, name) => `${visiblePlaces(selector)}.find(element => (${readPlaceName})(element) === ${JSON.stringify(name)})`;
 
 async function place(name) {
 	const rowNames = await placeNames(PLACES_ROW);

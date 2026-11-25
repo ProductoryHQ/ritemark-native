@@ -1,3 +1,7 @@
+export function placeName(label) {
+	return label.split(', ')[0].replace(/ \(.*\)$/, '').split(' - ')[0];
+}
+
 export function choosePlace(rowNames, moreNames, name) {
 	if (rowNames.includes(name)) {
 		return 'row';
