@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { isMac } from '../../hooks/usePlatform'
-import { pictureBarPlacement, type Box } from './pictureGeometry'
+import { pictureBarFold, pictureBarPlacement, type Box } from './pictureGeometry'
 
 export type PicturePlace = 'text' | 'left' | 'right' | 'behind'
 
@@ -231,7 +231,7 @@ export function PictureBar(props: PictureBarProps) {
   const [fold, setFold] = useState(0)
   const widths = useRef<number[]>([])
   const size = sizeOf(look.width, context)
-  const documentRow = anchor && !crop ? props.documentRow : undefined
+  const documentRow = anchor ? props.documentRow : undefined
   const roomHost = documentRow?.host
 
   useLayoutEffect(() => {
@@ -243,32 +243,29 @@ export function PictureBar(props: PictureBarProps) {
     const bar = ref.current
     if (!anchor || !bar) return
     const width = bar.getBoundingClientRect().width
-    widths.current[fold] = width
-    // A document picture's row bounds the bar too, so a bar in a narrow list item or cell folds rather than scrolls.
-    const rowRect = roomHost?.getBoundingClientRect()
-    const rowLeft = Math.max(0, rowRect?.left ?? 0)
-    const rowRight = Math.min(window.innerWidth, rowRect?.right ?? window.innerWidth)
-    const rowWidth = Math.max(0, rowRight - rowLeft)
-    const room = Math.min((props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16, rowRect ? rowWidth : Infinity)
-    if (width > room && fold < 3) {
-      setFold(fold + 1)
-      return
-    }
-    if (fold > 0 && widths.current[fold - 1] !== undefined && widths.current[fold - 1] <= room) {
-      setFold(fold - 1)
-      return
-    }
     const height = bar.offsetHeight
+    const rowRect = !crop ? roomHost?.getBoundingClientRect() : undefined
+    const row = documentRow && rowRect && {
+      picture: documentRow.picture,
+      width,
+      left: Math.max(0, rowRect.left),
+      right: Math.min(window.innerWidth, rowRect.right),
+    }
+    if (!crop || !documentRow) {
+      widths.current[fold] = width
+      const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
+      const nextFold = pictureBarFold(fold, widths.current, height, room, row)
+      if (nextFold !== fold) {
+        setFold(nextFold)
+        return
+      }
+    }
     const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
     const rightEdge = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - 8
     const maxX = rightEdge - width
     const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
-    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, documentRow && {
-      picture: documentRow.picture,
-      width,
-      left: rowLeft,
-      right: rowRight,
-    })
+    const retainedRoom = crop && roomHost ? parseFloat(roomHost.style.getPropertyValue('--picture-bar-room')) || 0 : 0
+    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, row, retainedRoom)
     if (placement.room) roomHost?.style.setProperty('--picture-bar-room', `${placement.room}px`)
     else roomHost?.style.removeProperty('--picture-bar-room')
     setLeft(placement.left ?? Math.round(x))
@@ -298,7 +295,7 @@ export function PictureBar(props: PictureBarProps) {
       role="toolbar"
       aria-label={crop ? 'Crop the picture' : 'The picture'}
       className="picture-bar fixed z-[60] flex items-center gap-1 rounded-xl bg-surface px-1.5 py-1 font-ui text-ink-strong shadow-[0_0_0_1px_var(--r-hairline),0_10px_28px_-10px_rgba(30,27,75,.3)]"
-      style={{ left: left ?? -9999, top, ...(documentRow && { width: 'max-content' }) }}
+      style={{ left: left ?? -9999, top, ...(documentRow && !crop && { width: 'max-content' }) }}
       // The picture stays chosen and the caret where it is: a press on the bar never takes the editor's selection.
       onMouseDown={event => { if (!(event.target as HTMLElement).closest('input, textarea')) event.preventDefault() }}
       onKeyDown={keys}
