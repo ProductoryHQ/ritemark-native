@@ -1152,21 +1152,14 @@ diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workben
  import { ThemeIcon } from '../../../base/common/themables.js';
  import { IAction, Separator, SubmenuAction, toAction } from '../../../base/common/actions.js';
  import { StringSHA1 } from '../../../base/common/hash.js';
-@@ -111,6 +112,7 @@
- 		@IViewsService private readonly viewService: IViewsService,
- 		@IContextKeyService protected readonly contextKeyService: IContextKeyService,
- 		@IWorkbenchEnvironmentService private readonly environmentService: IWorkbenchEnvironmentService,
-+		@IConfigurationService private readonly placeConfigurationService: IConfigurationService,
- 		@IWorkbenchLayoutService protected readonly layoutService: IWorkbenchLayoutService,
- 	) {
- 		super();
-@@ -449,6 +451,14 @@
+@@ -449,6 +450,15 @@
  		if (!this.hasExtensionsRegistered && !(this.part === Parts.SIDEBAR_PART && this.environmentService.remoteAuthority && isNative)) {
  			cachedViewContainer = cachedViewContainer || this.cachedViewContainers.find(({ id }) => id === viewContainerId);
  
 +			// Ritemark: check the current setting even when the cached entry predates the manifest's gate.
 +			if (cachedViewContainer && this.location === ViewContainerLocation.Sidebar) {
-+				const shown = ritemarkGatedPlaceShown(viewContainerId, this.placeConfigurationService);
++				const configurationService = this.instantiationService.invokeFunction(accessor => accessor.get(IConfigurationService));
++				const shown = ritemarkGatedPlaceShown(viewContainerId, configurationService);
 +				if (shown !== undefined) {
 +					return !shown;
 +				}
@@ -2679,10 +2672,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..37ff3dab6f8
+index 00000000000..c16555beec1
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,192 @@
+@@ -0,0 +1,233 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2693,11 +2686,16 @@ index 00000000000..37ff3dab6f8
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
 +import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
 +import { TestConfigurationService } from '../../../platform/configuration/test/common/testConfigurationService.js';
++import { ContextKeyService } from '../../../platform/contextkey/browser/contextKeyService.js';
++import { ContextKeyExpr } from '../../../platform/contextkey/common/contextkey.js';
++import { TestInstantiationService } from '../../../platform/instantiation/test/common/instantiationServiceMock.js';
 +import { ServicesAccessor } from '../../../platform/instantiation/common/instantiation.js';
 +import { NullLogService } from '../../../platform/log/common/log.js';
-+import { IStorageService, StorageScope } from '../../../platform/storage/common/storage.js';
++import { IStorageService, StorageScope, StorageTarget } from '../../../platform/storage/common/storage.js';
 +import { IWorkspaceContextService, WorkbenchState } from '../../../platform/workspace/common/workspace.js';
-+import { readRitemarkFrame, ritemarkFirstDesk, ritemarkGatedPlaceShown, ritemarkPlaceShown, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
++import { PaneCompositeBar } from '../../browser/parts/paneCompositeBar.js';
++import { ViewContainerLocation } from '../../common/views.js';
++import { readRitemarkFrame, ritemarkFirstDesk, ritemarkFrame, ritemarkGatedPlaceShown, ritemarkPlaceShown, ritemarkSeedPlaces, ritemarkSlotReleased } from '../../browser/ritemarkFrame.js';
 +import { ISerializedEditorGroupModel } from '../../common/editor/editorGroupModel.js';
 +import { Memento } from '../../common/memento.js';
 +import { TestStorageService } from '../common/workbenchTestServices.js';
@@ -2813,6 +2811,34 @@ index 00000000000..37ff3dab6f8
 +		assert.strictEqual(ritemarkGatedPlaceShown(id, on, defaultOff), true);
 +	});
 +
++	test('the places row checks the setting for a legacy cached built-in placeholder', () => {
++		const id = 'workbench.view.extension.ritemark-slide-library';
++		const storageService = store.add(new TestStorageService());
++		storageService.store('pinned', JSON.stringify([{ id, pinned: true, visible: true }]), StorageScope.PROFILE, StorageTarget.USER);
++		storageService.store('placeholders', JSON.stringify([{ id, name: 'Slide library', isBuiltin: true }]), StorageScope.PROFILE, StorageTarget.MACHINE);
++		const instantiationService = store.add(new TestInstantiationService());
++		const bar: PaneCompositeBar = Object.assign(Object.create(PaneCompositeBar.prototype), {
++			location: ViewContainerLocation.Sidebar,
++			hasExtensionsRegistered: false,
++			environmentService: {},
++			viewDescriptorService: { getViewContainerById: () => undefined },
++			options: { pinnedViewContainersKey: 'pinned', placeholderViewContainersKey: 'placeholders', viewContainersWorkspaceStateKey: 'workspace' },
++			storageService,
++			instantiationService,
++		});
++
++		const originalPlaces = ritemarkFrame.places;
++		Object.assign(ritemarkFrame, { places: readRitemarkFrame(manifest).places });
++		try {
++			instantiationService.set(IConfigurationService, new TestConfigurationService({}));
++			assert.strictEqual(bar['shouldBeHidden'](id), false);
++			instantiationService.set(IConfigurationService, new TestConfigurationService({ 'ritemark.features.decks': false }));
++			assert.strictEqual(bar['shouldBeHidden'](id), true);
++		} finally {
++			Object.assign(ritemarkFrame, { places: originalPlaces });
++		}
++	});
++
 +	test('a saved place is restored with its default unless the user turned it off', () => {
 +		const frame = readRitemarkFrame(manifest);
 +		const id = 'workbench.view.extension.ritemark-slide-library';
@@ -2821,6 +2847,14 @@ index 00000000000..37ff3dab6f8
 +		assert.strictEqual(ritemarkPlaceShown(id, fresh, frame), true);
 +		assert.strictEqual(ritemarkPlaceShown(id, off, frame), false);
 +		assert.strictEqual(ritemarkPlaceShown('workbench.view.explorer', off, frame), true);
++
++		const when = ContextKeyExpr.deserialize('config.ritemark.features.decks');
++		const values: unknown[] = [false, true, 'yes', '', 0, 1, ['a']];
++		for (const value of values) {
++			const settings = new TestConfigurationService({ 'ritemark.features.decks': value });
++			const context = store.add(new ContextKeyService(settings));
++			assert.strictEqual(ritemarkPlaceShown(id, settings, frame), context.contextMatchesRules(when), JSON.stringify(value));
++		}
 +	});
 +
 +	test('R3: a project\'s first desk is Home and the Task board, pinned, Home in front; Home alone with the board\'s flag off; none without a folder', () => {
