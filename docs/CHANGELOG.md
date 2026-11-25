@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Gemini 4 Neon replaces Gemini 4 Argon in the model lists when you use your own Gemini API key (#1062).
+- Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
 
 ### Fixed
 

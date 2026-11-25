@@ -63,7 +63,7 @@ test('S35: a keyed provider\'s group is OpenCode\'s list, with catalog labels fo
   const models = resolvedWith(openCodeLiveRows(FIXTURE, CURATED));
   const neon = models.find((row) => row.id === GOOGLE_NEON);
   assert.strictEqual(neon?.label, 'Gemini 4 Neon');
-  assert.strictEqual(neon?.description, 'Google — flagship reasoning', 'the catalog\'s description, not OpenCode\'s name');
+  assert.strictEqual(neon?.description, 'Google — strong reasoning', 'the catalog\'s description, not OpenCode\'s name');
   assert.strictEqual(models[0].id, 'google/gemini-3.8-flash', 'catalog order first (decision 10: the free-tier model leads)');
 });
 

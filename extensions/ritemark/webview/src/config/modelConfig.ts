@@ -11,6 +11,7 @@
 export interface ModelInfo {
   id: string;
   name: string;
+  hidden?: boolean;
 }
 
 export interface ModelConfig {
@@ -106,11 +107,12 @@ export function modelOptionsWithPersistedSelection(
   models: ModelInfo[],
   selectedId: string | undefined,
 ): { models: ModelInfo[]; unavailable: boolean } {
+  const choices = models.filter(model => !model.hidden);
   if (!selectedId || models.some(model => model.id === selectedId)) {
-    return { models, unavailable: false };
+    return { models: choices, unavailable: false };
   }
   return {
-    models: [{ id: selectedId, name: unavailableModelName(selectedId) }, ...models],
+    models: [{ id: selectedId, name: unavailableModelName(selectedId) }, ...choices],
     unavailable: true,
   };
 }

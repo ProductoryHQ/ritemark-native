@@ -11,7 +11,7 @@ import { buildPublishedFeed } from './feedExport';
 import { FEED_MIN_APP_VERSION } from './feedGates';
 import { resolveAll } from './resolver';
 import { validateCatalog } from './schema';
-import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS, GEMINI_MODEL_IDS } from '../modelConfig';
+import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS, GEMINI_MODEL_IDS, toOpenCodeModelId } from '../modelConfig';
 
 let failures = 0;
 function test(name: string, fn: () => void): void {
@@ -48,12 +48,17 @@ function anthropicIds(feed: Feed): string[] {
 
 console.log('feedExport.test.ts');
 
-test('a first publish is the visible bundled lineup with the new updatedAt', () => {
+test('a first publish includes the bundled lineup with the new updatedAt', () => {
   const feed = buildPublishedFeed(BUNDLED_CATALOG, undefined, NOW, {}) as unknown as Feed;
   assert.equal(feed.updatedAt, NOW);
   assert.equal(feed.schemaVersion, 1);
   for (const [provider, catalog] of Object.entries(BUNDLED_CATALOG.providers)) {
-    assert.deepEqual(feed.providers[provider].models, catalog!.models.filter((row) => !row.hidden), provider);
+    assert.deepEqual(feed.providers[provider].models.map((row) => row.id), catalog!.models.map((row) => row.id), provider);
+    assert.deepEqual(
+      feed.providers[provider].models.filter((row) => !catalog!.models.find((entry) => entry.id === row.id)?.hidden),
+      catalog!.models.filter((row) => !row.hidden),
+      provider,
+    );
     assert.deepEqual(feed.providers[provider].defaults, catalog!.defaults, provider);
   }
   validateCatalog(feed);
@@ -138,7 +143,23 @@ test('S141 S21: the export keeps Neon\'s OpenCode gate, and lists Neon once', ()
   assert.equal(rows.length, 1);
   assert.equal(rows[0].minAppVersion, '2.0.0');
   assert.equal(feed.providers.gemini.models.filter((row) => row.id === GEMINI_MODEL_IDS.NEON_4).length, 1);
-  assert.ok(!feed.providers.gemini.models.some((row) => row.id === GEMINI_MODEL_IDS.ARGON_4));
+});
+
+test('R6: the export keeps all Argon routes available for older saved selections', () => {
+  const feed = exported(FEED_C4808BE);
+  const googleArgon = toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4);
+  for (const [provider, id] of [
+    ['gemini', GEMINI_MODEL_IDS.ARGON_4],
+    ['opencode', googleArgon],
+    ['opencode', toOpenCodeModelId('openrouter', googleArgon)],
+  ]) {
+    const rows = feed.providers[provider].models.filter((row) => row.id === id);
+    assert.equal(rows.length, 1, id);
+    assert.equal(rows[0].description, 'Retained for saved selections');
+    assert.equal(rows[0].deprecated, false);
+    assert.equal(rows[0].order, 100);
+    assert.ok(!('hidden' in rows[0]), id);
+  }
 });
 
 test('S141 R6: the gates in feedGates.ts are applied, and the stricter gate wins', () => {

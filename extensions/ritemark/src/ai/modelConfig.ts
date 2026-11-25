@@ -351,8 +351,7 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
   {
     id: GEMINI_MODEL_IDS.NEON_4,
     name: 'Gemini 4 Neon',
-    description: 'Google’s flagship reasoning model (paid API tier)',
-    // as Argon until Google's model card is checked
+    description: 'Strong reasoning (paid Google API tier)',
     api: 'chat',
     reasoning: 'medium',
     contextWindow: 1000000,

@@ -769,8 +769,8 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     };
   }
 
-  private llmModelOptions(provider: 'openai' | 'gemini'): Array<{ id: string; name: string }> {
-    return modelCatalog.getModels(provider).filter(m => !m.hidden).map(m => ({ id: m.id, name: m.label }));
+  private llmModelOptions(provider: 'openai' | 'gemini'): Array<{ id: string; name: string; hidden?: boolean }> {
+    return modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label, ...(m.hidden ? { hidden: true } : {}) }));
   }
 
   /**

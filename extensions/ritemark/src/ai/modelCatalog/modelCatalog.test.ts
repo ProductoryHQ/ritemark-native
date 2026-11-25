@@ -730,7 +730,7 @@ test('S141 R1/S1: offline, Neon leads Flows\' Gemini list, is in OpenCode\'s Goo
   assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.NEON_4);
   const google = r.opencode.models.filter((m) => m.id.startsWith('google/')).map((m) => m.id);
   assert.ok(google.includes(`google/${GEMINI_MODEL_IDS.NEON_4}`));
-  assert.ok(r.opencode.models.some((m) => m.id === `openrouter/google/${GEMINI_MODEL_IDS.NEON_4}`));
+  assert.strictEqual(r.opencode.models.find((m) => m.id.startsWith('openrouter/') && !m.hidden)?.id, `openrouter/google/${GEMINI_MODEL_IDS.NEON_4}`);
 });
 
 test('S141 decision 10: OpenCode\'s Google group leads with a free-tier model, Neon second', () => {
@@ -754,6 +754,33 @@ test('S141 R1/S2: with the feed of c4808be, Neon is listed once and the bundled 
   assert.strictEqual(r.gemini.defaults['flow-llm'], DEFAULT_MODELS.flowLLMGemini);
   assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
   assert.strictEqual(r.anthropic.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
+});
+
+test('a fresher feed cannot show bundled hidden Argon rows, even at the top of the feed', () => {
+  const feed = { ...FEED_C4808BE, updatedAt: TEST_CATALOG_DATE };
+  const r = resolveAll({}, feed, null, BUNDLED_CATALOG, '2.3.0');
+  for (const [provider, id] of [
+    ['gemini', GEMINI_MODEL_IDS.ARGON_4],
+    ['opencode', `google/${GEMINI_MODEL_IDS.ARGON_4}`],
+  ] as const) {
+    assert.strictEqual(r[provider].source, 'remote');
+    const rows = r[provider].models;
+    assert.strictEqual(rows.find((m) => m.id === id)?.hidden, true);
+    assert.ok(rows.slice(rows.findIndex((m) => m.id === id)).every((m) => m.hidden));
+  }
+});
+
+test('a fresher feed default naming hidden Argon falls back to Gemini 3.5 Flash Lite', () => {
+  const feed = {
+    ...FEED_C4808BE,
+    updatedAt: TEST_CATALOG_DATE,
+    providers: {
+      ...FEED_C4808BE.providers,
+      gemini: { ...FEED_C4808BE.providers.gemini!, defaults: { 'flow-llm': GEMINI_MODEL_IDS.ARGON_4 } },
+    },
+  };
+  const r = resolveAll({}, feed, null, BUNDLED_CATALOG, '2.3.0');
+  assert.strictEqual(r.gemini.defaults['flow-llm'], GEMINI_MODEL_IDS.FLASH_LITE_3_5);
 });
 
 test('S141 R2/S5–S6: OpenCode carries the lineup, with OpenRouter\'s own Claude id', () => {

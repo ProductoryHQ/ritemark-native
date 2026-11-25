@@ -39,14 +39,16 @@ export const FEED_MIN_APP_VERSION: Partial<Record<Provider, Record<string, strin
   openai: { [OPENAI_MODEL_IDS.SOL_6_2]: '2.3.0', [OPENAI_MODEL_IDS.ASTRA_6_2]: '2.3.0' },
   // Claude Code 2.1.296 (1.14.0) is the first bundled CLI that knows Haiku 5.5.
   anthropic: { [CLAUDE_MODEL_IDS.HAIKU_5_5]: '1.14.0', [CLAUDE_MODEL_IDS.FABLE_5_2]: '2.3.0' },
-  // OpenCode rows from 2.0.0 (OpenCode 1.19.3), the version Argon was run on (c4808be).
+  // OpenCode rows from 2.0.0 (OpenCode 1.19.3). OpenCode reads models.dev, which lists Neon.
   opencode: Object.fromEntries([
     toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4),
+    toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4),
     toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5_5),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5_5),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.HAIKU_5_5),
     toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4)),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)),
     toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5),
     toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1)),
   ].map((id) => [id, '2.0.0']).concat([

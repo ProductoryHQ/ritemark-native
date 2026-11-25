@@ -60,6 +60,14 @@ function withOlderAppFields(
   gates: Partial<Record<Provider, Record<string, string>>>,
 ): JsonObject {
   const out: JsonObject = { ...row };
+  // Older apps need a plain row to resolve a saved selection. This build
+  // reapplies the hidden flag from its bundled catalog.
+  if (row.hidden) {
+    delete out.hidden;
+    out.description = 'Retained for saved selections';
+    out.deprecated = false;
+    out.order = 100;
+  }
   // Only a curated feed row carries fields on: an automated row's belong to the
   // withdrawn publisher, and the curated bundled row replaces it whole.
   const carried = current && current.provenance !== 'auto' ? current : undefined;
@@ -91,13 +99,11 @@ export function buildPublishedFeed(
     const catalog = bundled.providers[provider];
     if (!catalog) continue;
     const curatedIds = new Set(catalog.models.map((row) => row.id));
-    // Hidden bundled rows preserve saved choices locally and are not feed offers.
-    const publishedRows = catalog.models.filter((row) => !row.hidden);
     const currentRows = currentRowsById(currentProviders[provider]);
     providers[provider] = {
       defaults: { ...catalog.defaults },
       models: [
-        ...publishedRows.map((row) => withOlderAppFields(provider, row, currentRows.get(row.id), gates)),
+        ...catalog.models.map((row) => withOlderAppFields(provider, row, currentRows.get(row.id), gates)),
         ...feedOnlyRowsToKeep(currentProviders[provider], curatedIds),
       ],
     };
