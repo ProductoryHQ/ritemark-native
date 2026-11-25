@@ -14,10 +14,14 @@ final class ThumbnailProvider: QLThumbnailProvider {
         let edge = min(maximum.width, maximum.height)
         let pixels = edge * request.scale
         DeckCache.log.info("Thumbnail request: \(Double(pixels)) px")
-        let icon = QLThumbnailReply(contextSize: CGSize(width: edge, height: edge), drawing: { context in
+        let iconSize = CGSize(width: edge, height: edge)
+        let icon = QLThumbnailReply(contextSize: iconSize, drawing: { context in
+            guard DeckIcon.draw(in: context, size: iconSize, pixels: pixels) else {
+                DeckCache.log.error("Bundled deck icon could not be loaded")
+                return false
+            }
             let elapsed = (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
             DeckCache.log.info("Thumbnail deck icon in \(elapsed) ms")
-            DeckIcon.draw(in: context, size: CGSize(width: edge, height: edge))
             return true
         })
         guard pixels >= 64, Self.slots.wait(timeout: .now()) == .success else {

@@ -19,13 +19,15 @@ func save(_ image: CGImage, to url: URL) throws {
     try png.write(to: url)
 }
 
-func thumbnail(_ url: URL, edge: CGFloat) throws -> CGImage {
+func thumbnail(_ url: URL, edge: CGFloat) throws -> (image: CGImage, milliseconds: UInt64) {
     let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: edge, height: edge),
                                                scale: 1, representationTypes: .thumbnail)
     let start = DispatchTime.now()
     let done = DispatchSemaphore(value: 0)
+    var milliseconds: UInt64 = 0
     var response: Result<QLThumbnailRepresentation, Error>?
     QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, error in
+        milliseconds = elapsedMilliseconds(since: start)
         response = representation.map { .success($0) } ?? .failure(error ?? ProbeError.absentRepresentation)
         done.signal()
     }
@@ -38,13 +40,13 @@ func thumbnail(_ url: URL, edge: CGFloat) throws -> CGImage {
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
     }
     guard let reply = try response?.get() else { throw ProbeError.absentRepresentation }
-    print("\(url.lastPathComponent)\t\(reply.type.rawValue)\t\(elapsedMilliseconds(since: start)) ms")
+    print("\(url.lastPathComponent)\t\(reply.type.rawValue)\t\(milliseconds) ms")
     guard reply.type == .thumbnail else { throw ProbeError.wrongRepresentation }
-    return reply.cgImage
+    return (reply.cgImage, milliseconds)
 }
 
 // Compare premultiplied colour and alpha on a shared grid so the small icon
-// and the system reference can have different raster sizes.
+// and the PDF reference can have different raster sizes.
 private let sampleSide = 32
 
 func samples(_ image: CGImage) -> [UInt8] {
@@ -71,9 +73,13 @@ func elapsedMilliseconds(since start: DispatchTime) -> UInt64 {
     (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
 }
 
-func checkThumbnails(fixtures: URL, output: URL, privateFixtures: URL) throws {
+func checkThumbnails(fixtures: URL, output: URL, privateFixtures: URL, iconPDF: URL, smallIconPDF: URL) throws {
     guard let pdf = CGPDFDocument(fixtures.appendingPathComponent("expected.pdf") as CFURL),
           let page = pdf.page(at: 1),
+          let iconDocument = CGPDFDocument(iconPDF as CFURL),
+          let iconPage = iconDocument.page(at: 1),
+          let smallIconDocument = CGPDFDocument(smallIconPDF as CFURL),
+          let smallIconPage = smallIconDocument.page(at: 1),
           let context = CGContext(data: nil, width: 720, height: 405, bitsPerComponent: 8,
                                   bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
@@ -96,7 +102,7 @@ func checkThumbnails(fixtures: URL, output: URL, privateFixtures: URL) throws {
         let file = directory.appendingPathComponent("\(name).rtms")
         let start = DispatchTime.now()
         do {
-            let image = try thumbnail(file, edge: edge)
+            let (image, milliseconds) = try thumbnail(file, edge: edge)
             try save(image, to: output.appendingPathComponent("\(name).png"))
             let pageDifference = distance(image, reference)
             let passed: Bool
@@ -118,14 +124,22 @@ func checkThumbnails(fixtures: URL, output: URL, privateFixtures: URL) throws {
                                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
                     throw ProbeError.absentRepresentation
                 }
-                DeckIcon.draw(in: iconContext, size: CGSize(width: edge, height: edge))
+                // The provider's rule: the small icon below 64 px, the large from 64 px up, fitted and
+                // centred, scaling up as well as down.
+                let chosen = edge < 64 ? smallIconPage : iconPage
+                let box = chosen.getBoxRect(.mediaBox)
+                let scale = min(edge / box.width, edge / box.height)
+                iconContext.translateBy(x: (edge - box.width * scale) / 2, y: (edge - box.height * scale) / 2)
+                iconContext.scaleBy(x: scale, y: scale)
+                iconContext.translateBy(x: -box.minX, y: -box.minY)
+                iconContext.drawPDFPage(chosen)
                 guard let icon = iconContext.makeImage() else { throw ProbeError.absentRepresentation }
                 try save(icon, to: output.appendingPathComponent("\(name)-deck-icon.png"))
                 let iconDifference = distance(image, icon)
-                passed = iconDifference < 0.12 && pageDifference > 0.14
-                metrics = "deck icon distance \(iconDifference), page 1 distance \(pageDifference)"
+                passed = iconDifference < 0.12 && pageDifference > 0.14 && milliseconds < 1_000
+                metrics = "deck icon distance \(iconDifference), page 1 distance \(pageDifference), budget < 1000 ms"
             }
-            print("- \(name) thumbnail — \(passed ? "PASS" : "FAIL") expected \(expectation); \(metrics), \(elapsedMilliseconds(since: start)) ms ([PNG](\(output.deletingLastPathComponent().lastPathComponent)/png/\(name).png))")
+            print("- \(name) thumbnail — \(passed ? "PASS" : "FAIL") expected \(expectation); \(metrics), \(milliseconds) ms ([PNG](\(output.deletingLastPathComponent().lastPathComponent)/png/\(name).png))")
             matches = matches && passed
         } catch {
             print("- \(name) thumbnail — FAIL expected \(expectation); \(error) after \(elapsedMilliseconds(since: start)) ms")
@@ -148,7 +162,9 @@ enum Probe {
             } else {
                 try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
                                     output: URL(fileURLWithPath: arguments[1], isDirectory: true),
-                                    privateFixtures: URL(fileURLWithPath: arguments[2], isDirectory: true))
+                                    privateFixtures: URL(fileURLWithPath: arguments[2], isDirectory: true),
+                                    iconPDF: URL(fileURLWithPath: arguments[3]),
+                                    smallIconPDF: URL(fileURLWithPath: arguments[4]))
             }
         } catch {
             fputs("Probe failed: \(error)\n", stderr)

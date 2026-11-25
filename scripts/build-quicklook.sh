@@ -33,10 +33,8 @@ for kind in Thumbnail Preview; do
   plutil -replace RitemarkHostBundleIdentifier -string "$host_id" "$bundle/Info.plist"
   plutil -insert CFBundleShortVersionString -string "$version" "$bundle/Info.plist"
   plutil -insert CFBundleVersion -string "$version" "$bundle/Info.plist"
-  # TODO(Experience): supply DeckIcon.icns from product/design/experience/experiences/decks/file-icon/.
-  if [[ -f "$SOURCE/Shared/Resources/DeckIcon.icns" ]]; then
-    cp "$SOURCE/Shared/Resources/DeckIcon.icns" "$bundle/Resources/"
-  fi
+  cp "$SOURCE/Shared/Resources/DeckIcon.pdf" "$bundle/Resources/"
+  cp "$SOURCE/Shared/Resources/DeckIconSmall.pdf" "$bundle/Resources/"
   plutil -lint "$bundle/Info.plist" "$SOURCE/$kind/sandbox.entitlements"
   rm -rf "$OUT/$executable.appex"
   ditto "$WORK/$executable.appex" "$OUT/$executable.appex"

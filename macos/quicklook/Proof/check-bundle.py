@@ -35,6 +35,8 @@ checks = {
         "com.apple.security.files.user-selected.read-only": True,
         "com.apple.security.temporary-exception.files.home-relative-path.read-only": ["/"],
     }),
+    "DeckIcon.pdf exists": ((contents / "Resources" / "DeckIcon.pdf").is_file(), True),
+    "DeckIconSmall.pdf exists": ((contents / "Resources" / "DeckIconSmall.pdf").is_file(), True),
     "Executable exists": (executable.is_file(), True),
 }
 if kind == "Preview":

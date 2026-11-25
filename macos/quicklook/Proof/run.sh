@@ -73,7 +73,7 @@ xcrun swiftc -module-cache-path "$WORK/module-cache" "$SOURCE"/Shared/*.swift \
   printf '\n## Direct preview payload checks\n\n'
   awk -F '\t' '{printf "- %s — %s, %s\n", $1, $2, $3}' "$PROOF/preview-payload.tsv"
 } >> "$RESULTS"
-xcrun swiftc -module-cache-path "$WORK/module-cache" -parse-as-library "$SOURCE/Shared/DeckIcon.swift" "$SOURCE/Proof/probe.swift" -o "$WORK/probe"
+xcrun swiftc -module-cache-path "$WORK/module-cache" -parse-as-library "$SOURCE/Proof/probe.swift" -o "$WORK/probe"
 
 listing() {
   for point in thumbnail preview; do
@@ -139,7 +139,8 @@ exercise() {
   local first_line status=0
   first_line="$(wc -l < "$PROOF/provider-stream.txt")"
   printf '\n## %s requests\n\n' "$phase" >> "$RESULTS"
-  "$WORK/probe" "$fixtures" "$output/png" "$private_fixtures/$phase" > "$output/thumbnails.txt" 2>&1 || status=1
+  "$WORK/probe" "$fixtures" "$output/png" "$private_fixtures/$phase" \
+    "$SOURCE/Shared/Resources/DeckIcon.pdf" "$SOURCE/Shared/Resources/DeckIconSmall.pdf" > "$output/thumbnails.txt" 2>&1 || status=1
   if ! sed -n '/^- /p' "$output/thumbnails.txt" | grep . >> "$RESULTS"; then
     printf -- '- Thumbnail probe setup failed. See [%s log](%s/thumbnails.txt).\n' "$phase" "$phase" >> "$RESULTS"
   fi
