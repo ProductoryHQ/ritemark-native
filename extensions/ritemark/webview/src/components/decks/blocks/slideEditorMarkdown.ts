@@ -173,7 +173,7 @@ function markPictureBoundaries(html: string): string {
         if (neighbor?.nodeName === 'BR') (neighbor as Element).setAttribute('data-md-break', PICTURE_BREAK)
       }
       // The picture replaces one break. Further breaks still belong to the caption.
-      for (let next = index + 2; leaves[next]?.nodeName === 'BR'; next++) {
+      for (let next = index + 2; leaves[index + 1]?.nodeName === 'BR' && leaves[next]?.nodeName === 'BR'; next++) {
         const br = leaves[next] as Element
         if (br.getAttribute('data-md-break') !== PICTURE_BREAK) br.setAttribute('data-md-break', 'html')
       }
