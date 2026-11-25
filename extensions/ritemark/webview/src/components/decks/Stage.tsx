@@ -55,8 +55,8 @@ interface StageProps {
   onSplit?: (before: string, after: string) => void
   onFull?: (full: boolean) => void
   onNeedCaret?: () => void
-  /** The slide's right-click menu's Slide settings… (17 November): the popover at that point. */
-  onSlideSettings?: (at: { x: number; y: number }) => void
+  /** The slide's right-click menu's Slide settings… (17 November): the popover beside the slide. */
+  onSlideSettings?: () => void
   splitRequest?: number
   picture?: { path: string; url: string; serial: number } | null
 }
@@ -223,7 +223,7 @@ function LayoutStage({ editor, slide, theme, borderless, assets, width, onWritin
           // Inside a box being typed in, the system's own menu (Cut, Copy, Paste) stays.
           if (!onSlideSettings || (event.target as Element | null)?.closest?.('[contenteditable="true"]')) return
           event.preventDefault()
-          onSlideSettings({ x: event.clientX, y: event.clientY })
+          onSlideSettings()
         }}
       >
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />

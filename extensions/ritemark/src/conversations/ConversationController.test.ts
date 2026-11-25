@@ -1,3 +1,4 @@
+import { GEMINI_MODEL_IDS, toOpenCodeModelId } from '../ai/modelConfig';
 import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -7,6 +8,8 @@ import { ConversationStore, ConversationStoreError } from './ConversationStore';
 import { LegacyConversationMigrator } from './LegacyConversationMigrator';
 import { resolveProjectScope, unassignedLegacyScope } from './projectScope';
 import type { ConversationHostEvent } from './protocol';
+
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4);
 
 function uuid(value: number): string {
   return `10000000-0000-4000-8000-${value.toString().padStart(12, '0')}`;
@@ -562,11 +565,11 @@ async function run(): Promise<void> {
       conversationId: moved.data.conversation.conversationId,
       bindingGeneration: moved.data.conversation.bindingGeneration,
       agentId: 'opencode',
-      modelId: 'google/gemini-4-argon',
+      modelId: GOOGLE_NEON,
     });
     assert.equal(picked.ok, true);
     const afterPick = await store.get(moved.data.conversation.conversationId);
-    assert.deepEqual(afterPick?.composerPreferences.modelByRuntime, { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' }, 'each AI keeps its own');
+    assert.deepEqual(afterPick?.composerPreferences.modelByRuntime, { codex: 'gpt-6-luna', opencode: GOOGLE_NEON }, 'each AI keeps its own');
     assert.equal(afterPick?.lastActivityAt, pickedBefore?.lastActivityAt, 'a pick is a draft control, not activity');
     assert.equal(await controller.savedComposerModel(moved.data.conversation.conversationId, 'codex'), 'gpt-6-luna');
     assert.equal(await controller.savedComposerModel(moved.data.conversation.conversationId, 'claude-code'), undefined);
@@ -577,7 +580,7 @@ async function run(): Promise<void> {
       conversationId: moved.data.conversation.conversationId,
       bindingGeneration: moved.data.conversation.bindingGeneration,
       agentId: 'opencode',
-      modelId: 'google/gemini-4-argon',
+      modelId: GOOGLE_NEON,
     });
     assert.equal(samePick.ok, true);
     assert.equal((await store.get(moved.data.conversation.conversationId))?.revision, afterPick?.revision, 'the same pick writes nothing');

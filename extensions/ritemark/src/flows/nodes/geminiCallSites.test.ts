@@ -191,10 +191,10 @@ async function main(): Promise<void> {
 
   await test('S49/S52: the model probe sends the header and reads every page', async () => {
     respond = (call) => (call.url.includes('pageToken=')
-      ? json(200, { models: [{ name: `models/${GEMINI_MODEL_IDS.ARGON_4}`, supportedGenerationMethods: ['generateContent'] }] })
+      ? json(200, { models: [{ name: `models/${GEMINI_MODEL_IDS.NEON_4}`, supportedGenerationMethods: ['generateContent'] }] })
       : json(200, { models: [{ name: `models/${GEMINI_MODEL_IDS.FLASH_3_8}`, supportedGenerationMethods: ['generateContent'] }, { name: 'models/text-embedding', supportedGenerationMethods: ['embedContent'] }], nextPageToken: 'next' }));
     const models = await discoverGemini(KEY);
-    assert.deepEqual(models?.map((m) => m.id), [GEMINI_MODEL_IDS.FLASH_3_8, GEMINI_MODEL_IDS.ARGON_4]);
+    assert.deepEqual(models?.map((m) => m.id), [GEMINI_MODEL_IDS.FLASH_3_8, GEMINI_MODEL_IDS.NEON_4]);
     assert.equal(calls.length, 2);
     calls.forEach(assertKeyInHeaderOnly);
   });
