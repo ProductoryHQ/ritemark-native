@@ -4,8 +4,8 @@
  * project's folder, so "Nothing in this folder was moved or changed" stays true.
  *
  * Per project (by its folder's normalized URI): the ready request's record.
- * Per release (major.minor): the days a document was saved, and the feedback
- * card's answer. And the last day the ready request showed on Home (D1).
+ * Saved days and open-source Home history span releases. The existing week
+ * question keeps its per-release counter and answer until it is replaced.
  *
  * Sprint 156: the AI last seen ready on this profile, in a key of its own,
  * `ritemark.guidance.lastReadyAi`, holding only the AI's id. It is kept apart
@@ -15,9 +15,12 @@
  * No `vscode` import: it takes a Memento-shaped store.
  */
 
+import { createHash } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import { join } from 'node:path';
 import type { AgentId } from '../agent/types';
 import { testChannelRequested } from '../analytics/consent';
-import { releaseOf, withSavedDay } from './guidanceState';
+import { localDay, releaseOf, withSavedDay, SAVED_DAYS_FOR_FEEDBACK } from './guidanceState';
 import type { ReadyGone, ReadyRecord } from './readyRequest';
 
 export const GUIDANCE_KEY = 'ritemark.guidance.v1';
@@ -31,16 +34,44 @@ export interface GuidanceStateV1 {
   v: 1;
   projects: Record<string, ReadyRecord>;
   readyShownOn?: string;
+  savedDays: string[];
+  positiveReaction?: true;
+  /** null means an earlier build already ran on this profile. */
+  firstAppRun?: string | null;
+  home?: { presentations: HomePresentation[]; starred?: true };
   release?: { id: string; savedDays: string[]; feedback?: 'sent' | 'not-now' };
+}
+
+interface HomePresentation {
+  releaseId: string;
+  day: string;
+  dismissed?: true;
 }
 
 const AGENTS: readonly AgentId[] = ['claude-code', 'codex', 'opencode'];
 const GONE: readonly ReadyGone[] = ['answered', 'chat', 'hidden'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
+const isDay = (value: unknown): value is string => typeof value === 'string' && DAY.test(value);
+const daysOf = (value: unknown): string[] => Array.isArray(value) ? value.filter(isDay) : [];
+
+function decodeHomeHistory(value: unknown): GuidanceStateV1['home'] {
+  if (!value || typeof value !== 'object') return undefined;
+  const { presentations, starred } = value as Record<string, unknown>;
+  const history: HomePresentation[] = [];
+  if (Array.isArray(presentations)) {
+    for (const entry of presentations) {
+      if (entry && typeof entry.releaseId === 'string' && isDay(entry.day)) {
+        history.push({ releaseId: entry.releaseId, day: entry.day, ...(entry.dismissed === true ? { dismissed: true } : {}) });
+      }
+    }
+  }
+  return { presentations: history, ...(starred === true ? { starred: true } : {}) };
+}
+
 /** A stored value read defensively: anything malformed is dropped, never trusted. */
 export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
-  const empty: GuidanceStateV1 = { v: 1, projects: {} };
+  const empty: GuidanceStateV1 = { v: 1, projects: {}, savedDays: [] };
   if (!raw || typeof raw !== 'object') return empty;
   const value = raw as Record<string, unknown>;
   const projects: Record<string, ReadyRecord> = {};
@@ -56,15 +87,20 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
     }
   }
   const release = value.release as Record<string, unknown> | undefined;
+  const home = decodeHomeHistory(value.home);
   return {
     v: 1,
     projects,
+    savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_FEEDBACK),
+    ...(value.positiveReaction === true ? { positiveReaction: true } : {}),
+    ...(typeof value.firstAppRun === 'string' || value.firstAppRun === null ? { firstAppRun: value.firstAppRun } : {}),
+    ...(home ? { home } : {}),
     ...(typeof value.readyShownOn === 'string' && DAY.test(value.readyShownOn) ? { readyShownOn: value.readyShownOn } : {}),
     ...(release && typeof release.id === 'string'
       ? {
           release: {
             id: release.id,
-            savedDays: Array.isArray(release.savedDays) ? release.savedDays.filter((day): day is string => typeof day === 'string' && DAY.test(day)) : [],
+            savedDays: daysOf(release.savedDays),
             ...(release.feedback === 'sent' || release.feedback === 'not-now' ? { feedback: release.feedback } : {}),
           },
         }
@@ -72,18 +108,45 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
   };
 }
 
+export interface HomeEligibility {
+  day: string;
+  appRun: string;
+  whatMoved?: boolean;
+  readyRequest?: boolean;
+}
+
+// Orders read-modify-write for stores sharing one Memento.
+const pendingWrites = new WeakMap<MementoLike, Promise<unknown>>();
+
 export class GuidanceStore {
-  constructor(private readonly memento: MementoLike, readonly version: string) {}
+  constructor(
+    private readonly memento: MementoLike,
+    readonly version: string,
+    private readonly appRelease = version,
+    private readonly globalStoragePath?: string,
+  ) {}
 
   read(): GuidanceStateV1 {
     return decodeGuidanceState(this.memento.get(GUIDANCE_KEY));
   }
 
-  /** This release's part: a new release starts with no saved days and no answer. */
-  release(): { id: string; savedDays: string[]; feedback?: 'sent' | 'not-now' } {
+  private serialize<T>(operation: (state: GuidanceStateV1) => Promise<T>): Promise<T> {
+    const result = (pendingWrites.get(this.memento) ?? Promise.resolve()).then(() => operation(this.read()));
+    pendingWrites.set(this.memento, result.catch(() => undefined));
+    return result;
+  }
+
+  private async change(update: (state: GuidanceStateV1) => GuidanceStateV1): Promise<void> {
+    await this.serialize(async (state) => {
+      const next = update(state);
+      if (next !== state) await this.memento.update(GUIDANCE_KEY, next);
+    });
+  }
+
+  /** The existing week question's per-release view. */
+  release(state = this.read()): NonNullable<GuidanceStateV1['release']> {
     const id = releaseOf(this.version);
-    const current = this.read().release;
-    return current?.id === id ? current : { id, savedDays: [] };
+    return state.release?.id === id ? state.release : { id, savedDays: [] };
   }
 
   project(folderUri: string): ReadyRecord {
@@ -91,28 +154,103 @@ export class GuidanceStore {
   }
 
   async updateProject(folderUri: string, change: (record: ReadyRecord) => ReadyRecord): Promise<ReadyRecord> {
-    const state = this.read();
-    const next = change(state.projects[folderUri] ?? {});
-    await this.memento.update(GUIDANCE_KEY, { ...state, projects: { ...state.projects, [folderUri]: next } });
-    return next;
+    return this.serialize(async (state) => {
+      const next = change(state.projects[folderUri] ?? {});
+      await this.memento.update(GUIDANCE_KEY, { ...state, projects: { ...state.projects, [folderUri]: next } });
+      return next;
+    });
   }
 
-  async noteReadyShown(day: string): Promise<void> {
-    const state = this.read();
-    if (state.readyShownOn === day) return;
-    await this.memento.update(GUIDANCE_KEY, { ...state, readyShownOn: day });
+  noteReadyShown(day: string): Promise<void> {
+    return this.change((state) => state.readyShownOn === day ? state : { ...state, readyShownOn: day });
   }
 
-  async noteSavedDay(day: string): Promise<void> {
-    const state = this.read();
-    const release = this.release();
-    if (release.savedDays.includes(day)) return;
-    await this.memento.update(GUIDANCE_KEY, { ...state, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } });
+  noteDocumentSaved(scheme: string, at: Date, countForWeekQuestion: boolean): Promise<void> {
+    return scheme === 'file' ? this.noteSavedDay(localDay(at), countForWeekQuestion) : Promise.resolve();
   }
 
-  async answerFeedback(answer: 'sent' | 'not-now'): Promise<void> {
-    const state = this.read();
-    await this.memento.update(GUIDANCE_KEY, { ...state, release: { ...this.release(), feedback: answer } });
+  noteSavedDay(day: string, countForWeekQuestion = true): Promise<void> {
+    if (!isDay(day)) return Promise.resolve();
+    return this.change((state) => {
+      const savedDays = state.savedDays.length >= SAVED_DAYS_FOR_FEEDBACK || state.savedDays.includes(day)
+        ? state.savedDays : withSavedDay(state.savedDays, day);
+      const release = this.release(state);
+      if (countForWeekQuestion && !release.savedDays.includes(day) && release.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) {
+        return { ...state, savedDays, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } };
+      }
+      return savedDays === state.savedDays ? state : { ...state, savedDays };
+    });
+  }
+
+  answerFeedback(answer: 'sent' | 'not-now'): Promise<void> {
+    return this.change((state) => ({ ...state, release: { ...this.release(state), feedback: answer } }));
+  }
+
+  initializeAppRun(appRun: string | undefined, previouslyActivated: boolean): Promise<void> {
+    return this.change((state) => {
+      if (state.firstAppRun === undefined) return { ...state, firstAppRun: previouslyActivated ? null : appRun ?? '' };
+      if (state.firstAppRun !== null && appRun && state.firstAppRun !== appRun) return { ...state, firstAppRun: null };
+      return state;
+    });
+  }
+
+  homeEligible(input: HomeEligibility, state = this.read()): boolean {
+    if (!input.appRun || state.firstAppRun === undefined || state.firstAppRun === input.appRun) return false;
+    if (input.whatMoved || (input.readyRequest && state.readyShownOn === input.day)) return false;
+    if (state.home?.starred || (!state.positiveReaction && state.savedDays.length < SAVED_DAYS_FOR_FEEDBACK)) return false;
+
+    const history = state.home?.presentations ?? [];
+    if (history.some((entry) => entry.releaseId === this.appRelease)) return false;
+    // The previous calendar year's matching day has aged out of the allowance.
+    const cutoff = `${Number(input.day.slice(0, 4)) - 1}${input.day.slice(4)}`;
+    return history.filter((entry) => entry.day > cutoff).length < 3;
+  }
+
+  /** The marker arbitrates across windows. Memento keeps the presentation history. */
+  reserveHomePresentation(input: HomeEligibility): Promise<boolean> {
+    return this.serialize(async (state) => {
+      if (!this.homeEligible(input, state)) return false;
+      try {
+        if (!this.globalStoragePath) throw new Error('Global storage path is unavailable');
+        const folder = join(this.globalStoragePath, 'home-presentations');
+        const filename = /^\d(?:[\da-z.+-]{0,126}[\da-z])?$/.test(this.appRelease)
+          ? this.appRelease
+          : `release-${createHash('sha256').update(this.appRelease).digest('hex')}`;
+        await fs.mkdir(folder, { recursive: true });
+        const marker = await fs.open(join(folder, filename), 'wx').catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'EEXIST') return undefined;
+          throw error;
+        });
+        if (!marker) return false;
+        await marker.close();
+      } catch (error) {
+        console.warn('Ritemark: Could not reserve a Home presentation', error);
+        return false;
+      }
+      const presentations = state.home?.presentations ?? [];
+      await this.memento.update(GUIDANCE_KEY, {
+        ...state,
+        home: { presentations: [...presentations, { releaseId: this.appRelease, day: input.day }] },
+      });
+      return true;
+    });
+  }
+
+  /** Call only for Not now or an accepted Star handoff. */
+  endHomePresentation(action: 'dismiss' | 'star'): Promise<void> {
+    return this.change((state) => {
+      const home = state.home;
+      if (!home?.presentations.some((entry) => entry.releaseId === this.appRelease)) return state;
+      return {
+        ...state,
+        home: {
+          ...home,
+          ...(action === 'star' ? { starred: true } : {
+            presentations: home.presentations.map((entry) => entry.releaseId === this.appRelease ? { ...entry, dismissed: true } : entry),
+          }),
+        },
+      };
+    });
   }
 }
 

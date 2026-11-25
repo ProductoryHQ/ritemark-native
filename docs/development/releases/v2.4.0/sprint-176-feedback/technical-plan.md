@@ -32,6 +32,8 @@ Extend the existing GuidanceStore record with a version-independent saved-day li
 
 Record a presentation when Home actually renders it, and keep it usable during that presentation. Persist the release and rolling 12-month allowance before another window can present it. An interruption consumes that release’s exposure. Treat each new public app release as the boundary and verify packaging version matches it. Leave old week-question data readable for migration. The replacement and the caps need no usage event.
 
+PR 1 uses an exclusive marker file per release in extension global storage to arbitrate Home presentations across windows. Global state keeps the presentation history. This requires no shell change.
+
 ## R4 · Native preview and mail handoff
 
 Extend patch 018’s existing sheet and tests and `src/feedback/{feedbackSheet,feedbackRoute,feedbackCopy}.ts`. Spike a window-bound capture through the pinned shell’s Electron/native window service. Capture the originating workbench window only, without the feedback scrim, and bind image and preview to the sheet token. Verify an appropriate existing native capture and clipboard API in an initialized VS Code checkout. This worktree’s submodule is empty and the audit found no existing full-window capture path in the extension or patches. Keep the image in memory, cap dimensions and bytes before preview, discard it on close or uncheck and make stale capture completions harmless. A capture failure keeps text feedback available. A missing supported native path goes back to the manager before the implementation plan is revised.
