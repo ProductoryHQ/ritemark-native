@@ -17,7 +17,7 @@ RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-reading-claude
   --user-data-dir=/private/tmp/rm-reading-claude-1
 ```
 
-Use `openai` for ChatGPT once its isolated app-server can use the test-vault OpenAI key. This checkout only wires the test-vault OpenAI key into OpenCode and the provider-key features. Use `openrouter` for OpenCode. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
+For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
 
 1. All 13 documents have a matching fact or an explicit, valid unread reason. The fixture has two known unread cases (the scan and the confidential appendix).
 2. The notes belong to their own slides and slide 5 is explicitly reported as having none.

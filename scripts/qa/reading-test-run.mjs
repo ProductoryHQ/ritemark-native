@@ -12,7 +12,7 @@ const template = path.join(repo, 'docs/development/releases/v2.4.0/sprint-173-wo
 const runtimes = {
   claude: { label: 'Claude', key: 'ANTHROPIC' },
   chatgpt: { label: 'ChatGPT', key: 'OPENAI' },
-  opencode: { label: 'OpenCode', key: 'OPENROUTER' },
+  opencode: { label: 'OpenCode', key: 'GOOGLE' },
 };
 
 const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
