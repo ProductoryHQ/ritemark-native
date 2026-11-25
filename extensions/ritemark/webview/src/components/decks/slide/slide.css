@@ -165,6 +165,8 @@
 .deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > :is(h2, h3, h4, h5, h6) { padding-top: 0; }
 .deck-sl.is-blocks h1 + h2 { padding-top: 0; margin-bottom: .7em; }
 .deck-sl.is-blocks p { margin: 0 0 calc(12px * var(--fit, 1)); }
+/* An empty line adds the flow's own line height. The preceding block supplies the usual gap. */
+.deck-sl.is-blocks .blk-flow > p.blk-empty-line { min-height: 1lh; margin: 0; }
 .deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: 1.25em; }
 /* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
 .deck-sl.is-blocks ul { list-style: disc outside; }

@@ -16,6 +16,7 @@
  *
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
+import { markSlideEmptyLines, slideEmptyLineExtension } from './slideEmptyLines';
 import { isLineBreakTag } from './lineBreakTag';
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type SlideData } from '../deckFormat';
@@ -479,7 +480,7 @@ function slideTokenizer(): Tokenizer {
 function createSlideMarked(): Marked {
   const instance = new Marked({ gfm: true, breaks: true, tokenizer: slideTokenizer() });
   instance.use({
-    extensions: [{
+    extensions: [slideEmptyLineExtension(false), {
       // Experience 48: a table with column widths (its delimiter row's dashes, `tableWidths.ts`) is drawn at the slide's
       // width with those shares; any other table exactly as marked draws it.
       name: 'table',
@@ -638,7 +639,9 @@ export function isCommentBlock(token: Token): boolean {
  * free, and a title slide with one over its title is still a title slide.
  */
 function drawnBlocksOf(markdown: string): Token[] {
-  return lexBlockSlide(markdown).filter(token => token.type !== 'space' && !isCommentBlock(token) && !isLabelToken(token));
+  const tokens = lexBlockSlide(markdown);
+  markSlideEmptyLines(tokens);
+  return tokens.filter(token => token.type !== 'slideEmptyLines' && token.type !== 'space' && !isCommentBlock(token) && !isLabelToken(token));
 }
 
 const picturePathsCache = new Map<string, string[]>();
@@ -976,7 +979,10 @@ export function blockSlideHtml(markdown: string, options: BlockDrawingContext = 
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
   state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, ticks: options.ticks === true, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
   try {
-    return slideMarked.parse(withStepsLabels(markdown), { async: false }) as string;
+    const tokens = lexBlockSlide(markdown);
+    markSlideEmptyLines(tokens);
+    slideMarked.walkTokens(tokens, splitQuoteByLine);
+    return slideMarked.parser(tokens);
   } finally {
     state = previous;
   }

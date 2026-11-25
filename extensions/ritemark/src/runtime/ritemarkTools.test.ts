@@ -518,9 +518,11 @@ async function main(): Promise<void> {
     const listed = await runTool(tool('list_decks'), { where: 'library' }, context);
     assert.match(listed.text, /^Slide library\/Agents\.deck\.md · library topic · 1 slide/);
     // Sprint 172 (R8, scenario 21): a `.rtms` is a deck to the tools, as an older `.deck.md` is; a `.md` is not
-    files['Talks/Day one.rtms'] = '---\ndeck: 2\n---\n\n```slide\n---\nid: d1\n---\n# Day one\n```\n\nWelcome.\n';
+    files['Talks/Day one.rtms'] = '---\ndeck: 2\n---\n\n```slide\n---\nid: d1\n---\n# Day one\n\n<br>\n\nOutline\n```\n\nWelcome.\n';
     assert.match((await runTool(tool('list_decks'), {}, context)).text, /Talks\/Day one\.rtms · deck · 1 slide/);
-    assert.match((await runTool(tool('read_deck'), { deck: 'Talks/Day one.rtms' }, context)).text, /Slide 1 · id d1 · block slide\n# Day one/);
+    assert.match((await runTool(tool('read_deck'), { deck: 'Talks/Day one.rtms' }, context)).text, /Slide 1 · id d1 · block slide\n# Day one\n\n<br>\n\nOutline/);
+    files['Talks/Day one.rtms'] = files['Talks/Day one.rtms'].replace('Outline', 'Revised outline');
+    assert.match((await runTool(tool('read_deck'), { deck: 'Talks/Day one.rtms' }, context)).text, /# Day one\n\n<br>\n\nRevised outline/);
     const notDeck = await runTool(tool('read_deck'), { deck: 'notes.md' }, context);
     assert.equal(notDeck.isError, true);
     assert.match(notDeck.text, /^notes\.md is not a deck in this project/);

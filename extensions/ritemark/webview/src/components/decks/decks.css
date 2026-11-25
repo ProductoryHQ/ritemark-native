@@ -481,6 +481,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host > .blk-agenda { margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > .blk-agenda-host:last-child { margin-bottom: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); outline-offset: 4px; }
+/* Edge lines only take room while the caret is in them, so it stays visible while typing. */
+.deck-sl.is-blocks.is-editing .blk-flow > .blk-empty-line.is-edge { height: 0; min-height: 0; overflow: hidden; }
+.deck-sl.is-blocks.is-editing .blk-flow:focus > .blk-empty-line.is-edge.has-caret { height: auto; min-height: 1lh; overflow: visible; }
+.deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment, .blk-empty-line.is-edge)) { margin-bottom: 0; }
 /* An empty line waits for its words: the title's, an empty column's heading and text. Only a line: an empty block (a new
    Columns block's, PR 3) is marked empty too, and a ::before on its grid would take a column of its own (the app run). */
 .deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }

@@ -57,7 +57,7 @@ import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
 import { onDocChanged } from '../../../lib/docChange'
 import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, SlideEmptyLines, slidePlaceholderOf } from './slideEditorMarkdown'
 import { SlideLabel, labelNode } from './slideLabel'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
@@ -386,7 +386,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     codeBlock: SlideCodeBlock,
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     // Sprint 168 PR 1 (#863): a quote's attribution marked as the renderer marks it.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
+    afterImage: [OuterHistory, SlideEmptyLines, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource), SlideLabel],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.

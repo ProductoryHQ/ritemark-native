@@ -17,7 +17,7 @@
  * Comments on the slide (`<!-- … -->`, `<mark data-comment>`) load and save as the handout's do, with the comment flag.
  * Sprint 164 PR 3: the Label (`[words]{.label}`, `slideLabel.ts`) loads and saves here only, never in a Text document.
  */
-import { Node, mergeAttributes } from '@tiptap/core'
+import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import { Marked } from 'marked'
 import type TurndownService from 'turndown'
 import { fencedDivStart, scanFencedDiv, type FenceScan } from '../../../../../src/decks/blocks/fencedDiv'
@@ -33,7 +33,10 @@ import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMar
 import { LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
 import { splitQuoteByLine } from '../../../../../src/decks/blocks/slideRenderer'
 import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { markSlideEmptyLines, SLIDE_EMPTY_LINE, slideEmptyLineExtension } from '../../../../../src/decks/blocks/slideEmptyLines'
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -79,6 +82,7 @@ export const slideDivMarkedExtension = {
 /** The slide editor's own `marked`: the document editor's configuration, and the `:::` blocks. */
 export const slideEditorMarked = new Marked({ breaks: true, gfm: true })
 slideEditorMarked.use(asWrittenMarkedExtension)
+slideEditorMarked.use({ extensions: [slideEmptyLineExtension(true)] })
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
@@ -107,7 +111,7 @@ export function ensureSlideCommentPipeline(): void {
 
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  return withoutCodeEndBreak(withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked)))
+  return withoutCodeEndBreak(withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked, markSlideEmptyLines)))
 }
 
 /**
@@ -275,6 +279,9 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
   const blank = rules.blankRule.replacement
   rules.blankRule = {
     replacement: (content, node, options) => {
+      if (node.nodeName === 'P' && (node as HTMLElement).hasAttribute('data-slide-empty-line')) {
+        return `\n\n${SLIDE_EMPTY_LINE}\n\n`
+      }
       if (isSlideDiv(node)) return slideDivMarkdown(content, node as HTMLElement)
       // The Agenda holds no words of its own: Turndown's blank rule would drop it.
       if (isAgenda(node)) return agendaMarkdown(node as HTMLElement)
@@ -327,16 +334,96 @@ function createEscapingTurndownService(): TurndownService {
   return service
 }
 
-/** The slide editor's save: its HTML as Markdown. */
-export function slideEditorHTMLToMarkdown(html: string): string {
-  slideTurndown ??= createSlideTurndownService()
-  return slideTurndown.turndown(preprocessTableHTML(html))
+/** Empty lines on the stage are regular paragraphs, so typing replaces the space with text. */
+export const SlideEmptyLines = Extension.create({
+  name: 'slideEmptyLines',
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        decorations({ doc, selection }) {
+          const lines: { from: number; to: number }[] = []
+          let first = doc.content.size
+          let last = -1
+          doc.forEach((block, from) => {
+            const children = block.content.content
+            if (block.type.name === 'paragraph' && children.every(child => child.type.name === 'hardBreak')) {
+              lines.push({ from, to: from + block.nodeSize })
+            } else if (block.type.name !== 'commentNode') {
+              first = Math.min(first, from)
+              last = from
+            }
+          })
+          return DecorationSet.create(doc, lines.map(({ from, to }) => {
+            const edge = from < first || from > last
+            const hasCaret = selection.from > from && selection.from < to
+            const className = edge ? `blk-empty-line is-edge${hasCaret ? ' has-caret' : ''}` : 'blk-empty-line'
+            return Decoration.node(from, to, { class: className })
+          }))
+        },
+      },
+    })]
+  },
+})
+
+/** Move boundary breaks into editable paragraphs before CommonMark's writer can drop them. */
+function withSlideEmptyLines(html: string): HTMLElement {
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const emptyLine = () => {
+    const line = document.createElement('p')
+    line.setAttribute('data-slide-empty-line', '')
+    return line
+  }
+
+  for (const block of Array.from(root.children)) {
+    if (block.nodeName !== 'P') continue
+    const takeBreak = (side: 'firstChild' | 'lastChild') => {
+      let edge: globalThis.Node = block
+      while (edge[side]) edge = edge[side]!
+      if (edge.nodeName !== 'BR') return false
+      // A break can carry marks. Remove wrappers emptied by taking it out.
+      do {
+        const parent = edge.parentNode!
+        parent.removeChild(edge)
+        edge = parent
+      } while (edge !== block && !edge.hasChildNodes())
+      return true
+    }
+    let leading = 0
+    while (takeBreak('firstChild')) {
+      root.insertBefore(emptyLine(), block)
+      leading++
+    }
+    if (!block.hasChildNodes()) {
+      if (leading) block.remove()
+      else block.setAttribute('data-slide-empty-line', '')
+      continue
+    }
+    while (takeBreak('lastChild')) root.insertBefore(emptyLine(), block.nextSibling)
+  }
+
+  // A note is invisible on the slide, so it doesn't bound an empty line.
+  const children = Array.from(root.children).filter(block => block.nodeName !== 'RITEMARK-COMMENT')
+  const isEmptyLine = (block: Element) => block.hasAttribute('data-slide-empty-line')
+  const first = children.findIndex(block => !isEmptyLine(block))
+  let last = children.length - 1
+  while (last > first && isEmptyLine(children[last])) last--
+  children.forEach((block, index) => {
+    if (isEmptyLine(block) && (first < 0 || index < first || index > last)) block.remove()
+  })
+  return root
 }
 
-/** The slide editor's save with every text line that reads as a `:::` line escaped. */
-export function slideEditorHTMLToEscapedMarkdown(html: string): string {
-  escapingTurndown ??= createEscapingTurndownService()
-  return escapingTurndown.turndown(preprocessTableHTML(html))
+function writeSlide(root: HTMLElement, escapeFences = false): string {
+  const service = escapeFences
+    ? (escapingTurndown ??= createEscapingTurndownService())
+    : (slideTurndown ??= createSlideTurndownService())
+  return service.turndown(preprocessTableHTML(root.innerHTML))
+}
+
+/** The slide editor's save: its HTML as Markdown. */
+export function slideEditorHTMLToMarkdown(html: string): string {
+  return writeSlide(withSlideEmptyLines(html))
 }
 
 /** Do two documents hold the same blocks and words (their as-written attributes aside)? */
@@ -352,7 +439,9 @@ export function sameShape(a: PMNode, b: PMNode): boolean {
  * document's HTML, `load` the slide editor's own load of a Markdown.
  */
 export function saveSlideMarkdown(doc: PMNode, html: string, load: (markdown: string) => PMNode): string {
-  const markdown = slideEditorHTMLToMarkdown(html)
-  if (!markdown.includes(':::') || sameShape(load(markdown), doc)) return markdown
-  return slideEditorHTMLToEscapedMarkdown(html)
+  const root = withSlideEmptyLines(html)
+  const markdown = writeSlide(root)
+  if (!markdown.includes(':::')) return markdown
+  const expected = root.innerHTML === html ? doc : PMDOMParser.fromSchema(doc.type.schema).parse(root)
+  return sameShape(load(markdown), expected) ? markdown : writeSlide(root, true)
 }
