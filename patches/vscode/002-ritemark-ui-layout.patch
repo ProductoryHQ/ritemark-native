@@ -72,7 +72,7 @@ Sprint 148, PR 3 (R7): a head row may be the search box (`field: true` in the ma
   openView).
 Sprint 159, PR 1 and #924: a place may carry a boolean `setting` and its `settingDefault`. The manifest
   supplies the default for the fresh profile's seed and for the cached row before the extension registers.
-  The person's setting takes precedence there and when layout.ts decides whether to restore the place.
+  Application and user settings take precedence there and when layout.ts decides whether to restore the place.
   The extension's views keep the row in sync live through `config.<setting>`. Test: ritemarkFrame.test.ts.
 diff --git a/src/vs/workbench/api/browser/viewsExtensionPoint.ts b/src/vs/workbench/api/browser/viewsExtensionPoint.ts
 index 833787070f3..e4fa4a207e5 100644
@@ -1458,10 +1458,10 @@ index bfc8839cc65..745739c61f4 100644
  		};
 diff --git a/src/vs/workbench/browser/ritemarkFrame.ts b/src/vs/workbench/browser/ritemarkFrame.ts
 new file mode 100644
-index 00000000000..39630107022
+index 00000000000..ba85fa02b25
 --- /dev/null
 +++ b/src/vs/workbench/browser/ritemarkFrame.ts
-@@ -0,0 +1,528 @@
+@@ -0,0 +1,533 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -1681,7 +1681,12 @@ index 00000000000..39630107022
 +/** Visibility of a gated place before extension registration, when the configuration default may still be missing. */
 +export function ritemarkGatedPlaceShown(containerId: string | undefined, configurationService: IConfigurationService, frame = ritemarkFrame): boolean | undefined {
 +	const place = frame.places.find(entry => entry.id === containerId);
-+	return place?.setting ? !!(configurationService.getValue(place.setting) ?? place.settingDefault) : undefined;
++	if (!place?.setting) {
++		return undefined;
++	}
++	// Application settings come from the default profile. When it is active, VS Code reads them as user settings.
++	const { applicationValue, userValue } = configurationService.inspect(place.setting);
++	return !!(applicationValue ?? userValue ?? place.settingDefault);
 +}
 +
 +/** A restored place whose setting was turned off gives way to the default place in layout.ts. */
@@ -2672,10 +2677,10 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..c16555beec1
+index 00000000000..e0b77a63648
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,246 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2809,6 +2814,19 @@ index 00000000000..c16555beec1
 +		assert.strictEqual(pinned.find(place => place.id === id)?.visible, false);
 +		assert.strictEqual(ritemarkGatedPlaceShown(id, fresh, defaultOff), false);
 +		assert.strictEqual(ritemarkGatedPlaceShown(id, on, defaultOff), true);
++	});
++
++	test('the first frame ignores a workspace override of an application setting', () => {
++		const frame = readRitemarkFrame(manifest);
++		const id = 'workbench.view.extension.ritemark-slide-library';
++		const settings = new class extends TestConfigurationService {
++			override inspect<T>(key: string) {
++				const value = this.getValue<T>(key);
++				return { value, workspaceValue: value };
++			}
++		}({ 'ritemark.features.decks': false });
++		assert.strictEqual(ritemarkGatedPlaceShown(id, settings, frame), true);
++		assert.strictEqual(ritemarkPlaceShown(id, settings, frame), true);
 +	});
 +
 +	test('the places row checks the setting for a legacy cached built-in placeholder', () => {
