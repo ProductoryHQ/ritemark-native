@@ -14,6 +14,7 @@ const { useAISidebarStore } = await import('./store');
 const { createConversationState } = await import('./conversationState');
 const { AgentTurnBlock } = await import('./AgentView');
 const { CodexTurn } = await import('./CodexView');
+const { getActiveApprovedPlanForClaude } = await import('./lifecycle');
 
 const prose = 'I will update the opening paragraph and keep the examples intact. '.repeat(3)
   + 'The last section will stay as written.';
@@ -31,8 +32,8 @@ const store = useAISidebarStore;
 const send = (message: ExtensionMessage) => store.getState().handleExtensionMessage(message);
 const current = () => store.getState().conversations[conversationId];
 const noop = () => {};
-function assertBefore(markup: string, card: string) {
-  const textAt = markup.indexOf(prose);
+function assertBefore(markup: string, card: string, text = prose) {
+  const textAt = markup.indexOf(text);
   const cardAt = markup.indexOf(card);
   assert.ok(textAt >= 0 && cardAt > textAt, 'full assistant prose should render above the card');
 }
@@ -41,12 +42,14 @@ const snippet = prose.slice(0, 150) + '...';
 const pending = { toolUseId: 'ask', questions: [item] };
 const agentTurn = () => current().agentConversation[0];
 
-function startClaudeTurn() {
+function startClaudeTurn(planFirst = false) {
+  const conversation = createConversationState(conversationId);
   store.setState({
     activeConversationId: conversationId,
     conversations: {
       [conversationId]: {
-        ...createConversationState(conversationId),
+        ...conversation,
+        pendingRuntime: { ...conversation.pendingRuntime, planFirst },
         agentConversation: [{ ...baseTurn, isPlan: false, planHandled: false }],
       },
     },
@@ -122,6 +125,41 @@ test('Claude question context starts after the last tool use or result', () => {
   assertBefore(markup, question);
   assert.ok(!markup.includes(beforeUse));
   assert.ok(!markup.includes(beforeResult));
+});
+
+for (const decision of ['approvePlan', 'rejectPlan'] as const) {
+  test(`Claude keeps an earlier plan out of question context after ${decision}`, () => {
+    startClaudeTurn(true);
+    const draft = 'Planning notes.';
+    const plan = 'PLAN BODY: step one, step two.';
+    const detail = 'Need one detail.';
+    progress('plan_text', draft);
+    if (decision === 'approvePlan') progress('plan_ready', 'Plan ready for review');
+    send({ type: 'agent-plan-approval', conversationId, request: { toolUseId: 'plan', plan } });
+    store.getState()[decision](baseTurn.id);
+    assert.equal(agentTurn().assistantText, undefined);
+    if (decision === 'approvePlan') progress('text', '');
+    progress('text', detail);
+    openQuestion();
+
+    const markup = renderClaude();
+    assertBefore(markup, question, detail);
+    assert.ok(!markup.includes(draft));
+    assert.ok(!markup.includes(plan));
+    assert.equal(agentTurn().planText, plan);
+    if (decision === 'approvePlan') {
+      assert.equal(getActiveApprovedPlanForClaude([agentTurn()])?.planText, plan);
+    }
+  });
+}
+
+test('Claude shows fresh plan text above a question when no other tool intervenes', () => {
+  startClaudeTurn(true);
+  progress('plan_text', prose);
+  openQuestion();
+  const markup = renderClaude();
+  assertBefore(markup, question);
+  assert.equal(markup.split(prose).length - 1, 1);
 });
 
 for (const runtime of ['codex', 'opencode'] as const) {

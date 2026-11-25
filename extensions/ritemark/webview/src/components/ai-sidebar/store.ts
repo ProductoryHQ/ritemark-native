@@ -3271,17 +3271,16 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const progress = message.progress as AgentProgress;
 
           patchLastAgentTurn(targetId, (lastTurn) => {
-            if (progress.type === 'text') {
-              if (!progress.message) return { ...lastTurn, assistantText: undefined };
+            if (progress.type === 'text' || progress.type === 'plan_text') {
+              if (progress.type === 'text' && !progress.message) {
+                return { ...lastTurn, assistantText: undefined };
+              }
               return {
                 ...lastTurn,
                 assistantText: lastTurn.assistantText ? `${lastTurn.assistantText}\n\n${progress.message}` : progress.message,
-              };
-            }
-            if (progress.type === 'plan_text') {
-              return {
-                ...lastTurn,
-                planText: `${lastTurn.planText || ''}${lastTurn.planText ? '\n\n' : ''}${progress.message}`,
+                ...(progress.type === 'plan_text' && {
+                  planText: `${lastTurn.planText || ''}${lastTurn.planText ? '\n\n' : ''}${progress.message}`,
+                }),
               };
             }
 
@@ -3415,6 +3414,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               planHandled: false,
               planDecision: undefined,
               pendingPlanApproval,
+              assistantText: undefined,
               // ExitPlanMode's input.plan is the canonical plan text; streamed
               // plan_text events (lastTurn.planText) are only a fallback.
               planText: pendingPlanApproval.plan?.trim()

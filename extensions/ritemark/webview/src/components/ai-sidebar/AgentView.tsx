@@ -97,9 +97,6 @@ export function AgentTurnBlock({
       )}
 
       {turn.pendingQuestion && turn.assistantText && <AIResponseBubble content={turn.assistantText} />}
-      {turn.pendingQuestion && turn.planText && !turn.pendingPlanApproval && (
-        <AIResponseBubble content={turn.planText} />
-      )}
 
       {/* Pending question */}
       {turn.pendingQuestion && (
