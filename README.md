@@ -19,7 +19,8 @@
   <a href="https://ritemark.app">Website</a> ·
   <a href="#download">Download</a> ·
   <a href="docs/user/getting-started.md">Getting started</a> ·
-  <a href="https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0">What's new in 2.3</a>
+  <a href="https://github.com/jarmo-productory/ritemark-public/releases/tag/v2.3.0">What's new in 2.3</a> ·
+  <a href="https://github.com/ProductoryHQ/ritemark-native/discussions">Discussions</a>
 </p>
 
 ![Ritemark 2.3 with a deck open: the slide and its handout on the desk, the project's files on the left, and Claude's answer beside it after it added the slide](docs/assets/readme/ritemark-2.3-deck-hero.jpg)
@@ -113,6 +114,7 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 ## Community
 
+- [Discussions](https://github.com/ProductoryHQ/ritemark-native/discussions): ask us and others anything, share ideas and show what you made
 - [GitHub Issues](https://github.com/ProductoryHQ/ritemark-native/issues): bug reports and feature requests
 - [Code of Conduct](CODE_OF_CONDUCT.md): our community standards
 - [Security Policy](SECURITY.md): how to report security issues
