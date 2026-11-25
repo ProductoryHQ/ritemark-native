@@ -311,8 +311,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
 .deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Keep the text in the live region and keep its tooltip reachable. */
-.deck-notice-text[data-note-hidden] { opacity: 0; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
 .deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 1em; overflow: hidden; }
@@ -329,6 +327,15 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 8px; } /* the icon's focus ring (4 px out) clears the name by 4 px */
 .deck-notice-line > .deck-notice-words { flex: 0 1 auto; min-width: 0; }
 .deck-notice-shown { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Take hidden words out of the flex gap while keeping them in the live region. */
+.deck-notice:not([data-measure-words]) > .deck-notice-words:has(> .deck-notice-text[data-note-hidden]),
+.deck-notice-line > .deck-notice-words:has(> .deck-notice-shown[data-note-hidden]) {
+  position: absolute;
+  inline-size: 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  opacity: 0;
+}
 .deck-notice-after { display: inline-flex; flex: none; }
 .deck-notice:has(.deck-notice-cut) { overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
 .deck-notice .deck-notice-icon { width: 24px; height: 24px; min-width: 24px; padding: 0; }

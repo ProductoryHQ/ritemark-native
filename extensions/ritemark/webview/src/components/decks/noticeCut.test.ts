@@ -11,15 +11,23 @@ import { CUT, charactersOf, cutName, fitNotice, hideClippedNotice } from './noti
 const note = 'This deck is now a copy of Quarterly planning workshop'
 const measure = (words: string) => charactersOf(words).length * 6
 const minimum = measure('This deck is…')
-assert.equal(hideClippedNotice(note, measure('Th'), false, measure), true)
+assert.equal(hideClippedNotice(note, measure('Th'), undefined, measure), true)
 const shortened = measure('This deck is no')
 assert.ok(shortened < measure(note), 'CSS ellipsizes the visible note at this width')
-assert.equal(hideClippedNotice(note, shortened, true, measure), false)
-assert.equal(hideClippedNotice(note, measure(note), true, measure), false)
-assert.equal(hideClippedNotice(note, minimum - 1, false, measure), true)
-assert.equal(hideClippedNotice(note, minimum + 1, true, measure), true)
-assert.equal(hideClippedNotice(note, minimum + 3, true, measure), false)
-assert.equal(hideClippedNotice(note, minimum + 1, false, measure), false)
+assert.equal(hideClippedNotice(note, shortened, note, measure), false)
+assert.equal(hideClippedNotice(note, measure(note), note, measure), false)
+assert.equal(hideClippedNotice(note, minimum - 1, undefined, measure), true)
+assert.equal(hideClippedNotice(note, minimum + 1, note, measure), true)
+assert.equal(hideClippedNotice(note, minimum + 3, note, measure), false)
+assert.equal(hideClippedNotice(note, minimum + 1, undefined, measure), false)
+
+const short = 'Saved'
+assert.equal(hideClippedNotice(short, measure(short), undefined, measure), false)
+assert.equal(hideClippedNotice(short, measure(short) - 1, undefined, measure), true)
+assert.equal(hideClippedNotice('  Save   done\n', measure('Save done') - 0.5, undefined, measure), false)
+
+const newNote = 'This deck is ready for the workshop'
+assert.equal(hideClippedNotice(newNote, minimum + 1, note, measure), false)
 
 const long = 'Day one – slides and handout.pdf'
 // The middle cut keeps the start, the end and the extension.
@@ -60,13 +68,22 @@ assert.ok(fitNotice('Saved as ', long, room(29)).length < fitted.length + 1)
 // No room at all: the shortest cut, still ending with its extension.
 assert.ok(fitNotice('Saved as ', long, room(0)).endsWith('.pdf'))
 
+const saved = `Saved as ${long}`
+const shortestSaved = `Saved as ${cutName(long, 2)}`
+const savedMinimum = measure(shortestSaved)
+assert.equal(hideClippedNotice(saved, 12.5, undefined, measure, shortestSaved), true)
+assert.equal(hideClippedNotice(saved, savedMinimum - 1, undefined, measure, shortestSaved), true)
+assert.equal(hideClippedNotice(saved, savedMinimum + 1, saved, measure, shortestSaved), true)
+assert.equal(hideClippedNotice(saved, savedMinimum + 3, saved, measure, shortestSaved), false)
+
 // The notice passes its file name, and the bar draws such a notice with its words fitted; the tooltip has the whole.
 const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
 assert.match(view, /<NoticeWords\s+text=\{notice\.text\}\s+name=\{notice\.name\}\s+after=/)
 assert.match(view, /<Tooltip label=\{text\} className="deck-notice-words">\s*<span ref=\{shownRef\} className="deck-notice-shown"/)
 const publish = readFileSync(new URL('./DeckPublish.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
-assert.match(css, /\.deck-notice-text\[data-note-hidden\] \{ opacity: 0; \}/)
+assert.match(view, /hideClippedNotice\(text, room, shown\.dataset\.noteHidden, noticeMeasure\(shown, measure\), shortestCut\)/)
+assert.match(css, /\.deck-notice:not\(\[data-measure-words\]\) > \.deck-notice-words:has\(> \.deck-notice-text\[data-note-hidden\]\),\s*\.deck-notice-line > \.deck-notice-words:has\(> \.deck-notice-shown\[data-note-hidden\]\) \{[^}]*position: absolute;[^}]*inline-size: 0;/)
 assert.match(css, /\.deck-notice-text \{[^}]*text-overflow: ellipsis;/)
 assert.match(publish, /onNotice\(savedNotice\(message\.name\), showInFolder\(message\.name\), message\.name\)/)
 // The Experience lead (#931): Show in folder is an icon button (folder-open, 14 in 24) with its tooltip and a name

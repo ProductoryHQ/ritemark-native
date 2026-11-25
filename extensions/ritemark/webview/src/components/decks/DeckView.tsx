@@ -29,7 +29,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
-import { fitNotice, hideClippedNotice } from './noticeCut'
+import { cutName, fitNotice, hideClippedNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -190,10 +190,20 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
     const shown = shownRef.current
     if (!box || !line || !shown) return
     const prefix = text.slice(0, text.length - name.length)
+    const measure = document.createElement('canvas').getContext('2d')
+    const shortestCut = prefix + cutName(name, 2)
     let live = true
     const fit = () => {
       if (!live) return // a fonts' answer that comes after this notice was replaced
       const room = line.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      if (measure) {
+        const hidden = hideClippedNotice(text, room, shown.dataset.noteHidden, noticeMeasure(shown, measure), shortestCut)
+        if (hidden) {
+          shown.dataset.noteHidden = text
+          return
+        }
+        delete shown.dataset.noteHidden
+      }
       shown.textContent = fitNotice(prefix, name, words => {
         shown.textContent = words
         return shown.scrollWidth <= room
@@ -225,8 +235,15 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 /** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
 const NOTICE_ACTION_GAP = 8
 
+function noticeMeasure(words: HTMLElement, measure: CanvasRenderingContext2D) {
+  const style = getComputedStyle(words)
+  measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  return (text: string) => measure.measureText(text).width
+}
+
 /** Check the bar with full controls and the notice down to its ellipses and actions. */
 function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRenderingContext2D | null) {
+  notice.setAttribute('data-measure-words', '')
   bar.removeAttribute('data-theme-compact')
   notice.setAttribute('data-measure-min', '')
   const minimum = notice.getBoundingClientRect().width
@@ -241,16 +258,17 @@ function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRe
     roomChanged()
   }
 
-  // Keep the round-one layout and tooltip target even when the words have too little room to read.
-  if (!measure) return
-  for (const words of notice.querySelectorAll<HTMLElement>(':scope > .deck-notice-words > .deck-notice-text')) {
-    const style = getComputedStyle(words)
-    measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
-    const room = words.getBoundingClientRect().width
-    const hidden = hideClippedNotice(words.textContent ?? '', room, words.hasAttribute('data-note-hidden'),
-      text => measure.measureText(text).width)
-    words.toggleAttribute('data-note-hidden', hidden)
+  // Measure with all words in flow so a collapsed note can return when there is room.
+  if (measure) {
+    for (const words of notice.querySelectorAll<HTMLElement>(':scope > .deck-notice-words > .deck-notice-text')) {
+      const text = words.textContent ?? ''
+      const room = words.getBoundingClientRect().width
+      const hidden = hideClippedNotice(text, room, words.dataset.noteHidden, noticeMeasure(words, measure))
+      if (hidden) words.dataset.noteHidden = text
+      else delete words.dataset.noteHidden
+    }
   }
+  notice.removeAttribute('data-measure-words')
 }
 
 const NO_SLOTS: PartMenuSlot[] = []
