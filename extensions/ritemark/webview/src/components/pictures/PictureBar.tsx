@@ -76,7 +76,7 @@ export interface PictureBarProps {
   bounds?: { left: number; right: number }
   /** A slide-wide place (a side or behind): the bar sits inside it at the bottom, 12 px up, over the picture. */
   inside?: boolean
-  /** The document picture's box and its full-width block, which can reserve room for an S bar. */
+  /** The document picture's box and its full-width block, which can reserve room below the picture. */
   documentRow?: { picture: Box; host: HTMLElement }
   /** The bar's own element, so a press on it is never "outside". */
   barRef?: (element: HTMLDivElement | null) => void
@@ -231,20 +231,25 @@ export function PictureBar(props: PictureBarProps) {
   const [fold, setFold] = useState(0)
   const widths = useRef<number[]>([])
   const size = sizeOf(look.width, context)
-  const documentRow = anchor && size === 'S' && !crop ? props.documentRow : undefined
+  const documentRow = anchor && !crop ? props.documentRow : undefined
   const roomHost = documentRow?.host
 
   useLayoutEffect(() => {
     return () => { roomHost?.style.removeProperty('--picture-bar-room') }
   }, [roomHost])
 
-  // Centre below the picture by default. An S document bar can sit beside the picture.
+  // The document row bounds both the overlay and its below-picture fallback.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
-    const width = bar.offsetWidth
+    const width = bar.getBoundingClientRect().width
     widths.current[fold] = width
-    const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
+    // A document picture's row bounds the bar too, so a bar in a narrow list item or cell folds rather than scrolls.
+    const rowRect = roomHost?.getBoundingClientRect()
+    const rowLeft = Math.max(0, rowRect?.left ?? 0)
+    const rowRight = Math.min(window.innerWidth, rowRect?.right ?? window.innerWidth)
+    const rowWidth = Math.max(0, rowRight - rowLeft)
+    const room = Math.min((props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16, rowRect ? rowWidth : Infinity)
     if (width > room && fold < 3) {
       setFold(fold + 1)
       return
@@ -261,7 +266,8 @@ export function PictureBar(props: PictureBarProps) {
     const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, documentRow && {
       picture: documentRow.picture,
       width,
-      right: Math.min(documentRow.host.getBoundingClientRect().right, rightEdge),
+      left: rowLeft,
+      right: rowRight,
     })
     if (placement.room) roomHost?.style.setProperty('--picture-bar-room', `${placement.room}px`)
     else roomHost?.style.removeProperty('--picture-bar-room')
@@ -292,7 +298,7 @@ export function PictureBar(props: PictureBarProps) {
       role="toolbar"
       aria-label={crop ? 'Crop the picture' : 'The picture'}
       className="picture-bar fixed z-[60] flex items-center gap-1 rounded-xl bg-surface px-1.5 py-1 font-ui text-ink-strong shadow-[0_0_0_1px_var(--r-hairline),0_10px_28px_-10px_rgba(30,27,75,.3)]"
-      style={{ left: left ?? -9999, top }}
+      style={{ left: left ?? -9999, top, ...(documentRow && { width: 'max-content' }) }}
       // The picture stays chosen and the caret where it is: a press on the bar never takes the editor's selection.
       onMouseDown={event => { if (!(event.target as HTMLElement).closest('input, textarea')) event.preventDefault() }}
       onKeyDown={keys}

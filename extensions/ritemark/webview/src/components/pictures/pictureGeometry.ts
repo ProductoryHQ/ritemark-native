@@ -13,30 +13,36 @@ export interface Box {
   height: number
 }
 
-/** A small document picture uses the space beside it when the bar fits within the row and window. */
+/** A document picture bar sits in its row or reserves room below the block. */
 export function pictureBarPlacement(
   bottom: number,
   height: number,
   viewportHeight: number,
   inside: boolean,
-  beside?: { picture: Box; width: number; right: number },
+  row?: { picture: Box; width: number; left: number; right: number },
 ): { left?: number; top: number; room: number } {
-  if (beside) {
-    const { picture, width, right } = beside
-    const left = Math.max(8, picture.left + picture.width + 8)
-    if (left + width <= right) {
-      const top = Math.max(8, Math.min(viewportHeight - height - 8, picture.top + picture.height - height))
-      return { left, top, room: 0 }
+  const below = bottom + 10
+  if (row) {
+    const { picture, width, left, right } = row
+    const inset = Math.max(left, picture.left + 12)
+    if (picture.height >= height + 16 && inset + width <= right) {
+      return { left: inset, top: picture.top + picture.height - height - 8, room: 0 }
+    }
+    // Under the picture, from its left edge, kept inside the row.
+    const maxLeft = Math.max(left, right - width)
+    return {
+      left: Math.max(left, Math.min(picture.left, maxLeft)),
+      top: Math.round(below),
+      room: 10 + height + 1,
     }
   }
-  const reserveRoom = !!beside
-  const below = bottom + 10
+
   const top = inside
     ? Math.max(8, bottom - height - 12)
-    : reserveRoom || below + height + 8 <= viewportHeight
+    : below + height + 8 <= viewportHeight
       ? below
       : Math.max(8, bottom - height - 10)
-  return { top: Math.round(top), room: reserveRoom ? 10 + height + 1 : 0 }
+  return { top: Math.round(top), room: 0 }
 }
 
 /** The scale an element is drawn at: its width on the screen over its own width. */
