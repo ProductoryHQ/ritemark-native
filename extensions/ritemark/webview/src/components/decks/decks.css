@@ -318,7 +318,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice > .deck-failure-words { min-width: 0; }
 .deck-notice-warning { flex: none; color: var(--r-deck-warning); }
 .deck-notice-warning > span { display: inline-grid; place-items: center; padding: 4px; border-radius: 4px; }
-.deck-notice-warning > span:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+/* The keyboard ring (#635) in its own colour, drawn inside: the bar clips anything outside the note. */
+:where(:root:not([data-input-mode="pointer"])) .deck-notice-warning > span:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: -2px; }
 .deck-notice > .deck-notice-act { flex: none; }
 /* A hairline between a join's line and the full slide's line. */
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
