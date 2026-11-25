@@ -20,6 +20,20 @@ export function charactersOf(name: string): string[] {
   return Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(name), part => part.segment) : Array.from(name)
 }
 
+/** Keep a full note visible, and require 3 px of extra room to restore a clipped note. */
+export function hideClippedNotice(
+  text: string, room: number, hiddenFor: string | undefined, measure: (text: string) => number, shortestCut?: string,
+): boolean {
+  const displayed = text.replace(/\s+/g, ' ').trim()
+  if (room + 0.5 >= measure(displayed)) return false
+  const prefix = charactersOf(displayed).slice(0, 12).join('').trimEnd()
+  const minimum = Math.max(
+    measure(prefix + CUT),
+    shortestCut === undefined ? 0 : measure(shortestCut.replace(/\s+/g, ' ').trim()),
+  )
+  return room < minimum + (hiddenFor === text ? 3 : 0)
+}
+
 /** `name` kept to `keep` characters (and the ellipsis), its start and end kept, the end never shorter than its extension. */
 export function cutName(name: string, keep: number): string {
   const characters = charactersOf(name)

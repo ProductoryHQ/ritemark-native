@@ -1,7 +1,10 @@
+import { GEMINI_MODEL_IDS, toOpenCodeModelId } from '../ai/modelConfig';
 import assert from 'node:assert/strict';
 import { decodeConversationRecordV1, turnActiveDurationMs, withSavedModel, type ConversationRecordV1 } from './types';
 import { resolveProjectScope } from './projectScope';
 import type { RuntimeContinuationDescriptorV1 } from '../runtime/continuation';
+
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4);
 
 const scope = resolveProjectScope({ folderUris: ['file:///fixtures/project'], platform: 'darwin' });
 
@@ -263,7 +266,7 @@ function run(): void {
 
   // Sprint 139 (#417, R6, E2): a chat's saved model, read leniently.
   const withModel = record();
-  withModel.composerPreferences = { thinkingEffortByRuntime: {}, modelByRuntime: { codex: 'gpt-6-luna', opencode: 'google/gemini-4-argon' } };
+  withModel.composerPreferences = { thinkingEffortByRuntime: {}, modelByRuntime: { codex: 'gpt-6-luna', opencode: GOOGLE_NEON } };
   assert.deepEqual(decodeConversationRecordV1(JSON.parse(JSON.stringify(withModel))), withModel);
   const oddModels = JSON.parse(JSON.stringify(withModel)) as { composerPreferences: Record<string, unknown> };
   oddModels.composerPreferences.modelByRuntime = { codex: 42, opencode: 'x'.repeat(300), 'claude-code': 'claude-sonnet-5', gemini: 'flash', '': 'y' };

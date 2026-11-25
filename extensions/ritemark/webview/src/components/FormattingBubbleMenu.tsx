@@ -19,6 +19,7 @@ import { isEquationNodeSelection } from '../extensions/math/mathNodes'
 import type { Instance as TippyInstance } from 'tippy.js'
 import { bubbleHost, formattingToolbarShows, toolbarHidesAfterClick } from './formattingToolbar'
 import { Tooltip } from './ui/tooltip'
+import { slideBubblePopperOptions, slideBubbleReference } from './decks/blocks/slideBubblePlacement'
 
 /**
  * FormattingBubbleMenu Component
@@ -67,6 +68,8 @@ export function FormattingBubbleMenu({
   const linkInputRef = useRef<HTMLInputElement>(null)
   // The toolbar's tippy instance, for the re-check after a click (#687).
   const toolbarTippy = useRef<TippyInstance | null>(null)
+  const stageResize = useRef<ResizeObserver | null>(null)
+  const stageScroll = useRef<(() => void) | null>(null)
   // The selection the toolbar was hidden for when the comment door opened a
   // saved comment latched (#687). It stays hidden until the selection changes
   // or the editor gets the focus again.
@@ -319,9 +322,34 @@ export function FormattingBubbleMenu({
         editor={editor}
         tippyOptions={{
           maxWidth: 'none', // Remove default max-width constraint
-          ...(appendToBody ? { appendTo: () => bubbleHost(editor.view.dom.ownerDocument) } : {}),
+          ...(appendToBody ? {
+            appendTo: () => bubbleHost(editor.view.dom.ownerDocument),
+            getReferenceClientRect: slideBubbleReference(editor),
+            placement: 'top-start',
+          } : {}),
           onCreate: (instance) => {
             toolbarTippy.current = instance
+            const stage = appendToBody ? editor.view.dom.closest<HTMLElement>('.deck-stage') : null
+            if (!stage) return
+            instance.popper.classList.add('slide-formatting-bubble')
+            instance.setProps({ popperOptions: slideBubblePopperOptions(stage) })
+            const resize = () => {
+              instance.popper.style.setProperty('--slide-bubble-width', `${Math.max(0, stage.clientWidth - 10)}px`)
+              void instance.popperInstance?.update()
+            }
+            resize()
+            stageResize.current = new ResizeObserver(resize)
+            stageResize.current.observe(stage)
+            // A column or tab pane scrolling inside the slide moves the chosen words without moving the stage:
+            // update the bubble (and its hidden state) on any scroll under the stage.
+            const scrolled = () => { void instance.popperInstance?.update() }
+            stage.addEventListener('scroll', scrolled, { capture: true, passive: true })
+            stageScroll.current = () => stage.removeEventListener('scroll', scrolled, { capture: true })
+          },
+          onDestroy: () => {
+            stageResize.current?.disconnect()
+            stageScroll.current?.()
+            stageScroll.current = null
           },
         }}
         shouldShow={({ editor, state, view, element }) => {
@@ -352,8 +380,11 @@ export function FormattingBubbleMenu({
             `--r-surface-soft` turns dark in dark mode and hover/active states
             render dark-on-white text (invisible), e.g. the Comment label (#151). */}
         <div
-          className="flex items-center gap-1 bg-surface border border-hairline-strong rounded shadow-lg p-2"
-          style={{ '--r-surface-soft': 'var(--ritemark-surface-soft)' } as React.CSSProperties}
+          className={`flex items-center gap-1 bg-surface border border-hairline-strong rounded shadow-lg p-2${appendToBody ? ' flex-wrap' : ''}`}
+          style={{
+            '--r-surface-soft': 'var(--ritemark-surface-soft)',
+            maxWidth: appendToBody ? 'var(--slide-bubble-width, none)' : undefined,
+          } as React.CSSProperties}
           // After any button's own click (#687): if the focus left both the editor
           // and the toolbar with no edit, as when Comment brings an open box
           // forward, hide now. TipTap ignored that blur and won't check again.

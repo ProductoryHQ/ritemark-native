@@ -128,8 +128,8 @@ export interface SlideEditorProps {
   onFull?: (full: boolean) => void
   /** PR 3: the bar's Split at the cursor found no caret on the slide to split at. */
   onNeedCaret?: () => void
-  /** The right-click menu's Slide settings… (17 November): the popover at the point the menu was opened. */
-  onSlideSettings?: (at: { x: number; y: number }) => void
+  /** The right-click menu's Slide settings… (17 November): the popover beside the slide. */
+  onSlideSettings?: () => void
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
   /** PR 3: the picture the / menu's Picture asked for, saved beside the deck: it goes where the / was. */
@@ -914,8 +914,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pendingComment = useRef<SlideTarget | null>(null)
   /** The menu closed on a press outside it: the focus stays where that press put it. */
   const closedOutside = useRef(false)
-  /** Where the menu was opened, and its Slide settings… waiting for the menu to close. */
-  const menuPoint = useRef({ x: 0, y: 0 })
+  /** The menu's Slide settings…, waiting for the menu to close. */
   const pendingSettings = useRef(false)
   const startPendingComment = () => {
     const target = pendingComment.current
@@ -1206,7 +1205,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             closedOutside.current = false
             pendingComment.current = null
             pendingSettings.current = false
-            menuPoint.current = { x: event.clientX, y: event.clientY }
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
             setTableTarget(SlideTableHandles ? tableMenuTargetAt(editor.view, event.target) : null)
@@ -1298,7 +1296,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           else if (!closedOutside.current) editor.view.focus()
           if (pendingSettings.current) {
             pendingSettings.current = false
-            onSlideSettings?.(menuPoint.current)
+            onSlideSettings?.()
           }
         }}
       >
