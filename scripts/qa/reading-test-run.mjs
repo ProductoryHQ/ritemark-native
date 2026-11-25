@@ -22,6 +22,10 @@ const titleAliases = (name) => {
   const stripped = name.replace(/ (?:v ?\d+|draft \d+)$/, '');
   return stripped !== name && stripped.includes(' ') ? [name, stripped] : [name];
 };
+const entryEndingNames = (name) => {
+  const role = name.replace(/^interview /, '');
+  return role !== name && role.includes(' ') ? [name, role] : [name];
+};
 const containsFact = (text, words) => words.some((word) => {
   const escaped = normalize(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(normalize(text));
@@ -64,7 +68,8 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
       entry = [line];
       entries.get(file).push(entry);
     } else if (!line || /^(?:[-*+] |\d+[.)] |slide\s+\d+\b)/i.test(line)
-      || (entry && files.some((other) => other !== entryFile && containsFact(heading, namesByFile.get(other))))) {
+      || (entry && files.some((other) => other !== entryFile
+        && containsFact(heading, namesByFile.get(other).flatMap(entryEndingNames))))) {
       entry = undefined;
     } else {
       entry?.push(line);

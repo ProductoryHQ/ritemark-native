@@ -182,7 +182,7 @@ test('rejects facts attributed to the wrong fixture document', () => {
     { file: findings + '.docx', words: ['end of their life', 'rely on branches for help with the app'] },
     { file: tellers + '.docx', words: ['app desk near the door'] },
     { file: brief + '.docx', words: ['branches in three sizes'] },
-    { file: 'Interview – head of operations.docx', heading: 'Head of operations', words: ['11 years old'] },
+    { file: 'Interview – head of operations.docx', heading: 'Interview – head of operations', words: ['11 years old'] },
   ] };
   for (const [document, detail] of [
     [findings, 'Cash machines are 11 years old on average.'],
