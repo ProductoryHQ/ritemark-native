@@ -11,6 +11,10 @@
  */
 
 import { EventEmitter } from 'events';
+import { realpathSync, statSync } from 'fs';
+import { basename, dirname, join } from 'path';
+import { testChannelRequested } from '../analytics/consent';
+import { redactTestKeys, testEnvironmentKey } from '../ai/providerKeys';
 import { CodexManager } from './codexManager';
 import { LineBuffer, parseCodexRetryLine, type CodexRetryWaitHeard } from './codexRetry';
 
@@ -33,6 +37,8 @@ import type {
   TurnStartResponse,
   TurnInterruptParams,
   CollaborationMode,
+  LoginAccountApiKeyParams,
+  LoginAccountApiKeyResponse,
   LoginAccountChatGptParams,
   LoginAccountChatGptResponse,
   LogoutAccountResponse,
@@ -44,8 +50,28 @@ import type {
   ReviewDecision,
 } from './codexProtocol';
 
+/** Match the physical, sibling agent homes created by dev-launch-isolated.sh. */
+function isolatedCodexTestHome(env: NodeJS.ProcessEnv): string | undefined {
+  if (!testChannelRequested(env) || !env.CODEX_HOME || !env.CLAUDE_CONFIG_DIR) return;
+  const runDir = dirname(env.CODEX_HOME);
+  if (!/^rm-[A-Za-z0-9._-]+\.[A-Za-z0-9]{4}$/.test(basename(runDir))) return;
+  const codexHome = join(runDir, 'codex');
+  const claudeHome = join(runDir, 'claude');
+  if (env.CODEX_HOME !== codexHome || env.CLAUDE_CONFIG_DIR !== claudeHome) return;
+  try {
+    if (dirname(runDir) === realpathSync(env.TMPDIR || '/private/tmp')
+        && realpathSync(codexHome) === codexHome && realpathSync(claudeHome) === claudeHome
+        && statSync(codexHome).isDirectory() && statSync(claudeHome).isDirectory()) {
+      return codexHome;
+    }
+  } catch {
+    // Missing or inaccessible isolation directories fail closed.
+  }
+}
+
 export class CodexAppServer extends EventEmitter {
   private manager: CodexManager;
+  private readonly testApiKey?: string;
   private nextId = 1;
   private pendingRequests = new Map<number, {
     resolve: (result: unknown) => void;
@@ -63,7 +89,10 @@ export class CodexAppServer extends EventEmitter {
     super();
     this.trace = config.trace;
 
+    const isolatedTestHome = isolatedCodexTestHome(process.env);
+    this.testApiKey = isolatedTestHome ? testEnvironmentKey('openai-api-key') : undefined;
     this.manager = new CodexManager({
+      isolatedTestHome: this.testApiKey ? isolatedTestHome : undefined,
       onStdout: (data) => this.handleStdout(data),
       onStderr: (data) => this.handleStderr(data),
       onExit: (code) => this.handleExit(code),
@@ -94,6 +123,9 @@ export class CodexAppServer extends EventEmitter {
 
       this.sendNotification('initialized');
       this.trace?.('app-server', 'initialized', result);
+      if (this.testApiKey) {
+        await this.signInWithTestKey(this.testApiKey);
+      }
       return result;
     })();
 
@@ -105,9 +137,24 @@ export class CodexAppServer extends EventEmitter {
    */
   async getAccount(): Promise<GetAccountResponse> {
     await this.ensureInitialized();
-    return this.rpc<GetAccountParams, GetAccountResponse>('account/read', {
-      refreshToken: false,
-    });
+    return this.readAccount();
+  }
+
+  private readAccount(): Promise<GetAccountResponse> {
+    return this.rpc<GetAccountParams, GetAccountResponse>('account/read', { refreshToken: false });
+  }
+
+  private async signInWithTestKey(apiKey: string): Promise<void> {
+    try {
+      const { account } = await this.readAccount();
+      if (account !== null) return;
+      await this.rpc<LoginAccountApiKeyParams, LoginAccountApiKeyResponse>(
+        'account/login/start', { type: 'apiKey', apiKey }, 30_000, { omitParamsFromTrace: true },
+      );
+    } catch {
+      // Keep account status and manual sign-in available if the test login fails.
+      console.error('ChatGPT could not sign in with the test API key.');
+    }
   }
 
   /**
@@ -312,6 +359,7 @@ export class CodexAppServer extends EventEmitter {
     params: TParams,
     timeoutMs = 30_000,
     options?: {
+      omitParamsFromTrace?: boolean;
       progressAfterMs?: number;
       progressMessage?: string;
       /** Conversation the 'progress' event should be attributed to (Sprint 99 B4). */
@@ -379,7 +427,7 @@ export class CodexAppServer extends EventEmitter {
       });
 
       try {
-        this.trace?.('rpc:request', method, { id, params });
+        this.trace?.('rpc:request', method, options?.omitParamsFromTrace ? { id } : { id, params });
         this.manager.send(JSON.stringify(request));
       } catch (error) {
         clearTimeout(timer);
@@ -394,7 +442,7 @@ export class CodexAppServer extends EventEmitter {
    * Handle stdout data (JSONL parsing)
    */
   private handleStdout(data: string): void {
-    this.trace?.('stdio:stdout', 'chunk', data);
+    if (!this.testApiKey) this.trace?.('stdio:stdout', 'chunk', data);
     this.buffer += data;
 
     const lines = this.buffer.split('\n');
@@ -402,11 +450,19 @@ export class CodexAppServer extends EventEmitter {
 
     for (const line of lines) {
       if (line.trim()) {
+        // Redact complete lines so a key split across stdout chunks cannot reach logs or events.
+        const safeLine = this.testApiKey
+          ? line.split(JSON.stringify(this.testApiKey).slice(1, -1)).join('[test key]')
+          : line;
         try {
-          const message = JSON.parse(line);
-          this.handleMessage(message);
+          if (this.testApiKey) this.trace?.('stdio:stdout', 'line', redactTestKeys(safeLine));
+          this.handleMessage(JSON.parse(safeLine));
         } catch (error) {
-          console.error('Failed to parse JSONL line:', line, error);
+          if (this.testApiKey) {
+            console.error('Failed to process Codex JSONL line:', redactTestKeys(safeLine));
+          } else {
+            console.error('Failed to parse JSONL line:', line, error);
+          }
         }
       }
     }
@@ -423,7 +479,8 @@ export class CodexAppServer extends EventEmitter {
    */
   private handleStderrLines(lines: string[]): void {
     const other: string[] = [];
-    for (const line of lines) {
+    for (const rawLine of lines) {
+      const line = redactTestKeys(rawLine);
       const wait = parseCodexRetryLine(line);
       if (wait) {
         const heard: CodexRetryWaitHeard = { ...wait, at: Date.now() };

@@ -110,6 +110,16 @@ export interface GetAccountRateLimitsResponse {
   rateLimitsByLimitId: Record<string, RateLimitSnapshot> | null;
 }
 
+// Codex 0.171.0 app-server generate-ts, v2/LoginAccount{Params,Response}.ts.
+export interface LoginAccountApiKeyParams {
+  type: 'apiKey';
+  apiKey: string;
+}
+
+export interface LoginAccountApiKeyResponse {
+  type: 'apiKey';
+}
+
 export interface LoginAccountChatGptParams {
   type: 'chatgpt';
 }
