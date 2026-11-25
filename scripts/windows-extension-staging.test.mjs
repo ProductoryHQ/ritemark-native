@@ -229,7 +229,7 @@ test('every install registers the deck file type, .rtms, with its icon (Sprint 1
   const deckLines = registry.split('\n').filter((line) => /rtms/.test(line) && line.startsWith('Root:'));
   // HKA: the current user's classes, or every user's in an "Install for all users" install.
   assert.deepEqual(deckLines, [
-    'Root: HKA; Subkey: "Software\\Classes\\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty',
+    'Root: HKA; Subkey: "Software\\Classes\\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletekeyifempty',
     'Root: HKA; Subkey: "Software\\Classes\\.rtms\\OpenWithProgids"; ValueType: string; ValueName: "Ritemark.rtms"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty',
     'Root: HKA; Subkey: "Software\\Classes\\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey',
     'Root: HKA; Subkey: "Software\\Classes\\Ritemark.rtms\\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\\resources\\deck.ico"',
@@ -322,6 +322,10 @@ test('the standard-user check also updates from the previous release and starts 
   assert.match(workflow, /sparse-checkout: \|[\s\S]*?scripts\/verify-windows-app-starts\.ps1/, 'the reviewed harness must carry the start check');
   assert.match(workflow, /-AppStartVerifierPath '\.\.\\ci-harness\\scripts\\verify-windows-app-starts\.ps1'/);
 
+  assert.match(workflow, /^\s+-VerifyAssociationDefaults /m);
+  assert.doesNotMatch(canaryWorkflow, /-VerifyAssociationDefaults/);
+  assert.match(roundtrip, /\/TASKS=associatewithfiles/);
+
   const freshUninstalled = roundtrip.indexOf("Invoke-RegistryProbe 'verify-uninstalled'");
   const freshFiles = roundtrip.indexOf('$freshFiles = ');
   const freshStart = roundtrip.indexOf("'fresh-app-start'");
@@ -336,6 +340,10 @@ test('the standard-user check also updates from the previous release and starts 
   assert.ok(updateInstall > previousInstall, 'this release installs over the previous one');
   assert.ok(staleCheck > updateInstall, 'leftovers are checked after the update');
   assert.ok(updateStart > staleCheck, 'the updated app must start');
+  const changeDefaults = roundtrip.indexOf("Invoke-RegistryProbe 'replace-association-defaults'");
+  const verifyDefaults = roundtrip.indexOf("Invoke-RegistryProbe 'verify-replacement-defaults'");
+  assert.ok(changeDefaults > updateStart && changeDefaults < updateUninstall, 'replace defaults before uninstall');
+  assert.ok(verifyDefaults > updateUninstall, 'verify replacement defaults after uninstall');
   assert.ok(updateUninstall > updateStart, 'the update is uninstalled last');
   assert.match(roundtrip, /Get-FileHash -LiteralPath \$stagedPreviousInstaller -Algorithm SHA256/, 'the staged previous installer bytes must be checked');
   assert.match(roundtrip, /\/LOG=\$previousInstallLog/);

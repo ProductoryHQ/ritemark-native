@@ -143,13 +143,13 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 
 [Registry]
 ; Associate .md files with Ritemark
-Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletekeyifempty; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md"; ValueType: string; ValueName: ""; ValueData: "Markdown File"; Flags: uninsdeletekey; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatewithfiles
 
 ; Also associate .markdown files
-Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletekeyifempty; Tasks: associatewithfiles
 
 ; A deck, <name>.rtms, is Ritemark's own file type (Sprint 172, #940), so it is
 ; registered on every install, not behind the unchecked .md task above, and
@@ -158,8 +158,8 @@ Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: 
 ; another app takes the type later. HKA follows the install mode: the current
 ; user's classes, or every user's when "Install for all users" is chosen.
 ; scripts\windows-standard-user-registry-probe.ps1 checks these keys after
-; install and their absence after uninstall.
-Root: HKA; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty
+; install and checks cleanup after uninstall.
+Root: HKA; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Classes\.rtms\OpenWithProgids"; ValueType: string; ValueName: "Ritemark.rtms"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Classes\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Ritemark.rtms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\deck.ico"
@@ -179,4 +179,28 @@ begin
     exit;
   end;
   Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
+
+procedure RemoveAssociationDefault(RootKey: Integer; Extension, ProgId: string);
+var
+  Subkey, CurrentProgId: string;
+begin
+  Subkey := 'Software\Classes\' + Extension;
+  if RegQueryStringValue(RootKey, Subkey, '', CurrentProgId) then
+    if CompareText(CurrentProgId, ProgId) = 0 then
+      RegDeleteValue(RootKey, Subkey, '');
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    RemoveAssociationDefault(HKEY_CURRENT_USER, '.md', 'Ritemark.md');
+    RemoveAssociationDefault(HKEY_CURRENT_USER, '.markdown', 'Ritemark.md');
+    { Match HKA in [Registry] for the deck association. }
+    if IsAdminInstallMode then
+      RemoveAssociationDefault(HKEY_LOCAL_MACHINE, '.rtms', 'Ritemark.rtms')
+    else
+      RemoveAssociationDefault(HKEY_CURRENT_USER, '.rtms', 'Ritemark.rtms');
+  end;
 end;
