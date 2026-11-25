@@ -43,6 +43,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { choosePlace, placeName } from './frame-places.mjs';
 
 const args = process.argv.slice(2);
 const option = (name, fallback) => {
@@ -411,10 +412,28 @@ async function closeFrontTab() {
 	}
 }
 
-const placeLabel = name => byLabel('.part.sidebar .composite-bar .action-item .action-label', name);
+const PLACES_ROW = '.part.sidebar .composite-bar .action-item .action-label';
+const MORE_MENU = '.ritemark-more-menu[role="menu"][aria-label="More places"]';
+const MORE_ROWS = `${MORE_MENU} [role="menuitem"]`;
+const visiblePlaces = selector => `[...document.querySelectorAll(${JSON.stringify(selector)})].filter(element => element.getBoundingClientRect().width)`;
+const readPlaceName = `element => (${placeName})(element.getAttribute('aria-label') || '')`;
+const placeNames = selector => evaluate(`${visiblePlaces(selector)}.map(${readPlaceName})`);
+const placeLabel = (selector, name) => `${visiblePlaces(selector)}.find(element => (${readPlaceName})(element) === ${JSON.stringify(name)})`;
+
 async function place(name) {
-	await click(`the ${name} place`, placeLabel(name));
+	const rowNames = await placeNames(PLACES_ROW);
+	let moreNames = [];
+	if (!rowNames.includes(name) && rowNames.includes('More')) {
+		await click('More', placeLabel(PLACES_ROW, 'More'));
+		moreNames = await placeNames(MORE_ROWS);
+	}
+	const location = choosePlace(rowNames, moreNames, name);
+	await click(`the ${name} place`, placeLabel(location === 'row' ? PLACES_ROW : MORE_ROWS, name));
 	await sleep(1800);
+	// Selecting a More row closes the menu before running its action.
+	if (location === 'more' && await evaluate(`!!document.querySelector(${JSON.stringify(MORE_MENU)})?.getBoundingClientRect().width`)) {
+		throw new Error(`More places stayed open after choosing ${name}`);
+	}
 }
 
 // Sprint 134: a project window opens on Home; the base scene is Documents with a document in front
@@ -485,7 +504,7 @@ const SCENES = [
 		return async () => key('Escape', 0, 'Escape');
 	}],
 	['more-menu', async () => {
-		await click('More', byLabel('.part.sidebar .composite-bar .action-item .action-label', 'More'));
+		await click('More', placeLabel(PLACES_ROW, 'More'));
 		return async () => key('Escape', 0, 'Escape');
 	}],
 	['terminal', async () => {

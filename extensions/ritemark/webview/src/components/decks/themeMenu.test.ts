@@ -268,17 +268,22 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.match(css, /\.wall-slide \.deck-sl\.is-blocks \{ overflow: visible; \}/, 'only a block canvas lets its picture out')
 }
 
-// ---- When the bar is short of room, what gives way, in order: the Theme button's name, Publish's word, the notice's
-// words, Present's word last (step-3-themes.md).
+// ---- #950: every notice takes leftover room, then Theme folds whole, then Publish can give way.
 {
-  const css = readFileSync(fileURLToPath(new URL('./decks.css', import.meta.url)), 'utf8')
-  const weight = (selector: string) => Number(new RegExp(`\\n${selector.replace(/[.>]/g, m => `\\${m}`)} \\{ flex-shrink: (\\d+);`).exec(css)?.[1])
-  const order = ['.deck-bar > .deck-theme-slot', '.deck-bar > .deck-publish-slot', '.deck-bar > .deck-notice', '.deck-bar > .deck-present'].map(weight)
-  assert.ok(order.every(Number.isFinite), String(order))
-  assert.ok(order[0] > order[1] && order[1] > order[2] && order[2] > order[3], String(order))
-  const menu = readFileSync(fileURLToPath(new URL('./ThemeMenu.tsx', import.meta.url)), 'utf8')
-  assert.match(menu, /<Tooltip label=\{`\$\{theme\.name\}: the deck's look and theme`\} className="deck-theme-slot">/, 'the name is in its tooltip')
-  const publish = readFileSync(fileURLToPath(new URL('./DeckPublish.tsx', import.meta.url)), 'utf8')
+  const css = readFileSync(new URL('./decks.css', import.meta.url), 'utf8')
+  const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
+  assert.match(css, /\.deck-notice \{[^}]*flex: 1 0 0;[^}]*min-width: var\(--deck-notice-min, 0px\);[^}]*max-width: max-content;/)
+  assert.match(css, /\.deck-notice-text \{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
+  assert.match(view, /<Tooltip label=\{notice\.text\} className="deck-notice-words">/)
+  assert.match(view, /bar\.removeAttribute\('data-theme-compact'\)[\s\S]*?if \(last && last\.getBoundingClientRect\(\)\.right > right \+ 0\.01\) \{\s*bar\.setAttribute\('data-theme-compact', ''\)/)
+  assert.match(css, /\.deck-bar > :not\(\.deck-notice\) \{ flex-shrink: 0; \}/)
+  assert.match(css, /\.deck-bar\[data-theme-compact\] > \.deck-notice \{ max-width: var\(--deck-notice-min\); \}/)
+  assert.match(css, /\.deck-bar\[data-theme-compact\][^{}]*\.deck-theme-name,[^{}]*\.deck-theme-button > svg \{ display: none; \}/)
+  assert.match(css, /\.deck-bar\[data-theme-compact\] > \.deck-publish-slot \{ flex-shrink:/)
+  assert.doesNotMatch(css, /\.deck-theme-name \{[^}]*text-overflow/)
+  const menu = readFileSync(new URL('./ThemeMenu.tsx', import.meta.url), 'utf8')
+  assert.match(menu, /<Tooltip label=\{\`\$\{theme\.name\}: the deck's look and theme\`\} className="deck-theme-slot">/)
+  const publish = readFileSync(new URL('./DeckPublish.tsx', import.meta.url), 'utf8')
   assert.match(publish, /className="deck-publish-slot">\s+<Button variant="outline" size="bar" className="deck-publish" iconWhenNarrow onClick=\{publish\}>/)
 }
 
@@ -428,9 +433,9 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
 // ---- Where it is (frame 12): on the deck's bar, on the right before Saved, then Publish and Present.
 {
   const view = readFileSync(fileURLToPath(new URL('./DeckView.tsx', import.meta.url)), 'utf8')
-  const bar = view.slice(view.indexOf('<header className="deck-bar">'), view.indexOf('</header>'))
+  const bar = view.slice(view.indexOf('<header className="deck-bar"'), view.indexOf('</header>'))
   const at = (words: string) => { const index = bar.indexOf(words); assert.ok(index >= 0, words); return index }
-  assert.ok(at('<span className="flex-1" />') < at('<ThemeMenu') && at('<ThemeMenu') < at('deck-saved') && at('deck-saved') < at('<DeckPublish') && at('<DeckPublish') < at('<PresentButton'))
+  assert.ok(at('<span className="deck-bar-spacer" />') < at('<ThemeMenu') && at('<ThemeMenu') < at('deck-saved') && at('deck-saved') < at('<DeckPublish') && at('<DeckPublish') < at('<PresentButton'))
   // The pick and its notice with Undo, which takes back only that pick (the bar's other notices' rule).
   assert.match(view, /propertyTransaction\(editor\.state, 'theme', propertyValue\(propertiesRef\.current, 'theme'\), \{ present: true, value: path \}\)/)
   assert.match(view, /text: themePickedNotice\(name\),\s+action: \{ label: 'Undo', tip: '[^']+', run: \(\) => \{ if \(valid\(\)\) editor\.commands\.undo\(\) \} \},\s+valid,/)

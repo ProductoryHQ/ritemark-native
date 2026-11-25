@@ -249,7 +249,7 @@ function mergeDefaults(
   for (const surface of surfaces) {
     const pick = [primary[surface], secondary[surface]].find((id) => {
       const row = findModelEntry(models, id);
-      return row !== undefined && row.provenance !== 'auto';
+      return row !== undefined && !row.hidden && row.provenance !== 'auto';
     });
     if (pick) out[surface] = pick;
   }
@@ -369,6 +369,7 @@ function enrichCatalogCapabilities(
   return models.map((model) => ({
     ...model,
     thinkingEffort: model.thinkingEffort ?? bundledById.get(model.id)?.thinkingEffort,
+    ...(bundledById.get(model.id)?.hidden ? { hidden: true } : {}),
   }));
 }
 
