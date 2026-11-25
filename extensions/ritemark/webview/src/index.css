@@ -74,6 +74,7 @@
   --ritemark-hairline-strong: #cbd5e1;
   --ritemark-ink-strong: #1e1b4b;
   --ritemark-ink-body: #475569;
+  --ritemark-deck-warning: #B45309;
   --ritemark-ink-muted: #617187; /* the kit's muted, 4.5:1 on the ground (Sprint 132) */
   --ritemark-ink-faint: #94a3b8;
   --ritemark-ink-disabled: #cbd5e1;
@@ -104,6 +105,7 @@
   --ritemark-dark-hairline-strong: rgba(199, 210, 254, 0.22);
   --ritemark-dark-ink-strong: #f8fafc;
   --ritemark-dark-ink-body: #C7D2FE;
+  --ritemark-dark-deck-warning: #EAB308;
   --ritemark-dark-ink-muted: #94a3b8;
   --ritemark-dark-ink-faint: #7C86A2;
   --ritemark-dark-ink-disabled: #475569;
@@ -145,6 +147,7 @@
   --r-hairline-strong: var(--ritemark-hairline-strong);
   --r-ink-strong: var(--ritemark-ink-strong);
   --r-ink-body: var(--ritemark-ink-body);
+  --r-deck-warning: var(--ritemark-deck-warning);
   --r-ink-muted: var(--ritemark-ink-muted);
   --r-ink-faint: var(--ritemark-ink-faint);
   --r-ink-disabled: var(--ritemark-ink-disabled);
@@ -238,6 +241,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-hairline-strong: var(--ritemark-dark-hairline-strong);
   --r-ink-strong: var(--ritemark-dark-ink-strong);
   --r-ink-body: var(--ritemark-dark-ink-body);
+  --r-deck-warning: var(--ritemark-dark-deck-warning);
   --r-ink-muted: var(--ritemark-dark-ink-muted);
   --r-ink-faint: var(--ritemark-dark-ink-faint);
   --r-ink-disabled: var(--ritemark-dark-ink-disabled);
@@ -618,6 +622,7 @@ body {
 .ProseMirror .pic-block {
   position: relative;
   margin: 0.5em 0;
+  padding-bottom: var(--picture-bar-room, 0px);
 }
 .ProseMirror .pic-block img {
   margin: 0;

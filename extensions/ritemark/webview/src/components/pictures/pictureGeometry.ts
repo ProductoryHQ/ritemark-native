@@ -13,6 +13,57 @@ export interface Box {
   height: number
 }
 
+type PictureRow = { picture: Box; left: number; right: number }
+
+export function pictureBarFold(
+  fold: number,
+  widths: readonly number[],
+  room: number,
+  row?: PictureRow,
+  roomReserved = false,
+): number {
+  if (row) room = Math.min(room, row.right - row.left)
+  if (widths[fold] > room && fold < 3) return fold + 1
+  // More than a classic scrollbar's width: reserved room can bring a scrollbar that narrows the row, and the
+  // bar must not fold and unfold in turn (Windows' always-shown scrollbars are about 17 px).
+  const unfoldSlack = roomReserved ? 20 : 0
+  if (fold > 0 && widths[fold - 1] + unfoldSlack <= room) return fold - 1
+  return fold
+}
+
+/** A document picture bar sits in its row or reserves room below the block. */
+export function pictureBarPlacement(
+  bottom: number,
+  height: number,
+  viewportHeight: number,
+  inside: boolean,
+  row?: PictureRow & { width: number },
+  retainedRoom = 0,
+): { left?: number; top: number; room: number } {
+  const below = bottom + 10
+  if (row) {
+    const { picture, width, left, right } = row
+    if (picture.height >= height + 16 && width <= right - left) {
+      const inset = Math.max(left, Math.min(picture.left + 12, right - width))
+      return { left: inset, top: picture.top + picture.height - height - 8, room: 0 }
+    }
+    // Under the picture, from its left edge, kept inside the row.
+    const maxLeft = Math.max(left, right - width)
+    return {
+      left: Math.max(left, Math.min(picture.left, maxLeft)),
+      top: Math.round(below),
+      room: 10 + height + 1,
+    }
+  }
+
+  const top = inside
+    ? Math.max(8, bottom - height - 12)
+    : below + height + 8 <= viewportHeight
+      ? below
+      : Math.max(8, bottom - height - 10)
+  return { top: Math.round(top), room: retainedRoom }
+}
+
 /** The scale an element is drawn at: its width on the screen over its own width. */
 export function scaleOf(screenWidth: number, ownWidth: number): number {
   return ownWidth > 0 && screenWidth > 0 ? screenWidth / ownWidth : 1

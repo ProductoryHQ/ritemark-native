@@ -170,8 +170,8 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   const next = new GuidanceStore(memento, '2.2.0');
   assert.deepEqual(next.release(), { id: '2.2', savedDays: [] }, 'a new release asks again');
   assert.deepEqual(decodeGuidanceState({ v: 1, projects: { a: { gone: 'nope', ai: 'gpt', chatId: 7 }, b: 'x' }, readyShownOn: 'yesterday', release: { id: '2.1', savedDays: ['2026-1-1', '2026-11-01'], feedback: 'maybe' } }),
-    { v: 1, projects: { a: {} }, release: { id: '2.1', savedDays: ['2026-11-01'] } }, 'anything malformed is dropped');
-  assert.deepEqual(decodeGuidanceState(undefined), { v: 1, projects: {} });
+    { v: 1, projects: { a: {} }, savedDays: ['2026-11-01'], release: { id: '2.1', savedDays: ['2026-11-01'] } }, 'anything malformed is dropped');
+  assert.deepEqual(decodeGuidanceState(undefined), { v: 1, projects: {}, savedDays: [] });
 
   // ── The starting place (R8, R1; S33–S38, S43) ──
 

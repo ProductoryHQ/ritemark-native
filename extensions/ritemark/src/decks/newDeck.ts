@@ -12,6 +12,7 @@
  *    library, not earlier decks, so they are left out (as the library's Other decks leaves them out).
  */
 
+import type { DeckNoticeReporter } from './deckProtocol';
 import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
 import { folderOf, newTopicText, partText, rebasePath, rebaseSlide, rewriteMarkdownTargets } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
@@ -156,7 +157,7 @@ export interface CopyDeckSteps {
    */
   rename: (fileName: string, line: string) => Promise<boolean>;
   /** A line for the deck's bar, in the tab it is in now. */
-  notice: (text: string) => void;
+  notice: DeckNoticeReporter;
 }
 
 /** The bar's line once the deck is a copy. */
@@ -173,16 +174,16 @@ export async function copyEarlierDeck(source: string, steps: CopyDeckSteps): Pro
   const sourceName = deckNameOf(source);
   const written = await steps.read(source);
   if (written === null) {
-    steps.notice(`${sourceName} is no longer there.`);
+    steps.notice(`${sourceName} is no longer there.`, 'failure');
     return null;
   }
   if (!(await steps.replace(copiedDeckText(written, folderOf(source), folderOf(steps.deck))))) {
-    steps.notice(`This deck could not become a copy of ${sourceName}.`);
+    steps.notice(`This deck could not become a copy of ${sourceName}.`, 'failure');
     return null;
   }
   const fileName = copyFileName(sourceName, steps.taken);
   if (await steps.rename(fileName, copiedNotice(sourceName))) return fileName;
   // Not renamed: the deck is the copy under its own name, and this tab's bar says so
-  steps.notice(copiedNotice(sourceName));
+  steps.notice(copiedNotice(sourceName), 'success');
   return steps.deck.slice(steps.deck.lastIndexOf('/') + 1);
 }

@@ -153,12 +153,12 @@ export class DeckPdfSaver {
         );
         // A deck whose slides are all skipped has nothing to print as slides: say so rather than save a blank page.
         if (kind === 'slides' && built.deck.slides.length === 0) {
-          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES });
+          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES, kind: 'failure', operation: 'save-pdf' });
           return;
         }
         // Likewise a handout with no text: nothing to print but its footer.
         if (kind === 'handout' && !handoutHasText(built.deck)) {
-          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT, kind: 'failure', operation: 'save-pdf' });
           return;
         }
         folder = await fs.promises.mkdtemp(path.join(this.deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));
@@ -170,7 +170,7 @@ export class DeckPdfSaver {
         await writeOver(pdf, target);
       } catch (error) {
         console.warn('[Decks] Save as PDF failed:', error);
-        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED });
+        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED, kind: 'failure', operation: 'save-pdf' });
         return;
       }
       this.saved.set(key, target);

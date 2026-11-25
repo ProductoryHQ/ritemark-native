@@ -81,8 +81,8 @@ export interface ModelEntry {
   /** Tombstone: never offered, never declared to a runtime. */
   retired?: boolean;
   /**
-   * Set by the resolver, never read from a feed: kept so a saved selection still
-   * resolves and runs, but never offered in a model menu (Claude below 5).
+   * Set by bundled rows or the resolver, never read from a feed. Saved selections
+   * still resolve and run, while model menus omit the row.
    */
   hidden?: boolean;
   /** Anthropic rows only. */

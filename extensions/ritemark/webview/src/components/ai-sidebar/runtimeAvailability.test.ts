@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { GEMINI_MODEL_IDS, toOpenCodeModelId } from '../../../../src/ai/modelConfig'
 import {
   anotherOpenCodeModel,
   deriveRuntimeAvailabilities,
@@ -8,6 +9,7 @@ import {
   type RuntimeAvailabilityInput,
 } from './runtimeAvailability'
 
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4)
 const readyProbe = { phase: 'ready' as const, error: null }
 const base: RuntimeAvailabilityInput = {
   runtimeHydration: {
@@ -175,12 +177,12 @@ const catalogs = {
   assert.deepEqual(stillLimitedOpenCodeModels([
     turn('google/gemini-3.8-flash', { retryAt: '2026-11-16T13:00:41.000Z' }),
     turn('google/gemini-3.8-pro', { retryAt: '2026-11-16T12:59:00.000Z' }),
-    turn('google/gemini-4-argon'),
+    turn(GOOGLE_NEON),
     turn('openai/gpt-5.6', {}, 'codex'),
     { runtime: 'opencode', timestamp: now, result: { errorKind: 'limit', errorDetail: { billing: 'google', limit: 'quota' } } },
     { runtime: 'opencode', timestamp: now - 2 * 24 * 3600_000, result: { errorKind: 'limit', errorDetail: { limit: 'plan', model: 'google/gemini-old' } } },
     { runtime: 'opencode', timestamp: now },
-  ], now), ['google/gemini-3.8-flash', 'google/gemini-4-argon'],
+  ], now), ['google/gemini-3.8-flash', GOOGLE_NEON],
   'a time still ahead, or no time and less than a day old; never a passed time, another AI, a quota, or an old turn')
 }
 
