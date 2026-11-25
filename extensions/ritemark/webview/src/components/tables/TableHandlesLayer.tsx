@@ -14,7 +14,7 @@
  * lands where they are drawn, and a drag's pointer positions are divided by it too. Where the table's container clips
  * (a slide's text area), the handles stay inside it.
  */
-import { useCallback, useEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import type { Transaction } from '@tiptap/pm/state'
@@ -29,6 +29,7 @@ import { minPercent, resizePair } from './columnResize'
 import { MAX_WIDTH_COLUMNS, snapPercents } from '../../../../src/markdown/tableWidths'
 import { TableMenuItems, type MenuKit } from './TableMenuItems'
 import { dropTarget } from './dropTarget'
+import { watchTableAddBars } from './tableAddBars'
 
 const GRIP_GAP = 4
 const COL_GRIP = { width: 28, height: 14 }
@@ -269,6 +270,14 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
       resize?.disconnect()
     }
   }, [view])
+
+  const addRow = useRef<HTMLDivElement>(null)
+  const addColumn = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (addRow.current && addColumn.current) {
+      return watchTableAddBars(view.table, view.dom, addRow.current, addColumn.current)
+    }
+  })
 
   const tablePos = view.getPos()
   const table = tablePos === undefined ? null : tableAt(editor.state.doc, tablePos)
@@ -542,7 +551,8 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
         <>
           <div
             className="rm-table-add-spot"
-            style={{ left: clamp(tableRight + gap, bar, clipLeft, clipRight), top: box.top, width: bar, height: box.height, ['--rm-k' as string]: k }}
+            ref={addColumn}
+            style={{ left: tableRight - bar, top: box.top, width: bar, height: box.height, ['--rm-k' as string]: k }}
           >
             <Tooltip label="Add a column" className="size-full" side="right">
               <Button
@@ -559,7 +569,8 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           </div>
           <div
             className="rm-table-add-spot"
-            style={{ left: box.left, top: clamp(tableBottom + gap, bar, clipTop, clipBottom), width: box.width, height: bar, ['--rm-k' as string]: k }}
+            ref={addRow}
+            style={{ left: box.left, top: tableBottom - bar, width: box.width, height: bar, ['--rm-k' as string]: k }}
           >
             <Tooltip label="Add a row" className="size-full" side="bottom">
               <Button
