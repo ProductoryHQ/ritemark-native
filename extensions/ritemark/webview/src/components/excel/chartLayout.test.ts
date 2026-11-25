@@ -14,6 +14,7 @@ import { resolveSeries } from './chartSeries'
 import { keptNotice } from './keptNotice'
 import { readWorkbook, type SheetModel, type WorkbookModel } from './readWorkbook'
 import { modelSource } from './sheetSource'
+import { buildLayout } from './sheetLayout'
 
 Object.assign(globalThis, { React })
 
@@ -135,10 +136,65 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
     assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
   }
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
-    "This sheet has 2 waterfall charts, a treemap chart, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
+    "This sheet has 2 waterfall charts, a treemap, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
   // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
     "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
+})
+
+test('scenario 13: Excel out-of-scope charts keep titled cards and the quiet line names each kind', async () => {
+  const book = await open('charts-out-of-scope')
+  const expected = [
+    {
+      name: 'Out of scope',
+      charts: [
+        ['Trucks per month', 'column'],
+        ['Skills by depot', 'radarChart'],
+        ['Trucks, lateness and volume', 'bubbleChart'],
+        ['A shift, minute by minute', 'chartex', 'waterfall'],
+        ['Hours by area', 'chartex', 'treemap'],
+        ['Hours by area and group', 'chartex', 'sunburst'],
+      ],
+      notice: "This sheet has a radar chart, a bubble chart, a waterfall chart, a treemap and a sunburst chart. They're kept in the file; Open in Excel to see them.",
+    },
+    {
+      name: 'More kinds',
+      charts: [
+        ['Dock queue, high, low and close', 'stockChart'],
+        ['Dock queue as a surface', 'surface3DChart'],
+        ['Handover minutes', 'chartex', 'clusteredColumn'],
+        ['From booking to leaving', 'chartex', 'funnel'],
+        ['Handover minutes, spread', 'chartex', 'boxWhisker'],
+      ],
+      notice: "This sheet has a stock chart, a surface chart, a histogram chart, a funnel chart and a box and whisker chart. They're kept in the file; Open in Excel to see them.",
+    },
+  ]
+  assert.deepEqual(book.sheets.map(({ name }) => name), expected.map(({ name }) => name))
+  for (const [i, { charts, notice }] of expected.entries()) {
+    const sheet = book.sheets[i]
+    assert.equal(keptNotice(sheet.layout), notice)
+    assert.equal(sheet.layout.drawings.length, charts.length)
+    for (const [j, [title, kind, layoutId]] of charts.entries()) {
+      const drawing = sheet.layout.drawings[j]
+      assert.equal(drawing.what, 'chart', title)
+      assert.equal(drawing.title, title)
+      const chart = drawing.chart
+      assert.equal(chart?.kind, kind, title)
+      if (layoutId) assert.deepEqual(chart, { supported: false, kind, extendedKinds: [layoutId] }, title)
+
+      const markup = parse(renderToStaticMarkup(React.createElement(DrawingView, {
+        drawing, style: {}, workbook: book, version: 0, width: 480, height: 288,
+      })))
+      if (kind === 'column') {
+        assert.ok(markup.querySelector(`${chartGroup('bars')} rect`), title)
+        assert.equal(markup.querySelector('.sg-object'), null, title)
+      } else {
+        assert.equal(markup.querySelector('.sg-object-label')?.text, `Chart: ${title}`)
+        assert.equal(markup.querySelector('.sg-object-sub')?.text, 'Kept in the file. Open in Excel to see it.')
+        assert.equal(markup.querySelector('svg[role="img"]'), null, title)
+      }
+    }
+  }
 })
 
 const colours = await open('charts-colours')
@@ -451,8 +507,22 @@ test('scatter uses two numeric scales and draws each scatter style', () => {
     if (path === 'path') assert.match(rendered[0].getAttribute('d')!, / C /)
     if (markers) assert.ok(layout.markers[1].x > layout.markers[2].x && layout.markers[2].x > layout.markers[0].x)
   }
-  const fixture = forSheet(kinds, sheetNamed('Scatter'))
-  assert.equal(fixture.markers.length, 24)
+})
+
+test('the Excel scatter draws one series on axes from 0–90 and 0–35 at its saved size', () => {
+  const sheet = sheetNamed('Scatter')
+  const { anchor: { from, to } } = drawingOf(sheet)
+  assert.ok(from && to)
+  const grid = buildLayout(sheet, kinds.styles, { minWidth: 0, minHeight: 0 })
+  const width = grid.X[to.col] + to.colOff - grid.X[from.col] - from.colOff
+  const height = grid.Y[grid.displayOf.get(to.row)!] + to.rowOff
+    - grid.Y[grid.displayOf.get(from.row)!] - from.rowOff
+  const series = resolveSeries(scatterChart, kinds.sheets, kinds)
+  assert.equal(series[0].length, 1)
+  const fixture = layoutPlots(scatterChart, series, width, height, measure, kinds.date1904)
+  assert.deepEqual([fixture.xScale!.min, fixture.xScale!.max], [0, 90])
+  assert.deepEqual([fixture.scale.min, fixture.scale.max], [0, 35])
+  assert.equal(fixture.markers.length, 12)
   assert.equal(new Set(fixture.markers.map(({ x }) => x)).size, 12)
 })
 

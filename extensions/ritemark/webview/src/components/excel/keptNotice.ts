@@ -41,7 +41,9 @@ export function keptNotice(layout: Pick<SheetLayoutInfo, 'drawings'>, rules?: Ce
     for (const kind of new Set(kinds)) charts.set(kind, (charts.get(kind) ?? 0) + 1)
   }
   for (const [kind, count] of charts) {
-    if (kind) things.push(name(count, `${kind} chart`, `${kind} charts`))
+    if (!kind) continue
+    if (kind === 'treemap') things.push(name(count, 'treemap', 'treemaps'))
+    else things.push(name(count, `${kind} chart`, `${kind} charts`))
   }
   const unnamed = charts.get('') ?? 0
   if (unnamed) things.push(things.length

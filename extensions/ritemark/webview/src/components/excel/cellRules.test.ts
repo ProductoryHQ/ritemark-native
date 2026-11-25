@@ -7,7 +7,7 @@ import { createCellRuleCache, watchRuleDay, compileCellRules, dataBarPaint, rule
 import { drawsChart } from './chartLayout'
 import { keptNotice } from './keptNotice'
 import { cellKey, readWorkbook } from './readWorkbook'
-import { buildLayout, fontCss } from './sheetLayout'
+import { buildLayout, fontCss, styleIndexOf, styleOf } from './sheetLayout'
 import { compileRules, createRuleCache } from './ruleEngine'
 import { readRules } from './readRules'
 import { colorContext } from './excelStyles'
@@ -88,7 +88,8 @@ async function main() {
   const format = { dxf: { numberFormat: { id: 0, code: '0.000' } } }
   assert.equal(ruleCellText(cell, format, model).text, Number(cell.value).toFixed(3))
 
-  // Open Excel question: does the number format's [Red] override a conditional font colour?
+  // The Experience lead’s 25 Nov Excel render of rules-format-colour.xlsx confirms that
+  // the rule’s font colour wins when set. Otherwise the number format’s colour stays.
   const red = { dxf: { numberFormat: { id: 0, code: '[Red]0' }, font: { color: '#008000' } } }
   const redCell = ruleCellText(cell, red, model)
   assert.equal(redCell.color?.toLowerCase(), '#ff0000')
@@ -200,6 +201,29 @@ test('scenario 31: icon sets keep cell values and do not block a colour rule', a
   assert.equal(visibleCellRules(overlap, layout, window, sheet, model).at(1, 3)?.style?.fill, '#C6EFCE')
   assert.equal(keptNotice(sheet.layout, rules),
     "This sheet has 2 icon sets. They're kept in the file; Open in Excel to see them.")
+})
+
+test('Excel number format colours survive fill-only rules and yield to rule font colours', async () => {
+  const model = await load('rules-format-colour')
+  const sheet = model.sheets.find(({ name }) => name === 'Format colour')!
+  const layout = buildLayout(sheet, model.styles, { minWidth: 0, minHeight: 0 })
+  const rules = compileCellRules(model, sheet, today)
+  assert.ok(rules)
+  const { at } = visibleCellRules(rules, layout, { i0: 0, i1: 5, c0: 0, c1: 1 }, sheet, model)
+  for (const [row, color, fill] of [
+    [1, '#006100', '#C6EFCE'],
+    [2, '#FF0000', '#C6EFCE'],
+    [3, '#7030A0', undefined],
+    [4, '#006100', '#C6EFCE'],
+    [5, '#FF0000', undefined],
+  ] as const) {
+    const entry = at(layout.displayOf.get(row)!, 1)
+    const cell = entry?.cell ?? sheet.cells.get(cellKey(row, 1))!
+    const style = entry?.style ?? styleOf(model.styles, styleIndexOf(sheet, row, 1))
+    const font = fontCss(style?.font, model.styles.baseFont)
+    assert.equal(ruleTextColor(cell, entry?.rule.dxf?.font, font.color).toUpperCase(), color, `B${row + 1} text`)
+    assert.equal(style?.fill, fill, `B${row + 1} fill`)
+  }
 })
 
 test('scenario 32: a drawn chart and drawn rules leave no quiet line', async () => {

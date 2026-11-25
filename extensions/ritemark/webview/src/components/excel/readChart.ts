@@ -223,7 +223,12 @@ function data(el?: Element): ChartData | undefined {
 
 /** Preserve the rich-text title used by the existing drawing card. */
 export function chartTitle(xml: string): string | undefined {
-  return richTitleText(section(xml, 'title'))
+  const title = section(xml, 'title')
+  const rich = richTitleText(title)
+  if (rich) return rich
+  const tx = fields(title).get('tx')
+  const txData = fields(tx?.body).get('txData')
+  return fields(txData?.body).text('v')?.trim() || undefined
 }
 
 function richTitleText(body: string): string | undefined {
