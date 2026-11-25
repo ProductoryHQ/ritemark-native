@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
 - Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).
+- **Long notes in the deck bar give way first (#950).** The note shortens before Publish loses its label, and the theme button shows its full name or just its swatch. The full note and theme name are in their tooltips.
 
 ## [Unreleased] — v2.3.0
 

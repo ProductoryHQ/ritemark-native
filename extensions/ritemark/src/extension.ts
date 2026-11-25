@@ -20,6 +20,7 @@ import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerFeedback } from './feedback/feedbackSheet';
 import { registerFeedbackStatusBar } from './feedback/feedbackStatusBar';
 import { GuidanceHost } from './guidance/GuidanceHost';
+import { GuidanceStore } from './guidance/guidanceStore';
 import { madeSomething } from './guidance/madeSomething';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
@@ -49,7 +50,8 @@ import {
   RELAUNCH_COMMAND_ID,
   ActivationIntegrityTracker,
   quarantineVersion,
-  confirmActivationAndCleanup
+  confirmActivationAndCleanup,
+  getCurrentAppVersion,
 } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
@@ -309,6 +311,18 @@ export function activate(context: vscode.ExtensionContext) {
   // dedup (confirmed in tasks.md W3.4). See activationIntegrity.ts for the
   // documented limitation on load-time (syntax error) failures.
   const activationIntegrity = new ActivationIntegrityTracker(context.globalState);
+  const guidanceStore = new GuidanceStore(context.globalState, currentVersion, getCurrentAppVersion(), context.globalStorageUri.fsPath);
+  // The Electron main PID is inherited by each local extension host and survives window reloads.
+  void guidanceStore.initializeAppRun(process.env.VSCODE_PID, Boolean(activationIntegrity.getLastConfirmedVersion()))
+    .catch((error) => console.warn('Ritemark: Could not initialize local guidance', error));
+  const guidanceFolder = vscode.workspace.workspaceFolders?.[0];
+  const hasProjectGuidance = guidanceFolder?.uri.scheme === 'file' && !vscode.workspace.workspaceFile;
+  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((document) => {
+    void guidanceStore.noteDocumentSaved(document.uri.scheme, new Date(), hasProjectGuidance)
+      .catch((error) => console.warn('Ritemark: Could not record a local saved day', error));
+    if (hasProjectGuidance && document.uri.scheme === 'file') madeSomething.noteSaved(document.uri.fsPath);
+  }));
+
   const versionQuarantinedThisLaunch = activationIntegrity.didPreviousAttemptFail(currentVersion);
   if (versionQuarantinedThisLaunch) {
     console.warn(`Ritemark: ${currentVersion} failed to activate on the previous attempt — quarantining and requesting reload.`);
@@ -622,9 +636,9 @@ export function activate(context: vscode.ExtensionContext) {
   // (in 1.x's Home launcher's slot, `ritemark.homeView`), Home is the project's own first tab, Home and
   // Tasks are the first two tabs, and switching projects asks first while a chat works.
   // Sprint 140: the first day's guidance: Home's one card, the empty sheet's starting place, the day-one counts.
-  const guidanceFolder = vscode.workspace.workspaceFolders?.[0];
-  const guidance = guidanceFolder?.uri.scheme === 'file' && !vscode.workspace.workspaceFile ? new GuidanceHost({
+  const guidance = hasProjectGuidance ? new GuidanceHost({
     context,
+    store: guidanceStore,
     folder: guidanceFolder,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startChat: (request) => unifiedViewProvider.startChat(request),

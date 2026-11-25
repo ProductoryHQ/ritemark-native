@@ -2,7 +2,7 @@
  * The first day's guidance in one window (Sprint 140; experience 35, 29 and
  * 34): Home's one guidance card (What moved, the ready request or the feedback
  * card), the ready request's Ask with, its sign-ins and its press, the empty
- * sheet's starting place, the saved days, and the day-one counts.
+ * sheet's starting place, and the day-one counts.
  *
  * Sprint 156 (experience 35, "With no AI ready"): with no AI ready the card's
  * press signs in, through the welcome's own flows, and the card waits while it
@@ -42,7 +42,7 @@ import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welco
 import { countsLine, listFileNames } from './folderCounts';
 import { isEnabled } from '../features/featureGate';
 import { feedbackDue, guidanceCard, localDay } from './guidanceState';
-import { GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
+import { type GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
 import { AI_NAMES, AI_ORDER, canSignInHere, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind, type ReadyRecord } from './readyRequest';
 import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
@@ -93,6 +93,7 @@ const CLAUDE_SIGN_IN: ClaudeSignIn = {
 
 export interface GuidanceDependencies {
   context: vscode.ExtensionContext;
+  store: GuidanceStore;
   folder: vscode.WorkspaceFolder | undefined;
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
   startChat(request: ChatStartRequest): Promise<void>;
@@ -160,8 +161,7 @@ export class GuidanceHost implements vscode.Disposable {
   private readonly counts = new Map<string, Promise<{ names: string[]; more: boolean }>>();
 
   constructor(private readonly deps: GuidanceDependencies) {
-    const version = String(deps.context.extension.packageJSON.version ?? '0.0.0');
-    this.store = new GuidanceStore(deps.context.globalState, version);
+    this.store = deps.store;
     // Sprint 156: a test launch can stage a lapsed sign-in (test channel only; no effect anywhere else)
     void seedLastReadyAiForTest(deps.context.globalState);
     // Sprint 156: a sign-in or sign-out anywhere (the AI's sheet, Settings, a terminal) or an AI's key saved: Home's
@@ -186,12 +186,6 @@ export class GuidanceHost implements vscode.Disposable {
     this.disposables.push(
       deps.onTurnAccepted((turn) => void this.turnAccepted(turn)),
       deps.onChatOrigin((origin) => this.origins.set(origin.conversationId, origin)),
-      // R14: a day with a saved document; R15: a new document's first save
-      vscode.workspace.onDidSaveTextDocument((document) => {
-        if (document.uri.scheme !== 'file') return;
-        void this.store.noteSavedDay(localDay(new Date()));
-        madeSomething.noteSaved(document.uri.fsPath);
-      }),
       vscode.window.tabGroups.onDidChangeTabs(() => this.schedulePlace()),
       vscode.window.tabGroups.onDidChangeTabGroups(() => this.schedulePlace()),
       vscode.workspace.onDidChangeTextDocument((event) => {
