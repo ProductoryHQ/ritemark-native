@@ -93,6 +93,8 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },
+
+  // Sprint 177 (#953): Finder Quick Look previews for saved decks on macOS.
   'deck-quick-look': {
     id: 'deck-quick-look',
     label: 'Deck Quick Look',

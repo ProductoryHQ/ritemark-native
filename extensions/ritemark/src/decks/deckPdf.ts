@@ -54,6 +54,7 @@ export interface PrintInput {
   text: string;
   theme: DeckTheme;
   steps: readonly number[];
+  measureFit?: boolean;
   fonts: PageFontFile[];
   logo: PageFile | null;
 }
@@ -112,7 +113,7 @@ async function writePrintFolder(folder: string, html: string, files: readonly Pa
 
 export async function prepareDeckPdf(input: PrintInput, kind: DeckPdfKind, deps: Pick<PdfDeps, 'assets'>) {
   return buildPrintPage(
-    { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, print: kind === 'slides-and-handout' ? undefined : kind },
+    { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, measureFit: input.measureFit, print: kind === 'slides-and-handout' ? undefined : kind },
     { ...await deps.assets(), themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
   );
 }

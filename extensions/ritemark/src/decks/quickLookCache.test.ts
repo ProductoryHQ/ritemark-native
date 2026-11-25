@@ -16,8 +16,8 @@ function fixture(cacheLimit?: number) {
     fs.writeFileSync(file, name);
     return file;
   }
-  const publish = (file: string, pdf = Buffer.from('%PDF'), current = async () => true, window = cache) =>
-    window.publish(file, pdf, { slides: 1, sourceSha256: sha256(fs.readFileSync(file)), inputs: sha256('inputs'), appVersion: '2.4.0' }, current);
+  const publish = (file: string, pdf = Buffer.from('%PDF'), current = async () => true, window = cache, owner?: string) =>
+    window.publish(file, pdf, { slides: 1, sourceSha256: sha256(fs.readFileSync(file)), inputs: sha256('inputs'), owner, appVersion: '2.4.0' }, current);
   const folder = (file: string) => path.join(root, sourceIdentity(file).key);
   return { cache, deck, publish, folder, home, root };
 }
@@ -136,15 +136,60 @@ test('prunes missing sources first and then the oldest, with bounded PDF and cac
   assert.equal(fs.existsSync(large.root), false);
 });
 
-test('project removal retains entries under other listed roots, including nested roots', async () => {
-  const { cache, deck, home, publish } = fixture();
+test('startup purges removed project owners by list key', async () => {
+  const { cache, deck, publish } = fixture();
   const removed = deck('project/removed');
   const nested = deck('project/nested/kept');
   const neighbor = deck('project-2/other');
-  for (const file of [removed, nested, neighbor]) assert.equal(await publish(file), true);
-  const realHome = fs.realpathSync.native(home);
-  await cache.purgeProject(path.join(realHome, 'project'), async () => [path.join(realHome, 'project/nested')]);
+  await publish(removed, undefined, undefined, cache, 'file:///project-alias');
+  await publish(nested, undefined, undefined, cache, 'file:///nested-alias');
+  await publish(neighbor);
+  await cache.purgeUnlisted(async () => new Set(['file:///nested-alias']));
   assert.equal(await cache.read(removed), undefined);
   assert.ok(await cache.read(nested));
   assert.ok(await cache.read(neighbor));
+});
+
+test('old malformed locks and locks from a reused PID are reclaimed', async () => {
+  const { deck, publish, root } = fixture();
+  const window = new QuickLookCache(root, undefined, undefined, async () => 'Thu Jan  1 00:00:00 2026');
+  const file = deck('stale lock');
+  await publish(file);
+  const lock = path.join(root, '.lock');
+  for (const record of ['malformed', `${process.pid} 00000000-0000-0000-0000-000000000000 Wed Jan  1 00:00:00 2020`]) {
+    fs.writeFileSync(lock, record);
+    fs.utimesSync(lock, new Date(0), new Date(0));
+    assert.equal(await publish(file, undefined, undefined, window), true);
+  }
+});
+
+test('publication cleanup leaves a swapped entry symlink and its target untouched', async () => {
+  const { deck, folder, home, publish } = fixture();
+  const file = deck('swap');
+  const entry = folder(file);
+  const outside = path.join(home, 'outside');
+  fs.mkdirSync(outside);
+  assert.equal(await publish(file, undefined, async () => {
+    fs.renameSync(entry, entry + '-displaced');
+    for (const name of fs.readdirSync(entry + '-displaced')) fs.writeFileSync(path.join(outside, name), 'sentinel');
+    fs.symlinkSync(outside, entry);
+    return true;
+  }), false);
+  assert.ok(fs.lstatSync(entry).isSymbolicLink());
+  assert.deepEqual(fs.readdirSync(outside).map(name => fs.readFileSync(path.join(outside, name), 'utf8')),
+    ['sentinel', 'sentinel']);
+});
+
+test('folder removal clears missing descendants and retains replacements and siblings', async () => {
+  const { cache, deck, folder, home, publish } = fixture();
+  const gone = deck('folder/nested/gone');
+  const replaced = deck('folder/replaced');
+  const sibling = deck('folder-other/sibling');
+  const goneEntry = folder(gone);
+  for (const file of [gone, replaced, sibling]) assert.equal(await publish(file), true);
+  fs.unlinkSync(gone);
+  await cache.removeMissingUnder(path.join(fs.realpathSync.native(home), 'folder'));
+  assert.equal(fs.existsSync(goneEntry), false);
+  assert.ok(await cache.read(replaced));
+  assert.ok(await cache.read(sibling));
 });

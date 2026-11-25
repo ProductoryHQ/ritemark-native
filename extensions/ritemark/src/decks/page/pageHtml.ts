@@ -43,6 +43,7 @@ import { groundOf } from '../deckTheme';
 import { iconSvg } from '../../../webview/src/components/decks/slide/pageIcons';
 import { MARKED_OPTIONS, lexHandout, type HandoutTabsToken, type PublicDeck, type PublicSlide } from './publicDeck';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, type ImageTokenWithLook } from '../../markdown/pictureLook';
+import { PRINT_SLIDE_FIT } from './printSlideFit';
 import { PAGE_SCRIPT } from './pageScript';
 import { DECK_VERSION_META, PAGE_FOLLOWER } from './pageFollower';
 import { OPEN_IN_HOSTS, OPEN_IN_MAX_ADDRESS, openInAddresses } from '../blocks/codeTools';
@@ -101,6 +102,7 @@ export interface PageOptions {
    * from the page's.
    */
   print?: 'slides' | 'handout';
+  measureFit?: boolean;
 }
 
 /** Where a picture is named: a slide's `image:` line (a plain path) or a handout's Markdown (an address). */
@@ -1027,6 +1029,7 @@ function contentsHtml(slides: PublicSlide[]): string {
 }
 
 /** The script element's text, exactly: what the page's Content Security Policy hashes. */
+const PRINT_FIT_HASH = createHash('sha256').update(PRINT_SLIDE_FIT).digest('base64');
 const SCRIPT_TEXT = `\n${PAGE_SCRIPT}\n`;
 
 /**
@@ -1138,7 +1141,9 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
     '<html lang="en">',
     '<head>',
     '<meta charset="utf-8">',
-    `<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">`,
+    `<meta http-equiv="Content-Security-Policy" content="${options.measureFit
+      ? PAGE_CSP.replace("script-src ", "script-src 'sha256-" + PRINT_FIT_HASH + "' ")
+      : PAGE_CSP}">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
     `<meta name="generator" content="${GENERATOR_META}">`,
     `<meta name="${DIGEST_META}" content="${esc(options.digest)}">`,
@@ -1180,6 +1185,7 @@ export function pageHtml(deck: PublicDeck, assets: PageAssets, options: PageOpti
       + '<div class="zoom-pic"></div></div>',
     `<script>${PAGE_FOLLOWER}</script>`,
     `<script>${SCRIPT_TEXT}</script>`,
+    options.measureFit ? `<script>${PRINT_SLIDE_FIT}</script>` : '',
     '</body>',
     '</html>',
   ].filter(line => line !== '').join('\n') + '\n';

@@ -4,33 +4,20 @@ import * as vscode from 'vscode';
 import { isEnabled } from '../features';
 import { ProjectList } from '../projects/ProjectList';
 import { getCurrentAppVersion } from '../update/versionService';
-import { DECK_EXTENSION } from './deckFileName';
+import { normalizeProjectUri } from '../conversations/projectScope';
+import { connectQuickLookEvents, realPathOrAbsolute } from './quickLookEvents';
 import { projectRoot } from './deckDocuments';
 import { PRINT_COMMAND } from './deckPdf';
 import type { DeckPublisher } from './deckPublish';
 import { loadPageAssets } from './page/pageAssets';
-import { containsSource, QuickLookCache, quickLookRoot, sourceIdentity } from './quickLookCache';
-import { cacheSavedSlides, canStartQuickLook, QuickLookJobs } from './quickLookJobs';
-
-const DECK_PATTERN = '**/*.[rR][tT][mM][sS]';
-const isDeck = (file: string) => path.extname(file).toLowerCase() === DECK_EXTENSION;
-const quietly = (work: Promise<unknown>) => { void work.catch(() => undefined); };
-
-function realPathOrAbsolute(file: string): string {
-  try { return fs.realpathSync.native(file); } catch { return path.resolve(file); }
-}
-
-interface DeckJob {
-  file: string;
-  realPath: string;
-  owner?: string;
-}
+import { QuickLookCache, quickLookRoot, sha256 } from './quickLookCache';
+import { cacheSavedSlides, canStartQuickLook, dependencyStamps } from './quickLookJobs';
 
 export async function startQuickLook(
   context: vscode.ExtensionContext, publisher: DeckPublisher, projects: ProjectList, ready: Promise<void>,
 ): Promise<void> {
   if (!await canStartQuickLook(process.platform, isEnabled('deck-quick-look'), isEnabled('decks'),
-    async () => (await vscode.commands.getCommands(false)).includes(PRINT_COMMAND))) return;
+    async () => (await vscode.commands.getCommands(false)).includes(PRINT_COMMAND), () => hasQuickLookBundles(vscode.env.appRoot))) return;
   const product = JSON.parse(await fs.promises.readFile(path.join(vscode.env.appRoot, 'product.json'), 'utf8')) as {
     darwinBundleIdentifier?: string;
   };
@@ -42,149 +29,70 @@ export async function startQuickLook(
     assets: () => loadPageAssets(context.extensionPath),
     print: (htmlPath: string) => Promise.resolve(vscode.commands.executeCommand<string>(PRINT_COMMAND, htmlPath)),
   };
-  let disposed = false;
-  let root: string | null = null;
-  let realRoot: string | null = null;
-  let listed = new Map<string, string>();
-  let watch: vscode.FileSystemWatcher | undefined;
-  let sweep: ReturnType<typeof setTimeout> | undefined;
-  const deckDependencies = new Map<string, Set<string>>();
-
-  async function readRoots() {
-    const next = new Map<string, string>();
-    for (const project of await projects.entries()) {
-      const uri = vscode.Uri.parse(project.folderUri);
-      if (uri.scheme === 'file') next.set(project.folderUri, realPathOrAbsolute(uri.fsPath));
-    }
-    return next;
-  }
-
-  const jobs = new QuickLookJobs<DeckJob>(async (job, active) => {
-    await cacheSavedSlides({
-      ...job, active, appVersion, cache, print,
+  const extensionVersion: string = context.extension.packageJSON.version;
+  const filePath = (uri: vscode.Uri) => uri.scheme === 'file' ? uri.fsPath : undefined;
+  context.subscriptions.push(connectQuickLookEvents({
+    ready,
+    projects: async () => new Map((await projects.entries()).flatMap(project => {
+      const file = filePath(vscode.Uri.parse(project.folderUri));
+      return file ? [[normalizeProjectUri(project.folderUri), realPathOrAbsolute(file)] as const] : [];
+    })),
+    onProjectsChanged: refresh => {
+      const changed = () => { void refresh().catch(() => undefined); };
+      const unsubscribe = projects.onDidChange(changed);
+      // ProjectList's in-process event is local to the window.
+      fs.watchFile(projectListFile, { interval: 500, persistent: false }, changed);
+      return { dispose: () => { unsubscribe(); fs.unwatchFile(projectListFile, changed); } };
+    },
+    workspace: projectRoot,
+    onWorkspaceChanged: refresh => vscode.workspace.onDidChangeWorkspaceFolders(refresh),
+    watch: (root, changed) => {
+      const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, '**/*'));
+      watcher.onDidChange(uri => changed(uri.fsPath, 'change'));
+      watcher.onDidCreate(uri => changed(uri.fsPath, 'create'));
+      watcher.onDidDelete(uri => changed(uri.fsPath, 'delete'));
+      return watcher;
+    },
+    onSave: save => vscode.workspace.onDidSaveTextDocument(({ uri }) => {
+      const file = filePath(uri);
+      if (file) save(file);
+    }),
+    onRename: rename => vscode.workspace.onDidRenameFiles(event => {
+      for (const { oldUri, newUri } of event.files) rename(filePath(oldUri), filePath(newUri));
+    }),
+    onDelete: remove => vscode.workspace.onDidDeleteFiles(event => {
+      for (const uri of event.files) {
+        const file = filePath(uri);
+        if (file) remove(file);
+      }
+    }),
+    findDecks: async root => (await vscode.workspace.findFiles(
+      new vscode.RelativePattern(root, '**/*.[rR][tT][mM][sS]'), null)).map(uri => uri.fsPath),
+    enabled: () => isEnabled('decks'),
+    draw: (job, active, allowed, dependencies) => cacheSavedSlides({
+      ...job, active, allowed, dependencies, appVersion, extensionVersion, cache, print,
       load: (file, text) => publisher.savedPageInput(file, text),
-      allowed: async () => !job.owner || [...(await readRoots()).values()].includes(job.owner),
-      dependencies: files => {
-        if (realRoot && containsSource(realRoot, job.realPath)) {
-          deckDependencies.set(job.file, new Set(files.flatMap(file => [file, realPathOrAbsolute(file)]).map(file => file.normalize('NFC'))));
-        }
-      },
-    });
-  });
-
-  function queue(file: string, fromWorkspace: boolean): void {
-    if (disposed || !isDeck(file) || !isEnabled('decks')) return;
-    try {
-      const { key, realPath } = sourceIdentity(file);
-      const inWorkspace = realRoot && (containsSource(realRoot, realPath) || (root && containsSource(root, file)));
-      if (fromWorkspace && (!inWorkspace || !realRoot || !containsSource(realRoot, realPath))) return;
-      const roots = [...listed.values()];
-      const owner = (inWorkspace && realRoot) || roots.find(other => containsSource(other, realPath)) || undefined;
-      if (owner && !roots.includes(owner)) return;
-      jobs.queue(key, { file, realPath, owner });
-    } catch {
-      // A delete or replacement can arrive before its watcher event.
-    }
-  }
-
-  function remove(file: string): void {
-    if (!isDeck(file)) return;
-    deckDependencies.delete(file);
-    jobs.cancel(job => job.file === file || job.realPath === file);
-    const target = realRoot && root && containsSource(root, file) ? path.join(realRoot, path.relative(root, file)) : file;
-    // A replacement may already occupy the path by the time a delete event arrives.
-    quietly(cache.remove(target, () => !fs.existsSync(target)));
-    quietly(cache.prune());
-  }
-
-  function queueSweep(): void {
-    clearTimeout(sweep);
-    const here = root;
-    const resolved = realRoot;
-    if (!here || !resolved || ![...listed.values()].includes(resolved)) return;
-    sweep = setTimeout(() => quietly((async () => {
-      const decks = await vscode.workspace.findFiles(new vscode.RelativePattern(here, DECK_PATTERN), null);
-      if (disposed || root !== here || realRoot !== resolved) return;
-      for (const deck of decks) queue(deck.fsPath, true);
-      await cache.prune();
-    })()), 0);
-  }
-
-  function watchProject(): void {
-    watch?.dispose();
-    jobs.cancel(job => job.owner === realRoot);
-    deckDependencies.clear();
-    root = projectRoot();
-    realRoot = root ? realPathOrAbsolute(root) : null;
-    if (root) {
-      watch = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(root, '**/*'));
-      const changed = (uri: vscode.Uri, deleted: boolean) => {
-        const file = uri.fsPath;
-        if (isDeck(file)) {
-          if (deleted) remove(file);
-          else queue(file, true);
-        }
-        const name = file.normalize('NFC');
-        for (const [deck, paths] of deckDependencies) {
-          if (paths.has(name)) queue(deck, true);
-        }
-      };
-      watch.onDidCreate(uri => changed(uri, false));
-      watch.onDidChange(uri => changed(uri, false));
-      watch.onDidDelete(uri => changed(uri, true));
-    }
-    queueSweep();
-  }
-
-  let refresh = ready.then(async () => {
-    if (disposed) return;
-    listed = await readRoots();
-    if (!disposed) watchProject();
-  });
-  function projectsChanged(): void {
-    refresh = refresh.catch(() => undefined).then(async () => {
-      if (disposed) return;
-      const next = await readRoots();
-      if (disposed) return;
-      const remaining = [...next.values()];
-      const removed = new Set([...listed.values()].filter(old => !remaining.includes(old)));
-      const opened = realRoot && ![...listed.values()].includes(realRoot) && remaining.includes(realRoot);
-      listed = next;
-      for (const old of removed) {
-        jobs.cancel(job => job.owner === old || (containsSource(old, job.realPath) &&
-          !remaining.some(other => containsSource(other, job.realPath))));
-        await cache.purgeProject(old, async () => [...(await readRoots()).values()]);
-      }
-      if (opened) queueSweep();
-    });
-    quietly(refresh);
-  }
-
-  const unsubscribe = projects.onDidChange(projectsChanged);
-  // ProjectList is shared across windows, but its in-process event is local.
-  fs.watchFile(projectListFile, { interval: 500, persistent: false }, projectsChanged);
-  context.subscriptions.push(
-    { dispose: () => {
-      disposed = true;
-      unsubscribe();
-      fs.unwatchFile(projectListFile, projectsChanged);
-      watch?.dispose();
-      clearTimeout(sweep);
-      jobs.dispose();
-    } },
-    vscode.workspace.onDidChangeWorkspaceFolders(() => { if (!disposed) watchProject(); }),
-    vscode.workspace.onDidSaveTextDocument(document => {
-      if (document.uri.scheme === 'file') quietly(refresh.then(() => queue(document.uri.fsPath, false)));
     }),
-    vscode.workspace.onDidRenameFiles(event => {
-      for (const { oldUri, newUri } of event.files) {
-        if (oldUri.scheme === 'file') remove(oldUri.fsPath);
-        if (newUri.scheme === 'file') queue(newUri.fsPath, true);
-      }
-    }),
-    vscode.workspace.onDidDeleteFiles(event => {
-      for (const uri of event.files) if (uri.scheme === 'file') remove(uri.fsPath);
-    }),
-  );
-  quietly(refresh);
+    fresh: async job => {
+      const entry = await cache.metadata(job.file);
+      if (!entry || entry.owner !== job.owner || entry.appVersion !== appVersion
+        || entry.extensionVersion !== extensionVersion || !entry.dependencies) return;
+      const bytes = await fs.promises.readFile(job.realPath).catch(() => undefined);
+      if (!bytes || sha256(bytes) !== entry.sourceSha256) return;
+      const files = Object.keys(entry.dependencies);
+      if (JSON.stringify(await dependencyStamps(files)) === JSON.stringify(entry.dependencies)) return files;
+    },
+    remove: file => cache.remove(file, () => !fs.existsSync(file)),
+    removeUnder: folder => cache.removeMissingUnder(folder),
+    purgeOwners: listed => cache.purgeUnlisted(listed),
+    prune: () => cache.prune(),
+  }));
+}
+
+async function hasQuickLookBundles(appRoot: string): Promise<boolean> {
+  // appRoot is <app>/Contents/Resources/app for the packaged macOS shell.
+  const plugins = path.resolve(appRoot, '..', '..', 'PlugIns');
+  const found = await Promise.all(['RitemarkDeckThumbnail.appex', 'RitemarkDeckPreview.appex'].map(name =>
+    fs.promises.stat(path.join(plugins, name)).then(stat => stat.isDirectory(), () => false)));
+  return found.every(Boolean);
 }

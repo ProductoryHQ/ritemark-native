@@ -1,3 +1,5 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -19,6 +21,9 @@ export interface QuickLookEntry {
   appVersion: string;
   drawnAt: string;
   inputs: string;
+  owner?: string;
+  extensionVersion?: string;
+  dependencies?: Record<string, string>;
 }
 
 export function sha256(bytes: Buffer | string): string {
@@ -31,7 +36,7 @@ export function sourceIdentity(file: string) {
   return { realPath, source, key: sha256(source) };
 }
 
-export function quickLookRoot(bundleId: string, home = os.homedir()): string {
+export function quickLookRoot(bundleId: string, home = os.userInfo().homedir): string {
   if (!/^[\w-]+(?:\.[\w-]+)+$/.test(bundleId)) throw new Error('Invalid app bundle identifier');
   return path.join(home, 'Library', 'Caches', bundleId, 'quicklook', 'v1');
 }
@@ -45,47 +50,79 @@ function info(file: string): fs.Stats | undefined {
   return fs.lstatSync(file, { throwIfNoEntry: false });
 }
 
-function missingSource(file: string): boolean {
+const realpath = promisify(fs.realpath.native);
+
+async function missingSource(file: string): Promise<boolean> {
   try {
-    const { realPath, source } = sourceIdentity(file);
-    return source !== file || !fs.statSync(realPath).isFile();
+    const realPath = await realpath(file);
+    return realPath.normalize('NFC') !== file || !(await fs.promises.stat(realPath)).isFile();
   } catch (error) {
     return ['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '');
   }
 }
 
-function ownerExited(lock: string): boolean {
-  const seen = info(lock);
-  if (!seen?.isFile() || Date.now() - seen.mtimeMs < STALE_LOCK_MS) return false;
-  let pid: number;
+const exec = promisify(execFile);
+const writeFile = promisify(fs.writeFile);
+const fsync = promisify(fs.fsync);
+
+async function processStart(pid: number): Promise<string | undefined> {
   try {
-    pid = Number(fs.readFileSync(lock, 'utf8').split(' ')[0]);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw error;
-  }
-  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return false;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'ESRCH';
+    const { stdout } = await exec('/bin/ps', ['-p', String(pid), '-o', 'lstart='], {
+      env: { ...process.env, LC_ALL: 'C', TZ: 'UTC' },
+    });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
   }
 }
 
-async function locked<T>(lock: string, canWait: () => boolean, run: () => Promise<T>): Promise<T | undefined> {
+type ProcessStart = (pid: number) => Promise<string | undefined>;
+let ownStart: Promise<string | undefined> | undefined;
+const startOf: ProcessStart = pid => pid === process.pid
+  ? (ownStart ??= processStart(pid))
+  : processStart(pid);
+
+function sameDirectory(folder: string, original: fs.Stats): boolean {
+  const current = info(folder);
+  return !!current?.isDirectory() && current.dev === original.dev && current.ino === original.ino;
+}
+
+async function ownerExited(lock: string, startOf: ProcessStart): Promise<boolean> {
+  const seen = info(lock);
+  if (!seen?.isFile() || Date.now() - seen.mtimeMs < STALE_LOCK_MS) return false;
+  const record = (await readLimited(lock, 4096).catch(() => undefined))?.toString('utf8');
+  if (record === undefined) return false;
+  const [pidField, token, ...timestamp] = record.split(' ');
+  const pid = Number(pidField);
+  let stale = !/^\d+$/.test(pidField) || !Number.isSafeInteger(pid) || pid <= 0
+    || !/^[0-9a-f-]{36}$/.test(token ?? '');
+  if (!stale) {
+    try {
+      process.kill(pid, 0);
+      const start = timestamp.join(' ');
+      const actual = start && await startOf(pid);
+      stale = !!actual && actual !== start;
+    } catch (error) {
+      stale = (error as NodeJS.ErrnoException).code === 'ESRCH';
+    }
+  }
+  const now = info(lock);
+  return stale && now?.dev === seen.dev && now.ino === seen.ino && now.mtimeMs === seen.mtimeMs;
+}
+
+async function locked<T>(lock: string, startOf: ProcessStart, canWait: () => boolean, run: () => Promise<T>): Promise<T | undefined> {
   const deadline = Date.now() + 120_000;
-  const token = `${process.pid} ${randomUUID()}`;
+  const token = `${process.pid} ${randomUUID()} ${await startOf(process.pid) ?? ''}`;
   while (canWait()) {
     try {
       // Use wx and finish the tiny PID record synchronously before yielding.
       fs.writeFileSync(lock, token, { flag: 'wx', mode: 0o600 });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      if (ownerExited(lock)) {
+      if (await ownerExited(lock, startOf)) {
         // Serialize reapers, then recheck. A waiter cannot unlink a replacement lock.
-        await locked(lock + '.reap', canWait, async () => {
-          if (ownerExited(lock)) fs.unlinkSync(lock);
+        await locked(lock + '.reap', startOf, canWait, async () => {
+          if (await ownerExited(lock, startOf)) fs.unlinkSync(lock);
         });
       }
       if (Date.now() >= deadline) throw new Error('Quick Look cache is busy');
@@ -95,7 +132,7 @@ async function locked<T>(lock: string, canWait: () => boolean, run: () => Promis
     try {
       return await run();
     } finally {
-      if (fs.readFileSync(lock, 'utf8') === token) fs.unlinkSync(lock);
+      if (info(lock)?.isFile() && fs.readFileSync(lock, 'utf8') === token) fs.unlinkSync(lock);
     }
   }
   return undefined;
@@ -131,12 +168,13 @@ async function manifest(folder: string): Promise<QuickLookEntry | undefined> {
 }
 
 async function writeTemp(file: string, bytes: Buffer): Promise<void> {
-  const handle = await fs.promises.open(file, 'wx', 0o600);
+  // Open in the same turn as the caller's directory identity check.
+  const fd = fs.openSync(file, 'wx', 0o600);
   try {
-    await handle.writeFile(bytes);
-    await handle.sync();
+    await writeFile(fd, bytes);
+    await fsync(fd);
   } finally {
-    await handle.close();
+    fs.closeSync(fd);
   }
 }
 
@@ -145,6 +183,7 @@ export class QuickLookCache {
     readonly root: string,
     private readonly cacheLimit = MAX_CACHE_BYTES,
     private readonly pdfLimit = MAX_PDF_BYTES,
+    private readonly processStart = startOf,
   ) {}
 
   private safeRoot(create = false): boolean {
@@ -169,13 +208,28 @@ export class QuickLookCache {
 
   private async mutate<T>(run: () => Promise<T>): Promise<T | undefined> {
     if (!this.safeRoot(true)) return;
-    return locked(path.join(this.root, '.lock'), () => true, run);
+    return locked(path.join(this.root, '.lock'), this.processStart, () => true, run);
   }
 
   /** The shell serializes prints too. This lease covers preparation and publication across window hosts. */
   async drawWhenAvailable(canWait: () => boolean, draw: () => Promise<void>): Promise<void> {
     if (!canWait() || !this.safeRoot(true)) return;
-    await locked(path.join(this.root, '.draw-lock'), canWait, draw);
+    await locked(path.join(this.root, '.draw-lock'), this.processStart, canWait, draw);
+  }
+
+  async metadata(file: string): Promise<QuickLookEntry | undefined> {
+    try {
+      if (!this.safeRoot()) return;
+      const folder = path.join(this.root, sourceIdentity(file).key);
+      const original = info(folder);
+      if (!original?.isDirectory()) return;
+      const entry = await manifest(folder);
+      if (!entry || !sameDirectory(folder, original)) return;
+      const pdf = info(path.join(folder, 'slides.pdf'));
+      if (pdf?.isFile() && pdf.size <= this.pdfLimit) return entry;
+    } catch {
+      // A missing or incomplete entry needs to be drawn.
+    }
   }
 
   /** Same validation a native reader performs, usable for freshness checks and tests. */
@@ -184,9 +238,12 @@ export class QuickLookCache {
       if (!this.safeRoot()) return;
       const { realPath, key, source } = sourceIdentity(file);
       const folder = path.join(this.root, key);
+      const original = info(folder);
+      if (!original?.isDirectory()) return;
       const entry = await manifest(folder);
       if (!entry || entry.source !== source || (inputs !== undefined && entry.inputs !== inputs)) return;
       if (sha256(await fs.promises.readFile(realPath)) !== entry.sourceSha256) return;
+      if (!sameDirectory(folder, original)) return;
       const pdf = await readLimited(path.join(folder, 'slides.pdf'), this.pdfLimit);
       if (sha256(pdf) === entry.pdfSha256) return entry;
     } catch {
@@ -195,7 +252,7 @@ export class QuickLookCache {
   }
 
   async publish(
-    file: string, pdf: Buffer, details: Pick<QuickLookEntry, 'sourceSha256' | 'slides' | 'appVersion' | 'inputs'>,
+    file: string, pdf: Buffer, details: Pick<QuickLookEntry, 'sourceSha256' | 'slides' | 'appVersion' | 'inputs' | 'owner' | 'extensionVersion' | 'dependencies'>,
     current: () => Promise<boolean>,
     active: () => boolean = () => true,
   ): Promise<boolean> {
@@ -204,33 +261,44 @@ export class QuickLookCache {
     return (await this.mutate(async () => {
       if (!active()) return false;
       const folder = path.join(this.root, identity.key);
-      if (!info(folder)) fs.mkdirSync(folder, { mode: 0o700 });
-      if (!info(folder)?.isDirectory()) return false;
       const entry: QuickLookEntry = {
         v: 1, source: identity.source, ...details, pdfSha256: sha256(pdf), drawnAt: new Date().toISOString(),
       };
-      const encoded = Buffer.from(JSON.stringify(entry));
-      if (encoded.length > MAX_MANIFEST_BYTES || encoded.length + pdf.length > this.cacheLimit) return false;
-      for (const name of fs.readdirSync(folder)) {
-        if (name.startsWith('.tmp-')) fs.rmSync(path.join(folder, name), { force: true });
+      let encoded = Buffer.from(JSON.stringify(entry));
+      if (encoded.length > MAX_MANIFEST_BYTES && entry.dependencies) {
+        // Dependency metadata is optional. A large deck can still publish.
+        delete entry.dependencies;
+        encoded = Buffer.from(JSON.stringify(entry));
       }
+      if (encoded.length > MAX_MANIFEST_BYTES || encoded.length + pdf.length > this.cacheLimit) return false;
+      const existing = info(folder);
+      if (existing && (!existing.isDirectory() || fs.readdirSync(folder).some(name =>
+        (name !== 'slides.pdf' && name !== 'entry.json') || !info(path.join(folder, name))?.isFile()))) {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+      if (!info(folder)) fs.mkdirSync(folder, { mode: 0o700 });
+      const original = info(folder);
+      if (!original?.isDirectory()) return false;
       const temp = () => path.join(folder, `.tmp-${process.pid}-${randomUUID()}`);
       const pdfTemp = temp();
       const jsonTemp = temp();
       try {
         await writeTemp(pdfTemp, pdf);
+        if (!sameDirectory(folder, original)) return false;
         await writeTemp(jsonTemp, encoded);
         if (!active() || !await current()) return false;
         await this.pruneLocked(encoded.length + pdf.length, identity.key);
-        if (!active() || sourceIdentity(file).source !== identity.source
+        if (!active() || !sameDirectory(folder, original) || sourceIdentity(file).source !== identity.source
           || sha256(fs.readFileSync(identity.realPath)) !== details.sourceSha256) return false;
         fs.renameSync(pdfTemp, path.join(folder, 'slides.pdf'));
         fs.renameSync(jsonTemp, path.join(folder, 'entry.json'));
         return true;
       } finally {
-        fs.rmSync(pdfTemp, { force: true });
-        fs.rmSync(jsonTemp, { force: true });
-        if (fs.readdirSync(folder).length === 0) fs.rmdirSync(folder);
+        if (sameDirectory(folder, original)) {
+          fs.rmSync(pdfTemp, { force: true });
+          fs.rmSync(jsonTemp, { force: true });
+          if (fs.readdirSync(folder).length === 0) fs.rmdirSync(folder);
+        }
       }
     })) ?? false;
   }
@@ -242,11 +310,20 @@ export class QuickLookCache {
     });
   }
 
-  async purgeProject(root: string, listedRoots: () => Promise<readonly string[]>): Promise<void> {
+  async purgeUnlisted(listedOwners: () => Promise<ReadonlySet<string>>): Promise<void> {
     await this.mutate(async () => {
-      const keep = await listedRoots();
+      const entries = await this.entries();
+      const keep = await listedOwners();
+      for (const { folder, entry } of entries) {
+        if (entry?.owner && !keep.has(entry.owner)) fs.rmSync(folder, { recursive: true, force: true });
+      }
+    });
+  }
+
+  async removeMissingUnder(root: string): Promise<void> {
+    await this.mutate(async () => {
       for (const { folder, entry } of await this.entries()) {
-        if (entry && containsSource(root, entry.source) && !keep.some(other => containsSource(other, entry.source))) {
+        if (entry && containsSource(root, entry.source) && await missingSource(entry.source)) {
           fs.rmSync(folder, { recursive: true, force: true });
         }
       }
@@ -259,10 +336,12 @@ export class QuickLookCache {
 
   private async entries(skipKey?: string) {
     const found: Array<{ folder: string; entry?: QuickLookEntry }> = [];
-    for (const key of fs.readdirSync(this.root)) {
+    for (const key of await fs.promises.readdir(this.root)) {
       if (!HEX.test(key) || key === skipKey) continue;
       const folder = path.join(this.root, key);
-      found.push({ folder, entry: await manifest(folder) });
+      const original = info(folder);
+      const entry = await manifest(folder);
+      found.push({ folder, entry: original && sameDirectory(folder, original) ? entry : undefined });
     }
     return found;
   }
@@ -271,15 +350,19 @@ export class QuickLookCache {
     const live: Array<{ folder: string; drawnAt: number; bytes: number }> = [];
     let total = reserved;
     for (const { folder, entry } of await this.entries(skipKey)) {
-      const pdf = entry && info(path.join(folder, 'slides.pdf'));
-      if (!entry || missingSource(entry.source) || !pdf?.isFile() || pdf.size > this.pdfLimit) {
+      const original = info(folder);
+      const missing = entry && await missingSource(entry.source);
+      const pdf = original && sameDirectory(folder, original) && info(path.join(folder, 'slides.pdf'));
+      if (!entry || missing || !pdf || !pdf.isFile() || pdf.size > this.pdfLimit) {
         fs.rmSync(folder, { recursive: true, force: true });
         continue;
       }
-      for (const name of fs.readdirSync(folder)) {
-        if (name !== 'slides.pdf' && name !== 'entry.json') fs.rmSync(path.join(folder, name), { recursive: true, force: true });
+      const json = info(path.join(folder, 'entry.json'));
+      if (!json?.isFile() || fs.readdirSync(folder).some(name => name !== 'slides.pdf' && name !== 'entry.json')) {
+        fs.rmSync(folder, { recursive: true, force: true });
+        continue;
       }
-      const bytes = pdf.size + fs.lstatSync(path.join(folder, 'entry.json')).size;
+      const bytes = pdf.size + json.size;
       total += bytes;
       live.push({ folder, drawnAt: Date.parse(entry.drawnAt), bytes });
     }

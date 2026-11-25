@@ -636,7 +636,18 @@ export class DeckPublisher implements vscode.Disposable {
   /** Resolve the saved deck's look and local assets without opening a document. */
   async savedPageInput(deckPath: string, text: string, fresh = true) {
     const { theme, logo, themeBytes, themeFiles } = await this.lookFor(deckPath, text, fresh);
-    return { deckPath, text, theme, themeBytes, themeFiles, steps: [], fonts: await this.fontFilesFor(theme), logo };
+    const measured = fresh ? this.savedFit(deckPath, text) : undefined;
+    return { deckPath, text, theme, themeBytes, themeFiles, steps: measured ?? [], measureFit: fresh && !measured, fonts: await this.fontFilesFor(theme), logo };
+  }
+
+  private savedFit(deckPath: string, text: string): readonly number[] | undefined {
+    const body = splitFrontMatter(text).content;
+    const look = frontMatterLook(text);
+    const count = parseDeck(text.replace(/^\uFEFF/, '')).slides.length;
+    const input = [...this.seats].find(seat =>
+      samePath(seat.document.uri.fsPath, deckPath) && seat.liveInput?.text === body
+      && seat.liveInput.look === look && seat.liveInput.steps.length === count)?.liveInput;
+    return input && [...input.steps];
   }
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish

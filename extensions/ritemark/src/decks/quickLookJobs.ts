@@ -7,9 +7,9 @@ import { pictureFile } from './page/pageHtml';
 import { QuickLookCache, MAX_PDF_BYTES, sha256, sourceIdentity } from './quickLookCache';
 
 export async function canStartQuickLook(
-  platform: NodeJS.Platform, enabled: boolean, decks: boolean, hasPrint: () => Promise<boolean>,
+  platform: NodeJS.Platform, enabled: boolean, decks: boolean, hasPrint: () => Promise<boolean>, hasBundles: () => Promise<boolean>,
 ): Promise<boolean> {
-  return platform === 'darwin' && enabled && decks && await hasPrint();
+  return platform === 'darwin' && enabled && decks && await hasBundles() && await hasPrint();
 }
 
 interface Job<T> {
@@ -84,7 +84,7 @@ type SavedInput = (file: string, text: string) => Promise<SavedPrintInput>;
 type PrintDeps = Pick<PdfDeps, 'assets' | 'print' | 'tempRoot'>;
 
 /** Resolve the on-disk drawing and its dependencies using the Slides-as-PDF builder. */
-export async function prepareSavedSlides(file: string, bytes: Buffer, appVersion: string, load: SavedInput, deps: PrintDeps) {
+export async function prepareSavedSlides(file: string, bytes: Buffer, appVersion: string, load: SavedInput, deps: PrintDeps, extensionVersion = appVersion) {
   const text = bytes.toString('utf8');
   if (!isReadableDeckVersion(deckVersionOf(text))) return;
   const input = await load(file, text);
@@ -94,7 +94,7 @@ export async function prepareSavedSlides(file: string, bytes: Buffer, appVersion
     return [path.relative(path.dirname(file), picture.file).normalize('NFC'), stat?.size ?? null, stat?.mtimeMs ?? null];
   }));
   const sourceSha256 = sha256(bytes);
-  const inputs = sha256(JSON.stringify([sourceSha256, input.themeBytes && sha256(input.themeBytes), input.logo && sha256(input.logo.bytes), pictures, appVersion]));
+  const inputs = sha256(JSON.stringify([sourceSha256, input.themeBytes && sha256(input.themeBytes), input.logo && sha256(input.logo.bytes), pictures, appVersion, extensionVersion, input.steps, input.measureFit]));
   const dependencies = picturePaths(built.deck).filter(picture => picture.from === 'slide')
     .map(picture => path.resolve(path.dirname(file), pictureFile(picture.path, picture.from)));
   return { built, input, inputs, sourceSha256, dependencies: [...input.themeFiles, ...dependencies] };
@@ -105,6 +105,8 @@ export async function cacheSavedSlides(options: {
   file: string;
   realPath: string;
   appVersion: string;
+  extensionVersion: string;
+  owner?: string;
   load: SavedInput;
   print: PrintDeps;
   cache: QuickLookCache;
@@ -112,10 +114,10 @@ export async function cacheSavedSlides(options: {
   allowed: () => Promise<boolean>;
   dependencies: (files: string[]) => void;
 }): Promise<void> {
-  const { file, realPath, appVersion, load, print, cache, active, allowed, dependencies } = options;
+  const { file, realPath, appVersion, extensionVersion, owner, load, print, cache, active, allowed, dependencies } = options;
   const prepare = async () => {
     if (sourceIdentity(file).realPath !== realPath) return;
-    return prepareSavedSlides(file, await fs.promises.readFile(realPath), appVersion, load, print);
+    return prepareSavedSlides(file, await fs.promises.readFile(realPath), appVersion, load, print, extensionVersion);
   };
   await cache.drawWhenAvailable(active, async () => {
     if (!active() || !await allowed()) return;
@@ -130,7 +132,10 @@ export async function cacheSavedSlides(options: {
       if (await stillCurrent()) await cache.remove(realPath, active);
       return;
     }
-    if (await cache.read(file, snapshot.inputs)) return;
+    const stamps = await dependencyStamps(snapshot.dependencies);
+    const entry = await cache.read(file, snapshot.inputs);
+    if (entry && entry.owner === owner && entry.extensionVersion === extensionVersion
+      && JSON.stringify(entry.dependencies) === JSON.stringify(stamps)) return;
     await drawDeckPdf(snapshot.input, snapshot.built, print, async pdfPath => {
       if (!active()) return;
       if ((await fs.promises.stat(pdfPath)).size > MAX_PDF_BYTES) {
@@ -139,8 +144,16 @@ export async function cacheSavedSlides(options: {
       }
       const pdf = await fs.promises.readFile(pdfPath);
       await cache.publish(file, pdf, {
-        sourceSha256: snapshot.sourceSha256, slides: snapshot.built.deck.slides.length, appVersion, inputs: snapshot.inputs,
+        sourceSha256: snapshot.sourceSha256, slides: snapshot.built.deck.slides.length, appVersion, inputs: snapshot.inputs, owner, extensionVersion, dependencies: stamps,
       }, stillCurrent, active);
     });
   });
+}
+
+/** Cheap startup checks also notice dependencies edited while the app was closed. */
+export async function dependencyStamps(files: readonly string[]): Promise<Record<string, string>> {
+  return Object.fromEntries(await Promise.all([...new Set(files)].sort().map(async file => {
+    const stat = await fs.promises.stat(file).catch(() => undefined);
+    return [file, stat ? `${stat.size}:${stat.mtimeMs}:${stat.ctimeMs}` : 'missing'];
+  })));
 }
