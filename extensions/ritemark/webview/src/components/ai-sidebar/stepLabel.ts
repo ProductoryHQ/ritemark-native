@@ -106,11 +106,11 @@ export function visibleStepActivities(activities: AgentProgress[]): AgentProgres
     const folder = (step.path ?? '').replace(/\\/g, '/').replace(/\/+$/, '').replace(/^\.\//, '');
     const key = folder === '.' ? '' : folder;
     const previous = folders.get(key);
-    if (previous === undefined) {
+    if (previous !== undefined && !visible[previous].step?.listing?.length) {
+      visible[previous] = activity;
+    } else if (previous === undefined || step.listing?.length) {
       folders.set(key, visible.length);
       visible.push(activity);
-    } else if (step.listing?.length || !visible[previous].step?.listing?.length) {
-      visible[previous] = activity;
     }
   }
   return visible;

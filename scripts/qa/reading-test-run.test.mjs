@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
+import { evidenceRedactor, retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
 
 const facts = JSON.parse(`{
   "folder": "Review",
@@ -104,7 +104,8 @@ test('scores each multiline unread entry up to its next document or blank line',
 
 test('accepts each concrete Findings draft fact, excluding the minutes’ shared cost wording', () => {
   const findings = { file: 'Findings draft v2.docx',
-    words: ['six times', '6 times', 'case notes', 'cash machines', 'told early', 'older customers', 'older clients'] };
+    words: ['six times', '6 times', 'case notes', 'end of their life', 'staff want to be told early',
+      'rely on branches for help with the app'] };
   const fixture = { ...facts, documents: [...facts.documents, findings] };
   for (const fact of [
     'Cost per visit is six times the cost per call.',
@@ -119,6 +120,55 @@ test('accepts each concrete Findings draft fact, excluding the minutes’ shared
   }
   const scored = scoreRun({ ...sample, visibleAnswer: `${answer}\n- Findings draft v2: Cost per visit.` }, fixture);
   assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'missing');
+});
+
+test('rejects facts attributed to the wrong fixture document', () => {
+  const findings = 'Findings draft v2';
+  const tellers = 'Interview – two tellers, Harbour Street';
+  const brief = 'Engagement brief';
+  const fixture = { ...facts, documents: [
+    { file: findings + '.docx', words: ['end of their life', 'rely on branches for help with the app'] },
+    { file: tellers + '.docx', words: ['app desk near the door'] },
+    { file: brief + '.docx', words: ['branches in three sizes'] },
+    { file: 'Interview – head of operations.docx', words: ['11 years old'] },
+  ] };
+  for (const [document, detail] of [
+    [findings, 'Cash machines are 11 years old on average.'],
+    [findings, 'The bank runs 118 ATMs.'],
+    [findings, 'Riverside sees older customers paying bills.'],
+    [tellers, 'The proposal tests an app desk in two branches.'],
+    [tellers, 'The workshop suggests an app desk at the door.'],
+    [brief, 'The proposal designs the three branch sizes with staff.'],
+  ]) {
+    const visibleAnswer = `${document}: ${detail}`;
+    assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture)
+      .coverage.find(({ file }) => file === document + '.docx').result, 'missing', visibleAnswer);
+  }
+  for (const nextLine of [
+    'The Interview – head of operations says cash machines are near the end of their life.',
+    'Head of operations says cash machines are near the end of their life.',
+  ]) {
+    const visibleAnswer = `${findings} — summary of findings\n${nextLine}`;
+    assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture).coverage[0].result, 'missing', visibleAnswer);
+  }
+});
+
+test('redacts exact test keys and provider-shaped secrets from failure evidence', () => {
+  const redact = evidenceRedactor({
+    RITEMARK_TEST_KEY_GOOGLE: 'literal.+[google]',
+    RITEMARK_TEST_KEY_OTHER: 'two\nlines',
+    RITEMARK_TEST_KEY_EMPTY: '',
+    UNRELATED: 'visible',
+  });
+  const error = 'literal.+[google] AIza' + 'a'.repeat(20) + ' sk-' + 'b'.repeat(20);
+  const runtimeStderr = 'two\nlines visible sk-short literal.+[google]';
+  assert.equal(redact(error + '\n' + runtimeStderr),
+    '[redacted] [redacted] [redacted]\n[redacted] visible sk-short [redacted]');
+  assert.deepEqual(JSON.parse(JSON.stringify({ error, failure: { runtimeStderr, status: null } },
+    (_key, value) => redact(value))), {
+    error: '[redacted] [redacted] [redacted]',
+    failure: { runtimeStderr: '[redacted] visible sk-short [redacted]', status: null },
+  });
 });
 
 test('a custom question only scores step labels and source style', () => {
@@ -162,6 +212,7 @@ test('checks later links after a tab close fails and closes repeated destination
   const ui = {
     page: async () => ({}),
     async evaluate(_target, expression) {
+      if (expression.includes('find-bar-count') && clicks === 1) throw new Error('Simulated find probe failure.');
       if (expression.includes("new MouseEvent('auxclick'")) {
         tabToClose = expression.includes(facts.deck.file) ? facts.deck.file : facts.passwordDocument;
         seen.push(tabToClose);
@@ -180,7 +231,8 @@ test('checks later links after a tab close fails and closes repeated destination
       return true;
     },
     waitFor: async (probe) => (await probe()) || null,
-    targets: async () => [],
+    targets: async () => [{ type: 'iframe', url: 'vscode-webview://fixture' }],
+    frameCode: (expression) => expression,
   };
   await tryLinks(ui, folder, facts, [
     { label: 'Locked appendix', href: 'Locked%20appendix.docx#q=test' },
@@ -191,6 +243,8 @@ test('checks later links after a tab close fails and closes repeated destination
   assert.deepEqual(seen, [facts.passwordDocument, facts.deck.file, facts.deck.file, facts.deck.file]);
   assert.match(results[0].error, /Could not close/);
   assert.equal(results[0].errorStep, 'close destination tab');
+  assert.equal(results[1].errorStep, 'check find mark');
+  assert.equal(results[1].error, 'Simulated find probe failure.');
   assert.equal(results[2].errorStep, 'click answer link');
   assert.equal(results[2].error, 'Simulated CDP failure.');
   assert.equal(results[3].targetFile, facts.deck.file);

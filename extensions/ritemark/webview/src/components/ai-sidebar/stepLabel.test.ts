@@ -70,6 +70,16 @@ for (const rows of [lookups, [...lookups].reverse()]) {
 const elsewhere = progress(toolStepResult({ ...wideLookup, id: 'other', path: 'Reference' }, 'Report.pdf', false), 'Glob');
 assert.equal(visibleStepActivities([...lookups, elsewhere]).length, 2);
 
+const wordLookup: ToolStep = { id: 'words', kind: 'folder', command: '**/*.docx' };
+const pdfLookup: ToolStep = { id: 'pdfs', kind: 'folder', command: '**/*.pdf' };
+const words = progress(toolStepResult(wordLookup, 'Brief.docx\nMinutes.docx', false), 'Glob');
+const pendingPdf = progress(pdfLookup, 'Glob');
+const pdf = progress(toolStepResult(pdfLookup, 'Report.pdf', false), 'Glob');
+const running = updateStep([words], pendingPdf);
+assert.deepEqual(visibleStepActivities(running), [words, pendingPdf]);
+assert.deepEqual(visibleStepActivities(updateStep(running, pdf)).map((row) => stepLabel(row)?.label),
+  ['Looked in the project folder: 2 Word documents', 'Looked in the project folder: 1 PDF']);
+
 console.log('stepLabel: S17–S20 and folder retries passed');
 
 for (const tool of ['ToolSearch', 'TodoWrite', 'Task', 'Agent', 'ExitPlanMode', 'EnterPlanMode', 'mcp__server__lookup']) {

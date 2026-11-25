@@ -29,19 +29,36 @@ const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can'
 const scanReason = /\b(?:no (?:searchable |selectable |extractable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
 
+export function evidenceRedactor(env = process.env) {
+  const keys = Object.entries(env)
+    .filter(([name, value]) => name.startsWith('RITEMARK_TEST_KEY_') && value)
+    .map(([, value]) => value)
+    .sort((a, b) => b.length - a.length)
+    .map((value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const secrets = new RegExp([...keys, 'AIza[0-9A-Za-z_-]{20,}', 'sk-[A-Za-z0-9_-]{20,}'].join('|'), 'g');
+  return (value) => typeof value === 'string' ? value.replace(secrets, '[redacted]') : value;
+}
+
 export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [], customQuestion = false }, facts) {
   const lines = visibleAnswer.split(/\r?\n/).map((line) => line.trim());
   const files = [...facts.documents.map(({ file }) => file), facts.passwordDocument, facts.deck.file];
   const entries = new Map(files.map((file) => [file, []]));
+  const namesByFile = new Map(files.map((file) => {
+    const name = normalize(title(file));
+    return [file, [name, name.replace(/^interview\s*-\s*/, '')]];
+  }));
+  let entryFile;
   let entry;
   for (const line of lines) {
     const heading = normalize(line.replace(/^(?:[-*+] |\d+[.)] )?[“"'*]*/, ''));
     const file = files.find((file) => heading.startsWith(normalize(title(file)))
       && !/^[\p{L}\p{N}]/u.test(heading.slice(normalize(title(file)).length)));
     if (file) {
+      entryFile = file;
       entry = [line];
       entries.get(file).push(entry);
-    } else if (!line || /^(?:[-*+] |\d+[.)] |slide\s+\d+\b)/i.test(line)) {
+    } else if (!line || /^(?:[-*+] |\d+[.)] |slide\s+\d+\b)/i.test(line)
+      || (entry && files.some((other) => other !== entryFile && containsFact(line, namesByFile.get(other))))) {
       entry = undefined;
     } else {
       entry?.push(line);
@@ -426,7 +443,10 @@ export async function tryLinks(ui, folder, facts, links, results) {
         for (const target of (await ui.targets()).filter(({ type, url }) => type === 'iframe' && url.startsWith('vscode-webview://'))) {
           const found = await ui.evaluate(target, ui.frameCode(`
             return /^[1-9]\\d* of \\d+$/.test(d?.querySelector('[data-find-bar] .find-bar-count')?.innerText || '');
-          `)).catch(() => false);
+          `)).catch((error) => {
+            findProbeError = error;
+            return false;
+          });
           if (found) return true;
         }
         return false;
@@ -543,6 +563,9 @@ async function main() {
     report.error = error.message;
     process.exitCode = 1;
   } finally {
+    const redact = evidenceRedactor();
+    const writeReport = () => fs.writeFileSync(stem + '.json',
+      JSON.stringify(report, (_key, value) => redact(value), 2) + '\n');
     if (report.failure && values.ai === 'opencode' && runDir) {
       report.failure.runtimeStderr = null;
       try {
@@ -560,11 +583,11 @@ async function main() {
       try {
         const failureDir = stem + '-failure';
         fs.mkdirSync(failureDir, { recursive: true, mode: 0o700 });
-        fs.writeFileSync(path.join(failureDir, 'failure.txt'), [
+        fs.writeFileSync(path.join(failureDir, 'failure.txt'), redact([
           report.error,
           ...Object.entries(report.failure).map(([name, value]) => `${name}\n${value ?? 'Unavailable'}`),
-        ].join('\n\n') + '\n', { mode: 0o600 });
-        fs.writeFileSync(stem + '.json', JSON.stringify(report, null, 2) + '\n');
+        ].join('\n\n') + '\n'), { mode: 0o600 });
+        writeReport();
       } catch (error) {
         report.error += ` Could not save failure evidence: ${error.message}`;
       }
@@ -579,9 +602,9 @@ async function main() {
       }
     }
     Object.assign(report, scoreRun(report, facts));
-    fs.writeFileSync(stem + '.json', JSON.stringify(report, null, 2) + '\n');
-    fs.writeFileSync(stem + '.md', formatRun(report));
-    if (report.error) console.error(report.error);
+    writeReport();
+    fs.writeFileSync(stem + '.md', redact(formatRun(report)));
+    if (report.error) console.error(redact(report.error));
     if (Object.values(report.criteria).includes('fail')) process.exitCode = 1;
     console.log(`Evidence written to ${stem}.json and ${stem}.md`);
     process.removeListener('SIGINT', interrupt);
