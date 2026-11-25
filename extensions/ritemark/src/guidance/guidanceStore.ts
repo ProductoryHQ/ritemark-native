@@ -12,7 +12,8 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { AgentId } from '../agent/types';
 import { testChannelRequested } from '../analytics/consent';
 import { localDay, releaseOf, withSavedDay, SAVED_DAYS_FOR_FEEDBACK } from './guidanceState';
@@ -48,20 +49,6 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isDay = (value: unknown): value is string => typeof value === 'string' && DAY.test(value);
 const daysOf = (value: unknown): string[] => Array.isArray(value) ? value.filter(isDay) : [];
-
-function decodeHomeHistory(value: unknown) {
-  if (!value || typeof value !== 'object') return undefined;
-  const { presentations, starred } = value as Record<string, unknown>;
-  const history: Array<HomePresentation & { releaseId: string }> = [];
-  if (Array.isArray(presentations)) {
-    for (const entry of presentations) {
-      if (entry && typeof entry.releaseId === 'string' && isDay(entry.day)) {
-        history.push({ releaseId: entry.releaseId, day: entry.day, appRun: '', ...(entry.dismissed === true ? { dismissed: true } : {}) });
-      }
-    }
-  }
-  return { presentations: history, ...(starred === true ? { starred: true } : {}) };
-}
 
 /** A stored value read defensively: anything malformed is dropped, never trusted. */
 export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
@@ -108,9 +95,11 @@ export interface HomeEligibility {
 }
 
 const RELEASE_MARKER = /^(?:\d(?:[\da-z.+-]{0,126}[\da-z])?|release-[a-f0-9]{64})$/;
+const LEGACY_TEMP = /^(.+)\.[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}\.tmp$/;
 
 function markerName(release: string): string {
-  return RELEASE_MARKER.test(release) ? release : `release-${createHash('sha256').update(release).digest('hex')}`;
+  return RELEASE_MARKER.test(release) && !LEGACY_TEMP.test(release)
+    ? release : `release-${createHash('sha256').update(release).digest('hex')}`;
 }
 
 function hasCode(error: unknown, code: string): boolean {
@@ -134,11 +123,53 @@ async function readPresentation(file: string): Promise<HomePresentation | undefi
   return { day: localDay(stat.mtime), appRun: '' };
 }
 
+const PRESENTATION_TEMP = /^\.tmp-(\d+)-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+const RETRYABLE_RENAME_CODES = ['EPERM', 'EACCES', 'EBUSY'];
+
+function isOrphanedTemp(pid: number): boolean {
+  // Another window may be between writing the temp and renaming it.
+  if (!Number.isSafeInteger(pid) || pid < 1 || pid > 0x7fffffff) return false;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    return hasCode(error, 'ESRCH');
+  }
+}
+
+async function readHomeFiles(folder: string): Promise<string[]> {
+  const files = await fs.readdir(folder, { withFileTypes: true }).catch((error) => {
+    if (hasCode(error, 'ENOENT')) return [];
+    throw error;
+  });
+  const markers = [];
+  for (const file of files) {
+    if (!file.isFile()) continue;
+    const legacy = LEGACY_TEMP.exec(file.name);
+    const temporary = PRESENTATION_TEMP.exec(file.name);
+    if ((legacy && RELEASE_MARKER.test(legacy[1])) || (temporary && isOrphanedTemp(Number(temporary[1])))) {
+      // Cleanup is best effort when the storage directory is read-only.
+      await fs.rm(join(folder, file.name), { force: true }).catch(() => undefined);
+    } else if (!legacy && (file.name === 'starred' || RELEASE_MARKER.test(file.name))) {
+      markers.push(file.name);
+    }
+  }
+  return markers;
+}
+
 async function replacePresentation(file: string, entry: HomePresentation): Promise<void> {
-  const temporary = `${file}.${randomUUID()}.tmp`;
+  const temporary = join(dirname(file), `.tmp-${process.pid}-${randomUUID()}`);
   try {
     await fs.writeFile(temporary, JSON.stringify(entry), { flag: 'wx' });
-    await fs.rename(temporary, file);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await fs.rename(temporary, file);
+        break;
+      } catch (error) {
+        if (attempt === 3 || !RETRYABLE_RENAME_CODES.some((code) => hasCode(error, code))) throw error;
+        await delay(10 * 2 ** attempt);
+      }
+    }
   } finally {
     await fs.rm(temporary, { force: true });
   }
@@ -149,8 +180,6 @@ const pendingWrites = new WeakMap<MementoLike, Promise<unknown>>();
 
 export class GuidanceStore {
   private readonly homeFolder?: string;
-  private readonly legacyHome;
-  private homeMigration?: Promise<void>;
 
   constructor(
     private readonly memento: MementoLike,
@@ -159,7 +188,6 @@ export class GuidanceStore {
     globalStoragePath?: string,
   ) {
     this.homeFolder = globalStoragePath && join(globalStoragePath, 'home-presentations');
-    this.legacyHome = decodeHomeHistory(memento.get<{ home?: unknown }>(GUIDANCE_KEY)?.home);
   }
 
   read(): GuidanceStateV1 {
@@ -167,10 +195,7 @@ export class GuidanceStore {
   }
 
   private serialize<T>(operation: (state: GuidanceStateV1) => Promise<T>): Promise<T> {
-    const result = (pendingWrites.get(this.memento) ?? Promise.resolve()).then(async () => {
-      await this.migrateHome();
-      return operation(this.read());
-    });
+    const result = (pendingWrites.get(this.memento) ?? Promise.resolve()).then(() => operation(this.read()));
     pendingWrites.set(this.memento, result.catch(() => undefined));
     return result;
   }
@@ -233,37 +258,7 @@ export class GuidanceStore {
     });
   }
 
-  private migrateHome(): Promise<void> | undefined {
-    const folder = this.homeFolder;
-    const history = this.legacyHome;
-    if (!folder || !history) return;
-    return this.homeMigration ??= (async () => {
-      await fs.mkdir(folder, { recursive: true });
-      for (const { releaseId, ...entry } of history.presentations) {
-        const file = join(folder, markerName(releaseId));
-        try {
-          await fs.writeFile(file, JSON.stringify(entry), { flag: 'wx' });
-        } catch (error) {
-          if (!hasCode(error, 'EEXIST')) throw error;
-          // Older builds created empty markers alongside their Memento entries.
-          if ((await fs.stat(file)).size === 0) await replacePresentation(file, entry);
-        }
-      }
-      if (history.starred) await this.writeStar(folder);
-    })().catch((error) => {
-      this.homeMigration = undefined;
-      throw error;
-    });
-  }
-
-  private async writeStar(folder: string): Promise<void> {
-    await fs.writeFile(join(folder, 'starred'), '', { flag: 'wx' }).catch((error) => {
-      if (!hasCode(error, 'EEXIST')) throw error;
-    });
-  }
-
   async homeEligible(input: HomeEligibility): Promise<boolean> {
-    await this.migrateHome();
     const state = this.read();
     if (!input.appRun || state.firstAppRun === undefined || state.firstAppRun === input.appRun) return false;
     if (input.whatMoved || (input.readyRequest && state.readyShownOn === input.day)) return false;
@@ -271,22 +266,20 @@ export class GuidanceStore {
 
     const folder = this.homeFolder;
     if (!folder) return true;
-    const files = await fs.readdir(folder).catch((error): string[] => {
-      if (hasCode(error, 'ENOENT')) return [];
-      throw error;
-    });
+    const files = await readHomeFiles(folder);
     if (files.includes('starred') || files.includes(markerName(this.appRelease))) return false;
     // The previous calendar year's matching day has aged out of the allowance.
     const cutoff = `${Number(input.day.slice(0, 4)) - 1}${input.day.slice(4)}`;
-    const history = await Promise.all(files.filter((file) => RELEASE_MARKER.test(file))
-      .map((file) => readPresentation(join(folder, file))));
-    return history.filter((entry) => entry && entry.day > cutoff && entry.day <= input.day).length < 3;
+    const history = await Promise.all(files.map((file) => readPresentation(join(folder, file))));
+    return history.filter((entry) => entry && entry.day > cutoff).length < 3;
   }
 
   async openHomePresentation(appRun: string): Promise<HomePresentation | undefined> {
-    await this.migrateHome();
     if (!this.homeFolder || !appRun) return undefined;
-    const entry = await readPresentation(join(this.homeFolder, markerName(this.appRelease)));
+    const files = await readHomeFiles(this.homeFolder);
+    const marker = markerName(this.appRelease);
+    if (files.includes('starred') || !files.includes(marker)) return undefined;
+    const entry = await readPresentation(join(this.homeFolder, marker));
     return entry?.appRun === appRun && !entry.dismissed ? entry : undefined;
   }
 
@@ -318,11 +311,11 @@ export class GuidanceStore {
   async endHomePresentation(action: 'dismiss' | 'star'): Promise<void> {
     const folder = this.homeFolder;
     if (!folder) return;
-    await this.migrateHome();
     if (action === 'star') {
       await fs.mkdir(folder, { recursive: true });
-      await this.writeStar(folder);
-      return;
+      await fs.writeFile(join(folder, 'starred'), '', { flag: 'wx' }).catch((error) => {
+        if (!hasCode(error, 'EEXIST')) throw error;
+      });
     }
     const file = join(folder, markerName(this.appRelease));
     const entry = await readPresentation(file);

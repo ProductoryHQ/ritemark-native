@@ -32,7 +32,7 @@ Extend the existing GuidanceStore record with a version-independent saved-day li
 
 Record a presentation when Home actually renders it, and keep it usable during that presentation. Persist the release and rolling 12-month allowance before another window can present it. An interruption consumes that release’s exposure. Treat each new public app release as the boundary and verify packaging version matches it. Leave old week-question data readable for migration. The replacement and the caps need no usage event.
 
-PR 1 uses an exclusive marker file per release in extension global storage to arbitrate Home presentations across windows. Each release marker stores its presentation day, app run and dismissal. A separate Star marker ends eligibility, and existing Home history migrates from global state. This requires no shell change.
+PR 1 uses an exclusive marker file per release in extension global storage to arbitrate Home presentations across windows. Each release marker stores its presentation day, app run and dismissal. A separate Star marker ends eligibility and prevents Home from restoring the card after a reload. This requires no shell change.
 
 ## R4 · Native preview and mail handoff
 

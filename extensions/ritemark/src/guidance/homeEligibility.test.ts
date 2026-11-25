@@ -126,26 +126,70 @@ test('S7: the rolling allowance uses marker days and falls back to mtime for emp
   assert.equal(await fourth.reserveHomePresentation({ ...today, day: '2026-11-26' }), true);
 });
 
-test('S7: legacy Home history migrates into markers and is omitted from subsequent Memento writes', async () => {
+test('S7: Star ends the presentation and suppresses restoration after a same-run reload', async () => {
   const storage = makeTempDir('rm-home-');
-  const folder = join(storage, 'home-presentations');
-  await fs.mkdir(folder);
-  await fs.writeFile(join(folder, '2.3.0'), '');
-  const state = profile({
-    positiveReaction: true, firstAppRun: null,
-    home: { starred: true, presentations: [
-      { releaseId: '2.3.0', day: '2026-10-01', dismissed: true },
-      { releaseId: '2.3.1', day: '2026-10-22' },
-    ] },
-  });
+  const state = profile({ positiveReaction: true, firstAppRun: null });
   const store = new GuidanceStore(state, '2.4.0', '2.4.0', storage);
-  await store.noteReadyShown(today.day);
-  assert.equal(state.get<{ home?: unknown }>(GUIDANCE_KEY)?.home, undefined);
-  assert.deepEqual((await fs.readdir(folder)).sort(), ['2.3.0', '2.3.1', 'starred']);
-  assert.deepEqual(JSON.parse(await fs.readFile(join(folder, '2.3.0'), 'utf8')), {
-    day: '2026-10-01', appRun: '', dismissed: true,
+  const other = new GuidanceStore(state, '2.4.1', '2.4.1', storage);
+  assert.equal(await store.reserveHomePresentation(today), true);
+  assert.equal(await other.reserveHomePresentation(today), true);
+  assert.deepEqual(await store.openHomePresentation(today.appRun), today);
+  await store.endHomePresentation('star');
+
+  const reloaded = new GuidanceStore(state, '2.4.0', '2.4.0', storage);
+  assert.equal(await reloaded.openHomePresentation(today.appRun), undefined);
+  assert.equal(await other.openHomePresentation(today.appRun), undefined, 'Star suppresses any open presentation');
+  assert.deepEqual(JSON.parse(await fs.readFile(join(storage, 'home-presentations', '2.4.0'), 'utf8')), {
+    ...today, dismissed: true,
   });
-  assert.equal(await store.homeEligible(today), false);
+});
+
+test('S7: orphan temps are removed and do not consume the allowance', async (t) => {
+  const storage = makeTempDir('rm-home-');
+  const state = profile({ positiveReaction: true, firstAppRun: null });
+  for (const release of ['2.4.0', '2.4.1']) {
+    assert.equal(await new GuidanceStore(state, release, release, storage).reserveHomePresentation(today), true);
+  }
+  const folder = join(storage, 'home-presentations');
+  const uuid = '1993ed9c-f587-470a-9bdd-eb5db3ebbdbb';
+  const deadPid = 2147483647;
+  const kill = process.kill;
+  t.mock.method(process, 'kill', (pid: number, signal: number) => {
+    if (pid === deadPid) throw Object.assign(new Error('No such process'), { code: 'ESRCH' });
+    return kill(pid, signal);
+  });
+  const active = `.tmp-${process.pid}-${uuid}`;
+  for (const name of [`2.4.1.${uuid}.tmp`, `.tmp-${deadPid}-${uuid}`, active]) {
+    await fs.writeFile(join(folder, name), JSON.stringify({ ...today, dismissed: true }));
+  }
+  const next = new GuidanceStore(state, '2.4.2', '2.4.2', storage);
+  assert.equal(await next.homeEligible(today), true);
+  assert.deepEqual((await fs.readdir(folder)).sort(), [active, '2.4.0', '2.4.1']);
+});
+
+test('S7: Not now retries a temporarily busy marker rename', async (t) => {
+  const storage = makeTempDir('rm-home-');
+  const store = new GuidanceStore(profile({ positiveReaction: true, firstAppRun: null }), '2.4.0', '2.4.0', storage);
+  assert.equal(await store.reserveHomePresentation(today), true);
+  const rename = fs.rename;
+  const calls = t.mock.method(fs, 'rename', rename);
+  calls.mock.mockImplementationOnce(async () => {
+    throw Object.assign(new Error('File is busy'), { code: 'EBUSY' });
+  });
+  await store.endHomePresentation('dismiss');
+  assert.equal(calls.mock.callCount(), 2);
+  assert.equal(await store.openHomePresentation(today.appRun), undefined);
+  assert.deepEqual(await fs.readdir(join(storage, 'home-presentations')), ['2.4.0']);
+});
+
+test('S7: a presentation dated tomorrow still uses a slot after the local date moves back', async () => {
+  const storage = makeTempDir('rm-home-');
+  const state = profile({ positiveReaction: true, firstAppRun: null });
+  for (const [release, day] of [['2.4.0', today.day], ['2.4.1', today.day], ['2.4.2', '2026-11-26']]) {
+    assert.equal(await new GuidanceStore(state, release, release, storage).reserveHomePresentation({ ...today, day }), true);
+  }
+  const next = new GuidanceStore(state, '2.4.3', '2.4.3', storage);
+  assert.equal(await next.homeEligible(today), false);
 });
 
 test('S7: a failed JSON write still consumes the release if the exclusive create succeeded', async (t) => {
