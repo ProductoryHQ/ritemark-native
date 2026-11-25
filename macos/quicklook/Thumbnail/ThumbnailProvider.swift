@@ -9,13 +9,18 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
+        let start = DispatchTime.now()
         let maximum = request.maximumSize
         let edge = min(maximum.width, maximum.height)
+        let pixels = edge * request.scale
+        DeckCache.log.info("Thumbnail request: \(Double(pixels)) px")
         let icon = QLThumbnailReply(contextSize: CGSize(width: edge, height: edge), drawing: { context in
+            let elapsed = (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+            DeckCache.log.info("Thumbnail deck icon in \(elapsed) ms")
             DeckIcon.draw(in: context, size: CGSize(width: edge, height: edge))
             return true
         })
-        guard edge * request.scale >= 64, Self.slots.wait(timeout: .now()) == .success else {
+        guard pixels >= 64, Self.slots.wait(timeout: .now()) == .success else {
             handler(icon, nil)
             return
         }
@@ -39,7 +44,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
                 timeout.cancel()
                 Self.slots.signal()
             }
-            let hostID = Bundle.main.object(forInfoDictionaryKey: "RitemarkHostBundleIdentifier") as? String ?? ""
+            let hostID = Bundle(for: Self.self).object(forInfoDictionaryKey: "RitemarkHostBundleIdentifier") as? String ?? ""
             guard let source = try? DeckCache.Source(request.fileURL),
                   let pdf = DeckCache.pdf(for: source, hostID: hostID),
                   let provider = CGDataProvider(data: pdf as CFData),
@@ -53,6 +58,8 @@ final class ThumbnailProvider: QLThumbnailProvider {
             let bounds = CGRect(x: 0, y: 0, width: width, height: width * 9 / 16)
             let transform = page.getDrawingTransform(.mediaBox, rect: bounds, rotate: 0, preserveAspectRatio: true)
             finish(QLThumbnailReply(contextSize: bounds.size, drawing: { context in
+                let elapsed = (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+                DeckCache.log.info("Thumbnail PDF page 1 in \(elapsed) ms")
                 context.concatenate(transform)
                 context.drawPDFPage(page)
                 return true

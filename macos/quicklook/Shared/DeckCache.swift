@@ -1,8 +1,10 @@
 import CryptoKit
 import Darwin
 import Foundation
+import OSLog
 
 enum DeckCache {
+    static let log = Logger(subsystem: "ai.productory.ritemark.quicklook", category: "provider")
     private struct Entry: Decodable {
         let v: Int
         let source: String
@@ -27,13 +29,18 @@ enum DeckCache {
     }
 
     struct Source {
-        let url: URL
         let path: String
         let bytes: Data
 
         init(_ requestedURL: URL) throws {
-            url = requestedURL.resolvingSymlinksInPath()
-            path = url.path.precomposedStringWithCanonicalMapping
+            // Match the writer's native realpath, including Darwin's /private prefixes.
+            let resolved = requestedURL.withUnsafeFileSystemRepresentation { path in
+                path.flatMap { realpath($0, nil) }
+            }
+            defer { free(resolved) }
+            let url = resolved.map { URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil) }
+                ?? requestedURL
+            path = resolved.map { String(cString: $0).precomposedStringWithCanonicalMapping } ?? ""
             bytes = try Data(contentsOf: url)
         }
 
@@ -44,19 +51,33 @@ enum DeckCache {
     }
 
     static func pdf(for source: Source, hostID: String) -> Data? {
+        guard !source.path.isEmpty else {
+            log.info("Cache miss: source realpath unavailable")
+            return nil
+        }
         guard hostID.range(of: #"\A[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\z"#, options: .regularExpression) != nil,
-              let home = NSHomeDirectoryForUser(NSUserName()) else { return nil }
+              let home = NSHomeDirectoryForUser(NSUserName()) else {
+            log.info("Cache miss: host ID or user home unavailable")
+            return nil
+        }
         let key = digest(Data(source.path.utf8))
         let homeFD = open(URL(fileURLWithPath: home).resolvingSymlinksInPath().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
-        guard homeFD >= 0 else { return nil }
+        guard homeFD >= 0 else {
+            log.info("Cache miss: opening user home failed, errno \(errno)")
+            return nil
+        }
         var directory = homeFD
         defer { close(directory) }
 
         // Pin each directory before opening the next component. A rename or
         // symlink swap cannot redirect a subsequent read outside this chain.
-        for component in ["Library", "Caches", hostID, "quicklook", "v1", key] {
+        for (index, component) in ["Library", "Caches", hostID, "quicklook", "v1", key].enumerated() {
             let next = openat(directory, component, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
-            guard next >= 0 else { return nil }
+            guard next >= 0 else {
+                // The index identifies Library, Caches, host ID, quicklook, v1 or entry.
+                log.info("Cache miss: directory step \(index) failed, errno \(errno)")
+                return nil
+            }
             close(directory)
             directory = next
         }
@@ -66,7 +87,10 @@ enum DeckCache {
               entry.isValid, entry.source.utf8.elementsEqual(source.path.utf8),
               digest(source.bytes) == entry.sourceSha256,
               let pdf = read("slides.pdf", in: directory, limit: 50 * 1024 * 1024),
-              digest(pdf) == entry.pdfSha256 else { return nil }
+              digest(pdf) == entry.pdfSha256 else {
+            log.info("Cache miss: entry or PDF could not be read or validated")
+            return nil
+        }
         return pdf
     }
 

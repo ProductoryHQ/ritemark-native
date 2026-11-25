@@ -38,7 +38,7 @@ func thumbnail(_ url: URL, edge: CGFloat, type: QLThumbnailGenerator.Request.Rep
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
     }
     guard let reply = try response?.get() else { throw ProbeError.absentRepresentation }
-    print("\(url.lastPathComponent)\t\(type.rawValue)\t\(reply.type.rawValue)\t\((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000) ms")
+    print("\(url.lastPathComponent)\t\(type.rawValue)\t\(reply.type.rawValue)\t\(elapsedMilliseconds(since: start)) ms")
     guard reply.type == (type == .icon ? .icon : .thumbnail) else { throw ProbeError.wrongRepresentation }
     return reply.cgImage
 }
@@ -64,6 +64,10 @@ func distance(_ first: CGImage, _ second: CGImage) -> Double {
         / Double(lhs.count * 255)
 }
 
+func elapsedMilliseconds(since start: DispatchTime) -> UInt64 {
+    (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
+}
+
 func checkThumbnails(fixtures: URL, output: URL) throws {
     guard let pdf = CGPDFDocument(fixtures.appendingPathComponent("expected.pdf") as CFURL),
           let page = pdf.page(at: 1),
@@ -78,32 +82,65 @@ func checkThumbnails(fixtures: URL, output: URL) throws {
     guard let reference = context.makeImage() else { throw ProbeError.absentRepresentation }
     try save(reference, to: output.appendingPathComponent("page-one.png"))
     var matches = true
-    for (name, edge) in [("café", 512.0), ("stale", 512.0), ("small", 48.0)] {
+    for (name, edge, expectation) in [("café", 512.0, "PDF page 1"), ("stale", 512.0, "deck icon (stale cache)"),
+                                      ("missing", 512.0, "deck icon (missing cache)"), ("small", 48.0, "deck icon (<64 px)")] {
         let file = fixtures.appendingPathComponent("\(name).rtms")
-        let image = try thumbnail(file, edge: edge, type: .thumbnail)
-        try save(image, to: output.appendingPathComponent("\(name).png"))
-        if name == "café" {
-            let difference = distance(image, reference)
-            print("Page 1 colour difference: \(difference)")
-            matches = matches && abs(Double(image.width) / Double(image.height) - 16.0 / 9) < 0.02
-                && difference < 0.08
-        } else {
-            let icon = try thumbnail(file, edge: edge, type: .icon)
-            try save(icon, to: output.appendingPathComponent("\(name)-system-icon.png"))
-            let difference = distance(image, icon)
-            print("\(name) system icon difference: \(difference)")
-            matches = matches && difference < 0.12 && distance(image, reference) > 0.14
+        let start = DispatchTime.now()
+        do {
+            let image = try thumbnail(file, edge: edge, type: .thumbnail)
+            try save(image, to: output.appendingPathComponent("\(name).png"))
+            let pageDifference = distance(image, reference)
+            let passed: Bool
+            let metrics: String
+            if name == "café" {
+                let aspect = Double(image.width) / Double(image.height)
+                passed = abs(aspect - 16.0 / 9) < 0.02 && pageDifference < 0.08
+                metrics = "aspect \(aspect), page 1 distance \(pageDifference)"
+            } else {
+                guard let iconContext = CGContext(data: nil, width: Int(edge), height: Int(edge),
+                                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+                    throw ProbeError.absentRepresentation
+                }
+                DeckIcon.draw(in: iconContext, size: CGSize(width: edge, height: edge))
+                guard let icon = iconContext.makeImage() else { throw ProbeError.absentRepresentation }
+                try save(icon, to: output.appendingPathComponent("\(name)-deck-icon.png"))
+                // Keep the system's icon as additional evidence alongside our drawing reference.
+                if let system = try? thumbnail(file, edge: edge, type: .icon) {
+                    try save(system, to: output.appendingPathComponent("\(name)-system-icon.png"))
+                }
+                let iconDifference = distance(image, icon)
+                passed = iconDifference < 0.12 && pageDifference > 0.14
+                metrics = "deck icon distance \(iconDifference), page 1 distance \(pageDifference)"
+            }
+            print("- \(name) thumbnail — \(passed ? "PASS" : "FAIL") expected \(expectation); \(metrics), \(elapsedMilliseconds(since: start)) ms ([PNG](\(output.deletingLastPathComponent().lastPathComponent)/png/\(name).png))")
+            matches = matches && passed
+        } catch {
+            print("- \(name) thumbnail — FAIL expected \(expectation); \(error) after \(elapsedMilliseconds(since: start)) ms")
+            matches = false
         }
     }
     guard matches else { throw ProbeError.imageMismatch }
 }
 
-let arguments = Array(CommandLine.arguments.dropFirst())
-if arguments.first == "--ocr" {
-    let text = try recognizedText(URL(fileURLWithPath: arguments[1]))
-    print(text)
-    guard text.uppercased().contains(arguments[2]) else { throw ProbeError.missingText }
-} else {
-    try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
-                        output: URL(fileURLWithPath: arguments[1], isDirectory: true))
+@main
+enum Probe {
+    static func main() {
+        setbuf(stdout, nil)
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        do {
+            if arguments.first == "--ocr" {
+                let text = try recognizedText(URL(fileURLWithPath: arguments[1]))
+                print(text)
+                guard text.uppercased().contains(arguments[2]) else { throw ProbeError.missingText }
+            } else {
+                try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
+                                    output: URL(fileURLWithPath: arguments[1], isDirectory: true))
+            }
+        } catch {
+            fputs("Probe failed: \(error)\n", stderr)
+            exit(1)
+        }
+    }
 }

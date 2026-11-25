@@ -1,10 +1,32 @@
 """Create fixture-only v1 cache entries using the writer's on-disk contract."""
+import ctypes
 import hashlib
 import json
 import os
 import sys
 import unicodedata
 from pathlib import Path
+
+
+# Python's posixpath.realpath walks links in Python. Use Darwin's native
+# realpath, as the writer does, for filesystem spelling and /private aliases.
+libc = ctypes.CDLL(None, use_errno=True)
+libc.realpath.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
+libc.realpath.restype = ctypes.c_void_p
+libc.free.argtypes = [ctypes.c_void_p]
+libc.free.restype = None
+
+
+def source_identity(source):
+    resolved = libc.realpath(os.fsencode(source), None)
+    if not resolved:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), source)
+    try:
+        path = unicodedata.normalize("NFC", ctypes.string_at(resolved).decode("utf-8"))
+        return path, digest(path.encode("utf-8"))
+    finally:
+        libc.free(resolved)
 
 
 def digest(data):
@@ -47,9 +69,10 @@ def seed(root, fixtures):
         source.write_bytes(original)
         if name == "missing":
             continue
-        path = unicodedata.normalize("NFC", os.path.realpath(source))
-        entry = root / digest(path.encode("utf-8"))
+        path, key = source_identity(source)
+        entry = root / key
         entry.mkdir(parents=True)
+        print(f"{path}\t{entry}")
         manifest = {
             "v": 1, "source": path, "sourceSha256": digest(original), "pdfSha256": digest(pdf),
             "slides": 2, "appVersion": "2.4.0", "drawnAt": "2026-11-25T12:00:00.000Z",

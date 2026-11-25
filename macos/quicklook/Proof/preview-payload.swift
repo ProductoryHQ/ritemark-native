@@ -31,7 +31,7 @@ enum PreviewProof {
             fatalError("Expected system read error")
         } catch let error as NSError where error.domain == NSCocoaErrorDomain
             && error.code == NSFileReadNoSuchFileError {
-            print("absent\t\(error.domain)\t\(error.code)")
+            print("absent.rtms (intentionally missing source)\t\(error.domain)\t\(error.code)")
         }
     }
 }
