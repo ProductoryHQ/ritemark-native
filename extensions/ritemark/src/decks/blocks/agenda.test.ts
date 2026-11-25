@@ -108,6 +108,7 @@ const assets: PageAssets = {
   const deck = publicDeck(DECK, { folderName: 'Demo client', deckName: 'Demo day', theme: BUILT_IN_THEME });
   const html = pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl: () => null });
   const root = parse(html);
+  assert.match(html, /--ground:radial-gradient\(120% 95% at 88% 8%, /, 'Evening supplies the wall glow');
   const agendas = root.querySelectorAll('.layer .blk-agenda');
   assert.equal(agendas.length, 2, 'both agenda slides draw the list');
   assert.deepEqual(agendas[0].querySelectorAll('.blk-agenda-t').map(title => title.text), ['Getting started', 'Writing with an assistant', 'Numbered, no header', 'Wrap-up']);
@@ -153,15 +154,18 @@ const assets: PageAssets = {
   assert.equal(PRINT_CSS.match(/print-color-adjust: exact/g)?.length, 2, 'once, with its -webkit- twin');
   assert.match(rule('.layer'), /-webkit-print-color-adjust: exact; print-color-adjust: exact;/);
   assert.ok(!/print-color-adjust/.test(PAGE_CSS));
-  // A4 and Letter: no paper size forced, and the slide fits the narrower printed width (A4) at these margins.
+  assert.match(rule('.layer'), /background: var\(--ground\);/, 'the wall ground includes the theme glow');
   assert.ok(!/@page[^}]*size:/.test(PRINT_CSS), 'the reader\'s own paper');
-  const margins = /@page \{ margin: (\d+)mm (\d+)mm; \}/.exec(PRINT_CSS)!;
-  const side = Number(margins[2]);
-  const slideWidth = Number(/width: (\d+)px; height: (\d+)px;/.exec(rule('.layer'))![1]);
-  const mm = slideWidth / 96 * 25.4;
-  for (const [paper, width] of [['A4', 210], ['Letter', 215.9]] as const) assert.ok(mm <= width - 2 * side, `${paper}: the ${mm.toFixed(0)} mm slide fits`);
-  assert.match(rule('.layer .deck-sl'), /zoom: 0\.6/);
-  assert.equal(slideWidth, 960 * 0.6, 'the zoom draws the 960 px slide at the layer\'s width');
+  assert.match(rule('.wrap'), /padding: 0 1px;/, 'equal gutters');
+  assert.match(rule('.layer'), /width: 576px; height: 324px; margin: 0 auto 4mm;/, 'the fixed-size fallback is centred');
+  assert.match(rule('.layer > .deck-slide'), /width: 576px; height: 324px;/);
+  assert.match(rule('.layer .deck-sl'), /zoom: 0\.6; width: 960px; height: 540px;/);
+  const fullWidth = /@supports \(zoom: calc\(1px \/ 1px\)\) \{([\s\S]*?)\n  \}/.exec(print);
+  assert.ok(fullWidth, 'full-width sizing requires CSS length division');
+  assert.doesNotMatch(print.replace(fullWidth[0], ''), /zoom:\s*calc\([^;{}]*\//, 'zoom outside the feature query uses no division');
+  assert.match(fullWidth[1], /\.layer \{ width: 100%; height: auto; aspect-ratio: 16 \/ 9; \}/);
+  assert.match(fullWidth[1], /\.layer > \.deck-slide \{ width: 100%; height: 100%; container-type: inline-size; \}/);
+  assert.match(fullWidth[1], /\.layer \.deck-sl \{ zoom: calc\(100cqw \/ 960px\); \}/);
   // The order: slide n, then part n.
   assert.equal(printOrderCss(2), '@media print{.pre{order:0}#s1{order:1}#t1{order:2}#s2{order:3}#t2{order:4}}');
   assert.equal(printOrderCss(0), '');
