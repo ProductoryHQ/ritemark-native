@@ -136,7 +136,15 @@ test('unsupported charts keep the card and the quiet line names the kinds once',
     assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
   }
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
-    "This sheet has 2 waterfall charts, a treemap, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
+    "This sheet has 2 waterfall charts, a treemap, a histogram, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
+  const [treemap, histogram] = extended
+  const unknown = draw('<chartSpace><chart><plotArea/></chart></chartSpace>', true)
+  assert.equal(keptNotice({ drawings: [treemap, treemap] }),
+    "This sheet has 2 treemaps. They're kept in the file; Open in Excel to see them.")
+  assert.equal(keptNotice({ drawings: [histogram, waterfall] }),
+    "This sheet has a histogram and a waterfall chart. They're kept in the file; Open in Excel to see them.")
+  assert.equal(keptNotice({ drawings: [unknown, treemap] }),
+    "This sheet has a treemap and another chart. They're kept in the file; Open in Excel to see them.")
   // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
   assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
     "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
@@ -166,7 +174,7 @@ test('scenario 13: Excel out-of-scope charts keep titled cards and the quiet lin
         ['From booking to leaving', 'chartex', 'funnel'],
         ['Handover minutes, spread', 'chartex', 'boxWhisker'],
       ],
-      notice: "This sheet has a stock chart, a surface chart, a histogram chart, a funnel chart and a box and whisker chart. They're kept in the file; Open in Excel to see them.",
+      notice: "This sheet has a stock chart, a surface chart, a histogram, a funnel chart and a box and whisker chart. They're kept in the file; Open in Excel to see them.",
     },
   ]
   assert.deepEqual(book.sheets.map(({ name }) => name), expected.map(({ name }) => name))

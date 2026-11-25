@@ -307,6 +307,16 @@ async function main() {
   assert.equal(richChart.title?.text, 'First line Second')
   assert.equal(chartTitle(richChartXml), 'First line Second')
 
+  const axisTitle = '<c:chartSpace><c:chart><c:autoTitleDeleted val="1"/><c:plotArea>'
+    + `<c:catAx><c:title><c:tx>${rich}</c:tx></c:title></c:catAx>`
+    + '</c:plotArea></c:chart></c:chartSpace>'
+  assert.equal(chartTitle(axisTitle), undefined)
+
+  const extendedAxisTitle = '<cx:chartSpace><cx:chart><cx:plotArea><cx:axis>'
+    + '<cx:title><cx:tx><cx:txData><cx:v>Minutes</cx:v></cx:txData></cx:tx></cx:title>'
+    + '</cx:axis></cx:plotArea></cx:chart></cx:chartSpace>'
+  assert.equal(chartTitle(extendedAxisTitle), undefined)
+
   await checkExcelCharts()
   const sales = await readWorkbook(readFileSync(chartsKeepFixtures.find(({ file }) => file.endsWith('/sales-report.xlsx'))!.file))
   for (const [sheetName, expectedTitle] of [['Sales 2026', 'Revenue by region'], ['Revenue trend', 'Revenue per month']]) {
