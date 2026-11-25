@@ -19,9 +19,9 @@ func save(_ image: CGImage, to url: URL) throws {
     try png.write(to: url)
 }
 
-func thumbnail(_ url: URL, edge: CGFloat, type: QLThumbnailGenerator.Request.RepresentationTypes) throws -> CGImage {
+func thumbnail(_ url: URL, edge: CGFloat) throws -> CGImage {
     let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: edge, height: edge),
-                                               scale: 1, representationTypes: type)
+                                               scale: 1, representationTypes: .thumbnail)
     let start = DispatchTime.now()
     let done = DispatchSemaphore(value: 0)
     var response: Result<QLThumbnailRepresentation, Error>?
@@ -38,27 +38,30 @@ func thumbnail(_ url: URL, edge: CGFloat, type: QLThumbnailGenerator.Request.Rep
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
     }
     guard let reply = try response?.get() else { throw ProbeError.absentRepresentation }
-    print("\(url.lastPathComponent)\t\(type.rawValue)\t\(reply.type.rawValue)\t\(elapsedMilliseconds(since: start)) ms")
-    guard reply.type == (type == .icon ? .icon : .thumbnail) else { throw ProbeError.wrongRepresentation }
+    print("\(url.lastPathComponent)\t\(reply.type.rawValue)\t\(elapsedMilliseconds(since: start)) ms")
+    guard reply.type == .thumbnail else { throw ProbeError.wrongRepresentation }
     return reply.cgImage
 }
 
 // Compare premultiplied colour and alpha on a shared grid so the small icon
 // and the system reference can have different raster sizes.
-func distance(_ first: CGImage, _ second: CGImage) -> Double {
-    func samples(_ image: CGImage) -> [UInt8] {
-        let side = 32
-        var pixels = [UInt8](repeating: 0, count: side * side * 4)
-        pixels.withUnsafeMutableBytes { buffer in
-            let context = CGContext(data: buffer.baseAddress, width: side, height: side,
-                                    bitsPerComponent: 8, bytesPerRow: side * 4,
-                                    space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-            context.interpolationQuality = .high
-            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
-        }
-        return pixels
+private let sampleSide = 32
+
+func samples(_ image: CGImage) -> [UInt8] {
+    let side = sampleSide
+    var pixels = [UInt8](repeating: 0, count: side * side * 4)
+    pixels.withUnsafeMutableBytes { buffer in
+        let context = CGContext(data: buffer.baseAddress, width: side, height: side,
+                                bitsPerComponent: 8, bytesPerRow: side * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
     }
+    return pixels
+}
+
+func distance(_ first: CGImage, _ second: CGImage) -> Double {
     let lhs = samples(first)
     return Double(zip(lhs, samples(second)).reduce(0) { $0 + abs(Int($1.0) - Int($1.1)) })
         / Double(lhs.count * 255)
@@ -68,34 +71,46 @@ func elapsedMilliseconds(since start: DispatchTime) -> UInt64 {
     (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
 }
 
-func checkThumbnails(fixtures: URL, output: URL) throws {
+func checkThumbnails(fixtures: URL, output: URL, privateFixtures: URL) throws {
     guard let pdf = CGPDFDocument(fixtures.appendingPathComponent("expected.pdf") as CFURL),
           let page = pdf.page(at: 1),
-          let context = CGContext(data: nil, width: 512, height: 288, bitsPerComponent: 8,
+          let context = CGContext(data: nil, width: 720, height: 405, bitsPerComponent: 8,
                                   bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
         throw ProbeError.absentRepresentation
     }
-    let bounds = CGRect(x: 0, y: 0, width: 512, height: 288)
-    context.concatenate(page.getDrawingTransform(.mediaBox, rect: bounds, rotate: 0, preserveAspectRatio: true))
     context.drawPDFPage(page)
     guard let reference = context.makeImage() else { throw ProbeError.absentRepresentation }
     try save(reference, to: output.appendingPathComponent("page-one.png"))
     var matches = true
-    for (name, edge, expectation) in [("café", 512.0, "PDF page 1"), ("stale", 512.0, "deck icon (stale cache)"),
-                                      ("missing", 512.0, "deck icon (missing cache)"), ("small", 48.0, "deck icon (<64 px)")] {
-        let file = fixtures.appendingPathComponent("\(name).rtms")
+    let requests: [(String, CGFloat, Bool, String)] = [
+        ("café", 512, true, "PDF page 1"),
+        ("private", 1024, true, "PDF page 1 above 720 pt, filled edge to edge"),
+        ("stale", 512, false, "deck icon (stale cache)"),
+        ("missing", 512, false, "deck icon (missing cache)"),
+        ("large-source", 512, false, "deck icon (source above 16 MiB)"),
+        ("small", 48, false, "deck icon (48 px, valid cache)"),
+    ]
+    for (name, edge, expectsPage, expectation) in requests {
+        let directory = name == "private" ? privateFixtures : fixtures
+        let file = directory.appendingPathComponent("\(name).rtms")
         let start = DispatchTime.now()
         do {
-            let image = try thumbnail(file, edge: edge, type: .thumbnail)
+            let image = try thumbnail(file, edge: edge)
             try save(image, to: output.appendingPathComponent("\(name).png"))
             let pageDifference = distance(image, reference)
             let passed: Bool
             let metrics: String
-            if name == "café" {
+            if expectsPage {
                 let aspect = Double(image.width) / Double(image.height)
+                let pixels = samples(image)
+                let lastRow = pixels.count - sampleSide * 4
+                let lastPixel = pixels.count - 4
+                let corners = [0, (sampleSide - 1) * 4, lastRow, lastPixel]
+                let edgeAlpha = corners.map { pixels[$0 + 3] }.min() ?? 0
                 passed = abs(aspect - 16.0 / 9) < 0.02 && pageDifference < 0.08
-                metrics = "aspect \(aspect), page 1 distance \(pageDifference)"
+                    && (edge <= 720 || (image.width > 720 && edgeAlpha >= 250))
+                metrics = "\(image.width)×\(image.height) px, aspect \(aspect), minimum corner alpha \(edgeAlpha), page 1 distance \(pageDifference)"
             } else {
                 guard let iconContext = CGContext(data: nil, width: Int(edge), height: Int(edge),
                                                   bitsPerComponent: 8, bytesPerRow: 0,
@@ -106,10 +121,6 @@ func checkThumbnails(fixtures: URL, output: URL) throws {
                 DeckIcon.draw(in: iconContext, size: CGSize(width: edge, height: edge))
                 guard let icon = iconContext.makeImage() else { throw ProbeError.absentRepresentation }
                 try save(icon, to: output.appendingPathComponent("\(name)-deck-icon.png"))
-                // Keep the system's icon as additional evidence alongside our drawing reference.
-                if let system = try? thumbnail(file, edge: edge, type: .icon) {
-                    try save(system, to: output.appendingPathComponent("\(name)-system-icon.png"))
-                }
                 let iconDifference = distance(image, icon)
                 passed = iconDifference < 0.12 && pageDifference > 0.14
                 metrics = "deck icon distance \(iconDifference), page 1 distance \(pageDifference)"
@@ -136,7 +147,8 @@ enum Probe {
                 guard text.uppercased().contains(arguments[2]) else { throw ProbeError.missingText }
             } else {
                 try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
-                                    output: URL(fileURLWithPath: arguments[1], isDirectory: true))
+                                    output: URL(fileURLWithPath: arguments[1], isDirectory: true),
+                                    privateFixtures: URL(fileURLWithPath: arguments[2], isDirectory: true))
             }
         } catch {
             fputs("Probe failed: \(error)\n", stderr)

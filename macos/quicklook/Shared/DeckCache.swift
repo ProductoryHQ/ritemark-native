@@ -29,39 +29,77 @@ enum DeckCache {
     }
 
     struct Source {
+        private static let limit = 16 * 1024 * 1024
         let path: String
-        let bytes: Data
+        let sha256: String
+        private let info: stat
 
-        init(_ requestedURL: URL) throws {
-            // Match the writer's native realpath, including Darwin's /private prefixes.
-            let resolved = requestedURL.withUnsafeFileSystemRepresentation { path in
-                path.flatMap { realpath($0, nil) }
+        init?(_ requestedURL: URL) {
+            guard let resolved = Self.realPath(requestedURL) else { return nil }
+            let fd = open(resolved, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
+            guard fd >= 0 else { return nil }
+            let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+            defer { try? handle.close() }
+            var before = stat()
+            guard fstat(fd, &before) == 0, before.st_mode & S_IFMT == S_IFREG,
+                  before.st_size <= Self.limit else { return nil }
+            var hash = SHA256()
+            var count = 0
+            do {
+                while let chunk = try handle.read(upToCount: min(64 * 1024, Self.limit + 1 - count)),
+                      !chunk.isEmpty {
+                    count += chunk.count
+                    guard count <= Self.limit else { return nil }
+                    hash.update(data: chunk)
+                }
+            } catch {
+                return nil
             }
-            defer { free(resolved) }
-            let url = resolved.map { URL(fileURLWithFileSystemRepresentation: $0, isDirectory: false, relativeTo: nil) }
-                ?? requestedURL
-            path = resolved.map { String(cString: $0).precomposedStringWithCanonicalMapping } ?? ""
-            bytes = try Data(contentsOf: url)
+            path = resolved.precomposedStringWithCanonicalMapping
+            sha256 = hash.finalize().map { String(format: "%02x", $0) }.joined()
+            info = before
+            guard count == before.st_size, matches(requestedURL) else { return nil }
         }
 
+        // Recheck the file identity and revision before replying, without a second read.
         func matches(_ requestedURL: URL) -> Bool {
-            guard let latest = try? Source(requestedURL) else { return false }
-            return latest.path == path && latest.bytes == bytes
+            guard let resolved = Self.realPath(requestedURL),
+                  resolved.precomposedStringWithCanonicalMapping.utf8.elementsEqual(path.utf8) else { return false }
+            var current = stat()
+            return lstat(resolved, &current) == 0
+                && current.st_dev == info.st_dev && current.st_ino == info.st_ino
+                && current.st_size == info.st_size
+                && current.st_mtimespec.tv_sec == info.st_mtimespec.tv_sec
+                && current.st_mtimespec.tv_nsec == info.st_mtimespec.tv_nsec
+                && current.st_ctimespec.tv_sec == info.st_ctimespec.tv_sec
+                && current.st_ctimespec.tv_nsec == info.st_ctimespec.tv_nsec
+        }
+
+        private static func realPath(_ url: URL) -> String? {
+            // Darwin realpath preserves /private and canonical filesystem spelling.
+            let resolved = url.withUnsafeFileSystemRepresentation { path in
+                path.flatMap { Darwin.realpath($0, nil) }
+            }
+            defer { free(resolved) }
+            return resolved.flatMap { String(validatingUTF8: $0) }
         }
     }
 
+    // Foundation's home APIs can return the extension's sandbox container.
+    private static let realHome: String? = {
+        guard let home = getpwuid(getuid())?.pointee.pw_dir else { return nil }
+        return String(validatingUTF8: home)
+    }()
+
     static func pdf(for source: Source, hostID: String) -> Data? {
-        guard !source.path.isEmpty else {
-            log.info("Cache miss: source realpath unavailable")
-            return nil
-        }
         guard hostID.range(of: #"\A[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+\z"#, options: .regularExpression) != nil,
-              let home = NSHomeDirectoryForUser(NSUserName()) else {
+              let home = realHome else {
             log.info("Cache miss: host ID or user home unavailable")
             return nil
         }
+        let root = "\(home)/Library/Caches/\(hostID)/quicklook/v1"
         let key = digest(Data(source.path.utf8))
-        let homeFD = open(URL(fileURLWithPath: home).resolvingSymlinksInPath().path, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
+        let homeFD = open(home, O_RDONLY | O_DIRECTORY | O_CLOEXEC)
         guard homeFD >= 0 else {
             log.info("Cache miss: opening user home failed, errno \(errno)")
             return nil
@@ -85,12 +123,13 @@ enum DeckCache {
               !json.contains(0), String(data: json, encoding: .utf8) != nil,
               let entry = try? JSONDecoder().decode(Entry.self, from: json),
               entry.isValid, entry.source.utf8.elementsEqual(source.path.utf8),
-              digest(source.bytes) == entry.sourceSha256,
+              source.sha256 == entry.sourceSha256,
               let pdf = read("slides.pdf", in: directory, limit: 50 * 1024 * 1024),
               digest(pdf) == entry.pdfSha256 else {
             log.info("Cache miss: entry or PDF could not be read or validated")
             return nil
         }
+        log.info("Cache hit: \(root, privacy: .public)")
         return pdf
     }
 

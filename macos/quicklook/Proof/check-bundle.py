@@ -1,4 +1,5 @@
 """Validate the built proof bundle and the Swift class named in its plist."""
+import json
 import plistlib
 import subprocess
 import sys
@@ -16,7 +17,10 @@ with (bundle.parent / f"{name}.entitlements").open("rb") as stream:
     entitlements = plistlib.load(stream)
 executable = contents / "MacOS" / info["CFBundleExecutable"]
 principal = extension["NSExtensionPrincipalClass"]
+product = json.loads((Path(__file__).resolve().parents[3] / "branding/product.json").read_text(encoding="utf-8"))
 checks = {
+    "CFBundleShortVersionString": (info.get("CFBundleShortVersionString"), product["ritemarkVersion"]),
+    "CFBundleVersion": (info.get("CFBundleVersion"), product["ritemarkVersion"]),
     "CFBundlePackageType": (info["CFBundlePackageType"], "XPC!"),
     "CFBundleIdentifier": (info["CFBundleIdentifier"], f"ai.productory.ritemark.deck-{kind.lower()}"),
     "NSExtensionPointIdentifier": (extension["NSExtensionPointIdentifier"], f"com.apple.quicklook.{kind.lower()}"),
@@ -24,7 +28,7 @@ checks = {
     "QLSupportedContentTypes": (extension["NSExtensionAttributes"]["QLSupportedContentTypes"], ["ai.productory.ritemark.deck"]),
     "CFBundleExecutable": (info["CFBundleExecutable"], name),
     "Minimum macOS": (info["LSMinimumSystemVersion"], "12.0"),
-    "Host ID": (info["RitemarkHostBundleIdentifier"], "ai.productory.ritemark"),
+    "Host ID": (info["RitemarkHostBundleIdentifier"], product["darwinBundleIdentifier"]),
     "Searchable items": (attrs["QLSupportsSearchableItems"], False),
     "Entitlements": (entitlements, {
         "com.apple.security.app-sandbox": True,

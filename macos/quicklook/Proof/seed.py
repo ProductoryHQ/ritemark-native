@@ -37,13 +37,13 @@ def fixture_pdf():
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 960 540] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 960 540] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 720 405] /Resources << /Font << /F1 7 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 720 405] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>",
     ]
     for drawing in (
-        b"0.8 0.15 0.2 rg 0 0 480 540 re f 0.1 0.25 0.8 rg 480 0 480 540 re f "
-        b"1 1 1 rg BT /F1 64 Tf 175 250 Td (PROOF SLIDE ONE) Tj ET",
-        b"0.1 0.7 0.3 rg 0 0 960 540 re f 1 1 1 rg BT /F1 64 Tf 175 250 Td (PROOF SLIDE TWO) Tj ET",
+        b"0.8 0.15 0.2 rg 0 0 360 405 re f 0.1 0.25 0.8 rg 360 0 360 405 re f "
+        b"1 1 1 rg BT /F1 48 Tf 131 188 Td (PROOF SLIDE ONE) Tj ET",
+        b"0.1 0.7 0.3 rg 0 0 720 405 re f 1 1 1 rg BT /F1 48 Tf 131 188 Td (PROOF SLIDE TWO) Tj ET",
     ):
         objects.append(b"<< /Length %d >>\nstream\n" % len(drawing) + drawing + b"\nendstream")
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
@@ -60,16 +60,21 @@ def fixture_pdf():
     return bytes(pdf)
 
 
-def seed(root, fixtures):
+def seed(root, fixtures, private_fixtures):
     pdf = fixture_pdf()
     (fixtures / "expected.pdf").write_bytes(pdf)
-    for name in ("café", "small", "stale", "mixed", "linked-file", "linked-entry", "oversize", "oversize-manifest", "missing"):
-        source = fixtures / f"{name}.rtms"
+    for name in ("café", "private", "small", "stale", "mixed", "linked-file", "linked-entry",
+                 "oversize", "oversize-manifest", "large-source", "missing"):
+        source = (private_fixtures if name == "private" else fixtures) / f"{name}.rtms"
         original = b"# Fixture\n\nPROOF ORIGINAL SOURCE\n"
+        if name == "large-source":
+            original += b" " * (16 * 1024 * 1024)
         source.write_bytes(original)
         if name == "missing":
             continue
         path, key = source_identity(source)
+        if name == "private" and not path.startswith("/private/tmp/"):
+            raise ValueError(f"Expected a native /private/tmp path, got {path}")
         entry = root / key
         entry.mkdir(parents=True)
         print(f"{path}\t{entry}")
@@ -104,4 +109,4 @@ def seed(root, fixtures):
 
 
 if __name__ == "__main__":
-    seed(Path(sys.argv[1]), Path(sys.argv[2]))
+    seed(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]))

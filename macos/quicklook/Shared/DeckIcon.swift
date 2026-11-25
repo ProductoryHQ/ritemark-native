@@ -2,23 +2,31 @@ import AppKit
 import UniformTypeIdentifiers
 
 enum DeckIcon {
-    static func draw(in context: CGContext, size: CGSize) {
-        let bounds = CGRect(origin: .zero, size: size)
+    private static let image: NSImage? = {
         let workspace = NSWorkspace.shared
         if let type = UTType("ai.productory.ritemark.deck") {
             let icon = workspace.icon(for: type)
-            let generic = workspace.icon(for: .data)
-            let genericDocument = workspace.icon(for: .item)
             if let bytes = icon.tiffRepresentation,
-               bytes != generic.tiffRepresentation, bytes != genericDocument.tiffRepresentation,
-               draw(icon, in: context, bounds: bounds) {
-                return
+               bytes != workspace.icon(for: .data).tiffRepresentation,
+               bytes != workspace.icon(for: .item).tiffRepresentation {
+                return icon
             }
         }
-
         // TODO(Experience): install DeckIcon.icns from experiences/decks/file-icon/.
-        if let url = Bundle.main.url(forResource: "DeckIcon", withExtension: "icns"),
-           let icon = NSImage(contentsOf: url), draw(icon, in: context, bounds: bounds) {
+        return Bundle(for: ResourceBundle.self)
+            .url(forResource: "DeckIcon", withExtension: "icns").flatMap { NSImage(contentsOf: $0) }
+    }()
+    private final class ResourceBundle: NSObject {}
+    private static let imageLock = NSLock()
+
+    static func draw(in context: CGContext, size: CGSize) {
+        if let image {
+            imageLock.lock()
+            defer { imageLock.unlock() }
+            NSGraphicsContext.saveGraphicsState()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            image.draw(in: CGRect(origin: .zero, size: size))
             return
         }
 
@@ -46,12 +54,4 @@ enum DeckIcon {
         context.strokePath()
     }
 
-    private static func draw(_ image: NSImage, in context: CGContext, bounds: CGRect) -> Bool {
-        var target = bounds
-        guard let cgImage = image.cgImage(forProposedRect: &target, context: nil, hints: nil) else {
-            return false
-        }
-        context.draw(cgImage, in: bounds)
-        return true
-    }
 }

@@ -45,7 +45,10 @@ cp "$ROOT/branding/icons/icon.icns" "$STAND_IN/Contents/Resources/Ritemark.icns"
 cp "$SOURCE/Proof/Host.plist" "$STAND_IN/Contents/Info.plist"
 host_id="$(plutil -extract CFBundleIdentifier raw -o - "$STAND_IN/Contents/Info.plist")"
 [[ "$host_id" == "$(plutil -extract darwinBundleIdentifier raw -o - "$ROOT/branding/product.json")" ]]
-cache="$HOME/Library/Caches/$host_id/quicklook/v1"
+real_home="$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')"
+cache="$real_home/Library/Caches/$host_id/quicklook/v1"
+private_fixtures="$(mktemp -d /private/tmp/ritemark-quicklook.XXXXXX)"
+mkdir -p "$private_fixtures"/{default,elected}
 printf 'Host ID: %s\nCache root: %s\n' "$host_id" "$cache" > "$PROOF/cache.txt"
 "$ROOT/scripts/stamp-deck-document-type.sh" "$STAND_IN" | tee "$PROOF/deck-type.txt"
 
@@ -62,7 +65,7 @@ codesign --force --sign - "$STAND_IN"
 codesign -dv "$STAND_IN" > "$PROOF/Ritemark.codesign.txt" 2>&1
 codesign --verify --deep --strict --verbose=2 "$STAND_IN" 2>&1 | tee "$PROOF/codesign-verify.txt"
 
-python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/fixtures" >> "$PROOF/cache.txt"
+python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/fixtures" "$private_fixtures/default" >> "$PROOF/cache.txt"
 xcrun swiftc -module-cache-path "$WORK/module-cache" "$SOURCE"/Shared/*.swift \
   "$SOURCE/Preview/PreviewProvider.swift" "$SOURCE/Proof/preview-payload.swift" -o "$WORK/preview-payload"
 "$WORK/preview-payload" "$WORK/fixtures" "$host_id" | tee "$PROOF/preview-payload.tsv"
@@ -136,7 +139,7 @@ exercise() {
   local first_line status=0
   first_line="$(wc -l < "$PROOF/provider-stream.txt")"
   printf '\n## %s requests\n\n' "$phase" >> "$RESULTS"
-  "$WORK/probe" "$fixtures" "$output/png" > "$output/thumbnails.txt" 2>&1 || status=1
+  "$WORK/probe" "$fixtures" "$output/png" "$private_fixtures/$phase" > "$output/thumbnails.txt" 2>&1 || status=1
   if ! sed -n '/^- /p' "$output/thumbnails.txt" | grep . >> "$RESULTS"; then
     printf -- '- Thumbnail probe setup failed. See [%s log](%s/thumbnails.txt).\n' "$phase" "$phase" >> "$RESULTS"
   fi
@@ -150,6 +153,15 @@ exercise() {
       sed 's/^/- Provider reply — /' "$output/reply.txt" >> "$RESULTS"
     else
       printf -- '- FAIL missing provider reply evidence for %s.\n' "$description" >> "$RESULTS"
+      status=1
+    fi
+  done
+  local kind
+  for kind in Thumbnail Preview; do
+    if grep -F "RitemarkDeck$kind" "$output/providers.txt" | grep -F "Cache hit: $cache" > "$output/reply.txt"; then
+      printf -- '- PASS sandboxed %s cache hit at `%s`.\n' "$kind" "$cache" >> "$RESULTS"
+    else
+      printf -- '- FAIL expected sandboxed %s cache hit at `%s`.\n' "$kind" "$cache" >> "$RESULTS"
       status=1
     fi
   done
@@ -170,7 +182,7 @@ else
   qlmanage -r
   qlmanage -r cache
   mkdir -p "$WORK/elected-fixtures"
-  python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/elected-fixtures" >> "$PROOF/cache.txt"
+  python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/elected-fixtures" "$private_fixtures/elected" >> "$PROOF/cache.txt"
   if exercise elected "$WORK/elected-fixtures"; then
     printf '\nBoth Quick Look points passed after explicit registration and election.\n' | tee -a "$RESULTS"
   else

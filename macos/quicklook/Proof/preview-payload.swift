@@ -8,7 +8,7 @@ enum PreviewProof {
         let fixtures = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         let hostID = CommandLine.arguments[2]
         let expectedPDF = try Data(contentsOf: fixtures.appendingPathComponent("expected.pdf"))
-        for name in ["café", "alias", "stale", "mixed", "linked-file", "linked-entry", "oversize", "oversize-manifest", "missing"] {
+        for name in ["café", "alias", "stale", "mixed", "linked-file", "linked-entry", "oversize", "oversize-manifest", "large-source", "missing"] {
             let url = fixtures.appendingPathComponent("\(name).rtms")
             let (type, _, bytes) = try PreviewProvider.payload(for: url, hostID: hostID)
             if name == "café" || name == "alias" {
@@ -17,13 +17,13 @@ enum PreviewProof {
                       CGPDFDocument(provider)?.numberOfPages == 2 else {
                     fatalError("\(name): expected two-page fixture PDF")
                 }
-                print("\(name)\tPDF\t2 pages")
+                print("\(name)\tPASS expected fixture PDF\t2 pages")
             } else {
                 let source = try Data(contentsOf: url)
                 guard type == .plainText, bytes == source else {
                     fatalError("\(name): expected exact current source bytes")
                 }
-                print("\(name)\tplain text\t\(bytes.count) bytes")
+                print("\(name)\tPASS expected exact current plain text\t\(bytes.count) bytes")
             }
         }
         do {
@@ -31,7 +31,7 @@ enum PreviewProof {
             fatalError("Expected system read error")
         } catch let error as NSError where error.domain == NSCocoaErrorDomain
             && error.code == NSFileReadNoSuchFileError {
-            print("absent.rtms (intentionally missing source)\t\(error.domain)\t\(error.code)")
+            print("absent.rtms (intentionally missing source)\tPASS expected \(error.domain)\t\(error.code)")
         }
     }
 }

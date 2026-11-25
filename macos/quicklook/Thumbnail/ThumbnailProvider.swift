@@ -45,7 +45,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
                 Self.slots.signal()
             }
             let hostID = Bundle(for: Self.self).object(forInfoDictionaryKey: "RitemarkHostBundleIdentifier") as? String ?? ""
-            guard let source = try? DeckCache.Source(request.fileURL),
+            guard let source = DeckCache.Source(request.fileURL),
                   let pdf = DeckCache.pdf(for: source, hostID: hostID),
                   let provider = CGDataProvider(data: pdf as CFData),
                   let document = CGPDFDocument(provider), let page = document.page(at: 1),
@@ -56,7 +56,14 @@ final class ThumbnailProvider: QLThumbnailProvider {
 
             let width = min(maximum.width, maximum.height * 16 / 9)
             let bounds = CGRect(x: 0, y: 0, width: width, height: width * 9 / 16)
-            let transform = page.getDrawingTransform(.mediaBox, rect: bounds, rotate: 0, preserveAspectRatio: true)
+            let mediaBox = page.getBoxRect(.mediaBox)
+            guard mediaBox.width > 0, mediaBox.height > 0 else {
+                finish(nil)
+                return
+            }
+            let scale = bounds.width / mediaBox.width
+            let transform = CGAffineTransform(scaleX: scale, y: scale)
+                .translatedBy(x: -mediaBox.minX, y: -mediaBox.minY)
             finish(QLThumbnailReply(contextSize: bounds.size, drawing: { context in
                 let elapsed = (DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1_000_000
                 DeckCache.log.info("Thumbnail PDF page 1 in \(elapsed) ms")

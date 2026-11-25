@@ -22,16 +22,13 @@ final class PreviewProvider: QLPreviewProvider, QLPreviewingController {
     }
 
     static func payload(for url: URL, hostID: String) throws -> (UTType, CGSize, Data) {
-        let source = try DeckCache.Source(url)
-        if let pdf = DeckCache.pdf(for: source, hostID: hostID),
+        if let source = DeckCache.Source(url),
+           let pdf = DeckCache.pdf(for: source, hostID: hostID),
            let provider = CGDataProvider(data: pdf as CFData),
-           let document = CGPDFDocument(provider), let page = document.page(at: 1) {
-            let current = try DeckCache.Source(url)
-            if current.path == source.path && current.bytes == source.bytes {
-                return (.pdf, page.getBoxRect(.mediaBox).size, pdf)
-            }
-            return (.plainText, .zero, current.bytes)
+           let document = CGPDFDocument(provider), let page = document.page(at: 1),
+           source.matches(url) {
+            return (.pdf, page.getBoxRect(.mediaBox).size, pdf)
         }
-        return (.plainText, .zero, source.bytes)
+        return (.plainText, .zero, try Data(contentsOf: url, options: .alwaysMapped))
     }
 }

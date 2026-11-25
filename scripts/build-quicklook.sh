@@ -14,6 +14,8 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 host_id="$(plutil -extract darwinBundleIdentifier raw -o - "$ROOT/branding/product.json")"
 
+version="$(plutil -extract ritemarkVersion raw -o - "$ROOT/branding/product.json")"
+
 for kind in Thumbnail Preview; do
   executable="RitemarkDeck$kind"
   bundle="$WORK/$executable.appex/Contents"
@@ -29,6 +31,8 @@ for kind in Thumbnail Preview; do
   xcrun lipo "$binary" -verify_arch arm64 x86_64
   cp "$SOURCE/$kind/Info.plist" "$bundle/"
   plutil -replace RitemarkHostBundleIdentifier -string "$host_id" "$bundle/Info.plist"
+  plutil -insert CFBundleShortVersionString -string "$version" "$bundle/Info.plist"
+  plutil -insert CFBundleVersion -string "$version" "$bundle/Info.plist"
   # TODO(Experience): supply DeckIcon.icns from product/design/experience/experiences/decks/file-icon/.
   if [[ -f "$SOURCE/Shared/Resources/DeckIcon.icns" ]]; then
     cp "$SOURCE/Shared/Resources/DeckIcon.icns" "$bundle/Resources/"
