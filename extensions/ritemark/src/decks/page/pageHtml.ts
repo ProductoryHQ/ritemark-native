@@ -720,9 +720,8 @@ svg { flex: none; }
  *
  *  - The quiet line, Contents, More's ×, the toast, the picture view, Copy, the Open in links and the ticks' rings are left
  *    out. Each slide (its layer, shown one at a time on screen) is laid out above its part's text (More's, on screen),
- *    at 576 × 324 (about 152 mm, inside A4's and Letter's printed width at these margins), in the theme's fonts and
- *    colours: the slide alone may print its colours exactly (`print-color-adjust`), the rest prints as the browser sets
- *    it, on white.
+ *    across the text column at 16:9, with the wall's ground and the theme's fonts. The slide alone prints its colours
+ *    exactly (`print-color-adjust`), and the handout prints on white.
  *  - A slide stays with its text (`break-after: avoid`), and a part is kept off two pages where it fits
  *    (`break-inside: avoid`; a part longer than a page breaks as it must).
  *  - A prompt keeps its box as a line around it (backgrounds may not print); a step's tick box likewise.
@@ -741,18 +740,17 @@ export const PRINT_CSS = `
   html, body { height: auto; overflow: visible; background: #FFFFFF; }
   body { font-size: 10.5pt; line-height: 1.5; color: #33365A; --ink: #1C1F4A; --text: #33365A; --muted: #6B6F94; --label: #8A5A00; --line: #DADCE4; --soft: #F4F4FA; --link: #1C1F4A; }
   .ground, .line, .prog, .toc, .toast, .zoom, .restart, .sclose, .copy, .prompt .open, .cb-tools, .empty { display: none !important; }
-  /* 1 px inside the paper's right margin (Sprint 170 PR 3): a box as wide as the column (a Button's row, a prompt) had
-     its right line at the page's clip edge, and the print drew it half or not at all. */
-  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0 1px 0 0; gap: 0; }
+  /* Keep the column centred and its box outlines inside the paper's clip edges. */
+  .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0 1px; gap: 0; }
   .view, .frame, .side { display: contents !important; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
-  .layer { position: relative; inset: auto; display: block; width: 576px; height: 324px; margin: 0 0 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--slidebg); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: auto; }
+  .layer { position: relative; inset: auto; display: block; width: 100%; margin: 0 auto 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--ground); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: 16 / 9; }
   .layer:not(.on):not(.leaving) { display: block; }
-  body.bl .layer { border-radius: 0; background: transparent; box-shadow: inset 0 0 0 1px #E7E8F2; }
+  body.bl .layer { border-radius: 0; box-shadow: inset 0 0 0 1px #E7E8F2; }
   /* In the flow and zoomed, not scaled: a transformed 960 x 540 canvas keeps its full height in the layout, and a page
      break below a slide drew a sliver of it at the foot of the page. */
-  .layer > .deck-slide { position: relative; inset: auto; display: block; width: 576px; height: 324px; overflow: hidden; }
-  .layer .deck-sl { position: absolute; transform: none !important; zoom: 0.6; width: 960px; height: 540px; overflow: hidden; }
+  .layer > .deck-slide { position: relative; inset: auto; display: block; container-type: inline-size; overflow: hidden; }
+  .layer .deck-sl { position: absolute; transform: none !important; zoom: calc(100cqw / 960px); width: 960px; height: 540px; overflow: hidden; }
   .layer .deck-sl [data-reveal-hidden] { visibility: visible; }
   .layer .deck-sl.is-blocks .photo { top: 0; bottom: 0; }
   .layer .deck-sl.is-blocks.pic-left .photo { left: 0; width: 384px; }
@@ -785,7 +783,8 @@ export const PRINT_CSS = `
   .paddr:empty { display: none; }
   /* Sprint 163: a slide with tabs prints every tab, one after another, each under its name: the slide grows down to
      hold them, and nothing scrolls or fades on paper. */
-  .layer:has(.blk-tabs), .layer:has(.blk-tabs) > .deck-slide { height: auto; }
+  .layer:has(.blk-tabs) { aspect-ratio: auto; }
+  .layer:has(.blk-tabs) > .deck-slide { height: auto; }
   .layer:has(.blk-tabs) .deck-sl { position: relative; height: auto; min-height: 540px; }
   .layer:has(.blk-tabs) .deck-sl.is-blocks .blk-flow { position: relative; inset: auto; display: block; margin: 46px 64px 34px; overflow: visible; }
   .layer:has(.blk-tabs) .deck-sl.is-blocks.pic-left .blk-flow { margin-left: 432px; }
@@ -910,7 +909,6 @@ function pageColours(deck: PublicDeck): string {
     stepbg: on.box,
     stepline: on.boxl,
     quiet: dark ? 'rgba(255,255,255,.5)' : 'rgba(28,31,74,.42)',
-    slidebg: borderless ? 'transparent' : deck.theme.bg,
     // The quiet line: its words and buttons on the ground (the theme's ink, softened), as Productory's web decks have it.
     lstrong: on.hd,
     lbtn: dark ? 'rgba(255,255,255,.78)' : 'rgba(28,31,74,.74)',
