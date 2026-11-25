@@ -3,19 +3,14 @@
  * computer's global state, `ritemark.guidance.v1`. Nothing is ever written in a
  * project's folder, so "Nothing in this folder was moved or changed" stays true.
  *
- * Per project (by its folder's normalized URI): the ready request's record.
- * Saved days and open-source Home history span releases. The existing week
- * question keeps its per-release counter and answer until it is replaced.
- *
- * Sprint 156: the AI last seen ready on this profile, in a key of its own,
- * `ritemark.guidance.lastReadyAi`, holding only the AI's id. It is kept apart
- * from `ritemark.guidance.v1`, which a window rewrites whole, so one window's
- * write can't undo another's record. #926: the projects whose `ready_card_shown` was sent, in a key of their own,
- * `ritemark.guidance.readyCardCounted`, for the same reason.
+ * The Memento keeps ready requests, saved days, and the old week question.
+ * Its separate AI and ready-card count keys still share one value that a
+ * different window can overwrite. Home presentations and Star live in the
+ * home-presentations folder in extension global storage.
  * No `vscode` import: it takes a Memento-shaped store.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentId } from '../agent/types';
@@ -38,13 +33,12 @@ export interface GuidanceStateV1 {
   positiveReaction?: true;
   /** null means an earlier build already ran on this profile. */
   firstAppRun?: string | null;
-  home?: { presentations: HomePresentation[]; starred?: true };
   release?: { id: string; savedDays: string[]; feedback?: 'sent' | 'not-now' };
 }
 
 interface HomePresentation {
-  releaseId: string;
   day: string;
+  appRun: string;
   dismissed?: true;
 }
 
@@ -55,14 +49,14 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const isDay = (value: unknown): value is string => typeof value === 'string' && DAY.test(value);
 const daysOf = (value: unknown): string[] => Array.isArray(value) ? value.filter(isDay) : [];
 
-function decodeHomeHistory(value: unknown): GuidanceStateV1['home'] {
+function decodeHomeHistory(value: unknown) {
   if (!value || typeof value !== 'object') return undefined;
   const { presentations, starred } = value as Record<string, unknown>;
-  const history: HomePresentation[] = [];
+  const history: Array<HomePresentation & { releaseId: string }> = [];
   if (Array.isArray(presentations)) {
     for (const entry of presentations) {
       if (entry && typeof entry.releaseId === 'string' && isDay(entry.day)) {
-        history.push({ releaseId: entry.releaseId, day: entry.day, ...(entry.dismissed === true ? { dismissed: true } : {}) });
+        history.push({ releaseId: entry.releaseId, day: entry.day, appRun: '', ...(entry.dismissed === true ? { dismissed: true } : {}) });
       }
     }
   }
@@ -87,14 +81,12 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
     }
   }
   const release = value.release as Record<string, unknown> | undefined;
-  const home = decodeHomeHistory(value.home);
   return {
     v: 1,
     projects,
     savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_FEEDBACK),
     ...(value.positiveReaction === true ? { positiveReaction: true } : {}),
     ...(typeof value.firstAppRun === 'string' || value.firstAppRun === null ? { firstAppRun: value.firstAppRun } : {}),
-    ...(home ? { home } : {}),
     ...(typeof value.readyShownOn === 'string' && DAY.test(value.readyShownOn) ? { readyShownOn: value.readyShownOn } : {}),
     ...(release && typeof release.id === 'string'
       ? {
@@ -115,23 +107,70 @@ export interface HomeEligibility {
   readyRequest?: boolean;
 }
 
+const RELEASE_MARKER = /^(?:\d(?:[\da-z.+-]{0,126}[\da-z])?|release-[a-f0-9]{64})$/;
+
+function markerName(release: string): string {
+  return RELEASE_MARKER.test(release) ? release : `release-${createHash('sha256').update(release).digest('hex')}`;
+}
+
+function hasCode(error: unknown, code: string): boolean {
+  return (error as NodeJS.ErrnoException)?.code === code;
+}
+
+async function readPresentation(file: string): Promise<HomePresentation | undefined> {
+  const stat = await fs.stat(file).catch((error) => {
+    if (hasCode(error, 'ENOENT')) return undefined;
+    throw error;
+  });
+  if (!stat?.isFile()) return undefined;
+  try {
+    const entry = JSON.parse(await fs.readFile(file, 'utf8'));
+    if (isDay(entry?.day) && typeof entry.appRun === 'string') {
+      return { day: entry.day, appRun: entry.appRun, ...(entry.dismissed === true ? { dismissed: true } : {}) };
+    }
+  } catch {
+    // The exclusive create itself consumes the presentation.
+  }
+  return { day: localDay(stat.mtime), appRun: '' };
+}
+
+async function replacePresentation(file: string, entry: HomePresentation): Promise<void> {
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(temporary, JSON.stringify(entry), { flag: 'wx' });
+    await fs.rename(temporary, file);
+  } finally {
+    await fs.rm(temporary, { force: true });
+  }
+}
+
 // Orders read-modify-write for stores sharing one Memento.
 const pendingWrites = new WeakMap<MementoLike, Promise<unknown>>();
 
 export class GuidanceStore {
+  private readonly homeFolder?: string;
+  private readonly legacyHome;
+  private homeMigration?: Promise<void>;
+
   constructor(
     private readonly memento: MementoLike,
     readonly version: string,
     private readonly appRelease = version,
-    private readonly globalStoragePath?: string,
-  ) {}
+    globalStoragePath?: string,
+  ) {
+    this.homeFolder = globalStoragePath && join(globalStoragePath, 'home-presentations');
+    this.legacyHome = decodeHomeHistory(memento.get<{ home?: unknown }>(GUIDANCE_KEY)?.home);
+  }
 
   read(): GuidanceStateV1 {
     return decodeGuidanceState(this.memento.get(GUIDANCE_KEY));
   }
 
   private serialize<T>(operation: (state: GuidanceStateV1) => Promise<T>): Promise<T> {
-    const result = (pendingWrites.get(this.memento) ?? Promise.resolve()).then(() => operation(this.read()));
+    const result = (pendingWrites.get(this.memento) ?? Promise.resolve()).then(async () => {
+      await this.migrateHome();
+      return operation(this.read());
+    });
     pendingWrites.set(this.memento, result.catch(() => undefined));
     return result;
   }
@@ -165,17 +204,17 @@ export class GuidanceStore {
     return this.change((state) => state.readyShownOn === day ? state : { ...state, readyShownOn: day });
   }
 
-  noteDocumentSaved(scheme: string, at: Date, countForWeekQuestion: boolean): Promise<void> {
-    return scheme === 'file' ? this.noteSavedDay(localDay(at), countForWeekQuestion) : Promise.resolve();
+  noteDocumentSaved(scheme: string, at: Date, hasProjectGuidance: boolean): Promise<void> {
+    return scheme === 'file' && hasProjectGuidance ? this.noteSavedDay(localDay(at)) : Promise.resolve();
   }
 
-  noteSavedDay(day: string, countForWeekQuestion = true): Promise<void> {
+  noteSavedDay(day: string): Promise<void> {
     if (!isDay(day)) return Promise.resolve();
     return this.change((state) => {
       const savedDays = state.savedDays.length >= SAVED_DAYS_FOR_FEEDBACK || state.savedDays.includes(day)
         ? state.savedDays : withSavedDay(state.savedDays, day);
       const release = this.release(state);
-      if (countForWeekQuestion && !release.savedDays.includes(day) && release.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) {
+      if (!release.savedDays.includes(day) && release.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) {
         return { ...state, savedDays, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } };
       }
       return savedDays === state.savedDays ? state : { ...state, savedDays };
@@ -194,63 +233,100 @@ export class GuidanceStore {
     });
   }
 
-  homeEligible(input: HomeEligibility, state = this.read()): boolean {
-    if (!input.appRun || state.firstAppRun === undefined || state.firstAppRun === input.appRun) return false;
-    if (input.whatMoved || (input.readyRequest && state.readyShownOn === input.day)) return false;
-    if (state.home?.starred || (!state.positiveReaction && state.savedDays.length < SAVED_DAYS_FOR_FEEDBACK)) return false;
-
-    const history = state.home?.presentations ?? [];
-    if (history.some((entry) => entry.releaseId === this.appRelease)) return false;
-    // The previous calendar year's matching day has aged out of the allowance.
-    const cutoff = `${Number(input.day.slice(0, 4)) - 1}${input.day.slice(4)}`;
-    return history.filter((entry) => entry.day > cutoff).length < 3;
+  private migrateHome(): Promise<void> | undefined {
+    const folder = this.homeFolder;
+    const history = this.legacyHome;
+    if (!folder || !history) return;
+    return this.homeMigration ??= (async () => {
+      await fs.mkdir(folder, { recursive: true });
+      for (const { releaseId, ...entry } of history.presentations) {
+        const file = join(folder, markerName(releaseId));
+        try {
+          await fs.writeFile(file, JSON.stringify(entry), { flag: 'wx' });
+        } catch (error) {
+          if (!hasCode(error, 'EEXIST')) throw error;
+          // Older builds created empty markers alongside their Memento entries.
+          if ((await fs.stat(file)).size === 0) await replacePresentation(file, entry);
+        }
+      }
+      if (history.starred) await this.writeStar(folder);
+    })().catch((error) => {
+      this.homeMigration = undefined;
+      throw error;
+    });
   }
 
-  /** The marker arbitrates across windows. Memento keeps the presentation history. */
-  reserveHomePresentation(input: HomeEligibility): Promise<boolean> {
-    return this.serialize(async (state) => {
-      if (!this.homeEligible(input, state)) return false;
-      try {
-        if (!this.globalStoragePath) throw new Error('Global storage path is unavailable');
-        const folder = join(this.globalStoragePath, 'home-presentations');
-        const filename = /^\d(?:[\da-z.+-]{0,126}[\da-z])?$/.test(this.appRelease)
-          ? this.appRelease
-          : `release-${createHash('sha256').update(this.appRelease).digest('hex')}`;
-        await fs.mkdir(folder, { recursive: true });
-        const marker = await fs.open(join(folder, filename), 'wx').catch((error: NodeJS.ErrnoException) => {
-          if (error.code === 'EEXIST') return undefined;
-          throw error;
-        });
-        if (!marker) return false;
-        await marker.close();
-      } catch (error) {
-        console.warn('Ritemark: Could not reserve a Home presentation', error);
-        return false;
-      }
-      const presentations = state.home?.presentations ?? [];
-      await this.memento.update(GUIDANCE_KEY, {
-        ...state,
-        home: { presentations: [...presentations, { releaseId: this.appRelease, day: input.day }] },
-      });
-      return true;
+  private async writeStar(folder: string): Promise<void> {
+    await fs.writeFile(join(folder, 'starred'), '', { flag: 'wx' }).catch((error) => {
+      if (!hasCode(error, 'EEXIST')) throw error;
     });
+  }
+
+  async homeEligible(input: HomeEligibility): Promise<boolean> {
+    await this.migrateHome();
+    const state = this.read();
+    if (!input.appRun || state.firstAppRun === undefined || state.firstAppRun === input.appRun) return false;
+    if (input.whatMoved || (input.readyRequest && state.readyShownOn === input.day)) return false;
+    if (!state.positiveReaction && state.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) return false;
+
+    const folder = this.homeFolder;
+    if (!folder) return true;
+    const files = await fs.readdir(folder).catch((error): string[] => {
+      if (hasCode(error, 'ENOENT')) return [];
+      throw error;
+    });
+    if (files.includes('starred') || files.includes(markerName(this.appRelease))) return false;
+    // The previous calendar year's matching day has aged out of the allowance.
+    const cutoff = `${Number(input.day.slice(0, 4)) - 1}${input.day.slice(4)}`;
+    const history = await Promise.all(files.filter((file) => RELEASE_MARKER.test(file))
+      .map((file) => readPresentation(join(folder, file))));
+    return history.filter((entry) => entry && entry.day > cutoff && entry.day <= input.day).length < 3;
+  }
+
+  async openHomePresentation(appRun: string): Promise<HomePresentation | undefined> {
+    await this.migrateHome();
+    if (!this.homeFolder || !appRun) return undefined;
+    const entry = await readPresentation(join(this.homeFolder, markerName(this.appRelease)));
+    return entry?.appRun === appRun && !entry.dismissed ? entry : undefined;
+  }
+
+  async reserveHomePresentation(input: HomeEligibility): Promise<boolean> {
+    let createdFile: string | undefined;
+    try {
+      if (!await this.homeEligible(input)) return false;
+      if (!this.homeFolder) throw new Error('Global storage path is unavailable');
+      await fs.mkdir(this.homeFolder, { recursive: true });
+      const file = join(this.homeFolder, markerName(this.appRelease));
+      const marker = await fs.open(file, 'wx').catch((error) => {
+        if (!hasCode(error, 'EEXIST')) throw error;
+      });
+      if (!marker) return false;
+      createdFile = file;
+      try {
+        await marker.writeFile(JSON.stringify({ day: input.day, appRun: input.appRun }));
+      } finally {
+        await marker.close();
+      }
+      return true;
+    } catch (error) {
+      console.warn('Ritemark: Could not reserve a Home presentation', error);
+      return createdFile ? await fs.stat(createdFile).then((stat) => stat.isFile(), () => false) : false;
+    }
   }
 
   /** Call only for Not now or an accepted Star handoff. */
-  endHomePresentation(action: 'dismiss' | 'star'): Promise<void> {
-    return this.change((state) => {
-      const home = state.home;
-      if (!home?.presentations.some((entry) => entry.releaseId === this.appRelease)) return state;
-      return {
-        ...state,
-        home: {
-          ...home,
-          ...(action === 'star' ? { starred: true } : {
-            presentations: home.presentations.map((entry) => entry.releaseId === this.appRelease ? { ...entry, dismissed: true } : entry),
-          }),
-        },
-      };
-    });
+  async endHomePresentation(action: 'dismiss' | 'star'): Promise<void> {
+    const folder = this.homeFolder;
+    if (!folder) return;
+    await this.migrateHome();
+    if (action === 'star') {
+      await fs.mkdir(folder, { recursive: true });
+      await this.writeStar(folder);
+      return;
+    }
+    const file = join(folder, markerName(this.appRelease));
+    const entry = await readPresentation(file);
+    if (entry && !entry.dismissed) await replacePresentation(file, { ...entry, dismissed: true });
   }
 }
 

@@ -32,7 +32,11 @@ test('S11: migrate legacy days on upgrade, count only file saves once per local 
   await first.noteDocumentSaved('untitled', date, false);
   await second.noteDocumentSaved('vscode-remote', date, false);
   assert.equal(first.read().savedDays.length, 2);
-  await Promise.all([first.noteDocumentSaved('file', date, false), second.noteDocumentSaved('file', date, true)]);
+  await first.noteDocumentSaved('file', date, false);
+  assert.equal(first.read().savedDays.length, 2);
+  assert.deepEqual(first.release().savedDays, []);
+  await Promise.all([first.noteDocumentSaved('file', date, true), second.noteDocumentSaved('file', date, true)]);
+  assert.deepEqual(first.release().savedDays, ['2026-11-25']);
   await first.noteSavedDay('2026-11-26');
   const upgraded = new GuidanceStore(state, '2.5.0');
   assert.deepEqual(upgraded.release(), { id: '2.5', savedDays: [] });
@@ -46,73 +50,117 @@ test('S6: either threshold earns a later app run and an available slot, includin
     await fresh.initializeAppRun('first', false);
     const reloaded = new GuidanceStore(state, '2.4.0');
     await reloaded.initializeAppRun('first', true);
-    assert.equal(reloaded.homeEligible({ ...today, appRun: 'first' }), false);
+    assert.equal(await reloaded.homeEligible({ ...today, appRun: 'first' }), false);
     const upgraded = new GuidanceStore(state, '2.4.1');
     await upgraded.initializeAppRun(today.appRun, true);
-    assert.equal(upgraded.homeEligible({ ...today, whatMoved: true }), false);
+    assert.equal(await upgraded.homeEligible({ ...today, whatMoved: true }), false);
     await upgraded.noteReadyShown(today.day);
-    assert.equal(upgraded.homeEligible({ ...today, readyRequest: true }), false);
-    assert.equal(upgraded.homeEligible(today), true);
+    assert.equal(await upgraded.homeEligible({ ...today, readyRequest: true }), false);
+    assert.equal(await upgraded.homeEligible(today), true);
   }
   const previousInstall = new GuidanceStore(profile({ positiveReaction: true }), '2.4.0');
   await previousInstall.initializeAppRun(today.appRun, true);
-  assert.equal(previousInstall.homeEligible(today), true);
+  assert.equal(await previousInstall.homeEligible(today), true);
 });
 
-test('S7: one reservation per public release on a shared Memento, including concurrent calls', async () => {
-  const state = profile({ positiveReaction: true });
+test('S7: separate windows share a reservation that survives a stale Memento write', async () => {
   const storage = makeTempDir('rm-home-');
-  const first = new GuidanceStore(state, '2.4.0', '2.4.0', storage);
-  const second = new GuidanceStore(state, '2.4.0-ext.1', '2.4.0', storage);
-  await first.initializeAppRun(today.appRun, true);
-  assert.deepEqual(await Promise.all([first.reserveHomePresentation(today), second.reserveHomePresentation(today)]), [true, false]);
-  assert.equal(await first.reserveHomePresentation(today), false);
-  assert.deepEqual(first.read().home, { presentations: [{ releaseId: '2.4.0', day: today.day }] });
-  await first.endHomePresentation('dismiss');
-  assert.equal(second.read().home?.presentations[0].dismissed, true);
-  const next = new GuidanceStore(state, '2.4.1', '2.4.1', storage);
-  assert.equal(await next.reserveHomePresentation(today), true);
-  await next.endHomePresentation('star');
-  assert.equal(new GuidanceStore(state, '2.5.0').homeEligible(today), false);
+  const initial = { positiveReaction: true, firstAppRun: null };
+  const mementos = [profile(initial), profile(initial)];
+  const windows = mementos.map((state) => new GuidanceStore(state, '2.4.0', '2.4.0', storage));
+  const results = await Promise.all(windows.map((store) => store.reserveHomePresentation(today)));
+  assert.equal(results.filter(Boolean).length, 1);
+  const winnerIndex = results.indexOf(true);
+  const winner = windows[winnerIndex];
+  const loser = windows[1 - winnerIndex];
+  await loser.noteReadyShown(today.day);
+  // Simulate VS Code delivering the loser's whole Memento to the winner.
+  await mementos[winnerIndex].update(GUIDANCE_KEY, loser.read());
+  const reloaded = new GuidanceStore(mementos[winnerIndex], '2.4.0-ext.1', '2.4.0', storage);
+  assert.deepEqual(await reloaded.openHomePresentation(today.appRun), today);
+  assert.equal(await reloaded.openHomePresentation('later'), undefined);
+  assert.equal(await reloaded.reserveHomePresentation(today), false);
+  await winner.endHomePresentation('dismiss');
+  assert.equal(await reloaded.openHomePresentation(today.appRun), undefined);
+  assert.deepEqual(JSON.parse(await fs.readFile(join(storage, 'home-presentations', '2.4.0'), 'utf8')), {
+    ...today, dismissed: true,
+  });
+
+  for (const release of ['2.4.1', '2.4.2']) {
+    assert.equal(await new GuidanceStore(profile(initial), release, release, storage).reserveHomePresentation(today), true);
+  }
+  const next = new GuidanceStore(profile(initial), '2.4.3', '2.4.3', storage);
+  assert.equal(await next.homeEligible(today), false, 'the winner still uses one of the three slots');
+  await winner.endHomePresentation('star');
+  await loser.noteReadyShown('2026-11-26');
+  assert.equal(await next.homeEligible({ ...today, day: '2027-11-25' }), false, 'Star survives after all slots age out');
 });
 
-test('S7: the fourth release waits for the rolling calendar-year allowance', async () => {
+test('S7: Star works without a presentation and is idempotent', async () => {
+  const storage = makeTempDir('rm-home-');
+  const store = new GuidanceStore(profile({ positiveReaction: true, firstAppRun: null }), '2.4.0', '2.4.0', storage);
+  assert.equal(await store.homeEligible(today), true);
+  await store.endHomePresentation('star');
+  await store.endHomePresentation('star');
+  assert.deepEqual(await fs.readdir(join(storage, 'home-presentations')), ['starred']);
+  assert.equal(await store.homeEligible(today), false);
+});
+
+test('S7: the rolling allowance uses marker days and falls back to mtime for empty or invalid JSON', async () => {
   const state = profile({ positiveReaction: true, firstAppRun: null });
   const storage = makeTempDir('rm-home-');
-  for (const [version, day] of [['2.4.0', '2025-11-26'], ['2.4.1', '2026-01-01'], ['2.4.2', '2026-03-01']]) {
+  const folder = join(storage, 'home-presentations');
+  await fs.mkdir(folder);
+  const file = join(folder, '2.4.0');
+  await fs.writeFile(file, '');
+  const mtime = new Date(2025, 10, 26, 12);
+  await fs.utimes(file, mtime, mtime);
+  for (const [version, day] of [['2.4.1', '2026-01-01'], ['2.4.2', '2026-03-01']]) {
     assert.equal(await new GuidanceStore(state, version, version, storage).reserveHomePresentation({ ...today, day }), true);
   }
   const fourth = new GuidanceStore(state, '2.4.3', '2.4.3', storage);
   assert.equal(await fourth.reserveHomePresentation(today), false);
+  await fs.writeFile(file, '{');
+  await fs.utimes(file, mtime, mtime);
+  assert.equal(await fourth.reserveHomePresentation(today), false);
   assert.equal(await fourth.reserveHomePresentation({ ...today, day: '2026-11-26' }), true);
 });
 
-test('S7: two eligible windows with separate Mementos compete for one release marker', async () => {
-  const storage = makeTempDir('rm-home-');
-  const initial = { positiveReaction: true, firstAppRun: null };
-  const windows = [profile(initial), profile(initial)].map((state) => new GuidanceStore(state, '2.4.0', '2.4.0', storage));
-  assert.ok(windows.every((store) => store.homeEligible(today)));
-  const results = await Promise.all(windows.map((store) => store.reserveHomePresentation(today)));
-  assert.deepEqual(results.sort(), [false, true]);
-  assert.equal(windows.filter((store) => store.read().home).length, 1);
-});
-
-test('S7: a marker survives an earlier run and a new release can create its own', async () => {
+test('S7: legacy Home history migrates into markers and is omitted from subsequent Memento writes', async () => {
   const storage = makeTempDir('rm-home-');
   const folder = join(storage, 'home-presentations');
   await fs.mkdir(folder);
-  await fs.writeFile(join(folder, '2.4.0'), '');
+  await fs.writeFile(join(folder, '2.3.0'), '');
   const state = profile({
     positiveReaction: true, firstAppRun: null,
-    home: { presentations: [{ releaseId: '2.3.0', day: '2026-10-01' }] },
+    home: { starred: true, presentations: [
+      { releaseId: '2.3.0', day: '2026-10-01', dismissed: true },
+      { releaseId: '2.3.1', day: '2026-10-22' },
+    ] },
   });
-  const same = new GuidanceStore(state, '2.4.0', '2.4.0', storage);
-  assert.equal(same.homeEligible(today), true);
-  assert.equal(await same.reserveHomePresentation(today), false);
-  const next = new GuidanceStore(state, '2.4.1', '2.4.1', storage);
-  assert.equal(next.homeEligible(today), true);
-  assert.equal(await next.reserveHomePresentation(today), true);
-  assert.deepEqual((await fs.readdir(folder)).sort(), ['2.4.0', '2.4.1']);
+  const store = new GuidanceStore(state, '2.4.0', '2.4.0', storage);
+  await store.noteReadyShown(today.day);
+  assert.equal(state.get<{ home?: unknown }>(GUIDANCE_KEY)?.home, undefined);
+  assert.deepEqual((await fs.readdir(folder)).sort(), ['2.3.0', '2.3.1', 'starred']);
+  assert.deepEqual(JSON.parse(await fs.readFile(join(folder, '2.3.0'), 'utf8')), {
+    day: '2026-10-01', appRun: '', dismissed: true,
+  });
+  assert.equal(await store.homeEligible(today), false);
+});
+
+test('S7: a failed JSON write still consumes the release if the exclusive create succeeded', async (t) => {
+  const storage = makeTempDir('rm-home-');
+  const store = new GuidanceStore(profile({ positiveReaction: true, firstAppRun: null }), '2.4.0', '2.4.0', storage);
+  const open = fs.open;
+  t.mock.method(fs, 'open', async (...args: Parameters<typeof fs.open>) => {
+    const marker = await open(...args);
+    t.mock.method(marker, 'writeFile', async () => { throw new Error('Write failed'); });
+    return marker;
+  });
+  const warn = t.mock.method(console, 'warn', () => {});
+  assert.equal(await store.reserveHomePresentation(today), true);
+  assert.equal(await store.reserveHomePresentation(today), false);
+  assert.equal(warn.mock.callCount(), 1);
 });
 
 test('S7: an unwritable marker folder suppresses presentation and warns', async (t) => {
@@ -129,8 +177,8 @@ test('S7: an unwritable marker folder suppresses presentation and warns', async 
   }
   const warn = t.mock.method(console, 'warn', () => {});
   const store = new GuidanceStore(profile({ positiveReaction: true, firstAppRun: null }), '2.4.0', '2.4.0', storage);
-  assert.equal(store.homeEligible(today), true);
+  assert.equal(await store.homeEligible(today), true);
   assert.equal(await store.reserveHomePresentation(today), false);
-  assert.equal(store.read().home, undefined);
+  assert.deepEqual(await fs.readdir(folder), []);
   assert.equal(warn.mock.callCount(), 1);
 });
