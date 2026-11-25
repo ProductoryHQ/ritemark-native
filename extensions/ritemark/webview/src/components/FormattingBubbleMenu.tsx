@@ -69,6 +69,7 @@ export function FormattingBubbleMenu({
   // The toolbar's tippy instance, for the re-check after a click (#687).
   const toolbarTippy = useRef<TippyInstance | null>(null)
   const stageResize = useRef<ResizeObserver | null>(null)
+  const stageScroll = useRef<(() => void) | null>(null)
   // The selection the toolbar was hidden for when the comment door opened a
   // saved comment latched (#687). It stays hidden until the selection changes
   // or the editor gets the focus again.
@@ -339,8 +340,17 @@ export function FormattingBubbleMenu({
             resize()
             stageResize.current = new ResizeObserver(resize)
             stageResize.current.observe(stage)
+            // A column or tab pane scrolling inside the slide moves the chosen words without moving the stage:
+            // update the bubble (and its hidden state) on any scroll under the stage.
+            const scrolled = () => { void instance.popperInstance?.update() }
+            stage.addEventListener('scroll', scrolled, { capture: true, passive: true })
+            stageScroll.current = () => stage.removeEventListener('scroll', scrolled, { capture: true })
           },
-          onDestroy: () => stageResize.current?.disconnect(),
+          onDestroy: () => {
+            stageResize.current?.disconnect()
+            stageScroll.current?.()
+            stageScroll.current = null
+          },
         }}
         shouldShow={({ editor, state, view, element }) => {
           // #687: hidden for a comment the door opened latched, until the
