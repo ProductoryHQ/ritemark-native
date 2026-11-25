@@ -485,7 +485,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           ref={columnGripSpot}
           style={{
             left: gripLeft(col.left + col.width / 2 - colGrip.width / 2, colGrip.width),
-            top: `var(--rm-column-grip-top, ${slideTop(box.top - gap - colGrip.height, colGrip.height)}px)`,
+            top: slideTop(box.top - gap - colGrip.height, colGrip.height),
             width: colGrip.width,
             height: colGrip.height,
             ['--rm-k' as string]: k,

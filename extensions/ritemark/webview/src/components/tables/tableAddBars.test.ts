@@ -120,12 +120,9 @@ assert.match(css, /\.rm-table-add-spot \{ position: absolute;/)
 
 const decksCss = readFileSync(new URL('../decks/decks.css', import.meta.url), 'utf8')
 const handoutFrame = decksCss.match(/\.deck-handout .wysiwyg-editor .ProseMirror > \.rm-table \{([^}]+)\}/)?.[1] ?? ''
-const margins = handoutFrame.match(/margin-block: (-\d+)px (-\d+)px;/)
-const padding = handoutFrame.match(/padding-block: (\d+)px (\d+)px;/)
-assert.ok(margins && padding)
-const [, marginTop, marginBottom] = margins.map(Number)
-const [, paddingTop, paddingBottom] = padding.map(Number)
-assert.equal(paddingBottom + Math.min(marginTop, marginBottom) + paddingTop, 8, 'adjacent handout tables have an 8 px gap')
-assert.equal(marginTop, -8, 'the handout frame overlaps preceding blocks by at most 8 px')
+assert.match(handoutFrame, /margin-block: -8px;/, 'the frame clears the 8 px paragraph margins above and below')
+assert.match(handoutFrame, /padding-block: 8px;/, 'the frame room and two inner table margins leave about 40 px between adjacent table borders')
+assert.match(layer, /const GRIP_GAP = 4\b/)
+assert.match(layer, /ref=\{columnGripSpot\}[\s\S]*?top: slideTop\(box.top - gap - colGrip.height, colGrip.height\),/)
 
 console.log('tableAddBars: passed')
