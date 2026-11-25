@@ -361,14 +361,18 @@ $ErrorActionPreference = 'Stop'
     $updateInstallLog = Join-Path $profileRoot 'Ritemark-update-install.log'
     $updateUninstallLog = Join-Path $profileRoot 'Ritemark-update-uninstall.log'
 
+    # Enable the association task in the pinned v1.14.0 installer so its
+    # .md/.markdown uninstall records carry forward into the update. It
+    # predates .rtms, so exercising a legacy .rtms record requires a pinned
+    # v2.3.x installer that logged uninsdeletevalue for the deck default.
     $previousInstall = Invoke-UserProcess `
       -Label 'previous-installer' `
       -FilePath $stagedPreviousInstaller `
       -Environment $userProcessEnvironment `
-      -ArgumentList @(
+      -ArgumentList (@(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
         "/DIR=$installRoot", "/LOG=$previousInstallLog"
-      )
+      ) + $associationTasks)
     if ($previousInstall.ExitCode -ne 0) {
       throw "The previous release's silent install failed ($($previousInstall.ExitCode))."
     }
