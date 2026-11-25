@@ -32,12 +32,13 @@ No new flag. The Excel grid sits behind the existing `excel-editing` kill switch
 | 1 | The chart reader, nothing drawn | Standard |
 | 2 | Columns, bars and lines in place; chart sheet; typed values redraw | Standard, the lead's look |
 | 3 | Pie, doughnut, area, scatter | Standard, the lead's look |
-| 4 | Combo and second axis; chosen chart and copy; thinning; out-of-scope cards | Standard, the lead's look |
+| 4 | Combo and second axis; chosen chart; thinning; out-of-scope cards | Standard, the lead's look |
+| 4b | Copy a chosen chart as a PNG (R8) | High, plus security review |
 | 5 | The rules reader and engine, nothing drawn | Standard |
 | 6 | Cell rules, colour scales and data bars drawn | Standard, the lead's look |
 | 7 | The quiet line, icon sets, a very large sheet | Standard |
 
-No PR touches `App.tsx`, `src/editorSync/`, `ritemarkEditor.ts`, `excelDocument.ts`, `excelEditorProvider.ts` or `applyCellEdits.ts`, so none is High. If one must, it is re-rated High and gets the security review before it starts.
+PR 4b adds `img-src blob:` to the Excel webview policy in `excelEditorProvider.ts` for chart Copy. It is High and gets a security review. The other PRs leave that provider untouched.
 
 ## Success Criteria
 - [ ] Each chart kind in R2 is drawn where Excel puts it, beside Excel's own render of the same file, and the Experience lead has accepted each look.
@@ -54,6 +55,8 @@ No PR touches `App.tsx`, `src/editorSync/`, `ritemarkEditor.ts`, `excelDocument.
 One line per drawn thing, in plain words, with the `release-notes` skill. For example: "A workbook's charts show where they sit, as in Excel." and "A workbook's colour rules, scales and bars colour its cells, as in Excel."
 
 PR 2’s chart text formatting and manual layout are covered by the chart entry in the unreleased changelog. Fold that entry into the v2.4.0 release notes when they are drafted.
+
+Fold PR 4b’s chart Copy entry from the unreleased changelog into the v2.4.0 release notes when drafted.
 
 ## Out of scope
 - Editing a chart or a rule; creating either; changing a chart's kind, colours or data.

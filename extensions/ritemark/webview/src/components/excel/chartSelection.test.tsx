@@ -13,7 +13,7 @@ import { isMac } from '../../hooks/usePlatform'
 
 Object.assign(globalThis, { React })
 
-async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, type: string, props?: Record<string, unknown>) => Event; focused: () => Element | undefined }) => void, variant?: 'frozen' | 'untitled' | 'adjacent' | 'separated') {
+async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, type: string, props?: Record<string, unknown>) => Event; focused: () => Element | undefined }) => void | Promise<void>, variant?: 'frozen' | 'untitled' | 'adjacent' | 'separated') {
   const fixture = new URL(
     '../../../../../../docs/development/releases/v2.3.0/sprint-158-excel/research/spike/fixtures/sales-report.xlsx', import.meta.url,
   )
@@ -79,7 +79,7 @@ async function withGrid(run: (ui: { host: Element; dispatch: (target: Element, t
   try {
     flushSync(() => root.render(<SheetGrid model={model} sheet={sheet} version={0} editable cellRules={compileCellRules(model, sheet)}
       onEdit={() => edits++} getInput={() => ''} getFormula={() => undefined} onOpenInExcel={() => {}} openInLabel="Open in Excel" />))
-    run({ host, dispatch, focused: () => active })
+    await run({ host, dispatch, focused: () => active })
     assert.equal(edits, 0)
   } finally {
     await new Promise<void>((resolve) => setImmediate(resolve))
@@ -120,6 +120,72 @@ test('worksheet chart choosing updates the formula bar until Escape or an outsid
   assert.equal(selected(), chart)
   dispatch(host.querySelector('.sg-scroller')!, 'mousedown', { button: 0, clientX: 75, clientY: 50, detail: 1 })
   assert.equal(selected(), null)
+}))
+
+test('Cmd+C copies a chosen chart from its chart or scroller and leaves formula-bar Copy native', (t) => withGrid(async ({ host, dispatch }) => {
+  const chart = host.querySelector('[data-sheet-chart]')!
+  const grid = host.querySelector('.sg-scroller')!
+  const bar = host.querySelector('textarea')!
+  const doc = host.ownerDocument!
+  Object.defineProperty(doc, 'styleSheets', { value: [] })
+  Object.defineProperty(chart.querySelector('svg'), 'viewBox', { value: { baseVal: { width: 120, height: 75 } } })
+  const createElement = doc.createElement.bind(doc)
+  const png = new Blob([], { type: 'image/png' })
+  doc.createElement = ((tag: string) => tag === 'canvas' ? {
+    getContext: () => ({ fillRect() {}, drawImage() {}, measureText: (text: string) => ({ width: text.length * 7 }) }),
+    toBlob: (callback: (value: Blob) => void) => callback(png),
+  } : createElement(tag)) as typeof doc.createElement
+
+  class ImageStub {
+    onload?: () => void
+    set src(_url: string) { queueMicrotask(() => this.onload?.()) }
+    async decode() {}
+  }
+  class ClipboardItemStub {
+    constructor(readonly data: Record<string, Promise<Blob>>) {}
+  }
+  const write = t.mock.fn(async ([item]: ClipboardItemStub[]) => assert.equal(await item.data['image/png'], png))
+  for (const [name, value] of Object.entries({
+    navigator: { clipboard: { write } },
+    Image: ImageStub,
+    XMLSerializer: class { serializeToString(node: SVGSVGElement) { return node.outerHTML } },
+    ClipboardItem: ClipboardItemStub,
+  })) {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, name)
+    Object.defineProperty(globalThis, name, { configurable: true, value })
+    t.after(() => {
+      if (previous) Object.defineProperty(globalThis, name, previous)
+      else Reflect.deleteProperty(globalThis, name)
+    })
+  }
+  const log = t.mock.method(console, 'log', () => {})
+  const cellCopies = () => log.mock.calls.filter(({ arguments: args }) => args[1]?.type === 'copyToClipboard')
+  const copy = { key: 'c', metaKey: true }
+  const settle = () => new Promise<void>((resolve) => setImmediate(resolve))
+
+  dispatch(chart, 'click', { button: 0 })
+  assert.ok(dispatch(chart, 'keydown', copy).defaultPrevented)
+  await settle()
+  assert.equal(write.mock.callCount(), 1)
+  assert.equal(cellCopies().length, 0)
+
+  assert.ok(dispatch(grid, 'keydown', { ...copy, repeat: true }).defaultPrevented)
+  assert.equal(write.mock.callCount(), 1)
+  assert.ok(dispatch(grid, 'keydown', copy).defaultPrevented)
+  await settle()
+  assert.equal(write.mock.callCount(), 2)
+  assert.equal(cellCopies().length, 0)
+
+  dispatch(bar, 'click', { button: 0 })
+  // Domino lacks the input events React's change plugin expects. The chart listener runs in capture.
+  bar.addEventListener('keydown', (event) => event.stopPropagation())
+  assert.equal(dispatch(bar, 'keydown', copy).defaultPrevented, false)
+  assert.equal(write.mock.callCount(), 2)
+  assert.equal(cellCopies().length, 0)
+
+  dispatch(chart, 'keydown', { key: 'Escape' })
+  assert.ok(dispatch(grid, 'keydown', copy).defaultPrevented)
+  assert.equal(cellCopies().length, 1)
 }))
 
 test('Tab steps cells on a chart worksheet and Shift+Tab at A1 stays in the grid', () => withGrid(({ host, dispatch }) => {

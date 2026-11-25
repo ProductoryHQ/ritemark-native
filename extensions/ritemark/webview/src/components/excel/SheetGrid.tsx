@@ -94,7 +94,7 @@ export function SheetGrid({
   const scroller = useRef<HTMLDivElement>(null)
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const focusGrid = useCallback(() => scroller.current?.focus(), [])
-  const chartSelection = useChartSelection(focusGrid)
+  const chartSelection = useChartSelection(focusGrid, scroller)
   const [viewport, setViewport] = useState({ w: 1200, h: 800 })
   const [scroll, setScroll] = useState({ x: 0, y: 0 })
   // a sort: its column and direction, and the row order worked out when it was chosen

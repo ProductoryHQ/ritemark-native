@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useState, type RefObject } from 'react'
 import * as XLSX from 'xlsx'
 import type { ChartModel } from './chartModel'
+import { copyChart } from './chartCopy'
 import { joinAdjacentRefs, parseFormulaRef, type FormulaRef, type ReferenceEndpoint } from './formulaRef'
 import { isMac } from '../../hooks/usePlatform'
 
@@ -69,7 +70,7 @@ export interface ChartSelectionTarget {
   choose: (target: HTMLDivElement, text: string) => void
 }
 
-export function useChartSelection(restoreFocus?: () => void) {
+export function useChartSelection(restoreFocus?: () => void, scroller?: RefObject<HTMLDivElement | null>) {
   const prefix = useId()
   const barId = `${prefix}-formula-bar`
   const idFor = (index: number) => `${prefix}-${index}`
@@ -85,7 +86,13 @@ export function useChartSelection(restoreFocus?: () => void) {
       const chart = chartTarget(event.target)
       if (chart && chart.getAttribute('data-sheet-chart') !== chosen.id) clear()
     }
-    const escape = (event: KeyboardEvent) => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'c'
+        && (event.target === chosen.target || event.target === scroller?.current)) {
+        event.preventDefault()
+        if (!event.repeat) void copyChart(chosen.target)
+        return
+      }
       if (event.key !== 'Escape') return
       setChosen(null)
       if (chartTarget(document.activeElement)?.getAttribute('data-sheet-chart') === chosen.id) {
@@ -99,15 +106,15 @@ export function useChartSelection(restoreFocus?: () => void) {
     }
     document.addEventListener('pointerdown', outside, true)
     document.addEventListener('click', outside, true)
-    document.addEventListener('keydown', escape, true)
+    document.addEventListener('keydown', onKeyDown, true)
     document.addEventListener('focusin', onFocus, true)
     return () => {
       document.removeEventListener('pointerdown', outside, true)
       document.removeEventListener('click', outside, true)
-      document.removeEventListener('keydown', escape, true)
+      document.removeEventListener('keydown', onKeyDown, true)
       document.removeEventListener('focusin', onFocus, true)
     }
-  }, [barId, chosen, clear, restoreFocus])
+  }, [barId, chosen, clear, restoreFocus, scroller])
   function bind(index: number, focusable = true): ChartSelectionTarget {
     const id = idFor(index)
     return {
