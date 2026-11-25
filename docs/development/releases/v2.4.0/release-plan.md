@@ -30,8 +30,10 @@ Sprints are to be numbered when planned.
 | Sprint | Issues | Scope | Status |
 |---|---|---|---|
 | 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov; [plan](sprint-173-word-folder/sprint-plan.md) |
-| 174 · Excel charts and colour rules | #971 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Approved 24 Nov; [plan](sprint-174-excel-charts/sprint-plan.md) |
-| 175 · The live deck | to file | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Approved in the roadmap 24 Nov; plan after the Cloudflare measurements and the drawings |
+| 174 · Excel charts and colour rules | #971 (open until 2.4 publishes); PRs #990 (plan), #1026, #1029–#1032, #1034–#1036, #1038, #1039 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Done 25 Nov (code and docs); four follow-ups wait on the Experience lead's Excel renders; closing proof: [research/closing-proof.md](sprint-174-excel-charts/research/closing-proof.md) |
+| 175 · The live deck | no issue (roadmap item); PRs #995 (plan), #1003, #1006, #1012, #1014–#1016, #1020, #1022, #1024, #1027, #1028 | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Done 25 Nov; S18 and the Windows checks wait for Gate 2; closing proof: [research/closing-proof.md](sprint-175-live-deck/research/closing-proof.md) |
+
+Release notes: each sprint's `release-notes-lines.md`, joined in `docs/releases/v2.4.0/release-notes.md` with the `release-notes` skill.
 
 ## Work outside sprints
 
