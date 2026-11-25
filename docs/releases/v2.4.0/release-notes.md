@@ -19,6 +19,7 @@ If you run training or share slides with clients, you can update the page they a
 
 - **See charts where they belong.** Column, bar, line, area, pie, doughnut and scatter charts appear in place, including on their own sheets. Charts update when you edit values they use.
 - **See charts with two scales.** A chart that combines columns and a line can show a separate scale for each.
+- **Copy a chart as a picture.** Click a chart, or press Cmd+Option+5 on a Mac or Ctrl+Alt+5 on Windows, then copy it to paste into a document or a message.
 - **See which cells meet your rules.** Highlights, colour scales and data bars appear in the workbook. They change as you edit values.
 
 ## Ask AI about your project documents
@@ -36,6 +37,7 @@ If you run training or share slides with clients, you can update the page they a
 
 ## Fixes
 
+- **Copy cells from an Excel workbook.** Copying cells in Ritemark's Excel view now puts their text on the clipboard.
 - **Attach Office files from chat.** The paperclip now accepts Word, Excel and PowerPoint files.
 - **Hear button names on a phone.** Screen readers now announce the More and Contents buttons by name on published deck pages.
 
