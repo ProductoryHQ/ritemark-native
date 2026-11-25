@@ -12,7 +12,7 @@ One row per [scenario](../scenarios.md). Test passes cite existing coverage and 
 | 6 | Typing 9,999 redraws the bar | pass (test: `chartLayout.test.ts`) | The sales fixture checks the new bar, and the mounted-chart test checks redraw after the version bump. |
 | 7 | Formula-backed chart stays put and the edit notice appears | not run: no recorded edit checks both the chart and the notice | `chartSeries.test.ts` checks that a formula cell supplies its stored value. |
 | 8 | Missing external workbook uses saved chart values | pass (test: `chartLayout.test.ts`, `chartSeries.test.ts`) | The lost-source chart's bar uses a saved point, and the external-reference test verifies fallback. |
-| 9 | Chart fills its own sheet and the tab keeps the icon | not run: no recorded full chart-sheet window check | `chartLayout.test.ts` checks chart-sheet recognition and layout. The Excel reference image was missing in PR 1. |
+| 9 | Chart fills its own sheet and the tab keeps the icon | pass (test window, 25 Nov, on 5407104b) | Isolated test window beside the Experience lead's Excel renders (`chart-sheet--01…03`): Revenue trend fills its sheet with the chart-sheet icon on its tab, axis 0 to 60,000 EUR in steps of 10,000 as in Excel (the first run, on 2ffede62, showed 30,000 to 57,500 and was fixed in #1043); Data's cells match; Lost source draws from its cached values with Excel's axis, colours and legend. Light and dark; no console error; the file's SHA-256 unchanged. `chartLayout.test.ts` pins the axis. |
 | 10 | Click selects the chart and updates the formula bar | pass (test: `chartSelection.test.tsx`) | PR 4 tests the sales chart's selected state, formula-bar text and ring. The real-keypress window check is recorded in `37d0fa3d`. |
 | 11 | Copy a selected chart as a picture | pass (test: `chartCopy.test.ts`, `chartSelection.test.tsx`) | PR 4b tests the Copy key path and the PNG clipboard write with a mocked clipboard (`5fd4fdab`, `9c5d7bb5`). |
 | 12 | Untitled chart has a kind-only accessible name | pass (test: `chartLayout.test.ts`) | Untitled column layout uses the name “Column chart”. |
@@ -57,4 +57,4 @@ The qa-validator signed off with open items on `7eefb46c`.
 
 - Scenarios marked not run in the table (1, 2, 7, 9, 14, 15, 16, 17, 35, 38).
 - Done in this PR with the Experience lead’s Excel renders and fixtures: `[Red]` against the rule font colour, the saved-size scatter recheck, and the ChartEx and out-of-scope cards and quiet lines.
-- Chart-sheet references remain open. Comparing the chart sheet with Excel needs a test window.
+- Chart-sheet references: done 25 Nov (scenario 9 above); the comparison found the line axis defect fixed in #1043.
