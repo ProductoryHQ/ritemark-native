@@ -14,6 +14,7 @@ import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Marked, type Tokens } from 'marked'
+import { computePosition, flip, limitShift, offset, shift, size } from '@floating-ui/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
 import { history, undo } from '@tiptap/pm/history'
@@ -480,6 +481,54 @@ for (const surface of SURFACES) {
   const css = readFileSync(fileURLToPath(new URL('../../components/decks/slide/slide.css', import.meta.url)), 'utf8')
   assert.match(css, /:is\(th, td\):is\(\[align="center"\], \[data-md-align="center"\]\) \{ text-align: center; \}/)
   assert.match(css, /:is\(th, td\):is\(\[align="right"\], \[data-md-align="right"\]\) \{ text-align: right; \}/)
+}
+
+// ---- Right-click menu (#982): size against the viewport before Radix flips, then shift any remaining overflow.
+{
+  const menuSource = readFileSync(new URL('../../components/tables/TableHandlesLayer.tsx', import.meta.url), 'utf8')
+  assert.match(menuSource, /side="bottom"\s+avoidCollisions\s+collisionPadding=\{8\}\s+className="rm-table-menu w-\[236px\] max-w-none"/)
+  const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
+  assert.match(css, /\.rm-table-menu\[data-side\] \{\s*max-height: calc\(100dvh - 16px\);\s*overflow-y: auto;/)
+  const available = '--radix-dropdown-menu-content-available-height'
+  assert.ok(css.includes(`translate: 0 min(0px, calc(var(${available}) - 100%));`))
+  assert.ok(css.includes(`translate: 0 max(0px, calc(100% - var(${available})));`))
+
+  const contentHeight = 300
+  const cases = [
+    { viewport: 800, click: 100, placement: 'bottom-start', top: 104, bottom: 404, scroll: false },
+    { viewport: 800, click: 650, placement: 'top-start', top: 346, bottom: 646, scroll: false },
+    { viewport: 480, click: 240, placement: 'bottom-start', top: 172, bottom: 472, scroll: false },
+    { viewport: 240, click: 120, placement: 'bottom-start', top: 8, bottom: 232, scroll: true },
+  ]
+  for (const { viewport, click, placement, top, bottom, scroll } of cases) {
+    const height = Math.min(contentHeight, viewport - 16)
+    let availableHeight = 0
+    const position = await computePosition({}, {}, {
+      placement: 'bottom-start',
+      strategy: 'fixed',
+      middleware: [
+        offset(4),
+        shift({ padding: 8, limiter: limitShift() }),
+        flip({ padding: 8 }),
+        size({ padding: 8, apply: result => { availableHeight = result.availableHeight } }),
+      ],
+      platform: {
+        getElementRects: () => ({
+          reference: { x: 100, y: click, width: 0, height: 0 },
+          floating: { x: 0, y: 0, width: 236, height },
+        }),
+        getClippingRect: () => ({ x: 0, y: 0, width: 800, height: viewport }),
+        getDimensions: () => ({ width: 236, height }),
+      },
+    })
+    const overflow = Math.max(0, height - availableHeight)
+    const shiftedTop = position.y + (position.placement.startsWith('top') ? overflow : -overflow)
+    assert.deepEqual(
+      { placement: position.placement, top: shiftedTop, bottom: shiftedTop + height, scroll: height < contentHeight },
+      { placement, top, bottom, scroll },
+      `menu at y=${click} in a ${viewport}px viewport`,
+    )
+  }
 }
 
 console.log('tableOps: all checks passed')

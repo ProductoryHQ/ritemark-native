@@ -107,6 +107,7 @@ const flush = async () => { for (let i = 0; i < 12; i++) await new Promise((reso
 async function main(): Promise<void> {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_000_000 });
   const { GuidanceHost } = await import('./GuidanceHost');
+  const { GuidanceStore } = await import('./guidanceStore');
   const { CodexRuntime } = await import('../codex/CodexRuntime');
   const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
   const { emitClaudeStatusInvalidated } = await import('../agent/claudeStatusEvents');
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
   const folder = makeTempDir('rm-guidance-host-');
   fs.writeFileSync(path.join(folder, 'Brief.docx'), 'x');
   const host = new GuidanceHost({
+    store: new GuidanceStore(globalState, '2.2.0'),
     context: {
       extension: { packageJSON: { version: '2.2.0' } },
       globalState,
@@ -521,6 +523,7 @@ async function main(): Promise<void> {
   await host.readyCardShown(input.folderUri, shown);
   assert.deepEqual(cardCounts(), [], 'the guidance record rewritten whole: still no second count');
   const reloaded = new GuidanceHost({
+    store: new GuidanceStore(globalState, '2.3.0'),
     context: { extension: { packageJSON: { version: '2.3.0' } }, globalState, secrets: { onDidChange: none, get: async () => undefined } } as never,
     folder: undefined, runtimeAvailability: availability as never, startChat: async () => {}, startCodexSignIn, stopCodexSignIn,
     give: async () => null, hasWorkingTurn: () => false, setStartingPlace: () => {}, onTurnAccepted: none, onChatOrigin: none, claudeSignIn,
