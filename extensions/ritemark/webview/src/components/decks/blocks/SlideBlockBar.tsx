@@ -23,14 +23,15 @@ import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { Icon, type PhosphorIconName } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
+import { isMac } from '../../../hooks/usePlatform'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
-  dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type ChosenBlock,
 } from './blockBar'
-import { caretBoxIcon, caretBoxPos, markableBox } from './slideDivView'
+import { markableBox } from './slideDivView'
 import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
 import { SlideIconPickerContent } from './SlideBlockTools'
 import { SlideIconGlyph } from '../slide/SlideIconGlyph'
@@ -187,25 +188,64 @@ function SmilePlusGlyph() {
   )
 }
 
-function BoxIconButton({ box, trigger, onPick }: {
+function BoxIconButton({ box, trigger, onPick, focusEditor }: {
   box: NonNullable<ReturnType<typeof caretBoxIcon>>
   trigger: { current: HTMLButtonElement | null }
   onPick: (name: string | null) => void
+  focusEditor: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const openedByKeyboard = useRef(false)
+  const pickedByKeyboard = useRef(false)
+  const returnFocus = useRef<'trigger' | 'editor' | null>(null)
+  useEffect(() => {
+    if (!open) return
+    // An icon's tooltip can close the picker on Escape before the menu sees the key.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
+        returnFocus.current = openedByKeyboard.current ? 'trigger' : 'editor'
+      }
+    }
+    window.addEventListener('keydown', onEscape, true)
+    return () => window.removeEventListener('keydown', onEscape, true)
+  }, [open])
   return (
-    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <Tooltip label="Icon (Alt+F10): Choose or remove the box icon" suppressed={open}>
+    <DropdownMenu modal={false} open={open} onOpenChange={next => {
+      if (next) {
+        pickedByKeyboard.current = false
+        returnFocus.current = null
+      }
+      setOpen(next)
+    }}>
+      <Tooltip label={`Icon (${isMac ? '⌥F10' : 'Alt+F10'}): Choose or remove the box icon`} suppressed={open}>
         <DropdownMenuTrigger asChild>
-          <Button ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10" onMouseDown={event => event.preventDefault()}>
+          <Button
+            ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
+            onMouseDown={event => event.preventDefault()}
+            onPointerDownCapture={() => { openedByKeyboard.current = false }}
+            onKeyDownCapture={event => {
+              if (!open && ['Enter', ' ', 'ArrowDown'].includes(event.key)) openedByKeyboard.current = true
+            }}
+          >
             <SlideIconGlyph name={box.glyph} size={16} />
           </Button>
         </DropdownMenuTrigger>
       </Tooltip>
-      <SlideIconPickerContent current={box.current} onPick={onPick} onCloseAutoFocus={event => {
-        event.preventDefault()
-        trigger.current?.focus({ preventScroll: true })
-      }} />
+      <SlideIconPickerContent
+        current={box.current}
+        onKeyDownCapture={event => { pickedByKeyboard.current = event.key === 'Enter' || event.key === ' ' }}
+        onPointerUpCapture={() => { pickedByKeyboard.current = false }}
+        onInteractOutside={() => { returnFocus.current = null }}
+        onPick={name => {
+          returnFocus.current = openedByKeyboard.current && pickedByKeyboard.current ? 'trigger' : 'editor'
+          onPick(name)
+        }}
+        onCloseAutoFocus={event => {
+          event.preventDefault()
+          if (returnFocus.current === 'trigger') trigger.current?.focus({ preventScroll: true })
+          if (returnFocus.current === 'editor') focusEditor()
+        }}
+      />
     </DropdownMenu>
   )
 }
@@ -318,7 +358,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const press = (event: PointerEvent) => { if (event.defaultPrevented) return; setOpen(true); later() }
     // Tab moves between boxes. Alt+F10 moves from the text to its Icon control.
     const focusToolbar = (event: KeyboardEvent) => {
-      if (event.key !== 'F10' || !event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented) return
+      if (!isBoxIconShortcut(event)) return
       if (!frame || !caretBoxIcon(editor.state) || !chosenBlockAt(editor.state) || buttonAt(editor.state)) return
       event.preventDefault()
       if (iconTrigger.current) {
@@ -375,7 +415,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [frame])
   // Esc or a press outside the bar and the slide closes it (the slide's frame is its trigger: a press there is the
   // block's own, and opens it again).
-  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, enabled: showing })
+  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, returnFocus: () => null, enabled: showing })
 
   // Under the block, the page's own size; above it when there is no room under it; never off the window.
   // Inside the slide's pane (the Experience lead on #773): when the bar is wider than the pane, its own group folds
@@ -633,6 +673,14 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
             <div
               ref={barRef}
               className="deck-block-bar"
+              onKeyDown={event => {
+                // Radix may consume Escape to dismiss a tooltip over a toolbar button.
+                if (event.key !== 'Escape' || event.nativeEvent.isComposing
+                  || !event.currentTarget.contains(event.target as Node)) return
+                event.preventDefault()
+                editor.view.focus()
+                setOpen(false)
+              }}
               role="toolbar"
               aria-label={`${BAR_KIND_LABEL[chosen.kind]} block`}
               style={{ left: barAt?.left ?? -9999, top: barAt?.top ?? -9999 }}
@@ -676,6 +724,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   <BoxIconButton
                     box={placed.caretBox}
                     trigger={iconTrigger}
+                    focusEditor={() => editor.view.focus()}
                     onPick={name => {
                       const box = caretBoxIcon(editor.state)
                       if (box && box.pos === placed.caretBox?.pos) {

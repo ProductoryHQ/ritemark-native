@@ -34,11 +34,11 @@ import { loadSlide, loadSlideWithComments, saveSlide } from './slideEditorHarnes
 import { saveSlideMarkdown } from './slideEditorMarkdown'
 import { editorHTML } from '../../../utils/markdownFidelity'
 import { SlideSync } from './slideSync'
-import { caretBoxIcon, markableBox } from './slideDivView'
+import { markableBox } from './slideDivView'
 import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
+  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, caretBoxIcon, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
   FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind,
   MARK_LABEL, MARK_MENU_TIP, MARK_TIP, divAttributesOf, setBoxesMark,
 } from './blockBar'
@@ -696,11 +696,18 @@ stable(COLUMNS, 'three columns')
   assert.equal(caretBoxIcon(stateWith(picked, 'Unknown'))?.glyph, 'truck')
   assert.equal(caretBoxIcon(stateWith(picked, 'Known'))?.glyph, 'lightbulb')
 
-  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
-  assert.match(bar, /placed\.caretBox \? \([\s\S]*?<BoxIconButton/)
-  assert.match(bar, /<SlideIconGlyph name=\{box\.glyph\}/)
-  assert.match(bar, /<SlideIconPickerContent current=\{box\.current\} onPick=\{onPick\}/)
-  assert.match(bar, /apply\(setBlockValue\(editor\.state, box\.pos, 'icon', name\)\)/)
+  for (const look of OWN_MARK_LOOKS) {
+    const ownMark = markdown.replace(':::: boxes', `:::: {.boxes look="${look}"}`)
+    assert.equal(caretBoxIcon(stateWith(ownMark, 'Known')), null, look)
+  }
+
+  const shortcut = { key: 'F10', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, defaultPrevented: false }
+  assert.equal(isBoxIconShortcut(shortcut), true)
+  assert.equal(isBoxIconShortcut({ ...shortcut, key: 'F9' }), false)
+  assert.equal(isBoxIconShortcut({ ...shortcut, altKey: false }), false)
+  for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'defaultPrevented'] as const) {
+    assert.equal(isBoxIconShortcut({ ...shortcut, [key]: true }), false, key)
+  }
 }
 
 // ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.

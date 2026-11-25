@@ -17,15 +17,15 @@
  * No icon named “xyz” with Choose an icon. The name stays in the file as written until another icon is chosen.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconBadge } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg } from '../slide/pageIcons'
-import { boxIconOf, UNKNOWN_ICON } from '../slide/iconSet'
+import { boxIconOf } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
-import { divAttributesOf, revealWrappedList } from './blockBar'
+import { boxLookAt, caretBoxPos, divAttributesOf, revealWrappedList } from './blockBar'
 
 /** What the stage does when a box's icon is used (SlideEditor gives it; it reads its latest state). */
 export interface SlideDivHandlers {
@@ -42,15 +42,6 @@ export function unknownIconWords(name: string): string {
 
 /** The block's attributes, read from its opening line as written. */
 const attributesOf: (node: PMNode) => FenceAttributes = divAttributesOf
-
-/** The Boxes look a box is drawn under: its parent's, or Boxes. */
-function lookAround(getPos: () => number | undefined, doc: () => PMNode): string {
-  const pos = getPos()
-  if (pos === undefined) return 'boxes'
-  const parent = doc().resolve(pos).parent
-  if (parent.type.name !== 'slideDiv') return 'boxes'
-  return attributesOf(parent).values.look ?? 'boxes'
-}
 
 /** The attributes the block bar's values are drawn with (`boxesDrawnAttributes`, `columnsDrawnAttributes`). */
 const DRAWN = ['data-count', 'data-many', 'data-width', 'data-fill', 'data-align', 'data-valign', 'style'] as const
@@ -153,7 +144,7 @@ class SlideDivView implements NodeView {
     const deco = this.deco
     if (!deco) return
     // A box: its icon, an arrow under the Arrows look, nothing under Steps and Line (they draw their own mark).
-    const look = lookAround(this.getPos, this.doc)
+    const look = boxLookAt(this.doc(), this.getPos())
     // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
     const badge = boxIconBadge(attrs.values.icon)
     deco.removeAttribute('data-icon')
@@ -225,25 +216,6 @@ class SlideDivView implements NodeView {
 
 /** The box the caret is in: its empty icon place shows, and only there (17 November). */
 export const CARET_CLASS = 'is-caret'
-
-/** The position of the innermost box (`::: box`) holding the selection's head, or null. */
-export function caretBoxPos(state: EditorState): number | null {
-  const $head = state.selection.$head
-  for (let depth = $head.depth; depth > 0; depth--) {
-    const node = $head.node(depth)
-    if (node.type.name === 'slideDiv' && slideBlockClassOf(attributesOf(node)) === 'box') return $head.before(depth)
-  }
-  return null
-}
-
-/** The caret's box and its icon, including an unknown name as written. */
-export function caretBoxIcon(state: EditorState) {
-  const pos = caretBoxPos(state)
-  const node = pos === null ? null : state.doc.nodeAt(pos)
-  if (pos === null || !node) return null
-  const icon = boxIconOf(attributesOf(node).values.icon)
-  return { pos, current: icon?.name ?? null, glyph: icon?.phosphor ?? UNKNOWN_ICON }
-}
 
 /**
  * The element the caret's mark may go on: a box this view draws, in the page. Anything else (another node's element

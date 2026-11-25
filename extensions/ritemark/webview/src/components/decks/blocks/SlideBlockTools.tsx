@@ -43,9 +43,10 @@ export function SlideIconPicker({ pick, onPick, onClose }: { pick: IconPick | nu
   )
 }
 
-export function SlideIconPickerContent({ current, onPick, onCloseAutoFocus }: ComponentProps<typeof IconGridItems> & Pick<ComponentProps<typeof DropdownMenuContent>, 'onCloseAutoFocus'>) {
+export function SlideIconPickerContent({ current, onPick, ...contentProps }: ComponentProps<typeof IconGridItems> &
+  Pick<ComponentProps<typeof DropdownMenuContent>, 'onCloseAutoFocus' | 'onInteractOutside' | 'onKeyDownCapture' | 'onPointerUpCapture'>) {
   return (
-    <DropdownMenuContent align="start" className="w-auto max-w-none" onCloseAutoFocus={onCloseAutoFocus}>
+    <DropdownMenuContent align="start" className="w-auto max-w-none" {...contentProps}>
       <IconGridItems current={current} onPick={onPick} />
     </DropdownMenuContent>
   )
