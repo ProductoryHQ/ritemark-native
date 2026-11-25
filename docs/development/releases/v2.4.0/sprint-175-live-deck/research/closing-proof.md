@@ -27,3 +27,14 @@ The table records evidence available in the merged tests and PR commit bodies fo
 | S21 | The timetable. | pass (test window, PR 3) | The test window exercised the minutes box (`db483c53`). `timetable.test.ts`, `timetableDisplay.test.ts`, `DeckMinutes.test.ts` and `timetableList.test.ts` cover the timing rules and controls. Still check entry down the full list, the over-session foot and a slide copied from the library. | Experience 51, frames 8–9 |
 
 The shipped Go on can accept an outside-folder file within the project. Over-limit files still block the update (`liveUpdate.test.ts`, spec R12). A moved page can pause the update when Ritemark refuses the page path or cannot write the page there. Recognition of an arbitrary move is unproven.
+
+## Closing check (25 Nov)
+
+The qa-validator signed off with open items on `7eefb46c`.
+
+- S5 (Windows path case and links).
+- S18 (a page published by 2.3, then one Update).
+- Windows checks (OneDrive-held pictures, 150 % chip scaling).
+- Live repeats on the release build at Gate 2 for the scenarios marked "pass (test)" that name a test account, phone or test window (S1, S2, S3, S6, S7, S9, S11, S16, S17 and S21).
+
+#1015's open nit (a page found outside the project at the last check went offline instead of pausing) was fixed in #1024: `deckPublish.ts` now pauses there with the outside-project message.

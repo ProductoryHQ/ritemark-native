@@ -47,3 +47,10 @@ One row per [scenario](../scenarios.md). Test passes cite existing coverage and 
 
 - Rule font colour versus a number format's `[Red]` — not run: waiting for the lead's Excel file.
 - Windows — not run: no Windows test-window or clipboard check is recorded.
+
+## Closing check (25 Nov)
+
+The qa-validator signed off with open items on `7eefb46c`.
+
+- Scenarios marked not run in the table (1, 2, 7, 9, 13, 14, 15, 16, 17, 35, 38).
+- Four follow-ups awaiting the Experience lead's Excel renders: `[Red]` against the rule font colour, the scatter recheck, chartex fixtures, chart-sheet references.

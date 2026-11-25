@@ -9,20 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
-- Select an Excel chart and press Cmd+C or Ctrl+C to copy it as a picture.
-
-- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar.
-- Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
-- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
-- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar.
-- Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
-- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
-- Excel previews also explain when a chart sheet contains a chart they can’t draw.
-
-- Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
-- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
-- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values. Today rules follow the local date, and the notice identifies Excel icon sets kept in the file.
-- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use. They follow the workbook’s text formatting and chart layout.
+- Select an Excel chart and press Cmd+C or Ctrl+C to copy it as a picture (#1038).
+- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar (#1036).
+- Excel column, bar, line, pie, doughnut, area and scatter charts appear in their original positions and on chart sheets. Column, bar and line charts update when you change a number they use and follow the workbook’s text formatting and chart layout (#1031, #1034).
+- Excel previews explain when a chart sheet contains a chart they can’t draw (#1035).
+- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values. Today rules follow the local date, and the notice identifies Excel icon sets kept in the file (#1032, #1035).
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - When you open a deck, the status bar shows its slide count in place of the word count.
 - Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.
@@ -42,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).

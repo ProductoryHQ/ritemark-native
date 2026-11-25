@@ -19,6 +19,9 @@ Branch: `sprint-175-live-deck`, made from `main` before the first code edit; PRs
 PR 5 and PR 6 may be built side by side; PR 7 waits for both. PR 2 to PR 4 are independent of 1, 5 to 8 and can go first or between.
 
 ## Per-PR checklist
+
+The per-PR boxes are recorded in each PR's **Review record** comment on GitHub, which is authoritative; they are not ticked here.
+
 - [ ] Branch checked: not `main`.
 - [ ] Tests that fail first, then pass; targeted while working; the full chain once on the final head, output to a file.
 - [ ] Review at the tier, every finding answered, **Review record** comment naming the head.
@@ -26,5 +29,6 @@ PR 5 and PR 6 may be built side by side; PR 7 waits for both. PR 2 to PR 4 are i
 - [ ] `docs/development/vscode-patches.md` untouched (no patch changes).
 
 ## Closing
-- [ ] `qa-validator` before the sprint-end merge.
+
+- [x] `qa-validator` (25 Nov, on 7eefb46c: signed off with open items)
 - [ ] Windows checks (path case and links out of the deck's folder, OneDrive-held pictures, 150 % scaling of the chip) as short separate tasks; the rest at Gate 2.
