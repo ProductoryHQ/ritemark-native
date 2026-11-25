@@ -74,6 +74,10 @@
 :where(:root:not([data-input-mode="pointer"])) .deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
 
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+.slide-formatting-bubble > .tippy-box[data-reference-hidden] {
+  visibility: hidden;
+  pointer-events: none;
+}
 .deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
 /* README item 19: the Theme menu's transition, played once over the stage's slide (TransitionPreview). */
 .deck-transition-preview { position: absolute; inset: 0; z-index: 6; overflow: hidden; pointer-events: none; }
