@@ -262,8 +262,17 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
     dom.addEventListener('pointerleave', out)
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => rerender())
     resize?.observe(view.table)
+    // A scroll moves the table in its frame: the handles follow at once (#1051), once a frame.
+    let frame = 0
+    const scrolled = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => { frame = 0; rerender() })
+    }
+    window.addEventListener('scroll', scrolled, { capture: true, passive: true })
     return () => {
       window.clearTimeout(leave)
+      window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', scrolled, { capture: true })
       dom.removeEventListener('pointermove', move)
       dom.removeEventListener('pointerleave', out)
       resize?.disconnect()
@@ -430,6 +439,9 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const clipBottom = clip.y ? clip.y.top + clip.y.height : undefined
   const tableRight = box.left + box.width
   const tableBottom = box.top + box.height
+  // The add-row bar sits only at the table's own bottom edge (#1051): while that edge is scrolled out of its frame (a
+  // long table in the Text editor), there is none, rather than one floating over a row at the frame's foot.
+  const bottomInView = clipBottom === undefined || tableBottom <= clipBottom + 1
   const col = activeCol !== null ? cols[activeCol] : null
   const row = activeRow !== null ? rows[activeRow] : null
   const columnOpen = menuHere?.kind === 'column' && menuHere.col === activeCol
@@ -557,23 +569,25 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
               </Button>
             </Tooltip>
           </div>
-          <div
-            className="rm-table-add-spot"
-            style={{ left: box.left, top: clamp(tableBottom + gap, bar, clipTop, clipBottom), width: box.width, height: bar, ['--rm-k' as string]: k }}
-          >
-            <Tooltip label="Add a row" className="size-full" side="bottom">
-              <Button
-                type="button"
-                variant="ghost"
-                className="rm-table-add"
-                aria-label="Add a row"
-                onMouseDown={event => event.preventDefault()}
-                onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0))}
-              >
-                <Icon name="plus" size={12} tone="inherit" />
-              </Button>
-            </Tooltip>
-          </div>
+          {bottomInView ? (
+            <div
+              className="rm-table-add-spot"
+              style={{ left: box.left, top: clamp(tableBottom + gap, bar, clipTop, clipBottom), width: box.width, height: bar, ['--rm-k' as string]: k }}
+            >
+              <Tooltip label="Add a row" className="size-full" side="bottom">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="rm-table-add"
+                  aria-label="Add a row"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0))}
+                >
+                  <Icon name="plus" size={12} tone="inherit" />
+                </Button>
+              </Tooltip>
+            </div>
+          ) : null}
         </>
       ) : null}
       <DragEscape active={!!drag} onEscape={() => {
