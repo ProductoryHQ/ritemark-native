@@ -157,10 +157,15 @@ const assets: PageAssets = {
   assert.match(rule('.layer'), /background: var\(--ground\);/, 'the wall ground includes the theme glow');
   assert.ok(!/@page[^}]*size:/.test(PRINT_CSS), 'the reader\'s own paper');
   assert.match(rule('.wrap'), /padding: 0 1px;/, 'equal gutters');
-  assert.match(rule('.layer'), /width: 100%; margin: 0 auto 4mm;/, 'the slide fills and centres in the text column');
-  assert.match(rule('.layer'), /aspect-ratio: 16 \/ 9;/);
-  assert.match(rule('.layer > .deck-slide'), /container-type: inline-size;/);
-  assert.match(rule('.layer .deck-sl'), /zoom: calc\(100cqw \/ 960px\); width: 960px; height: 540px;/);
+  assert.match(rule('.layer'), /width: 576px; height: 324px; margin: 0 auto 4mm;/, 'the fixed-size fallback is centred');
+  assert.match(rule('.layer > .deck-slide'), /width: 576px; height: 324px;/);
+  assert.match(rule('.layer .deck-sl'), /zoom: 0\.6; width: 960px; height: 540px;/);
+  const fullWidth = /@supports \(zoom: calc\(1px \/ 1px\)\) \{([\s\S]*?)\n  \}/.exec(print);
+  assert.ok(fullWidth, 'full-width sizing requires CSS length division');
+  assert.doesNotMatch(print.replace(fullWidth[0], ''), /zoom:\s*calc\([^;{}]*\//, 'zoom outside the feature query uses no division');
+  assert.match(fullWidth[1], /\.layer \{ width: 100%; height: auto; aspect-ratio: 16 \/ 9; \}/);
+  assert.match(fullWidth[1], /\.layer > \.deck-slide \{ width: 100%; height: 100%; container-type: inline-size; \}/);
+  assert.match(fullWidth[1], /\.layer \.deck-sl \{ zoom: calc\(100cqw \/ 960px\); \}/);
   // The order: slide n, then part n.
   assert.equal(printOrderCss(2), '@media print{.pre{order:0}#s1{order:1}#t1{order:2}#s2{order:3}#t2{order:4}}');
   assert.equal(printOrderCss(0), '');

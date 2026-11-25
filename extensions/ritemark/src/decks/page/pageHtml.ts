@@ -720,8 +720,8 @@ svg { flex: none; }
  *
  *  - The quiet line, Contents, More's ×, the toast, the picture view, Copy, the Open in links and the ticks' rings are left
  *    out. Each slide (its layer, shown one at a time on screen) is laid out above its part's text (More's, on screen),
- *    across the text column at 16:9, with the wall's ground and the theme's fonts. The slide alone prints its colours
- *    exactly (`print-color-adjust`), and the handout prints on white.
+ *    centred at 16:9 with the wall's ground and the theme's fonts. It fills the text column where CSS length division
+ *    is supported. The slide alone prints its colours exactly (`print-color-adjust`), and the handout prints on white.
  *  - A slide stays with its text (`break-after: avoid`), and a part is kept off two pages where it fits
  *    (`break-inside: avoid`; a part longer than a page breaks as it must).
  *  - A prompt keeps its box as a line around it (backgrounds may not print); a step's tick box likewise.
@@ -744,13 +744,18 @@ export const PRINT_CSS = `
   .wrap { display: flex; flex-direction: column; align-items: flex-start; max-width: none; margin: 0; padding: 0 1px; gap: 0; }
   .view, .frame, .side { display: contents !important; }
   .wrap > *, .layer, .part, .pre, .foot { flex: none; width: 100%; }
-  .layer { position: relative; inset: auto; display: block; width: 100%; margin: 0 auto 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--ground); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: 16 / 9; }
+  .layer { position: relative; inset: auto; display: block; width: 576px; height: 324px; margin: 0 auto 4mm; visibility: visible; border-radius: 8px; overflow: hidden; background: var(--ground); break-inside: avoid; break-after: avoid; page-break-inside: avoid; page-break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; aspect-ratio: auto; }
   .layer:not(.on):not(.leaving) { display: block; }
   body.bl .layer { border-radius: 0; box-shadow: inset 0 0 0 1px #E7E8F2; }
   /* In the flow and zoomed, not scaled: a transformed 960 x 540 canvas keeps its full height in the layout, and a page
      break below a slide drew a sliver of it at the foot of the page. */
-  .layer > .deck-slide { position: relative; inset: auto; display: block; container-type: inline-size; overflow: hidden; }
-  .layer .deck-sl { position: absolute; transform: none !important; zoom: calc(100cqw / 960px); width: 960px; height: 540px; overflow: hidden; }
+  .layer > .deck-slide { position: relative; inset: auto; display: block; width: 576px; height: 324px; overflow: hidden; }
+  .layer .deck-sl { position: absolute; transform: none !important; zoom: 0.6; width: 960px; height: 540px; overflow: hidden; }
+  @supports (zoom: calc(1px / 1px)) {
+    .layer { width: 100%; height: auto; aspect-ratio: 16 / 9; }
+    .layer > .deck-slide { width: 100%; height: 100%; container-type: inline-size; }
+    .layer .deck-sl { zoom: calc(100cqw / 960px); }
+  }
   .layer .deck-sl [data-reveal-hidden] { visibility: visible; }
   .layer .deck-sl.is-blocks .photo { top: 0; bottom: 0; }
   .layer .deck-sl.is-blocks.pic-left .photo { left: 0; width: 384px; }
@@ -783,7 +788,7 @@ export const PRINT_CSS = `
   .paddr:empty { display: none; }
   /* Sprint 163: a slide with tabs prints every tab, one after another, each under its name: the slide grows down to
      hold them, and nothing scrolls or fades on paper. */
-  .layer:has(.blk-tabs) { aspect-ratio: auto; }
+  .layer:has(.blk-tabs) { height: auto; aspect-ratio: auto; }
   .layer:has(.blk-tabs) > .deck-slide { height: auto; }
   .layer:has(.blk-tabs) .deck-sl { position: relative; height: auto; min-height: 540px; }
   .layer:has(.blk-tabs) .deck-sl.is-blocks .blk-flow { position: relative; inset: auto; display: block; margin: 46px 64px 34px; overflow: visible; }
