@@ -1,7 +1,7 @@
 /**
  * 17 November 2026 (Jarmo; the Experience lead, "Nothing around the slide but the slide"): Slide settings is in the
  * slide's own menu ("slaidi settings peaks olema siin: mitte kuskil ülal tööriistaribas"): a Radix Popover anchored
- * beside the thumbnail, the part number or the point it came from, that closes on a press outside and on Esc and gives
+ * beside the thumbnail, the part number or the slide itself, that closes on a press outside and on Esc and gives
  * the focus back to where the menu was opened. The gear left the bar. The lines that sat under the slide are at the top
  * of its popup, Skip slide is only in the menu, and a library slide's thumbnail carries a badge.
  *
@@ -144,13 +144,21 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /^<Popover open=\{settingsFor !== null\} onOpenChange=\{open => \{ if \(!open\) setSettingsFor\(null\) \}\}>/)
   assert.match(popover, /<PopoverAnchor virtualRef=\{settingsAnchor\} \/>/)
   assert.doesNotMatch(popover, /PopoverTrigger/)
-  assert.match(popover, /side=\{settingsFor\?\.side \?\? 'right'\}\s+align="start"/, 'beside, top-aligned')
+  assert.match(popover, /side=\{stageSettingsOpen \? stageSettingsSide : 'right'\}\s+align=\{settingsRoom \? 'center' : 'start'\}/)
   assert.match(popover, /onCloseAutoFocus=\{event => \{[\s\S]*?back\.focus\(/, 'the focus back to where the menu was opened')
   assert.match(popover, /<PopoverContent[^>]*className="deck-settings"/, 'the popup carries the scroll rule')
-  // Its anchors: beside the thumbnail (right), beside the part number (right: the number is on the rail at the handout's left), at the slide's right-click point.
+  // A visible slide takes priority. With the stage folded, the thumbnail and part number retain their anchors.
+  assert.match(view, /const stageSlide = stageRef\.current\?\.querySelector<HTMLElement>\('\.deck-big'\)[\s\S]*?setSettingsFor\(\{ index, id, anchor: stageSlide \?\? where\.anchor, side: stageSlide \? 'stage' : where\.side \}\)/)
   assert.match(view, /settings: index => openSettings\(index, \(\) => \{\s+const thumb = stripRef\.current\?\.querySelector<HTMLElement>\(`\[data-thumb="\$\{index\}"\] \.deck-thumb-slide`\)\s+return thumb \? \{ anchor: thumb, side: 'right', back: stripRef\.current \} : null/)
   assert.match(view, /const partSettings = useCallback\(\(index: number, slot: PartMenuSlot\) => openSettings\(index, \(\) => \(\s+slot\.element\.isConnected\s+\? \{ anchor: slot\.element\.parentElement\?\.querySelector<HTMLElement>\('\.deck-part-number'\) \?\? slot\.element, side: 'right', back: slot\.element\.querySelector\('button'\) \}/)
-  assert.match(view, /anchor: \{ getBoundingClientRect: \(\) => new DOMRect\(at\.x, at\.y, 0, 0\) \}/)
+  assert.match(view, /openSettings\(currentRef\.current, anchor => \{\s+if \(!anchor\) return null[\s\S]*?return \{ anchor, side: 'stage', back: anchor\.querySelector<HTMLElement>\('\.ProseMirror'\)/)
+  // #981: the horizontal room includes the card, its gap from the slide and the viewport padding.
+  assert.match(view, /const sideRoom = SETTINGS_WIDTH \+ SETTINGS_GAP \+ SETTINGS_COLLISION_PADDING/)
+  assert.match(view, /setStageSettingsSide\(viewportWidth - slideRight >= sideRoom \? 'right'/, 'room to the right')
+  assert.match(view, /\? 'right' : slideLeft >= sideRoom \? 'left'/, 'room only to the left')
+  assert.match(view, /slideLeft >= sideRoom \? 'left' : 'bottom'\)/, 'neither side fits in a narrow window')
+  assert.match(view, /paddingBottom: settingsRoom \|\| undefined/, 'reserve room under the slide')
+  assert.match(popover, /maxHeight: .*--radix-popover-content-available-height/, 'scroll within the reserved room')
   assert.match(view, /onSlideSettings=\{stageSettings\}/)
   // The stage's right-click menu: Slide settings… at its end, after Comment, under a line.
   const editor = here('./blocks/SlideEditor.tsx')

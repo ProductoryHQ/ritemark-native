@@ -98,6 +98,8 @@ const STRIP_WIDTH = 132
 const TIMETABLE_STRIP_WIDTH = 300
 /** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
+const SETTINGS_GAP = 8
+const SETTINGS_COLLISION_PADDING = 8
 const NOTICE_MS = 8000
 /** Sprint 161 (PR 3, frame 24): the bar's line while the slide on the stage is full. */
 export const SLIDE_FULL = 'This slide is full: its words are at their smallest size.'
@@ -227,11 +229,11 @@ const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
 const JOIN_NOTE_ROOM = 12
 
-/** What the Slide settings popover is anchored to: a thumbnail, a part number's ⋯, or a point (the slide's right-click). */
+/** What the Slide settings popover is anchored to: a thumbnail, a part number’s ⋯, or the slide itself. */
 type SettingsAnchor = { getBoundingClientRect: () => DOMRect }
 
 /** Where a Slide settings… came from: what to anchor to, on which side, and where the focus goes back. */
-type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'left'; back: HTMLElement | null }
+type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'stage'; back: HTMLElement | null }
 
 /**
  * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
@@ -386,7 +388,8 @@ export function DeckView({
   const [showHandoutInNarrowView, setShowHandoutInNarrowView] = useState(false)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
-  const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
+  const [settingsFor, setSettingsFor] = useState<(Omit<SettingsPlace, 'back'> & { index: number; id?: string }) | null>(null)
+  const [stageSettingsSide, setStageSettingsSide] = useState<'right' | 'left' | 'bottom'>('right')
   const settingsAnchor = useRef<SettingsAnchor>({ getBoundingClientRect: () => new DOMRect() })
   if (settingsFor) settingsAnchor.current = settingsFor.anchor
   const settingsReturn = useRef<HTMLElement | null>(null)
@@ -748,7 +751,24 @@ export function DeckView({
   // At most half the stage: a card taller than that (All decks… in a project of many decks) scrolls with the stage
   // instead, so the slide never shrinks to nothing and the card is never unmounted by its own size (review).
   const slideCardUnder = startUnderSlide ? Math.min(slideCardRoom, Math.max(0, Math.floor(stageHeight / 2))) : 0
-  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  const normalSlideWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  const stageSettingsOpen = settingsFor?.side === 'stage'
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (!stageSettingsOpen || !stage) return
+    const { left } = stage.getBoundingClientRect()
+    // Use the slide's normal width so making room below cannot change the choice of side.
+    const slideLeft = left + (above || slideAlone ? (stageWidth - normalSlideWidth) / 2 : STAGE_MARGIN)
+    const slideRight = slideLeft + normalSlideWidth
+    const sideRoom = SETTINGS_WIDTH + SETTINGS_GAP + SETTINGS_COLLISION_PADDING
+    const viewportWidth = document.documentElement.clientWidth
+    setStageSettingsSide(viewportWidth - slideRight >= sideRoom ? 'right' : slideLeft >= sideRoom ? 'left' : 'bottom')
+  }, [stageSettingsOpen, above, slideAlone, stageWidth, normalSlideWidth, deskWidth])
+  // In a short window the slide can fill the stage vertically. Keep a scrollable portion of the popup below it.
+  const settingsRoom = stageSettingsOpen && stageSettingsSide === 'bottom' ? Math.min(180, Math.floor(stageHeight / 3)) : 0
+  const bigWidth = settingsRoom
+    ? Math.min(normalSlideWidth, fullSlideWidthFor(stageWidth, stageHeight - settingsRoom, slideAlone ? slideCardUnder : aboveUnder))
+    : normalSlideWidth
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
@@ -1285,18 +1305,19 @@ export function DeckView({
 
   /**
    * Slide settings… from a slide's menu (17 November): the slide is made current (its part scrolled to, unless it is
-   * the current one already), then, once the menu has closed and handed its focus back, the popover opens beside where
-   * the menu came from.
+   * the current one already). Once the menu hands back focus, the popover opens beside the slide if visible, or
+   * beside the menu's anchor if the slide is folded away.
    */
-  const openSettings = useCallback((index: number, place: () => SettingsPlace | null) => {
+  const openSettings = useCallback((index: number, place: (stageSlide: HTMLElement | null) => SettingsPlace | null) => {
     if (index !== currentRef.current) pick(index)
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const where = place()
+      const stageSlide = stageRef.current?.querySelector<HTMLElement>('.deck-big') ?? null
+      const where = place(stageSlide)
       if (!where) return
       settingsReturn.current = where.back
       // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
       const id = editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
-      setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
+      setSettingsFor({ index, id, anchor: stageSlide ?? where.anchor, side: stageSlide ? 'stage' : where.side })
     }))
   }, [pick, editor])
   /** From a part number's ⋯: beside the number (on its right: the number is on the rail at the handout's left), the focus back to its ⋯. */
@@ -1305,13 +1326,12 @@ export function DeckView({
       ? { anchor: slot.element.parentElement?.querySelector<HTMLElement>('.deck-part-number') ?? slot.element, side: 'right', back: slot.element.querySelector('button') }
       : null
   )), [openSettings])
-  /** From the slide's own right-click menu: at the point it was opened, the focus back to the slide's words. */
-  const stageSettings = useCallback((at: { x: number; y: number }) => openSettings(currentRef.current, () => ({
-    anchor: { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
-    side: 'right',
+  /** From the slide's own right-click menu: beside the slide, with focus returned to its words. */
+  const stageSettings = useCallback(() => openSettings(currentRef.current, anchor => {
+    if (!anchor) return null
     // A slide of a kind this build doesn't know has no editor of its own: the strip takes the focus then.
-    back: stageRef.current?.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current,
-  })), [openSettings])
+    return { anchor, side: 'stage', back: anchor.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current }
+  }), [openSettings])
 
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
   const dispatch = useCallback((tr: Transaction | null) => {
@@ -2233,7 +2253,7 @@ export function DeckView({
           <div
             ref={stageRef}
             className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}${slideAlone ? ' is-alone' : ''}`}
-            style={above ? { left: stripWidth, width: stageWidth, height: stageHeight } : { left: stripWidth, width: stageWidth }}
+            style={{ left: stripWidth, width: stageWidth, height: above ? stageHeight : undefined, paddingBottom: settingsRoom || undefined }}
           >
             {/* Above, the slide is centred over the handout's column, and alone in the room: the group is the slide's
                 own width. */}
@@ -2341,15 +2361,18 @@ export function DeckView({
       </div>
       {/* 17 November (Jarmo: "slaidi settings peaks olema siin: mitte kuskil ülal tööriistaribas"; the Experience lead,
           "Nothing around the slide"): Slide settings… in the slide's own menu opens this popover, anchored beside the
-          thumbnail, the part number or the point it came from, top-aligned with it. A Popover: a press outside or Esc
+          thumbnail, the part number or the slide itself. A Popover: a press outside or Esc
           closes it, and the focus goes back to where the menu was opened. */}
       <Popover open={settingsFor !== null} onOpenChange={open => { if (!open) setSettingsFor(null) }}>
         {settingsFor ? <PopoverAnchor virtualRef={settingsAnchor} /> : null}
         <PopoverContent
-          side={settingsFor?.side ?? 'right'}
-          align="start"
-          sideOffset={8}
-          collisionPadding={8}
+          side={stageSettingsOpen ? stageSettingsSide : 'right'}
+          align={settingsRoom ? 'center' : 'start'}
+          sideOffset={SETTINGS_GAP}
+          collisionPadding={SETTINGS_COLLISION_PADDING}
+          style={settingsRoom ? {
+            maxHeight: `min(${settingsRoom}px, var(--radix-popover-content-available-height, ${settingsRoom}px))`,
+          } : undefined}
           className="deck-settings"
           // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
           onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}

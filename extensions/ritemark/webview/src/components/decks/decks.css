@@ -334,9 +334,11 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-notice .deck-notice-icon { width: 24px; height: 24px; min-width: 24px; padding: 0; }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
-   thumbnail, the part number or the point it came from (DeckView); the bar has no gear. */
+   thumbnail, the part number or the slide itself (DeckView); the bar has no gear. */
 /* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
+/* Keep the card within the viewport even when it is narrower than the settings width. */
+.deck-settings[role="dialog"] { max-width: calc(100vw - 16px); }
 /* The popup is never taller than the room it has: it scrolls, so its last section (the deck's Card | Borderless)
    is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
 .deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
