@@ -362,7 +362,7 @@ export const GEMINI_LLM_MODELS: ModelConfig[] = [
   {
     id: GEMINI_MODEL_IDS.ARGON_4,
     name: 'Gemini 4 Argon',
-    description: "Google's flagship reasoning model",
+    description: "Retained for saved selections",
     api: 'chat',
     reasoning: 'medium',
     contextWindow: 1000000,
