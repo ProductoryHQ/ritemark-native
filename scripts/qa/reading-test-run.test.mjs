@@ -122,6 +122,23 @@ test('accepts each concrete Findings draft fact, excluding the minutes’ shared
   assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'missing');
 });
 
+test('matches the Claude title variants and headings without crediting another document', () => {
+  const fixture = { ...facts, documents: [
+    { file: '04 Drafts/Proposal phase 2 v3.docx', words: ['79,000'] },
+    { file: 'Steering group minutes 21 October.docx', words: ['18 November'] },
+    { file: '01 Brief/Engagement brief.docx', heading: 'Branch network review', words: ['42 branches'] },
+    { file: 'Findings draft 2.docx', words: ['six times'] },
+  ] };
+  const visibleAnswer = `- Proposal: phase 2 asks for €79,000 plus VAT.
+- Steering group minutes, 21 October set the board date at 18 November.
+- BRANCH NETWORK REVIEW covers 42 branches.
+- Findings says it costs six times as much.`;
+  const coverage = (text) => scoreRun({ ...sample, visibleAnswer: text }, fixture).coverage.slice(0, 4)
+    .map(({ result }) => result);
+  assert.deepEqual(coverage(visibleAnswer), ['read', 'read', 'read', 'read']);
+  assert.equal(coverage(visibleAnswer.replace('Proposal: phase 2', 'Findings draft 2'))[0], 'missing');
+});
+
 test('rejects facts attributed to the wrong fixture document', () => {
   const findings = 'Findings draft v2';
   const tellers = 'Interview – two tellers, Harbour Street';
@@ -238,7 +255,7 @@ test('checks later links after a tab close fails and closes repeated destination
     { label: 'Locked appendix', href: 'Locked%20appendix.docx#q=test' },
     { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=1' },
     { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=2' },
-    { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=3' },
+    { label: 'Another visible title', href: 'Pilot%20deck.pptx#p=3' },
   ], results);
   assert.deepEqual(seen, [facts.passwordDocument, facts.deck.file, facts.deck.file, facts.deck.file]);
   assert.match(results[0].error, /Could not close/);

@@ -44,7 +44,8 @@ function stepOf(activity: AgentProgress): Omit<ToolStep, 'id'> | undefined {
 export function stepLabel(activity: AgentProgress) {
   const step = stepOf(activity);
   if (!step) return;
-  const { path, command, status } = step;
+  const { command, status } = step;
+  const path = step.path?.trim() ? step.path : step.kind === 'read' ? activity.file : undefined;
   const warning = status === 'failed';
   const detail = [path, command].filter(Boolean).join('\n');
   if (step.kind === 'shell') {
@@ -85,7 +86,7 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
     ...previous,
     step: {
       ...step,
-      path: step.path ?? previous.step?.path,
+      path: step.path ?? previous.step?.path ?? incoming.file,
       command: step.command ?? previous.step?.command,
     },
   };

@@ -86,3 +86,12 @@ for (const tool of ['ToolSearch', 'TodoWrite', 'Task', 'Agent', 'ExitPlanMode', 
   assert.equal(updateStep(activities, { type: 'tool_use', tool, message: `Using ${tool}`, timestamp: 0 }), activities);
 }
 assert.equal(stepLabel(progress(locked, 'mcp__ritemark_documents__read_document'))?.warning, true);
+
+const proposal = '04 Drafts/Proposal phase 2 v3.docx';
+const unnamedRead: ToolStep = { id: 'proposal', kind: 'read' };
+const failedRead = progress(toolStepResult(unnamedRead, 'Tool input was rejected.', true, true));
+assert.equal(stepLabel({ ...failedRead, file: proposal })?.label, "Couldn't open Proposal phase 2 v3");
+const started = { ...progress(unnamedRead), file: proposal };
+assert.equal(stepLabel(updateStep([started], failedRead)[0])?.label, "Couldn't open Proposal phase 2 v3");
+const namedFailure = toolStepResult(unnamedRead, "Couldn't read Proposal phase 2 v3.docx. The file may be damaged.", true, true, 'damaged');
+assert.equal(stepLabel(progress(namedFailure))?.label, "Couldn't open Proposal phase 2 v3 · the file may be damaged");

@@ -538,19 +538,23 @@ function testDocumentStepEvents() {
     message: { content: [
       { type: 'tool_use', id: 'doc', name: 'mcp__ritemark_documents__read_document', input: { path: 'Reference/Locked.docx' } },
       { type: 'tool_use', id: 'ls', name: 'Glob', input: { path: 'Reference', pattern: '*.docx' } },
+      { type: 'tool_use', id: 'proposal', name: 'mcp__ritemark_documents__read_document', input: { path: '', filePath: '04 Drafts/Proposal phase 2 v3.docx' } },
     ] },
   } as Parameters<typeof processAssistantMessage>[0], files, capture);
   processToolResultMessage({
     type: 'user',
     message: { content: [
+      { type: 'tool_result', tool_use_id: 'proposal', is_error: true, content: 'Tool input was rejected.' },
       { type: 'tool_result', tool_use_id: 'ls', content: 'Reference/Locked.docx' },
       { type: 'tool_result', tool_use_id: 'doc', content: 'The file is locked.', _meta: { documentReadReason: 'password' } },
     ] },
   } as Parameters<typeof processToolResultMessage>[0], files, capture);
-  assert.deepEqual(events.map((event) => event[5]?.id), ['doc', 'ls', 'ls', 'doc']);
+  assert.deepEqual(events.map((event) => event[5]?.id), ['doc', 'ls', 'proposal', 'proposal', 'ls', 'doc']);
   assert.equal(events[0][5]?.path, 'Reference/Locked.docx');
-  assert.deepEqual(events[2][5]?.listing, ['Reference/Locked.docx']);
-  assert.equal(events[3][5]?.warning, 'it has a password');
+  assert.equal(events[3][3], '04 Drafts/Proposal phase 2 v3.docx');
+  assert.equal(events[3][5]?.status, 'failed');
+  assert.deepEqual(events[4][5]?.listing, ['Reference/Locked.docx']);
+  assert.equal(events[5][5]?.warning, 'it has a password');
   assert.deepEqual(files, []);
 }
 

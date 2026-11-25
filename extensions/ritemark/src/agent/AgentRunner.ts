@@ -1907,7 +1907,7 @@ export function processToolResultMessage(message: SDKMessage, filesModified: str
       steps?.delete(block.tool_use_id);
       const { step, tool, parentToolUseId } = activity;
       const update = toolStepResult(step, block.content, block.is_error === true, isDocumentReadTool(tool), documentReadReasonOf(block));
-      emitProgress?.(parentToolUseId ? 'subagent_progress' : 'tool_use', '', tool, step.path, { parentToolUseId }, update);
+      emitProgress?.(parentToolUseId ? 'subagent_progress' : 'tool_use', '', tool, update.path, { parentToolUseId }, update);
     }
     const file = pending?.get(block.tool_use_id);
     if (file === undefined) continue;
@@ -1951,6 +1951,7 @@ export function processAssistantMessage(
     } else if (block.type === 'tool_use') {
       const input = block.input as {
         file_path?: string;
+        filePath?: string;
         path?: string;
         command?: string;
         pattern?: string;
@@ -2005,8 +2006,8 @@ export function processAssistantMessage(
 
       let step: ToolStep | undefined;
       if (block.id && block.name) {
-        const path = input?.path ?? input?.file_path;
-        const target = typeof path === 'string' ? path : undefined;
+        const target = [input?.path, input?.file_path, input?.filePath]
+          .find((value) => typeof value === 'string' && value.trim());
         if (isDocumentReadTool(block.name) || block.name === 'Read') {
           step = { id: block.id, kind: 'read', path: target };
         } else if (block.name === 'Glob' || block.name === 'LS') {
@@ -2023,11 +2024,11 @@ export function processAssistantMessage(
 
       // If this is a subagent activity (has parent_tool_use_id), tag it
       if (parentToolUseId) {
-        emitProgress('subagent_progress', toolMessage, block.name, input?.file_path, {
+        emitProgress('subagent_progress', toolMessage, block.name, step?.path ?? input?.file_path, {
           parentToolUseId,
         }, step);
       } else {
-        emitProgress('tool_use', toolMessage, block.name, input?.file_path, undefined, step);
+        emitProgress('tool_use', toolMessage, block.name, step?.path ?? input?.file_path, undefined, step);
       }
     }
   }

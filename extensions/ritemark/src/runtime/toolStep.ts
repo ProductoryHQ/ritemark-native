@@ -41,7 +41,6 @@ export function documentReadReasonOf(output: unknown): DocumentReadReason | unde
 export function toolStepResult(step: ToolStep, output: unknown, failed: boolean, documentTool = false, reason?: DocumentReadReason): ToolStep {
   const status = failed ? 'failed' : 'completed';
   if (step.kind === 'shell' || (step.kind === 'read' && !documentTool && failed)) return { ...step, status };
-  if (step.kind === 'read' && reason) return { ...step, status: 'failed', warning: documentReadWarnings[reason] };
   const text = toolOutputText(output);
   const directory = step.kind === 'read' && !documentTool && text.includes('<type>directory</type>');
   if ((step.kind === 'folder' || directory) && !failed) {
@@ -58,6 +57,10 @@ export function toolStepResult(step: ToolStep, output: unknown, failed: boolean,
   }
   if (step.kind !== 'read' || !documentTool) return { ...step, status };
   const line = text.trimStart().split(/\r?\n/, 1)[0];
+  // Some result events have only the tool's display name for the document.
+  const reportedFile = /^Couldn't read (.+?\.(?:docx?|pdf|pptx?))(?=[:.] |$)/i.exec(line)?.[1];
+  const path = step.path?.trim() ? step.path : reportedFile;
+  if (reason) return { ...step, path, status: 'failed', warning: documentReadWarnings[reason] };
   const header = / · (?:Word|PDF|PowerPoint) · (\d+ (?:blocks?|pages?|slides?)) · (?:whole text|cut |pages? |slides? )/.exec(line);
   if (!failed && header) {
     return { ...step, status, units: header[1].includes('block') ? undefined : header[1] };
@@ -76,9 +79,9 @@ export function toolStepResult(step: ToolStep, output: unknown, failed: boolean,
     [/could not be found or opened|Check that the file is still/i, documentReadWarnings.unavailable],
     [/Ritemark couldn't (?:finish reading|read) this file/i, documentReadWarnings.worker],
   ] as const;
-  const file = step.path?.split(/[/\\]/).pop();
+  const file = path?.split(/[/\\]/).pop();
   const wording = file && line.includes(file) ? line.replace(file, '') : line;
   const warning = knownWording.find(([pattern]) => pattern.test(wording))?.[1];
   if (!failed && !warning && !text) return step;
-  return { ...step, status: 'failed', warning };
+  return { ...step, path, status: 'failed', warning };
 }

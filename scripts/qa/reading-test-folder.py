@@ -132,6 +132,14 @@ def write_word(path, body):
     scrub(path)
 
 
+def word_heading(path):
+    from docx import Document
+
+    return next((paragraph.text.strip() for paragraph in Document(path).paragraphs
+                 if paragraph.text.strip() and paragraph.style
+                 and (paragraph.style.name == 'Title' or paragraph.style.name.startswith('Heading '))), None)
+
+
 def write_pdf(path, body, scan):
     from PIL import Image, ImageDraw, ImageFont
     from reportlab.lib.pagesizes import A4
@@ -192,6 +200,7 @@ def build(folder):
             write_pdf(path, body, '(scan)' in path.name)
         documents.append({
             'file': relative, 'words': words,
+            'heading': word_heading(path) if path.suffix == '.docx' else None,
             'unreadReason': 'scan' if '(scan)' in path.name else None,
         })
 
