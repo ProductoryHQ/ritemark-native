@@ -433,10 +433,11 @@ export class DeckPages implements vscode.Disposable {
         const pending = (this.sessionEdits.get(document) ?? Promise.resolve()).then(async () => {
           if (document.isClosed) return;
           const change = sessionTimeEdit(document.getText(), field, value);
-          if (!change) return;
-          const edit = new vscode.WorkspaceEdit();
-          edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
-          if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+          if (change) {
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
+            if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+          }
           await this.post(webview, { type: 'deck/notice', text: '', kind: 'success', operation: `session-${field}` });
         }).catch(async () => {
           await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.`, kind: 'failure', operation: `session-${field}` });
@@ -555,7 +556,7 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/start-copy': {
         // The card waits for the answer: gone once the row was used, or as it is now when nothing was done
         const card = this.startCard;
-        const notice: DeckNoticeReporter = (text, kind) => void this.post(webview, { type: 'deck/notice', text, kind, operation: request.type });
+        const notice: DeckNoticeReporter = (text, kind) => void this.post(webview, { type: 'deck/notice', text, kind, operation: 'start-card' });
         const gone = !card || !isEnabled('decks') || (request.type === 'deck/start-draft'
           ? await card.draft(document, request.text, notice)
           : await card.copy(document, request.source, notice));
@@ -657,7 +658,7 @@ export class DeckPages implements vscode.Disposable {
           const write = this.writes.get(request.token);
           this.writes.delete(request.token);
           if (!write || !(await library.undoWrite(write))) {
-            await failed(null, 'The library was changed since, so it is left as it is.');
+            await this.post(webview, { type: 'deck/notice', text: 'The library was changed since, so it is left as it is.', kind: 'success', operation: request.type });
             return;
           }
           await this.post(webview, { type: 'deck/library-undone', token: request.token });

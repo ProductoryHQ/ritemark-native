@@ -106,13 +106,23 @@ for (const rule of (css.match(/\.deck-notice(?:-words|-text|-cut|-shown|-sizer)?
 const failure = 'The slides could not be put in.'
 assert.equal(hideClippedNotice(failure, measure(failure), undefined, measure), false)
 assert.equal(hideClippedNotice(failure, measure('The slides c…') - 1, undefined, measure), true)
-assert.match(view, /role="status" aria-live="polite">\s*\{Array\.from\(failures\)\.map[\s\S]*?<Tooltip label=\{text\} className="deck-notice-warning">\s*<span role="img" tabIndex=\{0\} aria-label=\{text\}>\s*<Icon name="warning" size=\{16\} tone="inherit"[\s\S]*?<span className="deck-notice-words deck-failure-words">\s*<span className="deck-notice-text">\{text\}<\/span>/)
-assert.match(css, /\.deck-notice\[data-measure-min\] > :not\(\.deck-notice-warning\) \{ display: none; \}/)
+assert.match(view, /role="status" aria-live="polite">\s*\{Array\.from\(failures\)\.map[\s\S]*?<Tooltip label=\{text\} className="deck-notice-warning">\s*<span role="img" tabIndex=\{0\} aria-label=\{text\}>\s*<Icon name="warning" size=\{16\} tone="inherit"[\s\S]*?<span className="deck-notice-words deck-failure-words" aria-hidden="true">\s*<span className="deck-notice-text">\{text\}<\/span>/)
+// The compact cap is the intrinsic width of the probe, with each action still in flow.
+assert.match(css, /\.deck-notice\[data-measure-min\] \{ flex: none; width: max-content; min-width: 0; \}/)
+assert.match(css, /\.deck-notice\[data-measure-min\] > \.deck-notice-words \{ flex: none; width: 1em; \}/)
+assert.match(css, /\.deck-notice\[data-measure-min\] > \.deck-failure-words,\s*\.deck-notice\[data-measure-min\] \.deck-notice-sizer > :first-child \{ display: none; \}/)
+assert.match(css, /\.deck-notice\[data-measure-min\] \.deck-notice-room \{ width: calc\(32px \+ 1em\); \}/)
+assert.match(css, /\.deck-bar\[data-theme-compact\] > \.deck-notice \{ max-width: var\(--deck-notice-min\); \}/)
+assert.match(css, /\.deck-notice > \.deck-notice-act \{ flex: none; \}/)
+assert.match(css, /\.deck-notice-after \{ display: inline-flex; flex: none; \}/)
+assert.match(view, /className="deck-notice-icon"[\s\S]*?onClick=\{\(\) => \{\s*notice\.action\?\.run\(\)/)
+assert.match(view, /className="deck-line-action"\s+onClick=\{\(\) => \{\s*notice\.action\?\.run\(\)/)
+assert.match(view, /onClick=\{\(\) => setSplitRequest\(value => value \+ 1\)\}>\s*Split at the cursor/)
 assert.match(css, /\.deck-notice-warning \{ flex: none; color: var\(--r-deck-warning\); \}/)
 
 // The passing-note timer and the edit/Undo dismissals only write the passing state.
 assert.match(view, /window\.setTimeout\(\(\) => setNotice\(current => current === notice \? null : current\), NOTICE_MS\)/)
-assert.match(view, /setFailures\(current => updateDeckFailures\(current, operation, \{ kind: 'success' \}\)\)/)
+assert.match(view, /if \(next === failuresRef\.current\) return\s+failuresRef\.current = next\s+setFailures\(next\)\s+setNotice\(null\)/)
 assert.match(view, /clearFailure\('insert-slides'\)\s*answer\(true\)/)
 
 const insertFailed = updateDeckFailures(new Map(), 'insert-slides', { kind: 'failure', text: failure })
@@ -121,5 +131,42 @@ assert.equal(updateDeckFailures(bothFailed, 'save-pdf', { kind: 'success' }), bo
 const retried = updateDeckFailures(bothFailed, 'insert-slides', { kind: 'success' })
 assert.deepEqual([...retried], [['save-image', 'The picture could not be saved.']])
 assert.equal(updateDeckFailures(retried, 'save-image', { kind: 'success' }).size, 0)
+
+const host = (file: string) => readFileSync(new URL(`../../../../src/decks/${file}`, import.meta.url), 'utf8')
+const pages = host('deckPages.ts')
+const repeated = updateDeckFailures(new Map(), 'deck/source-states', { kind: 'failure', text: failure })
+assert.equal(updateDeckFailures(repeated, 'deck/source-states', { kind: 'failure', text: failure }), repeated)
+assert.match(view, /if \(state\.fresh === false\) \{\s*startCardGone\.current = true\s*clearFailure\('start-card'\)/)
+assert.match(view, /const hideStart = useCallback\(\(\) => \{\s*startCardGone\.current = true\s*clearFailure\('start-card'\)/)
+assert.match(view, /if \(operation === 'start-card' && startCardGone\.current\) return/)
+assert.match(view, /if \(stale\.length\) setNotice\(\{ text: .*left as it is now/)
+assert.match(pages, /text: 'The library was changed since, so it is left as it is\.', kind: 'success', operation: request\.type/)
+assert.match(pages, /if \(change\) \{[^}]+\}\s*await this\.post\(webview, \{ type: 'deck\/notice', text: '', kind: 'success', operation: `session-\$\{field\}`/)
+
+const recovery: Array<[kind: string, success: string, source: string, handler: RegExp]> = [
+  ['insert-slides', 'slides inserted', view, /clearFailure\('insert-slides'\)\s*answer\(true\)/],
+  ['drop-pictures', 'pictures saved and inserted', view, /else clearFailure\('drop-pictures'\)/],
+  ['copy-picture', 'picture copied', view, /if \(!copied\).*\n\s*clearFailure\('copy-picture'\)/],
+  ['save-image', 'image saved', view, /clearFailure\('save-image'\)/],
+  ['present', 'deck/present-started', view, /message\.type === 'deck\/present-started'[^\n]*\n\s*clearFailure\('present'\)/],
+  ['publish', 'published', host('deckPublish.ts'), /if \(outcome === 'published'\) notice\('', 'success'\)/],
+  ['save-pdf', 'named deck/pdf-saved', view, /if \(name\) clearFailure\('save-pdf'\)/],
+  ['start-card', 'card gone or fresh:false', view, /if \(state\.fresh === false\) \{[^}]+clearFailure\('start-card'\)/],
+  ['deck/source-states', 'source states received', view, /case 'deck\/source-states': \{\s*clearFailure\('deck\/source-states'\)/],
+  ['deck/library-topics', 'library topics received', view, /case 'deck\/library-topics': \{\s*clearFailure\('deck\/library-topics'\)/],
+  ['deck/add-to-library', 'library write added', view, /clearFailure\(message\.verb === 'added' \? 'deck\/add-to-library'/],
+  ['deck/update-library', 'library write updated', view, /clearFailure\(message\.verb === 'added' .* : 'deck\/update-library'\)/],
+  ['deck/use-library', 'library version inserted', view, /clearFailure\('deck\/use-library'\)/],
+  ['deck/show-in-library', 'library focused', pages, /executeCommand\(.*SLIDE_LIBRARY_VIEW.*\);\s*await this\.post\(webview, \{ type: 'deck\/notice', text: '', kind: 'success', operation: request\.type/],
+  ['deck/undo-library', 'library undone', view, /case 'deck\/library-undone': \{\s*clearFailure\('deck\/undo-library'\)/],
+  ...(['start', 'end', 'length'] as const).map((field): [string, string, string, RegExp] => [
+    `session-${field}`, 'session time saved or already current', pages, /kind: 'success', operation: `session-\$\{field\}`/,
+  ]),
+]
+for (const [kind, success, source, handler] of recovery) {
+  assert.match(source, handler, `${kind} → ${success}`)
+  const failed = updateDeckFailures(new Map(), kind, { kind: 'failure', text: failure })
+  assert.equal(updateDeckFailures(failed, kind, { kind: 'success' }).size, 0, `${kind} → ${success}`)
+}
 
 console.log('noticeCut: passed')

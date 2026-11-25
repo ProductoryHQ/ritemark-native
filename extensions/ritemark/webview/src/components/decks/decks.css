@@ -299,10 +299,13 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > .deck-present { min-width: 58px; }
 /* Keep hover and press transitions without animating the horizontal padding used by the fit check. */
 .deck-bar .deck-theme-button, .deck-bar .deck-publish-slot > button { transition-property: color, background-color, border-color, box-shadow, transform; }
-/* Reserve room only for warnings. Passing notices use the space left by the controls. */
+/* Reserve room for warning icons, whole actions and an ellipsis for passing notes. */
 .deck-notice[data-measure-min] { flex: none; width: max-content; min-width: 0; }
-.deck-notice[data-measure-min] > :not(.deck-notice-warning) { display: none; }
-/* Compact the controls only when they and the warning icons cannot fit. */
+.deck-notice[data-measure-min] > .deck-notice-words { flex: none; width: 1em; }
+.deck-notice[data-measure-min] > .deck-failure-words,
+.deck-notice[data-measure-min] .deck-notice-sizer > :first-child { display: none; }
+.deck-notice[data-measure-min] .deck-notice-room { width: calc(32px + 1em); }
+/* Compact the controls only when they and the minimum notice cannot fit. */
 .deck-bar[data-theme-compact] > .deck-notice { max-width: var(--deck-notice-min); }
 .deck-bar[data-theme-compact] .deck-theme-name,
 .deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }

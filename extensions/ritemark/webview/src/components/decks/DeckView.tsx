@@ -242,7 +242,7 @@ function noticeMeasure(words: HTMLElement, measure: CanvasRenderingContext2D) {
   return (text: string) => measure.measureText(text).width
 }
 
-/** Check the bar with full controls and room reserved for its warning icons. */
+/** Check the bar with full controls and room reserved for its warning icons and actions. */
 function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRenderingContext2D | null) {
   notice.setAttribute('data-measure-words', '')
   bar.removeAttribute('data-theme-compact')
@@ -442,12 +442,20 @@ export function DeckView({
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failures, setFailures] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const failuresRef = useRef(failures)
+  const startCardGone = useRef(false)
   const reportFailure = useCallback((operation: string, text: string) => {
-    setFailures(current => updateDeckFailures(current, operation, { kind: 'failure', text }))
+    if (operation === 'start-card' && startCardGone.current) return
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'failure', text })
+    if (next === failuresRef.current) return
+    failuresRef.current = next
+    setFailures(next)
     setNotice(null)
   }, [])
   const clearFailure = useCallback((operation: string) => {
-    setFailures(current => updateDeckFailures(current, operation, { kind: 'success' }))
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'success' })
+    failuresRef.current = next
+    setFailures(next)
   }, [])
   const hostNotice = useCallback((text: string, kind: unknown, operation: unknown) => {
     if (typeof operation === 'string') {
@@ -690,19 +698,29 @@ export function DeckView({
     if (!editor) return
     const off = onMessage(message => {
       if (message.type !== 'deck/start-card' || !message.state || typeof message.state !== 'object') return
-      setStartState(message.state as StartCardState)
+      const state = message.state as StartCardState
+      if (state.fresh === false) {
+        startCardGone.current = true
+        clearFailure('start-card')
+      }
+      setStartState(state)
       setStartBusy(false)
     })
     sendToExtension('deck/start-card')
     return off
-  }, [editor])
+  }, [editor, clearFailure])
+  const hideStart = useCallback(() => {
+    startCardGone.current = true
+    clearFailure('start-card')
+    setStartGone(true)
+    sendToExtension('deck/start-card-gone')
+  }, [clearFailure])
   // The card goes for good once the deck is started (a second slide, words in the handout), and the host forgets it.
   const started = count > 0 && deckStarted(count, handoutText)
   useEffect(() => {
     if (!startState?.fresh || startGone || !started) return
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [startState, startGone, started])
+    hideStart()
+  }, [startState, startGone, started, hideStart])
   // While it shows without an Ask row, the AI's sign-in is read again when the window comes back (the person may have
   // signed in meanwhile).
   const startShown = !!startRows
@@ -713,10 +731,6 @@ export function DeckView({
     window.addEventListener('focus', again)
     return () => window.removeEventListener('focus', again)
   }, [askAgain])
-  const hideStart = useCallback(() => {
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [])
   const startWith = useCallback((type: 'deck/start-draft' | 'deck/start-copy', fields: Record<string, unknown>) => {
     setStartBusy(true)
     sendToExtension(type, fields)
@@ -1954,8 +1968,9 @@ export function DeckView({
       }
       case 'deck/library-failed': {
         done(typeof message.id === 'string' ? message.id : null)
-        reportFailure(typeof message.operation === 'string' ? message.operation : 'library',
-          typeof message.message === 'string' ? message.message : 'The Slide library could not do that.')
+        const text = typeof message.message === 'string' ? message.message : 'The Slide library could not do that.'
+        if (typeof message.operation === 'string') reportFailure(message.operation, text)
+        else setNotice({ text })
         return
       }
       case 'deck/library-written': {
@@ -2077,10 +2092,7 @@ export function DeckView({
       const changes = propertyChangesOf(transaction)
       if (changes.length === 0) return
       const { apply, stale } = applicableChanges(propertiesRef.current, changes)
-      for (const change of apply) clearFailure(`property-${change.key}`)
-      for (const change of stale) {
-        reportFailure(`property-${change.key}`, "The deck's theme or look was changed since, so it is left as it is now.")
-      }
+      if (stale.length) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
       if (apply.length === 0) return
       const next = withPropertyChanges(propertiesRef.current, apply)
       propertiesRef.current = next
@@ -2088,7 +2100,7 @@ export function DeckView({
     }
     editor.on('transaction', onTransaction)
     return () => { editor.off('transaction', onTransaction) }
-  }, [editor, onPropertiesChange, reportFailure, clearFailure])
+  }, [editor, onPropertiesChange])
   const pickTheme = useCallback((path: string, name: string) => {
     if (!editor || editor.isDestroyed) return
     editor.view.dispatch(propertyTransaction(editor.state, 'theme', propertyValue(propertiesRef.current, 'theme'), { present: true, value: path }))
@@ -2223,7 +2235,7 @@ export function DeckView({
                   <Icon name="warning" size={16} tone="inherit" />
                 </span>
               </Tooltip>
-              <span className="deck-notice-words deck-failure-words">
+              <span className="deck-notice-words deck-failure-words" aria-hidden="true">
                 <span className="deck-notice-text">{text}</span>
               </span>
             </ReactFragment>
