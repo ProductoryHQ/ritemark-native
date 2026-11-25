@@ -84,7 +84,7 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish, type PauseTarget } from './DeckPublish'
 import { computeResults } from '../../extensions/SearchExtension'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
-import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideSettingsPlacement, slideWidthWithSettings, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { ABOVE_PANE_MIN, STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideSettingsPlacement, slideWidthWithSettings, slideWidthFor, type DeckOrientation } from './deckLayout'
 import { isStageScrollbarPress, stageSettingsAnchor } from './slideSettingsGeometry'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
@@ -773,8 +773,25 @@ export function DeckView({
     ? slideSettingsPlacement(stageWidth, stageHeight, normalSlideLeft, normalSlideWidth, settingsSize, SETTINGS_GAP, SETTINGS_COLLISION_PADDING)
     : null
   const settingsRoom = settingsPlacement?.room ?? 0
-  const fittedSlideWidth = fullSlideWidthFor(stageWidth, stageHeight - settingsRoom, slideAlone ? slideCardUnder : aboveUnder)
+  // In the stacked split, borrow space from the handout and keep the rest of the card in the stage's scroll flow.
+  const settingsStageHeight = above && split
+    ? stageHeight + Math.min(settingsRoom, Math.max(0, deskHeight - stageHeight - ABOVE_PANE_MIN))
+    : stageHeight
+  const fittedSlideWidth = fullSlideWidthFor(stageWidth, settingsStageHeight - settingsRoom, slideAlone ? slideCardUnder : aboveUnder)
   const bigWidth = slideWidthWithSettings(normalSlideWidth, fittedSlideWidth, settingsRoom)
+  const settingsSide = settingsPlacement?.side
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (settingsSide !== 'bottom' || !settingsSlot || !settingsBox || !stage) return
+    const frame = requestAnimationFrame(() => {
+      // A tall card opens at its header. Otherwise reveal the whole slot with the smallest scroll.
+      settingsSlot.scrollIntoView({
+        block: settingsSlot.offsetHeight > stage.clientHeight ? 'start' : 'nearest',
+        inline: 'nearest',
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [settingsSide, settingsSlot, settingsBox])
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
@@ -2261,7 +2278,7 @@ export function DeckView({
           <div
             ref={stageRef}
             className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}${slideAlone ? ' is-alone' : ''}`}
-            style={{ left: stripWidth, width: stageWidth, height: above ? stageHeight : undefined }}
+            style={{ left: stripWidth, width: stageWidth, height: above ? settingsStageHeight : undefined }}
           >
             {/* Above, the slide is centred over the handout's column, and alone in the room: the group is the slide's
                 own width. */}
@@ -2326,7 +2343,7 @@ export function DeckView({
           <div
             className={`deck-divider${above ? ' is-above' : ''}${dragging ? ' is-dragging' : ''}`}
             // Above, a level line from the strip to the room's right edge; beside, the upright line.
-            style={above ? { left: stripWidth, top: aboveLine } : { left: dividerLeft }}
+            style={above ? { left: stripWidth, top: settingsStageHeight } : { left: dividerLeft }}
             role="separator"
             aria-orientation={above ? 'horizontal' : 'vertical'}
             aria-label={above ? 'Drag to change the heights' : 'Drag to change the widths'}
@@ -2353,7 +2370,7 @@ export function DeckView({
           className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}${above && split ? ' is-above' : ''}`}
           // The handout alone, or below the slide, is a Text document's centred column: its width sets the text's edges
           // (decks.css).
-          style={{ left: dividerLeft, top: above && split ? aboveLine : 0, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
+          style={{ left: dividerLeft, top: above && split ? settingsStageHeight : 0, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
           aria-hidden={handoutShown ? undefined : true}
         >
           {findBar}

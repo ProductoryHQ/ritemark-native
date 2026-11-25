@@ -157,6 +157,17 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /portalContainer=\{stageSettingsOpen \? settingsSlot : undefined\}/, 'stage settings share the stage scroller')
   assert.match(popover, /collisionBoundary=\{stageSettingsOpen \? stageRef.current : undefined\}/)
   assert.doesNotMatch(popover, /maxHeight/, 'the card keeps its natural height')
+  assert.match(view, /settingsSize\.height > 0\s*\? slideSettingsPlacement/)
+  assert.match(view, /if \(settingsSide !== 'bottom' \|\| !settingsSlot \|\| !settingsBox \|\| !stage\) return\s+const frame = requestAnimationFrame\(\(\) => \{[^]*?settingsSlot\.scrollIntoView\(\{\s+block: settingsSlot\.offsetHeight > stage\.clientHeight \? 'start' : 'nearest'/,
+    'reveal the measured bottom slot after layout, starting at the header if it is taller than the stage')
+  assert.match(popover, /onOpenAutoFocus=\{[^\n]*focus\(\{ preventScroll: true \}\)/)
+  assert.match(view, /const settingsStageHeight = above && split\s*\? stageHeight \+ Math\.min\(settingsRoom,/)
+  assert.match(view, /height: above \? settingsStageHeight : undefined[^]*?ref=\{setSettingsSlot\}\s+className=\{settingsRoom \? 'deck-settings-below'/)
+  assert.match(view, /className=\{`deck-divider[^]*?top: settingsStageHeight/)
+  assert.match(view, /className=\{`deck-handout[^]*?top: above && split \? settingsStageHeight : 0/,
+    'the handout begins at the expanded stage boundary')
+  assert.match(here('./decks.css'), /\.deck-settings-below \{[^}]*position: relative; z-index: 4;/,
+    'the in-flow settings slot paints above the handout')
   assert.match(view, /onSlideSettings=\{stageSettings\}/)
   // The stage's right-click menu: Slide settings… at its end, after Comment, under a line.
   const editor = here('./blocks/SlideEditor.tsx')

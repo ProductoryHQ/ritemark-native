@@ -342,8 +342,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* Keep the card within the viewport even when it is narrower than the settings width. */
 .deck-settings[role="dialog"] { max-width: calc(100vw - 16px); }
 /* Keep the bottom card in the stage's scroll flow while Radix handles dismissal and focus. */
-.deck-settings-below { align-self: center; text-align: left; }
-.deck-stage:is(.is-alone, .is-above) .deck-settings-below { position: relative; left: 50%; transform: translateX(-50%); }
+.deck-settings-below { position: relative; z-index: 4; align-self: center; text-align: left; }
+.deck-stage:is(.is-alone, .is-above) .deck-settings-below { left: 50%; transform: translateX(-50%); }
 .deck-settings-below > [data-radix-popper-content-wrapper] {
   position: relative !important;
   transform: none !important;
