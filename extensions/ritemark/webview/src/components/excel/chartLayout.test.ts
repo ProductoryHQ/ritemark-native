@@ -261,6 +261,13 @@ const chartSheets = await open('chart-sheet')
 const revenue = chartSheets.sheets.find(({ name }) => name === 'Revenue trend')!
 assert.equal(revenue.kind, 'chartsheet')
 assert.equal(forSheet(chartSheets, revenue).name, 'Line chart: Revenue trend')
+test('Revenue trend uses Excel’s zero-based EUR scale at chart-sheet size', () => {
+  const { chart } = drawingOf(revenue)
+  assert.ok(drawsChart(chart))
+  const series = resolveSeries(chart, chartSheets.sheets, chartSheets)
+  const { scale } = layoutPlots(chart, series, 960, 600, measure, chartSheets.date1904)
+  assert.deepEqual([scale.min, scale.max, scale.step], [0, 60000, 10000])
+})
 const lost = chartSheets.sheets.find(({ name }) => name === 'Lost source')!
 const lostChart = drawingOf(lost).chart
 assert.ok(drawsChart(lostChart))
@@ -296,6 +303,16 @@ const seriesOf = (values: (number | undefined)[], name = 'Revenue', category = '
 })
 const draw = (model: ReturnType<typeof synthetic>, series = [seriesOf([30, 80, 60])], width = 480) =>
   layoutChart(model, series, width, 288, measure)
+
+test('line axes round the half-range margin away from the data on either side of zero', () => {
+  const model = synthetic('line')
+  const positive = draw(model, [seriesOf([93, 100])]).scale
+  const negative = draw(model, [seriesOf([-100, -93])]).scale
+  // The unrounded near-zero bounds are 89.5 and -89.5.
+  assert.deepEqual([positive.min, positive.max, positive.step], [88, 102, 2])
+  assert.deepEqual([negative.min, negative.max, negative.step], [-102, -88, 2])
+  assert.equal(draw(model, [seriesOf([-120, -100])]).scale.max, 0)
+})
 
 test('automatic rotation fits horizontal labels or tilts crowded categories', () => {
   for (const rotation of [-60000000, 5400001]) {

@@ -79,7 +79,7 @@ function niceStep(span: number, divisions: number): number {
   return power * ([1, 2, 2.5, 5, 10].find((n) => n * power >= raw * (1 - 1e-12)) ?? 10)
 }
 
-function valueScale(low: number, high: number, axis: ChartAxis | undefined, percent: boolean, line: boolean, pixels: number, padding = .08, minimumRatio = .5) {
+function valueScale(low: number, high: number, axis: ChartAxis | undefined, percent: boolean, allowNonZeroBaseline: boolean, pixels: number, padding = .08) {
   const log = axis?.logBase
   if (log && log > 1) {
     const min = axis.min && axis.min > 0 ? axis.min : log ** Math.floor(Math.log(low > 0 ? low : 1) / Math.log(log))
@@ -88,11 +88,14 @@ function valueScale(low: number, high: number, axis: ChartAxis | undefined, perc
     for (let i = Math.ceil(Math.log(min) / Math.log(log) - 1e-9); ticks.length < 100 && log ** i <= max * (1 + 1e-9); i++) ticks.push(log ** i)
     return { min, max, step: log, ticks }
   }
-  const extent = high - low || Math.abs(high) || 1
+  const range = high - low
+  const extent = range || Math.abs(high) || 1
+  // Excel keeps zero on a one-sided axis unless the values are within one sixth of the larger magnitude.
+  const minimumRatio = 5 / 6
   const autoMin = percent ? (low < 0 ? -1 : 0)
-    : line && low > high * minimumRatio && low > 0 ? Math.max(0, low - extent / 2) : low < 0 ? low - extent * padding : 0
+    : allowNonZeroBaseline && low > high * minimumRatio && low > 0 ? low - range / 2 : low < 0 ? low - extent * padding : 0
   const autoMax = percent ? (high > 0 || low === 0 ? 1 : 0)
-    : line && high < low * minimumRatio && high < 0 ? Math.min(0, high + extent / 2) : high > 0 ? high + extent * padding : low < 0 ? 0 : 1
+    : allowNonZeroBaseline && high < low * minimumRatio && high < 0 ? high + range / 2 : high > 0 ? high + extent * padding : low < 0 ? 0 : 1
   const lower = axis?.min ?? autoMin
   const upper = axis?.max ?? autoMax
   const span = upper > lower ? upper - lower : extent
@@ -472,7 +475,7 @@ function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotDat
     } }
   }
   const xRange = numericExtent((xGroup.length ? xGroup : [data]).flatMap((plot) => plot.xy), 'x')
-  const xScale = scatter ? valueScale(xRange.min, xRange.max, xAxis, false, true, outer.width / 3, .05, 5 / 6) : undefined
+  const xScale = scatter ? valueScale(xRange.min, xRange.max, xAxis, false, true, outer.width / 3, .05) : undefined
   const count = xScale ? xScale.ticks.length : categoryCount
   const labelStyle = (axis?: ChartAxis) => styleOf(model.textStyle, axis?.textStyle)
   const categoryStyle = labelStyle(categoryAxis)
@@ -484,10 +487,10 @@ function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotDat
   const valueGroup = yGroup.length ? yGroup : [data]
   const extents = valueGroup.map((plot) => plot.scatter ? numericExtent(plot.xy, 'y') : { min: plot.low, max: plot.high })
   const scaleSource = valueGroup[0]
-  const lineScale = valueGroup.every((plot) => plot.line || plot.scatter)
+  const allowNonZeroBaseline = valueGroup.every((plot) => plot.line || plot.area || plot.scatter)
   const scale = valueScale(Math.min(...extents.map(({ min }) => min)), Math.max(...extents.map(({ max }) => max)),
-    valueAxis, valueGroup.every((plot) => plot.percent), lineScale, scaleSource.horizontal ? outer.width : outer.height - 20,
-    scaleSource.scatter ? .05 : .08, scaleSource.scatter ? 5 / 6 : .5)
+    valueAxis, valueGroup.every((plot) => plot.percent), allowNonZeroBaseline, scaleSource.horizontal ? outer.width : outer.height - 20,
+    scaleSource.scatter ? .05 : .08)
 
   const valueCode = valueAxis?.numberFormat?.formatCode ?? (scaleSource.percent ? '0%'
     : (scaleSource.scatter ? scaleSource.series[0]?.yVal : scaleSource.series[0]?.val)?.formatCode)
