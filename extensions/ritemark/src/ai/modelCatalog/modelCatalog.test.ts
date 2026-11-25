@@ -725,30 +725,32 @@ test('versionLt compares dotted-numeric versions correctly', () => {
 
 const FEED_C4808BE = validateCatalog(JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'feed-c4808be.json'), 'utf8')));
 
-test('S141 R1/S1: offline, Argon leads Flows\' Gemini list, is in OpenCode\'s Google group, and OpenRouter has it', () => {
+test('S141 R1/S1: offline, Neon leads Flows\' Gemini list, is in OpenCode\'s Google group, and OpenRouter has it', () => {
   const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
-  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.ARGON_4);
+  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.NEON_4);
   const google = r.opencode.models.filter((m) => m.id.startsWith('google/')).map((m) => m.id);
-  assert.ok(google.includes(`google/${GEMINI_MODEL_IDS.ARGON_4}`));
-  assert.ok(r.opencode.models.some((m) => m.id === `openrouter/google/${GEMINI_MODEL_IDS.ARGON_4}`));
+  assert.ok(google.includes(`google/${GEMINI_MODEL_IDS.NEON_4}`));
+  assert.ok(r.opencode.models.some((m) => m.id === `openrouter/google/${GEMINI_MODEL_IDS.NEON_4}`));
 });
 
-test('S141 decision 10: OpenCode\'s Google group leads with a free-tier model, Argon second', () => {
+test('S141 decision 10: OpenCode\'s Google group leads with a free-tier model, Neon second', () => {
   const r = resolveAll({}, null, null, BUNDLED_CATALOG, APP);
   const google = r.opencode.models.filter((m) => m.id.startsWith('google/')).map((m) => m.id);
-  assert.deepStrictEqual(google.slice(0, 2), [`google/${GEMINI_MODEL_IDS.FLASH_3_8}`, `google/${GEMINI_MODEL_IDS.ARGON_4}`]);
+  assert.deepStrictEqual(google.slice(0, 2), [`google/${GEMINI_MODEL_IDS.FLASH_3_8}`, `google/${GEMINI_MODEL_IDS.NEON_4}`]);
   // Flows' Gemini list and default are unchanged.
-  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.ARGON_4);
+  assert.strictEqual(r.gemini.models[0].id, GEMINI_MODEL_IDS.NEON_4);
   assert.strictEqual(r.gemini.defaults['flow-llm'], GEMINI_MODEL_IDS.FLASH_LITE_3_5);
 });
 
-test('S141 R1/S2: with the feed of c4808be, Argon is listed once and the bundled lineup and defaults hold', () => {
+test('S141 R1/S2: with the feed of c4808be, Neon is listed once and the bundled lineup and defaults hold', () => {
   const r = resolveAll({}, FEED_C4808BE, null, BUNDLED_CATALOG, APP);
   for (const provider of ['gemini', 'opencode'] as const) {
     const ids = r[provider].models.map((m) => m.id);
     assert.strictEqual(new Set(ids).size, ids.length, `${provider} lists no id twice`);
   }
-  assert.strictEqual(r.gemini.models.filter((m) => m.id === GEMINI_MODEL_IDS.ARGON_4).length, 1);
+  assert.strictEqual(r.gemini.models.filter((m) => m.id === GEMINI_MODEL_IDS.NEON_4).length, 1);
+  assert.strictEqual(r.gemini.models.find((m) => m.id === GEMINI_MODEL_IDS.ARGON_4)?.hidden, true);
+  assert.strictEqual(r.opencode.models.find((m) => m.id === `google/${GEMINI_MODEL_IDS.ARGON_4}`)?.hidden, true);
   assert.strictEqual(r.gemini.defaults['flow-llm'], DEFAULT_MODELS.flowLLMGemini);
   assert.strictEqual(r.codex.defaults.codex, CODEX_MODEL_IDS.SOL_6_2);
   assert.strictEqual(r.anthropic.defaults['claude-code'], CLAUDE_MODEL_IDS.SONNET_5_5);
@@ -771,8 +773,9 @@ test('S141 R3/S10: Flows\' Gemini default is the current model, and the 2.5 rows
   const legacy = r.models.filter((m) => m.id.startsWith('gemini-2.5-'));
   assert.strictEqual(legacy.length, 3);
   assert.ok(legacy.every((m) => m.deprecated && m.description === 'Retained for saved selections'));
-  const firstLegacy = r.models.findIndex((m) => m.id.startsWith('gemini-2.5-'));
-  assert.ok(r.models.slice(firstLegacy).every((m) => m.id.startsWith('gemini-2.5-')), '2.5 rows come last');
+  const visible = r.models.filter((m) => !m.hidden);
+  const firstLegacy = visible.findIndex((m) => m.id.startsWith('gemini-2.5-'));
+  assert.ok(visible.slice(firstLegacy).every((m) => m.id.startsWith('gemini-2.5-')), '2.5 rows come last in the picker');
   const opencode25 = resolveAll({}, null, null, BUNDLED_CATALOG, APP).opencode.models.find((m) => m.id === `google/${GEMINI_MODEL_IDS.PRO_2_5}`);
   assert.strictEqual(opencode25?.deprecated, true);
 });

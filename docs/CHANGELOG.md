@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Turn on Update on every save to keep a published deck’s page up to date (#1007).
 - The deck’s publish button shows when a page is live, updating, paused, or offline, and explains what to do when an update pauses.
 
+### Changed
+
+- Gemini 4 Neon replaces Gemini 4 Argon in the model lists when you use your own Gemini API key (#1062).
+
 ### Fixed
 
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).

@@ -9,7 +9,7 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import { OPENAI_MODEL_IDS, toOpenCodeModelId } from '../modelConfig';
+import { GEMINI_MODEL_IDS, OPENAI_MODEL_IDS, toOpenCodeModelId } from '../modelConfig';
 import { BUNDLED_CATALOG } from './bundledCatalog';
 import { openCodeLiveRows, type OpenCodeModelOption } from './opencodeLiveList';
 import { resolveAll, resolveStaticModels } from './resolver';
@@ -29,7 +29,11 @@ function test(name: string, fn: () => void): void {
 }
 
 const APP = '2.1.0';
-const FIXTURE: OpenCodeModelOption[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'opencode-models.fixture.json'), 'utf8')).options;
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4);
+const GOOGLE_ARGON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4);
+const HISTORICAL_FIXTURE: OpenCodeModelOption[] = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'opencode-models.fixture.json'), 'utf8')).options;
+// Extend the recorded list with a simulated OpenCode option for the new model.
+const FIXTURE = [...HISTORICAL_FIXTURE, { value: GOOGLE_NEON, name: 'Google/Neon from OpenCode' }];
 const CURATED = resolveStaticModels('opencode', null, null, BUNDLED_CATALOG, APP);
 const ids = (rows: ModelEntry[]): string[] => rows.map((row) => row.id);
 // Reconstruct the lineup from before #956 so Terra is still a newly discovered model.
@@ -57,9 +61,9 @@ function resolvedWith(live: ModelEntry[] | null): ModelEntry[] {
 
 test('S35: a keyed provider\'s group is OpenCode\'s list, with catalog labels for known models', () => {
   const models = resolvedWith(openCodeLiveRows(FIXTURE, CURATED));
-  const argon = models.find((row) => row.id === 'google/gemini-4-argon');
-  assert.strictEqual(argon?.label, 'Gemini 4 Argon');
-  assert.strictEqual(argon?.description, 'Google — flagship reasoning', 'the catalog\'s description, not OpenCode\'s name');
+  const neon = models.find((row) => row.id === GOOGLE_NEON);
+  assert.strictEqual(neon?.label, 'Gemini 4 Neon');
+  assert.strictEqual(neon?.description, 'Google — flagship reasoning', 'the catalog\'s description, not OpenCode\'s name');
   assert.strictEqual(models[0].id, 'google/gemini-3.8-flash', 'catalog order first (decision 10: the free-tier model leads)');
 });
 
@@ -85,7 +89,7 @@ test('S36: older models the catalog doesn\'t curate stay resolvable but hidden; 
 test('S36: embedding, speech, image, live and batch routes are not listed at all', () => {
   const live = openCodeLiveRows([
     { value: 'google/gemini-embedding-001' }, { value: 'google/gemini-4-flash-tts' }, { value: 'google/gemini-4-flash-image' },
-    { value: 'google/gemini-4-live' }, { value: 'openrouter/google/gemini-4-argon:batch' }, { value: 'openai/gpt-6.1-realtime' },
+    { value: 'google/gemini-4-live' }, { value: `openrouter/${GOOGLE_NEON}:batch` }, { value: 'openai/gpt-6.1-realtime' },
     { value: 'openai/gpt-6.1-audio' }, { value: 'google/gemma-4-27b' }, { value: 'openrouter/qwen/qwen-9-max' },
   ], CURATED);
   assert.deepStrictEqual(ids(live), []);
@@ -146,22 +150,23 @@ test('S35: narrowing by the provider\'s own list drops an unknown model it doesn
 });
 
 test('A model OpenCode doesn\'t list is not offered from the live list (version gates by construction)', () => {
-  const withoutArgon = FIXTURE.filter((option) => option.value !== 'google/gemini-4-argon');
-  const models = resolvedWith(openCodeLiveRows(withoutArgon, CURATED));
-  assert.ok(!offered(models, 'google').includes('google/gemini-4-argon'));
+  const withoutNeon = FIXTURE.filter((option) => option.value !== GOOGLE_NEON);
+  const models = resolvedWith(openCodeLiveRows(withoutNeon, CURATED));
+  assert.ok(!offered(models, 'google').includes(GOOGLE_NEON));
 });
 
 test('A saved pick on a hidden live model still resolves', () => {
   const models = resolvedWith(openCodeLiveRows(FIXTURE, CURATED));
   assert.ok(models.some((row) => row.id === 'google/gemini-2.5-flash' && row.hidden));
+  assert.ok(models.some((row) => row.id === GOOGLE_ARGON && row.hidden));
 });
 
 test('acpManager reads the model option\'s choices from session/new', () => {
   const options = openCodeModelOptions([
     { id: 'mode', name: 'Mode', type: 'select', currentValue: 'build', options: [{ value: 'build', name: 'Build' }] },
-    { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'opencode/beam-free', options: [{ value: 'google/gemini-4-argon', name: 'Google/Gemini 4 Argon' }, { value: 'opencode/beam-free', name: 'OpenCode/Beam Free' }] },
+    { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: 'opencode/beam-free', options: [{ value: GOOGLE_NEON, name: 'Google/Gemini 4 Neon' }, { value: 'opencode/beam-free', name: 'OpenCode/Beam Free' }] },
   ] as never);
-  assert.deepStrictEqual(options, [{ value: 'google/gemini-4-argon', name: 'Google/Gemini 4 Argon' }, { value: 'opencode/beam-free', name: 'OpenCode/Beam Free' }]);
+  assert.deepStrictEqual(options, [{ value: GOOGLE_NEON, name: 'Google/Gemini 4 Neon' }, { value: 'opencode/beam-free', name: 'OpenCode/Beam Free' }]);
   assert.deepStrictEqual(openCodeModelOptions([] as never), []);
 });
 

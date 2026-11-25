@@ -70,7 +70,8 @@ export const OPENAI_MODEL_IDS = {
 } as const;
 
 export const GEMINI_MODEL_IDS = {
-  /** Sprint 141 R1 (#532): Google's flagship reasoning model, stable since 13 October 2026. */
+  NEON_4: 'gemini-4-neon',
+  /** Sprint 141 R1 (#532): stable since 13 October 2026. */
   ARGON_4: 'gemini-4-argon',
   PRO_3_1_PREVIEW: 'gemini-3.1-pro-preview',
   FLASH_3_8: 'gemini-3.8-flash',
@@ -347,6 +348,18 @@ export const OPENAI_IMAGE_MODELS: ImageModelConfig[] = [
  * Model IDs from: https://ai.google.dev/gemini-api/docs/models
  */
 export const GEMINI_LLM_MODELS: ModelConfig[] = [
+  {
+    id: GEMINI_MODEL_IDS.NEON_4,
+    name: 'Gemini 4 Neon',
+    description: 'Google’s flagship reasoning model (paid API tier)',
+    // as Argon until Google's model card is checked
+    api: 'chat',
+    reasoning: 'medium',
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsStreaming: true,
+    costTier: 'high',
+  },
   {
     id: GEMINI_MODEL_IDS.ARGON_4,
     name: 'Gemini 4 Argon',

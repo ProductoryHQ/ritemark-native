@@ -279,9 +279,9 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     webview.postMessage({
       type: 'flow:modelConfig',
       config: {
-        openaiLLM: modelCatalog.getModels('openai').map(m => ({ id: m.id, name: m.label })),
+        openaiLLM: this.llmModelOptions('openai'),
         openaiImage: OPENAI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
-        geminiLLM: modelCatalog.getModels('gemini').map(m => ({ id: m.id, name: m.label })),
+        geminiLLM: this.llmModelOptions('gemini'),
         geminiImage: GEMINI_IMAGE_MODELS.filter(m => !m.deprecated).map(m => ({ id: m.id, name: m.name })),
         // Sprint 141 R4: the LLM steps' defaults are the catalog's, as the run's are.
         defaults: flowModelDefaults((provider, surface) => modelCatalog.getDefault(provider, surface)),
@@ -769,6 +769,10 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
     };
   }
 
+  private llmModelOptions(provider: 'openai' | 'gemini'): Array<{ id: string; name: string }> {
+    return modelCatalog.getModels(provider).filter(m => !m.hidden).map(m => ({ id: m.id, name: m.label }));
+  }
+
   /**
    * Fetch available models from provider API
    */
@@ -781,7 +785,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
       // Sprint 145 R5 (#580): a step can't run without its provider's key, so its panel says so, with the link to that
       // key, for the AI step and the image step alike. Only whether a key exists is read, before any network call.
       if (!(await this.hasProviderKey(provider))) {
-        const known = modelType === 'llm' ? modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label })) : [];
+        const known = modelType === 'llm' ? this.llmModelOptions(provider) : [];
         webview.postMessage({ type: 'flow:models', provider, modelType, models: known, ...stepKeyAnswer(stepKeyCopy(provider)) });
         return;
       }
@@ -796,7 +800,7 @@ export class FlowEditorProvider implements vscode.CustomTextEditorProvider {
         // LLM lists resolve through the model catalog (live probe → remote → cache
         // → bundled), replacing the standalone REST fetchers (Sprint 89 #109).
         await modelCatalog.refresh();
-        models = modelCatalog.getModels(provider).map(m => ({ id: m.id, name: m.label }));
+        models = this.llmModelOptions(provider);
       }
 
       webview.postMessage({ type: 'flow:models', provider, modelType, models });

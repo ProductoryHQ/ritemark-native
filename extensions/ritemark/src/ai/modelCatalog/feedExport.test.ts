@@ -48,12 +48,12 @@ function anthropicIds(feed: Feed): string[] {
 
 console.log('feedExport.test.ts');
 
-test('a first publish is the complete bundled lineup with the new updatedAt', () => {
+test('a first publish is the visible bundled lineup with the new updatedAt', () => {
   const feed = buildPublishedFeed(BUNDLED_CATALOG, undefined, NOW, {}) as unknown as Feed;
   assert.equal(feed.updatedAt, NOW);
   assert.equal(feed.schemaVersion, 1);
   for (const [provider, catalog] of Object.entries(BUNDLED_CATALOG.providers)) {
-    assert.deepEqual(feed.providers[provider].models, catalog!.models, provider);
+    assert.deepEqual(feed.providers[provider].models, catalog!.models.filter((row) => !row.hidden), provider);
     assert.deepEqual(feed.providers[provider].defaults, catalog!.defaults, provider);
   }
   validateCatalog(feed);
@@ -123,7 +123,7 @@ test('an unparseable updatedAt is refused', () => {
 
 const FEED_C4808BE = JSON.parse(fs.readFileSync(path.join(__dirname, 'testdata', 'feed-c4808be.json'), 'utf8'));
 const SONNET_5_5 = CLAUDE_MODEL_IDS.SONNET_5_5;
-const OPENCODE_ARGON = `google/${GEMINI_MODEL_IDS.ARGON_4}`;
+const OPENCODE_NEON = `google/${GEMINI_MODEL_IDS.NEON_4}`;
 
 test('S141 S20: the export keeps Sonnet 5.5\'s declaration from the feed of c4808be', () => {
   const feed = exported(FEED_C4808BE);
@@ -132,12 +132,13 @@ test('S141 S20: the export keeps Sonnet 5.5\'s declaration from the feed of c480
   assert.equal(BUNDLED_CATALOG.providers.anthropic!.models.find((row) => row.id === SONNET_5_5)!.claudeCode, undefined, 'the bundled row stays clean');
 });
 
-test('S141 S21: the export keeps Argon\'s OpenCode gate, and lists Argon once', () => {
+test('S141 S21: the export keeps Neon\'s OpenCode gate, and lists Neon once', () => {
   const feed = exported(FEED_C4808BE);
-  const rows = feed.providers.opencode.models.filter((row) => row.id === OPENCODE_ARGON);
+  const rows = feed.providers.opencode.models.filter((row) => row.id === OPENCODE_NEON);
   assert.equal(rows.length, 1);
   assert.equal(rows[0].minAppVersion, '2.0.0');
-  assert.equal(feed.providers.gemini.models.filter((row) => row.id === GEMINI_MODEL_IDS.ARGON_4).length, 1);
+  assert.equal(feed.providers.gemini.models.filter((row) => row.id === GEMINI_MODEL_IDS.NEON_4).length, 1);
+  assert.ok(!feed.providers.gemini.models.some((row) => row.id === GEMINI_MODEL_IDS.ARGON_4));
 });
 
 test('S141 R6: the gates in feedGates.ts are applied, and the stricter gate wins', () => {
@@ -147,18 +148,18 @@ test('S141 R6: the gates in feedGates.ts are applied, and the stricter gate wins
   for (const [id, version] of Object.entries(FEED_MIN_APP_VERSION.opencode ?? {})) {
     assert.equal(feed.providers.opencode.models.find((row) => row.id === id)?.minAppVersion, version, id);
   }
-  const current = JSON.parse(JSON.stringify(FEED_C4808BE));
-  current.providers.opencode.models.find((row: Row) => row.id === OPENCODE_ARGON).minAppVersion = '2.1.0';
-  assert.equal(exported(current).providers.opencode.models.find((row) => row.id === OPENCODE_ARGON)!.minAppVersion, '2.1.0', 'a stricter feed gate is kept');
+  const current = exported(FEED_C4808BE);
+  current.providers.opencode.models.find((row) => row.id === OPENCODE_NEON)!.minAppVersion = '2.1.0';
+  assert.equal(exported(current).providers.opencode.models.find((row) => row.id === OPENCODE_NEON)!.minAppVersion, '2.1.0', 'a stricter feed gate is kept');
 });
 
 test('S141 S22: a bundled row\'s own value wins over the feed\'s', () => {
   const bundled = JSON.parse(JSON.stringify(BUNDLED_CATALOG));
   bundled.providers.anthropic.models.find((row: Row) => row.id === SONNET_5_5).claudeCode = { inject: true, maxOutputTokens: 32000 };
-  bundled.providers.opencode.models.find((row: Row) => row.id === OPENCODE_ARGON).minAppVersion = '1.0.0';
+  bundled.providers.opencode.models.find((row: Row) => row.id === OPENCODE_NEON).minAppVersion = '1.0.0';
   const feed = buildPublishedFeed(bundled, FEED_C4808BE, NOW) as unknown as Feed;
   assert.deepEqual(feed.providers.anthropic.models.find((row) => row.id === SONNET_5_5)!.claudeCode, { inject: true, maxOutputTokens: 32000 });
-  assert.equal(feed.providers.opencode.models.find((row) => row.id === OPENCODE_ARGON)!.minAppVersion, '1.0.0');
+  assert.equal(feed.providers.opencode.models.find((row) => row.id === OPENCODE_NEON)!.minAppVersion, '1.0.0');
 });
 
 test('S141 R6: an automated feed row carries nothing onto the curated row', () => {

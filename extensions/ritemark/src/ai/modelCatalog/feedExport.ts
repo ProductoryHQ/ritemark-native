@@ -91,11 +91,13 @@ export function buildPublishedFeed(
     const catalog = bundled.providers[provider];
     if (!catalog) continue;
     const curatedIds = new Set(catalog.models.map((row) => row.id));
+    // Hidden bundled rows preserve saved choices locally and are not feed offers.
+    const publishedRows = catalog.models.filter((row) => !row.hidden);
     const currentRows = currentRowsById(currentProviders[provider]);
     providers[provider] = {
       defaults: { ...catalog.defaults },
       models: [
-        ...catalog.models.map((row) => withOlderAppFields(provider, row, currentRows.get(row.id), gates)),
+        ...publishedRows.map((row) => withOlderAppFields(provider, row, currentRows.get(row.id), gates)),
         ...feedOnlyRowsToKeep(currentProviders[provider], curatedIds),
       ],
     };

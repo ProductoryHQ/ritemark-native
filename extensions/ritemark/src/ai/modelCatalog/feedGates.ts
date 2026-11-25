@@ -41,12 +41,12 @@ export const FEED_MIN_APP_VERSION: Partial<Record<Provider, Record<string, strin
   anthropic: { [CLAUDE_MODEL_IDS.HAIKU_5_5]: '1.14.0', [CLAUDE_MODEL_IDS.FABLE_5_2]: '2.3.0' },
   // OpenCode rows from 2.0.0 (OpenCode 1.19.3), the version Argon was run on (c4808be).
   opencode: Object.fromEntries([
-    toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4),
+    toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4),
     toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5_5),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5_5),
     toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.HAIKU_5_5),
-    toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)),
+    toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4)),
     toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5),
     toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_1)),
   ].map((id) => [id, '2.0.0']).concat([

@@ -4,13 +4,16 @@
  * Run: npx tsx src/runtime/modelSubstitution.test.ts
  */
 
+import { GEMINI_MODEL_IDS, toOpenCodeModelId } from '../ai/modelConfig';
 import assert from 'node:assert/strict';
 import { modelSubstitutionForTurn } from './modelSubstitution';
+
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4);
 
 const offered = new Map([
   ['gpt-5.6-sol', 'gpt-5.6-sol'],
   ['gpt-6-luna', 'gpt-6-luna'],
-  ['google/gemini-4-argon', 'google/gemini-4-argon'],
+  [GOOGLE_NEON, GOOGLE_NEON],
   ['claude-sonnet-5', 'claude-sonnet-5'],
   ['sonnet', 'claude-sonnet-5'],
 ]);
@@ -18,7 +21,7 @@ const catalog = { idOf: (id: string) => offered.get(id) };
 
 // S33/S35: a saved model the catalog still offers: no line, whatever the AI.
 assert.equal(modelSubstitutionForTurn({ runtimeId: 'codex', chatSavedModel: 'gpt-6-luna', turnModel: 'gpt-6-luna', catalog }), undefined);
-assert.equal(modelSubstitutionForTurn({ runtimeId: 'opencode', chatSavedModel: 'google/gemini-4-argon', turnModel: 'google/gemini-4-argon', catalog }), undefined);
+assert.equal(modelSubstitutionForTurn({ runtimeId: 'opencode', chatSavedModel: GOOGLE_NEON, turnModel: GOOGLE_NEON, catalog }), undefined);
 
 // S38: a saved model the catalog no longer offers, replaced by the default: one line, for ChatGPT and OpenCode too.
 assert.deepEqual(
@@ -26,8 +29,8 @@ assert.deepEqual(
   { from: 'gpt-5.5-retired', to: 'gpt-5.6-sol' },
 );
 assert.deepEqual(
-  modelSubstitutionForTurn({ runtimeId: 'opencode', chatSavedModel: 'google/gemini-2-old', turnModel: 'google/gemini-4-argon', catalog }),
-  { from: 'google/gemini-2-old', to: 'google/gemini-4-argon' },
+  modelSubstitutionForTurn({ runtimeId: 'opencode', chatSavedModel: 'google/gemini-2-old', turnModel: GOOGLE_NEON, catalog }),
+  { from: 'google/gemini-2-old', to: GOOGLE_NEON },
 );
 // The person picked the same retired model again (it still runs): nothing to name.
 assert.equal(modelSubstitutionForTurn({ runtimeId: 'codex', chatSavedModel: 'gpt-5.5-retired', turnModel: 'gpt-5.5-retired', catalog }), undefined);
