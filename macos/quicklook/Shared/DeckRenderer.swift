@@ -3,7 +3,7 @@ import OSLog
 import UniformTypeIdentifiers
 import WebKit
 
-let proofLog = Logger(subsystem: "ai.productory.ritemark.quicklook-proof", category: "render")
+let proofLog = Logger(subsystem: "ai.productory.ritemark.quicklook", category: "render")
 
 enum DeckRenderError: Error {
     case resourceUnavailable, unexpectedResponse, noSlides, unsupportedFile
@@ -18,12 +18,27 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
     override init() {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        configuration.suppressesIncrementalRendering = true
         view = WKWebView(frame: Self.canvas, configuration: configuration)
         super.init()
         view.navigationDelegate = self
     }
 
-    func render(_ url: URL, thumbnail: Bool, completion: @escaping (Result<[String], Error>) -> Void) {
+    #if QUICKLOOK_MINIMAL
+    func renderStatic(completion: @escaping (Result<[String], Error>) -> Void) {
+        loaded = { error in
+            if let error { completion(.failure(error)) }
+            else { completion(.success(["Quick Look", "Static HTML", "Snapshot probe"])) }
+        }
+        view.loadHTMLString("""
+            <!doctype html><meta charset="utf-8"><h1>Quick Look</h1>
+            <p>Static HTML</p>
+            <p>Snapshot probe</p>
+            """, baseURL: nil)
+    }
+    #endif
+
+    func render(_ url: URL, thumbnail: Bool, firstOnly: Bool = false, completion: @escaping (Result<[String], Error>) -> Void) {
         guard url.pathExtension.lowercased() == "rtms" else {
             completion(.failure(DeckRenderError.unsupportedFile))
             return
@@ -42,7 +57,7 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
                 if let error {
                     completion(.failure(error))
                 } else {
-                    self?.draw(text, url: url, thumbnail: thumbnail, completion: completion)
+                    self?.draw(text, url: url, thumbnail: thumbnail, firstOnly: thumbnail || firstOnly, completion: completion)
                 }
             }
             view.loadHTMLString("""
@@ -56,12 +71,12 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
         }
     }
 
-    private func draw(_ text: String, url: URL, thumbnail: Bool,
+    private func draw(_ text: String, url: URL, thumbnail: Bool, firstOnly: Bool,
                       completion: @escaping (Result<[String], Error>) -> Void) {
         let folder = url.deletingLastPathComponent().resolvingSymlinksInPath()
         let name = url.lastPathComponent
         let mode = thumbnail ? "thumbnail" : "preview"
-        let arguments: [String: Any] = ["text": text, "thumbnail": thumbnail]
+        let arguments: [String: Any] = ["text": text, "thumbnail": thumbnail, "firstOnly": firstOnly]
         evaluate("return QuickLookDeck.themePath(text)", arguments) { [weak self] result in
             guard let self else { return }
             do {
@@ -69,7 +84,7 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
                 let theme = Self.findTheme(path, from: folder)
                 proofLog.notice("\(mode, privacy: .public) theme \(name, privacy: .public) \(theme == nil ? "no" : "yes", privacy: .public)")
                 let input = arguments.merging(["theme": theme?.text ?? ""]) { _, new in new }
-                self.evaluate("return QuickLookDeck.render(text, theme, thumbnail).paths", input) { [weak self] result in
+                self.evaluate("return QuickLookDeck.render(text, theme, firstOnly).paths", input) { [weak self] result in
                     guard let self else { return }
                     do {
                         guard let paths = try result.get() as? [String] else { throw DeckRenderError.unexpectedResponse }
@@ -84,7 +99,7 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
                             proofLog.notice("\(mode, privacy: .public) asset \(name, privacy: .public) \(key, privacy: .public) \(assets[key] == nil ? "no" : "yes", privacy: .public)")
                         }
                         self.evaluate("""
-                            const { slides } = QuickLookDeck.render(text, theme, thumbnail, assets);
+                            const { slides } = QuickLookDeck.render(text, theme, firstOnly, assets);
                             return await QuickLookDeck.show(slides, thumbnail, assets);
                             """, input.merging(["assets": assets]) { _, new in new }) { result in
                             completion(result.flatMap { value in
@@ -152,10 +167,22 @@ final class DeckRenderer: NSObject, WKNavigationDelegate {
         callback?(error)
     }
 
-    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finishLoad(nil) }
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finishLoad(error) }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        proofLog.notice("WebKit didFinish")
+        finishLoad(nil)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        proofLog.error("WebKit didFail: \(String(describing: error), privacy: .public)")
         finishLoad(error)
+    }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        proofLog.error("WebKit didFailProvisionalNavigation: \(String(describing: error), privacy: .public)")
+        finishLoad(error)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        proofLog.error("WebKit WebContent process terminated")
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,

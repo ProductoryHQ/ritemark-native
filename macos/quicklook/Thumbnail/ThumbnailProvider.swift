@@ -8,7 +8,7 @@ final class ThumbnailProvider: QLThumbnailProvider {
     override func provideThumbnail(for request: QLFileThumbnailRequest,
                                    _ handler: @escaping (QLThumbnailReply?, Error?) -> Void) {
         proofLog.notice("thumbnail started \(request.fileURL.lastPathComponent, privacy: .public)")
-        let deadline = DispatchTime.now() + .seconds(2)
+        let deadline = DispatchTime.now() + .seconds(10)
         let finish = ThumbnailCompletion(handler)
         // The timeout must also fire if WebKit or an asset read stalls the main thread.
         DispatchQueue.global().asyncAfter(deadline: deadline) {
@@ -25,13 +25,14 @@ final class ThumbnailProvider: QLThumbnailProvider {
             window.setFrameOrigin(NSPoint(x: -10_000, y: -10_000))
             window.contentView = renderer.view
             window.orderBack(nil)
+            // The queued cleanup owns the renderer and its window through the request deadline.
             let cleanup = DispatchWorkItem {
                 window.orderOut(nil)
                 window.contentView = nil
                 renderer.stop()
             }
             DispatchQueue.main.asyncAfter(deadline: deadline, execute: cleanup)
-            renderer.render(request.fileURL, thumbnail: true) { result in
+            let rendered: (Result<[String], Error>) -> Void = { result in
                 guard !cleanup.isCancelled, DispatchTime.now() < deadline else { return }
                 guard case .success = result else {
                     if case .failure(let error) = result {
@@ -50,7 +51,8 @@ final class ThumbnailProvider: QLThumbnailProvider {
                 let snapshot = WKSnapshotConfiguration()
                 snapshot.rect = DeckRenderer.canvas
                 snapshot.snapshotWidth = NSNumber(value: max(1, width * request.scale))
-                renderer.view.takeSnapshot(with: snapshot) { image, _ in
+                renderer.view.takeSnapshot(with: snapshot) { [renderer, window] image, error in
+                    proofLog.notice("thumbnail snapshot callback image=\(image != nil) error=\(String(describing: error), privacy: .public)")
                     guard DispatchTime.now() < deadline else { return }
                     cleanup.cancel()
                     window.orderOut(nil)
@@ -70,11 +72,17 @@ final class ThumbnailProvider: QLThumbnailProvider {
                     }
                 }
             }
+            #if QUICKLOOK_MINIMAL
+            renderer.renderStatic(completion: rendered)
+            #else
+            renderer.render(request.fileURL, thumbnail: true, completion: rendered)
+            #endif
         }
     }
 }
 
 private final class ThumbnailCompletion {
+    private let start = DispatchTime.now().uptimeNanoseconds
     private let lock = NSLock()
     private var handler: ((QLThumbnailReply?, Error?) -> Void)?
 
@@ -86,7 +94,10 @@ private final class ThumbnailCompletion {
         let callback = handler
         handler = nil
         lock.unlock()
-        callback?(reply, nil)
-        return callback != nil
+        guard let callback else { return false }
+        let elapsed = (DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
+        proofLog.notice("thumbnail reply image=\(reply != nil) elapsed_ms=\(elapsed)")
+        callback(reply, nil)
+        return true
     }
 }

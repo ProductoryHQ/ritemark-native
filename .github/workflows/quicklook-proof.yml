@@ -19,10 +19,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macos-14 retired on 2026-11-02 (actions/runner-images#13518).
-        # Use the latest standard Intel image to keep x86_64 runtime coverage.
-        runner: [macos-15, macos-26, macos-26-intel]
-        variant: [sandbox, read-exception]
+        runner: [macos-15, macos-26]
+        variant: [A, B, C, D]
     steps:
       - uses: actions/checkout@v4
 
@@ -31,11 +29,14 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Install renderer dependencies
+        if: matrix.variant != 'C'
         working-directory: extensions/ritemark
         run: npm ci --legacy-peer-deps --ignore-scripts
 
-      - name: Build both universal Quick Look bundles
-        run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build"
+      - name: Build the universal Quick Look bundle
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build" "$VARIANT"
 
       - name: Stamp, sign, register and measure Quick Look
         env:
