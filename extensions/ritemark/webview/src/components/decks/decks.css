@@ -29,7 +29,7 @@
 .deck-theme-swatch > i:last-child { top: 8px; width: 11px; }
 .deck-bar .deck-theme-button { gap: 7px; }
 .deck-bar .deck-theme-button[data-state="open"] { background: var(--r-surface-muted); color: var(--r-ink-strong); }
-.deck-theme-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-theme-name { flex: none; white-space: nowrap; }
 .deck-theme-menu .deck-settings-k { margin: 6px 6px 6px; }
 .deck-theme-sep { height: 1px; margin: 10px -8px 4px; background: var(--r-hairline); }
 .deck-theme-menu .deck-theme-row { width: 100%; height: 32px; justify-content: flex-start; gap: 9px; padding: 0 6px; font-size: 13px; font-weight: 400; color: var(--r-ink-strong); }
@@ -289,48 +289,61 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-menu-key { padding-left: 16px; font-size: 12px; letter-spacing: .5px; color: var(--r-ink-faint); }
 
 /* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
-.deck-notice { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
-/* When the bar is short of room (a notice with the AI open), what gives way, in order (Sprint 162, step-3-themes.md):
-   1. the Theme button's name (its swatch and ▾ stay; the name is in its tooltip);
-   2. Publish's word (it folds to its icon, `iconWhenNarrow`);
-   3. the notice's words (an ellipsis; its actions keep their words);
-   4. Present's word, last: the bar's main action.
-   Flex weights far apart give that order; everything else on the bar keeps its size. */
-.deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present):not(.deck-theme-slot):not(.deck-publish-slot) { flex-shrink: 0; }
-.deck-bar > .deck-theme-slot { flex-shrink: 100000; min-width: 0; }
-.deck-bar > .deck-publish-slot { flex-shrink: 10000; min-width: 0; }
-.deck-bar > .deck-notice { flex-shrink: 100; }
-.deck-bar > .deck-present { flex-shrink: 1; }
-/* Sprint 170: each gives way only down to its folded size, so a long notice ("Saved as <deck> – slides and
-   handout.pdf" with Show in folder) shortens its own words instead of drawing the bar's controls over each other:
-   the Theme button to its swatch and ▾, Publish's split button to its globe and ▾ (both measured at the bar's 30). */
-.deck-bar > .deck-theme-slot { min-width: 65px; }
+.deck-notice { display: inline-flex; flex: 1 0 0; align-items: center; gap: 8px; min-width: var(--deck-notice-min, 0px); max-width: max-content; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
+/* #931 and #950: the notice uses the room left by the controls. The spacer takes any surplus past the full notice. */
+.deck-bar > :not(.deck-notice) { flex-shrink: 0; }
+.deck-bar > .deck-bar-spacer { margin-inline-start: auto; }
+.deck-bar > :is(.deck-publish-slot, .deck-present) { max-width: none; }
+.deck-bar > .deck-publish-slot { min-width: 30px; }
 .deck-bar > .rm-split.deck-publish-split { min-width: 64px; }
-.deck-bar .deck-theme-slot > .deck-theme-button { min-width: 0; flex-shrink: 1; }
-.deck-bar .deck-theme-button > .deck-theme-swatch, .deck-bar .deck-theme-button > svg { flex: none; }
-.deck-bar .deck-theme-button > .deck-theme-name { flex: 0 1 auto; min-width: 0; }
+.deck-bar > .deck-present { min-width: 58px; }
+/* Keep hover and press transitions without animating the horizontal padding used by the fit check. */
+.deck-bar .deck-theme-button, .deck-bar .deck-publish-slot > button { transition-property: color, background-color, border-color, box-shadow, transform; }
+/* Reserve room for warning icons, whole actions and an ellipsis for passing notes. */
+.deck-notice[data-measure-min] { flex: none; width: max-content; min-width: 0; }
+.deck-notice[data-measure-min] > .deck-notice-words { flex: none; width: 1em; }
+.deck-notice[data-measure-min] > .deck-failure-words,
+.deck-notice[data-measure-min] .deck-notice-sizer > :first-child { display: none; }
+.deck-notice[data-measure-min] .deck-notice-room { width: calc(32px + 1em); }
+/* Compact the controls only when they and the minimum notice cannot fit. */
+.deck-bar[data-theme-compact] > .deck-notice { max-width: var(--deck-notice-min); }
+.deck-bar[data-theme-compact] .deck-theme-name,
+.deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }
+.deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
+.deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
-.deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 1em; overflow: hidden; }
+.deck-notice > .deck-failure-words { min-width: 0; }
+.deck-notice-warning { flex: none; color: var(--r-deck-warning); }
+.deck-notice-warning > span { display: inline-grid; place-items: center; padding: 4px; border-radius: 4px; }
+/* The keyboard ring (#635) in its own colour, drawn inside: the bar clips anything outside the note. */
+:where(:root:not([data-input-mode="pointer"])) .deck-notice-warning > span:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: -2px; }
 .deck-notice > .deck-notice-act { flex: none; }
-/* A join's line and the full slide's line side by side: a hairline between them. The pair gives way before the bar's
-   own controls (Present, which folds to its icon), its words first, its actions never. */
-.deck-notice:has(> .deck-notice-gap) { flex-shrink: 1000; }
+/* A hairline between a join's line and the full slide's line. */
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
 /* #931: a notice ending with a file name ("Saved as Day one.pdf") takes the room the bar has. The whole words, hidden,
    keep its width; the words shown are fitted to it, the name cut in its middle only when it doesn't fit (DeckView,
    `NoticeWords`). Its action is an icon button right after the name (Show in folder, 14 px in 24). While it shows, the
-   bar's other controls keep their room: the note gives way first, down to nothing, before any of them folds (its
-   weight is far above theirs), and the deck's own Saved steps aside (DeckView). */
+   deck's own Saved steps aside (DeckView). */
 .deck-notice-cut { position: relative; display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; padding: 4px; margin: -4px 0 -4px -4px; white-space: nowrap; } /* 4 px of room for the icon's focus ring (2 px at 2 px) inside the note's clip */
 .deck-notice-sizer { display: block; visibility: hidden; line-height: 24px; } /* the icon's height, so its ring fits the padding */
 .deck-notice-room { display: inline-block; width: 32px; } /* the action's 24 and the gap's 8 */
 .deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 8px; } /* the icon's focus ring (4 px out) clears the name by 4 px */
-.deck-notice-line > .deck-notice-words { flex: none; }
-.deck-notice-shown { display: block; white-space: nowrap; }
+.deck-notice-line > .deck-notice-words { flex: 0 1 auto; min-width: 0; }
+.deck-notice-shown { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Take hidden words out of the flex gap while keeping them in the live region. */
+.deck-notice:not([data-measure-words]) > .deck-notice-words:has(> .deck-notice-text[data-note-hidden]),
+.deck-notice-line > .deck-notice-words:has(> .deck-notice-shown[data-note-hidden]) {
+  position: absolute;
+  inline-size: 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  opacity: 0;
+}
 .deck-notice-after { display: inline-flex; flex: none; }
-.deck-bar > .deck-notice:has(.deck-notice-cut) { flex-shrink: 1000000000; overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
+.deck-notice:has(.deck-notice-cut) { overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
 .deck-notice .deck-notice-icon { width: 24px; height: 24px; min-width: 24px; padding: 0; }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
