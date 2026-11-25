@@ -372,6 +372,7 @@ export function PictureTools({ editor, context, comments, onComment, onReplace, 
       <PictureBar
         anchor={resizing || barHidden ? null : anchor}
         bounds={context === 'slide' ? stageBounds(host) : undefined}
+        roomHost={context === 'document' ? host : undefined}
         context={context}
         kind="flow"
         look={look}

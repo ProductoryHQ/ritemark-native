@@ -13,6 +13,17 @@ export interface Box {
   height: number
 }
 
+/** A small document picture reserves room for its bar in its own block. */
+export function pictureBarPlacement(bottom: number, height: number, viewportHeight: number, inside: boolean, reserveRoom = false) {
+  const below = bottom + 10
+  const top = inside
+    ? Math.max(8, bottom - height - 12)
+    : reserveRoom || below + height + 8 <= viewportHeight
+      ? below
+      : Math.max(8, bottom - height - 10)
+  return { top: Math.round(top), room: reserveRoom ? 10 + height + 1 : 0 }
+}
+
 /** The scale an element is drawn at: its width on the screen over its own width. */
 export function scaleOf(screenWidth: number, ownWidth: number): number {
   return ownWidth > 0 && screenWidth > 0 ? screenWidth / ownWidth : 1

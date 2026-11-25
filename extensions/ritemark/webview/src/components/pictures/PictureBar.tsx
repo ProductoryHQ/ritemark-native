@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { isMac } from '../../hooks/usePlatform'
+import { pictureBarPlacement } from './pictureGeometry'
 
 export type PicturePlace = 'text' | 'left' | 'right' | 'behind'
 
@@ -75,6 +76,8 @@ export interface PictureBarProps {
   bounds?: { left: number; right: number }
   /** A slide-wide place (a side or behind): the bar sits inside it at the bottom, 12 px up, over the picture. */
   inside?: boolean
+  /** The document picture block that can reserve room for an S bar. */
+  roomHost?: HTMLElement
   /** The bar's own element, so a press on it is never "outside". */
   barRef?: (element: HTMLDivElement | null) => void
 }
@@ -227,8 +230,14 @@ export function PictureBar(props: PictureBarProps) {
    */
   const [fold, setFold] = useState(0)
   const widths = useRef<number[]>([])
+  const size = sizeOf(look.width, context)
+  const roomHost = anchor && size === 'S' && !crop ? props.roomHost : undefined
 
-  // Under the picture, centred on it, inside the window; over the picture's lower edge when there is no room below.
+  useLayoutEffect(() => {
+    return () => { roomHost?.style.removeProperty('--picture-bar-room') }
+  }, [roomHost])
+
+  // Centre on the picture. An S document bar gets its own space below the picture in the block.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
@@ -247,15 +256,13 @@ export function PictureBar(props: PictureBarProps) {
     const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
     const maxX = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - width - 8
     const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
-    const below = anchor.top + anchor.height + 10
-    const inside = Math.max(8, anchor.top + anchor.height - height - 12)
-    const y = props.inside ? inside : below + height + 8 <= window.innerHeight ? below : Math.max(8, anchor.top + anchor.height - height - 10)
+    const { top: y, room: reservedRoom } = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, !!roomHost)
+    roomHost?.style.setProperty('--picture-bar-room', `${reservedRoom}px`)
     setLeft(Math.round(x))
-    setTop(Math.round(y))
+    setTop(y)
   })
 
   if (!anchor) return null
-  const size = sizeOf(look.width, context)
   const keys = (event: KeyboardEvent<HTMLDivElement>) => {
     // A key in the bar's own menu or Description (React hands it on through the portal) is theirs.
     if ((event.target as HTMLElement).closest?.('[data-radix-popper-content-wrapper]')) return

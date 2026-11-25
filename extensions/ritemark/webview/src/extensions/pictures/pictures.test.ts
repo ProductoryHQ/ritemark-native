@@ -27,7 +27,7 @@ import { blockSlideHtml, blockSlideMarkup, isCoverSlide, sidePictureOf } from '.
 import { slideDataOf, splitBlockSlide, withBlockMarkdown, writeSlideData } from '../../../../src/decks/deckFormat'
 import { BUILT_IN_THEME as DEFAULT_THEME } from '../../../../src/decks/deckTheme'
 import { EMPTY_SIDE, flowToSide, sideToText } from '../../components/decks/blocks/slidePicturePlace'
-import { CORNERS, cornerOf, frameBox, localBox, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
+import { CORNERS, cornerOf, frameBox, localBox, pictureBarPlacement, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
 import { caretBeforePicture, chosenPicture, chosenPictureUnder, leavePicture, pictureEditorEnabled, removePicture, setPictureEditorEnabled, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
 
 let failures = 0
@@ -68,6 +68,20 @@ check('sizes: S, M, L and Full by context, and a drag snaps to them', () => {
   assert.equal(draggedWidth(395, 832, 'slide'), '400px')
   assert.equal(draggedWidth(330, 832, 'slide'), '330px')
   assert.equal(draggedWidth(5000, 832, 'slide'), '100%')
+})
+
+check('the S document bar clears the following block, including at the top and near the viewport bottom', () => {
+  const barHeight = 36
+  for (const bottom of [24.5, 280, 584]) {
+    const { top, room } = pictureBarPlacement(bottom, barHeight, 600, false, true)
+    assert.equal(top, Math.round(bottom + 10))
+    assert.ok(top + barHeight <= bottom + room, 'the bar clears even a next block with no margin')
+  }
+})
+
+check('the M bar keeps its gap and its viewport fallback', () => {
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false), { top: 290, room: 0 })
+  assert.deepEqual(pictureBarPlacement(584, 36, 600, false), { top: 538, room: 0 })
 })
 
 check('crop: a region and its look are the same frame, presets keep their names', () => {
