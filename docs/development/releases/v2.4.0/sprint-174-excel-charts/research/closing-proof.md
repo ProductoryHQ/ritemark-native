@@ -4,7 +4,7 @@ One row per [scenario](../scenarios.md). Test passes cite existing coverage and 
 
 | # | Scenario | Result | Evidence |
 |---|---|---|---|
-| 1 | All supported kinds match Excel in place | not run: the full set of final renders has no recorded pass | PR 2 compared columns, bars and lines beside Excel and addressed the differences it found (`edd793ff`). PR 3's `chartLayout.test.ts` covers pie, doughnut, area and scatter. PR 4 adds combo and secondary-axis tests in that file. The scatter recheck awaits the rebuilt workbook. |
+| 1 | All supported kinds match Excel in place | not run: the full set of final renders has no recorded pass | PR 2 compared columns, bars and lines beside Excel and addressed the differences it found (`edd793ff`). PR 3's `chartLayout.test.ts` covers pie, doughnut, area and scatter. PR 4 adds combo and secondary-axis tests in that file. On the rebuilt scatter, `readChart.test.ts` checks the single “Minutes late” series (X from A2:A13, Y from B2:B13). `chartLayout.test.ts` checks 12 markers and axes of 0–90 (X) and 0–35 (Y) at the saved size, matching the lead’s 25 Nov Excel render. |
 | 2 | White charts and cells in Ritemark Dark | not run: no recorded Dark-mode window check | `chartLayout.test.ts` asserts white chart paper. PR 6 records white rule rendering in Dark (`519c8404`). |
 | 3 | Theme tints | pass (test: `readChart.test.ts`, `chartLayout.test.ts`) | The Excel fixture's series fills are checked and the same fills reach the bars and legend. PR 1 compared the reader's colours with Excel in [chart-reader.md](chart-reader.md). |
 | 4 | Automatic theme accents | pass (test: `readChart.test.ts`, `chartLayout.test.ts`) | The Excel fixture checks the first three accents in order and the layout draws the automatic series. |
@@ -16,8 +16,8 @@ One row per [scenario](../scenarios.md). Test passes cite existing coverage and 
 | 10 | Click selects the chart and updates the formula bar | pass (test: `chartSelection.test.tsx`) | PR 4 tests the sales chart's selected state, formula-bar text and ring. The real-keypress window check is recorded in `37d0fa3d`. |
 | 11 | Copy a selected chart as a picture | pass (test: `chartCopy.test.ts`, `chartSelection.test.tsx`) | PR 4b tests the Copy key path and the PNG clipboard write with a mocked clipboard (`5fd4fdab`, `9c5d7bb5`). |
 | 12 | Untitled chart has a kind-only accessible name | pass (test: `chartLayout.test.ts`) | Untitled column layout uses the name “Column chart”. |
-| 13 | Unsupported charts keep their cards and the quiet line names them | not run: the dedicated out-of-scope workbook and Excel-made chartex-kind fixtures are missing | Synthetic coverage checks unsupported drawings and combined notices. |
-| 14 | 200,000-point scatter matches Excel and scrolls smoothly | not run: no recorded desktop scroll or Excel shape comparison at 200,000 points | `chartLayout.test.ts` checks that thinning retains extrema. The separate scatter comparison still awaits the rebuilt workbook. |
+| 13 | Unsupported charts keep their cards and the quiet line names them | pass (tests: `chartLayout.test.ts`, `readWorkbook.test.ts`) | On both sheets of `charts-out-of-scope.xlsx`, the column draws and all ten unsupported charts keep titled cards. The quiet line names each kind, including Excel’s binned `clusteredColumn` as a histogram. The reader and chart-series resolver preserve the workbook input hash. |
+| 14 | 200,000-point scatter matches Excel and scrolls smoothly | not run: no recorded desktop scroll or Excel shape comparison at 200,000 points | `chartLayout.test.ts` checks that thinning retains extrema. The rebuilt 12-point scatter’s saved-size axis comparison is recorded in scenario 1. |
 | 15 | Cell save keeps chart parts and Excel opens it without repair | not run: Excel reopen and no-repair-prompt check await Jarmo's gate | `chartsKeep.test.ts` passed the chart, drawing and relationship byte comparisons. |
 | 16 | Open and close with no hash, modified-time or dirty-state change | not run: no recorded desktop close check that covers all three assertions | `readWorkbook.test.ts` proves reader input immutability. PR 7's commit reports hash and timestamp checks. The [detailed record](large-sheet.md#byte-checks-on-the-final-pr-7-working-tree) leaves the host check open. |
 | 17 | Sales Margin uses a red-yellow-green scale | not run: no recorded comparison for all 30 Margin cells | `ruleEngine.test.ts` checks sampled colours in the equivalent three-colour Excel fixture. |
@@ -43,14 +43,18 @@ One row per [scenario](../scenarios.md). Test passes cite existing coverage and 
 | 37 | A sort remains a view on save | pass (test: `chartsKeep.test.ts`) | The test maps the displayed row to its original cell and checks saved bytes. |
 | 38 | Workbook hash survives opening and closing the app | not run: no recorded app-close hash check for this workbook | `readWorkbook.test.ts` checks the fixture's input buffer before and after preview reads and model evaluation. |
 
+## Number format and rule colours
+
+`cellRules.test.ts` checks text and fill on B2:B6 of `rules-format-colour.xlsx` against the Experience lead’s 25 Nov Excel render. A rule font colour wins when set, including over `[Blue]` for positives. B3 keeps its format’s red text on the rule’s fill, and B6 keeps its red text without a rule.
+
 ## Other open checks
 
-- Rule font colour versus a number format's `[Red]` — not run: waiting for the lead's Excel file.
 - Windows — not run: no Windows test-window or clipboard check is recorded.
 
 ## Closing check (25 Nov)
 
 The qa-validator signed off with open items on `7eefb46c`.
 
-- Scenarios marked not run in the table (1, 2, 7, 9, 13, 14, 15, 16, 17, 35, 38).
-- Four follow-ups awaiting the Experience lead's Excel renders: `[Red]` against the rule font colour, the scatter recheck, chartex fixtures, chart-sheet references.
+- Scenarios marked not run in the table (1, 2, 7, 9, 14, 15, 16, 17, 35, 38).
+- Done in this PR with the Experience lead’s Excel renders and fixtures: `[Red]` against the rule font colour, the saved-size scatter recheck, and the ChartEx and out-of-scope cards and quiet lines.
+- Chart-sheet references remain open. Comparing the chart sheet with Excel needs a test window.

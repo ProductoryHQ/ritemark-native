@@ -1,6 +1,6 @@
 import { attr, decodeXmlEntities } from '../../../../src/excel/sheetXml'
 import {
-  chartColorVariation, colorOf, readTheme, section, type ColorContext, type ColorTransform,
+  chartColorVariation, colorOf, readTheme, type ColorContext, type ColorTransform,
 } from './excelStyles'
 import { drawingPresets } from './drawingColorNames'
 import type {
@@ -221,9 +221,16 @@ function data(el?: Element): ChartData | undefined {
   }
 }
 
-/** Preserve the rich-text title used by the existing drawing card. */
+/** Read the drawing card title from the chart itself, preferring rich text to ChartEx text data. */
 export function chartTitle(xml: string): string | undefined {
-  return richTitleText(section(xml, 'title'))
+  const root = children(xml).next().value
+  if (root?.name !== 'chartSpace') return undefined
+  const title = fields(fields(root.body).get('chart')?.body).get('title')?.body ?? ''
+  const rich = richTitleText(title)
+  if (rich) return rich
+  const tx = fields(title).get('tx')
+  const txData = fields(tx?.body).get('txData')
+  return fields(txData?.body).text('v')?.trim() || undefined
 }
 
 function richTitleText(body: string): string | undefined {

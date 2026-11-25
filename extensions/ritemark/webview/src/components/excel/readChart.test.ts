@@ -64,8 +64,7 @@ const excelCharts: Record<string, ExpectedChart[]> = {
     ['Stacked area', 'area', stackedTitle, 'BCD', 7, 'stacked'],
     ['Pie', 'pie', 'Handovers by depot', 'B', 5],
     ['Doughnut', 'doughnut', 'Why trucks were late', 'B', 5],
-    // The fixture README tracks the Experience lead's rebuild with one series and explicit X values.
-    ['Scatter', 'scatter', 'Distance and lateness', 'AB', 13],
+    ['Scatter', 'scatter', 'Distance and lateness', 'B', 13],
     ['Combo', 'combo', 'Trucks and on-time share', 'BC'],
   ],
   'charts-3d': [
@@ -113,10 +112,11 @@ async function checkExcelCharts() {
         : [...columns].map((col) => {
           const values = `${source}!$${col}$2:$${col}$${lastRow}`
           return kind === 'scatter'
-            ? [`${source}!$${col}$1`, undefined, undefined, undefined, values]
+            ? [`${source}!$${col}$1`, undefined, undefined, `${source}!$A$2:$A$${lastRow}`, values]
             : [`${source}!$${col}$1`, `${source}!$A$2:$A$${lastRow}`, values, undefined, undefined]
         })
       assert.deepEqual(ranges, expectedRanges, label)
+      if (name === 'Scatter') assert.equal(resolveSeries(chart, book.sheets, book)[0][0].tx?.points.get(0), 'Minutes late')
       if (name === 'Revenue trend') {
         assert.equal(sheet.kind, 'chartsheet')
         assert.equal(resolveSeries(chart, book.sheets, book)[0][0].val?.points.get(0), 38950)
@@ -306,6 +306,16 @@ async function main() {
   assert.ok(richChart.supported)
   assert.equal(richChart.title?.text, 'First line Second')
   assert.equal(chartTitle(richChartXml), 'First line Second')
+
+  const axisTitle = '<c:chartSpace><c:chart><c:autoTitleDeleted val="1"/><c:plotArea>'
+    + `<c:catAx><c:title><c:tx>${rich}</c:tx></c:title></c:catAx>`
+    + '</c:plotArea></c:chart></c:chartSpace>'
+  assert.equal(chartTitle(axisTitle), undefined)
+
+  const extendedAxisTitle = '<cx:chartSpace><cx:chart><cx:plotArea><cx:axis>'
+    + '<cx:title><cx:tx><cx:txData><cx:v>Minutes</cx:v></cx:txData></cx:tx></cx:title>'
+    + '</cx:axis></cx:plotArea></cx:chart></cx:chartSpace>'
+  assert.equal(chartTitle(extendedAxisTitle), undefined)
 
   await checkExcelCharts()
   const sales = await readWorkbook(readFileSync(chartsKeepFixtures.find(({ file }) => file.endsWith('/sales-report.xlsx'))!.file))
