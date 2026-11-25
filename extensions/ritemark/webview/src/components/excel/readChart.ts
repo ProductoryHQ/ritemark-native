@@ -422,13 +422,19 @@ function automaticSeriesColor(index: number, ctx: ColorContext): string | undefi
   return colorOf(`theme="${4 + index % 6}"`, ctx, chartColorVariation(Math.floor(index / 6)))
 }
 
-export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }): ChartModel {
+export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }, extended = false): ChartModel {
   const root = children(xml).next().value
-  if (root?.name !== 'chartSpace') return { supported: false, kind: 'unknown' }
+  if (root?.name !== 'chartSpace') return { supported: false, kind: extended ? 'chartex' : 'unknown' }
   const prefix = /^<([\w.-]+):/.exec(root.tag)?.[1]
   const namespace = attr(root.tag, prefix ? `xmlns:${prefix}` : 'xmlns')
-  if (namespace && /\b(?:drawingml|drawing)\/(?:\d+\/)+chartex$/i.test(namespace)) {
-    return { supported: false, kind: 'chartex' }
+  if (extended || namespace && /\b(?:drawingml|drawing)\/(?:\d+\/)+chartex$/i.test(namespace)) {
+    const chart = fields(fields(root.body).get('chart')?.body)
+    const regions = fields(chart.get('plotArea')?.body).all('plotAreaRegion')
+    const extendedKinds = [...new Set(regions.flatMap((region) => fields(region.body).all('series').flatMap((series) => {
+      const kind = attr(series.tag, 'layoutId')
+      return kind ? [kind] : []
+    })))]
+    return { supported: false, kind: 'chartex', ...(extendedKinds.length ? { extendedKinds } : {}) }
   }
   const space = fields(root.body)
   const chart = fields(space.get('chart')?.body)

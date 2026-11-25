@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { parse } from 'node-html-parser'
 import { ChartView } from './ChartView'
 import { DrawingView } from './DrawingView'
-import { drawsChart, layoutChart } from './chartLayout'
+import { drawsChart, layoutChart as layoutPlots } from './chartLayout'
 import { readChart } from './readChart'
 import { resolveSeries } from './chartSeries'
 import { keptNotice } from './keptNotice'
@@ -20,11 +20,13 @@ Object.assign(globalThis, { React })
 const open = (file: string) => readWorkbook(readFileSync(new URL(`../../../../src/excel/fixtures/excel-174/${file}.xlsx`, import.meta.url)))
 const drawingOf = (sheet: SheetModel) => sheet.layout.drawings.find(({ what }) => what === 'chart')!
 const measure = (text: string) => text.length * 6
+const layoutChart = (model: Parameters<typeof layoutPlots>[0], series: Parameters<typeof layoutPlots>[1][number],
+  ...dimensions: [number, number, typeof measure, boolean?]) => layoutPlots(model, [series], ...dimensions)
 function forSheet(book: WorkbookModel, sheet: SheetModel) {
   const { chart } = drawingOf(sheet)
   assert.ok(drawsChart(chart))
-  const [series] = resolveSeries(chart, book.sheets, book)
-  return layoutChart(chart, series, 480, 288, measure, book.date1904)
+  const series = resolveSeries(chart, book.sheets, book)
+  return layoutPlots(chart, series, 480, 288, measure, book.date1904)
 }
 const markupOf = (layout: ReturnType<typeof layoutChart>) => parse(renderToStaticMarkup(React.createElement(ChartView, { layout })))
 const chartGroup = (group: string) => `[data-chart="${group}"]`
@@ -93,19 +95,51 @@ for (const sheet of threeD.sheets.slice(0, 3)) {
   if (sheet.name.endsWith('line')) assert.equal(markup.querySelectorAll('polyline').length, 3)
   else assert.equal(markup.querySelector(chartGroup('bars'))!.querySelectorAll('rect').length, 18)
 }
-const combo = drawingOf(kinds.sheets.find(({ name }) => name === 'Combo') ?? kinds.sheets[kinds.sheets.length - 1])
+const comboSheet = kinds.sheets.find(({ name }) => name === 'Combo')!
+const combo = drawingOf(comboSheet)
 assert.equal(combo.chart?.kind, 'combo')
-const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
-  drawing: combo, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
-}))
-assert.match(fallback, /class="sg-object"/)
-assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
 const worksheet = kinds.sheets[0]
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo] }),
-  "This sheet has a chart. It's kept in the file; Open in Excel to see it.")
-// Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
-assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
-  "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
+test('the Excel combo draws columns and a line against two scales on opposite sides', () => {
+  const layout = forSheet(kinds, comboSheet)
+  const markup = markupOf(layout)
+  assert.deepEqual(markup.querySelectorAll('[data-chart-plot]').map((plot) => plot.getAttribute('data-chart-plot')), ['column', 'line'])
+  assert.deepEqual(layout.legend?.entries.map(({ label }) => label.text), ['Trucks', 'On time'])
+  assert.deepEqual(layout.valueScales?.map(({ scale: { min, max, step } }) => [min, max, step]), [[0, 140, 20], [.74, .94, .02]])
+  assert.ok(layout.axisLabels.some(({ x, text }) => x < layout.plot.x && text === '140'))
+  assert.ok(layout.axisLabels.some(({ x, text }) => x > layout.plot.x + layout.plot.width && text === '94%'))
+  assert.ok(layout.axes.some(({ from, to }) => from.x === to.x && from.x === layout.plot.x))
+  assert.ok(layout.axes.some(({ from, to }) => from.x === to.x && from.x === layout.plot.x + layout.plot.width))
+  const [bar] = layout.bars
+  const [point] = layout.lines[0].segments[0]
+  close(point.x, bar.x + bar.width / 2)
+  close(point.y, layout.plot.y + layout.plot.height * ((.94 - .81) / (.94 - .74)))
+  assert.equal(keptNotice(comboSheet.layout), undefined)
+})
+
+test('unsupported charts keep the card and the quiet line names the kinds once', () => {
+  const draw = (xml: string, extended = false) => ({ ...combo, chart: readChart(xml, undefined, extended) })
+  const waterfall = draw(readFileSync(new URL('../../../../src/excel/fixtures/synthetic-chartex.xml', import.meta.url), 'utf8'))
+  const extended = ['treemap', 'clusteredColumn', 'funnel', 'boxWhisker'].map((kind) => draw(
+    `<chartSpace><chart><plotArea><plotAreaRegion><series layoutId="${kind}"/></plotAreaRegion></plotArea></chart></chartSpace>`, true,
+  ))
+  const standard = ['radarChart', 'stockChart', 'surface3DChart', 'bubbleChart'].map((kind) => draw(
+    `<chartSpace><chart><plotArea><${kind}/></plotArea></chart></chartSpace>`,
+  ))
+  const unsupported = [waterfall, ...extended, ...standard]
+  for (const drawing of unsupported) {
+    const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
+      drawing, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
+    }))
+    assert.match(fallback, /class="sg-object\b/)
+    assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
+    assert.doesNotMatch(fallback, /<svg[^>]+role="img"/)
+  }
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), combo, ...unsupported, waterfall] }),
+    "This sheet has 2 waterfall charts, a treemap chart, a histogram chart, a funnel chart, a box and whisker chart, a radar chart, a stock chart, a surface chart and a bubble chart. They're kept in the file; Open in Excel to see them.")
+  // Colour rules are drawn from PR 6 on, so only what isn't drawn is named.
+  assert.equal(keptNotice({ drawings: [drawingOf(worksheet), { ...combo, what: 'image' }] }),
+    "This sheet has a picture. It's kept in the file; Open in Excel to see it.")
+})
 
 const colours = await open('charts-colours')
 const tints = forSheet(colours, colours.sheets[0])
@@ -613,6 +647,43 @@ test('crowded outside pie labels stay apart and clear the legend and SVG edge', 
   for (const { to } of layout.leaders!) assert.ok(to.x >= 0 && to.x <= layout.width && to.y >= 0 && to.y <= layout.height)
 })
 
+test('large line, area and column series share the extrema sampler', () => {
+  const values = Array<number>(6001).fill(3)
+  values[121] = -10
+  values[122] = 20
+  const series = seriesOf(values)
+  for (const model of [synthetic('line'), areaChart, synthetic('column')]) {
+    const layout = layoutChart(model, [series], 480, 288, measure)
+    const valueAtY = (y: number) =>
+      layout.scale.max - (y - layout.plot.y) / layout.plot.height * (layout.scale.max - layout.scale.min)
+    const retained = model.kind === 'column' ? layout.bars.map(({ to }) => to)
+      : (model.kind === 'area' ? layout.areas![0].segments.flatMap(({ top }) => top)
+        : layout.lines[0].segments.flat()).map(({ y }) => valueAtY(y))
+    assert.ok(retained.length <= 5000, model.kind)
+    close(Math.min(...retained), -10)
+    close(Math.max(...retained), 20)
+    assert.equal(series.val.points.size, values.length)
+  }
+  const gapped = values.map<number | undefined>((value, i) => i === 3000 ? undefined : value)
+  assert.equal(layoutChart(synthetic('line'), [seriesOf(gapped)], 480, 288, measure).lines[0].segments.length, 2)
+  assert.equal(layoutChart({ ...synthetic('line'), displayBlanksAs: 'span' }, [seriesOf(gapped)],
+    480, 288, measure).lines[0].segments.length, 1)
+  assert.equal(layoutChart(synthetic('column'), [seriesOf(values.slice(0, 5000))], 480, 288, measure).bars.length, 5000)
+})
+
+test('a combo shares a scale when its plots reference the same value axis', () => {
+  const column = synthetic('column')
+  const retitled = { ...column, kind: 'combo' as const, legend: { entries: [], position: 'b' },
+    plots: [column.plots[0], { ...column.plots[0], kind: 'line' as const, grouping: 'standard' }] }
+  const layout = layoutPlots(retitled, [[seriesOf([10, 20], 'First')], [seriesOf([50, 100], 'Second')]], 480, 288, measure)
+  assert.equal(layout.valueScales?.length, 1)
+  assert.ok(layout.scale.max >= 100)
+  assert.equal(layout.axisLabels.filter(({ text }) => text === 'Category 1').length, 1)
+  assert.deepEqual(layout.legend?.entries.map(({ label }) => label.text), ['First', 'Second'])
+  const last = layout.lines[0].segments[0][1]
+  close(last.y, layout.plot.y + layout.plot.height * (layout.scale.max - 100) / (layout.scale.max - layout.scale.min))
+})
+
 test('large scatter series keep line extrema and at most one marker per pixel', () => {
   const values = Array<number>(6001).fill(3)
   values[121] = -10
@@ -643,7 +714,7 @@ test('deleted pie labels reserve no space and unstyled slices cycle through shad
 })
 
 test('default doughnut labels sit at the centre of their ring', () => {
-  const model = { ...pieChart, kind: 'doughnut' as const, plots: [{ ...pieChart.plots[0], holeSize: 50,
+  const model = { ...pieChart, kind: 'doughnut' as const, plots: [{ ...pieChart.plots[0], kind: 'doughnut' as const, holeSize: 50,
     labels: { showVal: true } }] }
   const layout = layoutChart(model, [seriesOf([1, 2, 3])], 480, 288, measure)
   layout.slices!.forEach(({ center, innerRadius, radius }, i) =>
@@ -674,4 +745,43 @@ test('pie keeps saved chart text, rich label runs and the manual plot', () => {
   assert.equal(label.style.rotation, 2)
   assert.deepEqual(label.runs, [{ text: 'Saved label', style: { size: 12, rotation: 2, bold: true, italic: false, color: '#000000' } }])
   assert.equal(markupOf(layout).querySelector('[data-chart="data-labels"] tspan')!.textContent, 'Saved label')
+})
+
+test('grouped plots draw every series at the union of their bucket extrema', () => {
+  const first = Array<number>(6001).fill(2)
+  const second = Array<number>(6001).fill(3)
+  first[1] = 80
+  second[2] = 90
+  const column = synthetic('column')
+  for (const grouping of [undefined, 'clustered', 'stacked', 'percentStacked']) {
+    const layout = layoutChart({ ...column, plots: [{ ...column.plots[0], grouping }] },
+      [seriesOf(first), seriesOf(second)], 480, 288, measure)
+    const indices = [0, 1].map((series) => layout.bars.filter((bar) => bar.series === series).map((bar) => bar.index))
+    assert.deepEqual(indices[0], indices[1], grouping)
+    for (const index of [1, 2]) assert.ok(indices[0].includes(index), grouping)
+    assert.ok(indices[0].length <= 5000, grouping)
+  }
+})
+
+test('combos containing a pie or doughnut keep their card and name the circular kind', () => {
+  for (const [tag, kind] of [['pieChart', 'pie'], ['doughnutChart', 'doughnut']]) {
+    const chart = readChart(`<chartSpace><chart><plotArea><barChart><barDir val="col"/></barChart><${tag}/></plotArea></chart></chartSpace>`)
+    const drawing = { ...combo, chart }
+    const fallback = renderToStaticMarkup(React.createElement(DrawingView, {
+      drawing, style: {}, workbook: kinds, version: 0, width: 480, height: 288,
+    }))
+    assert.equal(drawsChart(chart), false)
+    assert.match(fallback, /Kept in the file\. Open in Excel to see it\./)
+    assert.match(keptNotice({ drawings: [drawing] })!, new RegExp(`a ${kind} chart`))
+  }
+})
+
+test('the quiet line describes unnamed charts alongside named kinds', () => {
+  const draw = (tag: string) => ({ ...combo, chart: readChart(`<chartSpace><chart><plotArea><${tag}/></plotArea></chart></chartSpace>`) })
+  const unknown = { ...combo, chart: readChart('<chartSpace><chart><plotArea/></chart></chartSpace>', undefined, true) }
+  for (const others of [[unknown], [unknown, unknown]]) {
+    assert.match(keptNotice({ drawings: [...others, draw('radarChart')] })!,
+      others.length === 1 ? /a radar chart and another chart\./ : /a radar chart and 2 other charts\./)
+  }
+  assert.match(keptNotice({ drawings: [unknown] })!, /has a chart\./)
 })

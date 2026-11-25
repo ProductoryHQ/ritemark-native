@@ -94,6 +94,16 @@ export function inputMode(): InputMode {
   return mode
 }
 
+let markKeyboard: (() => void) | undefined
+
+/**
+ * A shortcut of the page's own just moved focus through it (Sprint 174's Ctrl+Alt+5 / Cmd+Option+5 to a chart): the
+ * person is working by keyboard, so the ring shows, though a held modifier alone says nothing in `inputKindOf`.
+ */
+export function noteKeyboardNavigation(): void {
+  markKeyboard?.()
+}
+
 /** Start deciding the page's input mode (once: one page, one mode; the page's own document by default). */
 export function watchInputMode(doc: InputDocument | undefined = typeof document === 'undefined' ? undefined : document): void {
   const view = doc?.defaultView
@@ -106,6 +116,7 @@ export function watchInputMode(doc: InputDocument | undefined = typeof document 
     mode = next
     root.setAttribute('data-input-mode', next)
   }
+  markKeyboard = () => set('keyboard')
   // A press's own clicks are left out from its release for PRESS_CLICKS_MS, however long the press was held. Each press
   // has its number, so a timer left by an earlier press can't end a later one; a key ends any press whose release never
   // came (a native context menu's).

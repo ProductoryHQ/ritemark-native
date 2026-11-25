@@ -101,7 +101,7 @@ Click a drawn chart to choose it, or press Cmd+Option+5 on Mac or Ctrl+Alt+5 on 
 
 > Chart · Revenue by region · a column chart from Q5:Q7. Change it in Excel.
 
-With the chart chosen, press Cmd+C on Mac or Ctrl+C on Windows to copy it as a picture. Press Esc to return to the cells.
+With the chart chosen, press Cmd+C on Mac or Ctrl+C on Windows to copy it as a picture, ready to paste into a document or a message. Press Esc to return to the cells, where Cmd+C or Ctrl+C copies the cells' text.
 
 ### Colour rules
 

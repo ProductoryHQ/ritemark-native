@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- Select an Excel chart and press Cmd+C or Ctrl+C to copy it as a picture.
+
+- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar.
+- Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
+- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
+- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar.
+- Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
+- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use.
 - Excel previews also explain when a chart sheet contains a chart they can’t draw.
 
 - Excel pie, doughnut, area and scatter charts now appear in their original positions and on chart sheets.
