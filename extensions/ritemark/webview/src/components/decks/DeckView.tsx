@@ -29,7 +29,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
-import { fitNotice } from './noticeCut'
+import { fitNotice, hideClippedNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -226,7 +226,7 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 const NOTICE_ACTION_GAP = 8
 
 /** Check the bar with full controls and the notice down to its ellipses and actions. */
-function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement) {
+function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRenderingContext2D | null) {
   bar.removeAttribute('data-theme-compact')
   notice.setAttribute('data-measure-min', '')
   const minimum = notice.getBoundingClientRect().width
@@ -239,6 +239,17 @@ function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement) {
   if (last && last.getBoundingClientRect().right > right + 0.01) {
     bar.setAttribute('data-theme-compact', '')
     roomChanged()
+  }
+
+  // Keep the round-one layout and tooltip target even when the words have too little room to read.
+  if (!measure) return
+  for (const words of notice.querySelectorAll<HTMLElement>(':scope > .deck-notice-words > .deck-notice-text')) {
+    const style = getComputedStyle(words)
+    measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+    const room = words.getBoundingClientRect().width
+    const hidden = hideClippedNotice(words.textContent ?? '', room, words.hasAttribute('data-note-hidden'),
+      text => measure.measureText(text).width)
+    words.toggleAttribute('data-note-hidden', hidden)
   }
 }
 
@@ -1557,7 +1568,8 @@ export function DeckView({
     const bar = barRef.current
     const notice = barNoticeRef.current
     if (!bar || !notice) return
-    const fit = () => fitDeckBar(bar, notice)
+    const measure = document.createElement('canvas').getContext('2d')
+    const fit = () => fitDeckBar(bar, notice, measure)
     fit()
     const resize = new ResizeObserver(fit)
     resize.observe(bar)

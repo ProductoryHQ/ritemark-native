@@ -311,6 +311,8 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
 .deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Keep the text in the live region and keep its tooltip reachable. */
+.deck-notice-text[data-note-hidden] { opacity: 0; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
 .deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 1em; overflow: hidden; }

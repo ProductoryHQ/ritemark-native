@@ -20,6 +20,13 @@ export function charactersOf(name: string): string[] {
   return Segmenter ? Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(name), part => part.segment) : Array.from(name)
 }
 
+/** Keep a full note visible, and require 3 px of extra room to restore a clipped note. */
+export function hideClippedNotice(text: string, room: number, wasHidden: boolean, measure: (text: string) => number): boolean {
+  if (room >= measure(text)) return false
+  const prefix = charactersOf(text).slice(0, 12).join('').trimEnd()
+  return room < measure(prefix + CUT) + (wasHidden ? 3 : 0)
+}
+
 /** `name` kept to `keep` characters (and the ellipsis), its start and end kept, the end never shorter than its extension. */
 export function cutName(name: string, keep: number): string {
   const characters = charactersOf(name)
