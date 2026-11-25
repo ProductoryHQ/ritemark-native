@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { scoreRun, tryLinks } from './reading-test-run.mjs';
+import { retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
 
 const facts = JSON.parse(`{
   "folder": "Review",
@@ -91,6 +91,63 @@ test('accepts a password-free copy and the project folder label from the Claude 
   assert.equal(scoreRun({ ...sample, stepLabels: ['ToolSearchUsing ToolSearch'] }, facts).criteria[3], 'fail');
 });
 
+test('scores each multiline unread entry up to its next document or blank line', () => {
+  const multiline = answer.replace('Visit form is an image-only scan.', 'Visit form\nIt is an image-only scan.')
+    .replace('Locked appendix has a password.', 'Locked appendix\nIt has a password.');
+  const score = (visibleAnswer) => scoreRun({ ...sample, visibleAnswer }, facts);
+  assert.equal(score(multiline).criteria[1], 'pass');
+  assert.equal(score(multiline).criteria[5], 'pass');
+  assert.equal(score(multiline.replace('Visit form\n', 'Visit form\n\n')).coverage[1].result, 'missing');
+  assert.equal(score(multiline.replace('Please provide the password.', '\nCharter: Please provide the password.')).criteria[5], 'fail');
+  assert.equal(score(multiline.replace('It has a password.', 'Charter has a password.')).criteria[5], 'fail');
+});
+
+test('accepts each concrete Findings draft fact, excluding the minutes’ shared cost wording', () => {
+  const findings = { file: 'Findings draft v2.docx',
+    words: ['six times', '6 times', 'case notes', 'cash machines', 'told early', 'older customers', 'older clients'] };
+  const fixture = { ...facts, documents: [...facts.documents, findings] };
+  for (const fact of [
+    'Cost per visit is six times the cost per call.',
+    'Cost per visit is 6 times the cost per call.',
+    'Older customers rely on branches for help with the app.',
+    'Call centre and branches do not share case notes.',
+    'Cash machines are near the end of their life.',
+    'Staff want to be told early.',
+  ]) {
+    const scored = scoreRun({ ...sample, visibleAnswer: `${answer}\n- Findings draft v2: ${fact}` }, fixture);
+    assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'read', fact);
+  }
+  const scored = scoreRun({ ...sample, visibleAnswer: `${answer}\n- Findings draft v2: Cost per visit.` }, fixture);
+  assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'missing');
+});
+
+test('a custom question only scores step labels and source style', () => {
+  const answer = 'Only the pilot deck has speaker notes.';
+  const result = scoreRun({ ...sample, answer, visibleAnswer: answer, customQuestion: true, links: [] }, facts);
+  assert.deepEqual(result.criteria, { 1: 'n/a', 2: 'n/a', 3: 'pass', 4: 'n/a', 5: 'n/a', 6: 'pass' });
+  assert.deepEqual(result.coverage, []);
+  assert.deepEqual(result.slides, []);
+  assert.equal(scoreRun({ ...sample, customQuestion: true, visibleAnswer: 'Drafts/My deck.pptx',
+    stepLabels: ['Ran a command'] }, { ...facts, deck: { ...facts.deck, file: 'Drafts/My deck.pptx' } }).criteria[6], 'fail');
+});
+
+test('retries a destroyed CDP execution context once with a refreshed target', async () => {
+  const destroy = new Error('Execution context was destroyed.');
+  const calls = [];
+  const evaluate = async (target, expression) => {
+    calls.push([target, expression]);
+    if (target === 'old') throw destroy;
+    return 'value';
+  };
+  assert.equal(await retryDestroyedContext(evaluate, async () => 'new', 'old', 'query'), 'value');
+  assert.deepEqual(calls, [['old', 'query'], ['new', 'query']]);
+  let attempts = 0;
+  await assert.rejects(retryDestroyedContext(async () => { attempts++; throw destroy; }, async () => 'new', 'old', 'query'), destroy);
+  assert.equal(attempts, 2);
+  await assert.rejects(retryDestroyedContext(async () => { throw new SyntaxError('bad expression'); },
+    () => assert.fail('syntax errors should not retry'), 'old', 'query'), SyntaxError);
+});
+
 test('checks later links after a tab close fails and closes repeated destinations', async (t) => {
   const folder = realpathSync(mkdtempSync(join(tmpdir(), 'reading-links-')));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
@@ -98,6 +155,8 @@ test('checks later links after a tab close fails and closes repeated destination
   writeFileSync(join(folder, facts.deck.file), '');
 
   const seen = [];
+  const results = [];
+  let clicks = 0;
   let front = facts.deck.file;
   let tabToClose;
   const ui = {
@@ -113,20 +172,27 @@ test('checks later links after a tab close fails and closes repeated destination
       return front;
     },
     async chat(expression) {
+      assert.doesNotThrow(() => new Function('d', expression));
       assert.match(expression, /anchor\.click\(\)/);
+      assert.equal(results.length, 4);
+      if (++clicks === 2) throw new Error('Simulated CDP failure.');
       front = facts.deck.file;
       return true;
     },
     waitFor: async (probe) => (await probe()) || null,
     targets: async () => [],
   };
-  const results = [];
   await tryLinks(ui, folder, facts, [
     { label: 'Locked appendix', href: 'Locked%20appendix.docx#q=test' },
     { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=1' },
     { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=2' },
+    { label: 'Pilot deck', href: 'Pilot%20deck.pptx#p=3' },
   ], results);
-  assert.deepEqual(seen, [facts.passwordDocument, facts.deck.file, facts.deck.file]);
+  assert.deepEqual(seen, [facts.passwordDocument, facts.deck.file, facts.deck.file, facts.deck.file]);
   assert.match(results[0].error, /Could not close/);
-  assert.deepEqual(results.map(({ opensRightDocument }) => opensRightDocument), [false, true, true]);
+  assert.equal(results[0].errorStep, 'close destination tab');
+  assert.equal(results[2].errorStep, 'click answer link');
+  assert.equal(results[2].error, 'Simulated CDP failure.');
+  assert.equal(results[3].targetFile, facts.deck.file);
+  assert.deepEqual(results.map(({ opensRightDocument }) => opensRightDocument), [false, true, false, true]);
 });

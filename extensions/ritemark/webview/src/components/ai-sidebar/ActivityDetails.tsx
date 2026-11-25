@@ -2,7 +2,7 @@
  * ActivityDetails — collapsible tool call list using native <details>/<summary>.
  */
 
-import { isHiddenToolActivity, readSummary, stepLabel } from './stepLabel';
+import { readSummary, stepLabel, visibleStepActivities } from './stepLabel';
 import { ActivityCard } from './ActivityCard';
 import { activeDurationMs } from './types';
 import { formatSeconds } from './activityState';
@@ -15,15 +15,15 @@ interface ActivityDetailsProps {
 }
 
 export function ActivityDetails({ activities, metrics, running }: ActivityDetailsProps) {
+  const visible = visibleStepActivities(activities);
   if (running) {
-    const steps = activities.filter((activity) => stepLabel(activity));
+    const steps = visible.filter((activity) => stepLabel(activity));
     return steps.length ? (
       <div className="space-y-0.5">
         {steps.map((step, i) => <ActivityCard key={step.step?.id ?? i} activity={step} />)}
       </div>
     ) : null;
   }
-  const visible = activities.filter((activity) => !isHiddenToolActivity(activity));
   if (!visible.length) return null;
 
   const stepCount = visible.length;

@@ -79,6 +79,7 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
   const index = step ? activities.findIndex((a) => a.step?.id === step.id) : -1;
   if (!step || index < 0) return [...activities, incoming];
   const previous = activities[index];
+  if (previous.step?.status && !step.status) return activities;
   const next = [...activities];
   next[index] = {
     ...previous,
@@ -89,6 +90,30 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
     },
   };
   return next;
+}
+
+/** A folder search can retry with another pattern and a new tool ID. */
+export function visibleStepActivities(activities: AgentProgress[]): AgentProgress[] {
+  const visible: AgentProgress[] = [];
+  const folders = new Map<string, number>();
+  for (const activity of activities) {
+    if (isHiddenToolActivity(activity)) continue;
+    const { step } = activity;
+    if (step?.kind !== 'folder' || step.status !== 'completed') {
+      visible.push(activity);
+      continue;
+    }
+    const folder = (step.path ?? '').replace(/\\/g, '/').replace(/\/+$/, '').replace(/^\.\//, '');
+    const key = folder === '.' ? '' : folder;
+    const previous = folders.get(key);
+    if (previous === undefined) {
+      folders.set(key, visible.length);
+      visible.push(activity);
+    } else if (step.listing?.length || !visible[previous].step?.listing?.length) {
+      visible[previous] = activity;
+    }
+  }
+  return visible;
 }
 
 export function readSummary(activities: AgentProgress[], activeMs = 0): string | undefined {

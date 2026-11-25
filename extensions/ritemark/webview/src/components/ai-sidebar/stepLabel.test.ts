@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { toolStepResult, type ToolStep } from '../../../../src/runtime/toolStep';
-import { readSummary, stepLabel, updateStep } from './stepLabel';
+import { readSummary, stepLabel, updateStep, visibleStepActivities } from './stepLabel';
 import type { AgentProgress } from './types';
 
 function progress(step: ToolStep, tool = 'read_document'): AgentProgress {
@@ -54,7 +54,23 @@ for (const tool of ['Glob', 'LS']) {
   assert.equal(row?.detail, '/project/Reference/\n**/*.docx');
 }
 
-console.log('stepLabel: S17–S20 passed');
+// A deck search can make an empty folder lookup before retrying with a wider glob.
+const emptyLookup: ToolStep = { id: 'deck-search', kind: 'folder', command: '**/*.deck' };
+const wideLookup: ToolStep = { id: 'wide-search', kind: 'folder', path: '.', command: '**/*' };
+const empty = progress(toolStepResult(emptyLookup, 'No files found', false), 'Glob');
+const counting = progress(wideLookup, 'Glob');
+const counted = progress(toolStepResult(wideLookup, 'Brief.docx\nDecision briefing.pptx', false), 'Glob');
+const lookups = updateStep(updateStep([empty], counting), counted);
+assert.equal(lookups.length, 2);
+assert.equal(updateStep(lookups, counting), lookups);
+for (const rows of [lookups, [...lookups].reverse()]) {
+  assert.deepEqual(visibleStepActivities(rows).map((row) => stepLabel(row)?.label),
+    ['Looked in the project folder: 1 Word document, 1 PowerPoint deck']);
+}
+const elsewhere = progress(toolStepResult({ ...wideLookup, id: 'other', path: 'Reference' }, 'Report.pdf', false), 'Glob');
+assert.equal(visibleStepActivities([...lookups, elsewhere]).length, 2);
+
+console.log('stepLabel: S17–S20 and folder retries passed');
 
 for (const tool of ['ToolSearch', 'TodoWrite', 'Task', 'Agent', 'ExitPlanMode', 'EnterPlanMode', 'mcp__server__lookup']) {
   assert.equal(updateStep(activities, { type: 'tool_use', tool, message: `Using ${tool}`, timestamp: 0 }), activities);
