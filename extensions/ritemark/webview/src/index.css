@@ -145,6 +145,7 @@
   --r-hairline-strong: var(--ritemark-hairline-strong);
   --r-ink-strong: var(--ritemark-ink-strong);
   --r-ink-body: var(--ritemark-ink-body);
+  --r-deck-warning: #B45309;
   --r-ink-muted: var(--ritemark-ink-muted);
   --r-ink-faint: var(--ritemark-ink-faint);
   --r-ink-disabled: var(--ritemark-ink-disabled);
@@ -238,6 +239,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-hairline-strong: var(--ritemark-dark-hairline-strong);
   --r-ink-strong: var(--ritemark-dark-ink-strong);
   --r-ink-body: var(--ritemark-dark-ink-body);
+  --r-deck-warning: #EAB308;
   --r-ink-muted: var(--ritemark-dark-ink-muted);
   --r-ink-faint: var(--ritemark-dark-ink-faint);
   --r-ink-disabled: var(--ritemark-dark-ink-disabled);

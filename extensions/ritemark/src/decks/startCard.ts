@@ -10,6 +10,7 @@
  * tells the host, which drops the mark, so the card never comes back to that deck.
  */
 
+import type { DeckNoticeReporter } from './deckProtocol';
 import type { EarlierDeck } from './newDeck';
 
 /** The earlier decks the card shows before "All decks…". */
@@ -80,7 +81,7 @@ export interface DraftSteps {
    * and the words go as the person's first message, with the document in front (this deck) attached.
    */
   startChat: (request: { runtimeId: string; text: string; send: true }) => Promise<void>;
-  notice: (text: string) => void;
+  notice: DeckNoticeReporter;
 }
 
 /**
@@ -90,21 +91,22 @@ export interface DraftSteps {
 export async function sendDraft(words: string, steps: DraftSteps): Promise<boolean> {
   const ai = await steps.ai();
   if (!ai) {
-    steps.notice('No AI is signed in, so nothing was sent.');
+    steps.notice('No AI is signed in, so nothing was sent.', 'failure');
     return false;
   }
   // A deck that couldn't be saved is not sent: the AI would read the older file
   if (!(await steps.save().catch(() => false))) {
-    steps.notice('The deck could not be saved, so nothing was sent.');
+    steps.notice('The deck could not be saved, so nothing was sent.', 'failure');
     return false;
   }
   try {
     await steps.startChat({ runtimeId: ai.id, text: draftRequest(words), send: true });
   } catch {
-    steps.notice(`The message could not be sent to ${ai.name}.`);
+    steps.notice(`The message could not be sent to ${ai.name}.`, 'failure');
     return false;
   }
   await steps.forget();
+  steps.notice('', 'success');
   return true;
 }
 

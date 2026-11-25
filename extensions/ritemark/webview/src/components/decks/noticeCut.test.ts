@@ -8,6 +8,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { CUT, charactersOf, cutName, fitNotice, hideClippedNotice } from './noticeCut'
 
+import { updateDeckFailures } from './deckFailures'
+
 const note = 'This deck is now a copy of Quarterly planning workshop'
 const measure = (words: string) => charactersOf(words).length * 6
 const minimum = measure('This deck is…')
@@ -99,5 +101,25 @@ assert.match(view, /const NOTICE_ACTION_GAP = 8\b/)
 assert.match(css, /\.deck-notice \{[^}]*flex: 1 0 0;/, "the Saved as notice uses the shared leftover room")
 // Outside the minimum-width probe the words are as wide as the bar gives them.
 for (const rule of (css.match(/\.deck-notice(?:-words|-text|-cut|-shown|-sizer)?(?![\w-])[^{]*\{[^}]*\}/g) ?? []).filter(rule => !rule.includes('deck-notice-icon') && !rule.includes('data-measure-min'))) assert.doesNotMatch(rule, /(^|[\s;{])(max-)?width:\s*\d/, rule)
+
+// A failure uses the same word threshold as a passing notice. Only the words leave the layout.
+const failure = 'The slides could not be put in.'
+assert.equal(hideClippedNotice(failure, measure(failure), undefined, measure), false)
+assert.equal(hideClippedNotice(failure, measure('The slides c…') - 1, undefined, measure), true)
+assert.match(view, /role="status" aria-live="polite">\s*\{Array\.from\(failures\)\.map[\s\S]*?<Tooltip label=\{text\} className="deck-notice-warning">\s*<span role="img" tabIndex=\{0\} aria-label=\{text\}>\s*<Icon name="warning" size=\{16\} tone="inherit"[\s\S]*?<span className="deck-notice-words deck-failure-words">\s*<span className="deck-notice-text">\{text\}<\/span>/)
+assert.match(css, /\.deck-notice\[data-measure-min\] > :not\(\.deck-notice-warning\) \{ display: none; \}/)
+assert.match(css, /\.deck-notice-warning \{ flex: none; color: var\(--r-deck-warning\); \}/)
+
+// The passing-note timer and the edit/Undo dismissals only write the passing state.
+assert.match(view, /window\.setTimeout\(\(\) => setNotice\(current => current === notice \? null : current\), NOTICE_MS\)/)
+assert.match(view, /setFailures\(current => updateDeckFailures\(current, operation, \{ kind: 'success' \}\)\)/)
+assert.match(view, /clearFailure\('insert-slides'\)\s*answer\(true\)/)
+
+const insertFailed = updateDeckFailures(new Map(), 'insert-slides', { kind: 'failure', text: failure })
+const bothFailed = updateDeckFailures(insertFailed, 'save-image', { kind: 'failure', text: 'The picture could not be saved.' })
+assert.equal(updateDeckFailures(bothFailed, 'save-pdf', { kind: 'success' }), bothFailed)
+const retried = updateDeckFailures(bothFailed, 'insert-slides', { kind: 'success' })
+assert.deepEqual([...retried], [['save-image', 'The picture could not be saved.']])
+assert.equal(updateDeckFailures(retried, 'save-image', { kind: 'success' }).size, 0)
 
 console.log('noticeCut: passed')

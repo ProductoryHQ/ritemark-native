@@ -23,7 +23,7 @@ import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { deckModeOf } from './deckMode';
 import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type DeckTheme, type ThemeEntry } from './deckTheme';
 import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
-import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest, type DeckNoticeReporter } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, sessionTimeEdit, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { frontMatterField, parseFrom } from './deckFormat';
@@ -99,8 +99,8 @@ export class DeckPages implements vscode.Disposable {
     state: (document: vscode.TextDocument) => Promise<StartCardState>;
     gone: (document: vscode.TextDocument) => Promise<void>;
     /** Draft and the copy: true when the card is gone (the row was used), false when it stays (nothing was done). */
-    draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
-    copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
+    draft: (document: vscode.TextDocument, text: string, notice: DeckNoticeReporter) => Promise<boolean>;
+    copy: (document: vscode.TextDocument, source: string, notice: DeckNoticeReporter) => Promise<boolean>;
   } | null = null;
   /** Sprint 170 (#881): Save as PDF from Publish's menu (`deckPdf.ts`), set once at activation. */
   pdf: Pick<DeckPdfSaver, 'save' | 'show'> | null = null;
@@ -437,8 +437,9 @@ export class DeckPages implements vscode.Disposable {
           const edit = new vscode.WorkspaceEdit();
           edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
           if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+          await this.post(webview, { type: 'deck/notice', text: '', kind: 'success', operation: `session-${field}` });
         }).catch(async () => {
-          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.` });
+          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.`, kind: 'failure', operation: `session-${field}` });
         });
         this.sessionEdits.set(document, pending);
         await pending;
@@ -503,7 +504,7 @@ export class DeckPages implements vscode.Disposable {
         await this.publisher?.liveAction(document, request.action, webview);
         return;
       case 'deck/publish':
-        await this.publisher?.publish(document, request.text, request.look, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        await this.publisher?.publish(document, request.text, request.look, request.steps, (text, kind) => void this.post(webview, { type: 'deck/page-notice', text, kind, operation: 'publish' }));
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
@@ -554,7 +555,7 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/start-copy': {
         // The card waits for the answer: gone once the row was used, or as it is now when nothing was done
         const card = this.startCard;
-        const notice = (text: string) => void this.post(webview, { type: 'deck/notice', text });
+        const notice: DeckNoticeReporter = (text, kind) => void this.post(webview, { type: 'deck/notice', text, kind, operation: request.type });
         const gone = !card || !isEnabled('decks') || (request.type === 'deck/start-draft'
           ? await card.draft(document, request.text, notice)
           : await card.copy(document, request.source, notice));
@@ -593,7 +594,7 @@ export class DeckPages implements vscode.Disposable {
     const library = this.library();
     const root = projectRoot();
     const deckPath = root ? projectRelative(root, document.uri.fsPath) : null;
-    const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message });
+    const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message, operation: request.type });
     if (!isEnabled('decks')) {
       // Sprint 159 (PR 2): the deck keeps working with the flag turned off since it opened, but the library is off
       if (request.type === 'deck/source-states') await this.post(webview, { type: 'deck/source-states', states: [] });
@@ -648,6 +649,7 @@ export class DeckPages implements vscode.Disposable {
           const source = parseFrom(request.from);
           if (!source) return;
           await vscode.commands.executeCommand(`${SLIDE_LIBRARY_VIEW}.focus`);
+          await this.post(webview, { type: 'deck/notice', text: '', kind: 'success', operation: request.type });
           this.revealed.fire({ path: source.path, id: source.id });
           return;
         }

@@ -299,12 +299,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar > .deck-present { min-width: 58px; }
 /* Keep hover and press transitions without animating the horizontal padding used by the fit check. */
 .deck-bar .deck-theme-button, .deck-bar .deck-publish-slot > button { transition-property: color, background-color, border-color, box-shadow, transform; }
-/* Measure the minimum with a hover target for each ellipsis and the full space for the note's actions. */
+/* Reserve room only for warnings. Passing notices use the space left by the controls. */
 .deck-notice[data-measure-min] { flex: none; width: max-content; min-width: 0; }
-.deck-notice[data-measure-min] > .deck-notice-words { flex: none; width: 1em; }
-.deck-notice[data-measure-min] .deck-notice-sizer > :first-child { display: none; }
-.deck-notice[data-measure-min] .deck-notice-room { width: calc(32px + 1em); }
-/* Once the note is at its minimum, Theme goes straight to its swatch. Only then can Publish and Present fold. */
+.deck-notice[data-measure-min] > :not(.deck-notice-warning) { display: none; }
+/* Compact the controls only when they and the warning icons cannot fit. */
 .deck-bar[data-theme-compact] > .deck-notice { max-width: var(--deck-notice-min); }
 .deck-bar[data-theme-compact] .deck-theme-name,
 .deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }
@@ -314,6 +312,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
 .deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 1em; overflow: hidden; }
+.deck-notice > .deck-failure-words { min-width: 0; }
+.deck-notice-warning { flex: none; color: var(--r-deck-warning); }
+.deck-notice-warning > span { display: inline-grid; place-items: center; padding: 4px; border-radius: 4px; }
+.deck-notice-warning > span:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
 .deck-notice > .deck-notice-act { flex: none; }
 /* A hairline between a join's line and the full slide's line. */
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }

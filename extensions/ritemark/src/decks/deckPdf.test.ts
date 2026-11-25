@@ -198,7 +198,7 @@ async function main(): Promise<void> {
       } finally {
         console.warn = warn;
       }
-      assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NOT_SAVED });
+      assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NOT_SAVED, kind: 'failure', operation: 'save-pdf' });
       assert.equal(fs.readFileSync(target, 'utf8'), 'kept');
     }
   }
@@ -263,7 +263,7 @@ async function main(): Promise<void> {
     const { saver, seen } = saverFor(deckPath, empty, { text });
     const said: DeckHostMessage[] = [];
     await saver.save(docOf(deckPath), 'handout', '', 'card', [], message => said.push(message));
-    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_HANDOUT, kind: 'failure', operation: 'save-pdf' });
     assert.deepEqual({ printed: seen.printed, there: fs.existsSync(empty) }, { printed: [], there: false });
   }
 
@@ -274,7 +274,7 @@ async function main(): Promise<void> {
     const { saver, seen } = saverFor(deckPath, empty, { text });
     const said: DeckHostMessage[] = [];
     await saver.save(docOf(deckPath), 'slides', '', 'card', [], message => said.push(message));
-    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_SLIDES });
+    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_SLIDES, kind: 'failure', operation: 'save-pdf' });
     assert.deepEqual({ printed: seen.printed, there: fs.existsSync(empty) }, { printed: [], there: false });
   }
 
