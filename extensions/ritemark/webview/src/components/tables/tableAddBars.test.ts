@@ -1,6 +1,6 @@
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
-import { revealTableAddBar, watchTableAddBars } from './tableAddBars'
+import { watchTableAddBars } from './tableAddBars'
 
 const win = new EventTarget()
 let scale = 1
@@ -11,6 +11,10 @@ const frame = {
   clientLeft: 0, clientTop: 0,
   clientWidth: 400, clientHeight: 500,
   offsetWidth: 400, offsetHeight: 500,
+  get scrollTop() { return scrollTop },
+  set scrollTop(value) { scrollTop = value },
+  get scrollLeft() { return scrollLeft },
+  set scrollLeft(value) { scrollLeft = value },
   getBoundingClientRect: () => ({ left: 0, top: 50, width: 400 * scale, height: 500 * scale }),
 }
 Object.assign(win, { getComputedStyle: () => ({ overflowX, overflowY }) })
@@ -32,12 +36,6 @@ const spot = (left: () => number, top: () => number, width: number, height: numb
   getBoundingClientRect: () => ({
     left: left(), top: top(), right: left() + width * scale, bottom: top() + height * scale,
   }),
-  scrollIntoView(options: ScrollIntoViewOptions) {
-    assert.deepEqual(options, { block: 'nearest', inline: 'nearest' })
-    const rect = this.getBoundingClientRect()
-    scrollTop += Math.max(0, rect.bottom - 550)
-    scrollLeft += Math.max(0, rect.right - 400)
-  },
 })
 const row = spot(() => -scrollLeft, () => tableBottom + 4 * scale - scrollTop, 500, 14)
 const column = spot(() => tableRight + 4 * scale - scrollLeft, () => 50 - scrollTop, 14, 900)
@@ -74,8 +72,12 @@ try {
   watcher.update()
   assert.equal(row.style.visibility, 'hidden')
   assert.equal(column.style.visibility, 'hidden')
-  revealTableAddBar(element(row))
-  revealTableAddBar(element(column))
+  watcher.reveal(element(column), 'x')
+  assert.equal(scrollLeft, 143, 'revealing the column bar scrolls its full width into view')
+  assert.equal(scrollTop, 417, 'the tall column bar partly in view leaves vertical scroll alone')
+  watcher.reveal(element(row), 'y')
+  assert.equal(scrollTop, 443, 'revealing the row bar scrolls its full height into view')
+  assert.equal(scrollLeft, 143, 'revealing the wide row bar leaves horizontal scroll alone')
   scroll()
   assert.equal(row.style.visibility, '', 'revealing the new row bar scrolls it into view')
   assert.equal(column.style.visibility, '', 'revealing the new column bar scrolls it into view')
@@ -95,6 +97,8 @@ try {
   assert.equal(row.style.visibility, 'hidden', 'the scaled row bar crosses the scaled vertical clip')
   assert.equal(column.style.visibility, '', 'the y-only clip allows the column bar outside its horizontal span')
   assert.equal(grip.style.visibility, '', 'the y-only clip also allows the grip outside its horizontal span')
+  slide.reveal(element(row), 'y')
+  assert.equal(scrollTop, 0, 'the slide clip cannot scroll')
   tableBottom = 340
   slide.update()
   assert.equal(row.style.visibility, '', 'the scaled row bar now fits')
@@ -104,13 +108,24 @@ try {
 }
 
 const layer = readFileSync(new URL('./TableHandlesLayer.tsx', import.meta.url), 'utf8')
-assert.match(layer, /ref=\{addRow\}\s+style=\{\{ left: box.left, top: tableBottom \+ gap,/)
+assert.match(layer, /ref=\{addRow\}\s+style=\{\{ left: box.left, top: slideTop\(tableBottom \+ gap, bar\),/)
 assert.match(layer, /const columnBarLeft = clamp\(tableRight \+ gap,/)
 assert.match(layer, /ref=\{addColumn\}\s+style=\{\{ left: columnBarLeft, top: box.top,/)
-assert.match(layer, /if \(spot\) revealTableAddBar\(spot\)/)
+assert.match(layer, /visibility.current\?\.reveal\(spot, isRow \? 'y' : 'x'\)/)
+assert.match(layer, /const slideTop = .*clip\.slideY \? clamp\(at, size, clipTop, clipBottom\) : at/)
 assert.match(layer, /run\(insertRow\([^\n]+\), 'row'\)/)
 assert.match(layer, /run\(insertColumn\([^\n]+\), 'column'\)/)
 const css = readFileSync(new URL('../../index.css', import.meta.url), 'utf8')
 assert.match(css, /\.rm-table-add-spot \{ position: absolute;/)
+
+const decksCss = readFileSync(new URL('../decks/decks.css', import.meta.url), 'utf8')
+const handoutFrame = decksCss.match(/\.deck-handout .wysiwyg-editor .ProseMirror > \.rm-table \{([^}]+)\}/)?.[1] ?? ''
+const margins = handoutFrame.match(/margin-block: (-\d+)px (-\d+)px;/)
+const padding = handoutFrame.match(/padding-block: (\d+)px (\d+)px;/)
+assert.ok(margins && padding)
+const [, marginTop, marginBottom] = margins.map(Number)
+const [, paddingTop, paddingBottom] = padding.map(Number)
+assert.equal(paddingBottom + Math.min(marginTop, marginBottom) + paddingTop, 8, 'adjacent handout tables have an 8 px gap')
+assert.equal(marginTop, -8, 'the handout frame overlaps preceding blocks by at most 8 px')
 
 console.log('tableAddBars: passed')

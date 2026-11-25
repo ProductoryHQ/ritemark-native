@@ -11,8 +11,8 @@
  *
  * The handles are drawn inside the table's element, positioned in its own coordinates: on a slide (drawn with
  * `transform: scale`) every measured rect is divided by the scale, so the handles scale with the slide and a click
- * lands where they are drawn, and a drag's pointer positions are divided by it too. Grips can clamp to a slide's
- * non-scrolling text area. The + bars show only while their edge is in view.
+ * lands where they are drawn, and a drag's pointer positions are divided by it too. Grips and the row bar can clamp
+ * to a slide's non-scrolling text area.
  */
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -29,7 +29,7 @@ import { minPercent, resizePair } from './columnResize'
 import { MAX_WIDTH_COLUMNS, snapPercents } from '../../../../src/markdown/tableWidths'
 import { TableMenuItems, type MenuKit } from './TableMenuItems'
 import { dropTarget } from './dropTarget'
-import { revealTableAddBar, watchTableAddBars } from './tableAddBars'
+import { watchTableAddBars } from './tableAddBars'
 
 const GRIP_GAP = 4
 const COL_GRIP = { width: 28, height: 14 }
@@ -307,9 +307,10 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
 
   useLayoutEffect(() => {
     if (pendingReveal.current) {
-      const spot = pendingReveal.current === 'row' ? addRow.current : addColumn.current
+      const isRow = pendingReveal.current === 'row'
+      const spot = isRow ? addRow.current : addColumn.current
       pendingReveal.current = null
-      if (spot) revealTableAddBar(spot)
+      if (spot) visibility.current?.reveal(spot, isRow ? 'y' : 'x')
     }
     visibility.current?.update()
   })
@@ -468,7 +469,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const tableRight = box.left + box.width
   const tableBottom = box.top + box.height
   const gripLeft = (at: number, size: number) => clip.slideY ? clamp(at, size, clipLeft, clipRight) : at
-  const gripTop = (at: number, size: number) => clip.slideY ? clamp(at, size, clipTop, clipBottom) : at
+  const slideTop = (at: number, size: number) => clip.slideY ? clamp(at, size, clipTop, clipBottom) : at
   // Shorten the gap at a tight sideways clip while keeping the bar outside the cells.
   const columnBarLeft = clamp(tableRight + gap, bar, tableRight + 1, clipRight)
   const col = activeCol !== null ? cols[activeCol] : null
@@ -484,7 +485,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           ref={columnGripSpot}
           style={{
             left: gripLeft(col.left + col.width / 2 - colGrip.width / 2, colGrip.width),
-            top: gripTop(box.top - gap - colGrip.height, colGrip.height),
+            top: `var(--rm-column-grip-top, ${slideTop(box.top - gap - colGrip.height, colGrip.height)}px)`,
             width: colGrip.width,
             height: colGrip.height,
             ['--rm-k' as string]: k,
@@ -520,7 +521,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           ref={rowGripSpot}
           style={{
             left: gripLeft(box.left - gap - rowGrip.width, rowGrip.width),
-            top: gripTop(row.top + row.height / 2 - rowGrip.height / 2, rowGrip.height),
+            top: slideTop(row.top + row.height / 2 - rowGrip.height / 2, rowGrip.height),
             width: rowGrip.width,
             height: rowGrip.height,
             ['--rm-k' as string]: k,
@@ -595,7 +596,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
                 className="rm-table-add"
                 aria-label="Add a column"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => run(insertColumn(editor.state, tablePos, width, activeRow ?? 0), 'column')}
+                onClick={() => run(insertColumn(editor.state, tablePos, width, activeRow ?? 0, false), 'column')}
               >
                 <Icon name="plus" size={12} tone="inherit" />
               </Button>
@@ -604,7 +605,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           <div
             className="rm-table-add-spot"
             ref={addRow}
-            style={{ left: box.left, top: tableBottom + gap, width: box.width, height: bar, ['--rm-k' as string]: k }}
+            style={{ left: box.left, top: slideTop(tableBottom + gap, bar), width: box.width, height: bar, ['--rm-k' as string]: k }}
           >
             <Tooltip label="Add a row" className="size-full" side="bottom">
               <Button
@@ -613,7 +614,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
                 className="rm-table-add"
                 aria-label="Add a row"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0), 'row')}
+                onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0, false), 'row')}
               >
                 <Icon name="plus" size={12} tone="inherit" />
               </Button>
