@@ -8,8 +8,10 @@ import { QuickLookCache, MAX_PDF_BYTES, sha256, sourceIdentity } from './quickLo
 
 export async function canStartQuickLook(
   platform: NodeJS.Platform, enabled: boolean, decks: boolean, hasPrint: () => Promise<boolean>, hasBundles: () => Promise<boolean>,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
-  return platform === 'darwin' && enabled && decks && await hasBundles() && await hasPrint();
+  const devOverride = env.RITEMARK_BUILD_CHANNEL === 'test' && env.RITEMARK_QUICKLOOK_DEV === '1';
+  return platform === 'darwin' && enabled && decks && (devOverride || await hasBundles()) && await hasPrint();
 }
 
 interface Job<T> {
@@ -94,7 +96,8 @@ export async function prepareSavedSlides(file: string, bytes: Buffer, appVersion
     return [path.relative(path.dirname(file), picture.file).normalize('NFC'), stat?.size ?? null, stat?.mtimeMs ?? null];
   }));
   const sourceSha256 = sha256(bytes);
-  const inputs = sha256(JSON.stringify([sourceSha256, input.themeBytes && sha256(input.themeBytes), input.logo && sha256(input.logo.bytes), pictures, appVersion, extensionVersion, input.steps, input.measureFit]));
+  // Opening the deck can supply measured steps during a print without changing its saved inputs.
+  const inputs = sha256(JSON.stringify([sourceSha256, input.themeBytes && sha256(input.themeBytes), input.logo && sha256(input.logo.bytes), pictures, appVersion, extensionVersion]));
   const dependencies = picturePaths(built.deck).filter(picture => picture.from === 'slide')
     .map(picture => path.resolve(path.dirname(file), pictureFile(picture.path, picture.from)));
   return { built, input, inputs, sourceSha256, dependencies: [...input.themeFiles, ...dependencies] };

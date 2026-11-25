@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { fitFlow, fitValue } from '../../webview/src/components/decks/blocks/slideFit';
 import { makeTempDir } from '../testing/tempDir';
 import { DeckPdfSaver, type PdfDeps } from './deckPdf';
 import { BUILT_IN_THEME } from './deckTheme';
@@ -57,8 +58,22 @@ test('platform gate skips capability probing on Windows and with Decks off', asy
   assert.equal(await canStartQuickLook('darwin', true, false, noProbe, noProbe), false);
   assert.equal(await canStartQuickLook('darwin', false, true, noProbe, noProbe), false);
   assert.equal(await canStartQuickLook('darwin', true, true, async () => false, async () => true), false);
-  assert.equal(await canStartQuickLook('darwin', true, true, noProbe, async () => false), false);
+  assert.equal(await canStartQuickLook('darwin', true, true, noProbe, async () => false, {}), false);
   assert.equal(await canStartQuickLook('darwin', true, true, async () => true, async () => true), true);
+});
+
+test('only an opted-in test launch skips the bundle probe', async () => {
+  const noProbe = async () => assert.fail('should skip probing');
+  for (const channel of [undefined, 'prod', 'dev', 'test']) {
+    const env = { RITEMARK_BUILD_CHANNEL: channel, RITEMARK_QUICKLOOK_DEV: channel === 'test' ? '0' : '1' };
+    assert.equal(await canStartQuickLook('darwin', true, true, noProbe, async () => false, env), false, channel);
+  }
+  const env = { RITEMARK_BUILD_CHANNEL: 'test', RITEMARK_QUICKLOOK_DEV: '1' };
+  assert.equal(await canStartQuickLook('darwin', true, true, async () => true, noProbe, env), true);
+  assert.equal(await canStartQuickLook('darwin', true, true, async () => false, noProbe, env), false);
+  assert.equal(await canStartQuickLook('win32', true, true, noProbe, noProbe, env), false);
+  assert.equal(await canStartQuickLook('darwin', true, false, noProbe, noProbe, env), false);
+  assert.equal(await canStartQuickLook('darwin', false, true, noProbe, noProbe, env), false);
 });
 
 test('a running job stays superseded even if its replacement was cancelled', { timeout: 5000 }, async () => {
@@ -141,7 +156,28 @@ test('a project removed during print cannot publish its pending drawing', async 
   assert.equal(await cache.read(file), undefined);
 });
 
-test('an unmeasured deck fits the print layout again before printing', async () => {
+test('opening a deck during print does not invalidate its saved drawing', async () => {
+  const { file, cache, print, job, pages } = fixture();
+  let open = false;
+  const draw = {
+    ...job,
+    load: async (file: string, text: string) => {
+      const input = await job.load(file, text);
+      return open ? input : { ...input, steps: [], measureFit: true };
+    },
+    print: { ...print, print: async (html: string) => {
+      const pdf = await print.print(html);
+      open = true;
+      return pdf;
+    } },
+  };
+  await cacheSavedSlides(draw);
+  assert.ok(await cache.read(file));
+  await cacheSavedSlides(draw);
+  assert.equal(pages.length, 1);
+});
+
+test('the print page matches the webview fit and measures again before printing', async t => {
   const { job, pages } = fixture();
   await cacheSavedSlides({ ...job, load: async (file, text) => ({
     ...await job.load(file, text), steps: [], measureFit: true,
@@ -150,10 +186,24 @@ test('an unmeasured deck fits the print layout again before printing', async () 
   assert.ok(pages[0].includes("'sha256-" + Buffer.from(sha256(script), 'hex').toString('base64') + "'"));
   let fit = 1;
   let textHeight = 108;
+  let cover = false;
+  let sideways = false;
   let beforePrint!: () => void;
+  const getComputedStyle = () => ({ display: 'block', position: 'static' });
+  const originalStyle = Object.getOwnPropertyDescriptor(globalThis, 'getComputedStyle');
+  Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true, value: getComputedStyle });
+  t.after(() => {
+    if (originalStyle) Object.defineProperty(globalThis, 'getComputedStyle', originalStyle);
+    else Reflect.deleteProperty(globalThis, 'getComputedStyle');
+  });
   const flow = {
     style: { setProperty: (_name: string, value: string) => { fit = Number(value); } },
-    children: [{ offsetTop: 0, offsetLeft: 0, offsetWidth: 100, get offsetHeight() { return fit * textHeight; } }],
+    children: [{
+      get offsetTop() { return cover ? 100 - this.offsetHeight : 0; },
+      offsetLeft: 0,
+      get offsetWidth() { return sideways ? fit * 240 : 100; },
+      get offsetHeight() { return fit * textHeight; },
+    }],
     clientWidth: 200,
     clientHeight: 100,
     scrollHeight: 100,
@@ -164,10 +214,25 @@ test('an unmeasured deck fits the print layout again before printing', async () 
   runInNewContext(script, {
     document: { querySelectorAll: () => [flow] },
     window: { addEventListener: (_event: string, listener: () => void) => { beforePrint = listener; } },
-    getComputedStyle: () => ({ display: 'block', position: 'static' }),
+    getComputedStyle,
   });
-  assert.equal(fit, 0.92);
+  const assertFit = (expected: number, scenario: string) => {
+    const printFit = fit;
+    const { step } = fitFlow(flow as unknown as HTMLElement);
+    assert.equal(printFit, fitValue(step), scenario);
+    assert.equal(printFit, expected, scenario);
+  };
+  assertFit(0.92, 'bottom overflow');
   textHeight = 120;
   beforePrint();
-  assert.equal(fit, 0.84);
+  assertFit(0.84, 'bottom overflow after layout changes');
+  cover = true;
+  textHeight = 130;
+  beforePrint();
+  assertFit(0.76, 'top overflow on a cover');
+  cover = false;
+  sideways = true;
+  textHeight = 60;
+  beforePrint();
+  assertFit(0.76, 'sideways overflow');
 });

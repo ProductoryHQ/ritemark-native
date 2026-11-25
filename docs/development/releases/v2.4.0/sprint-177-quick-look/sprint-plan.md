@@ -45,6 +45,8 @@ The runner evidence behind decision 3 is round 3, run 45683909718, on macOS 15 a
 
 Branch `sprint-177-quick-look-pr2` implements the v1 writer and project lifecycle for R1–R5. It reuses the Slides-as-PDF renderer and enables background drawing on macOS when Decks, the offline print command and both Quick Look bundles are available. The hidden print page measures fit when the view has no matching fit steps. `npm run test:quick-look` runs under `test:decks` and `npm test`. The launched-app print and Finder proof are still due. Finder-facing release notes and S11 guidance follow the native extensions and proof.
 
+The publish-time check uses the same saved-input fingerprint as cache reuse. Fit steps and the choice to measure fit in the print page are rendering options and can change when someone opens a deck during a draw. For the local proof, `RITEMARK_BUILD_CHANNEL=test` with `RITEMARK_QUICKLOOK_DEV=1` skips the bundle check. macOS, both feature flags and the offline print command are still required.
+
 ## Release notes draft
 
 On Mac, Finder can show a saved deck’s first slide, and pressing Space lets you look through the slides. Ritemark keeps the previews on this Mac.
