@@ -84,7 +84,8 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish, type PauseTarget } from './DeckPublish'
 import { computeResults } from '../../extensions/SearchExtension'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
-import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideSettingsPlacement, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideSettingsPlacement, slideWidthWithSettings, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { isStageScrollbarPress, stageSettingsAnchor } from './slideSettingsGeometry'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
 import { isMac } from '../../hooks/usePlatform'
@@ -773,8 +774,7 @@ export function DeckView({
     : null
   const settingsRoom = settingsPlacement?.room ?? 0
   const fittedSlideWidth = fullSlideWidthFor(stageWidth, stageHeight - settingsRoom, slideAlone ? slideCardUnder : aboveUnder)
-  // If the slide and card cannot both fit, keep the slide and let the stage scroll.
-  const bigWidth = settingsRoom && fittedSlideWidth > 0 ? Math.min(normalSlideWidth, fittedSlideWidth) : normalSlideWidth
+  const bigWidth = slideWidthWithSettings(normalSlideWidth, fittedSlideWidth, settingsRoom)
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
@@ -1188,6 +1188,7 @@ export function DeckView({
     if (!stageWheel || !stage || settingsRoom) return
     let gesture = NO_GESTURE
     const onWheel = (event: WheelEvent) => {
+      if ((event.target as Element | null)?.closest('.deck-settings')) return
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const delta = wheelPixels(event, stage.clientHeight)
       // A pane or a column that holds more than its room scrolls first, then the stage while it can (a short window; in
@@ -1324,7 +1325,7 @@ export function DeckView({
       settingsReturn.current = where.back
       // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
       const id = editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
-      setSettingsFor({ index, id, anchor: stageSlide ?? where.anchor, side: stageSlide ? 'stage' : where.side })
+      setSettingsFor({ index, id, anchor: stageSlide ? stageSettingsAnchor(stageRef) : where.anchor, side: stageSlide ? 'stage' : where.side })
     }))
   }, [pick, editor])
   /** From a part number's ⋯: beside the number (on its right: the number is on the rail at the handout's left), the focus back to its ⋯. */
@@ -2390,9 +2391,14 @@ export function DeckView({
           collisionPadding={SETTINGS_COLLISION_PADDING}
           sticky={stageSettingsOpen ? "always" : undefined}
           style={stageSettingsOpen ? { maxWidth: Math.max(0, stageWidth - SETTINGS_COLLISION_PADDING * 2) } : undefined}
-          className="deck-settings"
+          className={stageSettingsOpen ? 'deck-settings' : 'deck-settings deck-settings-folded'}
+          onPointerDownOutside={event => {
+            if (stageSettingsOpen && isStageScrollbarPress(stageRef.current, event.detail.originalEvent)) {
+              event.preventDefault()
+            }
+          }}
           // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
-          onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+          onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true }) }}
           onCloseAutoFocus={event => {
             const back = settingsReturn.current
             settingsReturn.current = null

@@ -113,3 +113,8 @@ export function slideSettingsPlacement(
   }
   return { side: 'bottom', room: popup.height + gap }
 }
+
+/** Keep the normal slide size when fitting the card below would make the slide too small. */
+export function slideWidthWithSettings(normalWidth: number, fittedWidth: number, room: number): number {
+  return room > 0 && fittedWidth >= normalWidth / 2 ? Math.min(normalWidth, fittedWidth) : normalWidth
+}
