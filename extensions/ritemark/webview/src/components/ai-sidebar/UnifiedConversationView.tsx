@@ -113,6 +113,7 @@ export function UnifiedConversationView() {
 
   const lastMerged = merged[merged.length - 1];
   const lastAgentTurn = lastMerged?.runtime === 'claude' ? lastMerged.turn : undefined;
+  const questionContext = lastAgentTurn?.pendingQuestion ? lastAgentTurn.assistantText : undefined;
   const lastCodexTurn = lastMerged?.runtime === 'codex' ? lastMerged.turn : undefined;
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export function UnifiedConversationView() {
   }, [
     merged.length,
     lastAgentTurn?.activities.length,
+    questionContext,
     lastAgentTurn?.pendingQuestion,
     lastAgentTurn?.pendingPlanApproval,
     lastAgentTurn?.result,

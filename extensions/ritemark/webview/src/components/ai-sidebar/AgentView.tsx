@@ -12,7 +12,7 @@ import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
 import { ApprovalCard } from './CodexView';
 import { SubagentCard } from './SubagentCard';
-import { UserPromptBubble } from './ChatBubbles';
+import { AIResponseBubble, UserPromptBubble } from './ChatBubbles';
 import type { AgentConversationTurn, AgentProgress } from './types';
 import { RUNTIME_TURN_HEADER } from './backgroundWork';
 
@@ -96,6 +96,11 @@ export function AgentTurnBlock({
         </div>
       )}
 
+      {turn.pendingQuestion && turn.assistantText && <AIResponseBubble content={turn.assistantText} />}
+      {turn.pendingQuestion && turn.planText && !turn.pendingPlanApproval && (
+        <AIResponseBubble content={turn.planText} />
+      )}
+
       {/* Pending question */}
       {turn.pendingQuestion && (
         <AgentQuestion turnId={turn.id} question={turn.pendingQuestion} onAnswer={answerAgentQuestion} />
@@ -162,9 +167,10 @@ export function AgentView() {
   }, []);
 
   const lastTurn = agentConversation[agentConversation.length - 1];
+  const questionContext = lastTurn?.pendingQuestion ? lastTurn.assistantText : undefined;
   useEffect(() => {
     scrollToBottom();
-  }, [agentConversation.length, lastTurn?.activities.length, lastTurn?.pendingQuestion, lastTurn?.pendingPlanApproval, lastTurn?.result, scrollToBottom]);
+  }, [agentConversation.length, lastTurn?.activities.length, questionContext, lastTurn?.pendingQuestion, lastTurn?.pendingPlanApproval, lastTurn?.result, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;

@@ -193,28 +193,6 @@ export function CodexTurn({
         />
       )}
 
-      {/* Approval dialog */}
-      {turn.approval && (
-        <ApprovalCard
-          approval={turn.approval}
-          onApprove={onApprove}
-          onReject={onReject}
-          agentLabel={runtimeLabel}
-        />
-      )}
-
-      {turn.pendingQuestion && (
-        <AgentQuestion
-          turnId={turn.id}
-          question={{
-            toolUseId: String(turn.pendingQuestion.requestId),
-            questions: turn.pendingQuestion.questions,
-          }}
-          providerLabel={runtimeLabel}
-          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
-        />
-      )}
-
       {showPlanCard && !needsPlanReview && (
         <PlanCard explanation={turn.planExplanation} planSteps={turn.planSteps} planText={displayPlanText} />
       )}
@@ -237,6 +215,28 @@ export function CodexTurn({
       {/* Streaming text */}
       {turn.streamingText && !shouldHideStreamingBubble && (
         <AIResponseBubble content={turn.streamingText} />
+      )}
+
+      {/* Approval dialog */}
+      {turn.approval && (
+        <ApprovalCard
+          approval={turn.approval}
+          onApprove={onApprove}
+          onReject={onReject}
+          agentLabel={runtimeLabel}
+        />
+      )}
+
+      {turn.pendingQuestion && (
+        <AgentQuestion
+          turnId={turn.id}
+          question={{
+            toolUseId: String(turn.pendingQuestion.requestId),
+            questions: turn.pendingQuestion.questions,
+          }}
+          providerLabel={runtimeLabel}
+          onAnswer={(turnId, _question, answers) => onAnswerQuestion(turnId, turn.pendingQuestion!, answers)}
+        />
       )}
 
       {/* The conversation-level ActivityStatusLine covers the starting state —
