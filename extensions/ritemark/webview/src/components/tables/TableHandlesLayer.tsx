@@ -29,6 +29,7 @@ import { minPercent, resizePair } from './columnResize'
 import { MAX_WIDTH_COLUMNS, snapPercents } from '../../../../src/markdown/tableWidths'
 import { TableMenuItems, type MenuKit } from './TableMenuItems'
 import { dropTarget } from './dropTarget'
+import { menuPlacement, type MenuPlacement } from './menuPlacement'
 
 const GRIP_GAP = 4
 const COL_GRIP = { width: 28, height: 14 }
@@ -624,13 +625,21 @@ export function useAltHeld(): boolean {
 }
 
 /**
- * The menu: under the grip it came from, or at the pointer (a right-click) or the cell (Shift+F10). It closes on a press
- * outside and on Esc, and gives the focus back to the editor unless the press outside took it.
+ * The menu: under the grip it came from, or at the pointer (a right-click) or the cell (Shift+F10); above it, or moved
+ * up, when the window has no room below (`menuPlacement`). It closes on a press outside and on Esc, and gives the focus
+ * back to the editor unless the press outside took it.
  */
 function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; onClose: (outside: boolean) => void }) {
   const outside = useRef(false)
   const alt = useAltHeld()
   const anchor = menu.anchor
+  // The menu fits the window (#982): measured once at its full height, then under its anchor, above it, or moved up.
+  const [placement, setPlacement] = useState<MenuPlacement | null>(null)
+  const measure = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return
+    const height = element.scrollHeight + (element.offsetHeight - element.clientHeight)
+    setPlacement(current => current ?? menuPlacement(anchor, height, window.innerHeight))
+  }, [anchor])
   return (
     <DropdownMenu open modal={false} onOpenChange={open => { if (!open) onClose(outside.current) }}>
       {createPortal(
@@ -644,9 +653,11 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
         document.body,
       )}
       <DropdownMenuContent
+        ref={measure}
         align="start"
-        side="bottom"
-        // A long menu (a cell's, with Cut, Copy and Paste) scrolls inside the room the window has (the app run on #772).
+        side={placement?.side ?? 'bottom'}
+        sideOffset={placement?.sideOffset}
+        // A menu taller than the window scrolls inside the room it has (the app run on #772).
         className="rm-table-menu w-[236px] max-w-none max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
         onInteractOutside={() => { outside.current = true }}
         onCloseAutoFocus={event => event.preventDefault()}
