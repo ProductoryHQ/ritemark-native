@@ -339,9 +339,17 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
 /* Keep the card within the viewport even when it is narrower than the settings width. */
 .deck-settings[role="dialog"] { max-width: calc(100vw - 16px); }
-/* The popup is never taller than the room it has: it scrolls, so its last section (the deck's Card | Borderless)
-   is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
-.deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
+/* Keep the bottom card in the stage's scroll flow while Radix handles dismissal and focus. */
+.deck-settings-below { align-self: center; text-align: left; }
+.deck-stage:is(.is-alone, .is-above) .deck-settings-below { position: relative; left: 50%; transform: translateX(-50%); }
+.deck-settings-below > [data-radix-popper-content-wrapper] {
+  position: relative !important;
+  transform: none !important;
+  min-width: 0 !important;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
 .deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }
 /* Its top: the lines that sat under the slide, which wrap in the popup's width. */
 .deck-settings-about { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 4px 0 0; container-type: inline-size; }

@@ -7,6 +7,7 @@
  *
  * Run: npx tsx webview/src/components/decks/slideSettingsPopup.test.ts
  */
+import { slideSettingsPlacement } from './deckLayout'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
@@ -144,21 +145,17 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /^<Popover open=\{settingsFor !== null\} onOpenChange=\{open => \{ if \(!open\) setSettingsFor\(null\) \}\}>/)
   assert.match(popover, /<PopoverAnchor virtualRef=\{settingsAnchor\} \/>/)
   assert.doesNotMatch(popover, /PopoverTrigger/)
-  assert.match(popover, /side=\{stageSettingsOpen \? stageSettingsSide : 'right'\}\s+align=\{settingsRoom \? 'center' : 'start'\}/)
+  assert.match(popover, /side=\{settingsPlacement\?\.side \?\? 'right'\}\s+align="start"/)
   assert.match(popover, /onCloseAutoFocus=\{event => \{[\s\S]*?back\.focus\(/, 'the focus back to where the menu was opened')
-  assert.match(popover, /<PopoverContent[^>]*className="deck-settings"/, 'the popup carries the scroll rule')
+  assert.match(popover, /<PopoverContent[^>]*className="deck-settings"/, 'the popup uses the settings card styles')
   // A visible slide takes priority. With the stage folded, the thumbnail and part number retain their anchors.
   assert.match(view, /const stageSlide = stageRef\.current\?\.querySelector<HTMLElement>\('\.deck-big'\)[\s\S]*?setSettingsFor\(\{ index, id, anchor: stageSlide \?\? where\.anchor, side: stageSlide \? 'stage' : where\.side \}\)/)
   assert.match(view, /settings: index => openSettings\(index, \(\) => \{\s+const thumb = stripRef\.current\?\.querySelector<HTMLElement>\(`\[data-thumb="\$\{index\}"\] \.deck-thumb-slide`\)\s+return thumb \? \{ anchor: thumb, side: 'right', back: stripRef\.current \} : null/)
   assert.match(view, /const partSettings = useCallback\(\(index: number, slot: PartMenuSlot\) => openSettings\(index, \(\) => \(\s+slot\.element\.isConnected\s+\? \{ anchor: slot\.element\.parentElement\?\.querySelector<HTMLElement>\('\.deck-part-number'\) \?\? slot\.element, side: 'right', back: slot\.element\.querySelector\('button'\) \}/)
   assert.match(view, /openSettings\(currentRef\.current, anchor => \{\s+if \(!anchor\) return null[\s\S]*?return \{ anchor, side: 'stage', back: anchor\.querySelector<HTMLElement>\('\.ProseMirror'\)/)
-  // #981: the horizontal room includes the card, its gap from the slide and the viewport padding.
-  assert.match(view, /const sideRoom = SETTINGS_WIDTH \+ SETTINGS_GAP \+ SETTINGS_COLLISION_PADDING/)
-  assert.match(view, /setStageSettingsSide\(viewportWidth - slideRight >= sideRoom \? 'right'/, 'room to the right')
-  assert.match(view, /\? 'right' : slideLeft >= sideRoom \? 'left'/, 'room only to the left')
-  assert.match(view, /slideLeft >= sideRoom \? 'left' : 'bottom'\)/, 'neither side fits in a narrow window')
-  assert.match(view, /paddingBottom: settingsRoom \|\| undefined/, 'reserve room under the slide')
-  assert.match(popover, /maxHeight: .*--radix-popover-content-available-height/, 'scroll within the reserved room')
+  assert.match(popover, /portalContainer=\{stageSettingsOpen \? settingsSlot : undefined\}/, 'stage settings share the stage scroller')
+  assert.match(popover, /collisionBoundary=\{stageSettingsOpen \? stageRef.current : undefined\}/)
+  assert.doesNotMatch(popover, /maxHeight/, 'the card keeps its natural height')
   assert.match(view, /onSlideSettings=\{stageSettings\}/)
   // The stage's right-click menu: Slide settings… at its end, after Comment, under a line.
   const editor = here('./blocks/SlideEditor.tsx')
@@ -182,8 +179,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(view, /const after = look === 'borderless' \? \{ present: true, value: 'borderless' \} : \{ present: false \}/, 'the same `look: borderless` line, or none')
   assert.match(view, /editor\.view\.dispatch\(propertyTransaction\(editor\.state, 'look', before, after\)\)/)
   assert.ok(!here('./decks.css').includes('.deck-look'), "the bar's segment rule is gone")
-  // Review, #764: the popup never grows past the room it has; it scrolls, so its last section stays reachable.
-  assert.match(here('./decks.css'), /\n\.deck-settings:not\(\.deck-addlib\) \{ max-height: var\(--radix-popover-content-available-height\); overflow-y: auto; \}/)
+  assert.doesNotMatch(here('./decks.css'), /\.deck-settings[^{}]*\{[^{}]*(?:max-height|overflow-y: auto)/)
   assert.match(here('./library/AddToLibrarySheet.tsx'), /className="deck-settings deck-addlib"/)
   // Settings belong to their slide: another slide made current closes them, and so does the slide going.
   assert.match(view, /return open\.index === shown && open\.index < count && \(open\.id === undefined \|\| open\.id === shownSlideId\) \? open : null/, 'by the slide id, never another slide at its number')
@@ -214,3 +210,21 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
 }
 
 console.log('slideSettingsPopup: all checks passed')
+
+
+// #981: stage dimensions exclude the strip, bar and AI column.
+{
+  const popup = { width: 316, height: 330 }
+  const place = (width: number, height: number, slideLeft: number, slideWidth: number) =>
+    slideSettingsPlacement(width, height, slideLeft, slideWidth, popup, 8, 8)
+  assert.deepEqual(place(1240, 780, 260, 720), { side: 'bottom', room: 338 },
+    'the 132 px strip is not part of the room at the left')
+  assert.deepEqual(place(1600, 780, 400, 800), { side: 'right', room: 0 }, 'right wins when both sides fit')
+  assert.deepEqual(place(1240, 780, 400, 720), { side: 'left', room: 0 }, 'left fits entirely inside the stage')
+  assert.deepEqual(place(784, 540, 100, 584), { side: 'bottom', room: 338 },
+    'the former 180 px reserve grows to hold the entire popup and its gap')
+  assert.deepEqual(place(1600, 200, 400, 800), { side: 'bottom', room: 338 },
+    'width alone cannot qualify a side when the stage is too short')
+  assert.deepEqual(place(320, 180, 24, 272), { side: 'bottom', room: 338 },
+    'when no side fits the reserve still holds the entire card')
+}
