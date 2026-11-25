@@ -32,3 +32,7 @@ test('names both locations when the requested place is missing', () => {
 		/Agents.*places row.*More places menu/,
 	);
 });
+
+test('strips a shortcut and a badge together', () => {
+	assert.equal(placeName('Documents (⇧⌘E) - 1 unsaved file'), 'Documents');
+});

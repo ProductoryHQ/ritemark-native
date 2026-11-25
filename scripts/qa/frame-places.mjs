@@ -1,5 +1,6 @@
 export function placeName(label) {
-	return label.split(', ')[0].replace(/ \(.*\)$/, '').split(' - ')[0];
+	// VS Code's title is "{name} ({key}) - {badge}": drop the badge first, then the shortcut.
+	return label.split(', ')[0].split(' - ')[0].replace(/ \(.*\)$/, '');
 }
 
 export function choosePlace(rowNames, moreNames, name) {
