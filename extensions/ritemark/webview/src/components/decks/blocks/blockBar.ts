@@ -117,6 +117,17 @@ export function isBoxIconShortcut(event: Pick<KeyboardEvent, 'key' | 'altKey' | 
   return event.key === 'F10' && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.defaultPrevented
 }
 
+export type BoxIconMenuCloseReason = 'trigger' | 'outside' | 'escape' | 'mouse-pick' | 'keyboard-pick'
+
+export function boxIconMenuReturnFocus(
+  openedByKeyboard: boolean,
+  reason: BoxIconMenuCloseReason,
+): 'trigger' | 'editor' | null {
+  if (reason === 'outside') return null
+  if (reason === 'mouse-pick') return 'editor'
+  return openedByKeyboard ? 'trigger' : 'editor'
+}
+
 const divKind = (node: PMNode) => (node.type.name === 'slideDiv' ? slideBlockClassOf(divAttributesOf(node)) : null)
 const isNote = (node: PMNode) => node.type.name === 'commentNode'
 const isEmptyText = (node: PMNode) => node.isTextblock && node.content.size === 0

@@ -38,8 +38,8 @@ import { markableBox } from './slideDivView'
 import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, caretBoxIcon, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind,
+  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
+  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind, type BoxIconMenuCloseReason,
   MARK_LABEL, MARK_MENU_TIP, MARK_TIP, divAttributesOf, setBoxesMark,
 } from './blockBar'
 
@@ -707,6 +707,21 @@ stable(COLUMNS, 'three columns')
   assert.equal(isBoxIconShortcut({ ...shortcut, altKey: false }), false)
   for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'defaultPrevented'] as const) {
     assert.equal(isBoxIconShortcut({ ...shortcut, [key]: true }), false, key)
+  }
+}
+
+// ---- Focus after closing the box icon menu, by opening mode and close reason.
+{
+  const cases: [BoxIconMenuCloseReason, 'trigger' | 'editor' | null, 'trigger' | 'editor' | null][] = [
+    ['trigger', 'editor', 'trigger'],
+    ['outside', null, null],
+    ['escape', 'editor', 'trigger'],
+    ['mouse-pick', 'editor', 'editor'],
+    ['keyboard-pick', 'editor', 'trigger'],
+  ]
+  for (const [reason, mouseOpened, keyboardOpened] of cases) {
+    assert.equal(boxIconMenuReturnFocus(false, reason), mouseOpened, `mouse-opened: ${reason}`)
+    assert.equal(boxIconMenuReturnFocus(true, reason), keyboardOpened, `keyboard-opened: ${reason}`)
   }
 }
 

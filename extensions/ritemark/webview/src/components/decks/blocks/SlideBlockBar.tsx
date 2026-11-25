@@ -27,9 +27,9 @@ import { isMac } from '../../../hooks/usePlatform'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
   dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
-  type ChosenBlock,
+  type BoxIconMenuCloseReason, type ChosenBlock,
 } from './blockBar'
 import { markableBox } from './slideDivView'
 import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
@@ -197,13 +197,13 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
   const [open, setOpen] = useState(false)
   const openedByKeyboard = useRef(false)
   const pickedByKeyboard = useRef(false)
-  const returnFocus = useRef<'trigger' | 'editor' | null>(null)
+  const closeReason = useRef<BoxIconMenuCloseReason>('outside')
   useEffect(() => {
     if (!open) return
     // An icon's tooltip can close the picker on Escape before the menu sees the key.
     const onEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
-        returnFocus.current = openedByKeyboard.current ? 'trigger' : 'editor'
+        closeReason.current = 'escape'
       }
     }
     window.addEventListener('keydown', onEscape, true)
@@ -213,7 +213,7 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
     <DropdownMenu modal={false} open={open} onOpenChange={next => {
       if (next) {
         pickedByKeyboard.current = false
-        returnFocus.current = null
+        closeReason.current = 'outside'
       }
       setOpen(next)
     }}>
@@ -222,7 +222,7 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
           <Button
             ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
             onMouseDown={event => event.preventDefault()}
-            onPointerDownCapture={() => { openedByKeyboard.current = false }}
+            onPointerDownCapture={() => { if (!open) openedByKeyboard.current = false }}
             onKeyDownCapture={event => {
               if (!open && ['Enter', ' ', 'ArrowDown'].includes(event.key)) openedByKeyboard.current = true
             }}
@@ -235,15 +235,18 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
         current={box.current}
         onKeyDownCapture={event => { pickedByKeyboard.current = event.key === 'Enter' || event.key === ' ' }}
         onPointerUpCapture={() => { pickedByKeyboard.current = false }}
-        onInteractOutside={() => { returnFocus.current = null }}
+        onInteractOutside={event => {
+          closeReason.current = trigger.current?.contains(event.target as Node) ? 'trigger' : 'outside'
+        }}
         onPick={name => {
-          returnFocus.current = openedByKeyboard.current && pickedByKeyboard.current ? 'trigger' : 'editor'
+          closeReason.current = pickedByKeyboard.current ? 'keyboard-pick' : 'mouse-pick'
           onPick(name)
         }}
         onCloseAutoFocus={event => {
           event.preventDefault()
-          if (returnFocus.current === 'trigger') trigger.current?.focus({ preventScroll: true })
-          if (returnFocus.current === 'editor') focusEditor()
+          const returnFocus = boxIconMenuReturnFocus(openedByKeyboard.current, closeReason.current)
+          if (returnFocus === 'trigger') trigger.current?.focus({ preventScroll: true })
+          if (returnFocus === 'editor') focusEditor()
         }}
       />
     </DropdownMenu>
