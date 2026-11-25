@@ -56,7 +56,8 @@ function fixture() {
 }
 
 function run(cwd, ...args) {
-  const result = spawnSync(process.execPath, [provenance, ...args], { cwd, encoding: 'utf8' });
+  const env = { ...process.env, PATH: path.join(cwd, 'fixture-tools') + path.delimiter + process.env.PATH };
+  const result = spawnSync(process.execPath, [provenance, ...args], { cwd, env, encoding: 'utf8' });
   return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
@@ -174,4 +175,42 @@ test('a build always records its own checkout; --release-commit is verification-
   } finally {
     fs.rmSync(f.root, { recursive: true, force: true });
   }
+});
+
+test('Quick Look provenance anchors sources and checks PlugIns before signing', {
+  skip: process.platform === 'win32',
+}, t => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.root, { recursive: true, force: true }));
+  write(f.repo, 'macos/quicklook/Preview/PreviewProvider.swift', '// release source');
+  const releaseCommit = commitAll(f.repo, 'add Quick Look source');
+  git(f.repo, 'update-ref', 'refs/remotes/origin/main', releaseCommit);
+
+  write(f.repo, 'fixture-tools/xcrun', [
+    '#!/bin/sh',
+    'case "$*" in',
+    '  "--sdk macosx swiftc --version") echo "Swift fixture" ;;',
+    '  "--sdk macosx --show-sdk-version") echo "26.0" ;;',
+    '  *) exit 1 ;;',
+    'esac',
+    '',
+  ].join('\n'));
+  fs.chmodSync(path.join(f.repo, 'fixture-tools/xcrun'), 0o755);
+  const plugins = path.join(f.app, 'Contents', 'PlugIns');
+  for (const kind of ['Thumbnail', 'Preview']) {
+    write(plugins, `RitemarkDeck${kind}.appex/Contents/Info.plist`, kind);
+  }
+
+  const manifest = JSON.parse(fs.readFileSync(writeManifest(f), 'utf8'));
+  assert.match(manifest.inputs.quickLook.sha256, /^[a-f0-9]{64}$/);
+  assert.equal(manifest.quickLookPreSignSha256, sha256Tree(plugins));
+  assert.equal(manifest.buildEnvironment.swiftVersion, 'Swift fixture');
+  assert.equal(manifest.buildEnvironment.macosSdkVersion, '26.0');
+
+  write(f.repo, 'macos/quicklook/Preview/PreviewProvider.swift', '// harness drift');
+  assert.match(run(f.repo, ...verifyArgs(f)).output, /Quick Look source differs from the release commit/);
+  const anchored = [...verifyArgs(f), '--release-commit', releaseCommit];
+  assert.equal(run(f.repo, ...anchored).status, 0);
+  write(plugins, 'RitemarkDeckPreview.appex/Contents/Info.plist', 'changed');
+  assert.match(run(f.repo, ...anchored).output, /Quick Look PlugIns changed/);
 });

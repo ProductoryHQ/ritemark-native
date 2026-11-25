@@ -15,13 +15,14 @@ trap 'rm -rf "$WORK"' EXIT
 host_id="$(plutil -extract darwinBundleIdentifier raw -o - "$ROOT/branding/product.json")"
 
 version="$(plutil -extract ritemarkVersion raw -o - "$ROOT/branding/product.json")"
+sdk_path="$(xcrun --sdk macosx --show-sdk-path)"
 
 for kind in Thumbnail Preview; do
   executable="RitemarkDeck$kind"
   bundle="$WORK/$executable.appex/Contents"
   mkdir -p "$bundle/MacOS" "$bundle/Resources"
   for arch in arm64 x86_64; do
-    xcrun swiftc -parse-as-library -application-extension -module-name "$executable" \
+    xcrun --sdk macosx swiftc -sdk "$sdk_path" -parse-as-library -application-extension -module-name "$executable" \
       -target "$arch-apple-macos12.0" -module-cache-path "$WORK/module-cache" \
       -O -Xlinker -e -Xlinker _NSExtensionMain \
       "$SOURCE"/Shared/*.swift "$SOURCE/$kind/${kind}Provider.swift" -o "$WORK/$executable-$arch"

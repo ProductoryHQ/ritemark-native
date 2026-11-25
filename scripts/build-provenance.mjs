@@ -170,6 +170,38 @@ function verifiedExtensionPayload() {
   };
 }
 
+const quickLookSource = 'macos/quicklook';
+const quickLookKinds = ['Thumbnail', 'Preview'];
+
+function quickLookSourceInput(commit, verifyCheckout = false) {
+  if (!target.startsWith('darwin-') || !git(['ls-tree', commit, '--', quickLookSource])) return null;
+
+  const sha256 = sha256DirectoryAtCommit(commit, quickLookSource);
+  if (verifyCheckout && sha256Directory(path.join(repo, quickLookSource)) !== sha256) {
+    throw new Error('Quick Look source differs from the release commit');
+  }
+  return { path: quickLookSource, sha256 };
+}
+
+function quickLookPlugIns() {
+  const plugins = path.join(appPath, 'Contents', 'PlugIns');
+  for (const kind of quickLookKinds) {
+    const bundle = path.join(plugins, `RitemarkDeck${kind}.appex`);
+    if (!fs.existsSync(bundle) || !fs.lstatSync(bundle).isDirectory()) {
+      throw new Error(`missing Quick Look bundle: ${bundle}`);
+    }
+  }
+  return plugins;
+}
+
+function quickLookBuildEnvironment() {
+  const xcrun = (...args) => execFileSync('xcrun', args, { encoding: 'utf8' }).trim();
+  return {
+    swiftVersion: xcrun('--sdk', 'macosx', 'swiftc', '--version'),
+    macosSdkVersion: xcrun('--sdk', 'macosx', '--show-sdk-version')
+  };
+}
+
 const requiredInputFiles = {
   extensionLock: 'extensions/ritemark/package-lock.json',
   webviewLock: 'extensions/ritemark/webview/package-lock.json',
@@ -186,10 +218,14 @@ function inputs() {
     hashes[name] = { path: relative, sha256: sha256File(absolute) };
   }
 
+  const sourceCommit = git(['rev-parse', 'HEAD']);
+  const quickLook = quickLookSourceInput(sourceCommit, true);
+  if (quickLook) hashes.quickLook = quickLook;
+
   return {
     schemaVersion: 1,
     releaseCandidate: true,
-    sourceCommit: git(['rev-parse', 'HEAD']),
+    sourceCommit,
     releaseRefCommit: git(['rev-parse', 'origin/main^{commit}']),
     vscodeCommit: git(['rev-parse', 'HEAD'], path.join(repo, 'vscode')),
     patchSetSha256: sha256Directory(path.join(repo, 'patches', 'vscode')),
@@ -264,6 +300,9 @@ function anchoredInputs(commit) {
     hashes[name] = { path: relative, sha256: createHash('sha256').update(blob).digest('hex') };
   }
 
+  const quickLook = quickLookSourceInput(commit);
+  if (quickLook) hashes.quickLook = quickLook;
+
   return {
     schemaVersion: 1,
     releaseCandidate: true,
@@ -295,6 +334,7 @@ function manifestPath() {
 try {
   const current = releaseCommit ? anchoredInputs(releaseCommit) : inputs();
   const output = manifestPath();
+  const plugins = current.inputs.quickLook ? quickLookPlugIns() : null;
 
   if (current.sourceCommit !== current.releaseRefCommit) {
     throw new Error(`source commit ${current.sourceCommit} is not origin/main ${current.releaseRefCommit}`);
@@ -305,7 +345,12 @@ try {
     const manifest = {
       ...current,
       ...(extensionPayload ? { extensionPayload } : {}),
-      buildEnvironment: { nodeVersion: process.version, nodeArch: process.arch },
+      ...(plugins ? { quickLookPreSignSha256: sha256Tree(plugins) } : {}),
+      buildEnvironment: {
+        nodeVersion: process.version,
+        nodeArch: process.arch,
+        ...(plugins ? quickLookBuildEnvironment() : {})
+      },
       builtAt: new Date().toISOString()
     };
     fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -315,7 +360,8 @@ try {
     const manifest = JSON.parse(fs.readFileSync(output, 'utf8'));
     const {
       builtAt: _builtAt,
-      buildEnvironment: _buildEnvironment,
+      buildEnvironment,
+      quickLookPreSignSha256,
       extensionPayload,
       ...recorded
     } = manifest;
@@ -343,6 +389,17 @@ try {
       extensionPayload?.verifiedTransition !== 'staged-tree-to-final-copy-before-signing'
     )) {
       throw new Error('embedded macOS build provenance is missing a valid pre-sign extension payload attestation');
+    }
+    if (plugins) {
+      if (!/^[a-f0-9]{64}$/.test(quickLookPreSignSha256 || '') ||
+          !buildEnvironment?.swiftVersion || !buildEnvironment?.macosSdkVersion) {
+        throw new Error('embedded build provenance is missing the Quick Look payload or toolchain attestation');
+      }
+      // Exact bytes are checked at the pre-sign boundary. After signing,
+      // Mach-O bytes and resource seals are verified by the deep app signature.
+      if (extensionInput && sha256Tree(plugins) !== quickLookPreSignSha256) {
+        throw new Error('Quick Look PlugIns changed after the pre-sign attestation');
+      }
     }
     if (extensionInput) {
       if (!extensionPayload) {

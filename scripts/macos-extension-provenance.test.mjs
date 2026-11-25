@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -86,6 +86,15 @@ test('tar transport preserves extension symlinks, modes, and tree identity', {
   const originalDigest = sha256Tree(extension);
   fs.writeFileSync(path.join(source, 'ritemark-extension-pre-sign.sha256'), `${originalDigest}\n`);
 
+  const plugins = path.join(source, 'Ritemark.app', 'Contents', 'PlugIns');
+  for (const kind of ['Preview', 'Thumbnail']) {
+    const binary = path.join(plugins, `RitemarkDeck${kind}.appex`, 'Contents', 'MacOS', `RitemarkDeck${kind}`);
+    fs.mkdirSync(path.dirname(binary), { recursive: true });
+    fs.copyFileSync(runtime, binary);
+  }
+  const provenance = path.join(extension, '..', '..', 'ritemark-build-provenance.json');
+  fs.writeFileSync(provenance, JSON.stringify({ quickLookPreSignSha256: sha256Tree(plugins) }));
+
   const archive = path.join(root, 'ritemark-darwin-x64.tar.gz');
   execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
   const destination = path.join(root, 'verified-output');
@@ -101,6 +110,16 @@ test('tar transport preserves extension symlinks, modes, and tree identity', {
     'ritemark',
   );
   assert.equal(sha256Tree(extractedExtension), originalDigest);
+  assert.equal(sha256Tree(path.join(destination, 'Ritemark.app', 'Contents', 'PlugIns')), sha256Tree(plugins));
+
+  fs.rmSync(path.join(plugins, 'RitemarkDeckPreview.appex'), { recursive: true });
+  execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
+  const rejectedDestination = path.join(root, 'rejected-output');
+  const rejected = spawnSync(path.join(repo, 'scripts/extract-macos-x64-artifact.sh'),
+    [archive, rejectedDestination], { encoding: 'utf8' });
+  assert.equal(rejected.status, 1);
+  assert.match(rejected.stderr, /missing the Quick Look Preview bundle/);
+  assert.equal(fs.existsSync(rejectedDestination), false);
   assert.equal(fs.lstatSync(path.join(extractedExtension, 'node_modules', '.bin', 'runtime')).isSymbolicLink(), true);
   fs.accessSync(path.join(extractedExtension, 'node_modules', 'fixture', 'runtime'), fs.constants.X_OK);
 });

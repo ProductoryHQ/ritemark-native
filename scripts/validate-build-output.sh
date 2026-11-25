@@ -33,6 +33,80 @@ case "$TARGET" in
     ;;
 esac
 
+# Check the packaged metadata and each Mach-O slice using the same gate in CI
+# and in the full local build validation.
+check_quick_look() {
+  local app="$1" version kind provider executable plist binary arch load_commands icon
+  local attrs="NSExtension.NSExtensionAttributes"
+  version=$(plutil -extract ritemarkVersion raw -expect string -o - "$app/Contents/Resources/app/product.json") || return 1
+  [[ -n "$version" ]] || return 1
+
+  for kind in Thumbnail Preview; do
+    case "$kind" in
+      Thumbnail) provider=thumbnail ;;
+      Preview) provider=preview ;;
+    esac
+    executable="RitemarkDeck$kind"
+    local contents="$app/Contents/PlugIns/$executable.appex/Contents"
+    plist="$contents/Info.plist"
+    binary="$contents/MacOS/$executable"
+    echo "Checking Quick Look bundle $plist"
+    plutil -lint "$plist" || return 1
+    while IFS='|' read -r key type expected; do
+      local actual
+      if ! actual=$(plutil -extract "$key" raw -expect "$type" -o - "$plist") ||
+         [[ "$actual" != "$expected" ]]; then
+        echo "ERROR: $plist must declare $key as $expected" >&2
+        return 1
+      fi
+    done <<EOF
+CFBundleIdentifier|string|ai.productory.ritemark.deck-$provider
+CFBundleExecutable|string|$executable
+CFBundleShortVersionString|string|$version
+CFBundleVersion|string|$version
+LSMinimumSystemVersion|string|12.0
+NSExtension.NSExtensionPointIdentifier|string|com.apple.quicklook.$provider
+$attrs.QLSupportedContentTypes|array|1
+$attrs.QLSupportedContentTypes.0|string|ai.productory.ritemark.deck
+EOF
+
+    if [[ "$kind" == Preview ]] &&
+       [[ "$(plutil -extract "$attrs.QLIsDataBasedPreview" raw -expect bool -o - "$plist")" != true ]]; then
+      echo "ERROR: $plist must declare QLIsDataBasedPreview as true" >&2
+      return 1
+    fi
+    if [[ ! -x "$binary" ]] || ! xcrun lipo "$binary" -verify_arch arm64 x86_64; then
+      echo "ERROR: $binary must be executable with arm64 and x86_64 slices" >&2
+      return 1
+    fi
+    for arch in arm64 x86_64; do
+      if ! load_commands=$(xcrun otool -arch "$arch" -l "$binary") ||
+         ! awk '
+           $1 == "cmd" { command = $2; macos = 0 }
+           command == "LC_BUILD_VERSION" && $1 == "platform" { macos = ($2 == 1 || tolower($2) == "macos") }
+           command == "LC_BUILD_VERSION" && macos && $1 == "minos" { version = $2 }
+           command == "LC_VERSION_MIN_MACOSX" && $1 == "version" { version = $2 }
+           END { exit (version !~ /^12[.]0([.]0)?$/) }
+         ' <<< "$load_commands"; then
+        echo "ERROR: $binary ($arch) must target macOS 12.0" >&2
+        return 1
+      fi
+    done
+    for icon in DeckIcon.pdf DeckIconSmall.pdf; do
+      if [[ ! -s "$contents/Resources/$icon" ]] ||
+         [[ "$(head -c 5 "$contents/Resources/$icon")" != '%PDF-' ]]; then
+        echo "ERROR: missing or invalid Quick Look icon $contents/Resources/$icon" >&2
+        return 1
+      fi
+    done
+  done
+}
+
+if [[ "${2:-}" == "--quick-look-only" && "$TARGET" == darwin-* ]]; then
+  check_quick_look "VSCode-$TARGET/Ritemark.app"
+  exit $?
+fi
+
 # ---------------------------------------------------------------------------
 # Portable file-size + python interpreter resolution
 # ---------------------------------------------------------------------------
@@ -712,6 +786,11 @@ case "$TARGET" in
     else
       echo -e "${RED}FAIL${NC}"
       echo "$DECK_TYPE_OUTPUT" | sed 's/^/    /'
+      ERRORS=$((ERRORS + 1))
+    fi
+    echo ""
+    if ! check_quick_look "$APP_PATH"; then
+      echo -e "${RED}FAIL${NC} (Quick Look bundle validation)"
       ERRORS=$((ERRORS + 1))
     fi
     echo ""

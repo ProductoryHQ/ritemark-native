@@ -495,6 +495,22 @@ echo ""
 echo -e "${BLUE}Step 6/9: Provenance & Post-Build Validation${NC}"
 echo "----------------------------------------"
 
+(
+  QUICKLOOK_BUILD="$(mktemp -d)"
+  trap 'rm -rf "$QUICKLOOK_BUILD"' EXIT
+  ./scripts/build-quicklook.sh "$QUICKLOOK_BUILD"
+  PLUGINS="$APP_PATH/Contents/PlugIns"
+  mkdir -p "$PLUGINS"
+  for kind in Thumbnail Preview; do
+    bundle="RitemarkDeck$kind.appex"
+    if [[ ! -d "$QUICKLOOK_BUILD/$bundle" ]]; then
+      echo "ERROR: Quick Look build did not produce $bundle" >&2
+      exit 1
+    fi
+    ditto "$QUICKLOOK_BUILD/$bundle" "$PLUGINS/$bundle"
+  done
+)
+
 EXTENSION_SHA_PATH="$PROJECT_DIR/VSCode-$TARGET/ritemark-extension-pre-sign.sha256"
 node ./scripts/tree-sha256.mjs "$EXT_DEST" > "$EXTENSION_SHA_PATH"
 if ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"; then
