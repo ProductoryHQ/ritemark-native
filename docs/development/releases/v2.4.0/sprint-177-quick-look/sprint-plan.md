@@ -1,13 +1,13 @@
 # Sprint 177 · Quick Look for decks
 
-**Draft for approval** · SDD · Phase 2, planning · Branch `sprint-177-quick-look`, worktree `codex-177-plan`, based on local `origin/main` at `22bc481c`.
+**Approved 25 November 2026** · SDD · Phase 3, building · Branch `sprint-177-quick-look`, worktree `codex-177-plan`, based on local `origin/main` at `22bc481c`.
 
 Parent release v2.4.0. Issue #953 asks to show a deck’s first slide in Finder. This sprint also brings the slides to the space-bar preview on Mac. The native extensions ship in the full app build.
 
 ## SDD artifacts
 
 - [Spec](spec.md) gives the behaviour for R1–R6.
-- [Scenarios](scenarios.md) gives the proof for S1–S10.
+- [Scenarios](scenarios.md) gives the proof for S1–S11.
 - [Technical plan](technical-plan.md) records the audit, cache contract and build.
 - [Tasks](tasks.md) gives the PR order, tiers and proof.
 
@@ -38,7 +38,7 @@ The runner evidence behind decision 3 is round 3, run 45683909718, on macOS 15 a
 
 ## Risks and open decisions
 
-- **Experience lead.** Check the slide thumbnail’s fit and badge at Finder sizes, the deck icon match, and ground and glow beside the wall. Confirm the wording and placement of Settings help if an OS needs it.
+- **Experience lead.** Answered on 25 November: the slide edge to edge, no badge or shadow, the deck icon below 64 px; the system's type icon first, else a bundled icon from the decks file-icon design; the comparison list in S1; the Settings note, Help line and release-notes line in R6 and S11.
 - **Development manager.** Answered above. Still open until the proof: what a warmed Finder shows after a later draw, and macOS 26 Intel's election (`pluginkit -e use` was needed in round 2).
 
 ## Release notes draft
@@ -47,4 +47,4 @@ On Mac, Finder can show a saved deck’s first slide, and pressing Space lets yo
 
 ## Approval
 
-- [ ] The Development manager approves this plan (Jarmo, 24 November: sprint plans and their questions are the Development manager's) after the Experience lead's look answers; then the branch starts.
+- [x] Approved by the Development manager on 25 November 2026, after the Experience lead's look answers (Jarmo, 24 November: sprint plans and their questions are the Development manager's). Implementation starts on `sprint-177-quick-look`.

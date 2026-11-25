@@ -4,6 +4,8 @@
 
 Given a saved deck with a skipped opening slide and a dark theme with a glow, when Finder requests a thumbnail from a current entry, then the result is a PNG of the first shown slide. Check it against PDF page 1 and the wall, at small and large icon sizes. Repeat with Borderless, a local picture, a logo and a missing asset.
 
+**The wall-against-thumbnail comparison** (the Experience lead): ground and glow; a deck whose slide 1 is skipped (the first shown slide); a picture behind the words; Card and Borderless; a theme with a logo; a light theme such as Paper; Fraunces headings (the fonts come through); Finder in dark mode (the slide's own colours, never inverted); a size below 64 px (the deck icon).
+
 ### S2 · Read the deck with the space bar (R2)
 
 Given a matching entry with several slides, when the person presses Space, then Quick Look shows the PDF in order, with native paging. Inspect page count and page size, the chosen tab and revealed content, and confirm there is no handout, skipped slide, note or comment.
@@ -39,3 +41,7 @@ Given a clean runner, when the real bundle is placed in Applications and launche
 ### S10 · Verify the release build (R5, R6)
 
 Given clean release candidates, when build output is checked, then both extensions have the right bundle IDs, type, slices, deployment target, signatures and entitlements. Check notarized distribution through the release gates and do a Windows smoke for absence of cache jobs.
+
+### S11 · Turned off on this Mac (R6)
+
+On a Mac where Quick Look for Ritemark is off and Ritemark can tell: after the first deck is saved, Home's guidance slot shows the one-time note once, with Open System Settings (the right pane) and Not now; Help has the same line. Where Ritemark can't tell, no note. The proof confirms the pane's labels and the deep link per OS before the words ship.
