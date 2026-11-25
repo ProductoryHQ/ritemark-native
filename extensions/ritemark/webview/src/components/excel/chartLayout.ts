@@ -487,7 +487,8 @@ function preparePlotLayout(model: DrawableChart, data: PlotData, yGroup: PlotDat
   const valueGroup = yGroup.length ? yGroup : [data]
   const extents = valueGroup.map((plot) => plot.scatter ? numericExtent(plot.xy, 'y') : { min: plot.low, max: plot.high })
   const scaleSource = valueGroup[0]
-  const allowNonZeroBaseline = valueGroup.every((plot) => plot.line || plot.area || plot.scatter)
+  const allowNonZeroBaseline = valueGroup.every((plot) => plot.line || plot.area || plot.scatter
+    || (!plot.stacked && (plot.plotModel.kind === 'column' || plot.plotModel.kind === 'bar')))
   const scale = valueScale(Math.min(...extents.map(({ min }) => min)), Math.max(...extents.map(({ max }) => max)),
     valueAxis, valueGroup.every((plot) => plot.percent), allowNonZeroBaseline, scaleSource.horizontal ? outer.width : outer.height - 20,
     scaleSource.scatter ? .05 : .08)
