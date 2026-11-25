@@ -925,14 +925,15 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       const element = node as Element
       // A break with nothing after it in its block has no Markdown form; it
       // would be a literal backslash or trailing spaces.
-      if (!hasContentAfter(element)) return ''
+      const form = element.getAttribute('data-md-break')
+      if (!hasContentAfter(element)) return form === 'html' ? '<br>' : ''
       // A line break inside a table cell would end the row, and one inside a
       // heading would end the heading: an ATX heading is one line, so `\\` and a
       // newline there read back as a literal `\\` and a paragraph (#923).
       // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
       if (insideOneLineBlock(element)) return '<br>'
-      const form = element.getAttribute('data-md-break')
-      if (form === 'soft') return '\n'
+      if (form === 'soft' && element.previousSibling?.nodeName !== 'BR' &&
+        element.nextSibling?.nodeName !== 'BR') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
       if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).

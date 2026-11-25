@@ -18,7 +18,7 @@
  * Sprint 164 PR 3: the Label (`[words]{.label}`, `slideLabel.ts`) loads and saves here only, never in a Text document.
  */
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
-import { Marked } from 'marked'
+import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
 import { fencedDivStart, scanFencedDiv, type FenceScan } from '../../../../../src/decks/blocks/fencedDiv'
 import { AGENDA_CLOSE, AGENDA_OPEN, isAgendaClasses } from '../../../../../src/decks/blocks/agenda'
@@ -30,13 +30,14 @@ import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMark
 import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
-import { LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
+import { isEmptyLabel, LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
 import { splitQuoteByLine } from '../../../../../src/decks/blocks/slideRenderer'
 import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { markSlideEmptyLines, SLIDE_EMPTY_LINE, slideEmptyLineExtension } from '../../../../../src/decks/blocks/slideEmptyLines'
+import { isLineBreakTag } from '../../../../../src/decks/blocks/lineBreakTag'
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -79,10 +80,24 @@ export const slideDivMarkedExtension = {
   ],
 }
 
+/** Remember an inline tag at the end of a textblock so it doesn't save as a standalone line. */
+function markTrailingInlineBreak(token: Token): void {
+  if (token.type !== 'paragraph' && token.type !== 'heading' && token.type !== 'text') return
+  let tail = (token as { tokens?: Token[] }).tokens?.slice(-1)[0]
+  while (tail && 'tokens' in tail) tail = (tail.tokens as Token[] | undefined)?.slice(-1)[0]
+  if (tail?.type === 'html' && isLineBreakTag(tail.raw)) tail.type = 'slideTrailingBreak'
+}
+
 /** The slide editor's own `marked`: the document editor's configuration, and the `:::` blocks. */
 export const slideEditorMarked = new Marked({ breaks: true, gfm: true })
 slideEditorMarked.use(asWrittenMarkedExtension)
-slideEditorMarked.use({ extensions: [slideEmptyLineExtension(true)] })
+slideEditorMarked.use({
+  extensions: [
+    slideEmptyLineExtension(true),
+    { name: 'slideTrailingBreak', renderer: () => '<br data-md-break="html">' },
+  ],
+  walkTokens: markTrailingInlineBreak,
+})
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
@@ -337,28 +352,63 @@ function createEscapingTurndownService(): TurndownService {
 /** Empty lines on the stage are regular paragraphs, so typing replaces the space with text. */
 export const SlideEmptyLines = Extension.create({
   name: 'slideEmptyLines',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph'],
+      attributes: {
+        slideEmptyLine: {
+          default: false,
+          keepOnSplit: false,
+          parseHTML: (element: HTMLElement) => element.hasAttribute('data-slide-empty-line'),
+          renderHTML: (attrs: Record<string, unknown>) => attrs.slideEmptyLine ? { 'data-slide-empty-line': '' } : {},
+        },
+      },
+    }]
+  },
   addProseMirrorPlugins() {
     return [new Plugin({
       props: {
         decorations({ doc, selection }) {
-          const lines: { from: number; to: number }[] = []
-          let first = doc.content.size
-          let last = -1
+          const decorations: Decoration[] = []
+          const isEmpty = (block: PMNode) => block.type.name === 'paragraph' &&
+            block.content.content.every(child => child.type.name === 'hardBreak')
+          let firstDrawn = Infinity
+          let lastDrawn = -1
           doc.forEach((block, from) => {
-            const children = block.content.content
-            if (block.type.name === 'paragraph' && children.every(child => child.type.name === 'hardBreak')) {
-              lines.push({ from, to: from + block.nodeSize })
-            } else if (block.type.name !== 'commentNode') {
-              first = Math.min(first, from)
-              last = from
-            }
+            if (isEmpty(block) || block.type.name === 'commentNode' ||
+              (block.type.name === SLIDE_LABEL_NODE && isEmptyLabel(block.textContent))) return
+            firstDrawn = Math.min(firstDrawn, from)
+            lastDrawn = from
           })
-          return DecorationSet.create(doc, lines.map(({ from, to }) => {
-            const edge = from < first || from > last
+
+          doc.descendants((block, from, parent) => {
+            if (block.type.name === 'table') return false
+            const to = from + block.nodeSize
             const hasCaret = selection.from > from && selection.from < to
-            const className = edge ? `blk-empty-line is-edge${hasCaret ? ' has-caret' : ''}` : 'blk-empty-line'
-            return Decoration.node(from, to, { class: className })
-          }))
+            if (isEmpty(block)) {
+              const edge = parent === doc && (from < firstDrawn || from > lastDrawn)
+              const className = edge ? `blk-empty-line is-edge${hasCaret ? ' has-caret' : ''}` : 'blk-empty-line'
+              decorations.push(Decoration.node(from, to, { class: className }))
+              return false
+            }
+            if (parent !== doc || !/^(paragraph|heading)$/.test(block.type.name)) return
+            const first = from === firstDrawn
+            const last = from === lastDrawn
+            let leading = 0
+            let trailing = block.childCount
+            while (first && block.maybeChild(leading)?.type.name === 'hardBreak') leading++
+            while (last && trailing > leading && block.child(trailing - 1).type.name === 'hardBreak' &&
+              block.child(trailing - 1).attrs.mdBreak !== 'html') trailing--
+            block.forEach((child, offset, index) => {
+              if (index >= leading && index < trailing) return
+              const start = from + 1 + offset
+              const caret = selection.from === start || selection.from === start + child.nodeSize
+              decorations.push(Decoration.node(start, start + child.nodeSize, {
+                class: caret ? 'blk-edge-break has-caret' : 'blk-edge-break',
+              }))
+            })
+          })
+          return DecorationSet.create(doc, decorations)
         },
       },
     })]
@@ -375,12 +425,15 @@ function withSlideEmptyLines(html: string): HTMLElement {
     return line
   }
 
-  for (const block of Array.from(root.children)) {
-    if (block.nodeName !== 'P') continue
+  for (const block of Array.from(root.querySelectorAll('p, h1, h2, h3, h4, h5, h6'))) {
+    if (block.closest('table')) continue
+    const parent = block.parentElement!
+    if (block.hasChildNodes()) block.removeAttribute('data-slide-empty-line')
     const takeBreak = (side: 'firstChild' | 'lastChild') => {
       let edge: globalThis.Node = block
       while (edge[side]) edge = edge[side]!
-      if (edge.nodeName !== 'BR') return false
+      if (edge.nodeName !== 'BR' ||
+        (side === 'lastChild' && (edge as Element).getAttribute('data-md-break') === 'html')) return false
       // A break can carry marks. Remove wrappers emptied by taking it out.
       do {
         const parent = edge.parentNode!
@@ -389,21 +442,24 @@ function withSlideEmptyLines(html: string): HTMLElement {
       } while (edge !== block && !edge.hasChildNodes())
       return true
     }
-    let leading = 0
-    while (takeBreak('firstChild')) {
-      root.insertBefore(emptyLine(), block)
-      leading++
-    }
-    if (!block.hasChildNodes()) {
-      if (leading) block.remove()
-      else block.setAttribute('data-slide-empty-line', '')
+    // Empty container placeholders and bare list markers have no line in the file.
+    if (block.nodeName === 'P' && parent !== root && !block.hasChildNodes() &&
+      !block.hasAttribute('data-slide-empty-line') &&
+      Array.from(parent.children).every(sibling =>
+        sibling === block || (/^H[1-6]$/.test(sibling.nodeName) && !sibling.hasChildNodes()))) {
       continue
     }
-    while (takeBreak('lastChild')) root.insertBefore(emptyLine(), block.nextSibling)
+    while (takeBreak('firstChild')) parent.insertBefore(emptyLine(), block)
+    if (block.nodeName === 'P' && !block.hasChildNodes()) {
+      block.setAttribute('data-slide-empty-line', '')
+      continue
+    }
+    const next = block.nextSibling
+    while (takeBreak('lastChild')) parent.insertBefore(emptyLine(), next)
   }
 
-  // A note is invisible on the slide, so it doesn't bound an empty line.
-  const children = Array.from(root.children).filter(block => block.nodeName !== 'RITEMARK-COMMENT')
+  const children = Array.from(root.children).filter(block => block.nodeName !== 'RITEMARK-COMMENT' &&
+    !(block.hasAttribute('data-slide-label') && isEmptyLabel(block.textContent ?? '')))
   const isEmptyLine = (block: Element) => block.hasAttribute('data-slide-empty-line')
   const first = children.findIndex(block => !isEmptyLine(block))
   let last = children.length - 1

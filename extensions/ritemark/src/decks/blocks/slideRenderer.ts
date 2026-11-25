@@ -16,7 +16,7 @@
  *
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
-import { markSlideEmptyLines, slideEmptyLineExtension } from './slideEmptyLines';
+import { isInvisibleSlideBlock, markSlideEmptyLines, slideEmptyLineExtension } from './slideEmptyLines';
 import { isLineBreakTag } from './lineBreakTag';
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type SlideData } from '../deckFormat';
@@ -391,16 +391,6 @@ function drawnWordsOf(html: string): string {
   });
 }
 
-/**
- * A block a quote holds that is drawn as nothing: a blank line, a comment note (the slide editor's own reader makes it a
- * `ritemarkComment` token), an empty Label.
- */
-function drawsNoBlock(token: Token): boolean {
-  if (token.type === 'space' || token.type === 'ritemarkComment' || isCommentBlock(token)) return true;
-  const label = token.type === 'paragraph' ? labelParagraphOf(token as Tokens.Paragraph) : null;
-  return !!label && isEmptyLabel(label.words);
-}
-
 /** The words a run of inline tokens draws, as text: no tags, no picture, no line break. */
 function inlineWordsOf(tokens: readonly Token[]): string {
   return tokens.map(token => {
@@ -424,13 +414,13 @@ export function splitQuoteByLine(token: Token): void {
   if (token.type !== 'blockquote') return;
   const blocks = (token as Tokens.Blockquote).tokens;
   let at = blocks.length - 1;
-  while (at >= 0 && drawsNoBlock(blocks[at])) at--;
+  while (at >= 0 && (isInvisibleSlideBlock(blocks[at]) || blocks[at].type === 'slideEmptyLines')) at--;
   if (at < 0 || blocks[at].type !== 'paragraph') return;
   const paragraph = blocks[at] as Tokens.Paragraph;
   const inline = paragraph.tokens ?? [];
   if (labelParagraphOf(paragraph) || buttonParagraphOf(inline) || isPictureParagraph(paragraph) || isAlonePicture(paragraph)) return;
   // A last paragraph that opens with the dash under words of its own is the attribution already, whole.
-  if (blocks.slice(0, at).some(block => !drawsNoBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
+  if (blocks.slice(0, at).some(block => !isInvisibleSlideBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
   const br = inline.map(child => child.type).lastIndexOf('br');
   if (br <= 0) return;
   const words = inline.slice(0, br);
@@ -451,8 +441,9 @@ export function splitQuoteByLine(token: Token): void {
  * renderer's counters (One by one, Steps, Tabs) step as they would without this rule; what draws nothing (a blank line,
  * a comment note, an empty Label) is never "above" the attribution.
  */
-function quoteHtml(blocks: string[]): string {
-  const drawn = blocks.flatMap((html, index) => (html.trim() ? [index] : []));
+function quoteHtml(tokens: Token[], draw: (token: Token) => string): string {
+  const blocks = tokens.map(draw);
+  const drawn = blocks.flatMap((html, index) => (html.trim() && tokens[index].type !== 'slideEmptyLines' ? [index] : []));
   const last = drawn[drawn.length - 1];
   if (drawn.length >= 2 && blocks[last].startsWith('<p>') && isQuoteByWords(drawnWordsOf(blocks[last]))) {
     blocks[last] = `<p class="${QUOTE_BY_CLASS}">${blocks[last].slice('<p>'.length)}`;
@@ -547,7 +538,7 @@ function createSlideMarked(): Marked {
       // Sprint 168 PR 1 (#863): a quote with its attribution marked (`quoteHtml`).
       name: 'blockquote',
       renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
-        return quoteHtml((token as Tokens.Blockquote).tokens.map(block => this.parser.parse([block])));
+        return quoteHtml((token as Tokens.Blockquote).tokens, block => this.parser.parse([block]));
       },
     }, {
       // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.
