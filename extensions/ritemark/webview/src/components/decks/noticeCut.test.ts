@@ -105,8 +105,12 @@ for (const rule of (css.match(/\.deck-notice(?:-words|-text|-cut|-shown|-sizer)?
 // A failure uses the same word threshold as a passing notice. Only the words leave the layout.
 const failure = 'The slides could not be put in.'
 assert.equal(hideClippedNotice(failure, measure(failure), undefined, measure), false)
-assert.equal(hideClippedNotice(failure, measure('The slides c…') - 1, undefined, measure), true)
-assert.match(view, /role="status" aria-live="polite">\s*\{Array\.from\(failures\)\.map[\s\S]*?<Tooltip label=\{text\} className="deck-notice-warning">\s*<span role="img" tabIndex=\{0\} aria-label=\{text\}>\s*<Icon name="warning" size=\{16\} tone="inherit"[\s\S]*?<span className="deck-notice-words deck-failure-words" aria-hidden="true">\s*<span className="deck-notice-text">\{text\}<\/span>/)
+const failureMinimum = measure('The slides c…')
+assert.equal(hideClippedNotice(failure, failureMinimum - 1, undefined, measure), true)
+assert.equal(hideClippedNotice(failure, failureMinimum, undefined, measure), false)
+assert.match(css, /\.deck-notice > \.deck-notice-words \{[^}]*overflow: hidden;/)
+assert.match(css, /\.deck-notice > \.deck-failure-words \{[^}]*min-width: 0;/)
+assert.match(view, /role="status" aria-live="polite">\s*\{Array\.from\(failures\)\.map[\s\S]*?<Tooltip label=\{text\} className="deck-notice-warning">\s*<span role="img" tabIndex=\{0\} aria-label=\{text\}>\s*<Icon name="warning" size=\{16\} tone="inherit"[\s\S]*?<span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">\s*<span className="deck-notice-text">\{text\}<\/span>/)
 // The compact cap is the intrinsic width of the probe, with each action still in flow.
 assert.match(css, /\.deck-notice\[data-measure-min\] \{ flex: none; width: max-content; min-width: 0; \}/)
 assert.match(css, /\.deck-notice\[data-measure-min\] > \.deck-notice-words \{ flex: none; width: 1em; \}/)

@@ -2235,7 +2235,7 @@ export function DeckView({
                   <Icon name="warning" size={16} tone="inherit" />
                 </span>
               </Tooltip>
-              <span className="deck-notice-words deck-failure-words" aria-hidden="true">
+              <span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">
                 <span className="deck-notice-text">{text}</span>
               </span>
             </ReactFragment>
