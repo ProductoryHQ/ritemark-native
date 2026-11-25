@@ -20,6 +20,7 @@ const spike = path.join(repo, 'docs/development/releases/v2.3.0/sprint-158-excel
 const fixtures: Array<[string, string]> = [
   ...['training-budget.xlsx', 'estonian-timesheet.xlsx', 'project-plan.xlsx'].map((n) => [n, path.join(spike, n)] as [string, string]),
   ...chartsKeepFixtures.map(({ file }): [string, string] => [path.basename(file), file]),
+  ['charts-axis-zero.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/charts-axis-zero.xlsx', import.meta.url))],
   ['charts-out-of-scope.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/charts-out-of-scope.xlsx', import.meta.url))],
   ['rules-format-colour.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/rules-format-colour.xlsx', import.meta.url))],
   ['Excel for Mac', path.join(repo, 'docs/development/sprints/sprint-81-excel-editing/test-workbook.xlsx')],

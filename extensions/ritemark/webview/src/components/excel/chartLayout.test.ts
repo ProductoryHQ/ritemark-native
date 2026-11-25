@@ -90,6 +90,47 @@ for (const sheet of kinds.sheets.slice(0, 8)) {
 }
 assert.deepEqual(serialize(kinds), before, 'drawing must leave workbook cells and metadata intact')
 
+const axisZero = await open('charts-axis-zero')
+for (const [sheetName, expected] of [['Close values', [920, 1010, 10]], ['Spread values', [0, 1200, 200]]] as const) {
+  test(`${sheetName} uses Excel’s value scale for columns and bars at their saved size`, () => {
+    const sheet = axisZero.sheets.find(({ name }) => name === sheetName)!
+    const drawings = sheet.layout.drawings.filter(({ what }) => what === 'chart')
+    assert.deepEqual(drawings.map(({ chart }) => chart?.kind), ['column', 'bar'])
+    const grid = buildLayout(sheet, axisZero.styles, { minWidth: 0, minHeight: 0 })
+    for (const { chart, anchor: { from, to } } of drawings) {
+      assert.ok(drawsChart(chart) && from && to)
+      const width = grid.X[to.col] + to.colOff - grid.X[from.col] - from.colOff
+      const height = grid.Y[grid.displayOf.get(to.row)!] + to.rowOff
+        - grid.Y[grid.displayOf.get(from.row)!] - from.rowOff
+      const series = resolveSeries(chart, axisZero.sheets, axisZero)
+      const layout = layoutPlots(chart, series, width, height, measure, axisZero.date1904)
+      const { min, max, step } = layout.scale
+      assert.deepEqual([min, max, step], expected, chart.kind)
+      assert.ok(layout.bars.length > 0)
+      const { x, y, width: plotWidth, height: plotHeight } = layout.plot
+      const horizontal = chart.kind === 'bar'
+      for (const { from, ...bar } of layout.bars) {
+        assert.equal(from, min)
+        close(horizontal ? bar.x : bar.y + bar.height, horizontal ? x : y + plotHeight)
+        assert.ok(bar.x >= x - 1e-8 && bar.x + bar.width <= x + plotWidth + 1e-8)
+        assert.ok(bar.y >= y - 1e-8 && bar.y + bar.height <= y + plotHeight + 1e-8)
+      }
+      const crossing = layout.axes[0]
+      close(horizontal ? crossing.from.x : crossing.from.y, horizontal ? x : y + plotHeight)
+      close(horizontal ? crossing.to.x : crossing.to.y, horizontal ? x : y + plotHeight)
+    }
+  })
+}
+
+test('stacked columns with close values start at zero', () => {
+  const { chart } = drawingOf(axisZero.sheets.find(({ name }) => name === 'Close values')!)
+  assert.ok(drawsChart(chart))
+  const stacked = { ...chart, plots: chart.plots.map((plot) => ({ ...plot, grouping: 'stacked' })) }
+  const series = resolveSeries(stacked, axisZero.sheets, axisZero)
+  const layout = layoutPlots(stacked, series, 480, 288, measure, axisZero.date1904)
+  assert.equal(layout.scale.min, 0)
+})
+
 const threeD = await open('charts-3d')
 for (const sheet of threeD.sheets.slice(0, 3)) {
   const layout = forSheet(threeD, sheet)

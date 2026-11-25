@@ -1,6 +1,6 @@
 # Sprint 174 fixtures: Excel-made charts and colour rules
 
-**Status (25 November 2026, Experience lead):** all eight workbooks are made and every sheet has Excel's render. For ritemark-native Sprint 174, PR 0 part B (`tasks.md`), PR 1 and on. Everything in the files is made up: Harbour Logistics' depots, drivers and numbers.
+**Status (25 November 2026, Experience lead):** all nine workbooks are made and every sheet has Excel's render. For ritemark-native Sprint 174, PR 0 part B (`tasks.md`), PR 1 and on. Everything in the files is made up: Harbour Logistics' depots, drivers and numbers.
 
 ## How they were made
 
@@ -16,6 +16,7 @@ The references are in `reference/`, one PNG per sheet, named `<file>--<n>-<sheet
 | File | Sheets | Scenarios | Notes |
 | --- | --- | --- | --- |
 | `charts-all-kinds.xlsx` | Clustered column, Stacked column, 100% stacked column, Bar, Stacked bar, 100% stacked bar, Line, Line with markers, Area, Stacked area, Pie, Doughnut, Scatter, Combo | 1, 2, 12, 38 | Area has no title (12). Pie has data labels. Combo: columns with a line on a second axis. The scatter is one series, Minutes late against Distance (column A as x), remade on 25 November. |
+| `charts-axis-zero.xlsx` | Close values, Spread values | #1043 follow-up | Each sheet has a clustered column and a clustered bar chart. Excel uses 920–1,010 for values 951–1,000 and 0–1,200 for values 610–1,000. |
 | `charts-colours.xlsx` | Theme tints, Set colours, Automatic, Labels and axes | 3, 4 | Theme tints: eight series, so Excel's cycle runs past the six accents into tinted ones (`schemeClr` with `lumMod`/`lumOff`), and series 1 set to accent 6 by hand. Set colours: three RGB fills. Automatic: no series carries a colour (no `spPr`), as Excel keeps it. Labels and axes: data labels, axis titles, a percent axis, the legend on top. |
 | `charts-3d.xlsx` | 3-D column, 3-D bar, 3-D line, 3-D pie | 5 | |
 | `charts-out-of-scope.xlsx` | Out of scope, More kinds | 13 | Out of scope: a column chart that draws, beside a waterfall, a treemap, a radar, a bubble and a sunburst (13). More kinds: a histogram, a funnel, a box and whisker, a stock (high, low, close) and a surface. The six newer kinds are chartex parts (`xl/charts/chartEx1…6.xml`; the histogram's layout is `clusteredColumn` with binning, as Excel writes it); Excel's scripting can't create them, so each came from Excel's own Insert > Chart menu on the chosen cells (`make/chartex.applescript` chose the cells, placed each chart and set its title). Maps need Bing's service and are left out. Extra references: `--01b` (the lower charts), `--02b` and `--02c` (More kinds' charts to the right and below). |
