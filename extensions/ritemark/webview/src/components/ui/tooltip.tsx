@@ -4,7 +4,7 @@
  *
  *   <Tooltip label="Record from the microphone"><Button …/></Tooltip>
  *
- * The trigger is always a wrapping span: a disabled button receives no pointer
+ * By default the trigger is a wrapping span: a disabled button receives no pointer
  * events, so the span is what lets a tooltip explain why an action is
  * unavailable, and it works the same around any child. Pass layout classes for
  * the span through `className`.
@@ -95,6 +95,7 @@ export function Tooltip({
   label,
   side = 'bottom',
   className,
+  asChild = false,
   hoverOnly = false,
   suppressed = false,
   open,
@@ -104,6 +105,8 @@ export function Tooltip({
   label: ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
   className?: string;
+  /** Use a single ref-forwarding child as the trigger when it needs to share a parent with another control. */
+  asChild?: boolean;
   /** Open on hover only, never on focus (a list the arrow keys move through). */
   hoverOnly?: boolean;
   /** Kept closed while true (a table's grip being pressed or dragged: the tooltip would cover where it lands). */
@@ -122,7 +125,7 @@ export function Tooltip({
     <TooltipPrimitive.Provider delayDuration={300} skipDelayDuration={100}>
       <TooltipPrimitive.Root open={suppressed ? false : open} onOpenChange={onOpenChange}>
         <TooltipPrimitive.Trigger asChild onFocus={hoverOnly ? onTriggerFocusHoverOnly : onTriggerFocus}>
-          <span className={cn('inline-flex', className)}>{children}</span>
+          {asChild ? children : <span className={cn('inline-flex', className)}>{children}</span>}
         </TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
           <TooltipPrimitive.Content

@@ -185,3 +185,24 @@ console.log('libraryGroups: ok')
   const foot = /padding: 4px 8px (\d+)px/.exec(rule('.deck-lib'))
   assert.ok(foot && Number(foot[1]) >= 32, 'the list ends 32 px under its foot note')
 }
+
+// #920: all deck rows reserve the same room for a separate, focusable open action.
+{
+  const panel = readFileSync(new URL('./SlideLibraryPanel.tsx', import.meta.url), 'utf8')
+  const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  const tooltip = readFileSync(new URL('../../ui/tooltip.tsx', import.meta.url), 'utf8')
+  const rows = panel.slice(panel.indexOf('const deckRows ='), panel.indexOf('const searchResults ='))
+  assert.match(panel, /topics\.map\(\(deck\) => deckRows\(deck, false\)\)/)
+  assert.match(panel, /group\.decks\.map\(\(deck\) => deckRows\(deck, true\)\)/)
+  assert.match(panel, /decks\.map\(\(deck\) => deckRows\(deck, true, true\)\)/)
+  assert.match(rows, /className="deck-lib-row-actions">\s*\{deck\.topic && !named \? \([\s\S]*<\/button>\s*\) : \(\s*<DeckRow[\s\S]*?\/>\s*\)\}\s*<Tooltip label=\{deck\.topic \? 'Open topic' : 'Open deck'\} asChild>\s*<Button/)
+  assert.match(panel, /<Tooltip label=\{name\}[^>]* asChild>\s*<button/)
+  assert.match(tooltip, /\{asChild \? children : <span/)
+  assert.match(rows, /className="deck-lib-open size-6"/)
+  assert.match(rows, /aria-label=\{`Open deck \$\{deck\.name\}`\}/)
+  assert.match(rows, /onClick=\{\(\) => sendToExtension\('library\/open', \{ path: deck\.path \}\)\}/)
+  assert.match(rows, /<Icon name="arrow-square-out" size=\{14\} tone="inherit" className="size-3\.5"/)
+  assert.match(css, /\.deck-lib-row-actions > \.deck-lib-row \{ padding-right: 40px; \}/)
+  assert.match(css, /\.deck-lib-row-actions > \.deck-lib-open \{ position: absolute;[^}]*opacity: 0; pointer-events: none; \}/)
+  assert.match(css, /\.deck-lib-row-actions:hover > \.deck-lib-open,\s*[^\n]*\.deck-lib-row-actions:has\(> :focus-visible\) > \.deck-lib-open \{ opacity: 1; pointer-events: auto; \}/)
+}

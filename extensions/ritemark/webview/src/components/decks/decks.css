@@ -390,6 +390,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-group { margin: 14px 8px 4px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: .6px; text-transform: uppercase; color: var(--r-ink-muted); }
 /* Sprint 165 PR 1: an other deck's row on two lines, the caret and icon on the name's first line. */
 .deck-lib-row.deck-lib-row-two { height: auto; min-height: 30px; align-items: flex-start; padding: 5px 8px; white-space: normal; }
+.deck-lib-row-actions { position: relative; }
+/* Keep the 24px action and its two 8px gaps clear even when the action is hidden. */
+.deck-lib-row-actions > .deck-lib-row { padding-right: 40px; }
+.deck-lib-row-actions > .deck-lib-open { position: absolute; right: 8px; top: 50%; translate: 0 -50%; color: var(--r-ink-strong); opacity: 0; pointer-events: none; }
+.deck-lib-row-actions:hover > .deck-lib-open,
+:where(:root:not([data-input-mode="pointer"])) .deck-lib-row-actions:has(> :focus-visible) > .deck-lib-open { opacity: 1; pointer-events: auto; }
 .deck-lib-row.deck-lib-row-two > svg { margin-top: 2px; }
 .deck-lib-row.deck-lib-row-two > svg.deck-lib-caret { margin-top: 4px; }
 .deck-lib-deck-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
