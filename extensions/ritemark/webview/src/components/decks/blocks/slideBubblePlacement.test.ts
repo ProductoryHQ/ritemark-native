@@ -45,12 +45,12 @@ Object.defineProperty(window, 'getComputedStyle', { value: (element: Element) =>
   return { position: style.position || 'static', transform: 'none', perspective: 'none', direction: 'ltr' } as CSSStyleDeclaration
 } })
 
-function place(selection: DOMRect, scale = 1) {
+function place(selection: DOMRect, scale = 1, ranges = [{ $from: { pos: 1 }, $to: { pos: 7 } }]) {
   // Stub the browser's range measurement, which already applies the canvas transform.
   Object.defineProperty(doc, 'createRange', { configurable: true, value: () => ({
     setStart: (node: Node, offset: number) => assert.deepEqual([node, offset], [text, 0]),
     setEnd: (node: Node, offset: number) => assert.deepEqual([node, offset], [text, 6]),
-    getBoundingClientRect: () => rect(
+    getBoundingClientRect: () => selection.width === 0 && selection.height === 0 ? selection : rect(
       stageRect.left + selection.left * scale, stageRect.top + selection.top * scale,
       selection.width * scale, selection.height * scale,
     ),
@@ -58,7 +58,14 @@ function place(selection: DOMRect, scale = 1) {
   const reference = slideBubbleReference({
     view: {
       dom: editor,
-      state: { selection: { from: 1, to: 7 } },
+      state: {
+        doc: { content: { size: text.textContent!.length } },
+        selection: { from: ranges[0].$from.pos, to: ranges[0].$to.pos, ranges },
+      },
+      coordsAtPos: (position: number, side?: number) => {
+        assert.deepEqual([position, side], position === 1 ? [1, undefined] : [7, -1])
+        return rect(position === 1 ? 300 : 380, 260, 0, 20)
+      },
       domAtPos: (position: number) => ({ node: text, offset: position - 1 }),
     },
   } as unknown as Editor)
@@ -89,5 +96,14 @@ assert.deepEqual(place(rect(100, 4, 80, 20)), { left: 300, top: 134 })
 assert.deepEqual(place(rect(540, 160, 50, 20)), { left: 555, top: 210 })
 assert.deepEqual(place(rect(100, 160, 80, 20), 0.5), { left: 250, top: 130 })
 assert.deepEqual(place(rect(100, 160, 80, 20), 1.5), { left: 350, top: 290 })
+
+// An empty DOM range at a block boundary uses the editor's endpoint geometry.
+assert.deepEqual(place(rect(0, 0, 0, 0)), { left: 300, top: 210 })
+
+// CellSelection puts the head cell first, even when it is last in document order.
+assert.deepEqual(place(rect(100, 160, 80, 20), 1, [
+  { $from: { pos: 5 }, $to: { pos: 7 } },
+  { $from: { pos: 1 }, $to: { pos: 3 } },
+]), { left: 300, top: 210 })
 
 console.log('slideBubblePlacement: passed')

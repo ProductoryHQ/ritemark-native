@@ -330,6 +330,7 @@ export function FormattingBubbleMenu({
             toolbarTippy.current = instance
             const stage = appendToBody ? editor.view.dom.closest<HTMLElement>('.deck-stage') : null
             if (!stage) return
+            instance.popper.classList.add('slide-formatting-bubble')
             instance.setProps({ popperOptions: slideBubblePopperOptions(stage) })
             const resize = () => {
               instance.popper.style.setProperty('--slide-bubble-width', `${Math.max(0, stage.clientWidth - 10)}px`)
