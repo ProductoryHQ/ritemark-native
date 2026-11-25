@@ -120,14 +120,20 @@ const pictureCases = [
     picture + separator + 'Caption', picture + '\n\nCaption',
   ]),
   [picture + '<br>\nCaption', picture + '\n\n<br>Caption'],
+  ['[' + picture + '](https://a.test)\nCaption', picture + '\n\nCaption'],
+  ['**' + picture + '**\nCaption', picture + '\n\nCaption'],
+  ['*' + picture + '*\nCaption', picture + '\n\nCaption'],
+  ['Intro<br> ' + picture, 'Intro\n\n' + picture],
+  [picture + ' <br>Caption', picture + '\n\nCaption'],
+  ['- ' + picture + '\n  Caption\n- two', picture + '\n\nCaption\n\n- two', '-\n\n' + picture + '\n\nCaption\n\n- two'],
   ['Intro\n' + picture, 'Intro\n\n' + picture],
   ['<br>\n\n' + picture + '\n\n<br>\n\nCaption', '<br>\n\n' + picture + '\n\n<br>\n\nCaption'],
 ]
-for (const [body, savedBody] of pictureCases) {
-  for (const wrap of [
-    (content: string) => '# Title\n\n' + content,
-    (content: string) => '# Title\n\n:::: columns\n\n::: column\nLeft\n:::\n\n::: column\n' + content + '\n:::\n\n::::',
-  ]) {
+for (const [body, savedBody, savedColumn = savedBody] of pictureCases) {
+  for (const [wrap, expectedBody] of [
+    [(content: string) => '# Title\n\n' + content, savedBody],
+    [(content: string) => '# Title\n\n:::: columns\n\n::: column\nLeft\n:::\n\n::: column\n' + content + '\n:::\n\n::::', savedColumn],
+  ] as const) {
     const markdown = wrap(body)
     const original = loadSlide(markdown)
     const write = (doc: typeof original) => saveSlideMarkdown(doc, editorHTML(doc), loadSlide)
@@ -135,7 +141,7 @@ for (const [body, savedBody] of pictureCases) {
     assert.equal(sync.markdownOf(original), markdown)
     assert.equal(sync.toWrite(original), null)
     const edited = EditorState.create({ doc: original }).tr.insertText('!', 6).doc
-    const expected = wrap(savedBody).replace('# Title', '# Title!')
+    const expected = wrap(expectedBody).replace('# Title', '# Title!')
     assert.equal(sync.toWrite(edited), expected, markdown)
     assert.equal(write(loadSlide(expected)), expected)
   }

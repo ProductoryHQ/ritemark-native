@@ -33,7 +33,7 @@ import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMar
 import { isEmptyLabel, LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
 import { splitQuoteByLine } from '../../../../../src/decks/blocks/slideRenderer'
 import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
-import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { markSlideEmptyLines, SLIDE_EMPTY_LINE, slideEmptyLineExtension } from '../../../../../src/decks/blocks/slideEmptyLines'
@@ -140,43 +140,81 @@ export function ensureSlideCommentPipeline(): void {
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
   const html = markdownToEditorHTML(markdown, imageMappings, slideEditorMarked, markSlideEmptyLines)
-  return withoutCodeEndBreak(withColumnPlaces(splitPictureParagraphs(html)))
+  return withoutCodeEndBreak(withColumnPlaces(markPictureBoundaries(html)))
 }
 
-/** A block picture supplies its own line boundary. Split before ProseMirror can add an empty paragraph. */
-function splitPictureParagraphs(html: string): string {
+const PICTURE_PARAGRAPH = 'data-slide-picture-paragraph'
+const PICTURE_BREAK = 'slide-picture-boundary'
+
+/** Record the source boundaries before ProseMirror lifts inline pictures out as blocks. */
+function markPictureBoundaries(html: string): string {
   if (!html.includes('<img')) return html
   const root = document.createElement('div')
   root.innerHTML = html
-  for (const paragraph of Array.from(root.querySelectorAll('p'))) {
-    if (paragraph.closest('table')) continue
-    if (!Array.from(paragraph.children).some(child => child.nodeName === 'IMG')) continue
-    const parent = paragraph.parentNode!
-    let text = paragraph.cloneNode(false) as HTMLElement
-    while (paragraph.firstChild) {
-      const child = paragraph.firstChild
-      if (child.nodeName !== 'IMG') {
-        text.appendChild(child)
-        continue
-      }
-      if (text.lastChild?.nodeName === 'BR') text.removeChild(text.lastChild)
-      if (text.children.length || text.textContent?.trim()) parent.insertBefore(text, paragraph)
-      else {
-        const tight = text.getAttribute('data-md-tight')
-        if (tight !== null) (child as HTMLElement).setAttribute('data-md-tight', tight)
-      }
-      if (child.nextSibling?.nodeName === 'BR') paragraph.removeChild(child.nextSibling)
-      parent.insertBefore(child, paragraph)
-      text = document.createElement('p')
-      // Extra breaks after the boundary stay inline with the caption.
-      for (let next: ChildNode | null = paragraph.firstChild; next?.nodeName === 'BR'; next = next.nextSibling) {
-        (next as HTMLElement).setAttribute('data-md-break', 'html')
-      }
+  const inlineLeaves = (node: DomNode): DomNode[] => {
+    if (node.nodeType === 3) return node.textContent?.trim() ? [node] : []
+    if (node.nodeType !== 1) return []
+    // These wrappers can share a textblock with a picture. Other elements stop the boundary search.
+    if (/^(A|STRONG|B|EM|I|S|DEL|MARK|SPAN|U|SUB|SUP)$/.test(node.nodeName)) {
+      return Array.from(node.childNodes).flatMap(inlineLeaves)
     }
-    if (text.children.length || text.textContent?.trim()) parent.insertBefore(text, paragraph)
-    paragraph.remove()
+    return [node]
+  }
+
+  for (const block of Array.from(root.querySelectorAll('p, li'))) {
+    if (block.closest('table')) continue
+    const leaves = Array.from(block.childNodes).flatMap(inlineLeaves)
+    if (block.nodeName === 'P' && leaves.find(leaf => leaf.nodeName !== 'BR')?.nodeName === 'IMG') {
+      block.setAttribute(PICTURE_PARAGRAPH, '')
+    }
+    leaves.forEach((leaf, index) => {
+      if (leaf.nodeName !== 'IMG') return
+      for (const neighbor of [leaves[index - 1], leaves[index + 1]]) {
+        if (neighbor?.nodeName === 'BR') (neighbor as Element).setAttribute('data-md-break', PICTURE_BREAK)
+      }
+      // The picture replaces one break. Further breaks still belong to the caption.
+      for (let next = index + 2; leaves[next]?.nodeName === 'BR'; next++) {
+        const br = leaves[next] as Element
+        if (br.getAttribute('data-md-break') !== PICTURE_BREAK) br.setAttribute('data-md-break', 'html')
+      }
+    })
   }
   return root.innerHTML
+}
+
+/** Drop the paragraph and boundary break left when ProseMirror lifts a picture out of a textblock. */
+export function withoutPictureSplitArtifacts(doc: PMNode): PMNode {
+  function clean(node: PMNode): PMNode {
+    if (node.isLeaf) return node
+    const children: PMNode[] = []
+    node.forEach(child => {
+      if (child.type.name === 'hardBreak' && child.attrs.mdBreak === PICTURE_BREAK) return
+      children.push(clean(child))
+    })
+    const generatedParagraph = (child: PMNode) => child.attrs.slidePictureParagraph && child.childCount === 0
+    const kept = children.flatMap((child, index) => {
+      if (generatedParagraph(child)) return []
+      const previous = children[index - 1]
+      if (child.type.name === 'image' && previous && generatedParagraph(previous) && previous.attrs.mdTight) {
+        return [child.type.create({ ...child.attrs, mdTight: previous.attrs.mdTight }, child.content, child.marks)]
+      }
+      // A caption parsed in the picture's original paragraph can retain its inter-word space.
+      const text = child.firstChild?.text
+      if (previous?.type.name === 'image' && child.type.name === 'paragraph' && text?.startsWith(' ')) {
+        const start = /^ +/.exec(text)![0].length
+        return [child.copy(child.content.cut(start))]
+      }
+      return [child]
+    })
+    const content = Fragment.fromArray(kept)
+    // A list item can require its initial paragraph even when the picture was lifted out.
+    const validContent = node.type.validContent(content) ? content : Fragment.fromArray(children)
+    if (node.attrs.slidePictureParagraph && validContent.size > 0) {
+      return node.type.create({ ...node.attrs, slidePictureParagraph: false }, validContent, node.marks)
+    }
+    return node.content.eq(validContent) ? node : node.copy(validContent)
+  }
+  return clean(doc)
 }
 
 /**
@@ -406,6 +444,12 @@ export const SlideEmptyLines = Extension.create({
     return [{
       types: ['paragraph'],
       attributes: {
+        slidePictureParagraph: {
+          default: false,
+          keepOnSplit: false,
+          parseHTML: (element: HTMLElement) => element.hasAttribute(PICTURE_PARAGRAPH),
+          renderHTML: (attrs: Record<string, unknown>) => attrs.slidePictureParagraph ? { [PICTURE_PARAGRAPH]: '' } : {},
+        },
         slideEmptyLine: {
           default: false,
           keepOnSplit: false,

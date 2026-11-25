@@ -7,7 +7,7 @@ import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTML, installTestDocument } from '../../../utils/markdownFidelity'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { SlideAgenda, SlideDiv, SlideEmptyLines, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
+import { SlideAgenda, SlideDiv, SlideEmptyLines, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown, withoutPictureSplitArtifacts } from './slideEditorMarkdown'
 import { SlideLabel } from './slideLabel'
 
 installTestDocument()
@@ -29,7 +29,7 @@ function elementFromString(html: string): HTMLElement {
 
 /** A block slide's Markdown as the slide editor's document. */
 export function loadSlide(markdown: string): PMNode {
-  return PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown)))
+  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown))))
 }
 
 /** The slide editor's document as Markdown. */
@@ -46,5 +46,5 @@ export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck:
  */
 export function loadSlideWithComments(markdown: string): PMNode {
   ensureSlideCommentPipeline()
-  return PMDOMParser.fromSchema(slideCommentSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown)))
+  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideCommentSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown))))
 }
