@@ -14,7 +14,7 @@ import { vscode } from '../../lib/vscode'
 
 const labels = (place: Parameters<typeof startingPointsFor>[0], hasAbout = false) => startingPointsFor(place, { hasAbout }).map((point) => point.label)
 
-assert.deepEqual(labels('project'), ['What is here?', 'Find what I wrote about…', 'Write About this project'], 'S33')
+assert.deepEqual(labels('project'), ['What is here?', 'Find what I wrote about…', 'Write “About this project”'], 'S33')
 assert.deepEqual(labels('project', true), ['What is here?', 'Find what I wrote about…'], 'S41: About this project exists')
 assert.deepEqual(labels('empty_project'), ['This project is for…', 'Plan a first document with me'], 'S34')
 assert.deepEqual(labels('word_or_pdf'), ['Summarise this in five points', 'Turn this into a one-page brief', 'What does this say about…?'], 'S35')

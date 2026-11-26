@@ -15,7 +15,7 @@ export interface StartingPoint {
   cursor: number
 }
 
-const WRITE_ABOUT = 'Write About this project'
+const WRITE_ABOUT = 'Write “About this project”'
 
 const POINTS: Record<StartingPlace, readonly string[]> = {
   project: ['What is here?', 'Find what I wrote about…', WRITE_ABOUT],
@@ -36,7 +36,7 @@ export function fillOf(label: string): { text: string; cursor: number } {
   return { text: `${label.slice(0, at)} ${label.slice(at + 1)}`, cursor: at + 1 }
 }
 
-/** At most three; "Write About this project" only while the project has none. */
+/** At most three; Write “About this project” only while the project has none. The quotes show it names the file (the Experience lead). */
 export function startingPointsFor(place: StartingPlace, options: { hasAbout: boolean }): StartingPoint[] {
   return POINTS[place]
     .filter((label) => !(label === WRITE_ABOUT && options.hasAbout))
