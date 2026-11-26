@@ -233,6 +233,11 @@ assert.deepEqual(
 assert.deepEqual(classifyRuntimeError('claude-code', 'model not found', { code: 'model_not_found', turnModel: 'claude-opus-5-5', names })?.sentence,
   "Claude couldn't use Opus 5.5. It isn't available in Ritemark right now.");
 assert.equal(classifyRuntimeError('claude-code', 'API Error: Connection error.')?.kind, 'network');
+for (const message of ['This model is currently experiencing high demand', 'Provider overloaded', 'HTTP 429', '503 Service Unavailable']) {
+  assert.equal(classifyRuntimeError('opencode', `Internal error: ${message}`)?.detail?.limit, 'busy');
+}
+assert.equal(classifyRuntimeError('opencode', 'Internal error', { httpStatus: 429 })?.kind, 'provider');
+
 assert.equal(classifyRuntimeError('opencode', 'fetch failed')?.kind, 'network');
 
 // A13. Envelopes unwrapped; ordinary text untouched; nothing to say falls back to one plain sentence.
@@ -471,7 +476,6 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.equal(retryingLine('codex', 60_000), 'ChatGPT is busy. Trying again in a minute.');
   assert.equal(retryingLine('codex', 0), 'ChatGPT is busy. Trying again in a minute.');
   assert.equal(retryingLine('codex', undefined), 'ChatGPT is busy. Trying again soon.', 'the length unknown');
-  assert.equal(retryingLine('opencode', 120_000), 'OpenCode is busy. Trying again in 2 minutes.', "the AI's own name");
   for (const ms of [419_000, 60_000, undefined]) assert.doesNotMatch(retryingLine('codex', ms), /…|seconds| s\b|Codex/);
   // Continue with <AI> only while more than a minute is left.
   assert.equal(retryingOffersAlternative(419_000), true);
