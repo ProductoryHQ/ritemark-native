@@ -799,10 +799,10 @@ stable(COLUMNS, 'three columns')
     assert.equal(after(setReveal(state, chosen.pos, false)), LIST, `${form.split('\n')[2]}: All at once unwraps to the bare list`)
   }
   // The bar's control (the Experience lead, 18 November): one toggle, "One by one", pressed when on, with a tooltip; a
-  // press flips it (off is All at once). It folds just after the alignment: before Width (or the count) and Style.
+  // press flips it (off is All at once). It folds just after the alignment: before the Columns count and Style.
   assert.equal(REVEAL_LABEL, 'One by one')
   assert.ok(/Present/.test(REVEAL_TIP) && /one by one/.test(REVEAL_TIP), REVEAL_TIP)
-  assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Width or count, Style')
+  assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Columns count, Style')
   assert.equal(FOLD_AT.reveal, FOLD_AT.alignment + 1, 'Reveal folds right after the alignment')
   // Sprint 167 PR 2: Boxes' Mark, a menu already, folds last, to its value's icon (review of #878: else the Boxes bar at
   // its last fold was a menu wider than before, and ran past a narrow pane).
@@ -813,7 +813,7 @@ stable(COLUMNS, 'three columns')
     assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
     assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
     for (const group of ['Style', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
-    assert.match(barSource, /<Group label="Width" folded options=/)
+    assert.match(barSource, /<Group label="Size" folded tip=/)
     assert.match(barSource, /fold < MAX_FOLD/)
   }
   // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).
@@ -1025,14 +1025,14 @@ stable(COLUMNS, 'three columns')
     assert.deepEqual(numbers(slideOf(stage.save())), ['1 Two', '2 Three'], 'a delete: the numbers close up')
   }
 
-  // The bar: Mark is a menu that shows its value, right after Filled and Outline (before Width), each choice with its
+  // The bar: Mark is a menu that shows its value, right after Filled and Outline (before Size), each choice with its
   // word and icon; it is a menu already, so it never folds.
   const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
   const style = barSource.indexOf('<Group label="Style"')
   const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(')
-  const width = barSource.indexOf('<Group label="Width"')
+  const size = barSource.indexOf('<Group label="Size"')
   const boxIcon = barSource.indexOf('{boxIconButton}', markAt)
-  assert.ok(style > 0 && markAt > style && boxIcon > markAt && width > boxIcon, 'Style, Mark, box icon, Width')
+  assert.ok(style > 0 && markAt > style && boxIcon > markAt && size > boxIcon, 'Style, Mark, box icon, Size')
   assert.ok(!barSource.slice(markAt, boxIcon).includes('<Sep />'), 'Mark and box icon share a group')
   assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)

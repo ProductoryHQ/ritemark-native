@@ -2,10 +2,10 @@
  * The block's bar on the stage (experience 46, 17 November; frames 23, 29 and 30; `blockBar.ts` does the work).
  *
  *  - **The bar** sits under the chosen block (the caret's Boxes, Steps, Columns or list): the type as a menu
- *    ("Boxes ▾"), the block's own group (Boxes: Style, Mark, Width, alignment; Columns: the count, the vertical alignment and
+ *    ("Boxes ▾"), the block's own group (Boxes: Style, Mark, Size, alignment; Columns: the count, the vertical alignment and
  *    frame 23's ⋯ with Add a column, Remove a column and Delete block), then Add and Delete. It is the page's own size at
- *    any stage size, so it goes in `document.body` (the slide's frame clips, and frame 29's bar runs past the slide), and
- *    follows its block as the stage moves and scales. A press outside it or Esc closes it; a press in the block opens it.
+ *    any stage size, so it goes in `document.body`. It stays inside the slide and follows its block as the stage moves
+ *    and scales. A press outside it or Esc closes it; a press in the block opens it.
  *  - **The handles** go in the slide's frame, over the slide, at the block's place on the screen, so they move and scale
  *    with the slide and stay a pointer's size: the accent ring, the ⋮ at the block's top left that drags it within the
  *    slide (a line shows where it lands), the round + at its right or bottom edge, and on Columns the line between two
@@ -17,7 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { Transaction } from '@tiptap/pm/state'
-import { BOXES_MARKS, BOX_WIDTH_PX, boxesLookOf, boxesMarkOf, columnsAlignOf, type BoxWidth, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, boxesLookOf, boxesMarkOf, columnsAlignOf, type BoxWidth, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
@@ -38,6 +38,8 @@ import { SlideIconGlyph } from '../slide/SlideIconGlyph'
 import { SlideItemHandle } from './SlideItemHandle'
 import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
+
+const BOX_SIZE_LABEL: Record<BoxWidth, string> = { s: 'Small', m: 'Medium', l: 'Large' }
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar', tabs: 'tabs' }
 /** Sprint 167 PR 2: the Mark menu's icons (README item C, `block-details.html`). */
@@ -126,12 +128,13 @@ interface Option {
 /**
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
  * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
- * trigger says the value to a screen reader too ("Width: Auto"). `bare` shows the value as its icon only, the word in the
+ * trigger says the value to a screen reader too ("Size: Auto"). `bare` shows the value as its icon only, the word in the
  * tooltip ("Mark: Number"); `tip` overrides the tooltip.
  */
 function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
+  const hasIcons = options.some(option => option.icon)
   return (
     <DropdownMenu modal={false}>
       <Tooltip label={tip ?? (bare ? `${label}: ${current.label ?? current.tip}` : label)}>
@@ -146,7 +149,7 @@ function Group({ label, options, folded, tip, bare = false }: { label: string; o
       <DropdownMenuContent align="start" onCloseAutoFocus={event => event.preventDefault()}>
         {options.map(option => (
           <DropdownMenuItem key={option.key} className="gap-2" onSelect={option.pick}>
-            {option.icon ? <Icon name={option.icon} size={16} tone="inherit" /> : null}
+            {option.icon ? <Icon name={option.icon} size={16} tone="inherit" /> : hasIcons ? <span className="size-4 shrink-0" aria-hidden="true" /> : null}
             <span className="flex-1">{option.label ?? option.tip}</span>
             {option.on ? <Icon name="check" size={14} tone="inherit" /> : null}
           </DropdownMenuItem>
@@ -763,9 +766,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   }))} />
                   {boxIconButton}
                   <Sep />
-                  <Group label="Width" folded options={[
-                    { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },
-                    ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: width.toUpperCase(), tip: `Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`, pick: () => setValue('width', width) })),
+                  <Group label="Size" folded tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
+                    { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'Auto', pick: () => setValue('width', null) },
+                    ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: BOX_SIZE_LABEL[width], tip: BOX_SIZE_LABEL[width], pick: () => setValue('width', width) })),
                   ]} />
                   <Sep />
                   <Group label="Text alignment" folded={fold >= FOLD_AT.alignment} options={[

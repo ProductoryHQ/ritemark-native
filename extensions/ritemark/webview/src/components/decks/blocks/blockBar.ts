@@ -67,7 +67,7 @@ export const REVEAL_TIP = 'In Present, show the items one by one: the slide open
 
 /**
  * When the bar is wider than the slide's pane, its own groups fold one by one (the lead on #773), in this order: the
- * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then Width or the Columns count, then
+ * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then the Columns count, then
  * Style, and last Boxes' Mark (Sprint 167 PR 2), a menu already, which keeps its value as its icon only, the word in its
  * tooltip. `fold` counts the folds; a group is folded from its number on.
  */
