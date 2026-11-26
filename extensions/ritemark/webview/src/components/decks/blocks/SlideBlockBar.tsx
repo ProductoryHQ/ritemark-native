@@ -129,9 +129,10 @@ interface Option {
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
  * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
  * trigger says the value to a screen reader too ("Size: Auto"). `bare` shows the value as its icon only, the word in the
- * tooltip ("Mark: Number"); `tip` overrides the tooltip.
+ * tooltip ("Mark: Number"); `tip` overrides the tooltip. `icon` is the control's own icon on the trigger, kept whatever
+ * is chosen, for a group whose choices have no icons of their own (Size: "▯▯ Small ▾"; the Experience lead on #910).
  */
-function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
+function Group({ label, options, folded, tip, bare = false, icon }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean; icon?: PhosphorIconName }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
   const hasIcons = options.some(option => option.icon)
@@ -140,7 +141,7 @@ function Group({ label, options, folded, tip, bare = false }: { label: string; o
       <Tooltip label={tip ?? (bare ? `${label}: ${current.label ?? current.tip}` : label)}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
-            {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
+            {icon ?? current.icon ? <Icon name={(icon ?? current.icon)!} size={16} tone="inherit" /> : null}
             {bare && current.icon ? null : current.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
@@ -766,7 +767,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   }))} />
                   {boxIconButton}
                   <Sep />
-                  <Group label="Size" folded tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
+                  <Group label="Size" folded icon="columns" tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'Auto', pick: () => setValue('width', null) },
                     ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: BOX_SIZE_LABEL[width], tip: BOX_SIZE_LABEL[width], pick: () => setValue('width', width) })),
                   ]} />
