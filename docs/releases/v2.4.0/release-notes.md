@@ -33,6 +33,7 @@ If you run training or share slides with clients, you can update the page they a
 
 - **Keep Word formulas as math.** They carry over when AI reads the document or you make a Markdown copy. Some formulas look different.
 - **Share pictures without private details.** Ritemark removes location, camera and author details from the pictures it publishes.
+- **See your decks in Finder on a Mac.** Finder shows a saved deck's first slide, and pressing Space lets you look through its slides. Ritemark keeps these previews on your Mac. On some Macs, turn on Ritemark under Login Items & Extensions → Quick Look first.
 - **See how many slides you have.** The bottom of the window shows the slide count when you open a deck.
 
 ## Fixes
