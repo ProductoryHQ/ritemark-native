@@ -72,6 +72,7 @@ const mockManager = {
   },
   setModel: async (_sessionId: string, _model: string) => { calls.push('setModel'); },
   // Sprint 130 (G4): the turn's last assistant message, by ACP messageId.
+  preparePrompt: async (sessionId: string) => sessionId,
   lastAgentMessage: (_sessionId: string) => 'The final answer.',
   getThinkingEffortCapability: () => ({
     selectable: ['low', 'medium', 'high'],
@@ -199,28 +200,30 @@ async function testHungTurnTimesOut(): Promise<void> {
 
 const GEMINI_BUSY = 'Internal error: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.';
 
-async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permission' | 'permission-ceiling' | 'tool' | 'tool-ceiling'): Promise<void> {
+async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progress' | 'permission' | 'permission-ceiling' | 'tool' | 'tool-ceiling'): Promise<void> {
   const script = `
     const send = (message) => console.log(JSON.stringify({ jsonrpc: '2.0', ...message }));
     const reply = (id, result) => send({ id, result });
-    const chunk = (sessionUpdate, text) => send({ method: 'session/update', params: {
-      sessionId: 'fake', update: { sessionUpdate, content: { type: 'text', text } },
+    const chunk = (sessionUpdate, text, sessionId = 'fake') => send({ method: 'session/update', params: {
+      sessionId, update: { sessionUpdate, content: { type: 'text', text } },
     } });
     const mode = process.argv[1];
+    let sessionCount = 0;
     let promptId;
     let cancelled = false;
     let permissionCancelled = false;
     require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
       const { id, method, params, result } = JSON.parse(line);
       if (method === 'initialize') reply(id, { protocolVersion: 1, agentCapabilities: {} });
-      if (method === 'session/new') reply(id, { sessionId: 'fake', configOptions: [] });
+      if (method === 'session/new') reply(id, { sessionId: ++sessionCount === 1 ? 'fake' : 'replacement', configOptions: [] });
       if (method === 'session/prompt') {
         if (params.prompt[0].text === 'follow-up') {
-          if (!cancelled) return send({ id, error: { code: -32603, message: 'Previous prompt still running' } });
+          if (!cancelled && params.sessionId !== 'replacement') return send({ id, error: { code: -32603, message: 'Previous prompt still running' } });
           if (mode === 'permission-ceiling' && !permissionCancelled) {
             return send({ id, error: { code: -32603, message: 'Permission still pending' } });
           }
-          chunk('agent_message_chunk', 'second reply');
+          if (mode === 'stuck-cancel') chunk('agent_message_chunk', 'late reply');
+          chunk('agent_message_chunk', 'second reply', params.sessionId);
           return reply(id, { stopReason: 'end_turn' });
         }
         promptId = id;
@@ -237,7 +240,7 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
                 reply(id, { stopReason: 'end_turn' });
               }
             }, 50);
-          }, 425);
+          }, 200);
         }
         if (mode === 'tool' || mode === 'tool-ceiling') {
           const update = (sessionUpdate, toolCallId, status) => send({ method: 'session/update',
@@ -252,13 +255,17 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
         }
         if (mode === 'permission' || mode === 'permission-ceiling') send({ id: 500, method: 'session/request_permission',
           params: { sessionId: 'fake', toolCall: { toolCallId: 'ask', title: 'run' },
-            options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }] } });
+            options: [
+              { optionId: 'allow_once', name: 'Allow', kind: 'allow_once' },
+              { optionId: 'allow_always', name: 'Always allow', kind: 'allow_always' },
+              { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
+            ] } });
       }
       if (id === 500 && !method) {
         if (mode === 'permission') reply(promptId, { stopReason: 'end_turn' });
         permissionCancelled = result?.outcome?.outcome === 'cancelled';
       }
-      if (method === 'session/cancel') {
+      if (method === 'session/cancel' && mode !== 'stuck-cancel') {
         const cancelledId = promptId;
         setTimeout(() => {
           chunk('agent_thought_chunk', 'late thought');
@@ -290,18 +297,20 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
     },
     approveWrite: async () => true,
     onProgress: (event) => { progress.push(event.message); },
-  });
+  }, 150);
   try {
     const sessionId = await manager.start();
     const ceilingMs = mode.endsWith('-ceiling') ? 900 : undefined;
-    const session = new AcpSession('conv-quiet', sessionId, config, runtime, undefined, 300, ceilingMs);
+    const silent = mode === 'silent' || mode === 'stuck-cancel';
+    const quietMs = silent ? 100 : 300;
+    const session = new AcpSession('conv-quiet', sessionId, config, runtime, undefined, quietMs, ceilingMs);
     (runtime as any)._manager = manager;
     (runtime as any)._sessions.set(session.conversationId, session);
     (runtime as any)._sessionsByAcpId.set(sessionId, session);
     const startedAt = performance.now();
     const finished = session.prompt({
       prompt: 'hi',
-      timeoutMinutes: mode === 'progress' ? 650 / 60_000 : mode === 'tool-ceiling' ? 350 / 60_000 : undefined,
+      timeoutMinutes: silent ? 15 : mode === 'tool-ceiling' ? 0.01 : undefined,
     });
     const within = async (promise: Promise<unknown>) => {
       const deadline = new AbortController();
@@ -324,6 +333,9 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
       assert.equal(reported, undefined, 'a pending or running tool pauses the quiet timeout');
     }
     await within(finished);
+    if (silent) {
+      assert.ok(performance.now() - startedAt < 500, 'the quiet card appears at the injected 100 ms window');
+    }
     if (mode === 'tool') {
       assert.ok(performance.now() - startedAt >= 825, 'the quiet window restarts after the final tool update');
     }
@@ -339,13 +351,18 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
         detail: presentation.errorDetail,
         sentence: presentation.message,
       });
-      if (mode === 'silent' || mode === 'tool') {
+      if (silent || mode === 'tool') {
         assert.deepEqual(card, {
           title: "OpenCode couldn't finish this request",
           message: 'Send your message again.',
         });
       } else if (ceilingMs) {
-        assert.match(reported?.error ?? '', /^OpenCode did not respond within 0 minutes\./);
+        const minutes = mode === 'tool-ceiling' ? 0.01 : 0.015;
+        assert.ok(reported?.error?.startsWith(`OpenCode did not respond within ${minutes} minutes.`));
+        if (mode === 'tool-ceiling') {
+          const elapsedMs = performance.now() - startedAt;
+          assert.ok(elapsedMs >= 575 && elapsedMs < 875, 'the configured ceiling fires around 600 ms');
+        }
         assert.ok(card, 'the ceiling produces a failure card');
       } else {
         assert.equal(reported?.errorCode, 'APIError');
@@ -356,10 +373,16 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
         session.respondToApproval(requestId!, true, false);
         assert.deepEqual(permissionResult, { outcome: { outcome: 'cancelled' } });
       }
-      if (mode === 'silent' || mode === 'permission-ceiling') {
+      if (silent || mode === 'permission-ceiling') {
+        const followUpStartedAt = performance.now();
         await within(session.prompt({ prompt: 'follow-up' }));
         assert.equal(reported?.status, 'completed', reported?.error);
         assert.equal(reported?.lastAgentMessage, 'second reply');
+        if (mode === 'stuck-cancel') {
+          assert.ok(performance.now() - followUpStartedAt < 500, 'the follow-up is sent after the bounded drain');
+          assert.equal(session.acpSessionId, 'replacement');
+          assert.equal(manager.hasSession(sessionId), false);
+        }
         assert.ok(!progress.some((line) => line.startsWith('late ')), 'abandoned updates are dropped');
       }
     }
@@ -369,7 +392,7 @@ async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permissio
 }
 
 async function run() {
-  for (const mode of ['silent', 'busy', 'progress', 'permission', 'permission-ceiling', 'tool', 'tool-ceiling'] as const) {
+  for (const mode of ['silent', 'stuck-cancel', 'busy', 'progress', 'permission', 'permission-ceiling', 'tool', 'tool-ceiling'] as const) {
     await testQuietStream(mode);
     console.log(`✓ ACP quiet-stream fixture: ${mode}`);
   }
@@ -420,20 +443,24 @@ async function run() {
     console.log('✓ Test 4: respondToApproval() resolves pending approval');
   }
 
-  // Test 5: disposing one session rejects only ITS pending approvals
+  // Test 5: disposing one session cancels only its approvals and denies pending writes
   {
     const runtime = new AcpRuntime();
     const a = addSession(runtime, 'conv-a');
     const b = addSession(runtime, 'conv-b');
 
-    const results: string[] = [];
-    a.pendingApprovals.set('a1', (r) => results.push(`a1:${r.approved}`));
-    b.pendingApprovals.set('b1', (r) => results.push(`b1:${r.approved}`));
+    const cancelled: unknown[] = [];
+    a.pendingApprovals.set('a1', (decision) => cancelled.push(decision));
+    b.pendingApprovals.set('b1', () => assert.fail("sibling's approval must stay pending"));
 
+    const pendingWrite: Promise<boolean> = (runtime as any)._handleWriteApproval({
+      sessionId: a.acpSessionId, path: '/tmp/test/draft.md', content: 'draft',
+    });
     a.dispose();
-    assert.deepStrictEqual(results, ['a1:false'], 'only the disposed session had its approvals rejected');
+    assert.equal(await pendingWrite, false, 'disposing a session denies its pending write');
+    assert.deepStrictEqual(cancelled, [undefined], 'the disposed session had its pending approval cancelled');
     assert.strictEqual(b.pendingApprovals.size, 1, "sibling's pending approval survives");
-    console.log('✓ Test 5: disposing one session rejects only its own approvals');
+    console.log('✓ Test 5: disposing one session cancels only its approvals and denies pending writes');
   }
 
   // Test 6: prompt() calls setModel and manager.prompt()

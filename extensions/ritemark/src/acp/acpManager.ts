@@ -90,6 +90,8 @@ interface AcpTurnObserver {
   onToolRunning: (running: boolean) => void;
 }
 
+const ACP_CANCELLED_PROMPT_DRAIN_MS = 2_000;
+
 interface AcpTurn {
   observer?: AcpTurnObserver;
   response: Promise<PromptResponse>;
@@ -174,7 +176,7 @@ export class AcpManager {
   private client: AcpClient | null = null;
   private readonly sessions = new Map<string, AcpSessionState>();
 
-  constructor(config: AcpManagerConfig) {
+  constructor(config: AcpManagerConfig, private readonly cancelledPromptDrainMs = ACP_CANCELLED_PROMPT_DRAIN_MS) {
     this.config = config;
   }
 
@@ -374,14 +376,42 @@ export class AcpManager {
     return this.sessions.get(sessionId)?.turnChanges.files() ?? [];
   }
 
-  async prompt(sessionId: string, text: string, observer?: AcpTurnObserver, signal?: AbortSignal): Promise<PromptResponse> {
-    const { client, state } = this.requireSession(sessionId);
-    // Notifications carry only a session ID. Drain a cancelled prompt before
-    // dispatching the next one so trailing updates cannot reach the new turn.
+  /** Drain trailing updates before reusing a session, or replace it if the agent never settles. */
+  async preparePrompt(sessionId: string, signal?: AbortSignal): Promise<string> {
+    const { state } = this.requireSession(sessionId);
     const previous = state.turn;
-    if (previous?.cancelled) await previous.response.catch(() => undefined);
+    if (!previous?.cancelled) return sessionId;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        previous.response.catch(() => undefined),
+        new Promise<void>((resolve) => { timer = setTimeout(resolve, this.cancelledPromptDrainMs); }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
     signal?.throwIfAborted();
     if (this.sessions.get(sessionId) !== state) throw new Error(`ACP session is not running: ${sessionId}`);
+    if (state.turn !== previous) return sessionId;
+
+    // Notifications carry only a session ID. A new session isolates late updates
+    // and permission requests from the abandoned one without stopping siblings.
+    this.closeSession(sessionId);
+    const replacement = await this.start();
+    if (signal?.aborted) {
+      this.closeSession(replacement);
+      signal.throwIfAborted();
+    }
+    return replacement;
+  }
+
+  async prompt(sessionId: string, text: string, observer?: AcpTurnObserver, signal?: AbortSignal): Promise<PromptResponse> {
+    if (this.sessions.get(sessionId)?.turn?.cancelled) {
+      sessionId = await this.preparePrompt(sessionId, signal);
+    }
+    signal?.throwIfAborted();
+    const { client, state } = this.requireSession(sessionId);
     if (state.turn) throw new Error('An ACP prompt is already running for this session');
 
     state.sawContentThisTurn = false;

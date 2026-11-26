@@ -51,7 +51,8 @@ import { noteOpenCodeModels } from '../ai/modelCatalog';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { activeFileLines } from '../decks/currentSlide';
 
-type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
+type ApprovalDecision = { approved: boolean; alwaysAllow: boolean };
+type PendingApproval = (result: ApprovalDecision | undefined) => void;
 
 const _toolsInjector = new RitemarkToolsInjector();
 
@@ -90,7 +91,7 @@ export function isBoardToolPermission(params: RequestPermissionRequest): boolean
   return false;
 }
 
-// Claude's 15-minute inactivity window is too long for a silent OpenCode stream.
+// The 90-second quiet window is separate from the inactivity setting, which sets the turn ceiling.
 const ACP_QUIET_STREAM_MS = 90_000;
 const ACP_TURN_CEILING_MS = 15 * 60_000;
 // Give the notification time to flush before completion can dispose the subprocess.
@@ -166,7 +167,7 @@ export class AcpSession implements RuntimeSession {
   constructor(
     readonly conversationId: string,
     /** The ACP session id on the shared connection. */
-    readonly acpSessionId: string,
+    private _acpSessionId: string,
     config: RuntimeSessionConfig,
     private readonly _runtime: AcpRuntime,
     private _continuationContext?: NormalizedRuntimeContext,
@@ -186,6 +187,8 @@ export class AcpSession implements RuntimeSession {
       : config.continuation?.fallbackContext;
   }
 
+  get acpSessionId(): string { return this._acpSessionId; }
+
   async prompt(turn: RuntimeTurnConfig): Promise<void> {
     const manager = this._runtime.getManager();
     if (!manager) {
@@ -196,22 +199,38 @@ export class AcpSession implements RuntimeSession {
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
-    // Inject the shared capability context once per session (ACP has no system
-    // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
-    // ACP-flavoured render of src/ai/capabilityContext.ts.
-    const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
-    const { text: rawPromptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
-    const continuationContext = this._continuationContext;
-    this._continuationContext = undefined;
-    const promptText = frameRuntimePrompt(rawPromptText, continuationContext);
-    if (capabilityContext && capabilityContext.trim()) {
-      this._capabilityContextInjected = true;
-    }
-    if (imageAttachmentCount > 0) {
-      config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
-    }
-
     try {
+      const previousSessionId = this.acpSessionId;
+      const readySessionId = await manager.preparePrompt(previousSessionId);
+      if (readySessionId !== previousSessionId) {
+        this._runtime._replaceSessionId(this, previousSessionId, readySessionId, manager);
+        this._acpSessionId = readySessionId;
+        this._capabilityContextInjected = false;
+        this._manualThinkingEffortApplied = false;
+        this._continuationContext = config.continuation?.fallbackContext;
+        const compatibility = config.continuation?.compatibility;
+        if (compatibility) {
+          config.onContinuationCheckpoint?.(continuationCheckpoint(
+            readySessionId, compatibility, this._continuationContext?.coveredThroughEventId ?? null,
+          ));
+        }
+      }
+
+      // Inject the shared capability context once per session (ACP has no system
+      // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
+      // ACP-flavoured render of src/ai/capabilityContext.ts.
+      const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
+      const { text: rawPromptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+      const continuationContext = this._continuationContext;
+      this._continuationContext = undefined;
+      const promptText = frameRuntimePrompt(rawPromptText, continuationContext);
+      if (capabilityContext && capabilityContext.trim()) {
+        this._capabilityContextInjected = true;
+      }
+      if (imageAttachmentCount > 0) {
+        config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
+      }
+
       // Apply model for this turn (strip 'opencode:' composite prefix if present).
       // Must be inside try/catch — setModel throws if the model ID is invalid.
       if (config.model) {
@@ -257,7 +276,8 @@ export class AcpSession implements RuntimeSession {
         });
       }
 
-      const quietMs = turn.timeoutMinutes === undefined ? this._quietStreamMs : turn.timeoutMinutes * 60_000;
+      const ceilingMinutes = turn.timeoutMinutes ?? this._turnCeilingMs / 60_000;
+      const ceilingMs = turn.timeoutMinutes === undefined ? this._turnCeilingMs : ceilingMinutes * 60_000;
       let quietTimer: ReturnType<typeof setTimeout> | undefined;
       let cancelWriteTimer: ReturnType<typeof setTimeout> | undefined;
       let approvals = 0;
@@ -278,14 +298,14 @@ export class AcpSession implements RuntimeSession {
         if (finished || abort.signal.aborted || approvals > 0 || toolsRunning) return;
         quietTimer = setTimeout(() => {
           stop(Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
-        }, quietMs);
+        }, this._quietStreamMs);
       };
 
       // #658: hold this conversation's browser page only while its prompt is active.
       this._runtime.beginBrowserTurn(this, config.browserPage);
       const ceilingTimer = setTimeout(() => {
-        stop(new Error(`OpenCode did not respond within ${Math.round(this._turnCeilingMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
-      }, this._turnCeilingMs);
+        stop(new Error(`OpenCode did not respond within ${ceilingMinutes} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+      }, ceilingMs);
       onActivity();
       const prompted = manager.prompt(this.acpSessionId, promptText, {
         onActivity,
@@ -392,7 +412,7 @@ export class AcpSession implements RuntimeSession {
   /** @internal */
   rejectPendingApprovals(): void {
     for (const resolve of this.pendingApprovals.values()) {
-      resolve({ approved: false, alwaysAllow: false });
+      resolve(undefined);
     }
     this.pendingApprovals.clear();
   }
@@ -551,6 +571,16 @@ export class AcpRuntime implements AgentRuntime {
       this._manager = null;
       this._stopIpcServer();
     }
+  }
+
+  /** @internal Route updates and approvals to the existing conversation after session replacement. */
+  _replaceSessionId(session: AcpSession, previousId: string, nextId: string, manager: AcpManager): void {
+    if (this._manager !== manager || this._sessions.get(session.conversationId) !== session) {
+      manager.closeSession(nextId);
+      throw new Error('OpenCode conversation was closed while restarting its session.');
+    }
+    this._sessionsByAcpId.delete(previousId);
+    this._sessionsByAcpId.set(nextId, session);
   }
 
   private _stopIpcServer(): void {
@@ -728,12 +758,15 @@ export class AcpRuntime implements AgentRuntime {
       ? { requestId, agentId: 'opencode', kind: 'file-write', filePath: file }
       : { requestId, agentId: 'opencode', kind: 'shell-command', command: tool, workingDir: file ?? '' };
 
-    const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
+    const decision = await new Promise<ApprovalDecision | undefined>(
       (resolve) => {
         session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );
+
+    if (!decision) return { outcome: { outcome: 'cancelled' } };
+    const { approved } = decision;
 
     // C1: recorded on THIS session only. Another chat writing the same path
     // still has to ask.
@@ -775,14 +808,14 @@ export class AcpRuntime implements AgentRuntime {
       filePath: request.path,
     };
 
-    const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
+    const decision = await new Promise<ApprovalDecision | undefined>(
       (resolve) => {
         session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );
 
-    return approved;
+    return decision?.approved ?? false;
   }
 
   /**
