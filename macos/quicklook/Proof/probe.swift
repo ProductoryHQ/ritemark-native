@@ -12,6 +12,17 @@ func recognizedText(_ url: URL) throws -> String {
     return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
 }
 
+func settingsWindowID() -> Int? {
+    let owners = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.systempreferences")
+        .map(\.processIdentifier)
+    let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]] ?? []
+    return windows.first {
+        guard let pid = $0[kCGWindowOwnerPID as String] as? pid_t else { return false }
+        return owners.contains(pid) && $0[kCGWindowLayer as String] as? Int == 0
+    }?[kCGWindowNumber as String] as? Int
+}
+
 func save(_ image: CGImage, to url: URL) throws {
     guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
         throw ProbeError.absentRepresentation
@@ -158,7 +169,13 @@ enum Probe {
             if arguments.first == "--ocr" {
                 let text = try recognizedText(URL(fileURLWithPath: arguments[1]))
                 print(text)
-                guard text.uppercased().contains(arguments[2]) else { throw ProbeError.missingText }
+                let expectedLabels = arguments.dropFirst(2)
+                guard !expectedLabels.isEmpty, expectedLabels.allSatisfy({
+                    text.localizedCaseInsensitiveContains($0)
+                }) else { throw ProbeError.missingText }
+            } else if arguments.first == "--settings-window" {
+                guard let window = settingsWindowID() else { throw ProbeError.absentRepresentation }
+                print(window)
             } else {
                 try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
                                     output: URL(fileURLWithPath: arguments[1], isDirectory: true),

@@ -18,6 +18,9 @@ jobs:
         runner: [macos-15, macos-26, macos-26-intel]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Record runner
         run: |
@@ -38,4 +41,27 @@ jobs:
         with:
           name: quicklook-${{ matrix.runner }}
           path: ${{ runner.temp }}/quicklook-proof
+          retention-days: 30
+
+  settings-version-gate:
+    if: ${{ !cancelled() }}
+    needs: proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: quicklook-macos-*
+          path: ${{ runner.temp }}/quicklook-artifacts
+      - name: Compare confirmed Settings versions against the app gate
+        shell: bash
+        run: |
+          python3 macos/quicklook/Proof/settings-versions.py "$RUNNER_TEMP/quicklook-artifacts" \
+            extensions/ritemark/src/decks/quickLook/confirmedSettingsVersions.json \
+            "$RUNNER_TEMP/results.md" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quicklook-settings-versions
+          path: ${{ runner.temp }}/results.md
           retention-days: 30

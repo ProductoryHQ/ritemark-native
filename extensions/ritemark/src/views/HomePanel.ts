@@ -27,6 +27,8 @@ import { displayPlace } from '../welcome/recentProjects';
 import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
 import { normalizeProjectUri } from '../conversations/projectScope';
 import { pickerFolder } from '../utils/dialogDefaults';
+import type { QuickLookGuidance } from '../decks/quickLook/guidance';
+import { openSettingsLabel, settingsNote } from '../decks/quickLook/guidance';
 
 export const HOME_VIEW_TYPE = HOME_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
@@ -52,6 +54,7 @@ export interface HomeHostDependencies {
   onProjectsChanged: () => void;
   /** Sprint 140: the first day's guidance (Home's one card); null in a window with none. */
   guidance: GuidanceHost | null;
+  quickLookGuidance?: QuickLookGuidance & { onDidChange: vscode.Event<void> };
   /** Sprint 142 (R3): a message the AI's sheet accepted. */
   onTurnAccepted?: (listener: () => void) => vscode.Disposable;
 }
@@ -103,6 +106,7 @@ export class HomeHost implements vscode.Disposable {
     }));
     // Sprint 140: the guidance card follows a sign-in, a press, a send
     if (deps.guidance) this.disposables.push(deps.guidance.onDidChange(() => this.scheduleRedraw(0)));
+    if (deps.quickLookGuidance) this.disposables.push(deps.quickLookGuidance.onDidChange(() => this.scheduleRedraw(0)));
     // Sprint 142 (R3): a message sent on the AI's sheet ends the switch note
     if (deps.onTurnAccepted && this.switchedFrom) this.disposables.push(deps.onTurnAccepted(() => this.endSwitchedNote('turn-accepted')));
   }
@@ -371,6 +375,10 @@ export class HomeHost implements vscode.Disposable {
       case 'home/feedback-send':
         await this.deps.guidance?.sendFeedbackLine(request.text);
         return;
+      case 'home/quick-look-open':
+      case 'home/quick-look-dismiss':
+        await this.deps.quickLookGuidance?.retire(request.type === 'home/quick-look-open');
+        return;
       case 'home/feedback-not-now':
         await this.deps.guidance?.feedbackNotNow();
         return;
@@ -517,7 +525,8 @@ export class HomeHost implements vscode.Disposable {
       empty: recent.empty,
       boardEnabled: this.deps.boardEnabled(),
       decksEnabled: this.deps.decksEnabled(),
-      guidance,
+      guidance: await this.deps.quickLookGuidance?.eligible()
+        ? { card: 'quick-look', body: settingsNote, button: openSettingsLabel } : guidance,
       copilotChat: vscode.extensions.getExtension(COPILOT_CHAT_EXTENSION_ID) !== undefined,
       switchedFrom: this.switchedFrom ? { name: this.switchedFrom.name } : null,
       missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place, here: this.missing.folderUri === folder.uri.toString() } : null,

@@ -14,8 +14,11 @@ STAND_IN="$WORK/Ritemark.app"
 APP=/Applications/Ritemark.app
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 RESULTS="$PROOF/results.md"
+STATE_MODULE="$ROOT/extensions/ritemark/src/decks/quickLook/pluginkitState.ts"
+os_version="$(sw_vers -productVersion)"
+cpu="$(uname -m)"
 mkdir -p "$PROOF/registration"
-printf '# Quick Look runner proof\n' > "$RESULTS"
+printf '# Quick Look runner proof\n\nmacOS %s · %s\n' "$os_version" "$cpu" > "$RESULTS"
 since="$(date '+%Y-%m-%d %H:%M:%S')"
 collect_logs() {
   local status=$?
@@ -75,18 +78,38 @@ xcrun swiftc -module-cache-path "$WORK/module-cache" "$SOURCE"/Shared/*.swift \
 } >> "$RESULTS"
 xcrun swiftc -module-cache-path "$WORK/module-cache" -parse-as-library "$SOURCE/Proof/probe.swift" -o "$WORK/probe"
 
-listing() {
-  for point in thumbnail preview; do
-    pluginkit -m -vv -i "$host_id.deck-$point" > "$PROOF/registration/$1.$point.txt" 2>&1 || true
-  done
+installed_id() {
+  plutil -extract CFBundleIdentifier raw -o - "$STAND_IN/Contents/PlugIns/RitemarkDeck$1.appex/Contents/Info.plist"
 }
 
+thumbnail_id="$(installed_id Thumbnail)"
+preview_id="$(installed_id Preview)"
+
+listing() {
+  pluginkit -m -vv -i "$thumbnail_id" > "$PROOF/registration/$1.thumbnail.txt" 2>&1 || true
+  pluginkit -m -vv -i "$preview_id" > "$PROOF/registration/$1.preview.txt" 2>&1 || true
+}
+
+election() {
+  local phase="$1" kind="$2" bundle_id="$3"
+  local raw="registration/$phase.$kind.election"
+  local state
+  state="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" "$bundle_id" "$PROOF/$raw")"
+  printf -- '- %s %s (`%s`) — **%s** ([stdout](%s.txt), [stderr and exit status](%s.log), [registered paths](registration/%s.%s.txt))\n' \
+    "$phase" "$kind" "$bundle_id" "$state" "$raw" "$raw" "$phase" "$kind" >> "$RESULTS"
+}
+
+printf '\n## Discovery and election\n\n' >> "$RESULTS"
 listing 01-before-install
 if [[ -e "$APP" ]]; then
   echo "Destination already exists: $APP" >&2
   exit 1
 fi
 sudo ditto "$STAND_IN" "$APP"
+listing 02-before-launch
+election 02-before-launch thumbnail "$thumbnail_id"
+election 02-before-launch preview "$preview_id"
 /usr/bin/log stream --style compact --level info \
   --predicate 'subsystem == "ai.productory.ritemark.quicklook" AND process BEGINSWITH "RitemarkDeck"' \
   > "$PROOF/provider-stream.txt" 2> "$PROOF/provider-stream.stderr" &
@@ -96,10 +119,10 @@ if ! open "$APP" --args "$PROOF/host.pid" > "$PROOF/registration/launch.txt" 2>&
   exit 1
 fi
 for attempt in {1..15}; do
-  listing 02-after-launch
+  listing 03-after-launch
   if [[ -s "$PROOF/host.pid" ]] &&
-    grep -Fq "$host_id.deck-thumbnail(" "$PROOF/registration/02-after-launch.thumbnail.txt" &&
-    grep -Fq "$host_id.deck-preview(" "$PROOF/registration/02-after-launch.preview.txt"; then break; fi
+    grep -Fq "$thumbnail_id(" "$PROOF/registration/03-after-launch.thumbnail.txt" &&
+    grep -Fq "$preview_id(" "$PROOF/registration/03-after-launch.preview.txt"; then break; fi
   sleep 1
 done
 if [[ ! -s "$PROOF/host.pid" ]]; then
@@ -107,6 +130,51 @@ if [[ ! -s "$PROOF/host.pid" ]]; then
   exit 1
 fi
 printf '\nHost launched with PID %s.\n' "$(cat "$PROOF/host.pid")" >> "$RESULTS"
+printf '\n' >> "$RESULTS"
+election 03-after-launch thumbnail "$thumbnail_id"
+election 03-after-launch preview "$preview_id"
+
+settings_capture() {
+  local output="$PROOF/settings"
+  local window_id
+  local capture_available=false
+  local settings_url
+  mkdir -p "$output"
+  settings_url="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)"
+  printf '\n## System Settings\n\nLink: `%s`.\n\n' "$settings_url" >> "$RESULTS"
+  if ! open "$settings_url" > "$output/capture.log" 2>&1; then
+    printf -- '- FAIL opening the link ([log](settings/capture.log)).\n' >> "$RESULTS"
+    return 1
+  fi
+  for attempt in {1..15}; do
+    sleep 1
+    if window_id="$("$WORK/probe" --settings-window 2>> "$output/capture.log")" &&
+       screencapture -x -o -l "$window_id" "$output/window.png" >> "$output/capture.log" 2>&1; then
+      capture_available=true
+      if "$WORK/probe" --ocr "$output/window.png" 'Login Items & Extensions' 'Quick Look' \
+        > "$output/ocr.txt" 2>&1; then
+        printf -- '- PASS both labels in System Settings ([window PNG](settings/window.png), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
+        return 0
+      fi
+    fi
+  done
+  if [[ "$capture_available" == false ]] &&
+     ! screencapture -x "$WORK/settings-capture-check.png" >> "$output/capture.log" 2>&1; then
+    printf -- '- Coverage gap — screen capture unavailable ([log](settings/capture.log)).\n' >> "$RESULTS"
+    return 2
+  fi
+  printf -- '- FAIL could not verify both labels in System Settings ([artifacts](settings/)).\n' >> "$RESULTS"
+  return 1
+}
+
+settings_status=confirmed
+settings_capture || case "$?" in
+  2) settings_status=gap ;;
+  *) settings_status=failed ;;
+esac
+printf '%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" > "$PROOF/settings.tsv"
+killall 'System Settings' 2>/dev/null || true
 
 preview_capture() (
   local source="$1" output="$2" marker="$3" phase="$4" kind="$5"
@@ -115,6 +183,13 @@ preview_capture() (
   qlmanage -p "$source" > "$output/preview.log" 2>&1 &
   local pid=$!
   trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+  if [[ "$settings_status" == gap ]]; then
+    # Keep the native preview request and provider checks when screen capture is unavailable.
+    sleep 5
+    printf -- '- %s preview UI — coverage gap (screen capture unavailable, qlmanage PID %s).\n' \
+      "$kind" "$pid" >> "$RESULTS"
+    return 0
+  fi
   # Poll the screenshot for the expected content rather than taking a single snapshot.
   for attempt in {1..8}; do
     sleep 1
@@ -175,11 +250,13 @@ if exercise default "$WORK/fixtures"; then
 else
   printf '\nDefault launch proof failed. Controlled discovery and election follow.\n' | tee -a "$RESULTS"
   "$LSREGISTER" -f -R -trusted "$APP"
-  listing 03-explicit-registration
-  for point in thumbnail preview; do
-    pluginkit -e use -i "$host_id.deck-$point"
+  listing 04-explicit-registration
+  for bundle_id in "$thumbnail_id" "$preview_id"; do
+    pluginkit -e use -i "$bundle_id"
   done
-  listing 04-explicit-election
+  listing 05-explicit-election
+  election 05-explicit-election thumbnail "$thumbnail_id"
+  election 05-explicit-election preview "$preview_id"
   qlmanage -r
   qlmanage -r cache
   mkdir -p "$WORK/elected-fixtures"
@@ -191,3 +268,4 @@ else
     exit 1
   fi
 fi
+[[ "$settings_status" != failed ]]

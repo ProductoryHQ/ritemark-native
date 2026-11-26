@@ -75,6 +75,7 @@ export type HomeKeyName = 'google-ai-key' | 'openai-api-key' | 'anthropic-api-ke
 /** Sprint 140 (R2, R3, R14): the one guidance card under Waiting for you, or none. */
 export type HomeGuidance =
   | { card: 'what-moved' }
+  | { card: 'quick-look'; body: string; button: string }
   | {
       card: 'ready-request';
       kind: ReadyCardKind;
@@ -184,7 +185,9 @@ export type HomeRequest =
   | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>>; from: SignInFrom }
   | { type: 'home/feedback-send'; text: string }
   | { type: 'home/feedback-mail'; text: string }
-  | { type: 'home/feedback-not-now' };
+  | { type: 'home/feedback-not-now' }
+  | { type: 'home/quick-look-open' }
+  | { type: 'home/quick-look-dismiss' };
 
 /** Host → Home: OpenCode's keys were saved, or why not (the welcome's sheet, shared). */
 export type HomeKeysSaved = { type: 'home/keys-saved'; ok: boolean; message: string | null };
@@ -262,6 +265,8 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
     case 'home/cancel-sign-in':
     case 'home/reopen-sign-in':
     case 'home/feedback-not-now':
+    case 'home/quick-look-open':
+    case 'home/quick-look-dismiss':
       problem = check([]);
       return problem ? fail(problem) : { ok: true, request: { type: raw.type } };
     case 'home/ready-request-ai':

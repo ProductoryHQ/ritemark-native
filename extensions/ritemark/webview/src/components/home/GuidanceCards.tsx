@@ -251,5 +251,16 @@ export function GuidanceCard({ guidance, whatMoved }: { guidance: HomeGuidance |
   if (!guidance) return null
   if (guidance.card === 'what-moved') return <>{whatMoved}</>
   if (guidance.card === 'ready-request') return <ReadyRequestCard card={guidance} keysResult={keysResult} onKeysClosed={() => setKeysResult(null)} />
+  if (guidance.card === 'quick-look') {
+    return (
+      <section className="rh-guide" aria-labelledby="rh-quick-look-note">
+        <p className="rh-guide-body" id="rh-quick-look-note">{guidance.body}</p>
+        <div className="rh-guide-go">
+          <Button size="compact" onClick={() => send({ type: 'home/quick-look-open' })}>{guidance.button}</Button>
+          <Button variant="ghost" size="compact" className="rh-quiet" onClick={() => send({ type: 'home/quick-look-dismiss' })}>Not now</Button>
+        </div>
+      </section>
+    )
+  }
   return <FeedbackCard card={guidance} />
 }
