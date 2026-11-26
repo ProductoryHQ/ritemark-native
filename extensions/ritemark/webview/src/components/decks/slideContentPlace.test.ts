@@ -63,6 +63,7 @@ const TITLE = '# Agents at work, day 2\n\nHarbour Logistics · 12 November'
 // ---- What a choice writes: nothing for the default, the place otherwise; Bottom again on a title slide takes it out.
 {
   assert.deepEqual(contentPlaceChange({ markdown: CONTENT }, 'top'), { valign: undefined })
+  assert.deepEqual(contentPlaceChange({ markdown: '# The dock\n\n![Dock](images/dock.jpg)' }, 'top'), { valign: 'top' })
   assert.deepEqual(contentPlaceChange({ markdown: CONTENT }, 'middle'), { valign: 'middle' })
   assert.deepEqual(contentPlaceChange({ markdown: CONTENT }, 'bottom'), { valign: 'bottom' })
   assert.deepEqual(contentPlaceChange({ markdown: TITLE }, 'bottom'), { valign: undefined }, "a title slide's Bottom is its default")

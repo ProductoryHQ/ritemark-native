@@ -316,10 +316,11 @@
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > table { align-self: flex-start; }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > :is(.blk-pic, img) { flex: 0 1 auto; min-height: 0; align-self: center; object-position: center; }
 .deck-slide .deck-sl.is-blocks .blk-flow > img { max-height: none; }
+.deck-sl.is-blocks.is-titled-pic .blk-flow > h1,
 .deck-sl.is-blocks .blk-flow > h1:has(+ :is(.blk-pic, img)) { margin-bottom: calc(12px * var(--fit, 1)); }
 .deck-sl.is-blocks .blk-flow:has(> .blk-pic, > img) > .blk-pic.empty { align-self: stretch; }
-/* Only a picture-only slide shares the free height by default. These margins also outrank the stage's last-child rule. */
-.deck-slide .deck-sl.is-blocks.is-lone-pic .blk-flow > :is(.blk-pic, img) { margin-top: auto; margin-bottom: auto; }
+/* A single picture shares the free height on its own or beneath its title. */
+.deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic) .blk-flow > :is(.blk-pic, img) { margin-top: auto; margin-bottom: auto; }
 /* A picture whose file is gone (17 November): its place says so, with the file's name. */
 .deck-sl .blk-pic.is-missing, .deck-sl .photo.is-missing { display: flex; align-items: center; justify-content: center; text-align: center; }
 .deck-sl .blk-missing { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; padding: 12px; box-sizing: border-box; }
@@ -440,8 +441,8 @@
    is never drawn (as decks.css's own last-child rules say). */
 .deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) > :is(li, ol, ul):last-child,
 .deck-sl.is-blocks:is(.va-middle, .va-bottom) .blk-flow > :nth-last-child(1 of :not(ritemark-comment)) > :is(ol, ul):last-child > li:last-child { margin-bottom: 0; }
-/* A picture alone moves with the flow too: its own centring's auto margins give way to the place chosen. */
-.deck-slide .deck-sl.is-blocks.is-lone-pic:is(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img) { margin-top: 0; margin-bottom: 0; }
+/* An explicit Content place moves the whole flow together. */
+.deck-slide .deck-sl.is-blocks:is(.is-lone-pic, .is-titled-pic):is(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img) { margin-top: 0; margin-bottom: 0; }
 
 /* Borderless: the block slide's words on white */
 .deck-slide.is-borderless .deck-sl.is-blocks .blk-flow { color: var(--s-tx, #33365A); }

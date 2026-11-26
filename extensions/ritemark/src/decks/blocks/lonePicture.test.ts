@@ -11,9 +11,9 @@ import { pageHtml, type PageAssets } from '../page/pageHtml';
 
 const extension = path.join(__dirname, '../../..');
 const slideCss = fs.readFileSync(path.join(extension, 'webview', 'src', 'components', 'decks', 'slide', 'slide.css'), 'utf8');
-const canvas = (markdown: string, data: Record<string, unknown> = {}) =>
-  parse(blockCanvasMarkup({ markdown, ...data }, { width: 960, pictureUrl: () => 'pic.png' })).querySelector('.deck-sl')!;
-const centring = (css: string) => css.split('\n').filter(line => /is-lone-pic/.test(line) && line.includes('{'));
+const canvas = (markdown: string, data: Record<string, unknown> = {}, pictureUrl = 'pic.png') =>
+  parse(blockCanvasMarkup({ markdown, ...data }, { width: 960, pictureUrl: () => pictureUrl })).querySelector('.deck-sl')!;
+const centring = (css: string) => css.split('\n').filter(line => /is-(?:lone|titled)-pic/.test(line) && line.includes('{'));
 
 // ---- 1. Nothing else on the slide: the picture sits in the middle both ways.
 {
@@ -29,7 +29,7 @@ const centring = (css: string) => css.split('\n').filter(line => /is-lone-pic/.t
   assert.ok(!canvas('![Team](images/team.jpg)', { image: 'images/side.jpg', picture: 'right' }).classList.contains('is-lone-pic'));
   // The CSS: both margins of the column's height shared (the middle down), and the middle across.
   const rules = centring(slideCss);
-  assert.ok(rules.some(rule => /\.is-lone-pic \.blk-flow > :is\(\.blk-pic, img\) \{ margin-top: auto; margin-bottom: auto; \}/.test(rule)), 'the middle down');
+  assert.ok(rules.some(rule => /:is\(\.is-lone-pic, \.is-titled-pic\) \.blk-flow > :is\(\.blk-pic, img\) \{ margin-top: auto; margin-bottom: auto; \}/.test(rule)), 'the middle down');
   // The column the picture is in is the flex column the fit already gives a slide with a picture.
   assert.match(slideCss, /\.deck-sl\.is-blocks \.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/);
 }
@@ -56,7 +56,7 @@ const centring = (css: string) => css.split('\n').filter(line => /is-lone-pic/.t
   const assets: PageAssets = { slideCss, fonts: [] };
   const page = parse(pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl: () => 'pic.png' }));
   assert.equal(page.querySelectorAll('.layer .deck-sl.is-lone-pic').length, 1, 'the page: alone');
-  assert.ok(page.querySelector('.layer .deck-sl:not(.is-lone-pic) .blk-flow > h1 + img'), 'the page: in the flow under its title');
+  assert.ok(page.querySelector('.layer .deck-sl.is-titled-pic .blk-flow > h1 + img'), 'the page: Title & Photo');
   const editor = fs.readFileSync(path.join(extension, 'webview', 'src', 'components', 'decks', 'blocks', 'SlideEditor.tsx'), 'utf8');
   assert.match(editor, /'is-editing'[^\n]*lonePictureClass\(shownMarkdown, side\)/, 'the stage marks its canvas');
 }
@@ -66,15 +66,29 @@ console.log('lone picture: passed');
 const dropped = "# The deck's title\n![](<Kickoff files/photo.png>)";
 const directPictureRule = slideCss.match(/\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{([^}]+)\}/)?.[1] ?? '';
 
-test('#1116: a small picture follows its title at Top and keeps its natural size', () => {
-  const slide = canvas(dropped);
+test('#1116: Title & Photo centres a 64 px picture without enlarging it', () => {
+  const smallPicture = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"/>');
+  const slide = canvas(dropped, {}, smallPicture);
+  assert.equal(lonePictureOf(dropped), 'titled');
   assert.equal(contentPlaceOf(dropped, undefined, null), 'top');
   assert.ok(slide.querySelector('.blk-flow > h1 + img.blk-pic'));
   assert.ok(!slide.classList.contains('is-cover'));
-  assert.ok(!slide.classList.contains('is-titled-pic'), 'no auto margins between the title and picture');
+  assert.ok(slide.classList.contains('is-titled-pic'));
+  const image = slide.querySelector('.blk-flow > img')!;
+  assert.equal(image.getAttribute('src'), smallPicture);
+  assert.equal(image.getAttribute('style'), undefined);
   assert.match(directPictureRule, /align-self: center/);
   assert.doesNotMatch(directPictureRule, /min-height: (?!0;)|(?:^|;)\s*(?:width|height):/);
   assert.match(slideCss, /h1:has\(\+ :is\(\.blk-pic, img\)\) \{ margin-bottom: calc\(12px \* var\(--fit, 1\)\)/);
+});
+
+test('#1116: a picture with other content stays 12 px under the preceding text', () => {
+  const markdown = '# The title\n\nOur team\n\n![Team](images/team.jpg)';
+  const slide = canvas(markdown);
+  assert.equal(lonePictureOf(markdown), null);
+  assert.equal(lonePictureClass(markdown, null), '');
+  assert.ok(slide.querySelector('.blk-flow > h1 + p + img'));
+  assert.match(slideCss, /\.deck-sl\.is-blocks p \{ margin: 0 0 calc\(12px \* var\(--fit, 1\)\); \}/);
 });
 
 test('#1116: a large picture shrinks into the remaining room under the title', () => {
@@ -92,7 +106,9 @@ test('#1116: a picture-only slide defaults to Middle', () => {
 test('#1116: Bottom moves the title and picture together', () => {
   const slide = canvas(dropped, { valign: 'bottom' });
   assert.ok(slide.classList.contains('va-bottom'));
+  assert.ok(slide.classList.contains('is-titled-pic'));
   assert.ok(slide.querySelector('.blk-flow > h1 + img'));
+  assert.match(slideCss, /:is\(\.is-lone-pic, \.is-titled-pic\):is\(\.va-top, \.va-middle, \.va-bottom\) \.blk-flow > :is\(\.blk-pic, img\) \{ margin-top: 0; margin-bottom: 0; \}/);
   assert.match(slideCss, /\.va-bottom \.blk-flow \{[^}]*justify-content: safe flex-end/);
 });
 

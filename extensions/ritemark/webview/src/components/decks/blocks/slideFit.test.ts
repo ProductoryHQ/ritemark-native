@@ -150,12 +150,12 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
     'the stage title placeholder takes no room in the shared picture layout')
   // The app run (round 3): the stage's last-block rule set margin-bottom 0 over the lone picture's auto margins, so the
   // picture sat low. The stage's own rule must carry both auto margins on the last block, with no Content place chosen.
-  assert.match(css, /\.deck-slide \.deck-sl\.is-blocks\.is-editing\.is-lone-pic:not\(\.va-top, \.va-middle, \.va-bottom\) \.blk-flow > :is\(\.blk-pic, img\):nth-last-child\(1 of :not\(ritemark-comment, \.blk-empty-line\.is-edge\)\) \{ margin-top: auto; margin-bottom: auto; \}/,
-    'on the stage a lone picture keeps both auto margins over the last-block rule')
+  assert.match(css, /\.deck-slide \.deck-sl\.is-blocks\.is-editing:is\(\.is-lone-pic, \.is-titled-pic\):not\(\.va-top, \.va-middle, \.va-bottom\) \.blk-flow > :is\(\.blk-pic, img\):nth-last-child\(1 of :not\(ritemark-comment, \.blk-empty-line\.is-edge\)\) \{ margin-top: auto; margin-bottom: auto; \}/,
+    'on the stage both picture layouts keep both auto margins over the last-block rule')
 
   const state = EditorState.create({ doc })
   const titled = saveSlide(state.tr.insertText('A title', 1).doc)
-  assert.equal(lonePictureClass(titled, null), '')
+  assert.equal(lonePictureClass(titled, null), 'is-titled-pic')
   assert.equal(contentPlaceOf(titled, undefined, null), 'top')
   assert.match(blockCanvasMarkup({ markdown: titled }, { pictureUrl: () => 'large.png' }), /<h1>A title<\/h1>\s*<img/)
 }
