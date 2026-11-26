@@ -29,11 +29,11 @@ Sprints are to be numbered when planned.
 
 | Sprint | Issues | Scope | Status |
 |---|---|---|---|
-| 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov; [plan](sprint-173-word-folder/sprint-plan.md) |
+| 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov. PRs 1–7 merged (PR 3, #1000, on 26 Nov); the gate per AI and platform (#1083); the runner measures what G1 says (#1085, #1086). **Claude on the Mac passed G1, 3 of 3 on 11819457 (26 Nov); its Word and PDF starting points open (#1087).** ChatGPT waits for the OpenAI test key; OpenCode on Gemini is blocked by #1078; Windows runs at Gate 2. [plan](sprint-173-word-folder/sprint-plan.md) |
 | 174 · Excel charts and colour rules | #971 (open until 2.4 publishes); PRs #990 (plan), #1026, #1029–#1032, #1034–#1036, #1038, #1039 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Done 25 Nov (code and docs); four follow-ups wait on the Experience lead's Excel renders; closing proof: [research/closing-proof.md](sprint-174-excel-charts/research/closing-proof.md) |
 | 175 · The live deck | no issue (roadmap item); PRs #995 (plan), #1003, #1006, #1012, #1014–#1016, #1020, #1022, #1024, #1027, #1028 | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Done 25 Nov; S18 and the Windows checks wait for Gate 2; closing proof: [research/closing-proof.md](sprint-175-live-deck/research/closing-proof.md) |
 | 176 · Hear from people | #1045 | Thumbs on AI answers, feedback on failures, a window picture in feedback, one open-source card on Home in place of the week’s question, GitHub and Discussions in Help, and saved days across releases. | Planned 25 Nov; frames by 27 Nov |
-| 177 · Quick Look for decks | #953 | Finder shows the first shown slide and Space shows the slides when this Mac has a current picture. Otherwise Finder shows the deck icon and Space shows the deck text. | Approved 25 Nov; building; [plan](sprint-177-quick-look/sprint-plan.md) |
+| 177 · Quick Look for decks | #953 | Finder shows the first shown slide and Space shows the slides when this Mac has a current picture. Otherwise Finder shows the deck icon and Space shows the deck text. | Code done 26 Nov: #1073 (cache), #1074 (native extensions), #1079 (build, sign, ship), #1082 (Home note and Help; proof and docs). Runner proof green on macOS 15, 26 and 26 Intel; Intel CI green on main. Gate 1 rows: the signed app in a real Finder, and the Home note against a disabled extension (#953 open until then). [plan](sprint-177-quick-look/sprint-plan.md) |
 
 Release notes: each sprint's `release-notes-lines.md`, joined in `docs/releases/v2.4.0/release-notes.md` with the `release-notes` skill.
 
@@ -41,28 +41,28 @@ Release notes: each sprint's `release-notes-lines.md`, joined in `docs/releases/
 
 | Issue | What it does | PR or status |
 |---|---|---|
-| #947 | Place the start card right under the handout’s first part. | PR #958 |
-| #948 | Correct what the start card says. | PR #957 |
-| #950 | Keep a long bar note from squeezing the bar. | PR #977 |
-| #946 | Put the text bubble above the chosen words. | PR #1059 |
-| #927, #983 | Count a deck’s words in the status bar. #983 (RC4 smoke test) is the same fault. | PR #962 |
-| #910 | Make a box’s icon accessible from the keyboard. | PR #1069 |
-| #920 | Open a deck from its row in the Slide library. | PR #1064 |
-| #919 | Keep the theme on the printed page and in the PDF. | PR #1065 |
-| #966 | Make runtime checks fail when they can’t check. | PR #973 |
-| #968 | Give the published page’s buttons names on a phone. | PR #970 |
-| #980 | Keep a picture’s bar at size S off the paragraph below it. | PR #1063 |
-| #981 | Keep the Slide settings popup off the slide’s title. | PR #1061 |
+| #947 | Place the start card right under the handout’s first part. | PR #958 (merged) |
+| #948 | Correct what the start card says. | PR #957 (merged) |
+| #950 | Keep a long bar note from squeezing the bar. | PR #977 (merged) |
+| #946 | Put the text bubble above the chosen words. | PR #1059 (merged) |
+| #927, #983 | Count a deck’s words in the status bar. #983 (RC4 smoke test) is the same fault. | PR #962 (merged) |
+| #910 | Make a box’s icon accessible from the keyboard. | PR #1069 (merged) |
+| #920 | Open a deck from its row in the Slide library. | PR #1064 (merged) |
+| #919 | Keep the theme on the printed page and in the PDF. | PR #1065 (merged) |
+| #966 | Make runtime checks fail when they can’t check. | PR #973 (merged) |
+| #968 | Give the published page’s buttons names on a phone. | PR #970 (merged) |
+| #980 | Keep a picture’s bar at size S off the paragraph below it. | PR #1063 (merged) |
+| #981 | Keep the Slide settings popup off the slide’s title. | PR #1061 (merged) |
 | #982 | Keep a table cell’s right-click menu inside the window. | PR #1057 (merged) |
 | #984 | Show Claude’s own mark on its tile in Settings ▸ AI accounts. | Closed: the letter C stays (Jarmo) |
-| #934 | Get the frame screenshots through the Slide library. | PR #1066 |
-| #954 | Leave another app’s defaults alone when uninstalling on Windows. | PR #1071 |
-| #924 | Apply a place’s default in a fresh frame. | PR #1070 |
+| #934 | Get the frame screenshots through the Slide library. | PR #1066 (merged); frame run on the release candidate, baseline retaken |
+| #954 | Leave another app’s defaults alone when uninstalling on Windows. | PR #1071 (merged); fix proven on Windows CI (run 45723811419) |
+| #924 | Apply a place’s default in a fresh frame. | PR #1070 (merged) |
 | #582 | Address a noisy log line. | No code change needed; checked again on the release candidate |
-| #1051 | Put a table's + bars on its real edges, shown only when the edge is in view. | PR #1058 |
-| #1056 | Keep an empty line on a slide after leaving the slide. | PR #1060 |
-| #1062 | Put Gemini 4 Neon in place of Gemini 4 Argon in the model lists. | PR #1067 |
-| #501 | Address the first start after an update on Windows. | No PR yet |
+| #1051 | Put a table's + bars on its real edges, shown only when the edge is in view. | PR #1058 (merged) |
+| #1056 | Keep an empty line on a slide after leaving the slide. | PR #1060 (merged) |
+| #1062 | Put Gemini 4 Neon in place of Gemini 4 Argon in the model lists. | PR #1067 (merged) |
+| #501 | Address the first start after an update on Windows. | No PR yet; retest at Gate 2 |
 
 ## Cut line
 
