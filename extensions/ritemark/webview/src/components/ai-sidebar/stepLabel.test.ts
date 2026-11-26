@@ -142,6 +142,10 @@ assert.equal(thinkingText('[Reference/%C3%9Clevaade%202025.pdf](x.pdf)'), 'Ülev
 assert.equal(thinkingText('[Reference/%C3%20report.pdf](x.pdf)'), '%C3 report.pdf');
 assert.equal(thinkingText('2025. aastal oli'), '2025. aastal oli');
 assert.equal(thinkingText('[a [b] c](d.pdf)'), 'a [b] c');
+// Live run of round 11: a preview cut inside an emphasis pair left a stray mark ("Summary:*…").
+assert.equal(thinkingText('Findings draft v2.docx **Summary:*…'), 'Findings draft v2.docx Summary:…');
+assert.equal(thinkingText('**Summary:** *the cost per visit is…'), 'Summary: the cost per visit is…');
+assert.equal(thinkingText('Cost is 5*3 and a * b stays.'), 'Cost is 5*3 and a * b stays.');
 
 const draftsFolder = progress({ id: 'drafts', kind: 'folder', path: '04 Drafts', status: 'completed' }, 'Glob');
 const liveRetryThought: AgentProgress = {

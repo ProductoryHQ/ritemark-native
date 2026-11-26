@@ -227,6 +227,9 @@ export function thinkingText(markdown: string): string {
     .replace(/\*\*|__|~~|`/g, '')
     .replace(/(?<!\w)([*_])([^\n]+?)\1(?!\w)/g, '$2')
     .replace(/^\s*(?:#{1,6}|>|[-*+])\s+/gm, '')
+    // An emphasis mark whose pair was cut off by a preview's truncation ("**Summary:** *cut…").
+    .replace(/(^|\s)\*+(?=\S)/g, '$1')
+    .replace(/(\S)\*+(?=\s|$|…)/g, '$1')
     .replace(/\s+/g, ' ')
     .trim();
 }
