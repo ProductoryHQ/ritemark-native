@@ -19,8 +19,8 @@
  *
  * Sprint 167 PR 3 (decks README item A, `block-details.html`): a Content row, Top · Middle · Bottom, as tiles like
  * Picture's, after it: where the slide's whole content sits, title included. It shows the slide's own default chosen
- * when its header says nothing (a title or section slide Bottom, a picture alone Middle, the rest Top:
- * `contentPlaceDefault`); choosing another writes `valign:`, and choosing the default again takes the line out.
+ * when its header says nothing (a title or section slide Bottom, a picture alone Middle, the rest Top).
+ * A Content override writes to the header and places the whole flow together, including on Title & Photo.
  *
  * Sprint 167 PR 4 (decks README item D, #838): choosing Behind with no picture opens the file picker at once, and under
  * Behind sit Replace… and Remove for its picture (Choose… while the place is empty).
@@ -31,7 +31,7 @@
  */
 import type { ReactNode } from 'react'
 import { isBlockSlide, parseFrom, sidePictureOf, type ContentPlace, type SlideData } from '../../../../src/decks/deckFormat'
-import { contentPlaceDefault, contentPlaceOf } from '../../../../src/decks/blocks/slideRenderer'
+import { contentPlaceClass, contentPlaceOf } from '../../../../src/decks/blocks/slideRenderer'
 import { deckNameOf } from '../../../../src/decks/deckFileName'
 import { Button } from '../ui/button'
 import { Icon } from '../ui/Icon'
@@ -91,10 +91,10 @@ const CONTENT_PLACE_TILES: Array<{ value: ContentPlace; label: string; picture: 
 
 /**
  * What choosing a place writes: nothing (the line taken out) for the slide's own default, else the place. So a title
- * slide's Bottom, chosen again after Top, leaves its header as it was before.
+ * slide's Bottom, chosen again after Top, leaves its header as it was before. Title & Photo keeps a chosen place.
  */
 export function contentPlaceChange(data: SlideData, place: ContentPlace): Pick<SlideData, 'valign'> {
-  return { valign: place === contentPlaceDefault(data.markdown ?? '', sidePictureOf(data)) ? undefined : place }
+  return { valign: contentPlaceClass(data.markdown ?? '', place, sidePictureOf(data)) ? place : undefined }
 }
 
 /** Remove under Behind: the picture goes, its place stays (only Picture: None takes it away). Its file is never touched. */
