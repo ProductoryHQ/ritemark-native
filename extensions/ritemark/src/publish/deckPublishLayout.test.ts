@@ -529,3 +529,18 @@ test('upward assets check Git and project scope, share identical bytes and widen
   await project.write('Other/copy.png', 'changed after the sheet');
   await assert.rejects(readVerifiedUpload(plan), /copy\.png changed/);
 });
+
+test('a neutral address keeps only a known file type, so no part of a file name goes up', async t => {
+  // High review round 2 (nit): "board.ACMEX" went up as "/pictures/<hash>.acmex".
+  const project = await testProject({ 'Sales/board.ACMEX': PNG, 'Sales/map.JPEG': PNG });
+  t.after(project.cleanup);
+  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  const besideDeckPath = project.page('Training/Kickoff.html');
+  const html = '<img src="../Sales/board.ACMEX"><img src="../Sales/map.JPEG">';
+  const plan = await gatherPage(realPath, project.dir, { hostedDeck: { besideDeckPath, html, assetAddresses: [] } });
+  const upload = await readVerifiedUpload(plan);
+  const addresses = upload.files.map(file => file.urlPath);
+  assert.ok(addresses.every(address => !/acmex|board|map|sales/i.test(address)), addresses.join(' '));
+  const hash = createHash('sha256').update(PNG).digest('hex').slice(0, 12);
+  assert.ok(addresses.includes(`/pictures/${hash}.bin`) || addresses.includes(`/pictures/${hash}.jpeg`), addresses.join(' '));
+});

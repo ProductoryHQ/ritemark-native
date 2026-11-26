@@ -40,6 +40,12 @@ import {
   PublishPlan,
 } from './types';
 
+/** The file types a neutral address keeps (Sprint 178 PR 3): pictures, fonts and the page's own kinds. */
+const NEUTRAL_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg', '.bmp', '.ico', '.tif', '.tiff', '.heic',
+  '.woff', '.woff2', '.ttf', '.otf', '.css', '.js', '.json', '.mp4', '.webm', '.mp3', '.wav', '.pdf',
+]);
+
 export class HostedDeckLayoutError extends Error {}
 
 const BAD_HOSTED_LAYOUT = "Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again.";
@@ -441,8 +447,8 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     for (const { file, lexical } of gathered) {
       if (!file.relocated || !file.sha256) continue;
       const hash = file.sourceSha256 ?? file.sha256;
-      const ext = encodeURIComponent(p.extname(lexical).toLowerCase())
-        .replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16)}`);
+      // Only a known web file type keeps its extension; any other goes up as .bin, so no part of a name leaves.
+      const ext = NEUTRAL_EXTENSIONS.has(p.extname(lexical).toLowerCase()) ? p.extname(lexical).toLowerCase() : '.bin';
       let length = 12;
       for (;;) {
         const address = `/pictures/${hash.slice(0, length)}${ext}`;
