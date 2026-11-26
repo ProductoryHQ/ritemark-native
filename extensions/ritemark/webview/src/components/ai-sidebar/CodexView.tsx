@@ -347,9 +347,12 @@ function ActivitySection({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const activities = turnActivities.filter((activity) => !isTurnLifecycleActivity(activity));
+  const notices = isRunning ? turnActivities.filter((activity) => activity.type === 'notice') : [];
+  const activities = turnActivities.filter((activity) =>
+    !isTurnLifecycleActivity(activity) && (!isRunning || activity.type !== 'notice'));
   const count = activities.length;
-  if (!count) return null;
+  const runningNotices = notices.length > 0 ? <ActivityDetails activities={notices} running /> : null;
+  if (!count) return runningNotices;
   // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action. A row
   // that opens them says whose words they are (the Experience lead): "What ChatGPT said".
   const actions = activities.filter((activity) => activity.type !== 'error').length;
@@ -359,6 +362,7 @@ function ActivitySection({
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">
+      {runningNotices}
       {/* Summary row — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -386,7 +390,9 @@ function ActivitySection({
       {expanded && (
         <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
           {activities.map((activity, i) => (
-            stepLabel(activity) ? <ActivityCard key={i} activity={activity} /> : <ActivityLine key={i} activity={activity} />
+            activity.type === 'notice' || stepLabel(activity)
+              ? <ActivityCard key={i} activity={activity} />
+              : <ActivityLine key={i} activity={activity} />
           ))}
         </div>
       )}

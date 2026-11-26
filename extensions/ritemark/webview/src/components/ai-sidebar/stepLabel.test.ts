@@ -100,13 +100,17 @@ assert.equal(stepLabel(progress(namedFailure))?.label, "Couldn't open Proposal p
 const toolDone: AgentProgress = { type: 'done', tool: 'commandExecution', message: 'Done: commandExecution', timestamp: 1 };
 for (const [starting, completed] of [
   ['Starting Claude (selected-model)', 'Completed in 18.0s'],
+  ['Continuing (selected-model)', 'Completed in 18.0s'],
   ['Starting ChatGPT…', ''],
   ['Starting OpenCode…', ''],
 ]) {
   const init: AgentProgress = { type: 'init', message: starting, timestamp: 0 };
   const done: AgentProgress = { type: 'done', message: completed, timestamp: 2 };
   const recorded = updateStep([...updateStep([], init), ...activities, toolDone], done);
-  assert.deepEqual(visibleStepActivities(recorded), [...activities, toolDone]);
+  const notice: AgentProgress = {
+    type: 'notice', message: "Saved model isn't available right now — using default model.", timestamp: 0,
+  };
+  assert.deepEqual(visibleStepActivities([notice, ...recorded]), [notice, ...activities, toolDone]);
   assert.equal(recorded[0], init);
   assert.equal(recorded[recorded.length - 1], done);
   assert.equal(readSummary(visibleStepActivities(recorded), 18000), 'Read 4 Word documents · 18 s');

@@ -17,7 +17,7 @@ interface ActivityDetailsProps {
 export function ActivityDetails({ activities, metrics, running }: ActivityDetailsProps) {
   const visible = visibleStepActivities(activities);
   if (running) {
-    const steps = visible.filter((activity) => stepLabel(activity));
+    const steps = visible.filter((activity) => activity.type === 'notice' || stepLabel(activity));
     return steps.length ? (
       <div className="space-y-0.5">
         {steps.map((step, i) => <ActivityCard key={step.step?.id ?? i} activity={step} />)}

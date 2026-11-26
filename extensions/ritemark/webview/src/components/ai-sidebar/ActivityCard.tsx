@@ -25,7 +25,7 @@ const iconMap: Record<string, React.ReactNode> = {
 function getActivityIcon(activity: AgentProgress) {
   if (activity.type === 'thinking') return <Icon name="brain" size={14} />;
   if (activity.type === 'init') return <Icon name="play" size={14} />;
-  if (activity.type === 'error') return <Icon name="warning-circle" size={14} />;
+  if (activity.type === 'error' || activity.type === 'notice') return <Icon name="warning-circle" size={14} />;
   if (activity.type === 'done') return <Icon name="star-four" size={14} />;
   if (activity.type === 'text') return <Icon name="star-four" size={14} />;
   if (activity.type === 'subagent_start') return <Icon name="robot" size={14} className="text-[var(--r-ink-strong)]" />;
@@ -42,6 +42,7 @@ function getActivityLabel(activity: AgentProgress): string {
   if (activity.type === 'tool_use') return activity.tool || 'Tool';
   if (activity.type === 'done') return 'Done';
   if (activity.type === 'error') return 'Error';
+  if (activity.type === 'notice') return 'Notice';
   if (activity.type === 'text') return 'Response';
   if (activity.type === 'subagent_start') return 'Subagent';
   if (activity.type === 'subagent_progress') return 'Subagent';

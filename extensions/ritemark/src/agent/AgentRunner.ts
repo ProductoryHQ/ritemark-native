@@ -1451,7 +1451,7 @@ export class AgentSession {
             this._expectedResolvedModel,
             actualModel,
           )) {
-            this._turnEmitter()('init',
+            this._turnEmitter()('notice',
               `Model mismatch — running on ${actualModel}, but ${this._modelId} was requested. The runtime could not apply the requested model.`);
           } else if (!this._runtimeTurn) {
             this._emitProgress?.('init', `Starting Claude (${actualModel || 'claude'})`);

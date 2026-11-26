@@ -94,7 +94,7 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
 }
 
 export function isTurnLifecycleActivity(activity: AgentProgress): boolean {
-  // Codex also uses "done" for completed tool calls, which are still steps.
+  // Model notices have their own type. Codex also uses "done" for completed tool calls, which are still steps.
   return activity.type === 'init' || (activity.type === 'done' && !activity.tool && !activity.step);
 }
 
