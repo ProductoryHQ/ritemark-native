@@ -28,8 +28,8 @@ function elementFromString(html: string): HTMLElement {
 }
 
 /** A block slide's Markdown as the slide editor's document. */
-export function loadSlide(markdown: string): PMNode {
-  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown))))
+export function loadSlide(markdown: string, imageMappings?: Record<string, string>): PMNode {
+  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown, imageMappings))))
 }
 
 /** The slide editor's document as Markdown. */

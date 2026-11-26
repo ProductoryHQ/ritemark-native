@@ -70,10 +70,15 @@ export function withoutItemNumber(words: string, position: number): string {
   return match && Number(match[1]) === position ? words.slice(match[0].length) : words;
 }
 
-/** A path in a Markdown picture: in angle brackets when it holds a space or a bracket. */
+/** A path in a Markdown picture: in angle brackets when a bare destination would be ambiguous. */
 export function pictureTarget(path: string): string {
   const value = path.trim();
-  return /[\s()<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
+  let depth = 0;
+  for (const character of value) {
+    if (character === '(') depth++;
+    if (character === ')' && --depth < 0) break;
+  }
+  return depth !== 0 || /[\s<>]/.test(value) ? `<${value.replace(/[<>]/g, encodeURIComponent)}>` : value;
 }
 
 /** An attribute value in a div's `{…}` (`fenceAttributeValue`: quoted, no escapes). */

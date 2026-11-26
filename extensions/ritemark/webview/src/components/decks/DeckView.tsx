@@ -22,6 +22,7 @@ import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
 import { Button, roomChanged } from '../ui/button'
 import { Icon } from '../ui/Icon'
+import { SlideIconGlyph } from './slide/SlideIconGlyph'
 import { Tooltip } from '../ui/tooltip'
 import { SyncActionButton } from '../header'
 import { documentBarStatus, type DocumentSyncAction } from '../header/DocumentSyncAction'
@@ -284,7 +285,7 @@ const JOIN_NOTE_ROOM = 12
 type SettingsAnchor = { getBoundingClientRect: () => DOMRect }
 
 /** Where a Slide settings… came from: what to anchor to, on which side, and where the focus goes back. */
-type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'stage'; back: HTMLElement | null }
+type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'stage'; back: HTMLElement | null; fromGear?: true }
 
 /**
  * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
@@ -808,8 +809,7 @@ export function DeckView({
   const aboveLine = above && split ? aboveLineFor(deskHeight, aboveRatio) : 0
   const stageWidth = above ? (slideShown ? avail : 0) : stageWidthFor(avail, ratio, handoutShown, slideShown)
   const stageHeight = above && split ? aboveLine : deskHeight
-  // Above, the slide takes its pane's height less 32 and less whatever row is still under it (today the speaker notes'),
-  // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
+  // Above, the stage reserves room for the gear and measures any rows under the slide before fitting it.
   const [aboveUnder, setAboveUnder] = useState(0)
   // Slide only gives the slide the whole room (the design; Jarmo, 17 November: "align slide to center... and fill the
   // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap. A
@@ -840,8 +840,9 @@ export function DeckView({
   const slideCardUnder = startUnderSlide ? Math.min(slideCardRoom, Math.max(0, Math.floor(stageHeight / 2))) : 0
   const normalSlideWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
   const stageSettingsOpen = settingsFor?.side === 'stage'
+  const gearSettingsOpen = settingsFor?.fromGear === true
   useLayoutEffect(() => {
-    if (!stageSettingsOpen || !settingsBox) return
+    if (!stageSettingsOpen || gearSettingsOpen || !settingsBox) return
     const measure = () => {
       const { width, height } = settingsBox.getBoundingClientRect()
       setSettingsSize(previous => previous.width === width && previous.height === height ? previous : { width, height })
@@ -850,10 +851,10 @@ export function DeckView({
     const observer = new ResizeObserver(measure)
     observer.observe(settingsBox)
     return () => observer.disconnect()
-  }, [stageSettingsOpen, settingsBox])
+  }, [stageSettingsOpen, gearSettingsOpen, settingsBox])
   // Decide using the normal slide width so reserving space below can't change the choice of side.
   const normalSlideLeft = above || slideAlone ? (stageWidth - normalSlideWidth) / 2 : STAGE_MARGIN
-  const settingsPlacement = stageSettingsOpen && settingsSize.height > 0
+  const settingsPlacement = stageSettingsOpen && !gearSettingsOpen && settingsSize.height > 0
     ? slideSettingsPlacement(stageWidth, stageHeight, normalSlideLeft, normalSlideWidth, settingsSize, SETTINGS_GAP, SETTINGS_COLLISION_PADDING)
     : null
   const settingsRoom = settingsPlacement?.room ?? 0
@@ -1428,7 +1429,8 @@ export function DeckView({
       settingsReturn.current = where.back
       // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
       const id = editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
-      setSettingsFor({ index, id, anchor: stageSlide ? stageSettingsAnchor(stageRef) : where.anchor, side: stageSlide ? 'stage' : where.side })
+      const { anchor, side, fromGear } = where
+      setSettingsFor({ index, id, anchor: stageSlide && !fromGear ? stageSettingsAnchor(stageRef) : anchor, side: stageSlide ? 'stage' : side, fromGear })
     }))
   }, [pick, editor])
   /** From a part number's ⋯: beside the number (on its right: the number is on the rail at the handout's left), the focus back to its ⋯. */
@@ -1443,6 +1445,16 @@ export function DeckView({
     // A slide of a kind this build doesn't know has no editor of its own: the strip takes the focus then.
     return { anchor, side: 'stage', back: anchor.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current }
   }), [openSettings])
+
+  const toggleGearSettings = (gear: HTMLButtonElement) => {
+    if (gearSettingsOpen) {
+      setSettingsFor(null)
+      return
+    }
+    openSettings(currentRef.current, () => gear.isConnected
+      ? { anchor: gear, side: 'stage', back: gear, fromGear: true }
+      : null)
+  }
 
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
   const dispatch = useCallback((tr: Transaction | null) => {
@@ -1706,11 +1718,11 @@ export function DeckView({
   const shownSlideId = slides[shown]?.data.id
   useEffect(() => {
     setSettingsFor(open => {
-      if (!open) return open
+      if (!open || (open.fromGear && !slideShown)) return null
       return open.index === shown && open.index < count && (open.id === undefined || open.id === shownSlideId) ? open : null
     })
-  }, [shown, shownSlideId, count])
-  // A hidden slide keeps its settings (the Experience lead): hiding the slide hides the stage, not the slide.
+  }, [shown, shownSlideId, count, slideShown])
+  // Settings opened from a menu stay open when the stage is folded.
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -2417,33 +2429,54 @@ export function DeckView({
                 own width. */}
             <div className="deck-stage-group" style={above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 } : undefined}>
               {editor && slide && bigWidth > 0 ? (
-                <Stage
-                  // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
-                  key={slide.data.id ?? `index-${slide.index}`}
-                  editor={editor}
-                  slide={slide}
-                  theme={theme}
-                  borderless={borderless}
-                  assets={assets}
-                  missing={missingPictures}
-                  width={bigWidth}
-                  onWriting={onWriting}
-                  commentCallouts={commentCallouts}
-                  initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
-                  selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
-                  onFocusTaken={titleSelected}
-                  onPicture={onPicture}
-                  // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
-                  commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
-                  onCommentOpened={commentOpened}
-                  onNewSlideBelow={onNewSlideBelow}
-                  onSplit={onSplit}
-                  onFull={setSlideFull}
-                  onNeedCaret={needCaret}
-                  onSlideSettings={stageSettings}
-                  splitRequest={splitRequest}
-                  picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
-                />
+                <>
+                  <div className="deck-stage-gear" style={{ width: bigWidth }}>
+                    <Tooltip label="Slide settings" side="left" asChild suppressed={gearSettingsOpen}>
+                      <Button
+                        type="button"
+                        variant="toolbar"
+                        size="icon-xs"
+                        className="text-ink-muted hover:bg-hairline hover:text-ink-strong data-[state=open]:bg-hairline-strong data-[state=open]:text-ink-strong"
+                        aria-label="Slide settings"
+                        aria-haspopup="dialog"
+                        aria-expanded={gearSettingsOpen}
+                        aria-pressed={gearSettingsOpen}
+                        data-state={gearSettingsOpen ? 'open' : 'closed'}
+                        onClick={event => toggleGearSettings(event.currentTarget)}
+                      >
+                        <SlideIconGlyph name="gear-six" size={16} />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <Stage
+                    // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
+                    key={slide.data.id ?? `index-${slide.index}`}
+                    editor={editor}
+                    slide={slide}
+                    theme={theme}
+                    borderless={borderless}
+                    assets={assets}
+                    missing={missingPictures}
+                    width={bigWidth}
+                    onWriting={onWriting}
+                    commentCallouts={commentCallouts}
+                    initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
+                    selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
+                    onFocusTaken={titleSelected}
+                    onPicture={onPicture}
+                    // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
+                    commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
+                    onCommentOpened={commentOpened}
+                    onNewSlideBelow={onNewSlideBelow}
+                    onSplit={onSplit}
+                    onFull={setSlideFull}
+                    onNeedCaret={needCaret}
+                    onSlideSettings={stageSettings}
+                    settingsOpen={settingsFor !== null}
+                    splitRequest={splitRequest}
+                    picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
+                  />
+                </>
               ) : null}
               <div
                 ref={setSettingsSlot}
@@ -2533,17 +2566,23 @@ export function DeckView({
         {settingsFor ? <PopoverAnchor virtualRef={settingsAnchor} /> : null}
         <PopoverContent
           ref={setSettingsBox}
-          portalContainer={stageSettingsOpen ? settingsSlot : undefined}
-          side={settingsPlacement?.side ?? 'right'}
-          align="start"
-          sideOffset={SETTINGS_GAP}
+          portalContainer={stageSettingsOpen && !gearSettingsOpen ? settingsSlot : undefined}
+          side={gearSettingsOpen ? 'bottom' : settingsPlacement?.side ?? 'right'}
+          align={gearSettingsOpen ? 'end' : 'start'}
+          sideOffset={gearSettingsOpen ? 4 : SETTINGS_GAP}
+          avoidCollisions={!gearSettingsOpen}
           collisionBoundary={stageSettingsOpen ? stageRef.current : undefined}
           collisionPadding={SETTINGS_COLLISION_PADDING}
           sticky={stageSettingsOpen ? "always" : undefined}
           style={stageSettingsOpen ? { maxWidth: Math.max(0, stageWidth - SETTINGS_COLLISION_PADDING * 2) } : undefined}
-          className={stageSettingsOpen ? 'deck-settings' : 'deck-settings deck-settings-folded'}
+          className={stageSettingsOpen && !gearSettingsOpen ? 'deck-settings' : 'deck-settings deck-settings-folded'}
           onPointerDownOutside={event => {
-            if (stageSettingsOpen && isStageScrollbarPress(stageRef.current, event.detail.originalEvent)) {
+            if (stageSettingsOpen && !gearSettingsOpen && isStageScrollbarPress(stageRef.current, event.detail.originalEvent)) {
+              event.preventDefault()
+            }
+          }}
+          onInteractOutside={event => {
+            if (gearSettingsOpen && settingsReturn.current?.contains(event.target as Node)) {
               event.preventDefault()
             }
           }}

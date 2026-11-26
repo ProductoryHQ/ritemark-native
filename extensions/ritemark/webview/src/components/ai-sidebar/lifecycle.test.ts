@@ -352,6 +352,18 @@ function testPlanModeResultWithoutStructuredUpdateStillRequiresReview() {
   });
 }
 
+function testOpenCodeFailureClearsApproval() {
+  const turn = makeTurn({
+    runtime: 'opencode',
+    isRunning: true,
+    approval: { approvalType: 'command', requestId: 'acp-1', command: 'run' },
+  });
+  const failed = finalizeCodexTurnResult(turn, { status: 'error', error: 'OpenCode did not respond' });
+  assert.equal(failed.approval, undefined);
+  assert.equal(failed.isRunning, false);
+  assert.equal(failed.result?.status, 'error');
+}
+
 // Sprint 103 R1 (D4): prompt-text plan-mode detection removed — plan-first is
 // explicit UI state only, so there is nothing to sniff-test anymore.
 
@@ -368,6 +380,7 @@ function main() {
   testBuildCodexApprovedPlanPromptKeepsOriginalRequest();
   testApprovedContinuationPlanUpdateDoesNotReenterReview();
   testPlanModeResultWithoutStructuredUpdateStillRequiresReview();
+  testOpenCodeFailureClearsApproval();
   console.log('Webview lifecycle tests passed.');
 }
 

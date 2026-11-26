@@ -755,13 +755,7 @@ function coverOf(markdown: string): boolean {
   return false;
 }
 
-/**
- * Experience 49, 18 November: a picture alone on a slide is centred. `alone`: the slide draws one picture and nothing
- * else, so it sits in the middle both ways; `titled`: only a title above it, so it sits in the middle of the space under
- * the title, across and down (Keynote's Title & Photo). Null for any other slide. A comment never counts; a picture
- * beside or behind is something else on the slide (the caller leaves it out). The Align or Size the person set still
- * wins: its inline style (`outerStyle`) outranks the centring (slide.css's `.is-lone-pic`, `.is-titled-pic`).
- */
+/** A single picture can sit centred on its own or below a title. */
 export type LonePicture = 'alone' | 'titled';
 
 const loneCache = new Map<string, LonePicture | null>();
@@ -773,7 +767,9 @@ export function lonePictureOf(markdown: string): LonePicture | null {
   const onePicture = (token: Token | undefined) => token?.type === 'paragraph' && isPictureParagraph(token as Tokens.Paragraph)
     && ((token as Tokens.Paragraph).tokens ?? []).filter(part => part.type === 'image').length === 1;
   const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
-  const lone: LonePicture | null = blocks.length === 1 && onePicture(blocks[0]) ? 'alone' : blocks.length === 2 && isTitle(blocks[0]) && onePicture(blocks[1]) ? 'titled' : null;
+  let lone: LonePicture | null = null;
+  if (blocks.length === 1 && onePicture(blocks[0])) lone = 'alone';
+  if (blocks.length === 2 && isTitle(blocks[0]) && onePicture(blocks[1])) lone = 'titled';
   loneCache.set(markdown, lone);
   return lone;
 }
@@ -787,9 +783,8 @@ export function lonePictureClass(markdown: string, side: string | null): string 
 
 /**
  * Sprint 167 PR 3 (decks README item A): where a slide's content sits when its header says nothing, which is where it
- * is drawn today. A title or section slide (`isCoverSlide`) sits at the bottom, drawn big and low with its own foot room;
- * a picture alone on the slide in the middle (`lonePictureOf`, experience 49); every other slide at the top. Slide
- * settings shows this value chosen, and choosing it again takes the `valign:` line out. The theme holds no positions.
+ * is drawn today. A title or section slide sits at the bottom, with its own foot room. A picture alone sits
+ * in the middle. Other slides start at the top, including Title & Photo, which centres the picture below the title.
  */
 export function contentPlaceDefault(markdown: string, side: string | null): ContentPlace {
   if (isCoverSlide(markdown)) return 'bottom';
@@ -807,7 +802,10 @@ export function contentPlaceOf(markdown: string, valign: string | undefined, sid
  */
 export function contentPlaceClass(markdown: string, valign: string | undefined, side: string | null): string {
   const written = contentPlaceValue(valign);
-  return written && written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
+  if (!written) return '';
+  // Title & Photo centres the picture below its title by default. A chosen place moves both blocks together.
+  if (!side && lonePictureOf(markdown) === 'titled') return `va-${written}`;
+  return written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
 }
 
 /**

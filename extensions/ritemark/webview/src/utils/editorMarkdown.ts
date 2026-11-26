@@ -21,6 +21,9 @@
 import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
 import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
+import { DOMSerializer, type Schema } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorProps } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import BulletList from '@tiptap/extension-bullet-list'
 import ListItem from '@tiptap/extension-list-item'
@@ -96,6 +99,69 @@ export function ensureCommentMarkedPipeline(): void {
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
 }
 
+const clipboardSessionAttribute = 'data-ritemark-clipboard'
+const clipboardSession = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+  byte.toString(16).padStart(2, '0')).join('')
+
+/** ProseMirror serializes both copy and cut through this prop before writing text/html. */
+export function markdownClipboardProps(schema: Schema): EditorProps {
+  const serializer = DOMSerializer.fromSchema(schema)
+  const clipboardSerializer = new DOMSerializer(serializer.nodes, serializer.marks)
+  clipboardSerializer.serializeFragment = (fragment, options, target) => {
+    const dom = serializer.serializeFragment(fragment, options, target)
+    const firstElement = Array.from(dom.childNodes).find((node): node is Element => node.nodeType === 1)
+    firstElement?.setAttribute(clipboardSessionAttribute, clipboardSession)
+    return dom
+  }
+  return { clipboardSerializer, transformPastedHTML: stripPastedMarkdownAttributes }
+}
+
+/** Preserve ProseMirror's slice depths and node context across editors. */
+function stripSliceMarkdownAttributes(slice: string): string {
+  // Read the context as ProseMirror does (`(.*)`: up to the first line break), so nothing it reads escapes the strip.
+  const match = /^(\d+ \d+(?: -\d+)? )(.*)/.exec(slice)
+  if (!match) return slice
+  let context: unknown
+  try {
+    context = JSON.parse(match[2])
+  } catch {
+    return slice
+  }
+  // ProseMirror also reads an array-like object; anything but a real array loses its context here (2nd High review).
+  if (!Array.isArray(context)) return match[1] + '[]'
+
+  let changed = false
+  for (let index = 1; index < context.length; index += 2) {
+    const attrs = context[index]
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) continue
+    for (const key of Object.keys(attrs)) {
+      if (!key.startsWith('md')) continue
+      delete attrs[key]
+      changed = true
+    }
+  }
+  return changed ? match[1] + JSON.stringify(context) : slice
+}
+
+/** Strip Markdown spelling metadata before ProseMirror parses external paste or drop HTML. */
+function stripPastedMarkdownAttributes(html: string): string {
+  if (!/data-md-|data-pm-slice/i.test(html)) return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const elements = Array.from(template.content.querySelectorAll('*'))
+  if (elements.some(element => element.getAttribute(clipboardSessionAttribute) === clipboardSession)) return html
+
+  for (const element of elements) {
+    const slice = element.getAttribute('data-pm-slice')
+    if (slice !== null) element.setAttribute('data-pm-slice', stripSliceMarkdownAttributes(slice))
+    for (const attribute of Array.from(element.attributes)) {
+      if (attribute.name.startsWith('data-md-')) element.removeAttribute(attribute.name)
+    }
+  }
+  return template.innerHTML
+}
+
 /**
  * Unwrap standalone images from paragraph tags.
  *
@@ -105,9 +171,11 @@ export function ensureCommentMarkedPipeline(): void {
  * Without this, TipTap creates both an empty paragraph AND an image node,
  * causing extra spacing above images when reopening files.
  */
-export function preprocessImageHTML(html: string): string {
+export function preprocessImageHTML(html: string, imageMappings?: Record<string, string>): string {
   const temp = document.createElement('div')
   temp.innerHTML = html
+
+  mapImages(temp, imageMappings)
 
   // Find all paragraphs that hold only pictures (and maybe whitespace)
   temp.querySelectorAll('p').forEach(p => {
@@ -136,22 +204,36 @@ export function preprocessImageHTML(html: string): string {
  * original relative path in the title attribute for Turndown.
  */
 export function applyImageMappings(html: string, imageMappings: Record<string, string>): string {
-  if (!imageMappings || Object.keys(imageMappings).length === 0) {
-    return html
+  const container = document.createElement('div')
+  container.innerHTML = html
+  mapImages(container, imageMappings)
+  return container.innerHTML
+}
+
+function mapImages(container: HTMLElement, imageMappings?: Record<string, string>): void {
+  const entries = Object.entries(imageMappings ?? {})
+  const mappings = new Map(entries.map(([path, uri]) => [path, { path, uri }]))
+  // Match marked's URL encoding, including its preservation of existing percent escapes.
+  for (const [path, uri] of entries) {
+    const encoded = encodeURI(path).replace(/%25/g, '%')
+    if (!mappings.has(encoded)) mappings.set(encoded, { path, uri })
   }
 
-  // Process each mapping
-  let result = html
-  for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
-    // Escape special regex characters in the path
-    const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Replace src="relativePath" with src="webviewUri" title="relativePath"
-    // This preserves the relative path for turndown to use when saving
-    const srcRegex = new RegExp(`src="${escapedPath}"`, 'g')
-    result = result.replace(srcRegex, `src="${webviewUri}" title="${relativePath}"`)
+  for (const image of Array.from(container.querySelectorAll('img'))) {
+    const src = image.getAttribute('src')
+    if (src === null) continue
+    const mapping = mappings.get(src)
+    if (mapping) {
+      const caption = image.getAttribute('title')
+      if (caption && image.hasAttribute('data-md-image-target')) image.setAttribute('data-md-image-title', caption)
+      image.setAttribute('src', mapping.uri)
+      image.setAttribute('title', mapping.path)
+    }
+    if (image.hasAttribute('data-md-image-target')) {
+      if (mapping && mapping.path !== mapping.uri) image.setAttribute('data-md-image-src', mapping.path)
+      image.setAttribute('data-md-image-alt', image.getAttribute('alt') ?? '')
+    }
   }
-
-  return result
 }
 
 /**
@@ -186,9 +268,7 @@ function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tok
 export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked, prepareTokens?: (tokens: Token[]) => void): string {
   // Sprint 161: the slide editor passes its own scoped instance (`slideEditorMarkdown.ts`), never this one.
   const html = parseAsWritten(markdown, instance, prepareTokens)
-  let processed = preprocessTaskListHTML(html)
-  processed = preprocessImageHTML(processed)
-  return imageMappings ? applyImageMappings(processed, imageMappings) : processed
+  return preprocessImageHTML(preprocessTaskListHTML(html), imageMappings)
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +306,10 @@ function dataAttributes(names: readonly string[], keepOnSplit = true) {
 export const MarkdownAsWritten = Extension.create({
   name: 'markdownAsWritten',
 
+  addProseMirrorPlugins() {
+    return [new Plugin({ props: markdownClipboardProps(this.editor.schema) })]
+  },
+
   addGlobalAttributes() {
     return [
       { types: ['bulletList', 'orderedList', 'taskList'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.list) },
@@ -237,7 +321,7 @@ export const MarkdownAsWritten = Extension.create({
       { types: ['table'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.table) },
       { types: ['codeBlock'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.codeBlock, false) },
       // Experience 49: a picture's attribute block as written (`{width=50%}`), written back after its image line.
-      { types: ['image'], attributes: { picture: dataAttribute('data-picture', false) } },
+      { types: ['image'], attributes: { ...dataAttributes(AS_WRITTEN_ATTRIBUTES.image, false), picture: dataAttribute('data-picture', false) } },
       // A block split off with Enter is new writing: a blank line before it.
       { types: TIGHT_BLOCKS, attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.tight, false) },
       {
@@ -475,8 +559,8 @@ export function preprocessTableHTML(html: string): string {
  * comment-callout rules. Comment rules register unconditionally: they are
  * harmless when no comment nodes exist.
  */
-export function createEditorTurndownService(): TurndownService {
-  const service = createTurndownService()
+export function createEditorTurndownService(instance = editorMarked): TurndownService {
+  const service = createTurndownService(instance)
   addCommentTurndownRules(service)
   // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
   addDeckTurndownRules(service)

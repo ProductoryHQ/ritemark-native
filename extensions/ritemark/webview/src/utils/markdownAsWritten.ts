@@ -24,7 +24,7 @@
  * Nothing here changes what the editor shows or how it reads Markdown (spec R7):
  * the HTML `marked` makes is the same apart from the added attributes.
  */
-import { tableHasWidths } from '../../../src/markdown/tableWidths'
+import { delimiterUnits, tableHasWidths } from '../../../src/markdown/tableWidths'
 import type TurndownService from 'turndown'
 import type { MarkedExtension, Token, Tokens } from 'marked'
 
@@ -372,6 +372,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
   hardBreak: ['data-md-break'],
   horizontalRule: ['data-md-hr'],
   link: ['data-md-link'],
+  image: ['data-md-image-label', 'data-md-image-target', 'data-md-image-src', 'data-md-image-alt', 'data-md-image-title'],
   table: ['data-md-delims', 'data-md-spacing', 'data-md-widths'],
   codeBlock: ['data-md-info'],
   /** No blank line between a block and the one before it. */
@@ -569,6 +570,11 @@ function blockKind(node: Element): BlockKind {
   }
 }
 
+function writtenRule(node: Element): string | null {
+  const marker = node.getAttribute('data-md-hr')
+  return marker && /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*(?![\s\S])/.test(marker) ? marker : null
+}
+
 /**
  * Whether `next` is written on the line straight after `previous`, with no
  * blank line: only when the source wrote it so (`data-md-tight`), and only
@@ -586,7 +592,7 @@ function writtenTight(previous: Element | null, next: Element): boolean {
   if (before === 'fdiv' || after === 'fdiv') return true
   if (before === 'heading' || before === 'code' || before === 'rule') return true
   if (after === 'heading' || after === 'code') return true
-  if (after === 'rule') return before !== 'paragraph' || !(next.getAttribute('data-md-hr') ?? '-').startsWith('-')
+  if (after === 'rule') return before !== 'paragraph' || !(writtenRule(next) ?? '-').trimStart().startsWith('-')
   if (before === 'paragraph') {
     if (after === 'quote' || after === 'table') return true
     // A list interrupts a paragraph only with a first item, and an ordered one only from 1.
@@ -773,8 +779,9 @@ function holdsTwoParagraphs(blocks: ItemBlock[]): boolean {
  */
 export function serializeList(service: TurndownService, list: HTMLElement): string {
   const ordered = list.nodeName === 'OL'
-  const marker = list.getAttribute('data-md-marker') || '-'
-  const delimiter = list.getAttribute('data-md-delim') || '.'
+  const writtenMarker = list.getAttribute('data-md-marker')
+  const marker = writtenMarker === '*' || writtenMarker === '+' ? writtenMarker : '-'
+  const delimiter = list.getAttribute('data-md-delim') === ')' ? ')' : '.'
   const padAttribute = Number(list.getAttribute('data-md-pad'))
   const pad = padAttribute >= 1 && padAttribute <= 4 ? padAttribute : 1
   const start = ordered ? Number(list.getAttribute('start') || 1) : 0
@@ -809,7 +816,8 @@ export function serializeList(service: TurndownService, list: HTMLElement): stri
       markdown += gap ? '\n\n' : '\n'
     }
   })
-  const extraIndent = Number(list.getAttribute('data-md-indent'))
+  // A list starts at most 3 spaces in (4 would make it code); a pasted value is never trusted past that.
+  const extraIndent = Math.min(3, Math.floor(Number(list.getAttribute('data-md-indent'))) || 0)
   return extraIndent > 0 && !tabs ? indentAll(markdown, ' '.repeat(extraIndent)) : markdown
 }
 
@@ -949,7 +957,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       if (previousInline(element)?.nodeName === 'BR') return '\\\n'
       if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
-      if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
+      // A hard break is 2 or more spaces; bounded so a crafted value can never make the save throw.
+      if (spaces) return ' '.repeat(Math.min(64, Math.max(2, Number(spaces[1])))) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).
       return '\\\n'
     },
@@ -959,7 +968,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
     filter: 'hr',
     replacement(_content, node) {
       const element = node as Element
-      const written = element.getAttribute('data-md-hr')
+      const written = writtenRule(element)
       // A new break at the very top: `---` there can read as front matter.
       const marker = written || (isFirstBlock(element) ? '***' : '---')
       return blockLeading(element) + marker + blockTrailing(element)
@@ -968,7 +977,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
 
   service.addRule('asWrittenAddress', {
     filter(node) {
-      return node.nodeName === 'A' && !!node.getAttribute('data-md-link') && !!node.getAttribute('href')
+      const form = node.nodeName === 'A' ? node.getAttribute('data-md-link') : null
+      return (form === 'bare' || form === 'angle') && !!node.getAttribute('href')
     },
     replacement(content, node) {
       const link = node as HTMLAnchorElement
@@ -1034,11 +1044,11 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       const language = ((code.getAttribute('class') || '').match(/language-(\S+)/) || [null, ''])[1]
       const written = pre.getAttribute('data-md-info')
       let info: string
-      if (written !== null && (written === 'none' ? language === '' || language === 'plaintext' : written.split(/\s+/)[0] === language)) {
+      if (written !== null && !/[`\r\n]/.test(written) && (written === 'none' ? language === '' || language === 'plaintext' : written.split(/\s+/)[0] === language)) {
         info = written === 'none' ? '' : written
       } else {
         // The editor's default language is no language in the file.
-        info = language === 'plaintext' ? '' : language
+        info = language === 'plaintext' || language.includes('`') ? '' : language
       }
       const text = code.textContent ?? ''
       let fenceSize = 3
@@ -1078,7 +1088,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
         // The delimiter row as written, while the table has as many columns;
         // otherwise one cell per column from its alignment (S22).
         const written = table?.getAttribute('data-md-delims') ?? null
-        const writtenColumns = written ? written.slice(1, -1).split('|').length : 0
+        const writtenColumns = written && !/[^|:\- \t]/.test(written) ? delimiterUnits(written)?.length : undefined
         markdown += '\n' + (written && writtenColumns === cellElements.length
           ? written
           : line(cellElements.map(cell => alignDelimiter(cell.getAttribute('data-md-align') ?? cell.getAttribute('align')))))
