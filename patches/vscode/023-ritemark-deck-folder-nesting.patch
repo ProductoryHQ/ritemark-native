@@ -1,0 +1,306 @@
+# RiteMark Patch: ritemark-deck-folder-nesting
+#
+# Purpose: Fold a deck's matching sibling folder under the deck in Documents
+#
+# Why: Sprint 178 keeps deck assets together and carries the folder with a collapsed deck
+#
+# File(s): src/vs/workbench/contrib/files/common/explorerModel.ts, src/vs/workbench/contrib/files/browser/views/explorerViewer.ts, src/vs/workbench/contrib/files/browser/views/explorerView.ts
+# Created: 2026-11-26
+#
+diff --git a/src/vs/workbench/contrib/files/common/explorerModel.ts b/src/vs/workbench/contrib/files/common/explorerModel.ts
+index ddba6b33b..1383392d3 100644
+--- a/src/vs/workbench/contrib/files/common/explorerModel.ts
++++ b/src/vs/workbench/contrib/files/common/explorerModel.ts
+@@ -313,7 +313,7 @@ export class ExplorerItem {
+ 		const nestingConfig = this.configService.getValue<IFilesConfiguration>({ resource: this.root.resource }).explorer.fileNesting;
+ 
+ 		// fast path when the children can be resolved sync
+-		if (nestingConfig.enabled && this.nestedChildren) {
++		if (this.nestedChildren && (nestingConfig.enabled || this.nestedChildren.some(child => isDeckFolderOf(child, this)))) {
+ 			return this.nestedChildren;
+ 		}
+ 
+@@ -371,10 +371,23 @@ export class ExplorerItem {
+ 				}
+ 			} else {
+ 				this.children.forEach(child => {
++					child.nestedParent = undefined;
++					child.nestedChildren = undefined;
+ 					items.push(child);
+ 				});
+ 			}
+-			return items;
++			return items.filter(folder => {
++				if (!folder.isDirectory || !folder.name.endsWith(deckFolderSuffix)) {
++					return true;
++				}
++				const deck = this.getChild(folder.name.slice(0, -deckFolderSuffix.length) + deckExtension);
++				if (!deck || !isDeckFolderOf(folder, deck)) {
++					return true;
++				}
++				(deck.nestedChildren ??= []).push(folder);
++				folder.nestedParent = deck;
++				return false;
++			});
+ 		})();
+ 	}
+ 
+@@ -518,6 +531,14 @@ export class ExplorerItem {
+ 	}
+ }
+ 
++const deckExtension = '.rtms';
++const deckFolderSuffix = ' files';
++
++export function isDeckFolderOf(folder: ExplorerItem, file: ExplorerItem): boolean {
++	return folder.isDirectory && !file.isDirectory && !!file.parent && folder.parent === file.parent
++		&& file.name.endsWith(deckExtension) && folder.name === file.name.slice(0, -deckExtension.length) + deckFolderSuffix;
++}
++
+ export class NewExplorerItem extends ExplorerItem {
+ 	constructor(fileService: IFileService, configService: IConfigurationService, filesConfigService: IFilesConfigurationService, parent: ExplorerItem, isDirectory: boolean) {
+ 		super(URI.file(''), fileService, configService, filesConfigService, parent, isDirectory);
+diff --git a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+index ce07f487a..b5f0a987c 100644
+--- a/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
++++ b/src/vs/workbench/contrib/files/browser/views/explorerViewer.ts
+@@ -27,7 +27,7 @@ import { createSingleCallFunction } from '../../../../../base/common/functional.
+ import { IKeyboardEvent } from '../../../../../base/browser/keyboardEvent.js';
+ import { equals, deepClone } from '../../../../../base/common/objects.js';
+ import * as path from '../../../../../base/common/path.js';
+-import { ExplorerItem, NewExplorerItem } from '../../common/explorerModel.js';
++import { ExplorerItem, isDeckFolderOf, NewExplorerItem } from '../../common/explorerModel.js';
+ import { compareFileExtensionsDefault, compareFileNamesDefault, compareFileNamesUpper, compareFileExtensionsUpper, compareFileNamesLower, compareFileExtensionsLower, compareFileNamesUnicode, compareFileExtensionsUnicode } from '../../../../../base/common/comparers.js';
+ import { CodeDataTransfers, containsDragType } from '../../../../../platform/dnd/browser/dnd.js';
+ import { fillEditorsDragData } from '../../../../browser/dnd.js';
+@@ -1872,6 +1872,16 @@ export class FileDragAndDrop implements ITreeDragAndDrop<ExplorerItem> {
+ 
+ 	private async handleExplorerDrop(data: ElementsDragAndDropData<ExplorerItem, ExplorerItem[]>, target: ExplorerItem, targetIndex: number | undefined, targetSector: ListViewTargetSector | undefined, originalEvent: DragEvent): Promise<void> {
+ 		const elementsData = FileDragAndDrop.getStatsFromDragAndDropData(data);
++		const isCopy = (originalEvent.ctrlKey && !isMacintosh) || (originalEvent.altKey && isMacintosh);
++		if (!isCopy) {
++			for (let folder: ExplorerItem | undefined = target; folder; folder = folder.parent) {
++				const ancestor = folder;
++				if (elementsData.some(item => isDeckFolderOf(ancestor, item))) {
++					return;
++				}
++			}
++		}
++
+ 		const distinctItems = new Map(elementsData.map(element => [element, this.isCollapsed(element)]));
+ 
+ 		for (const [item, collapsed] of distinctItems) {
+@@ -1888,7 +1898,6 @@ export class FileDragAndDrop implements ITreeDragAndDrop<ExplorerItem> {
+ 		}
+ 
+ 		const items = distinctParents([...distinctItems.keys()], s => s.resource);
+-		const isCopy = (originalEvent.ctrlKey && !isMacintosh) || (originalEvent.altKey && isMacintosh);
+ 
+ 		// Handle confirm setting
+ 		const confirmDragAndDrop = !isCopy && this.configurationService.getValue<boolean>(FileDragAndDrop.CONFIRM_DND_SETTING_KEY);
+@@ -2135,7 +2144,8 @@ export function isCompressedFolderName(target: HTMLElement | EventTarget | Eleme
+ export class ExplorerCompressionDelegate implements ITreeCompressionDelegate<ExplorerItem> {
+ 
+ 	isIncompressible(stat: ExplorerItem): boolean {
+-		return stat.isRoot || !stat.isDirectory || stat instanceof NewExplorerItem || (!stat.parent || stat.parent.isRoot);
++		return stat.isRoot || !stat.isDirectory || stat instanceof NewExplorerItem || (!stat.parent || stat.parent.isRoot)
++			|| (!!stat.nestedParent && isDeckFolderOf(stat, stat.nestedParent));
+ 	}
+ }
+ 
+diff --git a/src/vs/workbench/contrib/files/browser/views/explorerView.ts b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
+index 57e665904..c31eb4042 100644
+--- a/src/vs/workbench/contrib/files/browser/views/explorerView.ts
++++ b/src/vs/workbench/contrib/files/browser/views/explorerView.ts
+@@ -32,7 +32,7 @@ import { IWorkbenchThemeService } from '../../../../services/themes/common/workb
+ import { ITreeContextMenuEvent, TreeVisibility } from '../../../../../base/browser/ui/tree/tree.js';
+ import { MenuId, Action2, registerAction2 } from '../../../../../platform/actions/common/actions.js';
+ import { ITelemetryService } from '../../../../../platform/telemetry/common/telemetry.js';
+-import { ExplorerItem, NewExplorerItem } from '../../common/explorerModel.js';
++import { ExplorerItem, isDeckFolderOf, NewExplorerItem } from '../../common/explorerModel.js';
+ import { ResourceLabels } from '../../../../browser/labels.js';
+ import { IStorageService, StorageScope, StorageTarget } from '../../../../../platform/storage/common/storage.js';
+ import { IAsyncDataTreeViewState } from '../../../../../base/browser/ui/tree/asyncDataTree.js';
+@@ -572,6 +572,9 @@ export class ExplorerView extends ViewPane implements IExplorerView {
+ 			dnd: this.instantiationService.createInstance(FileDragAndDrop, (item) => this.isItemCollapsed(item)),
+ 			collapseByDefault: (e) => {
+ 				if (e instanceof ExplorerItem) {
++					if (e.nestedChildren?.some(child => isDeckFolderOf(child, e))) {
++						return true;
++					}
+ 					if (e.hasNests && getFileNestingSettings(e).expand) {
+ 						return false;
+ 					}
+diff --git a/src/vs/workbench/contrib/files/test/browser/explorerModel.test.ts b/src/vs/workbench/contrib/files/test/browser/explorerModel.test.ts
+index af65a4da6..d33d9d33d 100644
+--- a/src/vs/workbench/contrib/files/test/browser/explorerModel.test.ts
++++ b/src/vs/workbench/contrib/files/test/browser/explorerModel.test.ts
+@@ -13,6 +13,7 @@ import { TestPathService } from '../../../../test/browser/workbenchTestServices.
+ import { NullFilesConfigurationService, TestFileService } from '../../../../test/common/workbenchTestServices.js';
+ import { validateFileName } from '../../browser/fileActions.js';
+ import { ExplorerItem } from '../../common/explorerModel.js';
++import { SortOrder } from '../../common/files.js';
+ 
+ 
+ suite('Files - View Model', function () {
+@@ -26,6 +27,28 @@ suite('Files - View Model', function () {
+ 
+ 	const pathService = new TestPathService();
+ 
++	test('deck folder nests only an exact sibling match with file nesting on or off', async () => {
++		const config = new TestConfigurationService({ explorer: { fileNesting: { enabled: true, patterns: {} } } });
++		const createItem = (path: string, isDirectory: boolean) =>
++			new ExplorerItem(URI.file(path), fileService, config, NullFilesConfigurationService, undefined, isDirectory);
++		const root = createItem('/workspace', true);
++		const deck = createItem('/workspace/Kickoff.rtms', false);
++		const folder = createItem('/workspace/Kickoff files', true);
++		const other = createItem('/workspace/Other files', true);
++		root._isDirectoryResolved = true;
++		root.addChild(deck);
++		root.addChild(folder);
++		root.addChild(other);
++
++		for (const enabled of [true, false]) {
++			await config.setUserConfiguration('explorer', { fileNesting: { enabled, patterns: {} } });
++			assert.deepStrictEqual(await root.fetchChildren(SortOrder.Default), [deck, other]);
++			assert.deepStrictEqual(await deck.fetchChildren(SortOrder.Default), [folder]);
++			assert.strictEqual(folder.nestedParent, deck);
++			assert.strictEqual(other.nestedParent, undefined);
++		}
++	});
++
+ 	test('Properties', function () {
+ 		const d = new Date().getTime();
+ 		let s = createStat.call(this, '/path/to/stat', 'sName', true, true, 8096, d);
+diff --git a/src/vs/workbench/contrib/files/test/browser/explorerView.test.ts b/src/vs/workbench/contrib/files/test/browser/explorerView.test.ts
+index 56033d594..4c8ed495e 100644
+--- a/src/vs/workbench/contrib/files/test/browser/explorerView.test.ts
++++ b/src/vs/workbench/contrib/files/test/browser/explorerView.test.ts
+@@ -4,13 +4,17 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import assert from 'assert';
++import { spy } from 'sinon';
++import { ElementsDragAndDropData } from '../../../../../base/browser/ui/list/listView.js';
++import { IAsyncDataTreeOptions } from '../../../../../base/browser/ui/tree/asyncDataTree.js';
++import { IWorkspaceEditingService } from '../../../../services/workspaces/common/workspaceEditing.js';
+ import { DeferredPromise, timeout } from '../../../../../base/common/async.js';
+ import { Emitter, Event } from '../../../../../base/common/event.js';
+ import { ensureNoDisposablesAreLeakedInTestSuite, toResource } from '../../../../../base/test/common/utils.js';
+ import { ExplorerItem } from '../../common/explorerModel.js';
+ import { ExplorerView, getContext, shouldPreserveWorkspaceNameCase } from '../../browser/views/explorerView.js';
+ import { listInvalidItemForeground } from '../../../../../platform/theme/common/colorRegistry.js';
+-import { CompressedNavigationController, ExplorerDataSource, ExplorerFindProvider, FileDragAndDrop, FilesFilter, FilesRenderer, FileSorter, ICompressedNavigationController } from '../../browser/views/explorerViewer.js';
++import { CompressedNavigationController, ExplorerCompressionDelegate, ExplorerDataSource, ExplorerFindProvider, FileDragAndDrop, FilesFilter, FilesRenderer, FileSorter, ICompressedNavigationController } from '../../browser/views/explorerViewer.js';
+ import * as dom from '../../../../../base/browser/dom.js';
+ import { DisposableStore, toDisposable } from '../../../../../base/common/lifecycle.js';
+ import { provideDecorations } from '../../browser/views/explorerDecorationsProvider.js';
+@@ -68,6 +72,67 @@ suite('Files - ExplorerView', () => {
+ 		assert.deepStrictEqual(getContext([], [s3, s1, s4], true, noNavigationController), [s3, s1, s4]);
+ 	});
+ 
++	function createDeckTree(root: ExplorerItem) {
++		const project = new ExplorerItem(joinPath(root.resource, 'project'), fileService, configService, NullFilesConfigurationService, root, true);
++		const deck = new ExplorerItem(joinPath(project.resource, 'Kickoff.rtms'), fileService, configService, NullFilesConfigurationService, project, false);
++		const folder = new ExplorerItem(joinPath(project.resource, 'Kickoff files'), fileService, configService, NullFilesConfigurationService, project, true);
++		root.addChild(project);
++		project.addChild(deck);
++		project.addChild(folder);
++		deck.nestedChildren = [folder];
++		folder.nestedParent = deck;
++		return { project, deck, folder };
++	}
++
++	test('deck folder has its own row when compact folders are enabled', () => {
++		const root = new ExplorerItem(URI.file('/workspace'), fileService, configService, NullFilesConfigurationService, undefined, true);
++		const { folder } = createDeckTree(root);
++		assert.strictEqual(new ExplorerCompressionDelegate().isIncompressible(folder), true);
++	});
++
++	suite('deck folder drag and drop', () => {
++		let dragAndDrop: FileDragAndDrop;
++		let deck: ExplorerItem;
++		let folder: ExplorerItem;
++		let destination: ExplorerItem;
++		let editedSources: URI[][];
++
++		setup(() => {
++			const root = new ExplorerItem(URI.file('/workspace'), fileService, configService, NullFilesConfigurationService, undefined, true);
++			({ deck, folder } = createDeckTree(root));
++			destination = new ExplorerItem(joinPath(root.resource, 'destination'), fileService, configService, NullFilesConfigurationService, root, true);
++			root.addChild(destination);
++			editedSources = [];
++			const instantiationService = workbenchInstantiationService({
++				configurationService: () => new TestConfigurationService({ explorer: { confirmDragAndDrop: false } }),
++			}, ds);
++			instantiationService.stub(IWorkspaceEditingService, {});
++			instantiationService.stub(IExplorerService, {
++				applyBulkEdit: async edits => {
++					editedSources.push(edits.flatMap(edit => edit.oldResource ? [edit.oldResource] : []));
++				},
++			});
++			dragAndDrop = ds.add(instantiationService.createInstance(FileDragAndDrop, item => item === deck));
++		});
++
++		function dropDeck(target: ExplorerItem): Promise<void> {
++			return dragAndDrop.drop(new ElementsDragAndDropData([deck]), target, undefined, undefined, new DragEvent('drop', { view: window }));
++		}
++
++		test('rejects dropping a deck into its own folder or any descendant before editing', async () => {
++			const descendant = new ExplorerItem(joinPath(folder.resource, 'images'), fileService, configService, NullFilesConfigurationService, folder, true);
++			folder.addChild(descendant);
++			await dropDeck(folder);
++			await dropDeck(descendant);
++			assert.deepStrictEqual(editedSources, []);
++		});
++
++		test('carries the deck folder when a collapsed deck is dropped elsewhere', async () => {
++			await dropDeck(destination);
++			assert.deepStrictEqual(editedSources, [[deck.resource, folder.resource]]);
++		});
++	});
++
+ 	suite('context menu', () => {
+ 		let view: TestExplorerView;
+ 		let tree: WorkbenchCompressibleAsyncDataTree<ExplorerItem | ExplorerItem[], ExplorerItem, FuzzyScore>;
+@@ -81,6 +146,7 @@ suite('Files - ExplorerView', () => {
+ 		let opened: ExplorerItem[];
+ 		let controllers: Map<ExplorerItem, ICompressedNavigationController[]>;
+ 		let refreshGate: DeferredPromise<void> | undefined;
++		let explorerTreeOptions: IAsyncDataTreeOptions<ExplorerItem, FuzzyScore>;
+ 
+ 		setup(async () => {
+ 			const createItem = (path: string, isDirectory = false) => new ExplorerItem(URI.file(path), fileService, configService, NullFilesConfigurationService, undefined, isDirectory);
+@@ -100,7 +166,7 @@ suite('Files - ExplorerView', () => {
+ 			refreshGate = undefined;
+ 
+ 			const instantiationService = workbenchInstantiationService({
+-				configurationService: () => new TestConfigurationService({ explorer: { autoReveal: false, compactFolders: false } }),
++				configurationService: () => new TestConfigurationService({ explorer: { autoReveal: false, compactFolders: false, fileNesting: { enabled: true, expand: true } } }),
+ 			}, ds);
+ 			instantiationService.stub(IViewDescriptorService, {
+ 				onDidChangeLocation: Event.None,
+@@ -185,7 +251,22 @@ suite('Files - ExplorerView', () => {
+ 				getCompressedNavigationController: item => controllers.get(item),
+ 				dispose: () => { },
+ 			});
+-			view.renderForTesting(container);
++			const createInstance = spy(instantiationService, 'createInstance');
++			try {
++				view.renderForTesting(container);
++				const treeCall = createInstance.getCalls().find(call => (call.args as readonly unknown[])[0] === WorkbenchCompressibleAsyncDataTree);
++				assert.ok(treeCall);
++				explorerTreeOptions = (treeCall.args as readonly unknown[])[7] as IAsyncDataTreeOptions<ExplorerItem, FuzzyScore>;
++			} finally {
++				createInstance.restore();
++			}
++		});
++
++		test('deck folder starts collapsed even when file nests start expanded', () => {
++			const { deck } = createDeckTree(root);
++			first.nestedChildren = [second];
++			assert.strictEqual(explorerTreeOptions.collapseByDefault?.(first), false);
++			assert.strictEqual(explorerTreeOptions.collapseByDefault?.(deck), true);
+ 		});
+ 
+ 		test('waits for a newly queued tree refresh before selecting a folder', async () => {
