@@ -40,6 +40,10 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
+import { setTimeout as delay } from 'node:timers/promises';
+import { AcpManager } from './acpManager';
+import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
+import { turnFailureCard } from '../runtime/turnFailureCopy';
 import * as os from 'os';
 import * as path from 'path';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
@@ -189,7 +193,168 @@ async function testHungTurnTimesOut(): Promise<void> {
   console.log('✓ Test 11: a hung OpenCode turn times out and cancels the session');
 }
 
+const GEMINI_BUSY = 'level=ERROR message="stream error" AI_APICallError: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.';
+
+async function testQuietStream(mode: 'silent' | 'busy' | 'progress' | 'permission' | 'tool' | 'tool-ceiling' | 'update-error' | 'rpc-error'): Promise<void> {
+  const script = `
+    const send = (message) => console.log(JSON.stringify({ jsonrpc: '2.0', ...message }));
+    const reply = (id, result) => send({ id, result });
+    let promptId;
+    require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+      const { id, method, params } = JSON.parse(line);
+      if (method === 'initialize') reply(id, { protocolVersion: 1, agentCapabilities: {} });
+      if (method === 'session/new') reply(id, { sessionId: 'fake', configOptions: [] });
+      if (method === 'session/prompt') {
+        promptId = id;
+        if (process.argv[1] === 'busy') {
+          const error = ${JSON.stringify(GEMINI_BUSY)};
+          const split = error.indexOf('demand');
+          process.stderr.write(error.slice(0, split));
+          setTimeout(() => {
+            console.error(error.slice(split));
+            console.error('message="retrying in 2s"');
+          }, 15);
+        }
+        if (process.argv[1] === 'update-error') send({ method: 'session/update',
+          params: { sessionId: 'fake', update: { sessionUpdate: 'error', error: { statusCode: 503 } } } });
+        if (process.argv[1] === 'rpc-error') send({ id, error: { code: -32603,
+          message: 'Internal error', data: { statusCode: 429 } } });
+        if (process.argv[1] === 'progress') {
+          let count = 0;
+          const interval = setInterval(() => {
+            send({ method: 'session/update', params: { sessionId: 'fake', update: {
+              sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'thinking' },
+            } } });
+            if (++count === 8) {
+              clearInterval(interval);
+              reply(id, { stopReason: 'end_turn' });
+            }
+          }, 25);
+        }
+        if (process.argv[1] === 'tool' || process.argv[1] === 'tool-ceiling') {
+          const update = (sessionUpdate, toolCallId, status) => send({ method: 'session/update',
+            params: { sessionId: 'fake', update: { sessionUpdate, toolCallId, status, title: 'browser' } } });
+          update('tool_call', 'first', 'in_progress');
+          if (process.argv[1] === 'tool') {
+            // ACP: a tool_call's status is optional and defaults to pending.
+            update('tool_call', 'second', undefined);
+            setTimeout(() => update('tool_call_update', 'first', 'completed'), 150);
+            setTimeout(() => update('tool_call_update', 'second', 'failed'), 400);
+          }
+        }
+        if (process.argv[1] === 'permission') send({ id: 500, method: 'session/request_permission',
+          params: { sessionId: 'fake', toolCall: { toolCallId: 'ask', title: 'run' }, options: [] } });
+      }
+      if (id === 500 && !method) reply(promptId, { stopReason: 'end_turn' });
+      if (method === 'session/cancel') {
+        console.error('cancel observed');
+        reply(promptId, { stopReason: 'cancelled' });
+      }
+    });
+  `;
+  const runtime = new AcpRuntime();
+  let approve: (() => void) | undefined;
+  let retry: Parameters<NonNullable<RuntimeSessionConfig['onRuntimeRetry']>>[0] | undefined;
+  let reported: Parameters<NonNullable<RuntimeSessionConfig['onCodexComplete']>>[0] | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onCodexComplete: (result) => { reported = result; },
+    onRuntimeRetry: (notice) => { retry = notice; },
+  };
+  const manager = new AcpManager({
+    binaryPath: process.execPath,
+    args: ['-e', script, mode],
+    workspaceRoot: os.tmpdir(),
+    requestPermission: () => new Promise((resolve) => {
+      approve = () => resolve({ outcome: { outcome: 'cancelled' } });
+    }),
+    approveWrite: async () => true,
+    onProgress: () => {},
+  });
+  try {
+    let cancelObserved!: () => void;
+    const cancelled = new Promise<void>((resolve) => { cancelObserved = resolve; });
+    const sessionId = await manager.start();
+    const client = (manager as any).client as import('./acpClient').AcpClient;
+    const clientConfig = (client as any).config as import('./acpClient').AcpClientConfig;
+    const stderr = clientConfig.onStderr;
+    clientConfig.onStderr = (line) => {
+      stderr?.(line);
+      if (line.includes('cancel observed')) cancelObserved();
+    };
+    (runtime as any)._manager = manager;
+    const session = new AcpSession('conv-quiet', sessionId, config, runtime, undefined, 100);
+    const startedAt = performance.now();
+    const finished = session.prompt({
+      prompt: 'hi',
+      ...(mode === 'tool-ceiling' ? { timeoutMinutes: 350 / 60_000 } : {}),
+    });
+    const within = async (promise: Promise<unknown>) => {
+      const deadline = new AbortController();
+      try {
+        await Promise.race([promise, delay(1_000, undefined, { signal: deadline.signal }).then(() => {
+          assert.fail(`${mode} turn did not settle within the test deadline`);
+        })]);
+      } finally {
+        deadline.abort();
+      }
+    };
+    if (mode === 'permission') {
+      await delay(250);
+      assert.ok(approve, 'agent requested permission');
+      assert.equal(reported, undefined, 'the turn waits for permission past the quiet limit');
+      approve();
+    }
+    if (mode === 'tool' || mode === 'tool-ceiling') {
+      await delay(300);
+      assert.equal(reported, undefined, 'a pending or running tool pauses the quiet timeout');
+    }
+    await within(finished);
+    if (mode === 'tool') {
+      assert.ok(performance.now() - startedAt >= 475, 'the quiet window restarts after the final tool update');
+    }
+    if (mode === 'progress' || mode === 'permission') {
+      assert.equal(reported?.status, 'completed');
+    } else {
+      assert.equal(reported?.status, 'error');
+      const presentation = presentRuntimeError('opencode', reported?.error, undefined, {
+        code: reported?.errorCode,
+        httpStatus: reported?.errorHttpStatus,
+      });
+      assert.ok(presentation);
+      const card = turnFailureCard({
+        runtimeId: 'opencode',
+        kind: presentation.errorKind,
+        detail: presentation.errorDetail,
+        sentence: presentation.message,
+      });
+      if (mode === 'silent' || mode === 'tool') {
+        assert.deepEqual(card, {
+          title: "OpenCode couldn't finish this request",
+          message: 'Send your message again.',
+        });
+      } else if (mode === 'tool-ceiling') {
+        assert.match(reported?.error ?? '', /^OpenCode did not respond within 0 minutes\./);
+        assert.ok(card, 'the ceiling produces a failure card');
+      } else {
+        assert.equal(card?.title, 'OpenCode is busy right now');
+      }
+      if (mode === 'busy') {
+        assert.ok(retry?.busy && retry.retryAt, 'the reported retry delay reaches the existing waiting line');
+      }
+      if (mode !== 'rpc-error') await within(cancelled);
+    }
+  } finally {
+    manager.dispose();
+    runtime.dispose();
+  }
+}
+
 async function run() {
+  for (const mode of ['silent', 'busy', 'progress', 'permission', 'tool', 'tool-ceiling', 'update-error', 'rpc-error'] as const) {
+    await testQuietStream(mode);
+    console.log(`✓ ACP quiet-stream fixture: ${mode}`);
+  }
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
     const runtime: AgentRuntime = new AcpRuntime();

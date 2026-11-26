@@ -46,7 +46,7 @@ import {
 } from '../runtime/continuation';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
-import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
+import { ACP_QUIET_STREAM_ERROR, acpTurnErrorCode, googleRetryDelaySeconds, serviceRetryAt } from '../runtime/runtimeErrorPresentation';
 import { noteOpenCodeModels } from '../ai/modelCatalog';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { activeFileLines } from '../decks/currentSlide';
@@ -90,13 +90,11 @@ export function isBoardToolPermission(params: RequestPermissionRequest): boolean
   return false;
 }
 
-/**
- * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
- * timeout in spirit — long enough for a real slow turn, short enough that a hung
- * provider does not strand the UI forever. Overridable per turn via
- * RuntimeTurnConfig.timeoutMinutes.
- */
+// Claude's 15-minute inactivity window is too long for a silent OpenCode stream.
+const ACP_QUIET_STREAM_MS = 90_000;
 const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
+// Give the notification time to flush before completion can dispose the subprocess.
+const ACP_CANCEL_WRITE_MS = 1_000;
 
 /**
  * Compose the text sent to OpenCode for one turn. Pure — no I/O — so the
@@ -172,6 +170,7 @@ export class AcpSession implements RuntimeSession {
     config: RuntimeSessionConfig,
     private readonly _runtime: AcpRuntime,
     private _continuationContext?: NormalizedRuntimeContext,
+    private readonly _quietStreamMs = ACP_QUIET_STREAM_MS,
   ) {
     this._config = config;
   }
@@ -257,29 +256,68 @@ export class AcpSession implements RuntimeSession {
         });
       }
 
-      // A BYOK provider can hang a turn indefinitely — no response, no error —
-      // and the ACP path had no timeout of its own, unlike Claude (15-min
-      // inactivity) and Codex (slow-RPC handling). The turn then sat at
-      // "Starting OpenCode…" forever with no way out but Stop. Bound it here and
-      // cancel the hung session so it settles as an actionable error.
       const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
-      let timedOut = false;
+      const quietMs = Math.min(this._quietStreamMs, timeoutMs);
       let timer: ReturnType<typeof setTimeout> | undefined;
-      // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
-      // Taken only around the prompt, which the timeout bounds: setModel and setThinkingEffort have no timeout of
-      // their own, and a hang there must not hold the browser from another conversation.
+      let approvals = 0;
+      let toolsRunning = false;
+      let finished = false;
+      let abandon = false;
+      let providerError: string | undefined;
+      let fail!: (error: Error) => void;
+      const failed = new Promise<never>((_, reject) => { fail = reject; });
+      const stop = (error: Error) => {
+        if (finished || abandon) return;
+        abandon = true;
+        clearTimeout(timer);
+        clearTimeout(ceilingTimer);
+        fail(error);
+      };
+      const onActivity = () => {
+        clearTimeout(timer);
+        if (finished || abandon || approvals > 0 || toolsRunning) return;
+        timer = setTimeout(() => {
+          stop(providerError
+            ? new Error(providerError)
+            : Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
+        }, quietMs);
+      };
+
+      // #658: hold this conversation's browser page only while its prompt is active.
       this._runtime.beginBrowserTurn(this, config.browserPage);
-      const prompted = manager.prompt(this.acpSessionId, promptText);
+      const ceilingTimer = setTimeout(() => {
+        stop(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+      }, timeoutMs);
+      onActivity();
+      const prompted = manager.prompt(this.acpSessionId, promptText, {
+        onActivity,
+        onApproval: (waiting) => {
+          approvals += waiting ? 1 : -1;
+          onActivity();
+        },
+        onToolRunning: (running) => {
+          toolsRunning = running;
+          onActivity();
+        },
+        onError: (error, terminal) => {
+          if (terminal) stop(new Error(error));
+          else {
+            providerError = error;
+            onActivity();
+          }
+        },
+        onRetry: (text) => {
+          onActivity();
+          if (!providerError) return;
+          const now = Date.now();
+          const retryAt = serviceRetryAt(text.replace(/\bretrying in\b/i, 'try again in'), now);
+          const delay = googleRetryDelaySeconds(text);
+          const retryTime = retryAt ? Date.parse(retryAt) : delay !== undefined ? now + delay * 1000 : undefined;
+          config.onRuntimeRetry?.({ busy: true, ...(retryTime !== undefined ? { retryAt: retryTime } : {}) });
+        },
+      });
       try {
-        const result = await Promise.race([
-          prompted,
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => {
-              timedOut = true;
-              reject(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
-            }, timeoutMs);
-          }),
-        ]);
+        const result = await Promise.race([prompted, failed]);
         this.markDispatchAccepted();
         // ACP calls a successful terminal state `end_turn`, while the shared
         // Ritemark/Codex result contract calls it `completed`. Forwarding the
@@ -299,22 +337,33 @@ export class AcpSession implements RuntimeSession {
           ...(filesModified.length ? { filesModified } : {}),
         });
       } catch (err) {
-        // On timeout, stop the abandoned turn upstream so it does not keep
-        // running against a session the user has already been told failed.
-        if (timedOut) {
+        // The prompt may still be pending after a timeout or an error update.
+        if (abandon) {
           // #658: its browser calls still in flight are refused until its prompt settles, not sent to another page.
           this._runtime.holdEndedBrowserTurn(this, prompted);
-          void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
+          await Promise.race([
+            manager.cancel(this.acpSessionId).catch(() => { /* already failing */ }),
+            new Promise<void>((resolve) => { timer = setTimeout(resolve, ACP_CANCEL_WRITE_MS); }),
+          ]);
         }
         throw err;
       } finally {
-        if (timer) clearTimeout(timer);
+        finished = true;
+        clearTimeout(timer);
+        clearTimeout(ceilingTimer);
         this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
-      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw), ...(errorCode ? { errorCode } : {}) });
+      const rpc = err as { code?: unknown; data?: { statusCode?: unknown; status?: unknown; message?: unknown } } | null;
+      const errorHttpStatus = rpc?.data?.statusCode ?? rpc?.data?.status ?? rpc?.code;
+      const providerMessage = typeof rpc?.data?.message === 'string' ? rpc.data.message : raw;
+      config.onCodexComplete?.({
+        status: 'error', error: describeAcpTurnError(providerMessage),
+        ...(errorCode ? { errorCode } : {}),
+        ...(errorHttpStatus === 429 || errorHttpStatus === 503 ? { errorHttpStatus } : {}),
+      });
     }
   }
 
@@ -570,8 +619,8 @@ export class AcpRuntime implements AgentRuntime {
   private readonly _endedTurns = new Map<AcpSession, { timer?: ReturnType<typeof setTimeout> }>();
 
   /**
-   * #658: a session's turn timed out. `endBrowserTurn` gives its page up at once, but the cancel is not awaited, and a
-   * browser call already on its way from that turn names no conversation: it would go to another conversation's page.
+   * #658: a session's turn timed out. Sending cancel does not guarantee that its prompt has settled, and a browser
+   * call already on its way from that turn names no conversation: it would go to another conversation's page.
    * So every browser call is refused until the timed-out prompt settles, the session is forgotten, or
    * `ENDED_OPENCODE_TURN_HOLD_MS` passes.
    */

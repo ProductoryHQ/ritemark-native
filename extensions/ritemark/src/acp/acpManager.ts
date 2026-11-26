@@ -18,6 +18,7 @@
  * Patterned on codexManager.ts (lifecycle + progress mapping + trace logging).
  */
 
+import { isOpenCodeBusyError } from '../runtime/runtimeErrorPresentation';
 import { commandStep } from '../runtime/commandStep';
 import { documentReadReasonOf, documentStepKind, isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import type {
@@ -84,6 +85,14 @@ export interface AcpManagerConfig {
   fsBackend?: AcpFsBackend;
 }
 
+interface AcpTurnObserver {
+  onActivity: () => void;
+  onApproval: (waiting: boolean) => void;
+  onToolRunning: (running: boolean) => void;
+  onError: (error: string, terminal: boolean) => void;
+  onRetry: (text: string) => void;
+}
+
 /** Per-session turn state. Every field here used to be a manager-wide scalar. */
 interface AcpSessionState {
   readonly sessionId: string;
@@ -102,6 +111,7 @@ interface AcpSessionState {
    * chat the user already saw go idle would come back to life.
    */
   cancelRequested: boolean;
+  observer?: AcpTurnObserver;
   /**
    * Sprint 130 (G4): the text of the turn's latest assistant message. ACP marks
    * message boundaries with `messageId`; the last message is the agent's
@@ -110,6 +120,7 @@ interface AcpSessionState {
   lastMessage: { id: string | null; text: string };
   /** Sprint 155: the files this turn's completed `edit` tool calls changed. */
   turnChanges: AcpTurnChanges;
+  runningToolCalls: Set<string>;
   toolSteps: Map<string, { tool: string; step: ToolStep; command?: string }>;
   /** Full live option set returned by ACP session setup / config mutation. */
   configOptions: SessionConfigOption[];
@@ -165,6 +176,7 @@ export class AcpManager {
   private readonly config: AcpManagerConfig;
   private client: AcpClient | null = null;
   private readonly sessions = new Map<string, AcpSessionState>();
+  private readonly activePrompts = new Set<AcpSessionState>();
 
   constructor(config: AcpManagerConfig) {
     this.config = config;
@@ -211,6 +223,7 @@ export class AcpManager {
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
       turnChanges: new AcpTurnChanges(),
+      runningToolCalls: new Set(),
       toolSteps: new Map(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
@@ -233,6 +246,7 @@ export class AcpManager {
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
       turnChanges: new AcpTurnChanges(),
+      runningToolCalls: new Set(),
       toolSteps: new Map(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
@@ -259,13 +273,21 @@ export class AcpManager {
     const fsProxy = new AcpFsProxy({
       workspaceRoot: this.config.workspaceRoot,
       backend: this.config.fsBackend,
-      approveWrite: this.config.approveWrite,
+      approveWrite: (request) => this.withApproval(request.sessionId, () => this.config.approveWrite(request)),
       trace: traceAcp,
     });
     const handlers: AcpClientHandlers = {
-      requestPermission: (params) => this.config.requestPermission(params),
+      requestPermission: (params) => this.withApproval(params.sessionId, () => this.config.requestPermission(params)),
       sessionUpdate: (params) => this.handleSessionUpdate(params),
-      readTextFile: fsProxy.readTextFile,
+      sessionError: (sessionId, error, willRetry) => {
+        const observer = this.sessions.get(sessionId)?.observer;
+        observer?.onError(error, !willRetry);
+        if (willRetry) observer?.onRetry(error);
+      },
+      readTextFile: (params) => {
+        this.sessions.get(params.sessionId)?.observer?.onActivity();
+        return fsProxy.readTextFile(params);
+      },
       writeTextFile: fsProxy.writeTextFile,
     };
     const client = new AcpClient({
@@ -275,7 +297,7 @@ export class AcpManager {
       env: this.buildSpawnEnv(),
       handlers,
       onExit: (code, signal) => this.handleExit(code, signal),
-      onStderr: (line) => traceAcp('manager', 'stderr', line),
+      onStderr: (line) => this.handleStderr(line),
       trace: traceAcp,
     });
     this.client = client;
@@ -360,7 +382,7 @@ export class AcpManager {
     return this.sessions.get(sessionId)?.turnChanges.files() ?? [];
   }
 
-  async prompt(sessionId: string, text: string): Promise<PromptResponse> {
+  async prompt(sessionId: string, text: string, observer?: AcpTurnObserver): Promise<PromptResponse> {
     const { client, state } = this.requireSession(sessionId);
 
     state.sawContentThisTurn = false;
@@ -368,7 +390,10 @@ export class AcpManager {
     state.lastMessage = { id: null, text: '' };
     state.turnChanges.reset();
     state.toolSteps.clear();
+    state.runningToolCalls.clear();
 
+    state.observer = observer;
+    this.activePrompts.add(state);
     let result: PromptResponse;
     try {
       result = await client.prompt(sessionId, text);
@@ -388,6 +413,9 @@ export class AcpManager {
         return { stopReason: 'cancelled' } as PromptResponse;
       }
       throw err;
+    } finally {
+      state.observer = undefined;
+      this.activePrompts.delete(state);
     }
 
     this.flushThoughts(state); // emit any trailing reasoning as one entry
@@ -459,6 +487,28 @@ export class AcpManager {
 
   // ── Internals ────────────────────────────────────────────────────────────
 
+  private async withApproval<T>(sessionId: string, ask: () => Promise<T>): Promise<T> {
+    const observer = this.sessions.get(sessionId)?.observer;
+    observer?.onApproval(true);
+    try {
+      return await ask();
+    } finally {
+      observer?.onApproval(false);
+    }
+  }
+
+  private handleStderr(line: string): void {
+    traceAcp('manager', 'stderr', line);
+    // stderr belongs to the process. An unscoped line is only useful when
+    // exactly one prompt is in flight, including prompts still cancelling.
+    const active = [...this.activePrompts];
+    if (active.length !== 1 || active[0].cancelRequested) return;
+    const observer = active[0].observer;
+    if (!observer) return;
+    if (isOpenCodeBusyError(line)) observer.onError(line, false);
+    if (/\bretrying\b/i.test(line)) observer.onRetry(line);
+  }
+
   private flushThoughts(state: AcpSessionState): void {
     if (state.thoughtBuffer) {
       this.emit(state.sessionId, 'thinking', state.thoughtBuffer);
@@ -516,6 +566,9 @@ export class AcpManager {
     }
 
     const update = params.update;
+    if (update.sessionUpdate !== 'tool_call' && update.sessionUpdate !== 'tool_call_update') {
+      state.observer?.onActivity();
+    }
     // Any non-thought update ends the current reasoning burst — flush it as a
     // single coalesced 'thinking' entry before handling the new update.
     if (update.sessionUpdate !== 'agent_thought_chunk') {
@@ -558,6 +611,13 @@ export class AcpManager {
       case 'tool_call':
       case 'tool_call_update': {
         traceAcp('manager', `update:${update.sessionUpdate}`, { sessionId, title: update.title, kind: update.kind, status: update.status });
+        // A tool_call's status is optional in ACP and defaults to pending.
+        if (update.status === 'pending' || update.status === 'in_progress' || (update.sessionUpdate === 'tool_call' && update.status == null)) {
+          state.runningToolCalls.add(update.toolCallId);
+        } else if (update.status === 'completed' || update.status === 'failed') {
+          state.runningToolCalls.delete(update.toolCallId);
+        }
+        state.observer?.onToolRunning(state.runningToolCalls.size > 0);
         state.turnChanges.note(update);
         const start = update.sessionUpdate === 'tool_call';
         if (start) state.sawContentThisTurn = true;

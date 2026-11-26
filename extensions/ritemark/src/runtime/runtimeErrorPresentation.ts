@@ -385,6 +385,14 @@ function finish(
   };
 }
 
+export const ACP_QUIET_STREAM_ERROR = 'acp_quiet_stream';
+
+export function isOpenCodeBusyError(text: string): boolean {
+  return /\b(?:high demand|overloaded)\b/i.test(text)
+    || /^(?:429|503)$/.test(text.trim())
+    || /\b(?:http(?: status)?|status(?:_?code)?|code|error)[ "'=:]+(?:429|503)\b|\b(?:429 Too Many Requests|503 Service Unavailable)\b/i.test(text);
+}
+
 /**
  * Turn a runtime's terminal error into a kind and one sentence. Only a turn's
  * terminal error ever reaches this — never an answer's text — so an answer that
@@ -450,6 +458,9 @@ export function classifyRuntimeError(
     if (CODEX_NETWORK_CODES.has(code) && hints?.httpStatus === undefined) {
       return finish(agentId, 'network', providerSentence, hints);
     }
+  }
+  if (agentId === 'opencode' && code === ACP_QUIET_STREAM_ERROR) {
+    return finish(agentId, 'provider', '', hints);
   }
   if (agentId === 'opencode' && code) {
     if (code === 'providermodelnotfounderror') {
@@ -532,6 +543,12 @@ export function classifyRuntimeError(
     }
   }
 
+  if (agentId === 'opencode' && (hints?.httpStatus === 429 || hints?.httpStatus === 503
+    || envelopeCodes.has('429') || envelopeCodes.has('503') || isOpenCodeBusyError(raw) || isOpenCodeBusyError(unwrapped ?? ''))) {
+    const retryAt = serviceRetryAt(haystack);
+    return finish(agentId, 'limit', providerSentence, hints, { limit: 'busy', ...(retryAt ? { retryAt } : {}) });
+  }
+
   if (NETWORK_PATTERNS.some((pattern) => pattern.test(unwrapped ?? raw.trim()))) {
     return finish(agentId, 'network', providerSentence, hints);
   }
@@ -601,6 +618,7 @@ export function acpTurnErrorCode(err: unknown): string | undefined {
   const { code, data } = err as { code?: unknown; data?: unknown };
   const errorName = data && typeof data === 'object' ? (data as { errorName?: unknown }).errorName : undefined;
   if (typeof errorName === 'string' && errorName.trim()) return errorName.trim();
+  if (code === ACP_QUIET_STREAM_ERROR) return code;
   if (code === -32000) return 'auth_required';
   return undefined;
 }
