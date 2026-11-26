@@ -29,7 +29,7 @@ If you run training or share slides with clients, you can update the page they a
 - **Ask about Word, PDF and PowerPoint files.** Claude, ChatGPT and OpenCode can read those files in your project. Ask for specific PDF pages or about a PowerPoint slide and its speaker notes.
 - **Check where an answer came from.** Hover over a named source to see the passage. Open the link to read the passage or go to the cited slide.
 - **See which documents the AI read.** While it works, each step names the document it opened. A file it can't open says why.
-- **Start from a document with Claude.** On a Mac, Claude offers starting points for the Word file or PDF in front, such as **Summarise this in five points**.
+- **Start from a document with Claude or ChatGPT.** On a Mac, they offer starting points for the Word file or PDF in front, such as **Summarise this in five points**.
 
 ## Smaller changes
 
@@ -67,4 +67,4 @@ If you run training or share slides with clients, you can update the page they a
 
 - **Some charts still need Excel.** Open the workbook in Excel to see charts such as waterfall, treemap and histogram charts.
 - **Cells with icon rules show their values.** Open the workbook in Excel to see icons such as arrows or traffic lights.
-- **Ask ChatGPT and OpenCode in chat.** With a Word file or PDF in front, they still show the project's starting points. Claude on Windows does too. Type your question about the document instead.
+- **Ask OpenCode in chat.** With a Word file or PDF in front, it still shows the project's starting points. So do Claude and ChatGPT on Windows. Type your question about the document instead.
