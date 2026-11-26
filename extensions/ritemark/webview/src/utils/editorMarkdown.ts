@@ -96,6 +96,23 @@ export function ensureCommentMarkedPipeline(): void {
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
 }
 
+/** Strip Markdown spelling metadata before ProseMirror parses external paste or drop HTML. */
+export function stripPastedMarkdownAttributes(html: string): string {
+  if (!/data-md-/i.test(html)) return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const slice = template.content.querySelector('[data-pm-slice]')?.getAttribute('data-pm-slice')
+  if (slice && /^\d+ \d+(?: -\d+)? /.test(slice)) return html
+
+  for (const element of Array.from(template.content.querySelectorAll('*'))) {
+    for (const attribute of Array.from(element.attributes)) {
+      if (attribute.name.toLowerCase().startsWith('data-md-')) element.removeAttribute(attribute.name)
+    }
+  }
+  return template.innerHTML
+}
+
 /**
  * Unwrap standalone images from paragraph tags.
  *
@@ -162,7 +179,7 @@ function mapImages(container: HTMLElement, imageMappings?: Record<string, string
       image.setAttribute('title', mapping.path)
     }
     if (image.hasAttribute('data-md-image-target')) {
-      image.setAttribute('data-md-image-src', mapping?.path ?? src)
+      if (mapping && mapping.path !== mapping.uri) image.setAttribute('data-md-image-src', mapping.path)
       image.setAttribute('data-md-image-alt', image.getAttribute('alt') ?? '')
     }
   }
@@ -487,8 +504,8 @@ export function preprocessTableHTML(html: string): string {
  * comment-callout rules. Comment rules register unconditionally: they are
  * harmless when no comment nodes exist.
  */
-export function createEditorTurndownService(): TurndownService {
-  const service = createTurndownService()
+export function createEditorTurndownService(instance = editorMarked): TurndownService {
+  const service = createTurndownService(instance)
   addCommentTurndownRules(service)
   // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
   addDeckTurndownRules(service)

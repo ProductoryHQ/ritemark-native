@@ -401,7 +401,7 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
 
 /** The slide editor's Turndown: the document editor's rules on a service of its own, and the div's rule. */
 export function createSlideTurndownService(): TurndownService {
-  const service = createEditorTurndownService()
+  const service = createEditorTurndownService(slideEditorMarked)
   addSlideDivTurndownRule(service)
   addLabelTurndownRules(service)
   return service

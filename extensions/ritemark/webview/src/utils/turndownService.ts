@@ -1,10 +1,22 @@
 import TurndownService from 'turndown'
+import { Lexer, marked, type Marked, type Tokens } from 'marked'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
 import { pictureTarget } from '../../../src/decks/blocks/legacyToBlocks'
 import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
 import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
+
+/** Marked encodes the destination for display, and host mappings may use its unencoded path. */
+function matchesImageSource(href: string, src: string): boolean {
+  if (href === src) return true
+  try {
+    const encode = (url: string) => encodeURI(url).replace(/%25/g, '%')
+    return encode(href) === encode(src)
+  } catch {
+    return false
+  }
+}
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -28,7 +40,7 @@ import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBracket
  *    editor's `data-md-*` attributes (paste, Word's Save as Markdown) gets one
  *    plain form: `- item`, tight lists, `---`, `| --- |`, a backslash break.
  */
-export function createTurndownService(): TurndownService {
+export function createTurndownService(instance: Pick<Marked, 'defaults'> = marked): TurndownService {
   const service = new TurndownService({
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
@@ -106,19 +118,28 @@ export function createTurndownService(): TurndownService {
       const title = el.getAttribute('title') || ''
       const displaySrc = el.getAttribute('src') ?? el.src
       const writtenSrc = el.getAttribute('data-md-image-src')
-      const useTitle = displaySrc !== writtenSrc &&
+      const writtenTarget = el.getAttribute('data-md-image-target')
+      // An image loaded as written only needs a separate source when the host mapped it for display.
+      const useTitle = (writtenSrc !== null || writtenTarget === null) && displaySrc !== writtenSrc &&
         (title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc)))
       const src = useTitle ? title : displaySrc
-      // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
+      const label = `![${markdownAlt(alt)}]`
+      let markdown = label + `(${pictureTarget(src)})`
+      if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
+        const writtenLabel = alt === el.getAttribute('data-md-image-alt')
+          ? el.getAttribute('data-md-image-label')
+          : null
+        const candidate = (writtenLabel ?? label) + writtenTarget
+        const tokens = Lexer.lexInline(candidate, instance.defaults)
+        const token = tokens[0]
+        if (tokens.length === 1 && token.type === 'image' && token.raw === candidate &&
+            matchesImageSource((token as Tokens.Image).href, src)) {
+          markdown = candidate
+        }
+      }
+      // Experience 49: keep a valid picture look block beside the image.
       const block = el.getAttribute('data-picture') ?? ''
-      const sameFile = src === writtenSrc
-      const writtenLabel = sameFile && alt === el.getAttribute('data-md-image-alt')
-        ? el.getAttribute('data-md-image-label')
-        : null
-      const writtenTarget = sameFile ? el.getAttribute('data-md-image-target') : null
-      const label = writtenLabel ?? `![${markdownAlt(alt)}]`
-      const target = writtenTarget ?? `(${pictureTarget(src)})`
-      return blockImage(label + target + (parsePictureBlock(block) ? block : ''), el)
+      return blockImage(markdown + (parsePictureBlock(block) ? block : ''), el)
     },
   })
 

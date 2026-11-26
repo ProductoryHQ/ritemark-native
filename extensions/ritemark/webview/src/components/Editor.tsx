@@ -52,6 +52,7 @@ import {
   editorHTMLToMarkdown,
   ensureCommentMarkedPipeline,
   markdownToEditorHTML,
+  stripPastedMarkdownAttributes,
 } from '../utils/editorMarkdown'
 
 // The editor's Markdown pipeline — `marked` on load, the schema, Turndown on
@@ -226,6 +227,7 @@ export function Editor({
       }
     },
     editorProps: {
+      transformPastedHTML: stripPastedMarkdownAttributes,
       attributes: {
         class: 'prose prose-lg max-w-none focus:outline-none',
       },
