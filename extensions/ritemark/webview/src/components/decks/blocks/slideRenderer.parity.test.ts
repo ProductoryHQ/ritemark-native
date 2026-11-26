@@ -230,8 +230,7 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
   assert.ok(/setIconPick\(\{ pos, rect[^\n]*\n\s*setIconHint\(null\)/.test(stage), 'the icon menu ends it')
   assert.ok(hint.includes('HINT_WAIT_MS') && hint.includes("classList.contains('is-unknown')") && hint.includes('requestAnimationFrame(follow)'), 'the place waits, checks and follows')
   // Sprint 169 PR 2 (#867): an icon outside the 24 (the Experience lead's `truck` and `folder`), and an alias, draw on
-  // the stage the renderer's own drawing from the full set: its path, not the chrome's. Under a look with its own mark
-  // (Mark: Number, Dot, Arrow; Sprint 167 PR 2) the box's icon is never drawn, on either.
+  // the stage the renderer's own drawing from the full set. Number keeps the icon below the count.
   const pathOf = (phosphor: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[phosphor])![1]
   for (const [icon, phosphor] of [['truck', 'truck'], ['folder', 'folder'], ['mail', 'envelope-simple'], ['list-checks', 'list-checks']] as const) {
     const badge = stageBadge(slide(icon))
@@ -244,10 +243,11 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
   }
   for (const look of ['steps', 'line', 'arrows']) {
     const marked = `:::: {.boxes look="${look}"}\n::: {.box icon="truck"}\n### Idea\n:::\n::::`
-    assert.ok(!draw(marked).includes(pathOf('truck')), `${look}: the renderer draws no icon`)
+    const showsIcon = look === 'steps'
+    assert.equal(draw(marked).includes(pathOf('truck')), showsIcon, `${look}: renderer icon`)
     const mark = stageBadge(marked)
-    assert.ok(!mark.innerHTML.includes(pathOf('truck')) && !mark.className.includes('blk-icon'), `${look}: the stage draws no icon`)
-    assert.equal(mark.className, look === 'arrows' ? 'blk-mark' : '', `${look}: the look's own mark`)
+    assert.equal(mark.innerHTML.includes(pathOf('truck')), showsIcon, `${look}: stage icon`)
+    assert.equal(mark.className, showsIcon ? 'blk-icon is-pickable' : look === 'arrows' ? 'blk-mark' : '', look)
   }
   console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
 }

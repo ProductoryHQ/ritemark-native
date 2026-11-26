@@ -5,7 +5,7 @@
  *
  * Its own module, apart from iconSet.ts, so the index (iconIndex.ts) reaches only the code that searches.
  */
-import { CLOSE_FENCE, CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, boxesMarkOf, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { CLOSE_FENCE, CODE_FENCE, CODE_FENCE_CLOSE, OPEN_FENCE, boxesShowIcons, parseFenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { layoutSlide, type SlideBox } from './layoutSlide'
 import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
@@ -219,9 +219,7 @@ export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: Slide
       continue
     }
     // A block slide's boxes. A `:::` line inside a code block is the code's words, not a box (fencedDiv's rule).
-    // The open divs, innermost last, each marked when it draws no box icons: a Boxes block set to Number, Dot or Arrow
-    // (`boxesMarkOf`) draws its own mark where the icon would be, so its boxes' icons are in use nowhere until it is
-    // Icon again.
+    // The open divs, innermost last, each marked when it draws no box icons (Dot or Arrow).
     let code: { char: string; size: number } | null = null
     const open: boolean[] = []
     for (const line of data.markdown.split('\n')) {
@@ -238,9 +236,9 @@ export function deckIconsInUse(slides: ReadonlyArray<{ kind: string; data: Slide
       const opening = OPEN_FENCE.exec(line)
       const attrs = opening ? parseFenceAttributes(opening[2]) : null
       if (attrs) {
-        const ownMark = attrs.classes.includes('boxes') && boxesMarkOf(attrs) !== 'icon'
+        const hidesIcons = attrs.classes.includes('boxes') && !boxesShowIcons(attrs.values.look ?? 'boxes')
         if (attrs.classes.includes('box') && !open.includes(true)) take(attrs.values.icon)
-        open.push(ownMark)
+        open.push(hidesIcons)
       } else if (CLOSE_FENCE.test(line)) open.pop()
     }
   }
@@ -295,4 +293,10 @@ export function iconMenuMove(at: number, move: IconMenuMove, count: number, with
   }
   if (at >= count) return count ? Math.floor((count - 1) / columns) * columns : -1
   return at - columns >= 0 ? at - columns : -1
+}
+
+/** Enter chooses the highlight, or the first result while still in the search field. */
+export function iconMenuEnterChoice(at: number, count: number, withNoIcon: boolean): number | 'none' | null {
+  if (withNoIcon && at === count) return 'none'
+  return count ? Math.max(at, 0) : null
 }

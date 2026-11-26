@@ -23,7 +23,9 @@ function open(current: string | null) {
     createElement(Menu.Trigger), createElement(Menu.Content, null, createElement(IconGridItems, { current, onPick: () => {} }))))
   const doc = createDocument(`<!doctype html><html><body>${html}</body></html>`)
   const field = doc.querySelector('input[placeholder="Search icons"]')
-  const choices = Array.from(doc.querySelectorAll('[data-choice]')).filter(element => /^\d+$/.test(element.getAttribute('data-choice') ?? ''))
+  const choices = Array.from(doc.querySelectorAll('[data-choice]'))
+  assert.equal(choices.pop()?.getAttribute('data-choice'), 'none', "No icon is the last item")
+  assert.equal(field?.hasAttribute('aria-activedescendant'), false, 'search opens without a highlighted choice')
   return { field: field?.getAttribute('value') ?? null, labels: choices.map(element => element.getAttribute('aria-label')), text: doc.body.textContent ?? '' }
 }
 

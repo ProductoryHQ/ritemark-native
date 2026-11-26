@@ -31,7 +31,7 @@
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { liftTarget } from '@tiptap/pm/transform'
-import { MARK_LOOK, OPEN_FENCE, OWN_MARK_LOOKS, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, boxesMarkOf, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type BoxesMark, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { MARK_LOOK, OPEN_FENCE, boxesShowIcons, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, boxesMarkOf, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type BoxesMark, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconOf, UNKNOWN_ICON } from '../slide/iconSet'
 import { SLIDE_COMMAND, setBlockValue, slideDivNode } from './slideCommands'
 import { addTab, columnsToTabs, tabsAround, tabsToColumns } from '../../../extensions/tabs/tabsCommands'
@@ -108,7 +108,7 @@ export function caretBoxPos(state: EditorState): number | null {
 export function caretBoxIcon(state: EditorState) {
   const pos = caretBoxPos(state)
   const node = pos === null ? null : state.doc.nodeAt(pos)
-  if (pos === null || !node || OWN_MARK_LOOKS.has(boxLookAt(state.doc, pos))) return null
+  if (pos === null || !node || !boxesShowIcons(boxLookAt(state.doc, pos))) return null
   const icon = boxIconOf(divAttributesOf(node).values.icon)
   return { pos, current: icon?.name ?? null, glyph: icon?.phosphor ?? UNKNOWN_ICON }
 }
@@ -217,7 +217,7 @@ export const MARK_TIP: Readonly<Record<BoxesMark, string>> = {
   dot: 'A dot on each box',
   arrow: 'An arrow on each box',
 }
-export const MARK_MENU_TIP = 'What each box shows at its top: its icon, its number, a dot or an arrow'
+export const MARK_MENU_TIP = 'Mark on every box'
 
 /**
  * Mark on a Boxes block's bar (README item C): its look on the block's own line (`look="steps"`), or none for Icon, one

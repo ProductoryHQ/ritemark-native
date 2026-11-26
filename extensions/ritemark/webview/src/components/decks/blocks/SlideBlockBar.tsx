@@ -127,14 +127,14 @@ interface Option {
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
  * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
  * trigger says the value to a screen reader too ("Width: Auto"). `bare` shows the value as its icon only, the word in the
- * tooltip ("Mark: Number"); `tip` is the tooltip otherwise (else the group's name).
+ * tooltip ("Mark: Number"); `tip` overrides the tooltip.
  */
 function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={bare ? `${label}: ${current.label ?? current.tip}` : tip ?? label}>
+      <Tooltip label={tip ?? (bare ? `${label}: ${current.label ?? current.tip}` : label)}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
             {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
@@ -217,7 +217,7 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
       }
       setOpen(next)
     }}>
-      <Tooltip label={`Icon (${isMac ? '⌥F10' : 'Alt+F10'}): Choose or remove the box icon`} suppressed={open}>
+      <Tooltip label={`This box's icon (${isMac ? '⌥F10' : 'Alt+F10'})`} suppressed={open}>
         <DropdownMenuTrigger asChild>
           <Button
             ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
@@ -585,6 +585,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   // The ring keeps 8 px from the words: a box has its own padding, so a Boxes block's ring sits closer.
   const ring = ringGap(chosen.kind)
 
+  const boxIconButton = placed.caretBox ? (
+    <BoxIconButton
+      box={placed.caretBox}
+      trigger={iconTrigger}
+      focusEditor={() => editor.view.focus()}
+      onPick={name => {
+        const box = caretBoxIcon(editor.state)
+        if (box && box.pos === placed.caretBox?.pos) {
+          apply(setBlockValue(editor.state, box.pos, 'icon', name))
+        }
+      }}
+    />
+  ) : null
+
   return (
     <>
       {/* The handles go in a layer of their own, put in the frame by this component (a portal): the frame's other
@@ -721,22 +735,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
-              {placed.caretBox ? (
-                <>
-                  <Sep />
-                  <BoxIconButton
-                    box={placed.caretBox}
-                    trigger={iconTrigger}
-                    focusEditor={() => editor.view.focus()}
-                    onPick={name => {
-                      const box = caretBoxIcon(editor.state)
-                      if (box && box.pos === placed.caretBox?.pos) {
-                        apply(setBlockValue(editor.state, box.pos, 'icon', name))
-                      }
-                    }}
-                  />
-                </>
-              ) : null}
+              {!look && boxIconButton ? <><Sep />{boxIconButton}</> : null}
               {look ? (
                 <>
                   <Sep />
@@ -747,7 +746,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   ]} />
                   <Sep />
                   {/* Sprint 167 PR 2 (README item C): Mark, a menu that shows its value; Icon, the default, writes nothing. On
-                      the narrowest pane it folds last, to its value's icon (the word stays in its tooltip). */}
+                      the narrowest pane it folds last, to its value's icon. */}
                   <Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(choice => ({
                     key: choice,
                     on: mark === choice,
@@ -756,6 +755,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                     tip: MARK_TIP[choice],
                     pick: () => run(act(pos => setBoxesMark(editor.state, pos, choice))),
                   }))} />
+                  {boxIconButton}
                   <Sep />
                   <Group label="Width" folded={fold >= FOLD_AT.size} options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },

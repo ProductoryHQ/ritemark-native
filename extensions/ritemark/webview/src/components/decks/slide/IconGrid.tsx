@@ -19,7 +19,7 @@ import { createContext, useContext, useEffect, useId, useMemo, useRef, useState,
 import { DropdownMenuItem, DropdownMenuSeparator } from '../../ui/dropdown-menu'
 import { Icon } from '../../ui/Icon'
 import { Tooltip } from '../../ui/tooltip'
-import { iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuStartQuery, type IconMenuMove } from './iconSearch'
+import { iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuEnterChoice, iconMenuStartQuery, type IconMenuMove } from './iconSearch'
 import type { SlideIcon } from './iconSet'
 import { SlideIconGlyph } from './SlideIconGlyph'
 
@@ -48,9 +48,8 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   const [startQuery] = useState(() => iconMenuStartQuery(current))
   const [query, setQuery] = useState(startQuery)
   const { icons, total, searching } = useMemo(() => iconMenuChoices(query, inUse), [query, inUse])
-  // The highlighted choice: an icon's place, `icons.length` for No icon, -1 for none. Typing highlights the best result.
+  // The highlighted choice: an icon's place, `icons.length` for No icon, -1 for the search field.
   const [active, setActive] = useState(-1)
-  useEffect(() => setActive(searching && icons.length ? 0 : -1), [query, searching, icons.length])
   const noIcon = current ? icons.length : -1
   const choicesId = useId()
 
@@ -81,7 +80,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
   }, [active, icons])
 
   // The highlighted icon's name in a tooltip (the words a screen reader hears), when the pointer or an arrow key put the
-  // highlight there; not for the best result typing highlights. Shown after the tooltips' usual wait, one at a time.
+  // highlight there. Shown after the tooltips' usual wait, one at a time.
   const tipWanted = useRef(false)
   const [tip, setTip] = useState(-1)
   // Bumped as the pointer comes onto an icon, so coming back onto the highlighted one shows its name again.
@@ -98,7 +97,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
     if (event.key === 'Escape' || event.key === 'Tab') return
     event.stopPropagation()
     const move = MOVES[event.key]
-    // ← and → move the caret until an icon is highlighted (typing highlights the best one), then the highlight.
+    // ← and → move the caret until an icon is highlighted, then move the highlight.
     if (move && ((move !== 'left' && move !== 'right') || (active >= 0 && active < icons.length))) {
       event.preventDefault()
       byKey.current = true
@@ -109,8 +108,8 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
     if (event.key === 'Enter') {
       event.preventDefault()
       // Through the item itself, so the menu chooses and closes as on a click, whoever owns it.
-      const item = active === noIcon ? 'none' : active >= 0 && active < icons.length ? String(active) : null
-      if (item) scroller.current?.parentElement?.querySelector<HTMLElement>(`[data-choice="${item}"]`)?.click()
+      const item = iconMenuEnterChoice(active, icons.length, !!current)
+      if (item !== null) scroller.current?.parentElement?.querySelector<HTMLElement>(`[data-choice="${item}"]`)?.click()
     }
   }
 
@@ -130,7 +129,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
           autoComplete="off"
           spellCheck={false}
           value={query}
-          onChange={event => { tipWanted.current = false; setQuery(event.target.value) }}
+          onChange={event => { tipWanted.current = false; setActive(-1); setQuery(event.target.value) }}
           onKeyDown={onKeyDown}
         />
       </label>

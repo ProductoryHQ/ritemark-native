@@ -696,9 +696,12 @@ stable(COLUMNS, 'three columns')
   assert.equal(caretBoxIcon(stateWith(picked, 'Unknown'))?.glyph, 'truck')
   assert.equal(caretBoxIcon(stateWith(picked, 'Known'))?.glyph, 'lightbulb')
 
-  for (const look of OWN_MARK_LOOKS) {
-    const ownMark = markdown.replace(':::: boxes', `:::: {.boxes look="${look}"}`)
-    assert.equal(caretBoxIcon(stateWith(ownMark, 'Known')), null, look)
+  for (const mark of BOXES_MARKS) {
+    const look = MARK_LOOK[mark] ?? 'boxes'
+    const marked = markdown.replace(':::: boxes', `:::: {.boxes look="${look}"}`)
+    const visible = mark === 'icon' || mark === 'number'
+    assert.equal(caretBoxIcon(stateWith(marked, 'Known'))?.glyph, visible ? 'lightbulb' : undefined, mark)
+    assert.equal(caretBoxIcon(stateWith(marked, 'Empty'))?.current, visible ? null : undefined, mark)
   }
 
   const shortcut = { key: 'F10', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, defaultPrevented: false }
@@ -874,7 +877,7 @@ stable(COLUMNS, 'three columns')
   assert.equal(MARK_LOOK.icon, null, 'Icon writes no look')
   assert.deepEqual(new Set(BOXES_MARKS.map(mark => MARK_LOOK[mark]).filter(look => look !== null)), OWN_MARK_LOOKS, 'Number, Dot, Arrow are the own-mark looks')
   for (const mark of BOXES_MARKS) assert.ok(MARK_TIP[mark].length > 0, `${mark} has a tooltip`)
-  assert.ok(/icon/.test(MARK_MENU_TIP) && /number/.test(MARK_MENU_TIP), MARK_MENU_TIP)
+  assert.equal(MARK_MENU_TIP, 'Mark on every box')
   // An old deck's look reads as its Mark, by the word that draws it; none, `boxes` and a word no look draws are Icon.
   for (const [line, mark] of [
     [':::: boxes', 'icon'], [':::: {.boxes look="boxes"}', 'icon'], [':::: {.boxes look="steps"}', 'number'], [':::: {.boxes look="line"}', 'dot'],
@@ -882,7 +885,7 @@ stable(COLUMNS, 'three columns')
   ] as const) {
     assert.equal(boxesMarkOf(lineOf(line)), mark, line)
     const drawn = blockSlideHtml(`${line}\n::: {.box icon="lightbulb"}\n### A\n:::\n::::`)
-    assert.equal(drawn.includes('class="blk-icon"'), mark === 'icon', `${line}: an icon drawn only under Icon`)
+    assert.equal(drawn.includes('class="blk-icon"'), mark === 'icon' || mark === 'number', `${line}: icon visibility`)
   }
 
   // Each mark round-trips: written on the block's own line only, the same bytes on the next open, read back as itself,
@@ -908,7 +911,7 @@ stable(COLUMNS, 'three columns')
     assert.ok(markdown.includes('icon="lightbulb"') && markdown.includes('icon="target"'), `${mark}: each box keeps its icon in the file`)
     const html = blockSlideHtml(markdown)
     assert.ok(html.includes(`data-look="${MARK_LOOK[mark]}"`), `${mark} drawn as its look`)
-    assert.ok(!html.includes('class="blk-icon"'), `${mark}: no icon drawn`)
+    assert.equal((html.match(/class="blk-icon"/g) ?? []).length, mark === 'number' ? 2 : 0, mark)
     assert.equal((html.match(/class="blk-mark"/g) ?? []).length, mark === 'arrow' ? 3 : 0, `${mark}: an arrow on each box only under Arrow`)
     // And back to Icon: the line as it was, the icons drawn again.
     const back = after(setBoxesMark(again, read.pos, 'icon'))
@@ -1027,14 +1030,16 @@ stable(COLUMNS, 'three columns')
   const style = barSource.indexOf('<Group label="Style"')
   const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(')
   const width = barSource.indexOf('<Group label="Width"')
-  assert.ok(style > 0 && markAt > style && width > markAt, 'Style, then Mark, then Width')
+  const boxIcon = barSource.indexOf('{boxIconButton}', markAt)
+  assert.ok(style > 0 && markAt > style && boxIcon > markAt && width > boxIcon, 'Style, Mark, box icon, Width')
+  assert.ok(!barSource.slice(markAt, boxIcon).includes('<Sep />'), 'Mark and box icon share a group')
   assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
-  // tooltip says it.
+  // accessible name keeps the value.
   assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
   assert.match(barSource, /\{bare && current\.icon \? null : current\.label\}/)
-  assert.match(barSource, /<Tooltip label=\{bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : tip \?\? label\}>/)
+  assert.match(barSource, /<Tooltip label=\{tip \?\? \(bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : label\)\}>/)
 }
 
 console.log('blockBar: Turn into, Width, Style, Mark, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')

@@ -20,7 +20,7 @@ import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconBadge } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg } from '../slide/pageIcons'
 import { boxIconOf } from '../slide/iconSet'
@@ -143,24 +143,25 @@ class SlideDivView implements NodeView {
         : {})
     const deco = this.deco
     if (!deco) return
-    // A box: its icon, an arrow under the Arrows look, nothing under Steps and Line (they draw their own mark).
+    // Number is drawn by CSS. The decoration holds the icon under Icon or Number, or the arrow under Arrow.
     const look = boxLookAt(this.doc(), this.getPos())
     // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
-    const badge = boxIconBadge(attrs.values.icon)
+    const showsIcons = boxesShowIcons(look)
+    const badge = showsIcons ? boxIconBadge(attrs.values.icon) : null
     deco.removeAttribute('data-icon')
     if (look === 'arrows') {
       deco.className = 'blk-mark'
       deco.innerHTML = iconSvg('arrow-right', 20)
       deco.hidden = false
       deco.removeAttribute('role')
-    } else if (!OWN_MARK_LOOKS.has(look) && badge) {
+    } else if (badge) {
       deco.className = `${badge.className}${this.handlers ? ' is-pickable' : ''}`
       deco.innerHTML = badge.svg
       deco.hidden = false
       // The unknown name, as written, for the stage's tooltip (`onIconEnter`).
       if (badge.unknown !== null) deco.setAttribute('data-icon', badge.unknown)
       this.pickable(deco, badge.unknown === null ? 'Change the icon' : `${unknownIconWords(badge.unknown)}: choose an icon`)
-    } else if (!OWN_MARK_LOOKS.has(look) && this.handlers) {
+    } else if (showsIcons && this.handlers) {
       // A box with no icon shows a place for one, on the stage only (README frame 4).
       deco.className = 'blk-icon is-pickable is-place'
       deco.innerHTML = PLUS_SVG

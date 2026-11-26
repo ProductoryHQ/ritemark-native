@@ -11,7 +11,7 @@ import { icons as catalog } from '@phosphor-icons/core'
 import { ICON_TAGS, ICON_TAG_SEPARATOR } from './iconIndex'
 import { PAGE_ICON_NAMES, PAGE_ICON_PATHS, isPageIconName } from './pageIcons'
 import { SLIDE_ICONS, SLIDE_ICON_ALIASES, SLIDE_ICON_NAMES, UNKNOWN_ICON, boxIconOf, slideIcon } from './iconSet'
-import { ICON_MENU_PAGE, deckIconsInUse, editsBetween, iconMenuChoices, iconMenuMoreLine, iconMenuMove, iconMenuStartQuery, searchIcons } from './iconSearch'
+import { ICON_MENU_PAGE, deckIconsInUse, editsBetween, iconMenuChoices, iconMenuMoreLine, iconMenuEnterChoice, iconMenuMove, iconMenuStartQuery, searchIcons } from './iconSearch'
 
 let passed = 0
 function test(name: string, run: () => void) {
@@ -180,11 +180,10 @@ test("PR 3 (#868): the deck's icons in use, in the order it first uses them, eac
   ]
   assert.deepEqual(deckIconsInUse(slides).map(icon => icon.name), ['truck', 'mail', 'brain', 'users'])
   assert.deepEqual(deckIconsInUse([]), [])
-  // A Boxes block set to Number, Dot or Arrow draws its own mark: its boxes' icons are in use nowhere, and count again
-  // once it is Icon. A box after the block closes counts as before.
+  // Dot and Arrow hide the icons. Number keeps them below the count. A box after the block closes counts as before.
   const boxes = (look: string) => [{ kind: 'blocks', data: { markdown: `:::: {.boxes${look}}\n::: {.box icon="truck"}\n### A\n:::\n::::\n\n::: {.box icon="brain"}\n:::` } }]
-  for (const look of [' look="steps"', ' look="line"', ' look="arrows"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['brain'], look)
-  for (const look of ['', ' look="boxes"', ' look="something-new"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['truck', 'brain'], look || 'Icon')
+  for (const look of [' look="line"', ' look="arrows"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['brain'], look)
+  for (const look of ['', ' look="boxes"', ' look="steps"', ' look="something-new"']) assert.deepEqual(deckIconsInUse(boxes(look)).map(icon => icon.name), ['truck', 'brain'], look || 'Icon')
 })
 
 test('PR 3: before typing, the icons in use, then the 24, each once; then results, a page at a time', () => {
@@ -246,6 +245,18 @@ test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the fo
   assert.deepEqual([0, 1, 6].map(at => side(at, 'left')), [0, 0, 5])
   assert.equal(side(26, 'left'), 26)
   assert.equal(side(-1, 'right'), -1)
+})
+
+test('Enter picks the first result from search and removes only at No icon', () => {
+  assert.equal(iconMenuEnterChoice(-1, 3, true), 0)
+  assert.equal(iconMenuEnterChoice(2, 3, true), 2)
+  assert.equal(iconMenuEnterChoice(-1, 0, true), null)
+  assert.equal(iconMenuEnterChoice(-1, 0, false), null)
+  for (const count of [0, 1, 6]) {
+    const last = iconMenuMove(count ? 0 : -1, 'down', count, true, 6)
+    assert.equal(last, count)
+    assert.equal(iconMenuEnterChoice(last, count, true), 'none')
+  }
 })
 
 test('PR 4 (#869): a misspelt name finds the names nearest it, nearest first; nonsense still finds none', () => {
