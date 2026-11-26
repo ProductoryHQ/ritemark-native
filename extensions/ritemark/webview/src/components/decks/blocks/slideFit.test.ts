@@ -195,7 +195,7 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(/\.blk-link(?:, [^{]*)? \{[^}]*overflow-wrap: anywhere;/.test(css), 'a link (a web address) may break (#938: the slide editor\'s live link shares the rule)')
   assert.ok(!/\.deck-sl\.is-blocks[^{]*\{[^}]*(?:word-break: break-all|overflow-wrap: anywhere)[^}]*\}/.test(css.replace(/\.deck-sl\.is-blocks \.blk-link[^{]*\{[^}]*\}/, '').replace(/\.deck-sl \.blk-missing-name \{[^}]*\}/, '')), 'nothing else splits words')
   assert.ok(/\.is-cover \.blk-flow \{[^}]*justify-content: safe flex-end;/.test(css), "a cover's title is never pushed past the top")
-  assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/.test(css) && /\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{ flex: 0 1 auto; min-height: 96px;/.test(css), 'the picture shrinks first, down to 96 px')
+  assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/.test(css) && /\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{ flex: 0 1 auto; min-height: 0;/.test(css), 'the picture shrinks first to fit the remaining room')
   assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) > \* \{ flex: none; \}/.test(css), 'the title and the words never shrink')
   // The stage's editor (ProseMirror) breaks long words by default: the slide's rule wins over it.
   const decks = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')

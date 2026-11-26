@@ -131,7 +131,7 @@ const SECTION = '2\n\n# The afternoon';
     const props = body.split(';').map(part => part.split(':')[0].trim()).filter(Boolean);
     if (/> :is\(\.blk-pic, img\)/.test(selector)) {
       assert.deepEqual(props, ['margin-top', 'margin-bottom'], 'a lone picture gives up its auto margins, nothing else');
-      assert.match(selector, /:is\(\.is-lone-pic, \.is-titled-pic\):is\(\.va-top, \.va-middle, \.va-bottom\)/, 'only a lone picture');
+      assert.match(selector, /\.is-lone-pic:is\(\.va-top, \.va-middle, \.va-bottom\)/, 'only a lone picture');
       continue;
     }
     if (/\.blk-flow > :nth-last-child/.test(selector)) {
