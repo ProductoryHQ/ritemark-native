@@ -56,7 +56,6 @@ export interface AcpClientHandlers {
   requestPermission: (params: RequestPermissionRequest) => Promise<RequestPermissionResponse>;
   /** session/update notifications — streaming progress (R5). */
   sessionUpdate: (params: SessionNotification) => void | Promise<void>;
-  sessionError?: (sessionId: string, error: string, willRetry: boolean) => void;
   /** fs/read_text_file — proxied through vscode.workspace.fs (acpFsProxy). */
   readTextFile: (params: ReadTextFileRequest) => Promise<ReadTextFileResponse>;
   /** fs/write_text_file — proxied + approval-gated (acpFsProxy, R4). */
@@ -134,32 +133,7 @@ export class AcpClient {
     const fromAgent = Readable.toWeb(this.process.stdout) as ReadableStream<Uint8Array>;
     const stream = acp.ndJsonStream(toAgent, fromAgent);
 
-    // The SDK validates the standard update variants. Read OpenCode's error
-    // extension before validation, leaving standard notifications to the SDK.
-    type Message = import('@agentclientprotocol/sdk').Stream['readable'] extends ReadableStream<infer T> ? T : never;
-    const readable = stream.readable.pipeThrough(new TransformStream<Message, Message>({
-      transform: (message, controller) => {
-        const notification = message as {
-          method?: unknown;
-          id?: unknown;
-          params?: {
-            sessionId?: unknown;
-            update?: { sessionUpdate?: unknown; error?: unknown; message?: unknown; willRetry?: unknown };
-          };
-        };
-        if (notification?.method === 'session/update' && notification.id === undefined) {
-          const { sessionId, update } = notification.params ?? {};
-          const error = update?.error ?? (update?.sessionUpdate === 'error' ? update.message : undefined);
-          if (typeof sessionId === 'string' && error != null) {
-            const text = typeof error === 'string' ? error : JSON.stringify(error);
-            this.config.handlers.sessionError?.(sessionId, text, update?.willRetry === true);
-            if (update?.sessionUpdate === 'error') return;
-          }
-        }
-        controller.enqueue(message);
-      },
-    }));
-    this.connection = new acp.ClientSideConnection(() => this.buildClientHandler(), { ...stream, readable });
+    this.connection = new acp.ClientSideConnection(() => this.buildClientHandler(), stream);
 
     const result = await this.connection.initialize({
       protocolVersion: acp.PROTOCOL_VERSION,

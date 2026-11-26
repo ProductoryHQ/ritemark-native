@@ -543,8 +543,7 @@ export function classifyRuntimeError(
     }
   }
 
-  if (agentId === 'opencode' && (hints?.httpStatus === 429 || hints?.httpStatus === 503
-    || envelopeCodes.has('429') || envelopeCodes.has('503') || isOpenCodeBusyError(raw) || isOpenCodeBusyError(unwrapped ?? ''))) {
+  if (agentId === 'opencode' && (isOpenCodeBusyError(raw) || isOpenCodeBusyError(unwrapped ?? ''))) {
     const retryAt = serviceRetryAt(haystack);
     return finish(agentId, 'limit', providerSentence, hints, { limit: 'busy', ...(retryAt ? { retryAt } : {}) });
   }

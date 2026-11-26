@@ -46,7 +46,7 @@ import {
 } from '../runtime/continuation';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
-import { ACP_QUIET_STREAM_ERROR, acpTurnErrorCode, googleRetryDelaySeconds, serviceRetryAt } from '../runtime/runtimeErrorPresentation';
+import { ACP_QUIET_STREAM_ERROR, acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 import { noteOpenCodeModels } from '../ai/modelCatalog';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { activeFileLines } from '../decks/currentSlide';
@@ -92,7 +92,7 @@ export function isBoardToolPermission(params: RequestPermissionRequest): boolean
 
 // Claude's 15-minute inactivity window is too long for a silent OpenCode stream.
 const ACP_QUIET_STREAM_MS = 90_000;
-const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
+const ACP_TURN_CEILING_MS = 15 * 60_000;
 // Give the notification time to flush before completion can dispose the subprocess.
 const ACP_CANCEL_WRITE_MS = 1_000;
 
@@ -171,6 +171,7 @@ export class AcpSession implements RuntimeSession {
     private readonly _runtime: AcpRuntime,
     private _continuationContext?: NormalizedRuntimeContext,
     private readonly _quietStreamMs = ACP_QUIET_STREAM_MS,
+    private readonly _turnCeilingMs = ACP_TURN_CEILING_MS,
   ) {
     this._config = config;
   }
@@ -256,38 +257,35 @@ export class AcpSession implements RuntimeSession {
         });
       }
 
-      const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
-      const quietMs = Math.min(this._quietStreamMs, timeoutMs);
-      let timer: ReturnType<typeof setTimeout> | undefined;
+      const quietMs = turn.timeoutMinutes === undefined ? this._quietStreamMs : turn.timeoutMinutes * 60_000;
+      let quietTimer: ReturnType<typeof setTimeout> | undefined;
+      let cancelWriteTimer: ReturnType<typeof setTimeout> | undefined;
       let approvals = 0;
       let toolsRunning = false;
       let finished = false;
-      let abandon = false;
-      let providerError: string | undefined;
+      const abort = new AbortController();
       let fail!: (error: Error) => void;
       const failed = new Promise<never>((_, reject) => { fail = reject; });
       const stop = (error: Error) => {
-        if (finished || abandon) return;
-        abandon = true;
-        clearTimeout(timer);
-        clearTimeout(ceilingTimer);
+        if (finished || abort.signal.aborted) return;
         fail(error);
+        abort.abort(error);
+        clearTimeout(quietTimer);
+        clearTimeout(ceilingTimer);
       };
       const onActivity = () => {
-        clearTimeout(timer);
-        if (finished || abandon || approvals > 0 || toolsRunning) return;
-        timer = setTimeout(() => {
-          stop(providerError
-            ? new Error(providerError)
-            : Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
+        clearTimeout(quietTimer);
+        if (finished || abort.signal.aborted || approvals > 0 || toolsRunning) return;
+        quietTimer = setTimeout(() => {
+          stop(Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
         }, quietMs);
       };
 
       // #658: hold this conversation's browser page only while its prompt is active.
       this._runtime.beginBrowserTurn(this, config.browserPage);
       const ceilingTimer = setTimeout(() => {
-        stop(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
-      }, timeoutMs);
+        stop(new Error(`OpenCode did not respond within ${Math.round(this._turnCeilingMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+      }, this._turnCeilingMs);
       onActivity();
       const prompted = manager.prompt(this.acpSessionId, promptText, {
         onActivity,
@@ -299,23 +297,7 @@ export class AcpSession implements RuntimeSession {
           toolsRunning = running;
           onActivity();
         },
-        onError: (error, terminal) => {
-          if (terminal) stop(new Error(error));
-          else {
-            providerError = error;
-            onActivity();
-          }
-        },
-        onRetry: (text) => {
-          onActivity();
-          if (!providerError) return;
-          const now = Date.now();
-          const retryAt = serviceRetryAt(text.replace(/\bretrying in\b/i, 'try again in'), now);
-          const delay = googleRetryDelaySeconds(text);
-          const retryTime = retryAt ? Date.parse(retryAt) : delay !== undefined ? now + delay * 1000 : undefined;
-          config.onRuntimeRetry?.({ busy: true, ...(retryTime !== undefined ? { retryAt: retryTime } : {}) });
-        },
-      });
+      }, abort.signal);
       try {
         const result = await Promise.race([prompted, failed]);
         this.markDispatchAccepted();
@@ -337,32 +319,31 @@ export class AcpSession implements RuntimeSession {
           ...(filesModified.length ? { filesModified } : {}),
         });
       } catch (err) {
-        // The prompt may still be pending after a timeout or an error update.
-        if (abandon) {
+        // The prompt may still be pending after a timeout.
+        if (abort.signal.aborted) {
           // #658: its browser calls still in flight are refused until its prompt settles, not sent to another page.
           this._runtime.holdEndedBrowserTurn(this, prompted);
+          this.rejectPendingApprovals();
+          this.recentlyPermissionedWrites.clear();
           await Promise.race([
-            manager.cancel(this.acpSessionId).catch(() => { /* already failing */ }),
-            new Promise<void>((resolve) => { timer = setTimeout(resolve, ACP_CANCEL_WRITE_MS); }),
+            manager.cancelTurn(this.acpSessionId).catch(() => { /* already failing */ }),
+            new Promise<void>((resolve) => { cancelWriteTimer = setTimeout(resolve, ACP_CANCEL_WRITE_MS); }),
           ]);
         }
         throw err;
       } finally {
         finished = true;
-        clearTimeout(timer);
+        clearTimeout(quietTimer);
+        clearTimeout(cancelWriteTimer);
         clearTimeout(ceilingTimer);
         this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
-      const rpc = err as { code?: unknown; data?: { statusCode?: unknown; status?: unknown; message?: unknown } } | null;
-      const errorHttpStatus = rpc?.data?.statusCode ?? rpc?.data?.status ?? rpc?.code;
-      const providerMessage = typeof rpc?.data?.message === 'string' ? rpc.data.message : raw;
       config.onCodexComplete?.({
-        status: 'error', error: describeAcpTurnError(providerMessage),
+        status: 'error', error: describeAcpTurnError(raw),
         ...(errorCode ? { errorCode } : {}),
-        ...(errorHttpStatus === 429 || errorHttpStatus === 503 ? { errorHttpStatus } : {}),
       });
     }
   }
