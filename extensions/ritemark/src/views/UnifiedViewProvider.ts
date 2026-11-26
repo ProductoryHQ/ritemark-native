@@ -302,7 +302,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    * signed in with, held until the sidebar's page can hear it, as the report
    * window is.
    */
-  private _pendingLandingChat: { runtimeId: AgentId; placeholder: string } | null = null;
+  private _pendingLandingChat: { runtimeId: AgentId } & ({ placeholder: string } | { fromStatus: true }) | null = null;
   /** Pictures with ChatGPT: a sign-in card to ring once the sidebar's page is ready. */
   private _pendingSignInAttention: SheetSignInAi | null = null;
   /** Sprint 140 (R5): a chat Home's ready request asked for before the sidebar's page was ready. */
@@ -782,11 +782,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             this._pendingOpenReport = false;
             void webviewView.webview.postMessage(this._reportOpenMessage());
           }
-          if (this._pendingLandingChat) {
-            const landing = this._pendingLandingChat;
-            this._pendingLandingChat = null;
-            void webviewView.webview.postMessage({ type: 'landing:new-chat', ...landing });
-          }
+          this._flushLandingChat();
           if (this._pendingSignInAttention) {
             const ai = this._pendingSignInAttention;
             this._pendingSignInAttention = null;
@@ -2074,6 +2070,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     // is visible so the composer chip reflects browser/menu changes without
     // requiring a tab switch. Polling stops when the sidebar hides or disposes.
     webviewView.onDidChangeVisibility(() => {
+      if (this._isCurrentSidebarView(webviewView.webview, viewGeneration)) this._flushLandingChat();
       this._refreshBrowserContextPolling();
       this._markInFrontRead();
       // Sprint 127 R5 (S27): a long-idle sidebar checks the model feed on show.
@@ -2157,15 +2154,22 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /**
    * The welcome's landing (Sprint 133, R6): open the AI's sheet on a new chat
    * with this runtime, its message box reading "Ask Claude about this project".
+   * A status bar click uses the same route with the standard composer placeholder.
    * Held until the sidebar's page is ready, like the report window.
    */
-  public async openLandingChat(runtimeId: AgentId, placeholder: string): Promise<void> {
+  public async openLandingChat(runtimeId: AgentId, placeholder?: string): Promise<void> {
+    this._pendingLandingChat = placeholder === undefined
+      ? { runtimeId, fromStatus: true }
+      : { runtimeId, placeholder };
     await vscode.commands.executeCommand('ritemark.unifiedView.focus');
-    if (this._view && this._sidebarReady) {
-      void this._view.webview.postMessage({ type: 'landing:new-chat', runtimeId, placeholder });
-      return;
-    }
-    this._pendingLandingChat = { runtimeId, placeholder };
+    this._flushLandingChat();
+  }
+
+  private _flushLandingChat(): void {
+    if (!this._view?.visible || !this._sidebarReady || !this._pendingLandingChat) return;
+    const landing = this._pendingLandingChat;
+    this._pendingLandingChat = null;
+    void this._view.webview.postMessage({ type: 'landing:new-chat', ...landing });
   }
 
   /**

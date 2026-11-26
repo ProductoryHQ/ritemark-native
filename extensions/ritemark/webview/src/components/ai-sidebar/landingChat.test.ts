@@ -103,5 +103,77 @@ assert.equal(useAISidebarStore.getState().landingPlaceholder?.runtimeId, 'openco
   }
 }
 
+// A status bar click brings the requested AI to a fresh chat and focuses the composer.
+{
+  const frames: FrameRequestCallback[] = [];
+  let focusCount = 0;
+  Object.assign(globalThis, {
+    requestAnimationFrame: (frame: FrameRequestCallback) => frames.push(frame),
+    document: { querySelector: (selector: string) => {
+      assert.equal(selector, 'textarea[aria-label="Message"]');
+      return { focus: () => focusCount++ };
+    } },
+  });
+  const click = (runtimeId: 'claude-code' | 'codex') => {
+    focusCount = 0;
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'landing:new-chat', runtimeId, fromStatus: true });
+    while (frames.length) frames.shift()!(0);
+    assert.equal(focusCount, 1);
+  };
+  try {
+    reset();
+    useAISidebarStore.setState({ codexModels: [{ id: 'gpt-test', name: 'GPT test', description: '' } as never] });
+    useAISidebarStore.getState().restoreActiveConversation({
+      chatMessages: [{ id: 'earlier', role: 'user', content: 'Earlier turn', timestamp: 1 }],
+    });
+    click('codex');
+    assert.notEqual(active().id, 'conv-1');
+    assert.equal(active().selectedAgent, 'codex');
+    assert.equal(active().pendingRuntime.runtimeId, 'codex');
+    assert.equal(useAISidebarStore.getState().conversations['conv-1'].chatMessages[0].content, 'Earlier turn');
+
+    const emptyId = active().id;
+    // On a cold open, the mounted composer consumes the fill and focuses itself.
+    const fill = useAISidebarStore.getState().composerFill;
+    assert.equal(fill?.conversationId, emptyId);
+    assert.equal(fill?.text, '');
+    assert.equal(fill?.cursor, 0);
+    useAISidebarStore.getState().takeComposerFill();
+    click('codex');
+    assert.equal(active().id, emptyId, 'the blank chat with that AI is the new chat: focus only');
+    const emptyThreads = () => Object.values(useAISidebarStore.getState().conversations)
+      .filter((c) => c.chatMessages.length === 0).length;
+    assert.equal(emptyThreads(), 1, 'R10: never a second empty thread');
+    useAISidebarStore.getState().takeComposerFill();
+
+    useAISidebarStore.getState().setComposerDraft(emptyId, 'Unsent draft');
+    useAISidebarStore.getState().setComposerEmpty(false);
+    click('claude-code');
+    assert.equal(active().id, emptyId);
+    assert.equal(active().selectedAgent, 'codex');
+    assert.equal(useAISidebarStore.getState().composerDrafts[emptyId], 'Unsent draft');
+
+    useAISidebarStore.getState().setComposerDraft(emptyId, '');
+    useAISidebarStore.getState().setComposerEmpty(true);
+    click('claude-code');
+    assert.equal(active().id, emptyId, 'a blank chat with another AI is reused, not doubled (R10)');
+    assert.equal(active().selectedAgent, 'claude-code', 'and takes the clicked AI');
+    assert.equal(emptyThreads(), 1, 'R10: still one empty thread');
+
+    reset();
+    useAISidebarStore.setState({ codexModels: [] });
+    click('codex');
+    assert.equal(emptyThreads(), 1, 'a closed column with a blank chat: still one empty thread');
+    assert.equal(active().pendingRuntime.runtimeId, 'codex', 'the chat starts on ChatGPT while its models load');
+    assert.ok(useAISidebarStore.getState().pendingLanding);
+    useAISidebarStore.setState({ codexModels: [{ id: 'gpt-test', name: 'GPT test', description: '' } as never] });
+    useAISidebarStore.getState().handleExtensionMessage({ type: 'ai-stopped' });
+    assert.equal(active().pendingRuntime.modelId, 'gpt-test');
+  } finally {
+    Reflect.deleteProperty(globalThis, 'requestAnimationFrame');
+    Reflect.deleteProperty(globalThis, 'document');
+  }
+}
+
 vscode.postMessage = originalPostMessage;
 console.log('landingChat tests passed.');
