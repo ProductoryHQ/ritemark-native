@@ -1,3 +1,4 @@
+import { commandStep } from '../../../../src/runtime/commandStep';
 import { splitFileName } from '../../../../src/decks/deckFileName';
 import { documentStepKind, isDocumentReadTool, type ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentProgress } from './types';
@@ -36,7 +37,8 @@ function stepOf(activity: AgentProgress): Omit<ToolStep, 'id'> | undefined {
   if (activity.step) return activity.step;
   // Older transcripts did not persist the step payload.
   if (/^(?:Bash|shell|terminal|commandExecution)$/i.test(activity.tool ?? '')) {
-    return { kind: 'shell', command: activity.message, status: activity.type === 'done' ? 'completed' : undefined };
+    const shell: ToolStep = { id: '', kind: 'shell', command: activity.message, status: activity.type === 'done' ? 'completed' : undefined };
+    return activity.tool === 'commandExecution' ? commandStep(shell) : shell;
   }
   if (activity.tool === 'Read' || isDocumentReadTool(activity.tool)) return { kind: 'read', path: activity.file };
   if (activity.tool === 'Glob' || activity.tool === 'LS') return { kind: 'folder', path: activity.file, command: activity.message };
@@ -51,7 +53,7 @@ export function stepLabel(activity: AgentProgress) {
   const reason = step.warning?.trim();
   const detail = [path, command].filter(Boolean).join('\n');
   if (step.kind === 'shell') {
-    const documents = /\.(?:docx?|pdf|pptx?)(?=$|[\s"'\x60,;)\]])/i.test(command ?? '');
+    const documents = activity.tool === 'Bash' && /\.(?:docx?|pdf|pptx?)(?=$|[\s"'\x60,;)\]])/i.test(command ?? '');
     const label = warning ? "Couldn't run the command" : documents ? 'Reading documents' : status === 'completed' ? 'Ran a command' : 'Running a command';
     const note = reason || (command
       ? 'the command failed. Open step details to check the command'
@@ -138,8 +140,12 @@ function isRetryThought(activity?: AgentProgress): boolean {
 }
 
 /** Remove superseded attempts from the turn's visible steps. */
-export function visibleStepActivities(activities: AgentProgress[], workspacePath?: string): AgentProgress[] {
-  const rows = activities.filter((activity) => !isTurnLifecycleActivity(activity) && !isHiddenToolActivity(activity));
+export function visibleStepActivities(activities: AgentProgress[], workspacePath?: string, omitEmptyThinking = false): AgentProgress[] {
+  const rows = activities.filter((activity) => {
+    if (isTurnLifecycleActivity(activity) || isHiddenToolActivity(activity)) return false;
+    if (!omitEmptyThinking || (activity.type !== 'thinking' && activity.tool !== 'agentMessage')) return true;
+    return !/^(?:Thinking(?:\.{3}|…))?$/i.test(thinkingText(activity.message));
+  });
   const superseded = new Set<number>();
   const outcomes = new Map<string, number>();
   let nextAction: AgentProgress | undefined;

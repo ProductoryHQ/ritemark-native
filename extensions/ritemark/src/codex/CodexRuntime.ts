@@ -16,6 +16,7 @@
  */
 
 import type { DocumentReadReason } from '../documents/documentRead';
+import { commandStep } from '../runtime/commandStep';
 import { isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import * as crypto from 'crypto';
 import { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT, CodexAppServer } from './codexAppServer';
@@ -50,6 +51,13 @@ import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { toolSetKey } from '../runtime/ritemarkTools';
 import { codexTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 import { activeFileLines } from '../decks/currentSlide';
+
+interface CommandItemFields {
+  command?: string;
+  cwd?: string;
+  commandActions?: Parameters<typeof commandStep>[1];
+  parsed_cmd?: Parameters<typeof commandStep>[1];
+}
 
 // ── Codex-specific constants ────────────────────────────────────────────────
 
@@ -926,7 +934,7 @@ export class CodexRuntime implements AgentRuntime {
 
     this._appServer.on(
       'item/started',
-      (params: { item: { type: string; id: string; command?: string; tool?: string }; threadId: string; turnId: string }) => {
+      (params: { item: CommandItemFields & { type: string; id: string; tool?: string }; threadId: string; turnId: string }) => {
         const session = this._sessionForThread(params.threadId, 'item/started');
         const config = session?.config;
         if (!session || !config) return;
@@ -936,7 +944,9 @@ export class CodexRuntime implements AgentRuntime {
         if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && !isDocumentReadTool(params.item.tool)) {
           const label = itemType === 'agentMessage' ? 'Thinking...' : `Running: ${itemType}`;
           const step: ToolStep | undefined = itemType === 'commandExecution'
-            ? { id: params.item.id, kind: 'shell', command: params.item.command } : undefined;
+            ? commandStep({ id: params.item.id, kind: 'shell', command: params.item.command },
+              params.item.commandActions ?? params.item.parsed_cmd, params.item.cwd, config.workspacePath)
+            : undefined;
           config.onProgress({ type: 'tool_use', message: label, tool: itemType, timestamp: Date.now(), ...(step ? { step } : {}) });
         }
       },
@@ -974,7 +984,7 @@ export class CodexRuntime implements AgentRuntime {
       config?.onCodexPlanUpdate?.(params.explanation, params.plan);
     });
 
-    this._appServer.on('item/completed', (params: { item: { type: string; id: string; text?: unknown; tool?: string; command?: string; status?: string }; threadId?: string }) => {
+    this._appServer.on('item/completed', (params: { item: CommandItemFields & { type: string; id: string; text?: unknown; tool?: string; status?: string; aggregatedOutput?: string }; threadId?: string }) => {
       const session = this._sessionForThread(params.threadId, 'item/completed');
       const config = session?.config;
       if (!session || !config) return;
@@ -991,9 +1001,16 @@ export class CodexRuntime implements AgentRuntime {
         session._lastAgentMessage = { itemId: params.item.id ?? null, text: params.item.text };
       }
       if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage' && !isDocumentReadTool(params.item.tool)) {
-        const step: ToolStep | undefined = itemType === 'commandExecution'
-          ? { id: params.item.id, kind: 'shell', command: params.item.command, status: params.item.status === 'completed' ? 'completed' : 'failed' }
+        const item = params.item;
+        const command = itemType === 'commandExecution'
+          ? commandStep({ id: item.id, kind: 'shell', command: item.command },
+            item.commandActions ?? item.parsed_cmd, item.cwd, config.workspacePath)
           : undefined;
+        const step = command && toolStepResult(command,
+          // Only rg --files and find emit one path per line.
+          command.kind === 'folder' && /^(?:rg\s+--files\b|find\s)/.test(item.command ?? '')
+            ? item.aggregatedOutput : undefined,
+          item.status !== 'completed');
         config.onProgress({ type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now(), ...(step ? { step } : {}) });
       }
     });

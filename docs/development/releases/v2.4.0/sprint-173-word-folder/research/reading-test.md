@@ -19,16 +19,16 @@ RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-reading-claude
 
 For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The runner selects a Google model for this run. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
 
-Use `--question "<text>"` to run the three S38 prompts. For these runs, criteria 1, 2, 4 and 5 are marked `n/a`. The runner checks step labels and source style and records any links the answer includes. Judge each S38 answer against its requested scope. Regenerate older fixtures to pick up the additional accepted facts for criterion 1.
+Use `--question "<text>"` to run the three S38 prompts. For these runs, criteria 1, 2, 4 and 5 are marked `n/a`. The runner checks step labels and source style and records any links the answer includes. Judge each S38 answer against its requested scope. Use the fixture’s listed facts for automatic coverage checks.
 
-1. All 13 documents have a matching fact or an explicit, valid unread reason. The fixture has two known unread cases (the scan and the confidential appendix).
+1. Check coverage for all 13 documents. The runner accepts a title after an optional leading “The” or “the” and still accepts unique title prefixes. A title with a matching listed fact is `read`. A document named with a valid unread reason is `unread`. A title with neither is `to check`. A document with no matching title or valid unread entry is `missing`. For each `to check` row, judge whether the bullet gives a concrete finding from that document and quote the document’s supporting sentence, as in the criterion 4 person check. The runner reports `pass` when all rows are `read` or `unread`, `fail` when any row is `missing`, and `to check` otherwise.
 2. The notes belong to their own slides and slide 5 is explicitly reported as having none.
 3. Every visible step label names a document or folder. Commands and paths fail this check.
 4. All source links must open the right document, and at least 90% of all source links must land on a passage or slide that supports the claim. The runner reports how many opened the right document and how many include a passage target. A link without a passage counts as a no. For links with passage targets, record a yes or no for each after checking the passage or slide yourself. A find match alone does not establish that the passage supports the claim. A link lands on the claim when the passage it opens supports the claim the link is attached to. An added detail from the same document is fine. An added detail from another document makes it a no.
 5. The confidential appendix is named, described as having a password, and accompanied by a way forward.
 6. The visible answer has no numbered sources, bracketed filenames or paths.
 
-For fixed-question runs, fill all six criteria with pass or fail. Each AI needs three passing runs out of three on each platform. After a failure, retain its evidence and start a fresh set after the fix. G2 opens the Word and PDF starting points per AI after it passes on Mac and keeps them on if Windows also passes at Gate 2.
+For fixed-question runs, resolve the pending person checks and record pass or fail for all six criteria. Each AI needs three passing runs out of three on each platform. After a failure, retain its evidence and start a fresh set after the fix. G2 opens the Word and PDF starting points per AI after it passes on Mac and keeps them on if Windows also passes at Gate 2.
 
 ## Run records
 
@@ -415,7 +415,9 @@ Verdict — pending (3 of 3 required).
 
 ### ChatGPT on Mac
 
-Verdict — pending (3 of 3 required).
+Set 1 (26 November 2026) — **0 of 3 on 1848bc80**. All three failed criterion 3 on generic command rows and a trailing empty Thinking row. Criterion 1 also failed as originally scored. Run 1 gave the Engagement brief’s March 2027 deadline, which was outside the fact list. Run 2 paraphrased the Findings draft’s point about older customers getting app help in branches. Run 3 used “The” before eight titles and paraphrased the Findings draft. Set 1 retains its original verdict. A fresh set follows.
+
+Fresh set verdict — pending (3 of 3 required).
 
 #### Run 1
 

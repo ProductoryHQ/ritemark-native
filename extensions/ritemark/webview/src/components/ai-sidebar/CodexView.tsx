@@ -348,7 +348,7 @@ function ActivitySection({
   const [expanded, setExpanded] = useState(false);
 
   const workspacePath = useAISidebarStore((state) => state.workspacePath);
-  const visible = visibleStepActivities(turnActivities, workspacePath);
+  const visible = visibleStepActivities(turnActivities, workspacePath, !isRunning);
   const notices = visible.filter((activity) => activity.type === 'notice');
   const activities = visible.filter((activity) => activity.type !== 'notice');
   const count = activities.length;
