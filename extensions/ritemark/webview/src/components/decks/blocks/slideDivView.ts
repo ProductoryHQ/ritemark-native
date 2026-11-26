@@ -4,11 +4,9 @@
  * look, `blk-box` with its icon, `blk-steps`. The block's words are the editor's own content.
  *
  * PR 3 (README frame 4 and "The 'Exercise' pill is the person's own word"; the plan's "Added to PR 3"):
- *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). A box with none gets a place
- *    for one, on the stage only, under the looks that draw icons. Since the follow-up to #773 the place is never drawn
- *    (`display: none`): it tells the block bar that the caret's box has room for an icon, and the bar draws the icon
- *    handle there (`SlideBlockBar`, the `smile-plus` handle over the box's top edge). `slideCaretBox` still marks the
- *    caret's box `is-caret`; no rule draws it now.
+ *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). Under Icon, an empty box
+ *    shows the same dashed badge as an unknown icon. Under Number, the hidden icon slot anchors the block bar's
+ *    icon handle when the caret is in the box.
  *  - **Steps** has no pill of its own since Sprint 164 PR 3: its old pill is a Label before it (`slideLabel.ts`), and the
  *    stage opens a slide with its pills as Labels already (`SlideEditor.stageMarkdownOf`).
  *
@@ -32,7 +30,7 @@ export interface SlideDivHandlers {
   /** A box's icon (or its empty place) was clicked: choose one for the box at `pos`, under `anchor`. */
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
   /** #850: the pointer came onto the badge of a box at `pos` whose icon `name` Ritemark doesn't know (its tooltip). */
-  hintIcon?: (pos: number, anchor: HTMLElement, name: string) => void
+  hintIcon?: (pos: number, anchor: HTMLElement, name: string | null) => void
 }
 
 /** #850: the words a box's unknown icon says, in the stage's tooltip and to a screen reader. */
@@ -116,9 +114,8 @@ class SlideDivView implements NodeView {
   /** #850: the pointer on an unknown icon's badge: the stage's tooltip says so, with Choose an icon. */
   private onIconEnter = () => {
     const pos = this.getPos()
-    const name = this.deco?.classList.contains('is-unknown') ? this.deco.getAttribute('data-icon') : null
-    if (pos === undefined || !this.deco || this.deco.hidden || !name) return
-    this.handlers?.hintIcon?.(pos, this.deco, name)
+    if (pos === undefined || !this.deco || this.deco.hidden || !this.deco.classList.contains('is-unknown')) return
+    this.handlers?.hintIcon?.(pos, this.deco, this.deco.getAttribute('data-icon'))
   }
 
   private render() {
@@ -147,7 +144,7 @@ class SlideDivView implements NodeView {
     const look = this.look
     // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
     const showsIcons = boxesShowIcons(look)
-    const badge = showsIcons ? boxIconBadge(attrs.values.icon) : null
+    const badge = showsIcons ? boxIconBadge(attrs.values.icon, look !== 'steps' ? 'placeholder' : undefined) : null
     deco.removeAttribute('data-icon')
     if (look === 'arrows') {
       deco.className = 'blk-mark'
@@ -160,9 +157,12 @@ class SlideDivView implements NodeView {
       deco.hidden = false
       // The unknown name, as written, for the stage's tooltip (`onIconEnter`).
       if (badge.unknown !== null) deco.setAttribute('data-icon', badge.unknown)
-      this.pickable(deco, badge.unknown === null ? 'Change the icon' : `${unknownIconWords(badge.unknown)}: choose an icon`)
+      const label = badge.unknown !== null
+        ? `${unknownIconWords(badge.unknown)}: choose an icon`
+        : attrs.values.icon?.trim() ? 'Change the icon' : 'Choose an icon'
+      this.pickable(deco, label)
     } else if (showsIcons && this.handlers) {
-      // A box with no icon shows a place for one, on the stage only (README frame 4).
+      // Under Number, the hidden slot anchors the caret’s icon handle.
       deco.className = 'blk-icon is-pickable is-place'
       deco.innerHTML = PLUS_SVG
       deco.hidden = false
