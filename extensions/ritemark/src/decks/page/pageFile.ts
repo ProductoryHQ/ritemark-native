@@ -212,21 +212,28 @@ export async function removeDeckPage(pageFs: PageFs, pagePath: string, html: str
 
 /** Every picture the public deck names, and where: the slides' `image:` lines and the handouts' pictures (relative ones). */
 export function picturePaths(deck: PublicDeck): Array<{ path: string; from: PictureFrom }> {
-  const found = new Map<string, { path: string; from: PictureFrom }>();
-  const add = (picture: string, from: PictureFrom) => {
-    if (isRelativeTarget(picture)) found.set(pictureKey(picture, from), { path: picture.trim(), from });
+  return pictureLocations(deck).map(({ path, from }) => ({ path, from }));
+}
+
+function pictureLocations(deck: PublicDeck) {
+  const found = new Map<string, { path: string; from: PictureFrom; slideIndex?: number }>();
+  const add = (picture: string, from: PictureFrom, slideIndex?: number) => {
+    if (!isRelativeTarget(picture)) return;
+    const key = pictureKey(picture, from);
+    if (found.get(key)?.slideIndex === undefined) found.set(key, { path: picture.trim(), from, slideIndex });
   };
-  for (const slide of deck.slides) {
-    if (slide.data.image) add(slide.data.image, 'slide');
-    // A block slide's own pictures (Sprint 161), by the paths its renderer asks for them.
-    if (slide.data.markdown) for (const picture of blockPicturePaths(slide.data.markdown)) add(picture, 'slide');
+  for (const [index, slide] of deck.slides.entries()) {
+    if (slide.data.image) add(slide.data.image, 'slide', index);
+    if (slide.data.markdown) for (const picture of blockPicturePaths(slide.data.markdown)) add(picture, 'slide', index);
   }
-  for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
-    if (!markdown) continue;
+  const handout = (markdown: string, slideIndex?: number) => {
+    if (!markdown) return;
     marked.walkTokens(lexHandout(markdown), token => {
-      if (token.type === 'image') add(token.href, 'handout');
+      if (token.type === 'image') add(token.href, 'handout', slideIndex);
     });
-  }
+  };
+  handout(deck.preamble);
+  deck.slides.forEach((slide, index) => handout(slide.handout, index));
   return [...found.values()];
 }
 
@@ -235,20 +242,22 @@ async function foundPictures(deck: PublicDeck, deckPath: string, pageFs: Pick<Pa
   return new Map([...(await foundPictureFiles(deck, deckPath, pageFs))].map(([key, found]) => [key, found.address]));
 }
 
+type FoundPicture = { address: string; file: string; slideIndex?: number };
+
 /** The same, with each picture's file on disk. */
-async function foundPictureFiles(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, { address: string; file: string }>> {
+async function foundPictureFiles(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, FoundPicture>> {
   const folder = path.dirname(deckPath);
-  const checked = await Promise.all(picturePaths(deck).map(async picture => {
+  const checked = await Promise.all(pictureLocations(deck).map(async (picture): Promise<readonly [string, FoundPicture] | null> => {
     const file = pictureFile(picture.path, picture.from);
     const onDisk = path.resolve(folder, ...file.split('/'));
     try {
-      return (await pageFs.stat(onDisk)).isFile() ? [pictureKey(picture.path, picture.from), { address: pictureAddress(file), file: onDisk }] as const : null;
+      return (await pageFs.stat(onDisk)).isFile() ? [pictureKey(picture.path, picture.from), { address: pictureAddress(file), file: onDisk, slideIndex: picture.slideIndex }] : null;
     } catch {
       // Not there: the slide draws its empty picture place, the handout the picture's words.
       return null;
     }
   }));
-  return new Map(checked.filter((entry): entry is readonly [string, { address: string; file: string }] => entry !== null));
+  return new Map(checked.filter((entry): entry is readonly [string, FoundPicture] => entry !== null));
 }
 
 /**
@@ -279,13 +288,13 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
 type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; measureFit?: boolean; print?: 'slides' | 'handout' };
 
 export async function buildDeckPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; pagePath?: string; onPicture?: (file: string) => void },
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; pagePath?: string; onPicture?: (file: string, slideIndex?: number) => void },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
   const folder = input.pagePath && path.dirname(input.pagePath);
   return buildPage(input, assets, pageFs, picture => {
-    input.onPicture?.(picture.file);
+    input.onPicture?.(picture.file, picture.slideIndex);
     return folder && folder !== path.dirname(input.deckPath)
       ? pictureAddress(path.relative(folder, picture.file).split(path.sep).join('/'))
       : picture.address;
@@ -328,7 +337,7 @@ async function buildPage(
   input: PageInput,
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'>,
-  placed: ((picture: { address: string; file: string }) => string) | null,
+  placed: ((picture: FoundPicture) => string) | null,
 ): Promise<BuiltPage> {
   const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
   const found = await foundPictureFiles(deck, input.deckPath, pageFs);

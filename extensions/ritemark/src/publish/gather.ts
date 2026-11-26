@@ -25,6 +25,7 @@ import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
 import { cssReferences, moduleReferences, pageReferences, Reference, scriptBuildsReferences } from './references';
+import { plainPart } from './plainText';
 import { cleanPicture, hasPictureSignature } from './pictureClean';
 import { isText, scanText } from './secretScan';
 import {
@@ -192,7 +193,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     const expected = p.join(p.dirname(hostedPath), `${name} files`, p.basename(hostedPath));
     if (key(pagePath) !== key(expected) || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
       || address.endsWith('/.') || address.endsWith('/..'))) {
-      throw new HostedDeckLayoutError('Ritemark could not check where the deck page and its files are. Nothing was sent.');
+      throw new HostedDeckLayoutError("Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again.");
     }
   }
   const moved = new Map((hosted?.assetAddresses ?? []).map(address => [
@@ -343,7 +344,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     { lexical: pagePath, real: pagePath, size: pageBytes.length, hostedPath },
     ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size, hostedPath: c.hostedPath })),
   ];
-  const gathered: { file: GatheredFile; lexical: string }[] = [];
+  const gathered: { file: GatheredFile; lexical: string; name: string }[] = [];
   const tooBig: PublishPlan['tooBig'] = [];
   const keyHits: KeyHit[] = [];
   for (const f of all) {
@@ -360,7 +361,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     }
     if (f.size > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: f.size });
-      gathered.push({ file, lexical: f.hostedPath });
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
       continue;
     }
     const bytes = f.lexical === pagePath ? pageBytes : await readFile(f.real);
@@ -368,7 +369,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     // A file can grow between its stat and this read: the limit holds for the bytes read, which are what would go
     if (bytes.length > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: bytes.length });
-      gathered.push({ file, lexical: f.hostedPath });
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
       continue;
     }
     if (file.kind !== 'page' && hasPictureSignature(bytes)) file.kind = 'picture';
@@ -392,7 +393,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
       if (file.kind === 'script' && scriptBuildsReferences(text)) scriptBuilt = true;
     }
-    gathered.push({ file, lexical: f.hostedPath });
+    gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
   }
 
   const publishedPath = hosted && options.publishedPagePath;
@@ -411,11 +412,16 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
 
   // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
   if (hosted) {
-    const served = new Set(files.slice(1).map(file => `/${file.relPath}`));
     const pageFolder = path.posix.dirname(files[0].relPath);
     const indexPath = pageFolder === '.' ? '/index.html' : `/${pageFolder}/index.html`;
-    if (served.size !== files.length - 1 || served.has(indexPath) || served.has('/version.json')) {
-      throw new HostedDeckLayoutError('Two files would publish at the same address. Nothing was sent.');
+    const served = new Map([[indexPath, gathered[0].name], ['/version.json', 'version.json']]);
+    for (const { file, name } of gathered.slice(1)) {
+      const address = `/${file.relPath}`;
+      const other = served.get(address);
+      if (other !== undefined) {
+        throw new HostedDeckLayoutError(`“${plainPart(other)}” and “${plainPart(name)}” would go to the same address on the page, so nothing was sent. Rename one of them and publish again.`);
+      }
+      served.set(address, name);
     }
   }
   const plan = frozenPlan({

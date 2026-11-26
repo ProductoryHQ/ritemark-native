@@ -44,13 +44,14 @@ import { splitFrontMatter } from '../editorSync/frontMatter';
 import { readRitemarkSavedLogicalHash } from '../editorSync/saveReceipt';
 import { normalizeLogicalText } from '../editorSync/state';
 import { normalizeForCompare, samePath } from '../utils/pathIdentity';
-import { frontMatterLook, parseDeck, publishText } from './deckFormat';
+import { frontMatterLook, parseDeck, publishText, slideDataOf } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
 import { deckThemeAndLogo } from './deckPages';
 import type { DeckHostMessage, DeckPageState, DeckPdfKind, DeckNoticeReporter } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
+import { plainPart } from '../publish/plainText';
 import { HostedDeckLayoutError, type HostedDeckPage } from '../publish/gather';
 import { DeckPictureFolderTaken, ensureDeckPictureFolder } from './deckPictureFolder';
 import { DECK_EXTENSION, LEGACY_DECK_EXTENSION, deckPictureFolderName } from './deckFileName';
@@ -686,9 +687,16 @@ export class DeckPublisher implements vscode.Disposable {
     const moved = pagePath !== pagePathFor(input.deckPath);
     const assetPaths = new Set([...input.fonts, ...(logo ? [logo] : [])]
       .map(file => normalizeForCompare(path.resolve(path.dirname(input.deckPath), file.address))));
-    const hosted = await buildDeckPage({ ...input, onPicture: file => {
-      if (moved && assetPaths.has(normalizeForCompare(file))) {
-        throw new HostedDeckLayoutError('A picture and a theme file would publish at the same address. Nothing was sent.');
+    const logoPath = logo && normalizeForCompare(path.resolve(path.dirname(input.deckPath), logo.address));
+    const hosted = await buildDeckPage({ ...input, onPicture: (file, slideIndex) => {
+      const address = normalizeForCompare(file);
+      if (moved && assetPaths.has(address)) {
+        const slide = slideIndex === undefined ? undefined : parseDeck(input.text.replace(/^\uFEFF/, '')).slides
+          .map((block, index) => ({ block, number: index + 1 }))
+          .filter(({ block }) => !slideDataOf(block.kind, block.body).skip)[slideIndex]?.number;
+        const where = slide === undefined ? '' : ` on slide ${slide}`;
+        const themeFile = address === logoPath ? 'logo' : 'font';
+        throw new HostedDeckLayoutError(`“${plainPart(path.basename(file))}”${where} and the theme's ${themeFile} would go to the same address, so nothing was sent. Rename the picture and publish again.`);
       }
     } }, pageAssets);
     const local = moved ? await buildDeckPage({ ...input, pagePath }, pageAssets) : hosted;
@@ -710,10 +718,12 @@ export class DeckPublisher implements vscode.Disposable {
     const record = await this.feature?.controller.recordFor(pagePath);
     if (!record?.deckFolder && !readPageMeta(bytes.subarray(0, 4096).toString('utf8')).ritemark) return undefined;
     const beside = path.join(path.dirname(folder), name);
+    let sourcePath: string | undefined;
     for (const extension of [DECK_EXTENSION, LEGACY_DECK_EXTENSION]) {
       const deckPath = beside + extension;
       const saved = await fs.promises.readFile(deckPath, 'utf8').catch(() => undefined);
       if (saved === undefined) continue;
+      sourcePath ??= deckPath;
       const source = { uri: vscode.Uri.file(deckPath), getText: () => saved };
       const measured = this.savedFit(deckPath, saved);
       const fits = [measured, record?.deckFit].filter((fit): fit is readonly number[] => Boolean(fit?.length));
@@ -722,7 +732,9 @@ export class DeckPublisher implements vscode.Disposable {
         if (bytes.equals(Buffer.from(built.html))) return this.hostedDeck(`${beside}.html`, built);
       }
     }
-    throw new HostedDeckLayoutError('Open the deck and choose Publish to update this page.');
+    throw new HostedDeckLayoutError(sourcePath
+      ? `This page is made from “${plainPart(path.basename(sourcePath))}”. Open the deck and choose Publish to update it.`
+      : 'Find the source deck and choose Publish to update this page.');
   }
 
   // ------------------------------------------------------------------ Save as PDF (Sprint 170)

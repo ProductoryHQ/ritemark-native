@@ -223,6 +223,29 @@ async function main(): Promise<void> {
     assert.ok(live.has('Intro.html'));
     assert.ok([...live.keys()].some(name => name.startsWith(`fonts${path.sep}Inter-`)), 'the theme\'s font goes beside the page');
     assert.ok([...live.keys()].some(name => name.startsWith(`logos${path.sep}logo-`)), 'and its logo');
+    const logoAddress = [...live.keys()].find(name => name.startsWith(`logos${path.sep}logo-`))!;
+    const collidingPicture = path.join(path.dirname(deckPath), logoAddress);
+    fs.mkdirSync(path.dirname(collidingPicture), { recursive: true });
+    fs.copyFileSync(path.join(deckFolder, logoAddress), collidingPicture);
+    const picture = `![Picture](${logoAddress.split(path.sep).join('/')})`;
+    const original = text;
+    try {
+      text = original.replace('Welcome, everyone.', picture);
+      await publish();
+      assert.deepEqual(notices.splice(0), [
+        `failure: “${path.basename(logoAddress)}” on slide 1 and the theme's logo would go to the same address, so nothing was sent. Rename the picture and publish again.`,
+      ]);
+
+      text = original.replace('\n\n```slide', `\n\n${picture}\n\n` + '```slide');
+      await publish();
+      assert.deepEqual(notices.splice(0), [
+        `failure: “${path.basename(logoAddress)}” and the theme's logo would go to the same address, so nothing was sent. Rename the picture and publish again.`,
+      ]);
+      assert.equal(published, 1);
+    } finally {
+      text = original;
+      fs.unlinkSync(collidingPicture);
+    }
     const page = () => fs.readFileSync(pagePath, 'utf8');
     assert.match(page(), /#C2410C/i, 'the page wears Fern\'s accent');
 
@@ -400,6 +423,15 @@ async function main(): Promise<void> {
       assert.ok(hosted);
       const plan = await gatherPage(pagePath, root, { hostedDeck: hosted });
       assert.equal(plan.files[0].sha256, publishedFit?.files[0].sha256);
+
+      fs.writeFileSync(pagePath, fromLive + '<!-- Edited in the browser preview -->');
+      try {
+        await assert.rejects(hostedForBrowser!(pagePath), {
+          message: 'This page is made from “Intro.deck.md”. Open the deck and choose Publish to update it.',
+        });
+      } finally {
+        fs.writeFileSync(pagePath, fromLive);
+      }
     } finally {
       reopened.dispose();
     }

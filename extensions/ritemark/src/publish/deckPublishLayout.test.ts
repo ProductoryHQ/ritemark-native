@@ -354,3 +354,26 @@ test('a nested published address survives when the picture above the deck is rem
   });
   assert.equal((await readVerifiedUpload(after)).pageUrlPath, '/Training/index.html');
 });
+
+test('an unexpected hosted layout asks the user to try Publish again', async t => {
+  const project = await testProject({});
+  t.after(project.cleanup);
+  await assert.rejects(gatherPage(project.page('Unexpected.html'), project.dir, {
+    hostedDeck: { besideDeckPath: project.page('Kickoff.html'), html: '', assetAddresses: [] },
+  }), { message: "Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again." });
+});
+
+test('the hosted refusal names both files at a shared address', { skip: process.platform === 'win32' }, async t => {
+  const project = await testProject({});
+  t.after(project.cleanup);
+  await project.write('images/photo.png', PNG);
+  // On POSIX a literal backslash in a filename is valid, but Publish turns it into a URL separator.
+  await project.write('images\\photo.png', PNG);
+  await assert.rejects(gatherPage(project.page('Kickoff files/Kickoff.html'), project.dir, {
+    hostedDeck: {
+      besideDeckPath: project.page('Kickoff.html'),
+      html: '<img src="images/photo.png"><img src="images%5Cphoto.png">',
+      assetAddresses: [],
+    },
+  }), { message: '“photo.png” and “images\\photo.png” would go to the same address on the page, so nothing was sent. Rename one of them and publish again.' });
+});
