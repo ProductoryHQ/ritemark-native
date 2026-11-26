@@ -45,6 +45,7 @@ export interface HostedDeckPage {
   readonly besideDeckPath: string;
   readonly html: string;
   readonly assetAddresses: readonly string[];
+  readonly fit?: readonly number[];
 }
 
 export interface GatherOptions {
@@ -429,7 +430,10 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     keyHits,
     contentHash: contentHashOf(files),
   });
-  if (hosted) hostedPages.set(plan, Object.freeze({ html: pageText, besideDeckPath: hostedPath, assetAddresses: Object.freeze([...hosted.assetAddresses]) }));
+  if (hosted) hostedPages.set(plan, Object.freeze({
+    html: pageText, besideDeckPath: hostedPath, assetAddresses: Object.freeze([...hosted.assetAddresses]),
+    fit: hosted.fit && Object.freeze([...hosted.fit]),
+  }));
   return plan;
 }
 

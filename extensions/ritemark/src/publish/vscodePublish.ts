@@ -58,7 +58,7 @@ export interface PublishFeature {
    */
   publishPage(page: vscode.Uri, hostedDeck?: HostedDeckPage): Promise<PublishOutcome | undefined>;
   /** The sheet's What goes and What stays rows for pages made from a deck: the deck host answers for its own pages. */
-  setHostedDeckPage(provider: ((pagePath: string) => Promise<HostedDeckPage | undefined>) | null): void;
+  setHostedDeckPage(provider: ((pagePath: string) => Promise<HostedDeckPage | undefined>) | null, assetsHeld?: (file: string) => boolean): void;
   setPageRows(provider: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null): void;
 }
 
@@ -137,11 +137,13 @@ export function createPublishFeature(
   const host = new CloudflareHost(account, { log });
   const records = new PublishRecordStore(context.globalStorageUri.fsPath);
 
+  let deckAssetsHeld: ((file: string) => boolean) | undefined;
   const controller = new PublishController({
     host,
     records,
     legacyFiles: {
       extensionPath: context.extensionPath,
+      held: file => deckAssetsHeld?.(file) ?? false,
       trash: file => Promise.resolve(vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true, recursive: false })),
     },
     hostedDeckPage: path => hostedDeckPage?.(path) ?? Promise.resolve(undefined),
@@ -264,7 +266,7 @@ export function createPublishFeature(
     onDidChangeReady: readyChanged.event,
     onDidChangePageState: pageStateChanged.event,
     publishPage: (page, hostedDeck) => publishPageToEnd(page, hostedDeck),
-    setHostedDeckPage: provider => { hostedDeckPage = provider; },
+    setHostedDeckPage: (provider, assetsHeld) => { hostedDeckPage = provider; deckAssetsHeld = assetsHeld; },
     setPageRows: (provider) => { pageRows = provider; },
   };
 }

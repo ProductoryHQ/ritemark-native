@@ -26,7 +26,7 @@
  */
 import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { locatePage, isInside } from '../browser/localPage';
+import { locatePage, isInside, isPagePath } from '../browser/localPage';
 import { OUTSIDE_PROJECT_MESSAGE } from '../browser/pageCommands';
 import { trackEvent } from '../analytics/posthog';
 import { DeckLive, type LiveSaveReceipt } from './deckLive';
@@ -167,7 +167,7 @@ export class DeckPublisher implements vscode.Disposable {
   connect(feature: PublishFeature): void {
     this.feature = feature;
     feature.setPageRows(pagePath => this.pageRows(pagePath));
-    feature.setHostedDeckPage(pagePath => this.hostedPageForBrowser(pagePath));
+    feature.setHostedDeckPage(pagePath => this.hostedPageForBrowser(pagePath), file => this.fontsHeld.has(normalizeForCompare(file)));
     this.disposables.push(
       { dispose: () => feature.setPageRows(null) },
       { dispose: () => feature.setHostedDeckPage(null) },
@@ -353,7 +353,7 @@ export class DeckPublisher implements vscode.Disposable {
     const pageKey = await pageKeyOf(pagePath);
     const preference = (kind === 'published' || kind === 'publishing')
       ? (await this.feature?.controller.recordFor(pageKey))?.live : undefined;
-    const live = preference && this.live.state(normalizeForCompare(pageKey), preference);
+    const live = preference && this.live.state(normalizeForCompare(await pageKeyOf(localPagePathFor(document.uri.fsPath))), preference);
     if (live?.state === 'paused' && live.pause?.kind === 'key') {
       if (live.pause.location) {
         // Stored scan coordinates include front matter. The deck editor holds just the body.
@@ -479,6 +479,12 @@ export class DeckPublisher implements vscode.Disposable {
       const pagePath = live && samePath(await this.recordedPage(deckPath), legacyKey) ? legacyPath : localPath;
       const pageKey = pagePath === legacyPath ? legacyKey : localKey;
       const moved = pagePath === localPath;
+      const legacyStopped = async (): Promise<LiveResult> => {
+        if (!moved && live?.active() && (await feature.controller.recordFor(localKey))?.live?.id === live.preference.id) {
+          return { kind: 'busy' };
+        }
+        return stopped;
+      };
       const releaseLegacy = moved && !live ? feature.controller.holdPage(legacyKey) : undefined;
       if (moved && !live && !releaseLegacy) {
         notice(PAGE_BEING_PUBLISHED);
@@ -506,7 +512,7 @@ export class DeckPublisher implements vscode.Disposable {
         return stopped;
       }
       const { theme, fontFiles, logoFiles } = built;
-      const hostedDeck = moved ? this.hostedDeck(legacyKey, built) : undefined;
+      let hostedDeck = moved ? this.hostedDeck(legacyKey, built) : undefined;
       const assetAnchor = moved ? pagePath : deckPath;
       let written: Awaited<ReturnType<typeof writeDeckPage>> | undefined;
       let fonts: { created: string[]; madeFolder: boolean } = { created: [], madeFolder: false };
@@ -523,8 +529,8 @@ export class DeckPublisher implements vscode.Disposable {
       // holds them, or another page of Ritemark's names them).
       const takeBackAssets = async () => {
         unhold();
-        await removePageFonts(nodeFontFs, assetAnchor, fonts, fontFiles, target => this.fontsHeld.has(target)).catch(() => undefined);
-        await removePageFonts(nodeFontFs, assetAnchor, logos, logoFiles, target => this.fontsHeld.has(target), LOGO_PLACE).catch(() => undefined);
+        await removePageFonts(nodeFontFs, assetAnchor, fonts, fontFiles, target => this.fontsHeld.has(normalizeForCompare(target))).catch(() => undefined);
+        await removePageFonts(nodeFontFs, assetAnchor, logos, logoFiles, target => this.fontsHeld.has(normalizeForCompare(target)), LOGO_PLACE).catch(() => undefined);
         if (madeFolder) await fs.promises.rmdir(path.dirname(pagePath)).catch(() => undefined);
       };
       try {
@@ -535,6 +541,14 @@ export class DeckPublisher implements vscode.Disposable {
             const folder = await ensureDeckPictureFolder(deckPath, () => { madeFolder = true; });
             const info = await fs.promises.lstat(folder);
             if (!info.isDirectory() || info.isSymbolicLink()) throw new DeckPictureFolderTaken(path.basename(folder));
+          }
+          if (live && moved && !built.fit.length && record?.deckFit?.length && record.deckDigest === built.digest) {
+            const fitted = await this.buildPage(document, body, look, record.deckFit, pagePath);
+            const publishedSha = record.files.find(file => isPagePath(file.path))?.sha256;
+            if (createHash('sha256').update(fitted.hostedHtml).digest('hex') === publishedSha) {
+              built = fitted;
+              hostedDeck = this.hostedDeck(legacyKey, fitted);
+            }
           }
           if (live && !moved && record && (!record.deckDigest || record.deckDigest === built.digest)) {
             const existing = await locatePage(pageKey, live.roots);
@@ -570,7 +584,7 @@ export class DeckPublisher implements vscode.Disposable {
           }
         };
         if (live && !moved) {
-          if (!await feature.controller.writeLegacyDeckPage(pageKey, write)) return stopped;
+          if (!await feature.controller.writeLegacyDeckPage(pageKey, write)) return await legacyStopped();
         } else {
           await write();
         }
@@ -599,12 +613,16 @@ export class DeckPublisher implements vscode.Disposable {
       });
       if (live) {
         const location = await locatePage(pagePath, live.roots);
-        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) return await feature.controller.pauseLivePage(pageKey, live, OUTSIDE_PROJECT_MESSAGE);
+        if (location.kind !== 'project' || !samePath(location.realPath, pageKey)) {
+          const result = await feature.controller.pauseLivePage(pageKey, live, OUTSIDE_PROJECT_MESSAGE);
+          return result.kind === 'stopped' ? await legacyStopped() : result;
+        }
         const describe = await locateLiveIssues(deckPath, text, built);
-        return await feature.controller.updateLive({ ...location, hostedDeck }, {
+        const result = await feature.controller.updateLive({ ...location, hostedDeck }, {
           ...live, digest: built.digest, legacyDigest, describe,
           pageSha: livePageSha ?? createHash('sha256').update(built.hostedHtml).digest('hex'),
         });
+        return result.kind === 'stopped' ? await legacyStopped() : result;
       }
       release();
       let outcome: PublishOutcome | undefined | 'stopped';
@@ -674,11 +692,11 @@ export class DeckPublisher implements vscode.Disposable {
       }
     } }, pageAssets);
     const local = moved ? await buildDeckPage({ ...input, pagePath }, pageAssets) : hosted;
-    return { ...local, hostedHtml: hosted.html, theme: input.theme, fontFiles: input.fonts, logoFiles: input.logo ? [input.logo] : [] };
+    return { ...local, fit: input.steps, hostedHtml: hosted.html, theme: input.theme, fontFiles: input.fonts, logoFiles: input.logo ? [input.logo] : [] };
   }
 
   private hostedDeck(besideDeckPath: string, built: Awaited<ReturnType<DeckPublisher['buildPage']>>): HostedDeckPage {
-    return { besideDeckPath, html: built.hostedHtml, assetAddresses: [...built.fontFiles, ...built.logoFiles].map(file => file.address) };
+    return { besideDeckPath, html: built.hostedHtml, fit: built.fit, assetAddresses: [...built.fontFiles, ...built.logoFiles].map(file => file.address) };
   }
 
   /** The browser can publish the local handout when the hosted render of those same bytes is available. */
@@ -697,9 +715,12 @@ export class DeckPublisher implements vscode.Disposable {
       const saved = await fs.promises.readFile(deckPath, 'utf8').catch(() => undefined);
       if (saved === undefined) continue;
       const source = { uri: vscode.Uri.file(deckPath), getText: () => saved };
-      const steps = this.savedFit(deckPath, saved) ?? [];
-      const built = await this.buildPage(source, splitFrontMatter(saved).content, frontMatterLook(saved), steps, pagePath);
-      if (bytes.equals(Buffer.from(built.html))) return this.hostedDeck(`${beside}.html`, built);
+      const measured = this.savedFit(deckPath, saved);
+      const fits = [measured, record?.deckFit].filter((fit): fit is readonly number[] => Boolean(fit?.length));
+      for (const steps of [...fits, []]) {
+        const built = await this.buildPage(source, splitFrontMatter(saved).content, frontMatterLook(saved), steps, pagePath);
+        if (bytes.equals(Buffer.from(built.html))) return this.hostedDeck(`${beside}.html`, built);
+      }
     }
     throw new HostedDeckLayoutError('Open the deck and choose Publish to update this page.');
   }
@@ -835,12 +856,13 @@ export class DeckPublisher implements vscode.Disposable {
 
   /** Hold font files beside a page while a Publish uses them; the returned function lets go, once. */
   private holdFonts(targets: readonly string[]): () => void {
-    for (const target of targets) this.fontsHeld.set(target, (this.fontsHeld.get(target) ?? 0) + 1);
+    const keys = targets.map(file => normalizeForCompare(file));
+    for (const target of keys) this.fontsHeld.set(target, (this.fontsHeld.get(target) ?? 0) + 1);
     let held = true;
     return () => {
       if (!held) return;
       held = false;
-      for (const target of targets) {
+      for (const target of keys) {
         const left = (this.fontsHeld.get(target) ?? 1) - 1;
         if (left > 0) this.fontsHeld.set(target, left);
         else this.fontsHeld.delete(target);

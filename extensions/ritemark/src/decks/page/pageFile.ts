@@ -180,6 +180,11 @@ export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: stri
   }
 }
 
+/** Whether the expected beside-deck path still belongs to the deck. */
+export async function ownsLegacyDeckPage(pagePath: string): Promise<boolean> {
+  return (await pageAt(nodePageFs, pagePath)).kind !== 'foreign';
+}
+
 /** A legacy deck page's mark and last published bytes must both agree. */
 export async function matchesLegacyDeckPage(pagePath: string, sha256: string | undefined): Promise<boolean> {
   if (!sha256) return false;

@@ -19,7 +19,6 @@ for (const font of DECK_FONT_LIST) {
 }
 
 function pageFiles(html: string, page: string): string[] {
-  if (!readPageMeta(html).ritemark) return [];
   const { refs, base, inlineCss } = pageReferences(html);
   const origin = new URL(base ?? '', pathToFileURL(page));
   return [...refs, ...inlineCss.flatMap(cssReferences)].flatMap(({ value }) => {
@@ -43,7 +42,7 @@ export async function trashLegacyDeckFiles(
   record: PublishRecord,
   plan: GatheredPlan,
   currentAddresses: readonly string[],
-  { extensionPath, trash }: { extensionPath: string; trash: (file: string) => Promise<void> },
+  { extensionPath, trash, held }: { extensionPath: string; trash: (file: string) => Promise<void>; held?: (file: string) => boolean },
 ): Promise<void> {
   const page = record.pagePath;
   const folder = path.dirname(page);
@@ -53,31 +52,27 @@ export async function trashLegacyDeckFiles(
   const recorded = new Map(record.files.map(file => [path.posix.relative(publishedFolder, file.path), file.sha256]));
   const oldHtml = await readPlainFile(page).catch(() => undefined);
   const candidates = new Set(recorded.keys());
-  if (oldHtml) {
+  if (oldHtml && readPageMeta(oldHtml.toString('utf8')).ritemark) {
     for (const file of pageFiles(oldHtml.toString('utf8'), page)) {
       candidates.add(path.relative(folder, file).split(path.sep).join('/'));
     }
   }
-  if (await matchesLegacyDeckPage(page, publishedPage.sha256).catch(() => false)) {
-    await trash(page).catch(() => undefined);
-  }
-
-  // Include the old page if it stayed. An unreadable sibling may still use these files.
-  const shared = new Set<string>();
+  // A sibling we cannot read may use any of these files. Check every page before taking anything back.
+  const references = new Map<string, string[]>();
   for (const name of await fs.readdir(folder)) {
     if (!isPagePath(name)) continue;
     const sibling = path.join(folder, name);
-    const stat = await fs.stat(sibling).catch(error => {
-      if (error.code !== 'ENOENT') throw error;
-      return undefined;
-    });
-    if (!stat?.isFile()) continue;
+    const stat = await fs.stat(sibling);
+    if (!stat.isFile()) continue;
     const html = await fs.readFile(sibling, 'utf8');
-    for (const file of pageFiles(html, sibling)) {
-      shared.add(normalizeForCompare(file));
-      shared.add(normalizeForCompare(await fs.realpath(file).catch(() => file)));
-    }
+    const files = pageFiles(html, sibling);
+    const resolved = await Promise.all(files.map(file => fs.realpath(file).catch(() => file)));
+    references.set(sibling, [...files, ...resolved].map(file => normalizeForCompare(file)));
   }
+  if (await matchesLegacyDeckPage(page, publishedPage.sha256).catch(() => false)) {
+    if (await trash(page).then(() => true, () => false)) references.delete(page);
+  }
+  const shared = new Set([...references.values()].flat());
 
   const currentFolder = path.dirname(plan.pagePath);
   const current = new Set(currentAddresses);
@@ -100,7 +95,7 @@ export async function trashLegacyDeckFiles(
         ? (await fs.readFile(path.join(extensionPath, 'media', 'fonts', source)).catch(() => undefined))?.equals(bytes)
         : logo && sha.startsWith(logo[1]) && (sha === recorded.get(address) || (current.has(address)
           && (await readPlainFile(path.join(currentFolder, address)).catch(() => undefined))?.equals(bytes)));
-      if (!same) continue;
+      if (!same || held?.(file)) continue;
       removed = await trash(file).then(() => true, () => removed);
     }
     const entries = removed ? await fs.readdir(directory).catch(() => undefined) : undefined;

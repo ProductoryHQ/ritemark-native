@@ -121,7 +121,7 @@ test('the hosted sheet names the ignored moved font and sends the unignored font
   assert.deepEqual((await readVerifiedUpload(plan)).files.map(file => file.urlPath), ['/index.html', `/${otherFont}`]);
 });
 
-for (const mode of ['success', 'current theme logo', 'shared font', 'foreign font', 'trash failure', 'cancel', 'deploy failure', 'write failure', 'edited legacy page', 'foreign legacy page'] as const) {
+for (const mode of ['success', 'current theme logo', 'shared font', 'foreign font', 'trash failure', 'cancel', 'deploy failure', 'write failure', '2.3 unchanged', '2.3 edited', '2.3 deleted', 'foreign legacy page', 'held font', 'unreadable sibling'] as const) {
   test(`deck migration: ${mode}`, async t => {
     const project = await testProject({});
     t.after(project.cleanup);
@@ -142,6 +142,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     const built = await makePage();
     const oldHtml = mode === 'foreign legacy page' ? built.html.replace('name="generator"', 'name="author"') : built.html;
     await project.write('Training/Kickoff.html', oldHtml);
+    await project.write('Training/Kickoff.rtms', '---\ndeck: 2\n---\n');
     const local = await makePage('Kickoff', realPath);
     await project.write('Training/Kickoff files/Kickoff.html', local.html);
     await project.write(`Training/${font}`, legacyFontBytes);
@@ -156,7 +157,11 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     const oldPlan = await gatherPage(besideDeckPath, project.dir);
     const oldUpload = await readVerifiedUpload(oldPlan);
     const records = new PublishRecordStore(project.page('storage'));
-    const old = { ...recordFor(oldPlan, { accountId, siteName, address }), deckVersion: 1000, deckDigest: built.digest };
+    const old = recordFor(oldPlan, { accountId, siteName, address });
+    if (!mode.startsWith('2.3')) {
+      old.deckVersion = 1000;
+      old.deckDigest = built.digest;
+    }
     if (mode === 'current theme logo') old.files = old.files.filter(file => file.path !== logo.address);
     await records.put(old);
     const live = { on: true as const, id: 'prior-consent' };
@@ -165,7 +170,9 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     await records.put(alternateSite);
     const pause = { ...live, pause: { kind: 'page' as const, at: 20, detail: 'Paused' } };
     await records.changeLive(alternateSite, pause);
-    if (mode === 'edited legacy page') await fs.appendFile(besideDeckPath, '<!-- edited -->');
+    if (mode === '2.3 edited') await fs.writeFile(besideDeckPath, (await makePage('Edited after publishing')).html);
+    if (mode === '2.3 deleted') await fs.unlink(besideDeckPath);
+    if (mode === 'unreadable sibling') await fs.symlink('missing.html', project.page('Training/Unreadable.html'));
     const before = await records.list();
     let deploys = 0;
     let deployed: VerifiedUpload | undefined;
@@ -180,7 +187,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
       publish: async (name, upload, options) => {
         assert.equal(name, siteName);
         assert.equal(options.replacing, true);
-        assert.equal(options.lastDeckVersion, 1000 + deploys);
+        assert.equal(options.lastDeckVersion, deploys === 0 ? old.deckVersion : 1000 + deploys);
         deploys++;
         if (mode === 'deploy failure') throw new Error('simulated deploy failure');
         deployed = upload;
@@ -193,6 +200,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
       const controller = new PublishController({
         legacyFiles: {
           extensionPath,
+          held: file => mode === 'held font' && file === project.page(`Training/${font}`),
           trash: async file => {
             assert.equal(await records.get(besideDeckPath), undefined);
             assert.equal((await records.get(realPath))?.address, address);
@@ -219,9 +227,10 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
       return controller;
     };
     const controller = openController();
-    const page = { realPath, projectFolder: project.dir, hostedDeck: { besideDeckPath, html: built.html, assetAddresses: [font, logo.address] } };
+    const page = { realPath, projectFolder: project.dir, hostedDeck: { besideDeckPath, html: built.html, assetAddresses: [font, logo.address], fit: [] } };
     assert.equal((await controller.recordFor(besideDeckPath))?.address, address);
     assert.equal((await controller.settingsProjection()).pages.find(p => p.id === siteName)?.address, address);
+    assert.equal((await controller.legacyDeckRecord(besideDeckPath))?.address, address);
     if (mode === 'cancel') await fs.rm(project.page(`Training/Kickoff files/${font}`));
     if (mode === 'success') {
       const release = controller.holdPage(besideDeckPath);
@@ -254,6 +263,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
         await controller.unpublishSite(alternateSite.siteName);
         assert.deepEqual(removed, [siteName, alternateSite.siteName]);
       }
+      if (mode === 'deploy failure') assert.ok((await controller.pageState(besideDeckPath)).line);
       if (mode === 'write failure') assert.match((await controller.pageState(realPath)).line ?? '', /couldn.t save|couldn.t note|record|remember/i);
       return;
     }
@@ -264,19 +274,23 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     const after = await records.get(realPath);
     assert.equal(after?.address, address);
     assert.equal(after?.deckVersion, 1001);
+    assert.deepEqual(after?.deckFit, []);
     assert.deepEqual(after?.live, live);
     assert.deepEqual((await records.list()).find(r => r.siteName === alternateSite.siteName), { ...alternateSite, pagePath: realPath, deckFolder: true, live: pause });
     assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${font}`)), legacyFontBytes);
     assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${logo.address}`)), logo.bytes);
     assert.equal(await fs.readFile(realPath, 'utf8'), local.html);
-    if (mode === 'edited legacy page') {
-      assert.match(await fs.readFile(besideDeckPath, 'utf8'), /edited/);
+    if (mode === '2.3 edited') {
+      assert.match(await fs.readFile(besideDeckPath, 'utf8'), /Edited after publishing/);
       assert.deepEqual(trashed, []);
-    } else if (mode === 'foreign legacy page') {
+    } else if (mode === 'foreign legacy page' || mode === 'unreadable sibling') {
       assert.equal(await fs.readFile(besideDeckPath, 'utf8'), oldHtml);
+      assert.deepEqual(await fs.readFile(project.page(`Training/${font}`)), fontBytes);
+      assert.deepEqual(await fs.readFile(project.page(`Training/${logo.address}`)), logo.bytes);
+      assert.deepEqual(trashed, []);
     } else {
       await assert.rejects(fs.access(besideDeckPath), { code: 'ENOENT' });
-      assert.ok(trashed.includes('Training/Kickoff.html'));
+      assert.equal(trashed.includes('Training/Kickoff.html'), mode !== '2.3 deleted');
     }
     if (mode === 'success' || mode === 'current theme logo') {
       for (const folder of ['fonts', 'logos']) {
@@ -293,7 +307,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
       assert.ok(url);
       assert.deepEqual(await fs.readFile(new URL(url, pathToFileURL(sibling))), fontBytes);
     }
-    if (mode === 'foreign font' || mode === 'trash failure') {
+    if (mode === 'foreign font' || mode === 'trash failure' || mode === 'held font') {
       assert.deepEqual(await fs.readFile(project.page(`Training/${font}`)), legacyFontBytes);
       assert.ok(!trashed.includes(`Training/${font}`));
     }

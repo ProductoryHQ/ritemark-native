@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Publishing a deck saves its local page, fonts and logo in the deck’s own folder and keeps its existing public link.
+- Publishing a deck writes its local page and any theme fonts or logo it uses into `<deck> files/`. Updating an existing published deck keeps its public link when the files fit its current hosted layout.
 - Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
 
 ### Fixed

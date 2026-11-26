@@ -29,7 +29,7 @@ import type { PublishedSite, PublishHost, VerifiedUpload } from './host';
 import { PublishError, readVerifiedUpload } from './host';
 import { gatherPage, hostedPageOf, isGatheredPlan, HostedDeckLayoutError, type HostedDeckPage } from './gather';
 import { isPagePath } from '../browser/localPage';
-import { matchesLegacyDeckPage } from '../decks/page/pageFile';
+import { ownsLegacyDeckPage } from '../decks/page/pageFile';
 import { trashLegacyDeckFiles } from './legacyDeckFiles';
 import { GitCheckError } from './gitIgnore';
 import { siteNameFor, suggestSubdomain } from './cloudflare/assets';
@@ -236,7 +236,7 @@ export interface PublishControllerDeps {
   readUpload?: (plan: GatheredPlan) => Promise<VerifiedUpload>;
   /** A page's bar state changed (patch 010's bar asks again). */
   onPageState?: (pagePath: string) => void;
-  legacyFiles?: { extensionPath: string; trash: (file: string) => Promise<void> };
+  legacyFiles?: { extensionPath: string; trash: (file: string) => Promise<void>; held?: (file: string) => boolean };
   hostedDeckPage?: (pagePath: string) => Promise<HostedDeckPage | undefined>;
   /**
    * The sheet's What goes and What stays rows for a page made from a deck (Sprint 159 PR 4): the deck host answers
@@ -881,7 +881,10 @@ export class PublishController {
         this.gone.delete(site.name);
         try {
           const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
-          if (hostedDeck) next.deckFolder = true;
+          if (hostedDeck) {
+            next.deckFolder = true;
+            if (hostedDeck.fit) next.deckFit = hostedDeck.fit;
+          }
           const deckVersion = site.deckVersion ?? current?.deckVersion ?? record?.deckVersion;
           if (deckVersion !== undefined) next.deckVersion = deckVersion;
           const html = upload.files.find(file => file.urlPath === upload.pageUrlPath);
@@ -913,7 +916,10 @@ export class PublishController {
       const line = error instanceof PublishError
         ? (error.code === 'address-taken' ? ADDRESS_TAKEN : error.message)
         : COULD_NOT_REACH_PUBLISH;
-      if (!live || !(error instanceof PublishError && error.code === 'busy')) this.pageLines.set(pagePath, line);
+      if (!live || !(error instanceof PublishError && error.code === 'busy')) {
+        this.pageLines.set(pagePath, line);
+        if (legacyKey) this.pageLines.set(legacyKey, line);
+      }
       throw error instanceof PublishError ? error : new PublishError('failed', line);
     } finally {
       this.publishing.delete(pagePath);
@@ -1013,8 +1019,7 @@ export class PublishController {
   async legacyDeckRecord(pagePath: string): Promise<PublishRecord | undefined> {
     const record = await this.liveRecord(pagePath);
     if (!record || record.deckDigest || record.deckVersion !== undefined) return record;
-    const sha = record.files.find(file => isPagePath(file.path))?.sha256;
-    return await matchesLegacyDeckPage(pagePath, sha).catch(() => false) ? record : undefined;
+    return await ownsLegacyDeckPage(pagePath).catch(() => false) ? record : undefined;
   }
 
   /** A legacy live save must not recreate its page after another window migrates the record. */

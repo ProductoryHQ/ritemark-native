@@ -56,6 +56,7 @@ export interface PublishRecord {
   files: { path: string; sha256: string }[];
   contentHash: string;
   deckDigest?: string;
+  deckFit?: readonly number[];
   deckFolder?: true;
   live?: LivePreference;
   /** ISO date of the last publish or update. */

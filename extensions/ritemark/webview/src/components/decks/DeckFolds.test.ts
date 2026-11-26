@@ -171,7 +171,7 @@ const draw = (view: DeckViewMode, above = false) =>
   const decksDir = new URL('../../../../src/decks/', import.meta.url)
   const pageSources = readdirSync(decksDir, { recursive: true }).map(String).filter(name => /\.tsx?$/.test(name) && !/\.test\./.test(name) && /^page\/|deckPublish|deckPages/.test(name))
   assert.ok(pageSources.includes('deckPublish.ts') && pageSources.includes('deckPages.ts'), 'the page code is read')
-  for (const name of pageSources) assert.ok(!/DeckFolds|OPENING_FOLD|deckFold/.test(readFileSync(new URL(name, decksDir), 'utf8')), `${name} keeps its own default`)
+  for (const name of pageSources) assert.ok(!/\b(?:DeckFolds|OPENING_FOLD|deckFold)\b/.test(readFileSync(new URL(name, decksDir), 'utf8')), `${name} keeps its own default`)
   assert.ok(!/sendToExtension\([^)]*fold/i.test(view), 'never sent to the host')
   const insert = block('insert: (at, kind) => {')
   assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')

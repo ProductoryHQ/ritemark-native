@@ -17,8 +17,8 @@ import * as path from 'node:path';
 import Module from 'node:module';
 import { mock } from 'node:test';
 import { liveFileDisplay } from './deckLiveIssues';
-import type { LivePreference } from '../publish/publishRecords';
-import { gatherPage } from '../publish/gather';
+import type { LivePreference, PublishRecord } from '../publish/publishRecords';
+import { gatherPage, type HostedDeckPage } from '../publish/gather';
 import { liveIssue, type LiveIssue } from '../publish/liveUpdate';
 import type { GatheredPlan } from '../publish/types';
 import { makeTempDir } from '../testing/tempDir';
@@ -327,8 +327,11 @@ async function main(): Promise<void> {
   let unchangedSaves = 0;
   let diagnosis: LiveIssue | undefined;
   let nextResult: (() => void) | undefined;
+  let publishedFit: Pick<PublishRecord, 'files' | 'deckFit' | 'deckDigest' | 'deckFolder'> | undefined;
+  let hostedForBrowser: ((page: string) => Promise<HostedDeckPage | undefined>) | null;
   const liveFeature = {
     ...feature,
+    setHostedDeckPage: (provider: typeof hostedForBrowser) => { hostedForBrowser = provider; },
     publishPage: async () => {
       if (manualStarted) await new Promise<void>(resolve => {
         finishManual = resolve;
@@ -338,7 +341,7 @@ async function main(): Promise<void> {
     },
     controller: {
       ...feature.controller,
-      recordFor: async () => ({ files: [], live: preference }),
+      recordFor: async () => ({ files: [], ...publishedFit, live: preference }),
       setLive: async (_page: string, on: boolean) => {
         preference = on ? { on: true, id: 'test' } : undefined;
         return true;
@@ -356,12 +359,17 @@ async function main(): Promise<void> {
         liveDigest = input.digest;
         liveHtml = fs.readFileSync(page.realPath, 'utf8');
         const plan = await gatherPage(page.realPath, root, { hostedDeck: page.hostedDeck });
+        if (!publishedFit) publishedFit = {
+          deckDigest: input.digest, deckFit: page.hostedDeck?.fit, deckFolder: true,
+          files: plan.files.map(file => ({ path: file.relPath, sha256: file.sha256! })),
+        };
         diagnosis = input.describe(plan, liveIssue(plan));
         return { kind: 'updated', pictures: [] };
       },
     },
   };
   const livePublisher = new DeckPublisher(extension);
+  const liveSaved = savedListeners.at(-1);
   const uri = document.uri;
   try {
     livePublisher.connect(liveFeature as never);
@@ -384,6 +392,17 @@ async function main(): Promise<void> {
     await livePublisher.publish(document as never, body, 'card', [2], () => {});
     assert.equal(fromLive, fs.readFileSync(pagePath, 'utf8'), 'live and manual Update build the same page, including fit');
     seat.dispose();
+    assert.deepEqual(publishedFit?.deckFit, [2]);
+    const reopened = new DeckPublisher(extension);
+    try {
+      reopened.connect(liveFeature as never);
+      const hosted = await hostedForBrowser!(pagePath);
+      assert.ok(hosted);
+      const plan = await gatherPage(pagePath, root, { hostedDeck: hosted });
+      assert.equal(plan.files[0].sha256, publishedFit?.files[0].sha256);
+    } finally {
+      reopened.dispose();
+    }
     preference = { on: true, id: 'already-on' };
     liveHtml = '';
     livePublisher.attach(document as never, async () => true);
@@ -394,9 +413,10 @@ async function main(): Promise<void> {
     expectUnchanged = true;
     text = text.replace('deck: 1', 'deck: 1\nritemark-length: 180').replace('id: a1', 'id: a1\ntime: 25');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     assert.deepEqual(await timetableTurn.finish([deckPath]), []);
     assert.equal(unchangedSaves, 1);
+    assert.equal(fs.readFileSync(pagePath, 'utf8'), fromLive, 'the unmeasured save leaves the fitted page intact');
     expectUnchanged = false;
     assert.equal(liveDigest, beforeTimetable, 'minutes and session changes have no public digest');
     const changed = new Promise<void>(resolve => { nextResult = resolve; });
@@ -411,14 +431,14 @@ async function main(): Promise<void> {
     const saved = new Promise<void>(resolve => { nextResult = resolve; });
     text = text.replace('An external save.', 'An editor save.');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await saved;
     assert.match(liveHtml, /An editor save/);
     const foundKey = new Promise<void>(resolve => { nextResult = resolve; });
     const fixtureKey = ['sk', 'ant', 'A1'.repeat(14)].join('-');
     text = text.replace('An editor save.', fixtureKey);
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await foundKey;
     assert.equal(diagnosis?.kind, 'key');
     assert.equal(diagnosis?.slide, 1);
@@ -430,7 +450,7 @@ async function main(): Promise<void> {
     const foundPicture = new Promise<void>(resolve => { nextResult = resolve; });
     text = text.replace(fixtureKey, '![Outside](/tmp/elsewhere.png)');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await foundPicture;
     assert.equal(diagnosis?.kind, 'outside');
     assert.equal(diagnosis?.slide, 1);
@@ -443,7 +463,7 @@ async function main(): Promise<void> {
     fs.truncateSync(logo, 26 * 1024 * 1024);
     text = deckText('Paper').replace('Welcome, everyone.', '![Logo](../Shared/logo.png)');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await limited;
     assert.equal(diagnosis?.kind, 'limits');
     assert.equal(diagnosis?.slide, 1);
@@ -478,7 +498,7 @@ async function main(): Promise<void> {
     for (const words of ['First save.', 'Latest save.']) {
       text = deckText('Paper').replace('Welcome, everyone.', words);
       fs.writeFileSync(deckPath, text);
-      savedListeners.at(-1)?.(document);
+      liveSaved?.(document);
       await new Promise(resolve => setTimeout(resolve, 35));
     }
     const beforeManualFinishes = liveHtml;
@@ -523,6 +543,62 @@ async function main(): Promise<void> {
 
   } finally {
     livePublisher.dispose();
+  }
+  const legacyPath = path.join(path.dirname(deckPath), 'Intro.html');
+  const legacyLive = { on: true as const, id: 'legacy' };
+  const legacyPublisher = new DeckPublisher(extension);
+  let moveOnWrite = false;
+  let migrated = false;
+  try {
+    legacyPublisher.connect({
+      ...feature,
+      controller: {
+        ...feature.controller,
+        legacyDeckRecord: async (page: string) => !migrated && page === legacyPath ? { live: legacyLive } : undefined,
+        recordFor: async (page: string) => page === (migrated ? pagePath : legacyPath) ? { files: [], live: legacyLive } : undefined,
+        setLive: async () => true,
+        writeLegacyDeckPage: async (_page: string, write: () => Promise<void>) => {
+          if (moveOnWrite) {
+            migrated = true;
+            return false;
+          }
+          await write();
+          return true;
+        },
+        updateLive: async (page: { realPath: string }, input: { sending: () => void }) => {
+          if (migrated) {
+            assert.equal(page.realPath, pagePath);
+            return { kind: 'updated', pictures: [] };
+          }
+          input.sending();
+          assert.equal((await legacyPublisher.stateOf(document as never)).live?.state, 'updating');
+          return { kind: 'offline', detail: 'Test connection failure.' };
+        },
+      },
+    } as never);
+    // User-requested live update, using the old record and the new activity key.
+    text = deckText('Paper');
+    fs.writeFileSync(deckPath, text);
+    legacyPublisher.attach(document as never, async () => true);
+    await legacyPublisher.liveAction(document as never, 'on');
+    const state = (await legacyPublisher.stateOf(document as never)).live;
+    assert.equal(state?.state, 'offline');
+    assert.match(state.tooltip, /Test connection failure/);
+    await legacyPublisher.liveAction(document as never, 'off');
+
+    moveOnWrite = true;
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const retried = new Promise<void>(resolve => legacyPublisher.onDidUpdateLive(() => resolve()));
+      await legacyPublisher.liveAction(document as never, 'on');
+      assert.equal(migrated, true);
+      mock.timers.tick(2_000);
+      await retried;
+    } finally {
+      mock.timers.reset();
+    }
+  } finally {
+    legacyPublisher.dispose();
   }
   console.log('deckPublish: all passed');
 }
