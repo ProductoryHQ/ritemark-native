@@ -17,3 +17,13 @@ The Quick Look provider proof in [run 45717696429](https://github.com/Productory
 | S11 · Turned off | PR 5 tests cover the election parser, first-save and once-only guidance, version gating and the non-Mac path. The confirmed-version list starts empty pending capture evidence. | Push the combined commit to a `ql-proof/**` branch for macOS 15, macOS 26 arm64 and macOS 26 Intel. Review the PNG/OCR evidence and use the `confirmed-settings-versions` line in the aggregate results to update the app gate, then rerun the workflow. Record denied capture as a coverage gap and leave that target unconfirmed. Verify the guidance and Help in the candidate. |
 
 Gate 1 supplies the signed, notarized app and real Finder evidence, including warmed thumbnail behavior and the potential duplicate “DECK” label. Experience acceptance and Gate 2 remain open.
+
+## PR 5 System Settings runner evidence
+
+| Runner | Run 45735453327 | Round 2 evidence to check |
+| --- | --- | --- |
+| macOS 15 arm64 | Quick Look passed. The pane title was visible and the Extensions section was below the fold. | The runner's `results.md` names the first capture that confirmed the wording or records a coverage gap. |
+| macOS 26 arm64 | Quick Look passed. The 715 × 625 Settings window showed Open at Login and App Background Activity. | Check the taller-window, scroll and By Category captures and their OCR for the exact labels. |
+| macOS 26 Intel | Quick Look passed. The on-screen window query returned no matching window in 15 attempts. The artifacts do not distinguish launch timing from window discovery. | `settings/capture.log` records Settings PIDs, matching WindowServer entries and display capture fallback during an extended launch poll. |
+
+Each runner archives the individual PNGs, their OCR text and the combined OCR in `settings/`. The round 2 method and wording are pending a runner execution. The aggregate `quicklook-settings-versions/results.md` confirms a major version once every runner for that version has confirmed the wording. Its gate compares the resulting list with the app's checked-in list. This round changes the proof harness only and has no user-facing release note.

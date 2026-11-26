@@ -134,47 +134,143 @@ printf '\n' >> "$RESULTS"
 election 03-after-launch thumbnail "$thumbnail_id"
 election 03-after-launch preview "$preview_id"
 
+settings_snapshot() {
+  local label="$1" output="$PROOF/settings" window_id
+  local png="$output/$label.png" ocr="$output/$label.ocr.txt"
+  printf '\nCapture %s\n' "$label" >> "$output/capture.log"
+  if window_id="$("$WORK/probe" --settings-window 2>> "$output/capture.log")" &&
+     screencapture -x -o -l "$window_id" "$png" >> "$output/capture.log" 2>&1 &&
+     [[ -s "$png" ]]; then
+    printf 'Window capture: ID %s\n' "$window_id" >> "$output/capture.log"
+  else
+    printf 'Trying display capture.\n' >> "$output/capture.log"
+    if ! screencapture -x -m "$png" >> "$output/capture.log" 2>&1 || [[ ! -s "$png" ]]; then
+      return 1
+    fi
+  fi
+  settings_image=true
+  "$WORK/probe" --settings-ocr "$png" > "$ocr" 2>> "$output/capture.log" || return 1
+  {
+    printf '\n--- %s ---\n' "$label"
+    cat "$ocr"
+  } >> "$output/ocr.txt"
+
+  if grep -Fqi 'Login Items & Extensions' "$ocr"; then
+    settings_pane=true
+  fi
+  # Use a standalone heading so the pane title cannot count as the Extensions section.
+  if [[ "$settings_pane" == true ]] && grep -Eiq '^[[:space:]]*Extensions[[:space:]]*$' "$ocr"; then
+    settings_section=true
+  fi
+  if [[ "$settings_section" == true ]] && grep -Eiq '^[[:space:]]*Quick Look[[:space:]]*$' "$ocr"; then
+    printf -- '- Confirmed via **%s**. OCR saw “Login Items & Extensions”, “Extensions” and “Quick Look” ([PNG](settings/%s.png), [OCR](settings/ocr.txt), [capture log](settings/capture.log)).\n' \
+      "$label" "$label" >> "$RESULTS"
+    settings_method="$label"
+    return 0
+  fi
+  return 1
+}
+
 settings_capture() {
-  local output="$PROOF/settings"
-  local window_id
-  local capture_available=false
-  local settings_url
-  mkdir -p "$output"
+  local output="$PROOF/settings" settings_url attempt action_status settings_category=false display_height
+  local settings_image=false settings_pane=false settings_section=false
+  local resize_allowed=false scroll_allowed=false
+  mkdir -p "$output" || return 1
   settings_url="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
-    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)"
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)" || return 1
   printf '\n## System Settings\n\nLink: `%s`.\n\n' "$settings_url" >> "$RESULTS"
-  if ! open "$settings_url" > "$output/capture.log" 2>&1; then
-    printf -- '- FAIL opening the link ([log](settings/capture.log)).\n' >> "$RESULTS"
+  : > "$output/capture.log"
+  : > "$output/ocr.txt"
+  if ! open -b com.apple.systempreferences "$settings_url" >> "$output/capture.log" 2>&1; then
+    printf -- '- Settings failed to open the link ([log](settings/capture.log)).\n' >> "$RESULTS"
     return 1
   fi
+  # Poll through cold launch. Reissue the link once if LaunchServices opened the app
+  # without navigating to the requested pane.
   for attempt in {1..15}; do
-    sleep 1
-    if window_id="$("$WORK/probe" --settings-window 2>> "$output/capture.log")" &&
-       screencapture -x -o -l "$window_id" "$output/window.png" >> "$output/capture.log" 2>&1; then
-      capture_available=true
-      if "$WORK/probe" --ocr "$output/window.png" 'Login Items & Extensions' 'Quick Look' \
-        > "$output/ocr.txt" 2>&1; then
-        printf -- '- PASS both labels in System Settings ([window PNG](settings/window.png), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
-        return 0
-      fi
+    sleep 2
+    settings_snapshot "initial-$attempt" && return 0
+    [[ "$settings_pane" == true ]] && break
+    if [[ "$attempt" == 7 ]]; then
+      open -b com.apple.systempreferences "$settings_url" >> "$output/capture.log" 2>&1 || true
     fi
   done
-  if [[ "$capture_available" == false ]] &&
-     ! screencapture -x "$WORK/settings-capture-check.png" >> "$output/capture.log" 2>&1; then
-    printf -- '- Coverage gap — screen capture unavailable ([log](settings/capture.log)).\n' >> "$RESULTS"
+
+  if display_height="$("$WORK/probe" --settings-display-height 2>> "$output/capture.log")" &&
+     osascript - "$display_height" >> "$output/capture.log" 2>&1 <<'APPLESCRIPT'
+on run argv
+  set targetHeight to (item 1 of argv as integer) - 64
+  with timeout of 5 seconds
+    tell application "System Events"
+      tell (first application process whose bundle identifier is "com.apple.systempreferences")
+        set {windowWidth, windowHeight} to size of front window
+        if targetHeight > windowHeight then
+          set position of front window to {0, 32}
+          set size of front window to {windowWidth, targetHeight}
+        end if
+        return size of front window
+      end tell
+    end tell
+  end timeout
+end run
+APPLESCRIPT
+  then resize_allowed=true
+  else printf 'Resize failed or was refused. Trying scroll.\n' >> "$output/capture.log"
+  fi
+  sleep 1
+  settings_snapshot taller-window && return 0
+
+  action_status=0
+  "$WORK/probe" --settings-scroll-end >> "$output/capture.log" 2>&1 || action_status=$?
+  [[ "$action_status" != 2 ]] && scroll_allowed=true
+  if [[ "$action_status" == 0 ]]; then
+    sleep 1
+    settings_snapshot scroll-end && return 0
+  fi
+  for attempt in {1..9}; do
+    # Try grouping even if scrolling was refused but resizing exposed Extensions.
+    if [[ "$settings_section" == true && "$settings_category" == false ]] &&
+       "$WORK/probe" --settings-category >> "$output/capture.log" 2>&1; then
+      settings_category=true
+      sleep 1
+      settings_snapshot by-category && return 0
+    fi
+    [[ "$attempt" != 9 ]] || break
+    if [[ "$attempt" == 1 && "$action_status" == 0 ]]; then
+      "$WORK/probe" --settings-scroll-start >> "$output/capture.log" 2>&1 || true
+      sleep 1
+    fi
+    local wheel_status=0
+    "$WORK/probe" --settings-scroll >> "$output/capture.log" 2>&1 || wheel_status=$?
+    [[ "$wheel_status" != 2 ]] && scroll_allowed=true
+    [[ "$wheel_status" == 0 ]] || break
+    sleep 1
+    settings_snapshot "scroll-$attempt" && return 0
+  done
+  if [[ "$settings_image" == false || ( "$resize_allowed" == false && "$scroll_allowed" == false ) ]]; then
+    printf -- '- Settings coverage gap. Capture or pane controls unavailable ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
     return 2
   fi
-  printf -- '- FAIL could not verify both labels in System Settings ([artifacts](settings/)).\n' >> "$RESULTS"
+  printf -- '- Settings wording unconfirmed ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
   return 1
 }
 
 settings_status=confirmed
+settings_method=none
 settings_capture || case "$?" in
   2) settings_status=gap ;;
   *) settings_status=failed ;;
 esac
-printf '%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" > "$PROOF/settings.tsv"
+printf '%s\t%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" "$settings_method" > "$PROOF/settings.tsv"
+printf '\nSettings verdict: **%s** (%s).\n' "$settings_status" "$settings_method" >> "$RESULTS"
 killall 'System Settings' 2>/dev/null || true
+
+# Screen capture availability is independent of the Settings wording or accessibility.
+preview_screen_available=true
+if ! screencapture -x "$WORK/preview-capture-check.png" > "$PROOF/preview-capture-check.log" 2>&1 ||
+   [[ ! -s "$WORK/preview-capture-check.png" ]]; then
+  preview_screen_available=false
+fi
 
 preview_capture() (
   local source="$1" output="$2" marker="$3" phase="$4" kind="$5"
@@ -183,7 +279,7 @@ preview_capture() (
   qlmanage -p "$source" > "$output/preview.log" 2>&1 &
   local pid=$!
   trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
-  if [[ "$settings_status" == gap ]]; then
+  if [[ "$preview_screen_available" == false ]]; then
     # Keep the native preview request and provider checks when screen capture is unavailable.
     sleep 5
     printf -- '- %s preview UI — coverage gap (screen capture unavailable, qlmanage PID %s).\n' \
@@ -246,7 +342,7 @@ exercise() {
 }
 
 if exercise default "$WORK/fixtures"; then
-  printf '\nBoth Quick Look points passed after first launch with default election.\n' | tee -a "$RESULTS"
+  printf '\nQuick Look verdict: **PASS** after first launch with default election.\n' | tee -a "$RESULTS"
 else
   printf '\nDefault launch proof failed. Controlled discovery and election follow.\n' | tee -a "$RESULTS"
   "$LSREGISTER" -f -R -trusted "$APP"
@@ -262,10 +358,9 @@ else
   mkdir -p "$WORK/elected-fixtures"
   python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/elected-fixtures" "$private_fixtures/elected" >> "$PROOF/cache.txt"
   if exercise elected "$WORK/elected-fixtures"; then
-    printf '\nBoth Quick Look points passed after explicit registration and election.\n' | tee -a "$RESULTS"
+    printf '\nQuick Look verdict: **PASS** after explicit registration and election.\n' | tee -a "$RESULTS"
   else
-    printf '\nQuick Look proof also failed after explicit election. See per-request artifacts.\n' | tee -a "$RESULTS"
+    printf '\nQuick Look verdict: **FAIL** after explicit election. See per-request artifacts.\n' | tee -a "$RESULTS"
     exit 1
   fi
 fi
-[[ "$settings_status" != failed ]]

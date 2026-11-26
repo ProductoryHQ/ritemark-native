@@ -31,7 +31,7 @@ jobs:
       - name: Build both universal Quick Look extensions
         run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build"
 
-      - name: Run native provider and registration proof
+      - name: Run Quick Look proof and collect the independent Settings verdict
         run: |
           bash macos/quicklook/Proof/run.sh "$RUNNER_TEMP/quicklook-build" \
             "$RUNNER_TEMP/quicklook-proof" "$RUNNER_TEMP/quicklook-work"
@@ -56,6 +56,7 @@ jobs:
       - name: Compare confirmed Settings versions against the app gate
         shell: bash
         run: |
+          set -o pipefail
           python3 macos/quicklook/Proof/settings-versions.py "$RUNNER_TEMP/quicklook-artifacts" \
             extensions/ritemark/src/decks/quickLook/confirmedSettingsVersions.json \
             "$RUNNER_TEMP/results.md" | tee -a "$GITHUB_STEP_SUMMARY"

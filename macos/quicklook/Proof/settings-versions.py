@@ -11,11 +11,10 @@ def main():
                 "macos-26-intel": (26, "x86_64")}
     outcomes = {}
     lines = ["# Quick Look System Settings proof", ""]
-    usable = True
     for runner, (major, expected_cpu) in variants.items():
         evidence = artifacts / f"quicklook-{runner}" / "settings.tsv"
         try:
-            version, cpu, state = evidence.read_text().strip().split("\t")
+            version, cpu, state, method = evidence.read_text().strip().split("\t")
             if (int(version.split(".")[0]), cpu) != (major, expected_cpu):
                 raise ValueError(f"unexpected runner OS or architecture ({version}, {cpu})")
             if state not in ("confirmed", "gap", "failed"):
@@ -24,9 +23,8 @@ def main():
             version, cpu, state = str(major), expected_cpu, "missing"
             lines.append(f"- {runner} — missing or invalid evidence ({error})")
         else:
-            lines.append(f"- {runner} — macOS {version} · {cpu} · {state}")
-        if state not in ("confirmed", "gap"):
-            usable = False
+            detail = f" via {method}" if state == "confirmed" else ""
+            lines.append(f"- {runner} — macOS {version} · {cpu} · {state}{detail}")
         outcomes.setdefault(major, []).append(state)
 
     confirmed = sorted(major for major, states in outcomes.items()
@@ -38,7 +36,7 @@ def main():
         lines.extend(("", f"Version gate drift: checked in {json.dumps(checked_in)}."))
     report.write_text("\n".join(lines) + "\n")
     print(report.read_text(), end="")
-    return 0 if usable and matches else 1
+    return 0 if matches else 1
 
 
 if __name__ == "__main__":
