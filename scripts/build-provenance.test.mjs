@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -202,10 +203,16 @@ test('Quick Look provenance anchors sources and checks PlugIns before signing', 
   }
 
   const manifest = JSON.parse(fs.readFileSync(writeManifest(f), 'utf8'));
-  assert.match(manifest.inputs.quickLook.sha256, /^[a-f0-9]{64}$/);
+  const treeId = git(f.repo, 'rev-parse', `${releaseCommit}:macos/quicklook`);
+  assert.equal(manifest.inputs.quickLook.sha256, createHash('sha256').update(treeId).digest('hex'));
   assert.equal(manifest.quickLookPreSignSha256, sha256Tree(plugins));
   assert.equal(manifest.buildEnvironment.swiftVersion, 'Swift fixture');
   assert.equal(manifest.buildEnvironment.macosSdkVersion, '26.0');
+
+  write(f.repo, '.git/info/exclude', '.DS_Store\n');
+  write(f.repo, 'macos/quicklook/.DS_Store', 'ignored file');
+  assert.match(run(f.repo, ...verifyArgs(f)).output, /Quick Look source contains untracked or ignored files/);
+  fs.unlinkSync(path.join(f.repo, 'macos/quicklook/.DS_Store'));
 
   write(f.repo, 'macos/quicklook/Preview/PreviewProvider.swift', '// harness drift');
   assert.match(run(f.repo, ...verifyArgs(f)).output, /Quick Look source differs from the release commit/);

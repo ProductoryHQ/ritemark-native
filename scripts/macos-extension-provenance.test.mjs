@@ -92,6 +92,8 @@ test('tar transport preserves extension symlinks, modes, and tree identity', {
     fs.mkdirSync(path.dirname(binary), { recursive: true });
     fs.copyFileSync(runtime, binary);
   }
+  const previewPlist = path.join(plugins, 'RitemarkDeckPreview.appex', 'Contents', 'Info.plist');
+  fs.writeFileSync(previewPlist, 'preview v1');
   const provenance = path.join(extension, '..', '..', 'ritemark-build-provenance.json');
   fs.writeFileSync(provenance, JSON.stringify({ quickLookPreSignSha256: sha256Tree(plugins) }));
 
@@ -112,9 +114,17 @@ test('tar transport preserves extension symlinks, modes, and tree identity', {
   assert.equal(sha256Tree(extractedExtension), originalDigest);
   assert.equal(sha256Tree(path.join(destination, 'Ritemark.app', 'Contents', 'PlugIns')), sha256Tree(plugins));
 
-  fs.rmSync(path.join(plugins, 'RitemarkDeckPreview.appex'), { recursive: true });
+  fs.writeFileSync(previewPlist, 'preview v2');
   execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
   const rejectedDestination = path.join(root, 'rejected-output');
+  const tampered = spawnSync(path.join(repo, 'scripts/extract-macos-x64-artifact.sh'),
+    [archive, rejectedDestination], { encoding: 'utf8' });
+  assert.equal(tampered.status, 1);
+  assert.match(tampered.stderr, /Quick Look PlugIns do not match the CI attestation/);
+  assert.equal(fs.existsSync(rejectedDestination), false);
+
+  fs.rmSync(path.join(plugins, 'RitemarkDeckPreview.appex'), { recursive: true });
+  execFileSync('tar', ['-czf', archive, '-C', root, 'VSCode-darwin-x64']);
   const rejected = spawnSync(path.join(repo, 'scripts/extract-macos-x64-artifact.sh'),
     [archive, rejectedDestination], { encoding: 'utf8' });
   assert.equal(rejected.status, 1);

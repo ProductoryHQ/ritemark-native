@@ -521,6 +521,34 @@ while IFS= read -r -d '' helperapp; do
     fi
 done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -name "*.app" -type d -print0 2>/dev/null)
 
+verify_quicklook_signature() {
+    local appex="$1" arch details entitlements
+    for arch in arm64 x86_64; do
+        details="$QUICKLOOK_ENTITLEMENTS_DIR/$arch.signature"
+        if ! entitlements=$(codesign -d --arch "$arch" --verbose=4 --entitlements :- "$appex" 2> "$details"); then
+            cat "$details" >&2
+            return 1
+        fi
+        if ! grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" "$details" ||
+           ! grep -Eq '^CodeDirectory .* flags=0x[[:xdigit:]]+\(([^)]*,)?runtime(,[^)]*)?\)' "$details"; then
+            echo "ERROR: $appex ($arch) must have TeamIdentifier=$APPLE_TEAM_ID and hardened runtime" >&2
+            return 1
+        fi
+        if ! printf '%s' "$entitlements" | plutil -convert json -o - -- - | node -e '
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          assert.deepStrictEqual(JSON.parse(fs.readFileSync(0, "utf8")), {
+            "com.apple.security.app-sandbox": true,
+            "com.apple.security.files.user-selected.read-only": true,
+            "com.apple.security.temporary-exception.files.home-relative-path.read-only": ["/"]
+          });
+        '; then
+            echo "ERROR: $appex ($arch) entitlements must match the Quick Look allowlist" >&2
+            return 1
+        fi
+    done
+}
+
 # Sign each app extension with the entitlements from the approved source,
 # which may differ from the checkout running the signing harness.
 QUICKLOOK_SOURCE_COMMIT="${RITEMARK_RELEASE_COMMIT:-HEAD}"
@@ -535,7 +563,8 @@ if [ -n "$QUICKLOOK_SOURCE" ]; then
         entitlements="$QUICKLOOK_ENTITLEMENTS_DIR/$kind.entitlements"
         if ! git -C "$PROJECT_ROOT" show "$QUICKLOOK_SOURCE_COMMIT:macos/quicklook/$kind/sandbox.entitlements" > "$entitlements" ||
            ! codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
-               --entitlements "$entitlements" "$appex"; then
+               --entitlements "$entitlements" "$appex" ||
+           ! verify_quicklook_signature "$appex"; then
             echo -e "    ${RED}FAILED: $appex${NC}"
             exit 1
         fi

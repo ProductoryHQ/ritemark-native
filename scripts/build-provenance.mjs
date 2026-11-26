@@ -176,10 +176,22 @@ const quickLookKinds = ['Thumbnail', 'Preview'];
 function quickLookSourceInput(commit, verifyCheckout = false) {
   if (!target.startsWith('darwin-') || !git(['ls-tree', commit, '--', quickLookSource])) return null;
 
-  const sha256 = sha256DirectoryAtCommit(commit, quickLookSource);
-  if (verifyCheckout && sha256Directory(path.join(repo, quickLookSource)) !== sha256) {
-    throw new Error('Quick Look source differs from the release commit');
+  const treeId = git(['rev-parse', `${commit}:${quickLookSource}`]);
+  if (verifyCheckout) {
+    const diff = ['diff', '--quiet', '--no-ext-diff'];
+    try {
+      git([...diff, '--', quickLookSource]);
+      git([...diff, '--cached', commit, '--', quickLookSource]);
+    } catch (error) {
+      if (error.status !== 1) throw error;
+      throw new Error('Quick Look source differs from the release commit');
+    }
+    // Without exclude options, --others includes ignored files.
+    if (git(['ls-files', '--others', '--', quickLookSource])) {
+      throw new Error('Quick Look source contains untracked or ignored files');
+    }
   }
+  const sha256 = createHash('sha256').update(treeId).digest('hex');
   return { path: quickLookSource, sha256 };
 }
 

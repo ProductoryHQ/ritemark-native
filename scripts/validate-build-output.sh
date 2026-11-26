@@ -36,10 +36,11 @@ esac
 # Check the packaged metadata and each Mach-O slice using the same gate in CI
 # and in the full local build validation.
 check_quick_look() {
-  local app="$1" version kind provider executable plist binary arch load_commands icon
+  local app="$1" version host_id kind provider executable plist binary arch load_commands icon
   local attrs="NSExtension.NSExtensionAttributes"
   version=$(plutil -extract ritemarkVersion raw -expect string -o - "$app/Contents/Resources/app/product.json") || return 1
-  [[ -n "$version" ]] || return 1
+  host_id=$(plutil -extract CFBundleIdentifier raw -expect string -o - "$app/Contents/Info.plist") || return 1
+  [[ -n "$version" && -n "$host_id" ]] || return 1
 
   for kind in Thumbnail Preview; do
     case "$kind" in
@@ -61,6 +62,7 @@ check_quick_look() {
       fi
     done <<EOF
 CFBundleIdentifier|string|ai.productory.ritemark.deck-$provider
+RitemarkHostBundleIdentifier|string|$host_id
 CFBundleExecutable|string|$executable
 CFBundleShortVersionString|string|$version
 CFBundleVersion|string|$version
