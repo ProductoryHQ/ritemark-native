@@ -1488,7 +1488,7 @@ export function DeckView({
     }
     if (saved.length && !inserted) {
       const folder = savedDeckPictureFolder(saved[0].path) ?? "the deck's folder"
-      reportFailure('drop-pictures', `The pictures are saved in ${folder}, but their slides could not be added.`)
+      reportFailure('drop-pictures', `The pictures are saved in ${folder}, but their slides couldn't be added.`)
     } else if (!saved.length && drop.failure) reportFailure('drop-pictures', drop.failure)
     else if (failed) reportFailure('drop-pictures', failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.`)
     else clearFailure('drop-pictures')

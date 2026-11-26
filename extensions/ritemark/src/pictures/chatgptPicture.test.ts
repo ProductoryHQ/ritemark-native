@@ -117,7 +117,7 @@ async function main(): Promise<void> {
       documentPath, root, signal: new AbortController().signal,
     };
     assert.deepStrictEqual(await makePicture(deps(), input), {
-      kind: 'failed', problem: 'A file named Kickoff files blocks saving pictures.',
+      kind: 'failed', problem: "“Kickoff files” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.",
     });
     assert.strictEqual(fs.readFileSync(deckFolder, 'utf8'), 'keep this file');
     fs.unlinkSync(deckFolder);

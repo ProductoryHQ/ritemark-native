@@ -133,7 +133,7 @@ async function main(): Promise<void> {
       fs.writeFileSync(folder, 'existing file');
       await pages.handle(manualDeck, view, save);
       assert.deepStrictEqual(posted.shift(), {
-        type: 'deck/image-failed', slideId: 's1', message: 'A file named Pictures files blocks saving pictures.',
+        type: 'deck/image-failed', slideId: 's1', message: "“Pictures files” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.",
       });
       assert.strictEqual(fs.readFileSync(folder, 'utf8'), 'existing file');
       fs.unlinkSync(folder);

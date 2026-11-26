@@ -44,11 +44,19 @@ export type MakerPhase =
   | { phase: 'sign-in'; ask: PictureAsk }
 
 /** The words the strip says when ChatGPT is done (experience 46 and 49). */
-export function doneWords(mode: PictureMode, folder?: string): string {
-  if (folder) return mode === 'change'
-    ? `ChatGPT changed the picture. The new one is in ${folder}.`
-    : `ChatGPT made the picture. It's in ${folder}.`
-  return mode === 'change' ? 'ChatGPT changed the picture. The old one is still in images/.' : 'ChatGPT made the picture. It\'s in images/.'
+export function doneWords(mode: PictureMode, folder?: string, source?: string): string {
+  if (mode === 'new') return `ChatGPT made the picture. It's in ${folder ?? 'images/'}.`
+  if (!folder) return 'ChatGPT changed the picture. The old one is still in images/.'
+
+  let oldPath = (source ?? '').replace(/[?#].*$/, '')
+  try {
+    oldPath = decodeURI(oldPath)
+  } catch {
+    // A path with a stray % is read as written, as on the host.
+  }
+  oldPath = pictureKey(oldPath)
+  const oldFolder = oldPath.startsWith('images/') ? 'images/' : oldPath.slice(0, Math.max(0, oldPath.lastIndexOf('/')))
+  return `ChatGPT changed the picture. The old one is still ${oldFolder ? `in ${oldFolder}` : 'there'}.`
 }
 
 /** Who gets what, under the field: the person's words, the slide's words, the picture to change. Never other files. */

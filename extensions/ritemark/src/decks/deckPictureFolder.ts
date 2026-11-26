@@ -4,7 +4,7 @@ import { deckPictureFolderName } from './deckFileName';
 
 export class DeckPictureFolderTaken extends Error {
   constructor(folder: string) {
-    super(`A file named ${folder} blocks saving pictures.`);
+    super(`“${folder}” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.`);
   }
 }
 

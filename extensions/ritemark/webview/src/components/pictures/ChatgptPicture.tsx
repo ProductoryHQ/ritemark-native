@@ -421,7 +421,7 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
     body = (
       <div className="flex items-center gap-2 py-1 pl-3 pr-1.5" role="status" aria-live="polite">
         <Icon name="check-circle" size={14} tone="inherit" />
-        <span className="whitespace-nowrap text-[13px]">{doneWords(state.ask.mode, state.folder)}</span>
+        <span className="whitespace-nowrap text-[13px]">{doneWords(state.ask.mode, state.folder, state.ask.source)}</span>
         <Tooltip label="Put the picture back as it was">
           <Button type="button" variant="ghost" size="compact" onClick={maker.undo}>
             <Icon name="arrow-counter-clockwise" size={14} tone="inherit" />
