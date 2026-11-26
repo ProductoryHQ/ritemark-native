@@ -491,4 +491,14 @@ assert.deepEqual(posted, [], 'drawing sends nothing to the host')
   assert.equal(recentIcon({ ...row, kind: 'markdown' }), 'file-text', 'a document')
   assert.equal(recentIcon({ ...row, name: 'Pitch', extension: '.pptx', kind: 'slides' }), 'file-ppt', 'PowerPoint keeps its own page, as in Documents')
 }
+const quickLook = parse(render(home({ guidance: {
+  card: 'quick-look',
+  body: 'Finder can show your decks’ first slides.',
+  button: 'Open System Settings',
+} })))
+const note = quickLook.querySelector('section[aria-labelledby="rh-quick-look-note"]')!
+assert.equal(note.querySelector('#rh-quick-look-note')?.text, 'Finder can show your decks’ first slides.')
+assert.deepEqual(note.querySelectorAll('button').map(words), ['Open System Settings', 'Not now'])
+assert.equal(note.querySelectorAll('.rh-guide-go > span[data-state="closed"] > button').length, 2, 'both note actions use Tooltip triggers')
+
 console.log('home: all assertions passed')

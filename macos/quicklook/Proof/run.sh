@@ -251,16 +251,6 @@ APPLESCRIPT
   return 1
 }
 
-settings_status=confirmed
-settings_method=none
-settings_capture || case "$?" in
-  2) settings_status=gap ;;
-  *) settings_status=contradiction ;;
-esac
-printf '%s\t%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" "$settings_method" > "$PROOF/settings.tsv"
-printf '\nSettings verdict: **%s** (%s).\n' "$settings_status" "$settings_method" >> "$RESULTS"
-killall 'System Settings' 2>/dev/null || true
-
 # Screen capture availability is independent of the Settings wording or accessibility.
 preview_screen_available=true
 if ! screencapture -x "$WORK/preview-capture-check.png" > "$PROOF/preview-capture-check.log" 2>&1 ||
@@ -337,7 +327,21 @@ exercise() {
   return "$status"
 }
 
-if exercise default "$WORK/fixtures"; then
+default_status=0
+exercise default "$WORK/fixtures" || default_status=$?
+
+# Capture Settings after the default requests, before changing the election.
+settings_status=confirmed
+settings_method=none
+settings_capture || case "$?" in
+  2) settings_status=gap ;;
+  *) settings_status=contradiction ;;
+esac
+printf '%s\t%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" "$settings_method" > "$PROOF/settings.tsv"
+printf '\nSettings verdict: **%s** (%s).\n' "$settings_status" "$settings_method" >> "$RESULTS"
+killall 'System Settings' 2>/dev/null || true
+
+if [[ "$default_status" == 0 ]]; then
   printf '\nQuick Look verdict: **PASS** after first launch with default election.\n' | tee -a "$RESULTS"
 else
   printf '\nDefault launch proof failed. Controlled discovery and election follow.\n' | tee -a "$RESULTS"

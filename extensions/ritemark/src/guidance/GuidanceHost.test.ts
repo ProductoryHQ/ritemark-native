@@ -108,6 +108,7 @@ async function main(): Promise<void> {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_000_000 });
   const { GuidanceHost } = await import('./GuidanceHost');
   const { GuidanceStore } = await import('./guidanceStore');
+  const { localDay } = await import('./guidanceState');
   const { CodexRuntime } = await import('../codex/CodexRuntime');
   const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
   const { emitClaudeStatusInvalidated } = await import('../agent/claudeStatusEvents');
@@ -159,8 +160,9 @@ async function main(): Promise<void> {
   const chats: unknown[] = [];
   const folder = makeTempDir('rm-guidance-host-');
   fs.writeFileSync(path.join(folder, 'Brief.docx'), 'x');
+  const store = new GuidanceStore(globalState, '2.2.0');
   const host = new GuidanceHost({
-    store: new GuidanceStore(globalState, '2.2.0'),
+    store,
     context: {
       extension: { packageJSON: { version: '2.2.0' } },
       globalState,
@@ -193,6 +195,9 @@ async function main(): Promise<void> {
 
   // ── No AI ready: ChatGPT leads, and Ask with is the host's every AI in today's order, the lead included ──
   let shown = await card();
+  assert.equal((await host.homeGuidance({ ...input, whatMoved: true }, { quickLook: true }))?.card, 'what-moved');
+  assert.equal((await host.homeGuidance({ ...input, foundBy: null }, { quickLook: true }))?.card, 'quick-look');
+  assert.equal(store.read().readyShownOn, undefined, 'computing a card does not record an impression');
   assert.equal(shown.ai, 'codex');
   assert.equal(shown.aiName, 'ChatGPT');
   assert.equal(shown.aiReady, false);
@@ -507,7 +512,10 @@ async function main(): Promise<void> {
   counts.splice(0);
   shown = await card();
   gateSends = false; // usage data off, or before the welcome's yes
+  await host.readyCardShown(input.folderUri, { card: 'what-moved' });
+  assert.equal(store.read().readyShownOn, undefined);
   await host.readyCardShown(input.folderUri, shown);
+  assert.equal(store.read().readyShownOn, localDay(new Date()));
   assert.deepEqual(cardCounts(), [{ event: 'ready_card_shown', kind: 'files', ai_ready: shown.aiReady, provider: 'opencode', held: false }], 'handed to the gate, which sends nothing');
   gateSends = true;
   await host.readyCardShown(input.folderUri, shown);
@@ -571,6 +579,14 @@ async function main(): Promise<void> {
   for (const listener of configListeners) listener({ affectsConfiguration: (section) => section === 'editor.fontSize' });
   assert.equal(cardChanges, 1, 'only the decks flag redraws the card');
   watching.dispose();
+
+  const noReadyRequest = { ...input, foundBy: null } as const;
+  for (const day of ['2026-11-01', '2026-11-02', '2026-11-03']) {
+    await store.noteDocumentSaved('file', new Date(`${day}T12:00:00`), true);
+  }
+  assert.equal(await host.homeGuidance(noReadyRequest), null, 'feedback waits on a day when the ready request showed');
+  await store.noteReadyShown('2026-11-01');
+  assert.equal((await host.homeGuidance(noReadyRequest))?.card, 'feedback', 'feedback is eligible on a later day');
   host.dispose();
   mock.timers.reset();
   fs.rmSync(folder, { recursive: true, force: true });

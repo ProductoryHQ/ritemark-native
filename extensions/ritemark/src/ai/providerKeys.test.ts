@@ -292,7 +292,9 @@ async function main() {
 
   // activate's first statement takes the snapshot, before anything can spawn a process or read a key
   const extension = read('extension.ts');
-  const body = extension.slice(extension.indexOf('export function activate(context: vscode.ExtensionContext) {'));
+  const start = extension.indexOf('export function activate(context: vscode.ExtensionContext) {');
+  assert.notEqual(start, -1, 'activate is synchronous');
+  const body = extension.slice(start);
   const firstStatement = body.split('\n').slice(1).map((l) => l.trim()).find((l) => l && !l.startsWith('//'));
   assert.equal(firstStatement, 'snapshotTestKeys();', `activate starts with the snapshot (found: ${firstStatement})`);
 

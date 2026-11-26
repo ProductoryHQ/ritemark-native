@@ -2,7 +2,7 @@ import { parsePluginkitState, type PluginkitState } from './pluginkitState';
 
 const confirmedVersions: readonly number[] = require('./confirmedSettingsVersions.json');
 export const settingsNote = "Finder can show your decks' first slides. Turn on Ritemark under General → Login Items & Extensions → Quick Look.";
-export const settingsHelp = 'Turn on Ritemark in System Settings under Quick Look extensions.';
+export const settingsHelp = "To show your decks' first slides in Finder, turn on Ritemark's Quick Look extension in your Mac's settings, under Extensions.";
 export const openSettingsLabel = 'Open System Settings';
 
 // CFBundleIdentifier in macos/quicklook/{Thumbnail,Preview}/Info.plist.
@@ -25,18 +25,26 @@ export class QuickLookGuidance {
   private running: Promise<void> | undefined;
   private refreshAgain = false;
   private retiring = false;
+  private openOnRetire = false;
 
   constructor(
     private readonly platform: string,
     private readonly profile: ProfileState,
     private readonly query: (id: string) => Promise<string>,
-    readonly confirmedSettings: Promise<boolean>,
+    private readonly confirmedSettings: () => Promise<boolean>,
     private readonly changed: () => void,
     private readonly openSettings: () => PromiseLike<unknown>,
+    private readonly available: () => Promise<boolean>,
   ) {}
 
-  refresh(): Promise<void> {
-    if (this.platform !== 'darwin') return Promise.resolve();
+  async refresh(): Promise<void> {
+    if (!await this.canQuery()) {
+      if (this.thumbnail === 'off') {
+        this.thumbnail = 'unknown';
+        this.changed();
+      }
+      return;
+    }
     this.thumbnail = 'unknown';
     if (this.running) {
       this.refreshAgain = true;
@@ -46,18 +54,22 @@ export class QuickLookGuidance {
     return this.running;
   }
 
+  private async canQuery(): Promise<boolean> {
+    return this.platform === 'darwin' && !this.isRetired()
+      && await this.available() && await this.confirmedSettings() && !this.isRetired();
+  }
+
+  private isRetired(): boolean {
+    return this.retiring || !!this.profile.get<boolean>(retiredKey);
+  }
+
   private async readElections(): Promise<void> {
     do {
       this.refreshAgain = false;
-      const [thumbnail] = await Promise.all([thumbnailId, previewId].map(async id => {
-        try {
-          return parsePluginkitState(await this.query(id), id);
-        } catch {
-          return 'unknown';
-        }
-      }));
+      const thumbnail = await this.query(thumbnailId)
+        .then(output => parsePluginkitState(output, thumbnailId), () => 'unknown' as const);
       if (!this.refreshAgain) this.thumbnail = thumbnail;
-    } while (this.refreshAgain);
+    } while (this.refreshAgain && await this.canQuery());
     this.changed();
   }
 
@@ -68,20 +80,26 @@ export class QuickLookGuidance {
   }
 
   async eligible(): Promise<boolean> {
-    return await this.confirmedSettings && this.platform === 'darwin' && this.thumbnail === 'off'
-      && !!this.profile.get<boolean>(savedKey) && !this.retiring && !this.profile.get<boolean>(retiredKey);
+    return this.thumbnail === 'off' && !!this.profile.get<boolean>(savedKey)
+      && await this.canQuery() && this.thumbnail === 'off';
   }
 
   async retire(open: boolean): Promise<void> {
-    if (!(await this.eligible())) return;
-    if (this.retiring) return;
+    // The visible note can outlive a refresh or a dismissal in another window.
+    this.openOnRetire ||= open;
+    if (this.retiring) {
+      this.changed();
+      return;
+    }
     this.retiring = true;
     try {
-      await this.profile.update(retiredKey, true);
-      if (open) await this.openSettings();
+      if (!this.profile.get<boolean>(retiredKey)) await this.profile.update(retiredKey, true);
     } finally {
       this.retiring = false;
+      const openSettings = this.openOnRetire;
+      this.openOnRetire = false;
       this.changed();
+      if (openSettings) await this.openSettings();
     }
   }
 }

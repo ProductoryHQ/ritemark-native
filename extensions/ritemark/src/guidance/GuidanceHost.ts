@@ -1,8 +1,8 @@
 /**
  * The first day's guidance in one window (Sprint 140; experience 35, 29 and
- * 34): Home's one guidance card (What moved, the ready request or the feedback
- * card), the ready request's Ask with, its sign-ins and its press, the empty
- * sheet's starting place, and the day-one counts.
+ * 34): Home's guidance card (the ready request, Quick Look, What moved or feedback),
+ * the ready request's Ask with, its sign-ins and its press, the empty sheet's
+ * starting place, and the day-one counts.
  *
  * Sprint 156 (experience 35, "With no AI ready"): with no AI ready the card's
  * press signs in, through the welcome's own flows, and the card waits while it
@@ -41,7 +41,8 @@ import { saveAiForNewChats } from '../welcome/welcomeHost';
 import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
 import { isEnabled } from '../features/featureGate';
-import { feedbackDue, guidanceCard, localDay } from './guidanceState';
+import { feedbackDue, guidanceCard, localDay, type GuidanceCard } from './guidanceState';
+import { openSettingsLabel, settingsNote } from '../decks/quickLook/guidance';
 import { type GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
 import { AI_NAMES, AI_ORDER, canSignInHere, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind, type ReadyRecord } from './readyRequest';
@@ -214,7 +215,10 @@ export class GuidanceHost implements vscode.Disposable {
 
   // ── Home's card (R2–R6, R14) ─────────────────────────────────────────────
 
-  async homeGuidance(input: HomeGuidanceInput): Promise<HomeGuidance | null> {
+  async homeGuidance(
+    input: HomeGuidanceInput,
+    { quickLook = false, selected }: { quickLook?: boolean; selected?: GuidanceCard } = {},
+  ): Promise<HomeGuidance | null> {
     // Home redraws on board changes too: the sample's starting points follow its card (experience 35, The build checked)
     this.schedulePlace();
     const key = normalizeProjectUri(input.folderUri);
@@ -234,21 +238,20 @@ export class GuidanceHost implements vscode.Disposable {
       });
       if (gone) record = await this.store.updateProject(key, (current) => ({ ...current, gone }));
     }
-    const today = localDay(new Date());
     const release = this.store.release();
-    const card = guidanceCard({
+    const card = selected ?? guidanceCard({
       whatMoved: input.whatMoved,
       readyRequest: readyRequestDue({ foundBy: input.foundBy, record, ownChats }),
-      feedback: feedbackDue({ savedDays: release.savedDays, answered: release.feedback !== undefined }) || this.feedback.sending || this.feedback.problem !== null,
-      today,
-      readyShownOn: this.store.read().readyShownOn,
+      feedback: this.store.read().readyShownOn !== localDay(new Date())
+        && feedbackDue({ savedDays: release.savedDays, answered: release.feedback !== undefined }),
+      quickLook,
     });
+    if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
     if (card === 'what-moved') return { card };
     if (card === 'feedback') {
       return { card, heading: FEEDBACK_COPY.card.heading, lede: FEEDBACK_COPY.card.lede, placeholder: FEEDBACK_COPY.card.placeholder, sending: this.feedback.sending, problem: this.feedback.problem };
     }
     if (card !== 'ready-request') return null;
-    await this.store.noteReadyShown(today);
     const states = await this.aiStates();
     const chosen = this.cardAiOf(record, states);
     // The card waits only for a sign-in to the AI it names, with no AI ready (answer 1); with one ready it stays usable
@@ -287,6 +290,7 @@ export class GuidanceHost implements vscode.Disposable {
    */
   async readyCardShown(folderUri: string, guidance: HomeGuidance | null): Promise<void> {
     if (guidance?.card !== 'ready-request') return;
+    await this.store.noteReadyShown(localDay(new Date()));
     const key = normalizeProjectUri(folderUri);
     if (this.shownCounting.has(key) || readyCardCounted(this.deps.context.globalState, key)) return;
     // The show is the impression, so it is always counted. While an AI's check still runs, `ai_ready` and the AI named
@@ -642,7 +646,7 @@ export class GuidanceHost implements vscode.Disposable {
 
   // ── The feedback card (R14) ──────────────────────────────────────────────
 
-  async sendFeedbackLine(text: string): Promise<void> {
+  async sendFeedbackLine(text: string): Promise<boolean> {
     this.feedback = { sending: true, problem: null };
     this.changed.fire();
     const sent = await sendWeekLine(text).catch(() => false);
@@ -654,10 +658,11 @@ export class GuidanceHost implements vscode.Disposable {
       this.feedback = { sending: false, problem: FEEDBACK_COPY.card.failed };
     }
     this.changed.fire();
+    return sent;
   }
 
   /** The card's line, after a send that did not go, handed to the person's own e-mail app (R13's e-mail route). */
-  async mailFeedbackLine(text: string): Promise<void> {
+  async mailFeedbackLine(text: string): Promise<boolean> {
     const context = narrowReportContext({ appVersion: this.store.version, platform: process.platform, occurredAt: new Date().toISOString() });
     const outcome = await openReportMail(
       { recipient: REPORT_RECIPIENT, subject: reportSubject(context, 'feedback'), body: composeReport(context, text) },
@@ -666,13 +671,14 @@ export class GuidanceHost implements vscode.Disposable {
     if (outcome !== 'opened') {
       this.feedback = { sending: false, problem: outcome === 'too-long' ? FEEDBACK_COPY.handoff.tooLong.lede : FEEDBACK_COPY.handoff.noHandler.lede };
       this.changed.fire();
-      return;
+      return false;
     }
     // Handed over: the question has its answer for this release; the mail is the person's to send.
     await this.store.answerFeedback('sent');
     this.feedback = { sending: false, problem: null };
     void showBriefToast(`${FEEDBACK_COPY.handoff.opened.title}. ${FEEDBACK_COPY.handoff.opened.message}`);
     this.changed.fire();
+    return true;
   }
 
   async feedbackNotNow(): Promise<void> {

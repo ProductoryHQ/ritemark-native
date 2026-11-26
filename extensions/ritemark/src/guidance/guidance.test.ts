@@ -132,14 +132,14 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   // ── Home's one card (R2, R14, D1; S7, S8, S61–S63) ──
 
-  const base = { whatMoved: false, readyRequest: false, feedback: false, today: '2026-11-03', readyShownOn: undefined };
+  const base = { whatMoved: false, readyRequest: false, quickLook: false, feedback: false };
   assert.equal(guidanceCard(base), null);
-  assert.equal(guidanceCard({ ...base, whatMoved: true, readyRequest: true, feedback: true }), 'what-moved', 'S8: What moved first');
-  assert.equal(guidanceCard({ ...base, readyRequest: true }), 'ready-request');
-  assert.equal(guidanceCard({ ...base, feedback: true }), 'feedback', 'S61');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true, readyShownOn: '2026-11-03' }), 'ready-request', 'S62: the day it showed, the feedback card waits');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true, readyShownOn: '2026-11-02' }), 'feedback', 'S62: the next day, the feedback card takes the place');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: false, readyShownOn: '2026-11-02' }), 'ready-request', 'S62: and the ready request returns after it');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, quickLook: true }), 'ready-request');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, whatMoved: true }), 'what-moved');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true }), 'ready-request');
+  assert.equal(guidanceCard({ ...base, quickLook: true, whatMoved: true }), 'what-moved');
+  assert.equal(guidanceCard({ ...base, quickLook: true, feedback: true }), 'quick-look');
+  assert.equal(guidanceCard({ ...base, whatMoved: true, feedback: true }), 'what-moved');
 
   // ── Saved days and releases (R14, S61, S63) ──
 

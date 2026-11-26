@@ -5,7 +5,8 @@
  * caller.
  */
 
-export type GuidanceCard = 'what-moved' | 'ready-request' | 'feedback';
+const GUIDANCE_ORDER = ['what-moved', 'ready-request', 'quick-look', 'feedback'] as const;
+export type GuidanceCard = typeof GUIDANCE_ORDER[number];
 
 /** The feedback card is due from the third day with a saved document in this release (R14). */
 export const SAVED_DAYS_FOR_FEEDBACK = 3;
@@ -17,24 +18,18 @@ export interface GuidanceInput {
   readyRequest: boolean;
   /** The feedback card is due: the third saved day reached, not yet answered in this release. */
   feedback: boolean;
-  /** Today, local. */
-  today: string;
-  /** The last day the ready request showed on Home, in any project. */
-  readyShownOn: string | undefined;
+  quickLook: boolean;
 }
 
-/**
- * One card at a time, in the drawn order: What moved, the ready request, the
- * feedback card. On a day the ready request showed, the feedback card waits;
- * the next day Home opens it takes the place once, even where the ready
- * request is still due, and the ready request returns as soon as Send or Not
- * now ends it (D1).
- */
+/** Choose one card for a newly opened slot. */
 export function guidanceCard(input: GuidanceInput): GuidanceCard | null {
-  if (input.whatMoved) return 'what-moved';
-  if (input.feedback && (!input.readyRequest || input.readyShownOn !== input.today)) return 'feedback';
-  if (input.readyRequest) return 'ready-request';
-  return null;
+  const eligible = {
+    'ready-request': input.readyRequest,
+    'quick-look': input.quickLook,
+    'what-moved': input.whatMoved,
+    feedback: input.feedback,
+  };
+  return GUIDANCE_ORDER.find(card => eligible[card]) ?? null;
 }
 
 /** The local calendar day of a moment, as `YYYY-MM-DD`. */
