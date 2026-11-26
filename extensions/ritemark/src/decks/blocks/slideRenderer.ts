@@ -25,7 +25,7 @@ import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '..
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
 import { boxIconOf } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
@@ -303,7 +303,7 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       const look = state.looks[state.looks.length - 1] ?? 'boxes';
       let mark = '';
       if (look === 'arrows') mark = `<span class="blk-mark">${iconSvg('arrow-right', 20)}</span>`;
-      else if (!OWN_MARK_LOOKS.has(look)) {
+      else if (boxesShowIcons(look)) {
         const badge = boxIconBadge(token.attrs.values.icon);
         if (badge) mark = `<span class="${badge.className}">${badge.svg}</span>`;
       }
