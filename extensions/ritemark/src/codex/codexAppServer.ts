@@ -30,6 +30,7 @@ import type {
   InitializeResult,
   GetAccountParams,
   GetAccountResponse,
+  AccountLoginCompletedNotification,
   GetAccountRateLimitsResponse,
   ThreadStartParams,
   ThreadStartResponse,
@@ -72,6 +73,7 @@ function isolatedCodexTestHome(env: NodeJS.ProcessEnv): string | undefined {
 export class CodexAppServer extends EventEmitter {
   private manager: CodexManager;
   private readonly testApiKey?: string;
+  private awaitingTestKeyCompletion = false;
   private nextId = 1;
   private pendingRequests = new Map<number, {
     resolve: (result: unknown) => void;
@@ -148,10 +150,13 @@ export class CodexAppServer extends EventEmitter {
     try {
       const { account } = await this.readAccount();
       if (account !== null) return;
+      // The completion may arrive in the same stdout chunk as the RPC response.
+      this.awaitingTestKeyCompletion = true;
       await this.rpc<LoginAccountApiKeyParams, LoginAccountApiKeyResponse>(
         'account/login/start', { type: 'apiKey', apiKey }, 30_000, { omitParamsFromTrace: true },
       );
     } catch {
+      this.awaitingTestKeyCompletion = false;
       // Keep account status and manual sign-in available if the test login fails.
       console.error('ChatGPT could not sign in with the test API key.');
     }
@@ -513,6 +518,7 @@ export class CodexAppServer extends EventEmitter {
     this.lastStderrMessage = null;
     this.sawStderrSinceStart = false;
     this.initializePromise = null;
+    this.awaitingTestKeyCompletion = false;
 
     this.emit('exit', code);
   }
@@ -569,6 +575,14 @@ export class CodexAppServer extends EventEmitter {
       // Notification (event)
       const notification = message as unknown as JsonRpcNotification;
       this.trace?.('rpc:event', String(notification.method), notification.params);
+      if (this.awaitingTestKeyCompletion && notification.method === 'account/login/completed'
+          && (notification.params as AccountLoginCompletedNotification | undefined)?.loginId === null) {
+        // This login belongs to the running process. Refresh via account/updated
+        // without triggering the restart used after browser sign-in.
+        this.awaitingTestKeyCompletion = false;
+        this.emit('notification', notification);
+        return;
+      }
       // Sprint 143 (#544): Codex's `error` notification can't be emitted as 'error': an EventEmitter throws an
       // 'error' nobody listens to, which this loop caught and logged as a JSON line it couldn't parse.
       this.emit(notification.method === 'error' ? CODEX_ERROR_EVENT : notification.method as string, notification.params);
@@ -581,6 +595,7 @@ export class CodexAppServer extends EventEmitter {
   }
 
   dispose(): void {
+    this.awaitingTestKeyCompletion = false;
     this.manager.dispose();
     this.removeAllListeners();
   }

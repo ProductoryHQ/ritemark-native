@@ -72,7 +72,10 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   const titles = candidates.filter(({ file, name, full }) => full || !candidates.some((other) =>
     other.file !== file && (other.name === name || other.name.startsWith(name + ' '))))
     .sort((a, b) => b.name.length - a.name.length);
-  const startsEntry = (heading) => titles.find(({ name }) => heading === name || heading.startsWith(name + ' '));
+  const startsEntry = (heading) => {
+    const matchTitle = (text) => titles.find(({ name }) => text === name || text.startsWith(name + ' '));
+    return matchTitle(heading) ?? (heading.startsWith('the ') ? matchTitle(heading.slice(4)) : undefined);
+  };
   const mentionsOther = (heading, file) => files.some((other) => other !== file
     && containsFact(heading, namesByFile.get(other).flatMap(entryEndingNames)));
   let entryFile;
@@ -100,7 +103,7 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     const visible = line.replace(/\[([^\]\n]+)\]\([^\n]*?\)/g, '$1');
     const heading = entryName(visible);
     const match = startsEntry(heading);
-    if (match && heading === match.name) {
+    if (match && (heading === match.name || heading === 'the ' + match.name)) {
       entryFile = match.file;
       unreadEntry = [visible];
       unreadRows.get(entryFile).push(unreadEntry);
@@ -118,9 +121,9 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     const rows = rowsFor(file);
     if (rows.some((row) => containsFact(row, words))) return { file, result: 'read' };
     if (unreadRowsFor(file).some((row) => otherUnreadReason.test(row) || (unreadReason === 'scan' && scanReason.test(row)))) return { file, result: 'unread' };
-    return { file, result: 'missing' };
+    return { file, result: rows.length ? 'to check' : 'missing' };
   });
-  if (!customQuestion) coverage.push({ file: facts.passwordDocument, result: passwordLine ? 'unread' : 'missing' });
+  if (!customQuestion) coverage.push({ file: facts.passwordDocument, result: passwordLine ? 'unread' : rowsFor(facts.passwordDocument).length ? 'to check' : 'missing' });
 
   // Each slide entry starts with its own number. The prompt asks for notes on the same line.
   const slideRows = new Map();
@@ -160,7 +163,8 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     || slides.every(({ number }) => linkedSlides.has(number)));
   if (!customQuestion) coverage.push({
     file: facts.deck.file,
-    result: deckRead ? 'read' : unreadRowsFor(facts.deck.file).some((line) => otherUnreadReason.test(line)) ? 'unread' : 'missing',
+    result: deckRead ? 'read' : unreadRowsFor(facts.deck.file).some((line) => otherUnreadReason.test(line)) ? 'unread'
+      : deckRows.length ? 'to check' : 'missing',
   });
 
   const names = ['the project folder', facts.folder, ...files.flatMap((file) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
@@ -193,7 +197,8 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   return {
     coverage, slides, badSteps, passwordLine, linkCounts,
     criteria: {
-      1: customQuestion ? 'n/a' : result(coverage.every(({ result: coverageResult }) => coverageResult !== 'missing')),
+      1: customQuestion ? 'n/a' : coverage.some((row) => row.result === 'missing') ? 'fail'
+        : coverage.some((row) => row.result === 'to check') ? 'to check' : 'pass',
       2: customQuestion ? 'n/a' : result(!duplicateSlide && slideRows.size === slides.length && slides.every((slide) => slide.notes)),
       3: result(stepLabels.length > 0 && badSteps.length === 0),
       4: customQuestion ? 'n/a' : passageLinksPass ? pendingClaims ? 'to check' : 'pass' : 'fail',
@@ -383,7 +388,16 @@ async function ask(ui, ai, runtime, question, report) {
   await ui.insert(question);
   await ui.waitFor(() => ui.chat(`return ${textarea}?.value === ${JSON.stringify(question)};`),
     10, 'The question did not reach the message box.');
-  if (!(await ui.clickChat('d.querySelector(\'button[aria-label="Send"]:not(:disabled)\')'))) throw new Error('Send is unavailable.');
+  const send = 'd.querySelector(\'button[aria-label="Send"]:not(:disabled)\')';
+  if (!(await ui.waitFor(() => ui.chat(`return !!${send};`), 30))) {
+    const status = await ui.chat(`
+      const notice = d.querySelector('[data-composer] [role="status"][aria-label], [data-composer] [role="alert"][aria-label]');
+      if (notice?.innerText.trim()) return notice.innerText.trim().replace(/\\s+/g, ' ');
+      return navigator.onLine ? ${textarea}?.placeholder : 'You are offline';
+    `);
+    throw new Error(`Send stayed disabled: ${status || 'composer status unavailable'}`);
+  }
+  if (!(await ui.clickChat(send))) throw new Error('Send is unavailable.');
 
   const answer = await ui.waitFor(() => ui.chat(`
     ${lastTurn}
@@ -541,6 +555,7 @@ function formatRun(run) {
   const fence = '`'.repeat(Math.max(3, ...(run.answer.match(/`+/g) ?? []).map((s) => s.length + 1)));
   const bullets = (items) => items.length ? items.map((line) => `- ${line}`).join('\n') : 'None recorded.';
   const { total, rightDocument, withPassage, onClaim } = run.linkCounts;
+  const pendingCoverage = run.coverage.filter(({ result }) => result === 'to check').map(({ file }) => title(file));
   const share = (count) => total ? `${count}/${total} (${(100 * count / total).toFixed(1)}%)` : '0/0';
   return `#### Run ${run.number}
 
@@ -560,7 +575,11 @@ ${fence}
 **Step labels**
 
 ${bullets(run.stepLabels)}
+${pendingCoverage.length ? `
+**Document findings to check**
 
+${bullets(pendingCoverage)}
+` : ''}
 **Links tried**
 
 - Opened the right document — ${share(rightDocument)}

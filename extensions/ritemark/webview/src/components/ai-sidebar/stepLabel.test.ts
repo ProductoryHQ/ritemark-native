@@ -26,7 +26,7 @@ assert.equal(readSummary([...activities, activities[0]], 18000), 'Read 4 Word do
 
 // S18: only the detail contains the command. Exercise native Claude reads too.
 const command = 'textutil -convert txt "Reference/Annual report.docx" -stdout';
-assert.deepEqual(stepLabel(progress({ id: 'shell', kind: 'shell', command }, 'commandExecution')), {
+assert.deepEqual(stepLabel(progress({ id: 'shell', kind: 'shell', command }, 'Bash')), {
   label: 'Reading documents', detail: command, warning: false, icon: 'terminal',
 });
 assert.equal(stepLabel(progress({ id: 'shell', kind: 'shell', command: 'git status' }, 'Bash'))?.label, 'Running a command');
@@ -181,4 +181,27 @@ assert.deepEqual(visibleStepActivities([absoluteFailure, draftsFolder, liveRetry
 assert.deepEqual(visibleStepActivities([absoluteFailure, findings], '/pro'), [absoluteFailure, findings]);
 assert.deepEqual(visibleStepActivities([finalThought, absoluteFailure, findings], '/project'), [finalThought, findings]);
 assert.equal(readSummary([findings], 7800), 'Read 1 Word document · 8s');
+// ChatGPT's shell rows and its empty assistant-message placeholder.
+for (const [command, label] of [
+  ['rg --files', 'Looked in the project folder'],
+  ["/bin/zsh -lc 'rg --files'", 'Looked in the project folder'],
+  ['find Reference -maxdepth 2 -name "*.docx" -type f', 'Looked in Reference'],
+  ['ls -R "01 Brief"', 'Looked in 01 Brief'],
+  ['find Reference -type f', 'Looked in Reference'],
+  ['cat "01 Brief/Engagement brief.docx"', 'Read Engagement brief'],
+  ['rg --files > files.txt', 'Ran a command'],
+  ['find Reference -type f -delete', 'Ran a command'],
+  ['rg --pre converter pilot Reference', 'Ran a command'],
+  ['rg --files && touch marker', 'Ran a command'],
+  ['cat "./01 Brief/Engagement brief.docx"', 'Read Engagement brief'],
+  ['cat ../Other.docx', 'Ran a command'],
+  ['textutil -convert txt Reference/Annual.docx', 'Ran a command'],
+]) {
+  assert.equal(stepLabel({ type: 'done', tool: 'commandExecution', message: command, timestamp: 0 })?.label, label);
+}
+const emptyThought: AgentProgress = { type: 'thinking', message: 'Thinking...', timestamp: 0 };
+const narration: AgentProgress = { ...emptyThought, message: 'I will check the appendix.' };
+const assistantStart: AgentProgress = { ...emptyThought, type: 'tool_use', tool: 'agentMessage' };
+assert.deepEqual(visibleStepActivities([emptyThought, narration, assistantStart], undefined, true), [narration]);
+
 console.log('stepLabel tests passed.');

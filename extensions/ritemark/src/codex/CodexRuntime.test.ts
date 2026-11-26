@@ -463,6 +463,32 @@ async function run() {
     mock.emit('item/started', {
       threadId: 'thread-docs', item: { type: 'commandExecution', id: 'shell', command: 'textutil "Ref.docx"' },
     });
+    for (const [id, command, commandActions, kind, path] of [
+      ['list', 'rg --files', [{ type: 'listFiles', path: null }], 'folder', '.'],
+      ['search', 'rg pilot Reference', [{ type: 'search', path: 'Reference' }], 'folder', 'Reference'],
+      ['read-command', 'cat "01 Brief/Engagement brief.docx"', [{ type: 'read', path: '01 Brief/Engagement brief.docx' }], 'read', '01 Brief/Engagement brief.docx'],
+      ['find', 'find Reference -type f', [{ type: 'unknown' }], 'folder', 'Reference'],
+      ['write', 'rg --files > files.txt', [{ type: 'listFiles', path: null }], 'shell', undefined],
+      ['mixed', 'rg --files', [{ type: 'listFiles', path: null }, { type: 'unknown' }], 'shell', undefined],
+      // Outside the project, a listing keeps its command row: a step's label never shows a path.
+      ['outside', 'ls /etc', [{ type: 'listFiles', path: '/etc' }], 'shell', undefined],
+      ['up', 'find ../other -type f', [{ type: 'unknown' }], 'shell', undefined],
+    ] as const) {
+      const item = { type: 'commandExecution', id, command, commandActions };
+      mock.emit('item/started', { threadId: 'thread-docs', item });
+      mock.emit('item/completed', { threadId: 'thread-docs', item: { ...item, status: 'completed' } });
+      const steps = events.filter(({ step }) => step?.id === id).map(({ step }) => step);
+      assert.deepEqual(steps.map((step) => [step?.kind, step?.path, step?.status]),
+        [[kind, path, undefined], [kind, path, 'completed']]);
+    }
+    mock.emit('item/completed', {
+      threadId: 'thread-docs', item: {
+        type: 'commandExecution', id: 'legacy-list', command: 'rg --files', status: 'completed',
+        parsed_cmd: [{ type: 'list_files', path: null }],
+        aggregatedOutput: '01 Brief/Engagement brief.docx\nReference/Annual report.pdf',
+      },
+    });
+    assert.deepEqual(events.at(-1)?.step?.listing, ['01 Brief/Engagement brief.docx', 'Reference/Annual report.pdf']);
     mock.emit('server-request', {
       id: 81, method: 'item/tool/call', params: {
         threadId: 'thread-docs', itemId: 'read', tool: 'read_document', arguments: { path: 'Reference/Locked.docx' },
@@ -930,9 +956,10 @@ async function run() {
   try {
     process.env = { ...oldEnv, TMPDIR: temp, CODEX_HOME: home, CLAUDE_CONFIG_DIR: claudeHome, RITEMARK_BUILD_CHANNEL: 'test' };
     console.error = (...args: unknown[]) => { output.push(args); };
-    async function initialize(account: unknown = null, failLogin = false) {
+    async function initialize(account: unknown = null, failLogin = false,
+      server = new CodexAppServer({ trace: (...args) => { output.push(args); } }),
+    ) {
       const requests: Array<{ id?: number; method: string; params?: unknown }> = [];
-      const server = new CodexAppServer({ trace: (...args) => { output.push(args); } });
       server.on('progress', (event) => output.push(event));
       server.on('notification', (event) => output.push(event));
       const internals = server as any;
@@ -976,13 +1003,47 @@ async function run() {
     fs.unlinkSync(home);
     fs.mkdirSync(home);
     assert.ok(!(await initialize({ type: 'chatgpt' })).requests.some(({ method }) => method === 'account/login/start'));
-    const { requests, args } = await initialize();
-    assert.deepStrictEqual(requests.map(({ method }) => method), [
-      'initialize', 'initialized', 'account/read', 'account/login/start',
-    ]);
-    assert.deepStrictEqual(requests.at(-1)?.params, { type: 'apiKey', apiKey: key });
-    assert.strictEqual(JSON.stringify(requests).split(key).length, 2);
-    assert.deepStrictEqual(args, ['-c', 'cli_auth_credentials_store="ephemeral"']);
+    const runtime = new CodexRuntime();
+    const r = runtime as any;
+    r._ensureAppServer();
+    const server = r._appServer as InstanceType<typeof CodexAppServer>;
+    let disposals = 0;
+    (server as any).manager.dispose = () => { disposals++; };
+    const reasons: string[] = [];
+    const { onCodexStatusInvalidated } = require('./codexStatusEvents') as typeof import('./codexStatusEvents');
+    const unsubscribe = onCodexStatusInvalidated(({ reason }) => {
+      reasons.push(reason);
+      if (reason === 'login-finished') runtime.dispose();
+    });
+    const notify = async (loginId: string | null) => {
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/login/completed', params: { loginId, success: true, error: null },
+      }) + '\n');
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    };
+    try {
+      const { requests, args } = await initialize(null, false, server);
+      assert.deepStrictEqual(requests.map(({ method }) => method), [
+        'initialize', 'initialized', 'account/read', 'account/login/start',
+      ]);
+      assert.ok(JSON.stringify(requests.at(-1)?.params) === JSON.stringify({ type: 'apiKey', apiKey: key }));
+      assert.strictEqual(JSON.stringify(requests).split(key).length, 2);
+      assert.deepStrictEqual(args, ['-c', 'cli_auth_credentials_store="ephemeral"']);
+      await notify(null);
+      assert.strictEqual(disposals, 0);
+      assert.ok(!reasons.includes('login-finished'));
+
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/updated', params: { authMode: 'apikey' },
+      }) + '\n');
+      assert.deepStrictEqual(reasons, ['status-refresh']);
+
+      await notify('browser-login');
+      assert.strictEqual(reasons.filter((reason) => reason === 'login-finished').length, 1);
+      assert.strictEqual(disposals, 1);
+    } finally {
+      unsubscribe();
+    }
     await initialize(null, true);
     assert.ok(output.some((event) => JSON.stringify(event) === '{"message":"[test key]"}'));
     assert.ok(!JSON.stringify(output).includes(key));

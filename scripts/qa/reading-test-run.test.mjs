@@ -66,7 +66,7 @@ test('reading harness catches unsubstantiated coverage, misplaced notes, command
     stepLabels: [...sample.stepLabels, 'Read Brief/Charter.docx', 'pdftotext Visit.pdf -'],
     links: [{ label: '2', expectedFile: 'Pilot deck.pptx', opensRightDocument: false }],
   }, facts);
-  assert.deepEqual(result.criteria, { 1: 'fail', 2: 'fail', 3: 'fail', 4: 'fail', 5: 'fail', 6: 'fail' });
+  assert.deepEqual(result.criteria, { 1: 'to check', 2: 'fail', 3: 'fail', 4: 'fail', 5: 'fail', 6: 'fail' });
   assert.deepEqual(result.badSteps, ['Read Brief/Charter.docx', 'pdftotext Visit.pdf -']);
   assert.equal(result.slides[0].notes, false);
   assert.equal(result.slides[4].notes, false);
@@ -148,7 +148,7 @@ test('scores each multiline unread entry up to its next document or blank line',
   const score = (visibleAnswer) => scoreRun({ ...sample, visibleAnswer }, facts);
   assert.equal(score(multiline).criteria[1], 'pass');
   assert.equal(score(multiline).criteria[5], 'pass');
-  assert.equal(score(multiline.replace('Visit form\n', 'Visit form\n\n')).coverage[1].result, 'missing');
+  assert.equal(score(multiline.replace('Visit form\n', 'Visit form\n\n')).coverage[1].result, 'to check');
   assert.equal(score(multiline.replace('Please provide the password.', '\nCharter: Please provide the password.')).criteria[5], 'fail');
   assert.equal(score(multiline.replace('It has a password.', 'Charter has a password.')).criteria[5], 'fail');
 });
@@ -170,7 +170,7 @@ test('accepts each concrete Findings draft fact, excluding the minutes’ shared
     assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'read', fact);
   }
   const scored = scoreRun({ ...sample, visibleAnswer: `${answer}\n- Findings draft v2: Cost per visit.` }, fixture);
-  assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'missing');
+  assert.equal(scored.coverage.find(({ file }) => file === findings.file).result, 'to check');
 });
 
 test('matches the Claude title variants and headings without crediting another document', () => {
@@ -205,7 +205,7 @@ His findings: a visit costs €18.40 against €3.10 for a call.`;
     .slice(0, fixture.documents.length).map(({ result }) => result);
   assert.deepEqual(coverage(visibleAnswer), ['missing', 'read', 'missing']);
   assert.equal(coverage(visibleAnswer.replace('His findings: a visit', 'He reported that a branch visit'))[1], 'read');
-  assert.equal(coverage(visibleAnswer.replace('His findings: a visit', 'He reported that a branch visit v 2'))[1], 'missing');
+  assert.equal(coverage(visibleAnswer.replace('His findings: a visit', 'He reported that a branch visit v 2'))[1], 'to check');
 });
 
 test('every version-stripped fixture title that becomes one word is rejected as an alias', () => {
@@ -245,14 +245,14 @@ test('rejects facts attributed to the wrong fixture document', () => {
   ]) {
     const visibleAnswer = `${document}: ${detail}`;
     assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture)
-      .coverage.find(({ file }) => file === document + '.docx').result, 'missing', visibleAnswer);
+      .coverage.find(({ file }) => file === document + '.docx').result, 'to check', visibleAnswer);
   }
   for (const nextLine of [
     'The Interview – head of operations says cash machines are near the end of their life.',
     'Head of operations says cash machines are near the end of their life.',
   ]) {
     const visibleAnswer = `${findings} — summary of findings\n${nextLine}`;
-    assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture).coverage[0].result, 'missing', visibleAnswer);
+    assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture).coverage[0].result, 'to check', visibleAnswer);
   }
 });
 
@@ -373,7 +373,7 @@ test('Claude round 2 run 1 associates standalone unread titles with their reason
     assert.equal(score.criteria[5], 'pass');
   }
   const separated = round2.unread.answer.replace('(scan)\n', '(scan)\n\n');
-  assert.equal(scoreRound2({ answer: separated }).coverage[0].result, 'missing');
+  assert.equal(scoreRound2({ answer: separated }).coverage[0].result, 'to check');
   const nextTitle = round2.unread.answer.replace('Confidential appendix\n', 'Confidential appendix\nAnnual report 2025\n');
   assert.equal(scoreRound2({ answer: nextTitle }).criteria[5], 'fail');
 });
@@ -386,9 +386,9 @@ test('Claude round 2 run 1 matches the December staff announcement in generated 
   const score = (answer) => scoreRound2({ answer }, { ...round2Facts, documents });
   const minutes = (answer) => score(answer).coverage.find(({ file }) => file.startsWith('Steering group minutes')).result;
   assert.equal(minutes(round2.minutes), 'read');
-  assert.equal(minutes('Steering group minutes 21 October: the cost per visit is six times the cost per call.'), 'missing');
+  assert.equal(minutes('Steering group minutes 21 October: the cost per visit is six times the cost per call.'), 'to check');
   assert.equal(score('Annual report 2025, branch section: a plan is due in March 2027.').coverage
-    .find(({ file }) => file.includes('Annual report')).result, 'missing');
+    .find(({ file }) => file.includes('Annual report')).result, 'to check');
 });
 
 test('Claude round 2 run 2 accepts the annual report short title only when unique', () => {
@@ -416,4 +416,20 @@ test('Claude round 2 runs 2 and 3 cover the deck with individually linked slides
 
 test('Claude round 2 run 2 reports the scan has no readable text', () => {
   assert.equal(scoreRound2({ answer: round2.scan2 }).coverage[0].result, 'unread');
+});
+
+test('ChatGPT gate set 1 excerpts distinguish supported, pending, and absent document findings', () => {
+  const fixture = { ...facts, documents: [
+    { file: '01 Brief/Engagement brief.docx', words: ['31%'] },
+    { file: '04 Drafts/Findings draft v2.docx', heading: 'Findings, draft 2',
+      words: ['rely on branches for help with the app'] },
+  ] };
+  const brief = '- The Engagement brief: branch network review sets a March 2027 deadline for the network plan and excludes IT systems from scope.';
+  const findings = '- Findings, draft 2 identifies branches as a source of app help for older customers.';
+  const score = (rows) => scoreRun({ ...sample, visibleAnswer: [answer, ...rows].join('\n') }, fixture);
+  assert.deepEqual(score([brief, findings]).coverage.slice(0, 2).map(({ result }) => result), ['to check', 'to check']);
+  assert.equal(score([brief, findings]).criteria[1], 'to check');
+  assert.equal(score([brief.replace('sets a March 2027 deadline', 'reports a 31% fall in visits'), findings]).coverage[0].result, 'read');
+  assert.equal(score([brief, findings.replace('Findings, draft 2', 'The draft')]).coverage[1].result, 'missing');
+  assert.equal(score([brief]).criteria[1], 'fail');
 });
