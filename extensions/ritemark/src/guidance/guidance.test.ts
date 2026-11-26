@@ -178,9 +178,9 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   assert.deepEqual(READ_KINDS_PASSED, {
     'claude-code': { darwin: true, win32: false },
-    codex: { darwin: false, win32: false },
+    codex: { darwin: true, win32: false },
     opencode: { darwin: false, win32: false },
-  }, 'the shipped gate: Claude on the Mac passed G1 (3 of 3); every other AI and platform stays closed');
+  }, 'the shipped gate: Claude and ChatGPT on the Mac passed G1 (3 of 3); OpenCode and Windows stay closed');
   const placeOnMac = (front: Parameters<typeof startingPlaceOf>[0], project: ReadyKind) =>
     startingPlaceOf(front, project, 'claude-code', 'darwin');
   assert.equal(placeOnMac(null, 'files'), 'project', 'S33');
@@ -189,7 +189,10 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
   assert.equal(placeOnMac({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its Word starting points open');
   assert.equal(placeOnMac({ viewType: 'ritemark.pdfViewer', fileName: 'Annual report.pdf' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its PDF starting points open');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'darwin'), 'project', 'S35: ChatGPT has not passed yet: the project\'s');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'darwin'), 'word_or_pdf', 'ChatGPT passed G1 on the Mac: its Word starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Annual report.pdf' }, 'files', 'codex', 'darwin'), 'word_or_pdf', 'ChatGPT passed G1 on the Mac: its PDF starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'opencode', 'darwin'), 'project', 'S35: OpenCode has not passed yet: the project\'s');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'win32'), 'project', 'S40: ChatGPT on Windows waits for Gate 2');
   assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'claude-code', 'win32'), 'project', 'S40: Claude on Windows waits for Gate 2');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
