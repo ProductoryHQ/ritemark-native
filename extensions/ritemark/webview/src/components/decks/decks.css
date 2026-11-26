@@ -530,6 +530,9 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 /* Keep the title clickable at the top without taking room from the centred picture (#1116). */
 .deck-sl.is-blocks.is-editing.is-lone-pic .blk-flow > h1.is-empty[data-placeholder="Title"] { position: absolute; top: 0; left: 0; margin: 0; }
 .deck-sl.is-blocks.is-editing.is-lone-pic .blk-flow > h1.is-empty[data-placeholder="Title"]::before { float: none; }
+/* The stage's last-block rule above (margin-bottom 0) outranks the lone picture's centring in slide.css; with no Content
+   place chosen, the picture keeps both auto margins, so it sits in the middle as in Present (#1116 round 3). */
+.deck-slide .deck-sl.is-blocks.is-editing.is-lone-pic:not(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img):nth-last-child(1 of :not(ritemark-comment, .blk-empty-line.is-edge)) { margin-top: auto; margin-bottom: auto; }
 
 /* Sprint 161 (experience 46, "Comments on the slide, for Claude"; frames 27 and 28). A comment on a block or on the
    whole slide is a standalone note (`ritemark-comment`) in the slide editor: never drawn, and taking no place, so the
