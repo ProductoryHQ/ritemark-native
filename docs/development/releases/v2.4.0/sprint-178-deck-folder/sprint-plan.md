@@ -1,8 +1,8 @@
 # Sprint 178 · A deck's own folder
 
-**Draft 26 November 2026; the Experience lead's spec check OK** · Full track (a VS Code patch makes it shell-tier) · Branch `sprint-178-deck-folder` once approved.
+**Approved 26 November 2026** · Full track (a VS Code patch makes it shell-tier) · Branch `sprint-178-deck-folder` once approved.
 
-Parent release: v2.4.0 if Jarmo puts it there; otherwise it moves to v2.5.0 unchanged. Jarmo's testing note of 26 November says "one slide can populate a lot of folders into project folder --- this is not good". He answered the Experience lead's recommendation with "jah, teeme nii".
+Parent release: v2.4.0 (Jarmo, 26 November). Jarmo's testing note of 26 November says "one slide can populate a lot of folders into project folder --- this is not good". He answered the Experience lead's recommendation with "jah, teeme nii".
 
 ## The spec
 
@@ -60,4 +60,4 @@ PR 1 goes first, because if the patch fails its size limit, R3 changes (option B
 ## Approval
 
 - [x] The Experience lead's spec check against the decks README, "A deck's own folder": OK on 26 November, with two additions folded in (every deck `images/` line in R6; the new lines go to the lead with PRs 2 and 3). On a delete of an expanded row, the folder may go to the Trash with only the deck named in the ask, because the Trash gets it back.
-- [ ] Jarmo: Sprint 178 into 2.4, patch 023 included. This sprint isn't in the 2.4 roadmap he approved on 24 November (decisions/log.md), and that approval covers only the sprints in it, so adding one changes the release's shape. His yes takes the sprint into 2.4 and approves this plan. Implementation then starts on `sprint-178-deck-folder`. A "2.5" moves the plan to v2.5.0.
+- [x] Jarmo, 26 November 2026: "las tuleb kaust sisse - pole probleem kui natuke edasi". Sprint 178 goes into 2.4 with patch 023, and the release candidate may move a little later. His yes approves this plan. Implementation starts on `sprint-178-deck-folder`.
