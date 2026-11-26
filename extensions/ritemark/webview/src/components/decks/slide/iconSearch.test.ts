@@ -248,14 +248,19 @@ test('PR 3: ↑ and ↓ move the highlight a row at a time, to No icon at the fo
 })
 
 test('Enter picks the first result from search and removes only at No icon', () => {
-  assert.equal(iconMenuEnterChoice(-1, 3, true), 0)
-  assert.equal(iconMenuEnterChoice(2, 3, true), 2)
-  assert.equal(iconMenuEnterChoice(-1, 0, true), null)
-  assert.equal(iconMenuEnterChoice(-1, 0, false), null)
+  assert.equal(iconMenuEnterChoice(-1, 3, true, true), 0)
+  assert.equal(iconMenuEnterChoice(2, 3, true, true), 2)
+  assert.equal(iconMenuEnterChoice(-1, 0, true, true), null)
+  assert.equal(iconMenuEnterChoice(-1, 0, false, true), null)
+  // Round 4 verify (#910): Enter in an empty search field with nothing highlighted changes no box.
+  assert.equal(iconMenuEnterChoice(-1, 3, true, false), null)
+  assert.equal(iconMenuEnterChoice(-1, 3, false, false), null)
+  // An arrow-key highlight still picks with the field empty.
+  assert.equal(iconMenuEnterChoice(1, 3, true, false), 1)
   for (const count of [0, 1, 6]) {
     const last = iconMenuMove(count ? 0 : -1, 'down', count, true, 6)
     assert.equal(last, count)
-    assert.equal(iconMenuEnterChoice(last, count, true), 'none')
+    assert.equal(iconMenuEnterChoice(last, count, true, false), 'none')
   }
 })
 

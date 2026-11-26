@@ -108,7 +108,7 @@ export function IconGridItems({ current, onPick }: { current: string | null; onP
     if (event.key === 'Enter') {
       event.preventDefault()
       // Through the item itself, so the menu chooses and closes as on a click, whoever owns it.
-      const item = iconMenuEnterChoice(active, icons.length, !!current)
+      const item = iconMenuEnterChoice(active, icons.length, !!current, searching)
       if (item !== null) scroller.current?.parentElement?.querySelector<HTMLElement>(`[data-choice="${item}"]`)?.click()
     }
   }

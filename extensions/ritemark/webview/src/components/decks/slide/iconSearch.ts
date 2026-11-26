@@ -295,8 +295,12 @@ export function iconMenuMove(at: number, move: IconMenuMove, count: number, with
   return at - columns >= 0 ? at - columns : -1
 }
 
-/** Enter chooses the highlight, or the first result while still in the search field. */
-export function iconMenuEnterChoice(at: number, count: number, withNoIcon: boolean): number | 'none' | null {
+/**
+ * Enter chooses the highlight, or the first result while still in the search field once something is typed. With the
+ * field empty and nothing highlighted, Enter does nothing, so opening the menu and pressing Enter again changes no box.
+ */
+export function iconMenuEnterChoice(at: number, count: number, withNoIcon: boolean, searching: boolean): number | 'none' | null {
   if (withNoIcon && at === count) return 'none'
+  if (at < 0 && !searching) return null
   return count ? Math.max(at, 0) : null
 }
