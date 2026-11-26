@@ -1,4 +1,5 @@
 import { sourcePage } from '../../utils/sourcePassage'
+import { consumeLinkClick } from '../../lib/consumeLinkClick'
 /**
  * PowerPoint preview (.pptx), read-only.
  *
@@ -202,8 +203,7 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
   const onStageClick = useCallback((event: MouseEvent) => {
     const anchor = (event.target as Element).closest?.('a[href]') as HTMLAnchorElement | null
     if (!anchor) return
-    event.preventDefault()
-    event.stopPropagation()
+    consumeLinkClick(event)
     const href = anchor.getAttribute('href') ?? ''
     if (/^https?:/i.test(href)) sendToExtension('openLink', { url: href })
   }, [])

@@ -5,5 +5,6 @@
  */
 
 declare module '@mixmark-io/domino' {
+  export function createWindow(html?: string): Window & typeof globalThis
   export function createDocument(html?: string, force?: boolean): Document
 }
