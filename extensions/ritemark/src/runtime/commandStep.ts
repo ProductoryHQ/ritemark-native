@@ -10,8 +10,13 @@ interface CommandAction {
 // outside this grammar leaves the original step visible.
 function commandParts(command: string): string[][] | undefined {
   if (/[\r\n|`$<>]/.test(command)) return;
-  const wrapper = /^(?:\/bin\/)?(?:bash|zsh|sh)\s+-l?c\s+(?:'([^']*)'|"((?:[^"\\]|\\.)*)")$/.exec(command.trim());
-  if (wrapper) command = wrapper[1] ?? wrapper[2].replace(/\\([\\"])/g, '$1');
+  // The shell argument may be several quoted pieces joined without a space: Codex
+  // writes `"… \\) "'! -name …'`, single-quoting the `!` that double quotes would expand.
+  const wrapper = /^(?:\/bin\/)?(?:bash|zsh|sh)\s+-l?c\s+((?:'[^']*'|"(?:[^"\\]|\\.)*")+)$/.exec(command.trim());
+  if (wrapper) {
+    command = [...wrapper[1].matchAll(/'([^']*)'|"((?:[^"\\]|\\.)*)"/g)]
+      .map(([, single, double]) => single ?? double.replace(/\\([\\"])/g, '$1')).join('');
+  }
 
   const token = /\s+|&&|;|"[^"\\]*"|'[^'\\]*'|\\[()]|[^\s"'*?\[\]{}~#\\();&]+/y;
   const parts: string[][] = [[]];

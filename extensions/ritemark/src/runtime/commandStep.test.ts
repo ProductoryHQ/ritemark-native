@@ -23,6 +23,17 @@ for (const command of [
   }
 }
 
+// The exact command string a traced ChatGPT run sent (26 Nov, set 3): Codex double-quotes the command and
+// single-quotes the part from `!` on, joined without a space.
+test('the real wrapped command with joined quoted pieces', () => {
+  const real = String.raw`/bin/bash -lc "ls -la; find . -type d \\( -name '.*' -o -name node_modules \\) "'! -name . -prune -o -type f -print'`;
+  assert.equal(classify(real).kind, 'folder');
+  assert.equal(classify(real).path, '.');
+  assert.equal(classify(String.raw`/bin/bash -lc "ls -la"'; rm -rf x'`).kind, 'shell');
+  assert.equal(classify(String.raw`/bin/bash -lc "find . "'-delete'`).kind, 'shell');
+  assert.equal(classify(String.raw`/bin/bash -lc "ls" 'extra'`).kind, 'shell');
+});
+
 test('accepts read-only find predicates and a shared folder in compounds', () => {
   const command = "ls Reference && find ./Reference/ -mindepth 1 -maxdepth 2 '(' -type d -or -type l ')' -and -not -iname tmp -path '*/a' -ipath '*/B' -print0";
   assert.equal(classify(command).path, 'Reference');
