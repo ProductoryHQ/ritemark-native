@@ -53,9 +53,13 @@ export interface PublishRecord {
   /** The public address, `https://…`. */
   address: string;
   /** Each file's published path and sha256 at the last publish. */
-  files: { path: string; sha256: string }[];
+  files: { path: string; sha256: string; projectPath?: string }[];
   contentHash: string;
   deckDigest?: string;
+  deckFit?: readonly number[];
+  /** Hash of the hosted render before its asset addresses were rewritten. */
+  deckSourceSha256?: string;
+  deckFolder?: true;
   live?: LivePreference;
   /** ISO date of the last publish or update. */
   publishedAt: string;
@@ -259,9 +263,12 @@ export class PublishRecordStore {
    * Notes a publish, keyed by page and site: an update (the same site) replaces its record, and so does a new site
    * for a page whose old record was already taken down; another site's record for the same page, still online, stays.
    */
-  put(record: PublishRecord): Promise<void> {
-    return this.change((current) => {
-      const records = current.filter((r) => !this.samePage(r, record.pagePath) || (r.siteName !== record.siteName && !r.unpublished));
+  put(record: PublishRecord, previousPagePath?: string): Promise<void> {
+    return this.change((stored) => {
+      const current = stored.map(r => previousPagePath && this.samePage(r, previousPagePath)
+        ? { ...r, pagePath: record.pagePath, deckFolder: true as const } : r);
+      const records = current.filter(r => !this.samePage(r, record.pagePath)
+        || (r.siteName !== record.siteName && (previousPagePath !== undefined || !r.unpublished)));
       const previous = current.find(r => this.samePage(r, record.pagePath) && r.siteName === record.siteName && !r.unpublished);
       records.push(previous?.live ? { ...record, live: previous.live } : record);
       return { records, result: undefined };
@@ -330,7 +337,9 @@ export function recordFor(
     accountId: site.accountId,
     siteName: site.siteName,
     address: site.address,
-    files: plan.files.map((f) => ({ path: f.relPath, sha256: f.sha256 ?? '' })),
+    files: plan.files.map((f) => ({
+      path: f.relPath, sha256: f.sha256 ?? '', ...(f.relocated && { projectPath: f.projectPath }),
+    })),
     contentHash: plan.contentHash,
     publishedAt: now.toISOString(),
   };
@@ -350,7 +359,7 @@ export function changedSincePublish(record: PublishRecord, plan: PublishPlan): b
 export function sheetNeeded(record: PublishRecord | undefined, plan: PublishPlan): boolean {
   if (!record) return true;
   if (plan.keyHits.length > 0 || plan.tooBig.length > 0 || plan.tooMany || plan.leftOut.some((row) => row.reason === 'uncleanable')) return true;
-  const before = new Set(record.files.map((f) => f.path));
-  const now = plan.files.map((f) => f.relPath);
+  const before = new Set(record.files.map((f) => JSON.stringify([f.path, f.projectPath])));
+  const now = plan.files.map((f) => JSON.stringify([f.relPath, f.relocated ? f.projectPath : undefined]));
   return before.size !== now.length || now.some((p) => !before.has(p));
 }

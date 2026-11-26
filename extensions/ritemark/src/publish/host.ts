@@ -13,7 +13,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { contentHashOf, isGatheredPlan } from './gather';
+import { contentHashOf, hostedPageOf, isGatheredPlan } from './gather';
 import { MAX_FILE_BYTES, MAX_FILES, type GatheredPlan } from './types';
 import { cleanPicture } from './pictureClean';
 import { plainPart } from './plainText';
@@ -162,20 +162,34 @@ export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps 
   const stat = deps.stat ?? ((p: string) => fs.promises.stat(p));
   const readFile = deps.readFile ?? ((p: string) => fs.promises.readFile(p));
   const files: UploadFile[] = [];
+  const hosted = hostedPageOf(plan);
+  const relocated = new Set<string>();
   for (const file of plan.files) {
     const name = path.posix.basename(file.projectPath);
     if (!file.sha256) throw new PublishError('too-big', `${plainPart(name)} is larger than 25 MB, too big to publish.`);
     let bytes: Uint8Array;
     try {
       // The size first, so a file that grew past the limit is never read whole
-      if ((await stat(file.realPath)).size > MAX_FILE_BYTES) throw new PublishError('changed', FILE_CHANGED(name));
-      bytes = await readFile(file.realPath);
+      if (hosted && !hosted.fromDisk && file === plan.files[0]) {
+        bytes = Buffer.from(hosted.html);
+      } else {
+        if ((await stat(file.realPath)).size > MAX_FILE_BYTES) throw new PublishError('changed', FILE_CHANGED(name));
+        bytes = await readFile(file.realPath);
+      }
     } catch (error) {
       if (error instanceof PublishError) throw error;
       throw new PublishError('changed', FILE_CHANGED(name));
     }
-    if (bytes.byteLength > MAX_FILE_BYTES || createHash('sha256').update(bytes).digest('hex') !== (file.sourceSha256 ?? file.sha256)) {
+    const legacyPage = hosted?.fromDisk && file === plan.files[0];
+    const expected = legacyPage ? hosted.sourceSha256 : file.sourceSha256 ?? file.sha256;
+    if (bytes.byteLength > MAX_FILE_BYTES || createHash('sha256').update(bytes).digest('hex') !== expected) {
       throw new PublishError('changed', FILE_CHANGED(name));
+    }
+    if (legacyPage) {
+      bytes = Buffer.from(hosted.html);
+      if (bytes.byteLength > MAX_FILE_BYTES || createHash('sha256').update(bytes).digest('hex') !== file.sha256) {
+        throw new PublishError('changed', FILE_CHANGED(name));
+      }
     }
     if (file.kind === 'picture') {
       const cleaned = cleanPicture(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
@@ -184,6 +198,9 @@ export async function readVerifiedUpload(plan: GatheredPlan, deps: ReadFileDeps 
       }
       bytes = cleaned.bytes;
     }
+    // Each source still gets verified, even when two sources share one hosted address.
+    if (file.relocated && relocated.has(file.relPath)) continue;
+    if (file.relocated) relocated.add(file.relPath);
     files.push(Object.freeze({ urlPath: file === plan.files[0] ? pageUrlPathOf(file.relPath) : `/${file.relPath}`, bytes }));
   }
   const upload: VerifiedUpload = Object.freeze({
