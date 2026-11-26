@@ -268,9 +268,9 @@ export function GuidanceCard({ guidance: selected, whatMoved }: { guidance: Home
   if (guidance.card === 'quick-look') {
     return (
       <section className="rh-guide" aria-labelledby="rh-quick-look-note">
-        <p className="rh-guide-body" id="rh-quick-look-note">{guidance.body}</p>
+        <p className="rh-guide-body rh-guide-lead" id="rh-quick-look-note"><Icon name="presentation" size={16} tone="inherit" />{guidance.body}</p>
         <div className="rh-guide-go">
-          <Tooltip label="Opens Login Items & Extensions in System Settings">
+          <Tooltip label="Opens System Settings">
             <Button size="compact" onClick={() => send({ type: 'home/quick-look-open' })}>{guidance.button}</Button>
           </Tooltip>
           <Tooltip label="Hides this note">

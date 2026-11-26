@@ -324,6 +324,7 @@ body.vscode-dark .rh-mark:not(.muted), body[data-vscode-theme-kind='vscode-dark'
   .rh-desk .rh-guide .rh-guide-hd { flex-wrap: wrap; row-gap: 6px; padding-right: 0; }
   .rh-desk .rh-guide .rh-guide-x { right: 8px; top: 10px; }
   .rh-desk .rh-guide .rh-guide-body, .rh-desk .rh-guide .rh-guide-sub, .rh-desk .rh-guide .rh-guide-go { margin-left: 0; }
+  .rh-desk .rh-guide .rh-guide-lead > svg { position: static; display: inline-block; vertical-align: -3px; margin-right: 8px; }
   .rh-row .rh-when { flex-basis: calc(100% - 40px); margin-left: 40px; }
   .rh-file .rh-when { flex-basis: calc(100% - 24px); margin-left: 24px; }
 }
@@ -512,6 +513,10 @@ body.vscode-dark .rp-row:not(.missing) .rp-mini, body[data-vscode-theme-kind='vs
 .rh-guide .rh-guide-x { position: absolute; right: 10px; top: 12px; }
 .rh-guide .rh-guide-x > button { width: 24px; height: 24px; border-radius: 6px; color: var(--r-ink-muted); }
 .rh-guide .rh-guide-body { margin: 2px 0 12px 24px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-body); }
+/* A card with no heading (the Quick Look note, Sprint 177): its icon sits in the 24 px slot the others' headings use, so
+   every guidance card keeps one left edge (the Experience lead). Same size and colour as a heading's icon. */
+.rh-guide .rh-guide-lead { position: relative; }
+.rh-guide .rh-guide-lead > svg { position: absolute; left: -24px; top: 2px; color: var(--r-accent); }
 .rh-guide .rh-guide-sub { margin: 2px 0 10px 24px; font: 400 13px/20px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
 .rh-guide .rh-guide-go { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-left: 24px; }
 .rh-guide .rh-guide-note { font: 400 12px/16px var(--ritemark-ui-font-family); color: var(--r-ink-muted); }
