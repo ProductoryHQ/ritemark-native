@@ -27,6 +27,7 @@ import type { ChatStartRequest } from '../views/UnifiedViewProvider';
 import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
 import { DECK_GLOB, isDeckPath } from './deckFileName';
 import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type DeckFolderFiles } from './deckFolderFollow';
+import { copyDeckFolder } from './copyDeckFolder';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -256,17 +257,8 @@ const deckFolderFiles: DeckFolderFiles = {
   },
   async copy(from, to) {
     if (await deckFolderFiles.kind(from) !== 'folder') return false;
-    const destination = fileUri(to).fsPath;
-    try {
-      // Reserve the name before copying, even if another operation creates it after the event's check.
-      await fs.promises.mkdir(destination);
-      await fs.promises.cp(fileUri(from).fsPath, destination, {
-        recursive: true, force: false, errorOnExist: true, verbatimSymlinks: true,
-      });
-      return true;
-    } catch {
-      return false;
-    }
+    // Create-only, entry by entry into the reserved name (copyDeckFolder: Electron's fs.cp refuses an existing target).
+    return copyDeckFolder(fileUri(from).fsPath, fileUri(to).fsPath);
   },
   notice(message) { void vscode.window.showWarningMessage(message); },
 };
