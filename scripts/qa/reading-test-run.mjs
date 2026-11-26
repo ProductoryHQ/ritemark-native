@@ -15,7 +15,7 @@ const runtimes = {
   opencode: { label: 'OpenCode', key: 'GOOGLE', modelPrefix: 'opencode:google/' },
 };
 
-const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[\p{Pd}−]/gu, '-').replace(/\s+/g, ' ').trim();
 const title = (file) => path.posix.basename(file, path.posix.extname(file));
 const titleWords = (text) => normalize(text).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const titleAliases = (name) => {
@@ -26,13 +26,17 @@ const entryEndingNames = (name) => {
   const role = name.replace(/^interview /, '');
   return role !== name && role.includes(' ') ? [name, role] : [name];
 };
-const containsFact = (text, words) => words.some((word) => {
-  const escaped = normalize(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(normalize(text));
-});
+const normalizeFact = (text) => normalize(text.replace(/["“”'‘’]/g, ''));
+const containsFact = (text, words) => {
+  const normalized = normalizeFact(text);
+  return words.some((word) => {
+    const escaped = normalizeFact(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return Boolean(escaped) && new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(normalized);
+  });
+};
 const pathText = /(?:\bfile:\/\/|\b[A-Z]:[\\/]|(?:^|[\s`"'(])(?:~|\.{1,2})?[\\/]\S|(?:[\w.-]+[\\/])+[\w.-]+\.(?:docx|pdf|pptx)\b)/im;
 const passwordReason = /\b(?:has a password|password[- ]protected|encrypted with a password|requires a password)\b/i;
-const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted)\s+copy\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+(?:the|a|its)\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
+const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted|unprotected|password-free)\s+copy\b|\bcopy\s+without\s+(?:the|a)\s+password\b|\bremove\s+the\s+password\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+its\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
 const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can't) (?:open|read|extract)\b[^\n]*\b(?:corrupt(?:ed)?|damaged|unsupported|permission denied|access denied|missing|not found|timed out)\b/i;
 const scanReason = /\b(?:no (?:searchable |selectable |extractable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
@@ -130,15 +134,25 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     || pathText.test(visibleAnswer) || knownRelativePath || links.some(({ label }) => /^\s*\[?\d+\]?\s*$/.test(label));
   const readSourcesLinked = coverage.filter(({ result }) => result === 'read')
     .every(({ file }) => links.some((link) => link.expectedFile === file));
-  const documentsOpen = links.length > 0 && links.every((link) => link.opensRightDocument && link.hasPassage);
+  const passageLinks = links.filter((link) => link.hasPassage);
+  const linkCounts = {
+    total: links.length,
+    rightDocument: links.filter((link) => link.opensRightDocument).length,
+    withPassage: passageLinks.length,
+    onClaim: passageLinks.filter((link) => link.landsOnClaim === 'yes').length,
+  };
+  const pendingClaims = passageLinks.filter((link) => !['yes', 'no'].includes(link.landsOnClaim)).length;
+  const requiredPassages = Math.ceil(linkCounts.total * 0.9);
+  const passageLinksPass = readSourcesLinked && linkCounts.total > 0 && linkCounts.rightDocument === linkCounts.total
+    && linkCounts.onClaim + pendingClaims >= requiredPassages;
   const result = (ok) => ok ? 'pass' : 'fail';
   return {
-    coverage, slides, badSteps, passwordLine,
+    coverage, slides, badSteps, passwordLine, linkCounts,
     criteria: {
       1: customQuestion ? 'n/a' : result(coverage.every(({ result: coverageResult }) => coverageResult !== 'missing')),
       2: customQuestion ? 'n/a' : result(!duplicateSlide && slideRows.size === slides.length && slides.every((slide) => slide.notes)),
       3: result(stepLabels.length > 0 && badSteps.length === 0),
-      4: customQuestion ? 'n/a' : readSourcesLinked && documentsOpen ? 'to check' : 'fail',
+      4: customQuestion ? 'n/a' : passageLinksPass ? pendingClaims ? 'to check' : 'pass' : 'fail',
       5: customQuestion ? 'n/a' : result(Boolean(passwordLine && wayForward.test(passwordLine))),
       6: result(Boolean(answer.trim()) && !badSourceStyle),
     },
@@ -394,7 +408,7 @@ export async function tryLinks(ui, folder, facts, links, results) {
     return {
       ...link, targetFile, expectedFile: targetFile,
       hasPassage: destination?.passage ?? false, openedDocument: null,
-      opensRightDocument: false, findMarkedPassage: false, landsOnClaim: 'to check',
+      opensRightDocument: false, findMarkedPassage: false, landsOnClaim: destination?.passage ? 'to check' : 'no',
     };
   });
   results.push(...entries);
@@ -482,6 +496,8 @@ function launch(args) {
 function formatRun(run) {
   const fence = '`'.repeat(Math.max(3, ...(run.answer.match(/`+/g) ?? []).map((s) => s.length + 1)));
   const bullets = (items) => items.length ? items.map((line) => `- ${line}`).join('\n') : 'None recorded.';
+  const { total, rightDocument, withPassage, onClaim } = run.linkCounts;
+  const share = (count) => total ? `${count}/${total} (${(100 * count / total).toFixed(1)}%)` : '0/0';
   return `#### Run ${run.number}
 
 - Date — ${run.date}
@@ -503,7 +519,11 @@ ${bullets(run.stepLabels)}
 
 **Links tried**
 
-${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim to check${link.error ? ` — ${link.errorStep}: ${link.error}` : ''}`))}
+- Opened the right document — ${share(rightDocument)}
+- Include a passage target — ${share(withPassage)}
+- Confirmed to land on the claim — ${share(onClaim)}
+
+${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim ${link.landsOnClaim}${link.error ? ` — ${link.errorStep}: ${link.error}` : ''}`))}
 
 **Criteria**
 
