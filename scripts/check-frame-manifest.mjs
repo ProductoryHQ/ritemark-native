@@ -11,8 +11,8 @@
 // defaults for the frame-shaping settings the manifest lists (`settings`). A slot the extension no longer fills is released, logged, and the frame
 // moves; a place it adds that the manifest doesn't name arrives late. release-extension-preflight.sh stops either.
 //
-// Sprint 159: a place may carry a `setting` (a feature flag, off by default), which shows it only while it is true. Its
-// setting must be one of the extension's booleans, false by default, and every view in it must be shown on exactly
+// A place may carry a boolean `setting` and its `settingDefault`. The default must match package.json,
+// and every view in the place must be shown on exactly
 // `config.<setting>`, which is what the shell seeds for a new profile's first frame (ritemarkFrame.ts). A place that
 // is off by default in that way and missing from an older shell's manifest is accepted (decision 2): with the flag
 // off, as every installed app has it, the place never shows, so the frame doesn't move; with it on, the place arrives
@@ -128,7 +128,7 @@ export function frameMismatches(product, pkg, identifiers) {
   for (const place of places) {
     if (!place.id?.startsWith(CONTAINER)) {
       // VS Code's own place (Documents): no view container of ours, and nothing of ours that a setting could gate
-      if (place.setting !== undefined) {
+      if (place.setting !== undefined || place.settingDefault !== undefined) {
         problems.push(`place ${place.id}: VS Code's own place can't carry a setting (only an extension's place is shown on one)`);
       }
       continue;
@@ -153,8 +153,8 @@ export function frameMismatches(product, pkg, identifiers) {
       const setting = settings[place.setting];
       if (typeof place.setting !== 'string' || setting?.type !== 'boolean') {
         problems.push(`place ${place.id}: its setting ${JSON.stringify(place.setting)} is not a boolean setting in package.json`);
-      } else if (setting.default !== false) {
-        problems.push(`place ${place.id}: its setting ${place.setting} is ${JSON.stringify(setting.default)} by default; a place with a setting is off by default (one that is on has no setting)`);
+      } else if (typeof place.settingDefault !== 'boolean' || setting.default !== place.settingDefault) {
+        problems.push(`place ${place.id}: settingDefault must be a boolean matching ${place.setting} in package.json (manifest: ${JSON.stringify(place.settingDefault)}, package.json: ${JSON.stringify(setting.default)})`);
       }
       for (const view of hasViews(id) ? views[id] : []) {
         if (view.when !== `config.${place.setting}`) {
@@ -162,10 +162,13 @@ export function frameMismatches(product, pkg, identifiers) {
         }
       }
     } else {
+      if (place.settingDefault !== undefined) {
+        problems.push(`place ${place.id}: settingDefault requires a setting`);
+      }
       // Drawn from a new profile's first frame, then hidden once the extension registers it with the flag off
       const offBy = offByDefaultSetting(pkg, id);
       if (offBy) {
-        problems.push(`place ${place.id}: off by default in package.json (config.${offBy}), but the manifest draws it always: give it "setting": "${offBy}"`);
+        problems.push(`place ${place.id}: off by default in package.json (config.${offBy}), but the manifest draws it always: give it "setting": "${offBy}", "settingDefault": false`);
       }
     }
   }

@@ -143,23 +143,24 @@ Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#AppName}}"; F
 
 [Registry]
 ; Associate .md files with Ritemark
-Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.md"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletekeyifempty; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md"; ValueType: string; ValueName: ""; ValueData: "Markdown File"; Flags: uninsdeletekey; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"; Tasks: associatewithfiles
 Root: HKCU; Subkey: "Software\Classes\Ritemark.md\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""; Tasks: associatewithfiles
 
 ; Also associate .markdown files
-Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletevalue uninsdeletekeyifempty; Tasks: associatewithfiles
+Root: HKCU; Subkey: "Software\Classes\.markdown"; ValueType: string; ValueName: ""; ValueData: "Ritemark.md"; Flags: uninsdeletekeyifempty; Tasks: associatewithfiles
 
 ; A deck, <name>.rtms, is Ritemark's own file type (Sprint 172, #940), so it is
-; registered on every install, not behind the unchecked .md task above, and
-; removed on uninstall. Explorer names it "Ritemark Deck", draws the deck icon
+; registered on every install, not behind the unchecked .md task above. Its
+; default is removed on uninstall only while it still names Ritemark.rtms.
+; Explorer names it "Ritemark Deck", draws the deck icon
 ; and opens it in Ritemark; OpenWithProgids keeps Ritemark in Open with if
 ; another app takes the type later. HKA follows the install mode: the current
 ; user's classes, or every user's when "Install for all users" is chosen.
 ; scripts\windows-standard-user-registry-probe.ps1 checks these keys after
-; install and their absence after uninstall.
-Root: HKA; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletevalue uninsdeletekeyifempty
+; install and checks cleanup after uninstall.
+Root: HKA; Subkey: "Software\Classes\.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark.rtms"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Classes\.rtms\OpenWithProgids"; ValueType: string; ValueName: "Ritemark.rtms"; ValueData: ""; Flags: uninsdeletevalue uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Classes\Ritemark.rtms"; ValueType: string; ValueName: ""; ValueData: "Ritemark Deck"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Ritemark.rtms\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\resources\deck.ico"
@@ -169,6 +170,10 @@ Root: HKA; Subkey: "Software\Classes\Ritemark.rtms\shell\open\command"; ValueTyp
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\bin"; Tasks: addtopath; Check: NeedsAddPath('{app}\bin')
 
 [Code]
+var
+  SavedMdDefault, SavedMarkdownDefault, SavedDeckDefault: string;
+  DeckRootKey: Integer;
+
 function NeedsAddPath(Param: string): Boolean;
 var
   OrigPath: string;
@@ -179,4 +184,52 @@ begin
     exit;
   end;
   Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
+
+procedure RemoveAssociationDefault(RootKey: Integer; Extension, ProgId: string;
+  var SavedDefault: string);
+var
+  Subkey, CurrentProgId: string;
+begin
+  SavedDefault := '';
+  Subkey := 'Software\Classes\' + Extension;
+  if RegQueryStringValue(RootKey, Subkey, '', CurrentProgId) then
+  begin
+    if CompareText(CurrentProgId, ProgId) = 0 then
+      RegDeleteValue(RootKey, Subkey, '')
+    else
+      SavedDefault := CurrentProgId;
+  end;
+end;
+
+procedure RestoreAssociationDefault(RootKey: Integer; Extension, SavedDefault: string);
+var
+  Subkey: string;
+begin
+  Subkey := 'Software\Classes\' + Extension;
+  if (SavedDefault <> '') and not RegValueExists(RootKey, Subkey, '') then
+    if not RegWriteStringValue(RootKey, Subkey, '', SavedDefault) then
+      Log('Could not restore the previous default for ' + Extension);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    RemoveAssociationDefault(HKEY_CURRENT_USER, '.md', 'Ritemark.md', SavedMdDefault);
+    RemoveAssociationDefault(HKEY_CURRENT_USER, '.markdown', 'Ritemark.md', SavedMarkdownDefault);
+    { Match HKA in [Registry] for the deck association. }
+    if IsAdminInstallMode then
+      DeckRootKey := HKEY_LOCAL_MACHINE
+    else
+      DeckRootKey := HKEY_CURRENT_USER;
+    RemoveAssociationDefault(DeckRootKey, '.rtms', 'Ritemark.rtms', SavedDeckDefault);
+  end
+  else if CurUninstallStep = usPostUninstall then
+  begin
+    { Inno replays older uninsdeletevalue records from its appended log. }
+    RestoreAssociationDefault(HKEY_CURRENT_USER, '.md', SavedMdDefault);
+    RestoreAssociationDefault(HKEY_CURRENT_USER, '.markdown', SavedMarkdownDefault);
+    RestoreAssociationDefault(DeckRootKey, '.rtms', SavedDeckDefault);
+  end;
 end;

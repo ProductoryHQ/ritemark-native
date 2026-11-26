@@ -127,6 +127,9 @@ export interface DeckPageState {
 }
 
 /** The host's answers. */
+export type DeckNoticeKind = 'failure' | 'success';
+export type DeckNoticeReporter = (text: string, kind?: DeckNoticeKind) => void;
+
 export type DeckHostMessage =
   /** Each path the host could resolve to a picture beside the deck, mapped to its webview URI. */
   | { type: 'deck/assets'; assets: Record<string, string>; /** 17 November: the paths it looked for and found no file at. */ missing?: string[] }
@@ -160,7 +163,7 @@ export type DeckHostMessage =
   | { type: 'deck/library-written'; id: string; from: string; verb: 'updated' | 'added'; token: string | null; sourceName: string }
   /** The library's version of a copy, to put in its place (its notes stay the deck's). */
   | { type: 'deck/library-part'; id: string; kind: string; body: string; handout: string }
-  | { type: 'deck/library-failed'; id: string | null; message: string }
+  | { type: 'deck/library-failed'; operation: string; id: string | null; message: string }
   /** The library's topics: path, name and how many slides. */
   | { type: 'deck/library-topics'; topics: Array<{ path: string; name: string; count: number }> }
   /** The library write with this token is undone: the copy's `from:` goes back too. */
@@ -174,13 +177,13 @@ export type DeckHostMessage =
   /** The bar's Publish control's state (Sprint 159 PR 4). */
   | { type: 'deck/page-state'; state: DeckPageState }
   /** A line for the deck's bar from Publish: why a page wasn't written, or that the link is copied. */
-  | { type: 'deck/page-notice'; text: string }
+  | { type: 'deck/page-notice'; text: string; kind?: DeckNoticeKind; operation?: string }
   /** Sprint 170: the PDF is saved, under this file name: the bar says "Saved as <name>" with Show in folder. */
   | { type: 'deck/pdf-saved'; name: string }
   /** The start card's state for this deck (`startCard.ts`). */
   | { type: 'deck/start-card'; state: StartCardState }
   /** A line for the deck's bar from the start card: "This deck is now a copy of <name>.", or why it couldn't be. */
-  | { type: 'deck/notice'; text: string };
+  | { type: 'deck/notice'; text: string; kind?: DeckNoticeKind; operation?: string };
 
 export class DeckProtocolError extends Error {}
 

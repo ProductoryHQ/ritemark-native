@@ -61,7 +61,7 @@ export interface ModelOption {
   aliases?: string[];
   isDefault?: boolean;
   thinkingEffort?: ModelThinkingEffort;
-  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  /** Bundled or resolver-hidden row kept for saved selections and omitted from model menus. */
   hidden?: boolean;
 }
 
@@ -482,7 +482,7 @@ export interface ByokModelOption {
   id: string;
   label: string;
   description: string;
-  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  /** Bundled or resolver-hidden row kept for saved selections and omitted from model menus. */
   hidden?: boolean;
 }
 

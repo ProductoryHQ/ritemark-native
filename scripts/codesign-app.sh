@@ -252,7 +252,9 @@ echo "[4/7] Discovering all native binaries..."
 
 # Create temp file for binary list
 BINARY_LIST=$(mktemp)
-trap "rm -f $BINARY_LIST $SIGNED_FILE $FAILED_FILE" EXIT
+QUICKLOOK_ENTITLEMENTS_DIR=""
+trap 'rm -f "$BINARY_LIST" "$SIGNED_FILE" "$FAILED_FILE"
+      if [ -n "${QUICKLOOK_ENTITLEMENTS_DIR:-}" ]; then rm -rf "$QUICKLOOK_ENTITLEMENTS_DIR"; fi' EXIT
 
 # Find all Mach-O binaries and libraries
 # This catches: executables, .node files, .dylib files, and any other native code
@@ -519,6 +521,58 @@ while IFS= read -r -d '' helperapp; do
     fi
 done < <(find "$APP_PATH/Contents/Frameworks" -maxdepth 1 -name "*.app" -type d -print0 2>/dev/null)
 
+verify_quicklook_signature() {
+    local appex="$1" arch details entitlements
+    for arch in arm64 x86_64; do
+        details="$QUICKLOOK_ENTITLEMENTS_DIR/$arch.signature"
+        if ! entitlements=$(codesign -d --arch "$arch" --verbose=4 --entitlements :- "$appex" 2> "$details"); then
+            cat "$details" >&2
+            return 1
+        fi
+        if ! grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" "$details" ||
+           ! grep -Eq '^CodeDirectory .* flags=0x[[:xdigit:]]+\(([^)]*,)?runtime(,[^)]*)?\)' "$details"; then
+            echo "ERROR: $appex ($arch) must have TeamIdentifier=$APPLE_TEAM_ID and hardened runtime" >&2
+            return 1
+        fi
+        if ! printf '%s' "$entitlements" | plutil -convert json -o - -- - | node -e '
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          assert.deepStrictEqual(JSON.parse(fs.readFileSync(0, "utf8")), {
+            "com.apple.security.app-sandbox": true,
+            "com.apple.security.files.user-selected.read-only": true,
+            "com.apple.security.temporary-exception.files.home-relative-path.read-only": ["/"]
+          });
+        '; then
+            echo "ERROR: $appex ($arch) entitlements must match the Quick Look allowlist" >&2
+            return 1
+        fi
+    done
+}
+
+# Sign each app extension with the entitlements from the approved source,
+# which may differ from the checkout running the signing harness.
+QUICKLOOK_SOURCE_COMMIT="${RITEMARK_RELEASE_COMMIT:-HEAD}"
+if ! QUICKLOOK_SOURCE=$(git -C "$PROJECT_ROOT" ls-tree "$QUICKLOOK_SOURCE_COMMIT" -- macos/quicklook); then
+    exit 1
+fi
+if [ -n "$QUICKLOOK_SOURCE" ]; then
+    echo "  [5f] Signing Quick Look extensions..."
+    QUICKLOOK_ENTITLEMENTS_DIR=$(mktemp -d) || exit 1
+    for kind in Thumbnail Preview; do
+        appex="$APP_PATH/Contents/PlugIns/RitemarkDeck$kind.appex"
+        entitlements="$QUICKLOOK_ENTITLEMENTS_DIR/$kind.entitlements"
+        if ! git -C "$PROJECT_ROOT" show "$QUICKLOOK_SOURCE_COMMIT:macos/quicklook/$kind/sandbox.entitlements" > "$entitlements" ||
+           ! codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" \
+               --entitlements "$entitlements" "$appex" ||
+           ! verify_quicklook_signature "$appex"; then
+            echo -e "    ${RED}FAILED: $appex${NC}"
+            exit 1
+        fi
+        echo "    ✓ Signed: $appex"
+        increment_signed
+    done
+fi
+
 echo ""
 echo "  Summary: $(get_signed) signed, $(get_failed) failed"
 
@@ -549,7 +603,8 @@ echo "  Verifying main bundle..."
 if codesign --verify --deep --strict "$APP_PATH" 2>&1; then
     echo -e "  ${GREEN}✓ Deep verification passed${NC}"
 else
-    echo -e "  ${YELLOW}Warning: Deep verification has issues, checking individual components...${NC}"
+    echo -e "  ${RED}ERROR: Deep strict verification failed${NC}"
+    exit 1
 fi
 
 # 7b. Scan for any unsigned Mach-O binaries
