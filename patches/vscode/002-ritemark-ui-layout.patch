@@ -2706,7 +2706,7 @@ index ef3388a877f..873b2dbf292 100644
  
 diff --git a/src/vs/workbench/test/browser/ritemarkFrame.test.ts b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 new file mode 100644
-index 00000000000..e0b77a63648
+index 00000000000..34d7c84fbd7
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/ritemarkFrame.test.ts
 @@ -0,0 +1,272 @@
@@ -2718,7 +2718,7 @@ index 00000000000..e0b77a63648
 +import assert from 'assert';
 +import { ISerializedLeafNode, ISerializedNode } from '../../../base/browser/ui/grid/gridview.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../base/test/common/utils.js';
-+import { IConfigurationService } from '../../../platform/configuration/common/configuration.js';
++import { IConfigurationService, IConfigurationValue } from '../../../platform/configuration/common/configuration.js';
 +import { TestConfigurationService } from '../../../platform/configuration/test/common/testConfigurationService.js';
 +import { ContextKeyService } from '../../../platform/contextkey/browser/contextKeyService.js';
 +import { ContextKeyExpr } from '../../../platform/contextkey/common/contextkey.js';
@@ -2866,7 +2866,7 @@ index 00000000000..e0b77a63648
 +		const profile = { isDefault: false };
 +		const settings = new TestConfigurationService({ 'ritemark.features.decks': false });
 +		const applicationOff = new class extends TestConfigurationService {
-+			override inspect<T>(key: string) {
++			override inspect<T>(key: string): IConfigurationValue<T> {
 +				return { ...super.inspect<T>(key), applicationValue: false as T };
 +			}
 +		}({ 'ritemark.features.decks': true });
@@ -2894,7 +2894,7 @@ index 00000000000..e0b77a63648
 +		const originalPlaces = ritemarkFrame.places;
 +		Object.assign(ritemarkFrame, { places: readRitemarkFrame(manifest).places });
 +		try {
-+			instantiationService.stub(IUserDataProfileService, 'currentProfile', defaultProfile);
++			instantiationService.stub(IUserDataProfileService, { currentProfile: defaultProfile } as IUserDataProfileService);
 +			instantiationService.set(IConfigurationService, new TestConfigurationService({}));
 +			assert.strictEqual(bar['shouldBeHidden'](id), false);
 +			instantiationService.set(IConfigurationService, new TestConfigurationService({ 'ritemark.features.decks': false }));
