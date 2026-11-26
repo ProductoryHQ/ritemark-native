@@ -930,9 +930,10 @@ async function run() {
   try {
     process.env = { ...oldEnv, TMPDIR: temp, CODEX_HOME: home, CLAUDE_CONFIG_DIR: claudeHome, RITEMARK_BUILD_CHANNEL: 'test' };
     console.error = (...args: unknown[]) => { output.push(args); };
-    async function initialize(account: unknown = null, failLogin = false) {
+    async function initialize(account: unknown = null, failLogin = false,
+      server = new CodexAppServer({ trace: (...args) => { output.push(args); } }),
+    ) {
       const requests: Array<{ id?: number; method: string; params?: unknown }> = [];
-      const server = new CodexAppServer({ trace: (...args) => { output.push(args); } });
       server.on('progress', (event) => output.push(event));
       server.on('notification', (event) => output.push(event));
       const internals = server as any;
@@ -976,13 +977,47 @@ async function run() {
     fs.unlinkSync(home);
     fs.mkdirSync(home);
     assert.ok(!(await initialize({ type: 'chatgpt' })).requests.some(({ method }) => method === 'account/login/start'));
-    const { requests, args } = await initialize();
-    assert.deepStrictEqual(requests.map(({ method }) => method), [
-      'initialize', 'initialized', 'account/read', 'account/login/start',
-    ]);
-    assert.deepStrictEqual(requests.at(-1)?.params, { type: 'apiKey', apiKey: key });
-    assert.strictEqual(JSON.stringify(requests).split(key).length, 2);
-    assert.deepStrictEqual(args, ['-c', 'cli_auth_credentials_store="ephemeral"']);
+    const runtime = new CodexRuntime();
+    const r = runtime as any;
+    r._ensureAppServer();
+    const server = r._appServer as InstanceType<typeof CodexAppServer>;
+    let disposals = 0;
+    (server as any).manager.dispose = () => { disposals++; };
+    const reasons: string[] = [];
+    const { onCodexStatusInvalidated } = require('./codexStatusEvents') as typeof import('./codexStatusEvents');
+    const unsubscribe = onCodexStatusInvalidated(({ reason }) => {
+      reasons.push(reason);
+      if (reason === 'login-finished') runtime.dispose();
+    });
+    const notify = async (loginId: string | null) => {
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/login/completed', params: { loginId, success: true, error: null },
+      }) + '\n');
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    };
+    try {
+      const { requests, args } = await initialize(null, false, server);
+      assert.deepStrictEqual(requests.map(({ method }) => method), [
+        'initialize', 'initialized', 'account/read', 'account/login/start',
+      ]);
+      assert.ok(JSON.stringify(requests.at(-1)?.params) === JSON.stringify({ type: 'apiKey', apiKey: key }));
+      assert.strictEqual(JSON.stringify(requests).split(key).length, 2);
+      assert.deepStrictEqual(args, ['-c', 'cli_auth_credentials_store="ephemeral"']);
+      await notify(null);
+      assert.strictEqual(disposals, 0);
+      assert.ok(!reasons.includes('login-finished'));
+
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/updated', params: { authMode: 'apikey' },
+      }) + '\n');
+      assert.deepStrictEqual(reasons, ['status-refresh']);
+
+      await notify('browser-login');
+      assert.strictEqual(reasons.filter((reason) => reason === 'login-finished').length, 1);
+      assert.strictEqual(disposals, 1);
+    } finally {
+      unsubscribe();
+    }
     await initialize(null, true);
     assert.ok(output.some((event) => JSON.stringify(event) === '{"message":"[test key]"}'));
     assert.ok(!JSON.stringify(output).includes(key));
