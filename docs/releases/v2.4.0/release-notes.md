@@ -48,6 +48,7 @@ If you run training or share slides with clients, you can update the page they a
 - **Open a chat link once.** A web link in an AI answer opens your browser, with no extra question afterwards.
 - **Hear button names on a phone.** Screen readers now announce the More and Contents buttons by name on published deck pages.
 - **Print slides with their theme.** On paper and in a PDF, each slide spans the column and keeps its theme's colours.
+- **Keep every picture in a row.** Pictures written side by side no longer disappear when you save. Each one now gets its own line.
 - **Keep empty lines on a slide.** A blank line you add between blocks no longer disappears when you leave the slide.
 - **See the text toolbar where you work.** On a slide, it appears above the words you chose.
 - **Keep the slide's title in view.** **Slide settings** opens beside the slide, not over its title.
