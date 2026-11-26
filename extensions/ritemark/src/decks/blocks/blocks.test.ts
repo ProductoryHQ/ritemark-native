@@ -210,9 +210,6 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
   assert.ok(boxes('lightbulb').includes(`<span class="blk-icon">${iconSvg('lightbulb', 28)}</span>`));
   assert.ok(boxes(' Message ').includes(`<span class="blk-icon">${iconSvg('chat-text', 28)}</span>`));
   for (const name of ['lightbulb', 'message']) assert.ok(!boxes(name).includes('is-unknown') && !boxes(name).includes(dashed), name);
-  // No icon, or an empty one: no badge at all.
-  assert.ok(!blockSlideHtml(':::: boxes\n::: box\n### Idea\n:::\n::::').includes('blk-icon'));
-  assert.ok(!boxes('').includes('blk-icon') && !boxes('  ').includes('blk-icon'));
   for (const look of ['steps', 'line', 'arrows']) {
     const html = blockSlideHtml(`:::: {.boxes look="${look}"}\n::: {.box icon="xyz"}\nA\n:::\n::::`);
     assert.equal(html.includes('blk-icon is-unknown'), look === 'steps', look);
@@ -272,6 +269,23 @@ const pictureUrl = (picture: string, from: PictureFrom) => {
   const file = pictureFile(picture, from);
   return there.has(file) ? pictureAddress(file) : null;
 };
+
+test('#1103: the page leaves an empty icon slot only in a mixed Icon block', () => {
+  const mixed = ':::: boxes\n::: {.box icon="truck"}\n### Truck\n:::\n::: box\n### Empty\n:::\n::: {.box icon="rocket-launch"}\n### Rocket\n:::\n::::';
+  const empty = ':::: boxes\n::: box\n### No icons\n:::\n::: {.box icon=""}\n### Empty name\n:::\n::::';
+  const unknown = ':::: boxes\n::: {.box icon="trukc"}\n### Unknown\n:::\n::: {.box icon=" "}\n### Blank\n:::\n::::';
+  const source = ['---', 'deck: 2', '---', '', '```slide', '---', 'id: boxes', '---', mixed, '', empty, '', unknown, '```', ''].join('\n');
+  const deck = publicDeck(source, { folderName: 'Boxes', deckName: 'Boxes', theme: BUILT_IN_THEME });
+  const html = pageHtml(deck, assets, { digest: deckDigest(deck), pictureUrl });
+  assert.ok(html.includes(`<span class="blk-icon">${iconSvg('truck', 28)}</span><h3>Truck</h3>`));
+  assert.ok(html.includes(`<span class="blk-icon">${iconSvg('rocket-launch', 28)}</span><h3>Rocket</h3>`));
+  assert.ok(html.includes('<span class="blk-icon is-empty" aria-hidden="true"></span><h3>Empty</h3>'));
+  assert.ok(html.includes('<div class="blk-box"><h3>No icons</h3>'));
+  assert.ok(html.includes('<div class="blk-box"><h3>Empty name</h3>'));
+  assert.ok(html.includes(`<span class="blk-icon is-unknown">${iconSvg(UNKNOWN_ICON as PageIconName, 28)}</span><h3>Unknown</h3>`));
+  assert.ok(html.includes('<span class="blk-icon is-empty" aria-hidden="true"></span><h3>Blank</h3>'));
+  assert.match(assets.slideCss, /\.blk-icon\.is-empty \{\s*visibility: hidden;\s*\}/);
+});
 
 test('a block deck: no private word reaches the page, its digest, the file list or the wall', () => {
   const deck = publicDeck(PRIVATE_BLOCK_DECK, { folderName: 'Harbour Logistics', deckName: 'Blocks', theme: BUILT_IN_THEME });

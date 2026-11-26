@@ -56,7 +56,7 @@ export function SlideIconPickerContent({ current, onPick, ...contentProps }: Com
 export interface IconHint {
   pos: number
   anchor: HTMLElement
-  name: string
+  name: string | null
 }
 
 /**
@@ -127,7 +127,7 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
       cancelAnimationFrame(frameId)
     }
   }, [hint.anchor, measure, onDone])
-  const words = unknownIconWords(hint.name)
+  const words = hint.name === null ? null : unknownIconWords(hint.name)
   const choose = () => onChoose(hint, hint.anchor.getBoundingClientRect())
   return (
     <div className="deck-block-at" style={{ ...place, zIndex: 5 }}>
@@ -148,7 +148,7 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
       >
         <span
           role="button"
-          aria-label={`${words}: choose an icon`}
+          aria-label={words ? `${words}: choose an icon` : 'Choose an icon'}
           className="deck-icon-hint"
           // A press keeps the caret where it is, as on every handle over the slide.
           onMouseDown={event => event.preventDefault()}
