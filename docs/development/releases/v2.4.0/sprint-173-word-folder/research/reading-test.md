@@ -417,6 +417,17 @@ Verdict — pending (3 of 3 required).
 
 Set 1 (26 November 2026) — **0 of 3 on 1848bc80**. All three failed criterion 3 on generic command rows and a trailing empty Thinking row. Criterion 1 also failed as originally scored. Run 1 gave the Engagement brief’s March 2027 deadline, which was outside the fact list. Run 2 paraphrased the Findings draft’s point about older customers getting app help in branches. Run 3 used “The” before eight titles and paraphrased the Findings draft. Set 1 retains its original verdict. A fresh set follows.
 
+Set 2 on `62554ef6` — the harness stopped during run 1 after the command palette failed to open. No result.
+
+Set 3 on `62554ef6` — **0 of 3**. Criterion 3 failed in every run with one or two “Ran a command” rows before the first read. A traced run identified these two folder listings:
+
+```sh
+ls -la; find . -type d \( -name '.*' -o -name node_modules \) ! -name . -prune -o -type f -print
+find . -type f \( -name '*.docx' -o -name '*.pdf' -o -name '*.pptx' \)
+```
+
+Criterion 5 produced false negatives in run 2. Criteria 1 and 4 are to check. Set 3 retains its verdict. A fresh set follows after the fixes.
+
 Fresh set verdict — pending (3 of 3 required).
 
 #### Run 1

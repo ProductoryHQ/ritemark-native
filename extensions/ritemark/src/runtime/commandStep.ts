@@ -6,35 +6,74 @@ interface CommandAction {
   path?: string | null;
 }
 
-// Recognize only literal arguments of a single command. Shell expansions,
-// redirects, compound commands and unsupported switches stay visible as shell steps.
-function literalWords(command: string): string[] {
-  if (/[\r\n;&|<>`$\\]/.test(command)) return [];
-  const words = command.trim().match(/"[^"]*"|'[^']*'|[^\s"'*?\[\]{}~#]+/g) ?? [];
-  if (words.join(' ') !== command.trim().replace(/("[^"]*"|'[^']*')|\s+/g, (_part, quoted) => quoted ?? ' ')) return [];
-  return words.map((word) => word.replace(/^(['"])(.*)\1$/, '$2'));
+// Tokenize literal words and the two supported separators. Any shell syntax
+// outside this grammar leaves the original step visible.
+function commandParts(command: string): string[][] | undefined {
+  if (/[\r\n|`$<>]/.test(command)) return;
+  // The shell argument may be several quoted pieces joined without a space: Codex
+  // writes `"… \\) "'! -name …'`, single-quoting the `!` that double quotes would expand.
+  const wrapper = /^(?:\/bin\/)?(?:bash|zsh|sh)\s+-l?c\s+((?:'[^']*'|"(?:[^"\\]|\\.)*")+)$/.exec(command.trim());
+  if (wrapper) {
+    command = [...wrapper[1].matchAll(/'([^']*)'|"((?:[^"\\]|\\.)*)"/g)]
+      .map(([, single, double]) => single ?? double.replace(/\\([\\"])/g, '$1')).join('');
+  }
+
+  const token = /\s+|&&|;|"[^"\\]*"|'[^'\\]*'|\\[()]|[^\s"'*?\[\]{}~#\\();&]+/y;
+  const parts: string[][] = [[]];
+  let needsSpace = false;
+  for (let i = 0; i < command.length; i = token.lastIndex) {
+    token.lastIndex = i;
+    const word = token.exec(command)?.[0];
+    if (!word) return;
+    if (/^\s/.test(word)) {
+      needsSpace = false;
+    } else if (word === ';' || word === '&&') {
+      if (!parts[parts.length - 1].length) return;
+      parts.push([]);
+      needsSpace = false;
+    } else {
+      if (needsSpace) return;
+      parts[parts.length - 1].push(word.replace(/^(['"])(.*)\1$/, '$2').replace(/^\\([()])$/, '$1'));
+      needsSpace = true;
+    }
+  }
+  if (parts[parts.length - 1].length) return parts;
 }
 
-function readOnlyTarget(command: string): { kind: 'folder' | 'read'; path?: string } | undefined {
-  const words = literalWords(command);
-  const shell = /^(?:\/bin\/)?(?:bash|zsh|sh)$/.test(words[0]);
-  const [program, ...args] = shell && words.length === 3 && /^-l?c$/.test(words[1])
-    ? literalWords(words[2]) : words;
-  const operand = (value?: string): value is string => !!value && !value.startsWith('-');
+const operand = (value?: string): value is string => !!value && !value.startsWith('-');
+const absolute = /^(?:[/\\]|[a-z]:)/i;
+const outside = /(?:^|[/\\])\.\.(?:[/\\]|$)|^(?:[/\\]|[a-z]:)/i;
+
+function readOnlyFind(filters: string[]): boolean {
+  let depth = 0;
+  for (let i = 0; i < filters.length; i++) {
+    const arg = filters[i];
+    if (arg === '(') depth++;
+    else if (arg === ')') {
+      if (--depth < 0) return false;
+    } else if (['-o', '-or', '-a', '-and', '!', '-not', '-prune', '-print', '-print0'].includes(arg)) {
+      continue;
+    } else if (['-name', '-iname', '-path', '-ipath'].includes(arg)) {
+      if (!operand(filters[++i])) return false;
+    } else if (arg === '-type') {
+      if (!/^[fdl]$/.test(filters[++i])) return false;
+    } else if (arg === '-maxdepth' || arg === '-mindepth') {
+      if (!/^\d+$/.test(filters[++i])) return false;
+    } else return false;
+  }
+  return depth === 0;
+}
+
+function readOnlyTarget([program, ...args]: string[]): { kind: 'folder' | 'read'; path?: string } | undefined {
   if (program === 'ls') {
     const paths = args.filter(operand);
     if (paths.length <= 1 && args.every((arg) => operand(arg) || /^-[aAlhR1]+$/.test(arg))) {
       return { kind: 'folder', path: paths[0] };
     }
   }
-  if (program === 'find' && operand(args[0])) {
-    const filters = args.slice(1);
-    if (filters.length >= 2 && filters.length % 2 === 0 && filters.every((arg, i) =>
-      i % 2 === 1 || (arg === '-type' && filters[i + 1] === 'f')
-      || (arg === '-maxdepth' && /^\d+$/.test(filters[i + 1]))
-      || (['-name', '-iname'].includes(arg) && operand(filters[i + 1])))) {
-      return { kind: 'folder', path: args[0] };
-    }
+  if (program === 'find' && operand(args[0]) && !['(', ')', '!'].includes(args[0]) && !outside.test(args[0])
+    && readOnlyFind(args.slice(1))) {
+    return { kind: 'folder', path: args[0] };
   }
   if (program === 'rg') {
     const paths: string[] = [];
@@ -73,24 +112,40 @@ export function commandStep(
   cwd?: string,
   workspace?: string,
 ): ToolStep {
-  const target = readOnlyTarget(step.command ?? '');
-  if (!target) return step;
-  if ((actions?.length ?? 0) > 1) return step;
+  const parts = commandParts(step.command ?? '');
+  if (!parts) return step;
+  const slash = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '');
+  const root = workspace && slash(workspace);
+  const projectPathFor = (path: string) => {
+    const normalized = slash(cwd && !absolute.test(path) ? `${slash(cwd)}/${path}` : path)
+      .replace(/^(?:\.\/)+/, '').replace(/\/\.(?=\/|$)/g, '') || '.';
+    return root && normalized === root ? '.'
+      : root && normalized.startsWith(root + '/') ? normalized.slice(root.length + 1) : normalized;
+  };
+
+  if (parts.length > 1) {
+    let folder = '.';
+    let listsProject = false;
+    for (const words of parts) {
+      const target = readOnlyTarget(words);
+      if (target?.kind !== 'folder' || outside.test(target.path ?? '.')) return step;
+      const path = projectPathFor(target.path ?? '.');
+      if (outside.test(path) || (path !== '.' && folder !== '.' && path !== folder)) return step;
+      if (path === '.') listsProject = true;
+      else folder = path;
+    }
+    return { ...step, kind: 'folder', path: listsProject ? '.' : folder };
+  }
+
+  const target = readOnlyTarget(parts[0]);
+  if (!target || (actions?.length ?? 0) > 1) return step;
   const action = actions?.[0]?.type === 'unknown' ? undefined : actions?.[0];
   if (action && (target.kind === 'read' ? action.type !== 'read'
     : !['listFiles', 'list_files', 'search'].includes(action.type))) return step;
 
-  const path = action?.path || target.path || '.';
-  const slash = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '');
-  const root = workspace && slash(workspace);
-  const absolute = /^(?:[/\\]|[a-z]:)/i;
-  const normalized = slash(cwd && !absolute.test(path) ? `${slash(cwd)}/${path}` : path)
-    .replace(/^(?:\.\/)+/, '').replace(/\/\.(?=\/|$)/g, '') || '.';
-  const projectPath = root && normalized === root ? '.'
-    : root && normalized.startsWith(root + '/') ? normalized.slice(root.length + 1) : normalized;
-  // Outside the project (an absolute path or one through ".."), a folder or a read keeps its honest command row:
-  // a step's label never shows a path.
-  if (/(?:^|[/\\])\.\.(?:[/\\]|$)|^(?:[/\\]|[a-z]:)/i.test(projectPath)) return step;
+  const projectPath = projectPathFor(action?.path || target.path || '.');
+  // Outside the project, a folder or a read keeps its command row.
+  if (outside.test(projectPath)) return step;
   if (target.kind === 'read' && !documentStepKind(projectPath)) return step;
   return { ...step, kind: target.kind, path: projectPath };
 }
