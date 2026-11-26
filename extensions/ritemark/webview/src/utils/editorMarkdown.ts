@@ -18,7 +18,7 @@
  * extensions in through `EditorExtensionSlots`, at the positions they always
  * had, so the editor's extension order is unchanged.
  */
-import { Marked } from 'marked'
+import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
 import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -164,13 +164,14 @@ export function applyImageMappings(html: string, imageMappings: Record<string, s
  * another) or the whole source (tab-indented lists). The rest is what `parse`
  * does: hooks, `walkTokens` and the parser, with the same options.
  */
-function parseAsWritten(markdown: string, instance: Marked = editorMarked): string {
+function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tokens: Token[]) => void): string {
   // The editor's instance is synchronous: no extension sets `async`.
   const options = instance.defaults
   const preprocessed = options.hooks ? options.hooks.preprocess(markdown) as string : markdown
   const source = protectFenceTabs(preprocessed)
   const tokens = instance.lexer(source)
   annotateAsWritten(tokens, source)
+  prepareTokens?.(tokens)
   if (options.walkTokens) instance.walkTokens(tokens, options.walkTokens)
   const html = instance.parser(tokens)
   return options.hooks ? options.hooks.postprocess(html) as string : html
@@ -184,9 +185,9 @@ function parseAsWritten(markdown: string, instance: Marked = editorMarked): stri
  * Throws what `marked` throws; the editor catches it and falls back to plain
  * paragraphs.
  */
-export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked): string {
+export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked, prepareTokens?: (tokens: Token[]) => void): string {
   // Sprint 161: the slide editor passes its own scoped instance (`slideEditorMarkdown.ts`), never this one.
-  const html = parseAsWritten(markdown, instance)
+  const html = parseAsWritten(markdown, instance, prepareTokens)
   let processed = preprocessTaskListHTML(html)
   processed = preprocessImageHTML(processed)
   return imageMappings ? applyImageMappings(processed, imageMappings) : processed

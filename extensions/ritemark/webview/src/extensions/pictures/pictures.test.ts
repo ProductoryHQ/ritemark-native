@@ -27,7 +27,7 @@ import { blockSlideHtml, blockSlideMarkup, isCoverSlide, sidePictureOf } from '.
 import { slideDataOf, splitBlockSlide, withBlockMarkdown, writeSlideData } from '../../../../src/decks/deckFormat'
 import { BUILT_IN_THEME as DEFAULT_THEME } from '../../../../src/decks/deckTheme'
 import { EMPTY_SIDE, flowToSide, sideToText } from '../../components/decks/blocks/slidePicturePlace'
-import { CORNERS, cornerOf, frameBox, localBox, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
+import { CORNERS, cornerOf, frameBox, localBox, pictureBarFold, pictureBarPlacement, resizedWidth, screenPoint, wholeBox } from '../../components/pictures/pictureGeometry'
 import { caretBeforePicture, chosenPicture, chosenPictureUnder, leavePicture, pictureEditorEnabled, removePicture, setPictureEditorEnabled, replacePicture, setPictureAlt, setPictureLook } from './pictureCommands'
 
 let failures = 0
@@ -68,6 +68,90 @@ check('sizes: S, M, L and Full by context, and a drag snaps to them', () => {
   assert.equal(draggedWidth(395, 832, 'slide'), '400px')
   assert.equal(draggedWidth(330, 832, 'slide'), '330px')
   assert.equal(draggedWidth(5000, 832, 'slide'), '100%')
+})
+
+check('S, M, L and Full document bars sit inside the picture row', () => {
+  const barHeight = 36
+  const column = { left: 250.5, right: 1091 }
+  for (const width of [320, 480, 640, 840.5]) {
+    const picture = { left: column.left, top: 140.5, width, height: width / 2 }
+    const bottom = picture.top + picture.height
+    const barWidth = 638
+    const placement = pictureBarPlacement(bottom, barHeight, 600, false, { picture, width: barWidth, ...column })
+    assert.deepEqual(placement, { left: picture.left + 12, top: bottom - barHeight - 8, room: 0 })
+    assert.ok(placement.left! >= column.left)
+    assert.ok(placement.left! + barWidth <= column.right)
+  }
+})
+
+check('right-aligned S → M → S keeps the full bar inside the 840 px row', () => {
+  const column = { left: 250, right: 1090 }
+  const widths = [638, 520, 490, 420]
+  let fold = 1
+  for (const width of [320, 480, 320]) {
+    const picture = { left: column.right - width, top: 140, width, height: width / 2 }
+    const row = { ...column, picture }
+    fold = pictureBarFold(fold, widths, 1200, row)
+    assert.equal(fold, 0)
+    const bottom = picture.top + picture.height
+    assert.deepEqual(pictureBarPlacement(bottom, 36, 600, false, { ...row, width: widths[fold] }), {
+      left: column.right - widths[0], top: bottom - 44, room: 0,
+    })
+  }
+})
+
+check('a narrow row folds before reserving room', () => {
+  const row = { picture: { left: 250, top: 140, width: 400, height: 200 }, left: 250, right: 670 }
+  const widths = [638, 520, 490, 420]
+  for (const fold of [0, 1, 2]) assert.equal(pictureBarFold(fold, widths, 1200, row), fold + 1)
+  assert.equal(pictureBarFold(3, widths, 1200, row), 3)
+  assert.equal(pictureBarPlacement(340, 36, 600, false, { ...row, width: widths[3] }).room, 0)
+  assert.equal(pictureBarPlacement(340, 36, 600, false, { ...row, right: 669, width: widths[3] }).room, 47)
+})
+
+check('unfolding needs spare width only while the bar reserves room', () => {
+  const row = { picture: { left: 250, top: 140, width: 480, height: 24 }, left: 250, right: 890 }
+  const widths = [640, 620]
+  assert.equal(pictureBarFold(1, widths, 1200, row), 0)
+  assert.equal(pictureBarFold(1, widths, 1200, row, true), 1)
+  assert.equal(pictureBarFold(1, widths, 1200, { ...row, right: 907 }, true), 1)
+  assert.equal(pictureBarFold(1, widths, 1200, { ...row, right: 910 }, true), 0)
+  assert.equal(pictureBarFold(0, widths, 1200, { ...row, right: 893 }, true), 0)
+})
+
+check('crop keeps the room already reserved for the picture bar', () => {
+  const picture = { left: 100, top: 256, width: 480, height: 24 }
+  const placement = pictureBarPlacement(280, 36, 600, false, { picture, width: 320, left: 80, right: 600 })
+  assert.deepEqual(pictureBarPlacement(400, 32, 600, false, undefined, placement.room), { top: 410, room: 47 })
+  assert.equal(pictureBarPlacement(400, 32, 600, false, undefined, 0).room, 0)
+})
+
+check('a short picture reserves left-aligned room below, including near the viewport edges', () => {
+  const barHeight = 36
+  for (const bottom of [24.5, 280, 584]) {
+    const picture = { left: 100, top: bottom - 24, width: 480, height: 24 }
+    const placement = pictureBarPlacement(bottom, barHeight, 600, false, { picture, width: 320, left: 80, right: 600 })
+    assert.deepEqual(placement, { left: picture.left, top: Math.round(bottom + 10), room: 47 })
+    assert.ok(placement.top + barHeight <= bottom + placement.room)
+  }
+})
+
+check('a narrow table cell reserves room and a wider row clamps the bar inside', () => {
+  const picture = { left: 80, top: 180, width: 60, height: 100 }
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, { picture, width: 320, left: 80, right: 320 }), {
+    left: 80, top: 290, room: 47,
+  })
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, {
+    picture: { ...picture, left: 500 }, width: 320, left: 260, right: 708,
+  }), { left: 388, top: 236, room: 0 })
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false, {
+    picture, width: 320, left: 100, right: 600,
+  }), { left: 100, top: 236, room: 0 })
+})
+
+check('slide bars keep their gap and their viewport fallback', () => {
+  assert.deepEqual(pictureBarPlacement(280, 36, 600, false), { top: 290, room: 0 })
+  assert.deepEqual(pictureBarPlacement(584, 36, 600, false), { top: 538, room: 0 })
 })
 
 check('crop: a region and its look are the same frame, presets keep their names', () => {

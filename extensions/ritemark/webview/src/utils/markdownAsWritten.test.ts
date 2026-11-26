@@ -22,6 +22,13 @@ const li = (...content: PMNode[]) => n.listItem.create(null, content)
 const doc = (...content: PMNode[]) => n.doc.create(null, content)
 const roundTrip = (markdown: string) => saveDocument(openDocument(markdown))
 
+for (const spaces of [' ', '  ']) {
+  const source = 'A<br>' + spaces + '\nB'
+  const written = roundTrip(source)
+  assert.equal(written, 'A\\\n\\\nB\n')
+  assert.equal(openDocument(written).doc.toString(), openDocument(source).doc.toString())
+}
+
 // ---- the parse records how a block was written ----
 {
   const html = markdownToEditorHTML('Intro:\n* one\n* two\n\n1) a\n2) b')

@@ -163,7 +163,7 @@ async function main(): Promise<void> {
     // Button keeps its own width beside its words, and a box as wide as the column keeps its right line.
     assert.match(HANDOUT_PRINT_CSS, /\.pre \{ padding-left: 10mm; \}/);
     assert.match(PRINT_CSS, /\.pbutton:not\(\.is-solo\) \{ flex-direction: row;/);
-    assert.match(PRINT_CSS, /\.wrap \{[^}]*padding: 0 1px 0 0;/);
+    assert.match(PRINT_CSS, /\.wrap \{[^}]*padding: 0 1px;/);
     assert.match(page, /#t1:not\(\.sect\)::before\{content:"1"\}#t2:not\(\.sect\)::before\{content:"2"\}/);
     for (const [place, word] of Object.entries(PRIVATE_WORDS)) assert.ok(!page.includes(word), `${place} is not in the printed handout`);
     // R8: saved again over it (the system asked Replace; yes): replaced in one step, no hidden copy left.
@@ -198,7 +198,7 @@ async function main(): Promise<void> {
       } finally {
         console.warn = warn;
       }
-      assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NOT_SAVED });
+      assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NOT_SAVED, kind: 'failure', operation: 'save-pdf' });
       assert.equal(fs.readFileSync(target, 'utf8'), 'kept');
     }
   }
@@ -263,7 +263,7 @@ async function main(): Promise<void> {
     const { saver, seen } = saverFor(deckPath, empty, { text });
     const said: DeckHostMessage[] = [];
     await saver.save(docOf(deckPath), 'handout', '', 'card', [], message => said.push(message));
-    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_HANDOUT, kind: 'failure', operation: 'save-pdf' });
     assert.deepEqual({ printed: seen.printed, there: fs.existsSync(empty) }, { printed: [], there: false });
   }
 
@@ -274,7 +274,7 @@ async function main(): Promise<void> {
     const { saver, seen } = saverFor(deckPath, empty, { text });
     const said: DeckHostMessage[] = [];
     await saver.save(docOf(deckPath), 'slides', '', 'card', [], message => said.push(message));
-    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_SLIDES });
+    assert.deepEqual(said.at(-1), { type: 'deck/page-notice', text: PDF_NO_SLIDES, kind: 'failure', operation: 'save-pdf' });
     assert.deepEqual({ printed: seen.printed, there: fs.existsSync(empty) }, { printed: [], there: false });
   }
 

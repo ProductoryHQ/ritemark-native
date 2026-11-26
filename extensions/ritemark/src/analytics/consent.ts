@@ -77,8 +77,8 @@ export type BuildChannel = 'dev' | 'prod' | 'test';
 
 /**
  * Whether this run was started as one of our own test launches (`RITEMARK_BUILD_CHANNEL=test`). The one reading of
- * the variable: `buildChannel` below, and the test-key fallback (`ai/providerKeys.ts`, Sprint 155) that only a test
- * launch may use.
+ * the variable, shared by `buildChannel` below and test-only features such as the test-key fallback
+ * (`ai/providerKeys.ts`, Sprint 155) and the Quick Look development override.
  */
 export function testChannelRequested(env: Record<string, string | undefined> = {}): boolean {
   return env.RITEMARK_BUILD_CHANNEL?.trim().toLowerCase() === 'test';

@@ -40,23 +40,23 @@ async function main(): Promise<void> {
       forget: async () => { log.push('forget'); },
       save: async () => { log.push('save'); return true; },
       startChat: async request => { log.push(`startChat ${JSON.stringify(request)}`); },
-      notice: text => { log.push(`notice ${text}`); },
+      notice: (text, kind) => { log.push(`${kind}: ${text}`); },
     };
     assert.equal(await sendDraft('  A 3-hour training for the bank\'s staff  ', steps), true);
-    assert.deepEqual(log, ['save', `startChat ${JSON.stringify({ runtimeId: 'claude-code', text: "Draft this deck: A 3-hour training for the bank's staff", send: true })}`, 'forget']);
+    assert.deepEqual(log, ['save', `startChat ${JSON.stringify({ runtimeId: 'claude-code', text: "Draft this deck: A 3-hour training for the bank's staff", send: true })}`, 'forget', 'success: ']);
     assert.equal(log.filter(entry => entry.startsWith('startChat')).length, 1, 'one message');
     // The AI's sheet couldn't take it: the card stays (no forget), and the bar says so
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, startChat: async () => { throw new Error('no sheet'); } }), false);
-    assert.deepEqual(log, ['save', 'notice The message could not be sent to Claude.']);
+    assert.deepEqual(log, ['save', 'failure: The message could not be sent to Claude.']);
     // The deck couldn't be saved (Codex on #749): nothing is sent, the card stays, and the bar says why
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, save: async () => { log.push('save'); return false; } }), false);
-    assert.deepEqual(log, ['save', 'notice The deck could not be saved, so nothing was sent.']);
+    assert.deepEqual(log, ['save', 'failure: The deck could not be saved, so nothing was sent.']);
     // No AI signed in (it signed out after the card was drawn): nothing is sent, the card stays the host's, and the bar says why
     log.length = 0;
     assert.equal(await sendDraft('Anything', { ...steps, ai: async () => null }), false);
-    assert.deepEqual(log, ['notice No AI is signed in, so nothing was sent.']);
+    assert.deepEqual(log, ['failure: No AI is signed in, so nothing was sent.']);
     assert.equal(draftRequest('For managers'), 'Draft this deck: For managers');
   }
 

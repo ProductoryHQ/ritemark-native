@@ -44,7 +44,7 @@ import {
 
 export const BUNDLED_CATALOG: ModelCatalog = {
   schemaVersion: 1,
-  updatedAt: '2026-11-22T00:00:00Z',
+  updatedAt: '2026-11-25T00:00:00Z',
   providers: {
     anthropic: {
       defaults: { 'claude-code': CLAUDE_MODEL_IDS.SONNET_5_5 },
@@ -81,13 +81,14 @@ export const BUNDLED_CATALOG: ModelCatalog = {
     gemini: {
       defaults: { 'flow-llm': DEFAULT_MODELS.flowLLMGemini },
       models: [
-        { id: GEMINI_MODEL_IDS.ARGON_4, label: 'Gemini 4 Argon', description: "Google's flagship reasoning model", tier: 'high', deprecated: false, order: 0 },
+        { id: GEMINI_MODEL_IDS.NEON_4, label: 'Gemini 4 Neon', description: 'Strong reasoning', tier: 'high', deprecated: false, order: 0 },
         { id: GEMINI_MODEL_IDS.PRO_3_1_PREVIEW, label: 'Gemini 3.1 Pro', description: 'Most capable Gemini with reasoning', tier: 'high', deprecated: false, order: 1 },
         { id: GEMINI_MODEL_IDS.FLASH_3_8, label: 'Gemini 3.8 Flash', description: 'Current fast Gemini model', tier: 'medium', deprecated: false, order: 2 },
         { id: GEMINI_MODEL_IDS.FLASH_LITE_3_5, label: 'Gemini 3.5 Flash Lite', description: 'Current low-cost Gemini model', tier: 'low', deprecated: false, order: 3 },
         { id: GEMINI_MODEL_IDS.PRO_2_5, label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
         { id: GEMINI_MODEL_IDS.FLASH_2_5, label: 'Gemini 2.5 Flash', description: 'Retained for saved selections', tier: 'low', deprecated: true, order: 5 },
         { id: GEMINI_MODEL_IDS.FLASH_LITE_2_5, label: 'Gemini 2.5 Flash Lite', description: 'Retained for saved selections', tier: 'low', deprecated: true, order: 6 },
+        { id: GEMINI_MODEL_IDS.ARGON_4, label: 'Gemini 4 Argon', description: 'Retained for saved selections', tier: 'high', deprecated: false, hidden: true, order: 100 },
       ],
     },
     codex: {
@@ -116,10 +117,10 @@ export const BUNDLED_CATALOG: ModelCatalog = {
       defaults: {},
       models: [
         // Sprint 141 decision 10: the first row is OpenCode's one-shot model and the composer's
-        // first choice, so it is one Google's free tier serves (3.8 Flash; Argon and 3.1 Pro
-        // are "Not available" on it, Gemini API pricing page of 2026-10-26).
+        // first choice, so it is one Google's free tier serves (3.8 Flash; Neon and 3.1 Pro
+        // are "Not available" on it, Gemini API pricing page of 2026-11-25).
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_3_8), label: 'Gemini 3.8 Flash', description: 'Google — current fast model', tier: 'medium', deprecated: false, order: 0 },
-        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4), label: 'Gemini 4 Argon', description: 'Google — flagship reasoning', tier: 'high', deprecated: false, order: 1 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4), label: 'Gemini 4 Neon', description: 'Google — strong reasoning', tier: 'high', deprecated: false, order: 1 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_3_1_PREVIEW), label: 'Gemini 3.1 Pro', description: 'Google — most capable, deep reasoning', tier: 'high', deprecated: false, order: 2 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.FLASH_LITE_3_5), label: 'Gemini 3.5 Flash Lite', description: 'Google — current low-cost model', tier: 'low', deprecated: false, order: 3 },
         { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.PRO_2_5), label: 'Gemini 2.5 Pro', description: 'Retained for saved selections', tier: 'high', deprecated: true, order: 4 },
@@ -140,7 +141,7 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5), label: 'Claude Sonnet 5', description: 'Anthropic — previous Sonnet', tier: 'medium', deprecated: false, order: 15 },
         { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_5), label: 'Claude Opus 5', description: 'Anthropic — previous Opus', tier: 'high', deprecated: false, order: 16 },
         { id: toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.OPUS_4_8), label: 'Claude Opus 4.8', description: 'Anthropic — previous Opus generation', tier: 'high', deprecated: false, order: 17 },
-        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)), label: 'Gemini 4 Argon', description: 'OpenRouter — Google via OpenRouter', tier: 'high', deprecated: false, order: 18 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4)), label: 'Gemini 4 Neon', description: 'OpenRouter — strong reasoning', tier: 'high', deprecated: false, order: 18 },
         { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.CLAUDE_SONNET_5_5), label: 'Claude Sonnet 5.5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 19 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('anthropic', CLAUDE_MODEL_IDS.SONNET_5)), label: 'Claude Sonnet 5', description: 'OpenRouter — Anthropic via OpenRouter', tier: 'medium', deprecated: false, order: 20 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.SOL_6_2)), label: 'GPT-6.2 Sol', description: 'OpenRouter — Fast, go-to model for coding and everyday work', tier: 'high', deprecated: false, order: 20.1 },
@@ -156,6 +157,8 @@ export const BUNDLED_CATALOG: ModelCatalog = {
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.LUNA)), label: 'GPT-5.6 Luna', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'low', deprecated: false, order: 27 },
         { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('openai', OPENAI_MODEL_IDS.GPT_5_2)), label: 'GPT-5.2', description: 'OpenRouter — OpenAI via OpenRouter', tier: 'high', deprecated: false, order: 28 },
         { id: toOpenCodeModelId('openrouter', OPENROUTER_MODEL_IDS.LLAMA_3_3_70B_INSTRUCT), label: 'Llama 3.3 70B', description: 'OpenRouter — open-weight, low cost', tier: 'low', deprecated: false, order: 29 },
+        { id: toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4), label: 'Gemini 4 Argon', description: 'Retained for saved selections', tier: 'high', deprecated: false, hidden: true, order: 100 },
+        { id: toOpenCodeModelId('openrouter', toOpenCodeModelId('google', GEMINI_MODEL_IDS.ARGON_4)), label: 'Gemini 4 Argon', description: 'Retained for saved selections', tier: 'high', deprecated: false, hidden: true, order: 100 },
       ],
     },
   },

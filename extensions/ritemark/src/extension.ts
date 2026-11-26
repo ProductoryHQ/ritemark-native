@@ -27,6 +27,7 @@ import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
 import { registerDecks, type DecksHost } from './decks/decksHost';
 import { registerQuickLookGuidance } from './decks/quickLook/registerGuidance';
+import { startQuickLook } from './decks/quickLookService';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
@@ -670,6 +671,10 @@ export function activate(context: vscode.ExtensionContext) {
     stopWorkingChats: () => unifiedViewProvider.stopWorkingChats(),
     guidance,
     onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(() => listener()),
+  });
+
+  void startQuickLook(context, decks.publisher, projectsHost.projectList, projectsHost.ready).catch(() => {
+    // The optional background cache must never interfere with opening or saving a deck.
   });
 
   // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the
