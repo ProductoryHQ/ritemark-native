@@ -1,6 +1,6 @@
 # Sprint 178 · A deck's own folder
 
-**Draft 26 November 2026** · Full track (a VS Code patch makes it shell-tier) · Branch `sprint-178-deck-folder` once approved.
+**Draft 26 November 2026; the Experience lead's spec check OK** · Full track (a VS Code patch makes it shell-tier) · Branch `sprint-178-deck-folder` once approved.
 
 Parent release: v2.4.0 if Jarmo puts it there; otherwise it moves to v2.5.0 unchanged. Jarmo's testing note of 26 November says "one slide can populate a lot of folders into project folder --- this is not good". He answered the Experience lead's recommendation with "jah, teeme nii".
 
@@ -13,7 +13,7 @@ The Decks README section "A deck's own folder (26 November)" in `ritemark-dev` (
 - **R3 · Folded under the deck** in the Documents tree. The deck's row gets a chevron, closed by default, that keeps the person's last choice. Search, Home's Last changed and the Slide library list the deck, never the folder's files as documents of their own.
 - **R4 · Moves with the deck in Ritemark.** Renaming the deck renames its folder and rewrites the deck's links. Moving the deck to another folder takes the folder along. Deleting the deck to the Trash takes the folder with it, and Delete asks once for both. Duplicate copies both (`Kickoff (copy).rtms` with `Kickoff (copy) files/`). A rename in Finder or Explorer leaves the links working, because they name the folder, not the deck.
 - **R5 · Decks made before.** Their pictures stay where they are and their links keep working. New pictures go to the deck's folder. Ritemark's own page, fonts and logo move into the deck's folder at the next Publish, only the files Ritemark wrote, and the published link stays the same.
-- **R6 · The words.** The picture bar says "It's in Kickoff files." where it said "It's in images/". Publish's line for a taken name names the deck's folder.
+- **R6 · The words.** The picture bar says "It's in Kickoff files." where it said "It's in images/". The same goes for every other line that names `images/` for a deck: at least the Gamma paste bar ("The picture is saved in images/.", Decks README point 25) and the picture import's line. Publish's line for a taken name names the deck's folder. Documents' lines stay as they are.
 - **R7 · Documents keep `images/`,** one per folder, as today.
 
 ## What the code does today (survey of 26 November, main 3b8a0f7d)
@@ -39,8 +39,8 @@ The Decks README section "A deck's own folder (26 November)" in `ritemark-dev` (
 | PR | What | Tier and review | Proof |
 | --- | --- | --- | --- |
 | 1 | Patch 023, the fold. Collapsed by default, the person's choice kept; the size limit above | High (`patches/`): `/code-review` high + `/security-review`; the patch row in `docs/development/vscode-patches.md` | Fault first: the folder at the top of the tree, then folded under the deck. Light and dark, open and closed. A collapsed deck dragged into a folder carries its folder |
-| 2 | New pictures into `<deck> files/`: paste, drop, picker, strip, ChatGPT pictures for slides. The picture bar's words. Documents unchanged | Standard; the picture bar's words to the lead | A new deck has no folder until its first picture. The picture then shows, and its link names the folder |
-| 3 | Publish writes into the deck's folder. The old deck's Ritemark files move at the next Publish, keeping the same link. The taken-name line | High (`src/publish/`): `/code-review` high + `/security-review` | An old deck's next Publish: `fonts/` and `logos/` are gone from beside it, and Copy link gives the same link. A file Ritemark didn't write stays put |
+| 2 | New pictures into `<deck> files/`: paste, drop, picker, strip, ChatGPT pictures for slides. Every deck line that names `images/` (listed in the PR) changes to the deck's folder. Documents unchanged | Standard; the changed lines and the new "taken name" line (technical answer 2) to the lead before the merge | A new deck has no folder until its first picture. The picture then shows, and its link names the folder |
+| 3 | Publish writes into the deck's folder. The old deck's Ritemark files move at the next Publish, keeping the same link. The taken-name line | High (`src/publish/`): `/code-review` high + `/security-review`; the taken-name line's words to the lead before the merge | An old deck's next Publish: `fonts/` and `logos/` are gone from beside it, and Copy link gives the same link. A file Ritemark didn't write stays put |
 | 4 | Rename, move, delete and duplicate follow the deck, for both expanded and collapsed rows. Search, Home and the library skip the folder's files | Standard | A rename in Ritemark, then a picture still showing. Delete, then both are in the Trash. Duplicate, then both copies exist |
 | Close | The spec's shots: the tree folded and unfolded, light and dark; Finder with the two side by side; the rename; the old deck's Publish. One short Windows task for paths with spaces and a drive letter (REVIEW.md: Windows before the merge covers file paths) | Light | `research/closing-proof.md` |
 
@@ -59,6 +59,5 @@ PR 1 goes first, because if the patch fails its size limit, R3 changes (option B
 
 ## Approval
 
-- [ ] The Experience lead checks the plan against the spec (decks README, "A deck's own folder").
-- [ ] Jarmo: 2.4 before the release candidate, or 2.5 (the release's scope is his).
-- [ ] The Development manager approves after both (Jarmo, 24 November: sprint plans and their questions are the Development manager's). Implementation then starts on `sprint-178-deck-folder`.
+- [x] The Experience lead's spec check against the decks README, "A deck's own folder": OK on 26 November, with two additions folded in (every deck `images/` line in R6; the new lines go to the lead with PRs 2 and 3). On a delete of an expanded row, the folder may go to the Trash with only the deck named in the ask, because the Trash gets it back.
+- [ ] Jarmo: Sprint 178 into 2.4, patch 023 included. This sprint isn't in the 2.4 roadmap he approved on 24 November (decisions/log.md), and that approval covers only the sprints in it, so adding one changes the release's shape. His yes takes the sprint into 2.4 and approves this plan. Implementation then starts on `sprint-178-deck-folder`. A "2.5" moves the plan to v2.5.0.
