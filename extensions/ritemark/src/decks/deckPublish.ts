@@ -47,7 +47,7 @@ import { normalizeForCompare, samePath } from '../utils/pathIdentity';
 import { frontMatterLook, parseDeck, publishText } from './deckFormat';
 import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckTheme';
 import { deckThemeAndLogo } from './deckPages';
-import type { DeckHostMessage, DeckPageState, DeckPdfKind } from './deckProtocol';
+import type { DeckHostMessage, DeckPageState, DeckPdfKind, DeckNoticeReporter } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
 import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
@@ -425,7 +425,7 @@ export class DeckPublisher implements vscode.Disposable {
    * Publish or Update the page: write it beside the deck from the view's text (`body`, front matter left out), look and
    * fit steps, then 2.2's Publish on it.
    */
-  async publish(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[], notice: (text: string) => void): Promise<void> {
+  async publish(document: vscode.TextDocument, body: string, look: 'card' | 'borderless', steps: readonly number[], notice: DeckNoticeReporter): Promise<void> {
     this.rememberLiveInput(document, undefined, { text: body, look, steps });
     if (!this.ready()) return this.refreshDocument(document);
     await this.publishDeck(document, body, look, steps, notice);
@@ -433,7 +433,7 @@ export class DeckPublisher implements vscode.Disposable {
 
   private async publishDeck(
     document: Pick<vscode.TextDocument, 'uri' | 'getText'>, body: string, look: 'card' | 'borderless',
-    steps: readonly number[], notice: (text: string) => void,
+    steps: readonly number[], notice: DeckNoticeReporter,
     live?: { preference: LivePreference; resume: boolean; active: () => boolean; sending: () => void; roots: string[] },
   ): Promise<LiveResult> {
     const stopped: LiveResult = { kind: 'stopped' };
@@ -469,7 +469,7 @@ export class DeckPublisher implements vscode.Disposable {
       } catch (error) {
         if (live) return await feature.controller.pauseLivePage(pageKey, live, PAGE_NOT_WRITTEN);
         console.warn('[Decks] Could not build the page:', error);
-        notice(PAGE_NOT_WRITTEN);
+        notice(PAGE_NOT_WRITTEN, 'failure');
         return stopped;
       }
       const { theme, fontFiles, logoFiles } = built;
@@ -532,13 +532,13 @@ export class DeckPublisher implements vscode.Disposable {
         }
         console.warn('[Decks] Could not write the page:', error);
         await takeBackFonts();
-        notice(PAGE_NOT_WRITTEN);
+        notice(PAGE_NOT_WRITTEN, 'failure');
         return stopped;
       }
       if (written.kind === 'refused') {
         await takeBackFonts();
         if (live) return await feature.controller.pauseLivePage(pageKey, live, written.line);
-        notice(written.line);
+        notice(written.line, 'failure');
         return stopped;
       }
       this.written.set(normalizeForCompare(pageKey), { digest: built.digest, rows: deckSheetRows(deckCounts(text, theme, fontFiles, logoFiles.length > 0)) });
@@ -559,10 +559,11 @@ export class DeckPublisher implements vscode.Disposable {
       } catch (error) {
         // An error past the controller's own handling, before anything was sent (an upload's errors are its failures)
         console.warn('[Decks] Publish stopped:', error);
-        notice(PUBLISH_STOPPED);
+        notice(PUBLISH_STOPPED, 'failure');
         outcome = 'stopped';
       }
       if (outcome === 'busy') notice(PAGE_BEING_PUBLISHED);
+      if (outcome === 'published') notice('', 'success');
       // A page made for this Publish goes again when nothing was published and nothing failed: cancelled in the sheet,
       // refused before any flow began (the command said why), Publish not reachable, or stopped by an error. A failed
       // one stays for Try again, and a busy one belongs to the flow that took it.
@@ -652,7 +653,7 @@ export class DeckPublisher implements vscode.Disposable {
 
   // ------------------------------------------------------------------ Copy link, See online, Unpublish
 
-  async pageAction(document: vscode.TextDocument, action: 'copy-link' | 'see-online' | 'unpublish', notice: (text: string) => void): Promise<void> {
+  async pageAction(document: vscode.TextDocument, action: 'copy-link' | 'see-online' | 'unpublish', notice: DeckNoticeReporter): Promise<void> {
     const feature = this.feature;
     if (!feature) return;
     const page = vscode.Uri.file(pagePathFor(document.uri.fsPath));

@@ -458,11 +458,11 @@ interface LLMNodeConfigProps {
 }
 
 // Model config is received from extension - use helper functions
-import { getLLMModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection, modelListWaiting, offeredImageModels, setFetchedImageModels } from '../../config/modelConfig';
+import { getLLMModels, getDefaultLLMModel, getDefaultImageModel, modelOptionsWithPersistedSelection, modelListWaiting, offeredImageModels, setFetchedImageModels, type ModelInfo } from '../../config/modelConfig';
 
 function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   const provider = data.provider || 'openai';
-  const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [models, setModels] = useState<ModelInfo[]>(() => getLLMModels(provider));
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Sprint 145 R5 (#580): what fixes the error, when the host names it (no key for the provider: Settings at that key)
@@ -471,6 +471,7 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
   // Sprint 144 P4: the known list and the saved model stay usable while the host refreshes the list; the picker waits
   // only when it has no list at all. A saved model missing from the list stays visible, as on the Image step.
   const modelOptions = modelOptionsWithPersistedSelection(models, data.model);
+  const savedHiddenModel = models.find(model => model.hidden && model.id === data.model);
   const waiting = modelListWaiting(isLoading, models.length);
 
   // Fetch models from API when provider changes
@@ -555,12 +556,12 @@ function LLMNodeConfig({ nodeId, data, onUpdate }: LLMNodeConfigProps) {
       >
         <Select
           // Sprint 141 R4: an unset step shows the model it runs on (the catalog's default), as its card does.
-          value={data.model || getDefaultLLMModel(provider) || models[0]?.id || ''}
+          value={data.model || getDefaultLLMModel(provider) || modelOptions.models[0]?.id || ''}
           onValueChange={(value) => onUpdate({ model: value })}
           disabled={waiting}
         >
           <SelectTrigger>
-            <SelectValue placeholder={waiting ? 'Loading...' : 'Select model'} />
+            <SelectValue placeholder={waiting ? 'Loading...' : 'Select model'}>{savedHiddenModel?.name}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {modelOptions.models.map((m) => (

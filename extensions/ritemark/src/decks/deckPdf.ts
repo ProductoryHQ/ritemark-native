@@ -177,17 +177,17 @@ export class DeckPdfSaver {
         const input = await this.source.pageInput(document, body, look, steps);
         const built = await prepareDeckPdf(input, kind, this.deps);
         if (kind === 'slides' && built.deck.slides.length === 0) {
-          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES });
+          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES, kind: 'failure', operation: 'save-pdf' });
           return;
         }
         if (kind === 'handout' && !handoutHasText(built.deck)) {
-          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT, kind: 'failure', operation: 'save-pdf' });
           return;
         }
         await drawDeckPdf(input, built, this.deps, pdf => writeOver(pdf, target));
       } catch (error) {
         console.warn('[Decks] Save as PDF failed:', error);
-        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED });
+        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED, kind: 'failure', operation: 'save-pdf' });
         return;
       }
       this.saved.set(key, target);
