@@ -27,7 +27,10 @@ import { randomUUID } from 'node:crypto';
 import { liveIssue, type LiveIssue, type LiveResult } from './liveUpdate';
 import type { PublishedSite, PublishHost, VerifiedUpload } from './host';
 import { PublishError, readVerifiedUpload } from './host';
-import { gatherPage, isGatheredPlan } from './gather';
+import { gatherPage, hostedPageOf, isGatheredPlan, HostedDeckLayoutError, type HostedDeckPage } from './gather';
+import { isPagePath } from '../browser/localPage';
+import { matchesLegacyDeckPage } from '../decks/page/pageFile';
+import { trashLegacyDeckFiles } from './legacyDeckFiles';
 import { GitCheckError } from './gitIgnore';
 import { siteNameFor, suggestSubdomain } from './cloudflare/assets';
 import { ADDRESS_TAKEN, CONNECT_AGAIN, COULD_NOT_REACH_PUBLISH, COULD_NOT_REACH_UNPUBLISH } from './cloudflare/CloudflareHost';
@@ -215,6 +218,7 @@ export interface PageBarState {
 
 /** A project page, as `pageCommands.publishPage` found it by real path. */
 export interface ProjectPage {
+  hostedDeck?: HostedDeckPage;
   realPath: string;
   projectFolder: string;
 }
@@ -232,6 +236,8 @@ export interface PublishControllerDeps {
   readUpload?: (plan: GatheredPlan) => Promise<VerifiedUpload>;
   /** A page's bar state changed (patch 010's bar asks again). */
   onPageState?: (pagePath: string) => void;
+  legacyFiles?: { extensionPath: string; trash: (file: string) => Promise<void> };
+  hostedDeckPage?: (pagePath: string) => Promise<HostedDeckPage | undefined>;
   /**
    * The sheet's What goes and What stays rows for a page made from a deck (Sprint 159 PR 4): the deck host answers
    * for its own pages, undefined for any other. Counts only; the gather and the file list are unchanged.
@@ -455,7 +461,7 @@ export class PublishController {
    * at the end either way, so no spinner is left.
    */
   async unpublishSite(id: string, options: { fromBar?: boolean } = {}): Promise<void> {
-    const record = await this.bySite(id);
+    let record = await this.bySite(id);
     if (!record || this.unpublishing.has(id)) return;
     const fromBar = options.fromBar === true;
     this.siteLines.delete(id);
@@ -477,7 +483,7 @@ export class PublishController {
     try {
       let down = false;
       try {
-        await this.deps.records.withPageDeploy(record.pagePath, async () => {
+        const takeDown = async (record: PublishRecord) => {
           if (this.deps.host.accountId() !== record.accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
           await this.deps.host.unpublish(record.siteName, record.address, {
             onSlow: () => {
@@ -495,6 +501,14 @@ export class PublishController {
           });
           down = true;
           await this.deps.records.remove(record.pagePath, record.siteName);
+        };
+        const selectedPath = record.pagePath;
+        await this.deps.records.withPageDeploy(selectedPath, async () => {
+          const current = await this.bySite(id);
+          if (!current) return;
+          record = current;
+          if (current.pagePath === selectedPath) await takeDown(current);
+          else await this.deps.records.withPageDeploy(current.pagePath, () => takeDown(current));
         });
         this.gone.delete(id);
       } catch (error) {
@@ -544,7 +558,7 @@ export class PublishController {
         try {
           return await this.prepare(page);
         } catch (error) {
-          stopLine = error instanceof PublishError ? error.message : COULD_NOT_REACH_PUBLISH;
+          stopLine = error instanceof PublishError || error instanceof HostedDeckLayoutError ? error.message : COULD_NOT_REACH_PUBLISH;
           return null;
         }
       };
@@ -604,10 +618,12 @@ export class PublishController {
   private async prepare(page: ProjectPage): Promise<Prepared> {
     const accountId = this.deps.host.accountId();
     if (!accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
-    const record = await this.liveRecord(page.realPath);
+    const hostedDeck = page.hostedDeck ?? await this.deps.hostedDeckPage?.(page.realPath);
+    page = { ...page, hostedDeck };
+    const record = await this.recordForProjectPage(page);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     const subdomain = await this.deps.host.refreshSubdomain();
-    const plan = await this.deps.gather(page.realPath, page.projectFolder);
+    const plan = await this.gatherPage(page, record);
     const accountName = this.deps.host.snapshot().accountName;
     const options: SheetOptions = {
       destination: { name: 'Your Cloudflare', detail: accountName ?? 'Your account' },
@@ -684,6 +700,26 @@ export class PublishController {
     return changed;
   }
 
+  private gatherPage(page: ProjectPage, record?: PublishRecord): Promise<GatheredPlan> {
+    return page.hostedDeck
+      ? gatherPage(page.realPath, page.projectFolder, {
+        hostedDeck: page.hostedDeck, publishedPagePath: record?.files.find(file => isPagePath(file.path))?.path,
+      })
+      : this.deps.gather(page.realPath, page.projectFolder);
+  }
+
+  private async recordForProjectPage(page: ProjectPage): Promise<PublishRecord | undefined> {
+    return await this.liveRecord(page.realPath)
+      ?? (page.hostedDeck && await this.legacyDeckRecord(page.hostedDeck.besideDeckPath));
+  }
+
+  /** The browser and deck chips compare the layout that would go up. */
+  async currentPageHash(page: ProjectPage): Promise<string | undefined> {
+    const hostedDeck = await this.deps.hostedDeckPage?.(page.realPath);
+    const record = await this.liveRecord(page.realPath);
+    return (await this.gatherPage({ ...page, hostedDeck }, record)).contentHash;
+  }
+
   /** Whether preserving the fitted local HTML also preserves every byte readers already have. */
   async matchesPublishedBytes(page: ProjectPage, hash: string): Promise<boolean> {
     return (await this.deps.gather(page.realPath, page.projectFolder)).contentHash === hash;
@@ -691,6 +727,7 @@ export class PublishController {
 
   /** Preview only. Supply the newly rendered page in memory and scan its local references as usual. */
   async hasLiveKey(page: ProjectPage, html: string): Promise<boolean> {
+    if (page.hostedDeck) return (await this.gatherPage(page)).keyHits.length > 0;
     const plan = await gatherPage(page.realPath, page.projectFolder, {
       readFile: file => file === page.realPath ? Promise.resolve(Buffer.from(html)) : readFile(file),
     });
@@ -735,7 +772,7 @@ export class PublishController {
     const connection: LiveIssue = { kind: 'connection', detail: 'Cloudflare needs you to connect again.' };
     const active = () => input.active() && this.canPublish();
     try {
-      const plan = await this.deps.gather(page.realPath, page.projectFolder);
+      const plan = await this.gatherPage(page, record);
       const issue = liveIssue(plan, input.resume && record.live.pause?.kind === 'outside' ? record.live.pause.scope : undefined);
       if (!plan.tooBig.some(file => file.projectPath === plan.files[0]?.projectPath) && plan.files[0]?.sha256 !== input.pageSha) {
         return { kind: 'offline', detail: 'The page file changed while Ritemark was checking it.' };
@@ -773,6 +810,7 @@ export class PublishController {
       if (!current || current.siteName !== record.siteName || current.live?.id !== record.live.id
         || JSON.stringify(current.live.pause) !== JSON.stringify(record.live.pause)) return { kind: 'stopped' };
       if (error instanceof PublishError && error.code === 'busy') return { kind: 'busy' };
+      if (error instanceof HostedDeckLayoutError) return pause({ kind: 'page', detail: error.message });
       if (error instanceof GitCheckError) return pause({ kind: 'unchecked', detail: "Ritemark couldn't check which files Git ignores in this project." });
       if (error instanceof PublishError && ['not-connected', 'refused', 'cannot-publish'].includes(error.code)) return pause(connection);
       return { kind: 'offline', detail: error instanceof PublishError ? plainLine(error.message) : COULD_NOT_REACH_PUBLISH };
@@ -797,8 +835,12 @@ export class PublishController {
     if (!accountId) throw new PublishError('not-connected', CONNECT_AGAIN);
     if (plan.tooBig.length > 0 || plan.tooMany) throw new PublishError(plan.tooMany ? 'too-many' : 'too-big', 'This page is too big for Cloudflare\'s free plan. Nothing was sent.');
     const pagePath = plan.pagePath;
-    const record = await this.liveRecord(pagePath);
-    if (this.publishing.has(pagePath)) throw new PublishError('busy', PAGE_BEING_PUBLISHED);
+    const hostedDeck = hostedPageOf(plan);
+    const previousPath = hostedDeck?.besideDeckPath;
+    const findRecord = async () => await this.liveRecord(pagePath) ?? (previousPath ? await this.legacyDeckRecord(previousPath) : undefined);
+    const record = await findRecord();
+    const legacyKey = previousPath && previousPath !== pagePath && consent !== 'live-update' ? previousPath : undefined;
+    if (legacyKey && this.publishing.has(legacyKey)) throw new PublishError('busy', PAGE_BEING_PUBLISHED);
     if (record && record.accountId !== accountId) throw new PublishError('failed', OTHER_ACCOUNT_UPDATE);
     const live = consent === 'live-update' ? this.livePlans.get(plan) : undefined;
     if (consent === 'live-update' && (!record?.live?.on || !live || !this.matchesLive(record, live.record) || !live.active())) {
@@ -816,13 +858,18 @@ export class PublishController {
 
     this.publishing.add(pagePath);
     this.pageLines.delete(pagePath);
+    if (legacyKey) {
+      this.publishing.add(legacyKey);
+      this.pageLines.delete(legacyKey);
+      this.deps.onPageState?.(legacyKey);
+    }
     this.deps.onPageState?.(pagePath);
     try {
-      const { site, upload } = await this.deps.records.withPageDeploy(pagePath, async () => {
+      const deploy = () => this.deps.records.withPageDeploy(pagePath, async () => {
         // Verify the source checked by the scan and the cleaned bytes the record will hash.
         const upload = await this.readUpload(plan);
-        const current = await this.liveRecord(pagePath);
-        if (current?.siteName !== record?.siteName || current?.contentHash !== record?.contentHash
+        const current = await findRecord();
+        if (current?.pagePath !== record?.pagePath || current?.siteName !== record?.siteName || current?.contentHash !== record?.contentHash
           || (current && this.unpublishing.has(current.siteName))) {
           throw new PublishError('changed', 'The published page changed. Try again.');
         }
@@ -834,6 +881,7 @@ export class PublishController {
         this.gone.delete(site.name);
         try {
           const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
+          if (hostedDeck) next.deckFolder = true;
           const deckVersion = site.deckVersion ?? current?.deckVersion ?? record?.deckVersion;
           if (deckVersion !== undefined) next.deckVersion = deckVersion;
           const html = upload.files.find(file => file.urlPath === upload.pageUrlPath);
@@ -843,13 +891,21 @@ export class PublishController {
               next.deckDigest = /<meta name="ritemark-deck" content="([0-9a-f]{64})">/.exec(head)?.[1];
             }
           }
-          await this.deps.records.put(next);
+          const migrating = previousPath && current?.pagePath === previousPath;
+          await this.deps.records.put(next, migrating ? previousPath : undefined);
+          if (migrating && this.deps.legacyFiles) {
+            await trashLegacyDeckFiles(current, plan, hostedDeck?.assetAddresses ?? [], this.deps.legacyFiles).catch(() => undefined);
+          }
         } catch {
           this.deps.log('[publish] published, but the record could not be written');
           this.pageLines.set(pagePath, PUBLISHED_NOT_NOTED);
+          if (current && current.pagePath !== pagePath) this.pageLines.set(current.pagePath, PUBLISHED_NOT_NOTED);
         }
         return { site, upload };
       });
+      const { site, upload } = legacyKey
+        ? await this.deps.records.withPageDeploy(legacyKey, deploy)
+        : await deploy();
       await this.post();
       if (!record) await this.waitForFirstAnswer(pagePath, site, input.newName === true, pageTitleOf(upload, pagePath));
       return site;
@@ -861,6 +917,10 @@ export class PublishController {
       throw error instanceof PublishError ? error : new PublishError('failed', line);
     } finally {
       this.publishing.delete(pagePath);
+      if (legacyKey) {
+        this.publishing.delete(legacyKey);
+        this.deps.onPageState?.(legacyKey);
+      }
       this.deps.onPageState?.(pagePath);
     }
   }
@@ -947,6 +1007,23 @@ export class PublishController {
       held = false;
       this.held.delete(pagePath);
     };
+  }
+
+  /** A same-named web page can have its own record without belonging to the deck. */
+  async legacyDeckRecord(pagePath: string): Promise<PublishRecord | undefined> {
+    const record = await this.liveRecord(pagePath);
+    if (!record || record.deckDigest || record.deckVersion !== undefined) return record;
+    const sha = record.files.find(file => isPagePath(file.path))?.sha256;
+    return await matchesLegacyDeckPage(pagePath, sha).catch(() => false) ? record : undefined;
+  }
+
+  /** A legacy live save must not recreate its page after another window migrates the record. */
+  writeLegacyDeckPage(pagePath: string, write: () => Promise<void>): Promise<boolean> {
+    return this.deps.records.withPageDeploy(pagePath, async () => {
+      if (!await this.liveRecord(pagePath)) return false;
+      await write();
+      return true;
+    });
   }
 
   /** The page's record while it is online, for the bar's Copy link, Open the page and Unpublish. */

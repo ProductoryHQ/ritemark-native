@@ -1,0 +1,342 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import test from 'node:test';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { BUILT_IN_THEME } from '../decks/deckTheme';
+import { buildDeckPage, pageLogoFile, pagePathFor } from '../decks/page/pageFile';
+import { DECK_VERSION_META } from '../decks/page/pageFollower';
+import { buildManifest, siteAddress } from './cloudflare/assets';
+import { testProject } from './cloudflare/testing/pages';
+import { deckVersionAssets } from './deckVersion';
+import { gatherPage } from './gather';
+import { sheetModelOf } from './sheetModel';
+import { PublishController, type PublishControllerDeps } from './PublishController';
+import { readVerifiedUpload, type VerifiedUpload } from './host';
+import { PublishRecordStore, recordFor } from './publishRecords';
+import { PNG } from './testing/pictures';
+
+const oldPicture = 'images/old.png';
+const newPicture = 'Kickoff files/new.png';
+const font = 'fonts/Inter-4.001-latin.woff2';
+const logo = pageLogoFile(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'), 'svg');
+
+for (const { name, pictures, withLogo, sha256 } of [
+  { name: 'a', pictures: [newPicture], withLogo: false, sha256: '66468a240a8efb220100a1a3c428d364db05e6d2882daa82534c7b1a6a5622b6' },
+  { name: 'b', pictures: [oldPicture], withLogo: true, sha256: '6fd86a74f34b340236fab927a878c9d7adf9ac9d826a113e8df56c23e87a4437' },
+  { name: 'c', pictures: [oldPicture, newPicture], withLogo: true, sha256: 'e1e7f5c6c2d626f6c53df94dac46c10d8d06b38b71fb474ad03d4cb9c3ff96b0' },
+]) {
+  test(`deck ${name} keeps its hosted URLs, bytes and Copy link`, async t => {
+    const project = await testProject({});
+    t.after(project.cleanup);
+    for (const picture of pictures) await project.write(`Training/${picture}`, PNG);
+    await project.write(`Training/${font}`, 'fixture font bytes');
+    if (withLogo) await project.write(`Training/${logo.address}`, logo.bytes);
+    const deckPath = project.page('Training/Kickoff.rtms');
+    const text = ['---', 'deck: 2', '---', '', '```slide', '# Kickoff', '```', '', ...pictures.map(picture => `![Picture](<${picture}>)`)].join('\n');
+    const theme = withLogo
+      ? { ...BUILT_IN_THEME, logo: { file: 'Brand.svg', place: 'top-right' as const, on: 'every-slide' as const } }
+      : BUILT_IN_THEME;
+    const assets = {
+      slideCss: '', fonts: [], themeFonts: [{ family: 'Inter', unicodeRange: 'U+0000-00FF', address: font }],
+      logo: withLogo ? logo : null,
+    };
+    const page = await buildDeckPage({ deckPath, text, theme }, assets);
+    const pagePath = pagePathFor(deckPath);
+    await project.write('Training/Kickoff.html', page.html);
+    const plan = await gatherPage(pagePath, project.dir);
+    const movedPath = project.page('Training/Kickoff files/Kickoff.html');
+    const local = await buildDeckPage({ deckPath, text, theme, pagePath: movedPath }, assets);
+    await project.write('Training/Kickoff files/Kickoff.html', local.html);
+    const assetAddresses = [font, ...(withLogo ? [logo.address] : [])];
+    for (const asset of assetAddresses) {
+      await project.write(`Training/Kickoff files/${asset}`, await fs.readFile(project.page(`Training/${asset}`)));
+    }
+    for (const picture of pictures) {
+      const address = picture === oldPicture ? '../images/old.png' : 'new.png';
+      assert.ok(local.html.includes(`src="${address}"`));
+      assert.equal(fileURLToPath(new URL(address, pathToFileURL(movedPath))), project.page(`Training/${picture}`));
+    }
+    assert.ok(local.html.includes(`url(${font})`));
+    if (withLogo) assert.ok(local.html.includes(`src="${logo.address}"`));
+    const movedPlan = await gatherPage(movedPath, project.dir, { hostedDeck: { besideDeckPath: pagePath, html: page.html, assetAddresses } });
+    // Editing the preview after the scan cannot substitute its bytes for the hosted page.
+    await fs.writeFile(movedPath, '<p>Someone edited the preview.</p>');
+    const upload = await readVerifiedUpload(movedPlan);
+    assert.deepEqual(upload, await readVerifiedUpload(plan));
+    const stamped = deckVersionAssets(upload, 1000);
+    assert.ok(stamped);
+    const expected = ['/index.html', ...(withLogo ? [`/${logo.address}`] : []), ...pictures.map(picture => `/${picture}`), `/${font}`];
+    assert.deepEqual(Object.keys(buildManifest(stamped).manifest), [...expected, '/version.json']);
+    const siteName = 'kickoff-123abc';
+    const address = siteAddress(siteName, 'training', upload.pageUrlPath);
+    const records = new PublishRecordStore(project.page('storage'));
+    await records.put(recordFor(movedPlan, { accountId: 'a'.repeat(32), siteName, address }));
+    assert.equal((await records.get(movedPath))?.address, 'https://kickoff-123abc.training.workers.dev/');
+    const html = Buffer.from(upload.files[0].bytes).toString('utf8');
+    assert.equal(Buffer.from(stamped[0].bytes).toString('utf8'),
+      html.replace(`name="${DECK_VERSION_META}" content="0"`, `name="${DECK_VERSION_META}" content="1000"`));
+    for (const picture of pictures) assert.ok(html.includes(`src="${picture.replaceAll(' ', '%20')}"`));
+    assert.ok(html.includes(`url(${font})`));
+    if (withLogo) assert.ok(html.includes(`src="${logo.address}"`));
+    assert.equal(createHash('sha256').update(html).digest('hex'), sha256);
+  });
+}
+
+test('Git excludes the moved font while allowing the same font beside the deck', async t => {
+  const project = await testProject({});
+  t.after(project.cleanup);
+  execFileSync('git', ['init', '-q'], { cwd: project.dir });
+  await project.write('.gitignore', '/Kickoff files/fonts/\n');
+  const html = `<style>@font-face { font-family: Inter; src: url(${font}) }</style>`;
+  for (const folder of ['', 'Kickoff files/']) {
+    await project.write(`${folder}Kickoff.html`, html);
+    await project.write(`${folder}${font}`, 'same font bytes');
+  }
+  const oldPlan = await gatherPage(project.page('Kickoff.html'), project.dir);
+  const movedPlan = await gatherPage(project.page('Kickoff files/Kickoff.html'), project.dir);
+  assert.deepEqual((await readVerifiedUpload(oldPlan)).files.map(file => file.urlPath), ['/index.html', `/${font}`]);
+  assert.deepEqual((await readVerifiedUpload(movedPlan)).files.map(file => file.urlPath), ['/index.html']);
+  assert.deepEqual(movedPlan.leftOut, [{ display: `Kickoff files/${font}`, reason: 'gitIgnored' }]);
+});
+
+test('the hosted sheet names the ignored moved font and sends the unignored font at its old address', async t => {
+  const project = await testProject({});
+  t.after(project.cleanup);
+  execFileSync('git', ['init', '-q'], { cwd: project.dir });
+  const otherFont = 'fonts/Other.woff2';
+  await project.write('.gitignore', `/Kickoff files/${font}\n`);
+  const html = `<style>@font-face { src: url(${font}) } @font-face { src: url(${otherFont}) }</style>`;
+  for (const address of [font, otherFont]) await project.write(`Kickoff files/${address}`, 'font bytes');
+  const realPath = project.page('Kickoff files/Kickoff.html');
+  await project.write('Kickoff files/Kickoff.html', html);
+  const plan = await gatherPage(realPath, project.dir, {
+    hostedDeck: { besideDeckPath: project.page('Kickoff.html'), html, assetAddresses: [font, otherFont] },
+  });
+  assert.deepEqual(sheetModelOf(plan, 'Training').leftOut, [
+    { name: 'Inter-4.001-latin.woff2', display: `Kickoff files/${font}`, reason: 'gitIgnored' },
+  ]);
+  assert.deepEqual((await readVerifiedUpload(plan)).files.map(file => file.urlPath), ['/index.html', `/${otherFont}`]);
+});
+
+for (const mode of ['success', 'current theme logo', 'shared font', 'foreign font', 'trash failure', 'cancel', 'deploy failure', 'write failure', 'edited legacy page', 'foreign legacy page'] as const) {
+  test(`deck migration: ${mode}`, async t => {
+    const project = await testProject({});
+    t.after(project.cleanup);
+    const besideDeckPath = project.page('Training/Kickoff.html');
+    const realPath = project.page('Training/Kickoff files/Kickoff.html');
+    const accountId = 'a'.repeat(32);
+    const siteName = 'kickoff-123abc';
+    const address = siteAddress(siteName, 'training', '/index.html');
+    const extensionPath = fileURLToPath(new URL('../../', import.meta.url));
+    const fontBytes = await fs.readFile(path.join(extensionPath, 'media/fonts/Inter-latin.woff2'));
+    const legacyFontBytes = mode === 'foreign font' ? Buffer.from('different font bytes') : fontBytes;
+    const makePage = async (heading = 'Kickoff', pagePath?: string) => (await buildDeckPage({
+      deckPath: project.page('Training/Kickoff.rtms'), text: ['---', 'deck: 2', '---', '', '```slide', '# ' + heading, '```', '', '![Picture](images/old.png)'].join('\n'),
+      pagePath,
+      theme: { ...BUILT_IN_THEME, logo: { file: 'Brand.svg', place: 'top-right', on: 'every-slide' } },
+    }, { logo, slideCss: '', fonts: [], themeFonts: [{ family: 'Inter', unicodeRange: 'U+0000-00FF', address: font }] }));
+    await project.write('Training/images/old.png', PNG);
+    const built = await makePage();
+    const oldHtml = mode === 'foreign legacy page' ? built.html.replace('name="generator"', 'name="author"') : built.html;
+    await project.write('Training/Kickoff.html', oldHtml);
+    const local = await makePage('Kickoff', realPath);
+    await project.write('Training/Kickoff files/Kickoff.html', local.html);
+    await project.write(`Training/${font}`, legacyFontBytes);
+    await project.write(`Training/Kickoff files/${font}`, legacyFontBytes);
+    await project.write(`Training/${logo.address}`, logo.bytes);
+    await project.write(`Training/Kickoff files/${logo.address}`, logo.bytes);
+    if (mode === 'shared font') {
+      await project.write('Training/Shared.html', (await makePage('Shared')).html
+        .replaceAll(logo.address, 'images/old.png').replaceAll(font, './fonts/%49nter-4.001-latin.woff2'));
+    }
+    if (mode === 'foreign font') await project.write('Training/logos/foreign.svg', '<svg><!-- foreign --></svg>');
+    const oldPlan = await gatherPage(besideDeckPath, project.dir);
+    const oldUpload = await readVerifiedUpload(oldPlan);
+    const records = new PublishRecordStore(project.page('storage'));
+    const old = { ...recordFor(oldPlan, { accountId, siteName, address }), deckVersion: 1000, deckDigest: built.digest };
+    if (mode === 'current theme logo') old.files = old.files.filter(file => file.path !== logo.address);
+    await records.put(old);
+    const live = { on: true as const, id: 'prior-consent' };
+    await records.changeLive(old, live);
+    const alternateSite = { ...old, siteName: 'other-123abc', address: siteAddress('other-123abc', 'training', '/index.html'), publishedAt: '2000-01-01T00:00:00.000Z' };
+    await records.put(alternateSite);
+    const pause = { ...live, pause: { kind: 'page' as const, at: 20, detail: 'Paused' } };
+    await records.changeLive(alternateSite, pause);
+    if (mode === 'edited legacy page') await fs.appendFile(besideDeckPath, '<!-- edited -->');
+    const before = await records.list();
+    let deploys = 0;
+    let deployed: VerifiedUpload | undefined;
+    const removed: string[] = [];
+    const trashed: string[] = [];
+    const failures: string[] = [];
+    const host: PublishControllerDeps['host'] = {
+      id: 'cloudflare', accountId: () => accountId,
+      snapshot: () => ({ state: 'connected', accountName: 'Training', subdomain: 'training' }),
+      refreshSubdomain: async () => 'training', connectWithToken: async () => { throw new Error('unexpected connect'); },
+      disconnect: async () => {}, chooseSubdomain: async () => 'training', siteExists: async () => true,
+      publish: async (name, upload, options) => {
+        assert.equal(name, siteName);
+        assert.equal(options.replacing, true);
+        assert.equal(options.lastDeckVersion, 1000 + deploys);
+        deploys++;
+        if (mode === 'deploy failure') throw new Error('simulated deploy failure');
+        deployed = upload;
+        return { name, address: siteAddress(name, 'training', upload.pageUrlPath), deckVersion: 1000 + deploys };
+      },
+      unpublish: async name => { removed.push(name); },
+      waitUntilOnline: async () => 'online',
+    };
+    const openController = () => {
+      const controller = new PublishController({
+        legacyFiles: {
+          extensionPath,
+          trash: async file => {
+            assert.equal(await records.get(besideDeckPath), undefined);
+            assert.equal((await records.get(realPath))?.address, address);
+            if (mode === 'trash failure' && file === project.page(`Training/${font}`)) throw new Error('simulated Trash failure');
+            const target = path.relative(project.dir, file);
+            await fs.rename(file, project.page(`trash-${trashed.length}`));
+            trashed.push(target);
+          },
+        },
+        host, records, gather: gatherPage, isFeatureEnabled: () => true, setReady: () => {}, postSettings: () => {}, log: () => {},
+        ui: {
+          openExternal: async () => true, askToken: async () => {}, showConnect: () => {},
+          showSheet: async ({ plan, onConfirm }) => {
+            if (mode === 'cancel') return { kind: 'cancel' };
+            assert.equal(mode, 'current theme logo');
+            assert.ok(plan);
+            assert.equal((await onConfirm({ anyway: false })).kind, 'close');
+            return { kind: 'publish', plan };
+          },
+          showFailure: line => { failures.push(line); }, showWaiting: () => () => {}, showBrief: () => {},
+        },
+      });
+      controller.setPublishEntryAvailable(true);
+      return controller;
+    };
+    const controller = openController();
+    const page = { realPath, projectFolder: project.dir, hostedDeck: { besideDeckPath, html: built.html, assetAddresses: [font, logo.address] } };
+    assert.equal((await controller.recordFor(besideDeckPath))?.address, address);
+    assert.equal((await controller.settingsProjection()).pages.find(p => p.id === siteName)?.address, address);
+    if (mode === 'cancel') await fs.rm(project.page(`Training/Kickoff files/${font}`));
+    if (mode === 'success') {
+      const release = controller.holdPage(besideDeckPath);
+      assert.ok(release);
+      assert.deepEqual(await controller.updateLive({ realPath: besideDeckPath, projectFolder: project.dir }, {
+        preference: live, resume: false, active: () => true, digest: built.digest,
+        pageSha: createHash('sha256').update(built.html).digest('hex'),
+      }), { kind: 'unchanged' });
+      release();
+      assert.deepEqual(await records.list(), before);
+    }
+    // Fail the atomic rename before it changes the record file.
+    if (mode === 'write failure') {
+      const rename = fs.rename;
+      t.mock.method(fs.default, 'rename', async (from: string, to: string) => {
+        if (to.endsWith('records.json')) throw new Error('simulated record write failure');
+        await rename(from, to);
+      });
+    }
+    const outcome = await controller.publishFromBar(page);
+    if (mode === 'cancel' || mode === 'deploy failure' || mode === 'write failure') {
+      assert.equal(outcome, mode === 'cancel' ? 'cancelled' : mode === 'deploy failure' ? 'failed' : 'published');
+      assert.equal(deploys, mode === 'cancel' ? 0 : 1);
+      assert.deepEqual(await records.list(), before);
+      assert.deepEqual(trashed, []);
+      assert.equal(await fs.readFile(besideDeckPath, 'utf8'), oldHtml);
+      assert.equal((await controller.recordFor(besideDeckPath))?.address, address);
+      if (mode === 'cancel') {
+        await controller.unpublishPage(besideDeckPath);
+        await controller.unpublishSite(alternateSite.siteName);
+        assert.deepEqual(removed, [siteName, alternateSite.siteName]);
+      }
+      if (mode === 'write failure') assert.match((await controller.pageState(realPath)).line ?? '', /couldn.t save|couldn.t note|record|remember/i);
+      return;
+    }
+    assert.equal(outcome, 'published');
+    assert.deepEqual(deployed?.files, oldUpload.files.map((file, index) =>
+      mode === 'foreign legacy page' && index === 0 ? { ...file, bytes: Buffer.from(built.html) } : file));
+    assert.equal(await controller.recordFor(besideDeckPath), undefined);
+    const after = await records.get(realPath);
+    assert.equal(after?.address, address);
+    assert.equal(after?.deckVersion, 1001);
+    assert.deepEqual(after?.live, live);
+    assert.deepEqual((await records.list()).find(r => r.siteName === alternateSite.siteName), { ...alternateSite, pagePath: realPath, deckFolder: true, live: pause });
+    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${font}`)), legacyFontBytes);
+    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${logo.address}`)), logo.bytes);
+    assert.equal(await fs.readFile(realPath, 'utf8'), local.html);
+    if (mode === 'edited legacy page') {
+      assert.match(await fs.readFile(besideDeckPath, 'utf8'), /edited/);
+      assert.deepEqual(trashed, []);
+    } else if (mode === 'foreign legacy page') {
+      assert.equal(await fs.readFile(besideDeckPath, 'utf8'), oldHtml);
+    } else {
+      await assert.rejects(fs.access(besideDeckPath), { code: 'ENOENT' });
+      assert.ok(trashed.includes('Training/Kickoff.html'));
+    }
+    if (mode === 'success' || mode === 'current theme logo') {
+      for (const folder of ['fonts', 'logos']) {
+        assert.ok(trashed.includes(`Training/${folder}`), JSON.stringify(trashed));
+        await assert.rejects(fs.access(project.page(`Training/${folder}`)), { code: 'ENOENT' });
+      }
+      assert.ok(trashed.includes(`Training/${font}`));
+      assert.ok(trashed.includes(`Training/${logo.address}`));
+    }
+    if (mode === 'shared font') {
+      const sibling = project.page('Training/Shared.html');
+      const html = await fs.readFile(sibling, 'utf8');
+      const url = /url\(["']?([^"'()]*%49nter[^"'()]*)/.exec(html)?.[1];
+      assert.ok(url);
+      assert.deepEqual(await fs.readFile(new URL(url, pathToFileURL(sibling))), fontBytes);
+    }
+    if (mode === 'foreign font' || mode === 'trash failure') {
+      assert.deepEqual(await fs.readFile(project.page(`Training/${font}`)), legacyFontBytes);
+      assert.ok(!trashed.includes(`Training/${font}`));
+    }
+    if (mode === 'foreign font') {
+      assert.equal(await fs.readFile(project.page('Training/logos/foreign.svg'), 'utf8'), '<svg><!-- foreign --></svg>');
+    }
+
+    const reopened = openController();
+    assert.equal((await reopened.recordFor(realPath))?.address, address);
+    const release = reopened.holdPage(realPath);
+    assert.ok(release);
+    const attempt = { preference: live, active: () => true, resume: false };
+    assert.deepEqual(await reopened.updateLive(page, {
+      ...attempt, digest: built.digest, pageSha: createHash('sha256').update(built.html).digest('hex'),
+    }), { kind: 'unchanged' });
+    const edited = await makePage('Updated');
+    assert.deepEqual(await reopened.updateLive({ ...page, hostedDeck: { ...page.hostedDeck, html: edited.html } }, {
+      ...attempt, digest: edited.digest, pageSha: createHash('sha256').update(edited.html).digest('hex'),
+    }), { kind: 'updated', pictures: [] });
+    release();
+    assert.equal(deploys, 2);
+    await reopened.unpublishPage(realPath);
+    await reopened.unpublishSite(alternateSite.siteName);
+    assert.deepEqual(removed, [siteName, alternateSite.siteName]);
+    assert.deepEqual(await records.list(), []);
+    assert.deepEqual(failures, []);
+  });
+}
+
+test('a nested published address survives when the picture above the deck is removed', async t => {
+  const project = await testProject({});
+  t.after(project.cleanup);
+  const besideDeckPath = project.page('Training/Kickoff.html');
+  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  await project.write('shared.png', PNG);
+  await project.write('Training/Kickoff.html', '<img src="../shared.png">');
+  const before = await gatherPage(besideDeckPath, project.dir);
+  assert.equal(before.files[0].relPath, 'Training/Kickoff.html');
+  const html = '<p>Kickoff</p>';
+  await project.write('Training/Kickoff files/Kickoff.html', html);
+  const after = await gatherPage(realPath, project.dir, {
+    hostedDeck: { besideDeckPath, html, assetAddresses: [] },
+    publishedPagePath: before.files[0].relPath,
+  });
+  assert.equal((await readVerifiedUpload(after)).pageUrlPath, '/Training/index.html');
+});

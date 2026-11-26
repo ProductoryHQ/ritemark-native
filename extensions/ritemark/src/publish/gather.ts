@@ -39,7 +39,17 @@ import {
   PublishPlan,
 } from './types';
 
+export class HostedDeckLayoutError extends Error {}
+
+export interface HostedDeckPage {
+  readonly besideDeckPath: string;
+  readonly html: string;
+  readonly assetAddresses: readonly string[];
+}
+
 export interface GatherOptions {
+  hostedDeck?: HostedDeckPage;
+  publishedPagePath?: string;
   platform?: NodeJS.Platform;
   realpath?: (p: string) => Promise<string>;
   stat?: (p: string) => Promise<{ isFile(): boolean; size: number }>;
@@ -122,6 +132,7 @@ interface Pending {
   size: number;
   as: Reference['as'];
   display: string;
+  hostedPath: string;
 }
 
 /** The deepest folder that holds every path. */
@@ -140,6 +151,12 @@ function commonFolder(paths: string[], p: typeof path.posix | typeof path.win32)
 
 /** Every plan `gatherPage` made, by identity. A plan written by hand, or copied, is not among them. */
 const gatheredPlans = new WeakSet<object>();
+const hostedPages = new WeakMap<GatheredPlan, HostedDeckPage>();
+
+/** The immutable HTML string that gather scanned, and the previous record key. */
+export function hostedPageOf(plan: GatheredPlan) {
+  return hostedPages.get(plan);
+}
 
 /** Whether a plan is one `gatherPage` made (and froze), so PR 4's upload can refuse anything else. */
 export function isGatheredPlan(plan: unknown): plan is GatheredPlan {
@@ -166,10 +183,24 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   const key = (x: string) => (platform === 'win32' ? x.toLowerCase() : x);
 
   if (!isInside(pagePath, projectFolder, platform)) throw new Error('This page is outside this project.');
-  const pageBytes = await readFile(pagePath);
+  const hosted = options.hostedDeck;
+  const hostedPath = hosted?.besideDeckPath ?? pagePath;
+  if (!isInside(hostedPath, projectFolder, platform)) throw new Error('This page is outside this project.');
+  if (hosted) {
+    const name = p.basename(hostedPath, '.html');
+    const expected = p.join(p.dirname(hostedPath), `${name} files`, p.basename(hostedPath));
+    if (key(pagePath) !== key(expected) || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
+      || address.endsWith('/.') || address.endsWith('/..'))) {
+      throw new HostedDeckLayoutError('Ritemark could not check where the deck page and its files are. Nothing was sent.');
+    }
+  }
+  const moved = new Map((hosted?.assetAddresses ?? []).map(address => [
+    key(p.resolve(p.dirname(hostedPath), address)), p.resolve(p.dirname(pagePath), address),
+  ]));
+  const pageBytes = hosted ? Buffer.from(hosted.html) : await readFile(pagePath);
   const pageText = pageBytes.toString('utf8');
   const page = pageReferences(pageText);
-  const pageUrl = pathToFileURL(pagePath);
+  const pageUrl = pathToFileURL(hostedPath);
   let base: URL = pageUrl;
   if (page.base) {
     try {
@@ -210,18 +241,19 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   while (level.length > 0 && accepted.length <= MAX_FILES) {
     const candidates: Pending[] = [];
     for (const { ref, base: from } of level) {
-      const resolved = resolveRef(ref.value, from, pagePath, platform);
+      const resolved = resolveRef(ref.value, from, hostedPath, platform);
       if (resolved.kind === 'skip') continue;
       if (resolved.kind === 'outside') {
         addLeftOut(resolved.display, 'outside');
         continue;
       }
-      const lexical = resolved.fsPath;
+      const logical = resolved.fsPath;
+      const lexical = moved.get(key(logical)) ?? logical;
       const isLink = ref.as === 'link';
       if (ref.as === 'picture') picturePaths.add(key(lexical));
-      if (seen.has(key(lexical))) continue;
-      if (!isLink) seen.add(key(lexical));
-      if (!isInside(lexical, projectFolder, platform)) {
+      if (seen.has(key(logical))) continue;
+      if (!isLink) seen.add(key(logical));
+      if (!isInside(logical, projectFolder, platform) || !isInside(lexical, projectFolder, platform)) {
         addLeftOut(displayOf(ref.value), 'outside');
         continue;
       }
@@ -241,7 +273,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       const relLexical = p.relative(projectFolder, lexical);
       const relReal = p.relative(projectFolder, real);
       const shown = toSlash(relLexical);
-      const segments = [...segmentsOf(relLexical), ...segmentsOf(relReal)];
+      const segments = [...segmentsOf(relLexical), ...segmentsOf(relReal), ...segmentsOf(p.relative(projectFolder, logical))];
       if (segments.some((s) => s.startsWith('.'))) {
         addLeftOut(shown, 'hidden');
         continue;
@@ -261,7 +293,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
         }
         continue;
       }
-      candidates.push({ fsPath: lexical, realPath: real, size: info.size, as: ref.as, display: shown });
+      candidates.push({ fsPath: lexical, realPath: real, size: info.size, as: ref.as, display: shown, hostedPath: logical });
     }
 
     // Git decides for the whole level at once, before anything in it is followed
@@ -287,7 +319,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       accepted.push(c);
       if (c.size > MAX_FILE_BYTES) continue;
       const ext = p.extname(c.fsPath).toLowerCase();
-      const fileBase = pathToFileURL(c.fsPath);
+      const fileBase = pathToFileURL(c.hostedPath);
       const isStyle = c.as === 'style' || ext === '.css';
       if (!isStyle && c.as !== 'module' && ext !== '.mjs') continue;
       // a file that grew past the limit since its stat goes as too big (below) and is not followed
@@ -306,9 +338,9 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   }
 
   // Sizes, hashes and the key scan, over the page and every file that goes
-  const all: { lexical: string; real: string; size: number }[] = [
-    { lexical: pagePath, real: pagePath, size: pageBytes.length },
-    ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size })),
+  const all: { lexical: string; real: string; size: number; hostedPath: string }[] = [
+    { lexical: pagePath, real: pagePath, size: pageBytes.length, hostedPath },
+    ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size, hostedPath: c.hostedPath })),
   ];
   const gathered: { file: GatheredFile; lexical: string }[] = [];
   const tooBig: PublishPlan['tooBig'] = [];
@@ -327,7 +359,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     }
     if (f.size > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: f.size });
-      gathered.push({ file, lexical: f.lexical });
+      gathered.push({ file, lexical: f.hostedPath });
       continue;
     }
     const bytes = f.lexical === pagePath ? pageBytes : await readFile(f.real);
@@ -335,7 +367,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     // A file can grow between its stat and this read: the limit holds for the bytes read, which are what would go
     if (bytes.length > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: bytes.length });
-      gathered.push({ file, lexical: f.lexical });
+      gathered.push({ file, lexical: f.hostedPath });
       continue;
     }
     if (file.kind !== 'page' && hasPictureSignature(bytes)) file.kind = 'picture';
@@ -359,17 +391,33 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
       if (file.kind === 'script' && scriptBuildsReferences(text)) scriptBuilt = true;
     }
-    gathered.push({ file, lexical: f.lexical });
+    gathered.push({ file, lexical: f.hostedPath });
   }
 
-  const root = commonFolder(gathered.map(({ lexical }) => lexical), p);
+  const publishedPath = hosted && options.publishedPagePath;
+  const root = publishedPath
+    ? p.resolve(p.dirname(hostedPath), ...publishedPath.split('/').slice(1).map(() => '..'))
+    : commonFolder(gathered.map(({ lexical }) => lexical), p);
+  if (publishedPath && (toSlash(p.relative(root, hostedPath)) !== publishedPath
+    || !isInside(p.join(root, 'index.html'), projectFolder, platform)
+    || gathered.some(({ lexical }) => !isInside(lexical, root, platform)))) {
+    throw new HostedDeckLayoutError('These files would change the published page’s address. Nothing was sent.');
+  }
   const files = gathered.map(({ file, lexical }) => {
     file.relPath = toSlash(p.relative(root, lexical));
     return file;
   });
 
   // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
-  return frozenPlan({
+  if (hosted) {
+    const served = new Set(files.slice(1).map(file => `/${file.relPath}`));
+    const pageFolder = path.posix.dirname(files[0].relPath);
+    const indexPath = pageFolder === '.' ? '/index.html' : `/${pageFolder}/index.html`;
+    if (served.size !== files.length - 1 || served.has(indexPath) || served.has('/version.json')) {
+      throw new HostedDeckLayoutError('Two files would publish at the same address. Nothing was sent.');
+    }
+  }
+  const plan = frozenPlan({
     pagePath,
     projectFolder,
     root,
@@ -381,6 +429,8 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     keyHits,
     contentHash: contentHashOf(files),
   });
+  if (hosted) hostedPages.set(plan, Object.freeze({ html: pageText, besideDeckPath: hostedPath, assetAddresses: Object.freeze([...hosted.assetAddresses]) }));
+  return plan;
 }
 
 /** sha256 over each file's published path and hash, sorted: equal exactly when the same bytes go to the same places. */

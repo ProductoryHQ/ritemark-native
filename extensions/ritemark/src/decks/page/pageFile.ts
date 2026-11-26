@@ -41,11 +41,23 @@ export interface PageFs {
   unlink(target: string): Promise<void>;
 }
 
+async function writeNewFile(target: string, data: string | Buffer): Promise<void> {
+  const handle = await fs.promises.open(target, 'wx');
+  try {
+    await handle.writeFile(data);
+    await handle.close();
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    await fs.promises.unlink(target).catch(() => undefined);
+    throw error;
+  }
+}
+
 export const nodePageFs: PageFs = {
   lstat: target => fs.promises.lstat(target),
   stat: target => fs.promises.stat(target),
   readFile: target => fs.promises.readFile(target, 'utf8'),
-  writeFile: (target, data) => fs.promises.writeFile(target, data, { encoding: 'utf8', flag: 'wx' }),
+  writeFile: writeNewFile,
   rename: (from, to) => fs.promises.rename(from, to),
   link: (from, to) => fs.promises.link(from, to),
   unlink: target => fs.promises.unlink(target),
@@ -69,8 +81,8 @@ export function deckNameOf(deckPath: string): string {
 }
 
 /** Where a deck's page goes: `<deck name>.html` beside it. */
-export function pagePathFor(deckPath: string): string {
-  return path.join(path.dirname(deckPath), `${deckNameOf(deckPath)}.html`);
+export function pagePathFor(deckPath: string, folder = path.dirname(deckPath)): string {
+  return path.join(folder, `${deckNameOf(deckPath)}.html`);
 }
 
 /** The two marks of a page Ritemark wrote from a deck, read from the page's head. */
@@ -114,28 +126,39 @@ function besidePage(pagePath: string, ending: string): string {
  * `to` is taken, then the first name dropped. False when `to` was taken. Where the file system can't give a second
  * name (FAT and exFAT, some network and synced folders, whatever the error), a move after a last check stands in.
  */
-async function placeNoReplace(pageFs: PageFs, from: string, to: string): Promise<boolean> {
+async function placeNoReplace(pageFs: PageFs, from: string, to: string, html: string): Promise<boolean> {
   try {
     await pageFs.link(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
-    if ((await pageAt(pageFs, to)).kind !== 'none') return false;
-    await pageFs.rename(from, to);
-    return true;
+    try {
+      await pageFs.writeFile(to, html);
+      return true;
+    } catch (writeError) {
+      if ((writeError as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
+      throw writeError;
+    }
   }
   await pageFs.unlink(from).catch(() => undefined);
   return true;
 }
 
+export function takenDeckPageLine(pagePath: string): string {
+  return `“${path.basename(pagePath)}” is already in “${path.basename(path.dirname(pagePath))}”, and Ritemark didn’t make it from the deck, so it stays as it is. Rename that file to publish the deck.`;
+}
+
 /**
- * Write the page beside the deck. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
+ * Write the page at its chosen location. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
  * the result says why in one line. The page is written under a hidden name first, so a half-written page is never what
  * Publish reads. Where nothing is, it goes in only if nothing arrived meanwhile, in one step (`placeNoReplace`: Codex
  * on #729); a page Ritemark wrote is replaced by a move over it, after a last check, so the place is never empty.
  */
-export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string): Promise<WriteResult> {
-  const pagePath = pagePathFor(deckPath);
-  const refused = (): WriteResult => ({ kind: 'refused', pagePath, line: foreignPageLine(pagePath) });
+export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string, pagePath = pagePathFor(deckPath)): Promise<WriteResult> {
+  const refused = (): WriteResult => ({
+    kind: 'refused', pagePath,
+    line: pagePath === pagePathFor(deckPath) ? foreignPageLine(pagePath)
+      : takenDeckPageLine(pagePath),
+  });
   let there = await pageAt(pageFs, pagePath);
   if (there.kind === 'foreign') return refused();
   if (there.kind === 'ours' && there.html === html) return { kind: 'written', pagePath, created: false, unchanged: true };
@@ -143,7 +166,7 @@ export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: stri
   await pageFs.writeFile(temporary, html);
   try {
     if (there.kind === 'none') {
-      if (await placeNoReplace(pageFs, temporary, pagePath)) return { kind: 'written', pagePath, created: true, unchanged: false };
+      if (await placeNoReplace(pageFs, temporary, pagePath, html)) return { kind: 'written', pagePath, created: true, unchanged: false };
       // Something arrived meanwhile: another window's page for this deck is replaced, anything else stays.
       there = await pageAt(pageFs, pagePath);
       if (there.kind !== 'ours') return refused();
@@ -155,6 +178,19 @@ export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: stri
   } finally {
     await pageFs.unlink(temporary).catch(() => undefined);
   }
+}
+
+/** A legacy deck page's mark and last published bytes must both agree. */
+export async function matchesLegacyDeckPage(pagePath: string, sha256: string | undefined): Promise<boolean> {
+  if (!sha256) return false;
+  const there = await pageAt({
+    ...nodePageFs,
+    readFile: async target => {
+      const bytes = await fs.promises.readFile(target);
+      return createHash('sha256').update(bytes).digest('hex') === sha256 ? bytes.toString('utf8') : '';
+    },
+  }, pagePath);
+  return there.kind === 'ours';
 }
 
 /**
@@ -238,11 +274,17 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
 type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; measureFit?: boolean; print?: 'slides' | 'handout' };
 
 export async function buildDeckPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; pagePath?: string; onPicture?: (file: string) => void },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
-  return buildPage(input, assets, pageFs, null);
+  const folder = input.pagePath && path.dirname(input.pagePath);
+  return buildPage(input, assets, pageFs, picture => {
+    input.onPicture?.(picture.file);
+    return folder && folder !== path.dirname(input.deckPath)
+      ? pictureAddress(path.relative(folder, picture.file).split(path.sep).join('/'))
+      : picture.address;
+  });
 }
 
 /** Sprint 170: the folder Save as PDF prints from holds each picture under this name, `pictures/<n><.ext>`. */
@@ -411,17 +453,7 @@ export const nodeFontFs: FontFs = {
   readFile: target => fs.promises.readFile(target),
   // Create-only; a file it created and couldn't finish (a full disk, a dropped network folder) is taken back, since it
   // is Ritemark's own, and a half font must never stop the next Publish (the review of #777).
-  writeFile: async (target, data) => {
-    const handle = await fs.promises.open(target, 'wx');
-    try {
-      await handle.writeFile(data);
-      await handle.close();
-    } catch (error) {
-      await handle.close().catch(() => undefined);
-      await fs.promises.unlink(target).catch(() => undefined);
-      throw error;
-    }
-  },
+  writeFile: writeNewFile,
   mkdir: async target => { await fs.promises.mkdir(target); },
   readdir: target => fs.promises.readdir(target),
   link: (from, to) => fs.promises.link(from, to),

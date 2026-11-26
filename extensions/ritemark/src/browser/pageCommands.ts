@@ -15,6 +15,7 @@
 
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
+import type { HostedDeckPage } from '../publish/gather';
 import type { PublishOutcome } from '../publish/PublishController';
 import { PageLocation, PageTarget, locatePage, localPagePath } from './localPage';
 
@@ -26,7 +27,7 @@ export const OUTSIDE_PROJECT_MESSAGE =
   'Only pages in this project can be published. Move the page into the project folder to publish it.';
 export const MISSING_PAGE_MESSAGE = "This page's file can't be found. It may have been moved or deleted.";
 
-type PublishHandler = (page: { realPath: string; projectFolder: string }) => Promise<PublishOutcome>;
+type PublishHandler = (page: { realPath: string; projectFolder: string }, hostedDeck?: HostedDeckPage) => Promise<PublishOutcome>;
 let publishHandler: PublishHandler | null = null;
 
 /** PR 4: what Publish does with a project page once the boundary check passed (`PublishController.publishFromBar`). */
@@ -90,10 +91,10 @@ export async function publishPage(arg?: unknown): Promise<PageLocation | undefin
  * The same way in, waited to its end (Sprint 159 PR 4, the deck's bar): the boundary check, then the publish flow,
  * and how it ended. Undefined when the check refused the page (it said why).
  */
-export async function publishPageToEnd(arg?: unknown): Promise<PublishOutcome | undefined> {
+export async function publishPageToEnd(arg?: unknown, hostedDeck?: HostedDeckPage): Promise<PublishOutcome | undefined> {
   const location = await projectPageOf(arg);
   if (!location) return undefined;
-  return publishHandler ? publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder }) : 'not-ready';
+  return publishHandler ? publishHandler({ realPath: location.realPath, projectFolder: location.projectFolder }, hostedDeck) : 'not-ready';
 }
 
 async function projectPageOf(arg: unknown): Promise<Extract<PageLocation, { kind: 'project' }> | undefined> {

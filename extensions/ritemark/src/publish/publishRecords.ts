@@ -56,6 +56,7 @@ export interface PublishRecord {
   files: { path: string; sha256: string }[];
   contentHash: string;
   deckDigest?: string;
+  deckFolder?: true;
   live?: LivePreference;
   /** ISO date of the last publish or update. */
   publishedAt: string;
@@ -259,9 +260,12 @@ export class PublishRecordStore {
    * Notes a publish, keyed by page and site: an update (the same site) replaces its record, and so does a new site
    * for a page whose old record was already taken down; another site's record for the same page, still online, stays.
    */
-  put(record: PublishRecord): Promise<void> {
-    return this.change((current) => {
-      const records = current.filter((r) => !this.samePage(r, record.pagePath) || (r.siteName !== record.siteName && !r.unpublished));
+  put(record: PublishRecord, previousPagePath?: string): Promise<void> {
+    return this.change((stored) => {
+      const current = stored.map(r => previousPagePath && this.samePage(r, previousPagePath)
+        ? { ...r, pagePath: record.pagePath, deckFolder: true as const } : r);
+      const records = current.filter(r => !this.samePage(r, record.pagePath)
+        || (r.siteName !== record.siteName && (previousPagePath !== undefined || !r.unpublished)));
       const previous = current.find(r => this.samePage(r, record.pagePath) && r.siteName === record.siteName && !r.unpublished);
       records.push(previous?.live ? { ...record, live: previous.live } : record);
       return { records, result: undefined };
