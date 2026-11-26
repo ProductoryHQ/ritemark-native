@@ -9,6 +9,7 @@
  */
 
 import Link, { type LinkOptions } from '@tiptap/extension-link'
+import { consumeLinkClick } from '../lib/consumeLinkClick'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { openExternalUrl, openInternalLink } from '../bridge'
 import { canOpenExternally, classifyLinkTarget } from '../lib/linkTargets'
@@ -56,9 +57,7 @@ export const CustomLink = Link.extend<CustomLinkOptions>({
             const href = link.getAttribute('href')
             if (!href) return false
 
-            // Always prevent default browser navigation
-            event.preventDefault()
-            event.stopPropagation()
+            consumeLinkClick(event)
 
             // Cmd+click (Mac) or Ctrl+click (Windows/Linux):
             //   external → open in default browser

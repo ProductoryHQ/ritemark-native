@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useCallback, useState, useId, useLayoutEffect, useRef } from 'react';
+import { consumeLinkClick } from '../../lib/consumeLinkClick';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
@@ -92,7 +93,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     const anchor = target.closest('a');
     if (anchor) {
       const link = classifyChatHref(anchor.getAttribute('href'));
-      e.preventDefault();
+      consumeLinkClick(e);
       if (link.kind === 'external') {
         vscode.postMessage({ type: 'openExternal', url: link.url });
       } else if (link.kind === 'file') {
