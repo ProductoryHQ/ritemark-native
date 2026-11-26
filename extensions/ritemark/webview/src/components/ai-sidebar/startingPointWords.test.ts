@@ -37,7 +37,12 @@ assert.deepEqual(fillOf('This project is for…'), { text: 'This project is for 
 assert.equal(startingSentence('ChatGPT'), 'ChatGPT can work across your open documents and the whole project.', 'D2')
 
 // Sprint 173, S39 and S40: deliver the host's places once per platform, then switch AIs in the column.
-const passed = { ...READ_KINDS_PASSED, 'claude-code': { darwin: true, win32: false } }
+// Its own gate, independent of which AIs have passed since: Claude passed on the Mac only, the others not yet.
+const passed = {
+  'claude-code': { darwin: true, win32: false },
+  codex: { darwin: false, win32: false },
+  opencode: { darwin: false, win32: false },
+} satisfies typeof READ_KINDS_PASSED
 const word = { viewType: 'ritemark.docxViewer', fileName: 'Tender.docx' }
 const pdf = { viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }
 const conversation = createConversationState('starting-points', { selectedAgent: 'claude-code' })
