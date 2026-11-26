@@ -151,7 +151,7 @@ interface SlideTools {
   splitLine: () => boolean
   tab: (direction: 1 | -1) => boolean
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
-  hintIcon: (pos: number, anchor: HTMLElement, name: string) => void
+  hintIcon: (pos: number, anchor: HTMLElement, name: string | null) => void
 }
 
 /** A paragraph that holds only `***`, the caret at its end: Split slide here's shortcut (frame 22). */

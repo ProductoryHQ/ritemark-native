@@ -12,7 +12,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import domino, { createDocument } from '@mixmark-io/domino'
-import { EditorState, TextSelection, type Plugin } from '@tiptap/pm/state'
+import { EditorState, NodeSelection, TextSelection, type Plugin } from '@tiptap/pm/state'
 import { DecorationSet, EditorView, type NodeView } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { isBlockSlide, isSlideKind, parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
@@ -21,8 +21,11 @@ import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { BOXES_MARKS, SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
 import { caretBoxIcon, chosenBlockAt, setBoxesMark } from './blockBar'
-import { loadSlide } from './slideEditorHarness'
+import * as itemHandle from './itemHandle'
+import { loadSlide, saveSlide } from './slideEditorHarness'
 import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
+import { setBlockValue } from './slideCommands'
+import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { quoteBy } from './slideQuote'
 import { PAGE_ICON_PATHS } from '../slide/pageIcons'
 
@@ -173,8 +176,12 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
 // the stage drew the box's empty place (hidden) and the renderer nothing.
 {
   const calls: string[] = []
+  const picks: { pos: number; current: string | null }[] = []
   const handlers: SlideDivHandlers = {
-    pickIcon: (_pos, _anchor, current) => { calls.push(`pick ${current}`) },
+    pickIcon: (pos, _anchor, current) => {
+      calls.push(`pick ${current}`)
+      picks.push({ pos, current })
+    },
     hintIcon: (_pos, _anchor, name) => { calls.push(`hint ${name}`) },
   }
   const extension = slideDivWithView(handlers)
@@ -278,6 +285,58 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
       assert.equal(badge.classList.contains('blk-icon'), showsIcons, `${mark}: ${node.textContent} icon or placeholder`)
       assert.equal(badge.classList.contains('blk-mark'), mark === 'arrow', `${mark}: arrow`)
     })
+  }
+  // Domino has no layout engine. Both views put the shared badge box before the title in the flex layout.
+  const mixed = ':::: boxes\n::: {.box icon="truck"}\n### Truck\n:::\n::: box\n### Empty\n:::\n::: {.box icon="rocket-launch"}\n### Rocket\n:::\n::::'
+  liveView.updateState(EditorState.create({ doc: loadSlide(mixed), plugins: plugins() }))
+  const page = createDocument(draw(mixed))
+  const stageBoxes = Array.from(liveView.dom.querySelectorAll('.blk-box'))
+  const pageBoxes = Array.from(page.querySelectorAll('.blk-box'))
+  assert.equal(stageBoxes.length, 3)
+  assert.equal(pageBoxes.length, 3)
+  for (const [index, box] of stageBoxes.entries()) {
+    const stageIcon = box.firstElementChild!
+    const pageIcon = pageBoxes[index].firstElementChild!
+    assert.ok(stageIcon.classList.contains('blk-icon') && pageIcon.classList.contains('blk-icon'))
+    assert.equal(stageIcon.nextElementSibling?.firstElementChild?.textContent, pageIcon.nextElementSibling?.textContent)
+    if (index === 1) {
+      assert.ok(stageIcon.classList.contains('is-unknown') && stageIcon.innerHTML.includes(pathOf('circle-dashed')))
+      assert.equal(pageIcon.className, 'blk-icon is-empty')
+      assert.equal(pageIcon.innerHTML, '')
+    } else {
+      assert.equal(pageIcon.innerHTML, stageIcon.innerHTML)
+    }
+  }
+  // #1103: the empty block keeps the page's geometry, even when the caret moves.
+  const numbered = ':::: {.boxes look="steps"}\n::: box\nFirst\n:::\n::: box\nSecond\n:::\n::::'
+  const plain = numbered.replace(':::: {.boxes look="steps"}', ':::: boxes')
+  const stageBadges = () => liveView.dom.querySelectorAll('.blk-box > .blk-icon:not(.is-place)')
+  for (const index of [1, null]) {
+    const doc = loadSlide(numbered)
+    liveView.updateState(EditorState.create({ doc, plugins: plugins() }))
+    const block = doc.firstChild!
+    const first = 1
+    const second = first + block.firstChild!.nodeSize
+    const selection = index === null ? NodeSelection.create(doc, 0) : TextSelection.create(doc, second + 2)
+    liveView.dispatch(liveView.state.tr.setSelection(selection))
+    const target = itemHandle.boxForEmptyIconMenu(liveView.state, chosenBlockAt(liveView.state)!)
+    assert.equal(target, index === null ? first : second)
+    liveView.dispatch(setBoxesMark(liveView.state, 0, 'icon')!)
+    assert.equal(stageBadges().length, 0, 'an all-plain Icon block has no stage badges, with or without a caret')
+    assert.equal(createDocument(draw(plain)).querySelectorAll('.blk-icon').length, 0)
+    assert.equal(saveSlide(liveView.state.doc), plain, 'opening the chooser writes no icon')
+    // Dismissing the picker leaves only the Mark change. Choosing writes only the targeted box.
+    assert.equal(saveSlide(liveView.state.doc), plain, 'Escape leaves the block plain')
+    const [choice] = iconMenuChoices(iconMenuStartQuery(null), []).icons
+    liveView.dispatch(setBlockValue(liveView.state, target!, 'icon', choice.name)!)
+    const word = index === null ? 'First' : 'Second'
+    assert.equal(saveSlide(liveView.state.doc), plain.replace(`::: box\n${word}`, `::: {.box icon="${choice.name}"}\n${word}`))
+    assert.equal(stageBadges().length, 2)
+    const emptyBadge = stageBadges()[index === null ? 1 : 0]
+    assert.ok(emptyBadge.classList.contains('is-unknown') && emptyBadge.innerHTML.includes(pathOf('circle-dashed')))
+    assert.equal(itemHandle.boxForEmptyIconMenu(liveView.state, chosenBlockAt(liveView.state)!), null, 'a mixed block already has an icon')
+    liveView.dispatch(setBlockValue(liveView.state, target!, 'icon', null)!)
+    assert.equal(stageBadges().length, 0, 'removing the last icon also clears the sibling badge')
   }
   liveView.destroy()
   console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
