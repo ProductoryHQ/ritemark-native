@@ -463,6 +463,32 @@ async function run() {
     mock.emit('item/started', {
       threadId: 'thread-docs', item: { type: 'commandExecution', id: 'shell', command: 'textutil "Ref.docx"' },
     });
+    for (const [id, command, commandActions, kind, path] of [
+      ['list', 'rg --files', [{ type: 'listFiles', path: null }], 'folder', '.'],
+      ['search', 'rg pilot Reference', [{ type: 'search', path: 'Reference' }], 'folder', 'Reference'],
+      ['read-command', 'cat "01 Brief/Engagement brief.docx"', [{ type: 'read', path: '01 Brief/Engagement brief.docx' }], 'read', '01 Brief/Engagement brief.docx'],
+      ['find', 'find Reference -type f', [{ type: 'unknown' }], 'folder', 'Reference'],
+      ['write', 'rg --files > files.txt', [{ type: 'listFiles', path: null }], 'shell', undefined],
+      ['mixed', 'rg --files', [{ type: 'listFiles', path: null }, { type: 'unknown' }], 'shell', undefined],
+      // Outside the project, a listing keeps its command row: a step's label never shows a path.
+      ['outside', 'ls /etc', [{ type: 'listFiles', path: '/etc' }], 'shell', undefined],
+      ['up', 'find ../other -type f', [{ type: 'unknown' }], 'shell', undefined],
+    ] as const) {
+      const item = { type: 'commandExecution', id, command, commandActions };
+      mock.emit('item/started', { threadId: 'thread-docs', item });
+      mock.emit('item/completed', { threadId: 'thread-docs', item: { ...item, status: 'completed' } });
+      const steps = events.filter(({ step }) => step?.id === id).map(({ step }) => step);
+      assert.deepEqual(steps.map((step) => [step?.kind, step?.path, step?.status]),
+        [[kind, path, undefined], [kind, path, 'completed']]);
+    }
+    mock.emit('item/completed', {
+      threadId: 'thread-docs', item: {
+        type: 'commandExecution', id: 'legacy-list', command: 'rg --files', status: 'completed',
+        parsed_cmd: [{ type: 'list_files', path: null }],
+        aggregatedOutput: '01 Brief/Engagement brief.docx\nReference/Annual report.pdf',
+      },
+    });
+    assert.deepEqual(events.at(-1)?.step?.listing, ['01 Brief/Engagement brief.docx', 'Reference/Annual report.pdf']);
     mock.emit('server-request', {
       id: 81, method: 'item/tool/call', params: {
         threadId: 'thread-docs', itemId: 'read', tool: 'read_document', arguments: { path: 'Reference/Locked.docx' },

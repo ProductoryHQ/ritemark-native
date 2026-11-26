@@ -18,6 +18,7 @@
  * Patterned on codexManager.ts (lifecycle + progress mapping + trace logging).
  */
 
+import { commandStep } from '../runtime/commandStep';
 import { documentReadReasonOf, documentStepKind, isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import type {
   AgentProgress,
@@ -109,7 +110,7 @@ interface AcpSessionState {
   lastMessage: { id: string | null; text: string };
   /** Sprint 155: the files this turn's completed `edit` tool calls changed. */
   turnChanges: AcpTurnChanges;
-  toolSteps: Map<string, { tool: string; step: ToolStep }>;
+  toolSteps: Map<string, { tool: string; step: ToolStep; command?: string }>;
   /** Full live option set returned by ACP session setup / config mutation. */
   configOptions: SessionConfigOption[];
   /** Original provider selection used when Composer returns to Auto. */
@@ -566,7 +567,7 @@ export class AcpManager {
         const documentTool = isDocumentReadTool(tool) || (typeof raw?.tool === 'string' && isDocumentReadTool(raw.tool));
         const inputPath = raw?.path ?? raw?.filePath;
         const file = typeof inputPath === 'string' ? inputPath : update.locations?.[0]?.path ?? previous?.step.path;
-        const command = typeof raw?.command === 'string' ? raw.command : previous?.step.command;
+        const command = typeof raw?.command === 'string' ? raw.command : previous?.command;
         let kind = previous?.step.kind;
         if (documentTool) kind = 'read';
         else if (update.kind === 'execute' || /^(?:bash|terminal)(?:$|[ :])/i.test(tool) || command) kind = 'shell';
@@ -575,13 +576,14 @@ export class AcpManager {
 
         if (kind) {
           let step: ToolStep = { id: update.toolCallId, kind, path: file, command: command ?? (kind === 'shell' ? tool : typeof raw?.pattern === 'string' ? raw.pattern : undefined) };
+          if (kind === 'shell') step = commandStep(step, undefined, this.config.workspaceRoot, this.config.workspaceRoot);
           const stepTool = documentTool ? 'read_document' : tool;
           if (update.status === 'completed' || update.status === 'failed') {
             const output = update.content?.length ? update.content : update.rawOutput;
             step = toolStepResult(step, output, update.status === 'failed', documentTool, documentReadReasonOf(update.rawOutput));
             state.toolSteps.delete(update.toolCallId);
           } else {
-            state.toolSteps.set(update.toolCallId, { tool: stepTool, step });
+            state.toolSteps.set(update.toolCallId, { tool: stepTool, step, command: kind === 'shell' ? step.command : undefined });
           }
           this.emit(sessionId, 'tool_use', tool, { tool: stepTool, file, step });
         } else if (start) {
