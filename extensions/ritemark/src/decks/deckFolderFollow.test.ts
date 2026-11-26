@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type DeckFolderFiles, type DeckMove } from './deckFolderFollow';
+import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles, type DeckFolderFiles, type DeckMove } from './deckFolderFollow';
 import { folderOf, movedTarget, placeAfterMoves, rewriteDeckPictures } from './deckLibraryFormat';
 import { deckFolderCheck, insideDeckFolder, listedDeckFolders } from './deckFolderListing';
+import { emptyDeckText } from './newDeck';
 
 const original = 'work/Kickoff.rtms';
 const assets = 'work/Kickoff files';
@@ -13,10 +14,20 @@ function fixture() {
   const folders = new Set([assets]);
   const changes: string[] = [];
   const notices: string[] = [];
-  const fs: DeckFolderFiles = {
+  const logs: string[] = [];
+  const searches: Array<{ glob: string; limit: number }> = [];
+  const fs: CreatedDeckFiles = {
     kind: async file => folders.has(file) ? 'folder' : content.has(file) ? 'file' : undefined,
     siblingDecks: async dir => [...content.keys()].filter(file => folderOf(file) === dir && /\.(?:rtms|deck\.md)$/.test(file)),
     readDeck: async file => content.get(file)!,
+    readBytes: async file => Buffer.from(content.get(file)!),
+    resolves: async file => folders.has(file) || content.has(file),
+    findFiles: async (glob, limit) => {
+      searches.push({ glob, limit });
+      const names = new Set(glob.slice(4, -1).split(','));
+      return [...content.keys()].filter(file => names.has(file.split('/').pop()!)).slice(0, limit);
+    },
+    log: (message: string) => { logs.push(message); },
     rename: async (from, to) => {
       assert.ok(folders.delete(from));
       folders.add(to);
@@ -38,7 +49,7 @@ function fixture() {
     },
     notice: message => { notices.push(message); },
   };
-  return { fs, content, folders, changes, notices };
+  return { fs, content, folders, changes, notices, searches, logs };
 }
 
 async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, direct = true) {
@@ -119,14 +130,69 @@ test('unavailable Trash leaves the folder and reports once', async () => {
 
 test('Copy/Paste copies pictures and rewrites only the new deck, unless its folder is taken', async () => {
   const { fs, content } = fixture();
-  const copy = 'work/Kickoff copy.deck.md';
+  const copy = 'work/Kickoff copy 2.deck.md';
   content.set(copy, text);
-  const copied = await copyCreatedDeckPictures(copy, text, fs);
-  assert.equal(copied, text.replaceAll('Kickoff files/', 'Kickoff copy files/'));
-  assert.equal(content.get('work/Kickoff copy files/x.png'), 'x');
-  assert.equal(content.get('work/Kickoff copy files/y.png'), 'y');
+  content.set('work/other.png', 'other');
+  const copied = await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy));
+  assert.equal(copied, text.replaceAll('Kickoff files/', 'Kickoff copy 2 files/'));
+  assert.equal(content.get('work/Kickoff copy 2 files/x.png'), 'x');
+  assert.equal(content.get('work/Kickoff copy 2 files/y.png'), 'y');
   assert.equal(content.get(original), text);
-  assert.equal(await copyCreatedDeckPictures(copy, text, fs), text);
+  assert.equal(await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy)), text);
+});
+
+test('Copy/Paste into another folder copies pictures and rebases other relative links', async () => {
+  const { fs, content, searches } = fixture();
+  const copy = 'work/Archive/Kickoff.rtms';
+  const written = text.replace('other.png', 'images/other.png') + '[![Photo](<Kickoff files/y.png>)](../notes.md#next)\n';
+  content.set(original, written);
+  content.set(copy, written);
+  content.set('work/images/other.png', 'other');
+  content.set('notes.md', 'notes');
+  assert.equal(await copyCreatedDeckPictures(copy, written, fs, await fs.readBytes(copy)),
+    written.replace('images/other.png', '../images/other.png').replace('../notes.md', '../../notes.md'));
+  assert.equal(content.get('work/Archive/Kickoff files/x.png'), 'x');
+  assert.equal(content.get('work/Archive/Kickoff files/y.png'), 'y');
+  assert.equal(content.get(original), written);
+  assert.deepEqual(searches, [{ glob: '**/{Kickoff.rtms,Kickoff.deck.md}', limit: 32 }]);
+});
+
+for (const matches of [0, 2]) {
+  test(`a copy with ${matches} identical source candidates stays untouched and logs once`, async () => {
+    const { fs, content, folders, logs, notices } = fixture();
+    const copy = 'work/Archive/Kickoff.rtms';
+    content.set(copy, text);
+    if (matches === 0) content.set(original, '\uFEFF' + text);
+    else content.set('other/Kickoff.rtms', text);
+    assert.equal(await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy)), text);
+    assert.deepEqual([...folders], [assets]);
+    assert.equal(logs.length, 1);
+    assert.deepEqual(notices, []);
+  });
+}
+
+test('a copy with only a broken Markdown link still rebases it', async () => {
+  const { fs, content, folders } = fixture();
+  const copy = 'work/Archive/Kickoff.rtms';
+  const written = emptyDeckText() + '\n[Notes](notes.md)\n';
+  content.set(original, written);
+  content.set(copy, written);
+  content.set('work/notes.md', 'notes');
+  folders.delete(assets);
+  assert.equal(await copyCreatedDeckPictures(copy, written, fs, await fs.readBytes(copy)),
+    written.replace('(notes.md)', '(../notes.md)'));
+  assert.equal(folders.size, 0);
+});
+
+test('New → Deck has no linked files and does not look for copies', async () => {
+  const { fs, content, folders, searches, logs } = fixture();
+  const deck = 'work/Untitled.rtms';
+  const empty = emptyDeckText();
+  content.set(deck, empty);
+  assert.equal(await copyCreatedDeckPictures(deck, empty, fs, await fs.readBytes(deck)), empty);
+  assert.deepEqual([...folders], [assets]);
+  assert.deepEqual(searches, []);
+  assert.deepEqual(logs, []);
 });
 
 test('only ancestors with a sibling deck are treated as deck folders', async () => {

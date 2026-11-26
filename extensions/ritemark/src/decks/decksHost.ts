@@ -26,7 +26,7 @@ import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
 import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
 import { DECK_GLOB, isDeckPath } from './deckFileName';
-import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type DeckFolderFiles } from './deckFolderFollow';
+import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles } from './deckFolderFollow';
 import { copyDeckFolder } from './copyDeckFolder';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -163,17 +163,28 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
       for (const file of event.files) void fresh.remove(markOf(file.oldUri.fsPath));
       follow(() => rebaseMovedDecks(event.files.filter(file => file.oldUri.scheme === 'file' && file.newUri.scheme === 'file')));
     }),
-    vscode.workspace.onDidCreateFiles(event => follow(async () => {
-      for (const uri of event.files) {
-        if (uri.scheme !== 'file' || !isDeckPath(uri.fsPath)) continue;
-        const deck = rootless(uri.fsPath);
-        if (await deckFolderFiles.kind(deck) !== 'file') continue;
-        const document = await vscode.workspace.openTextDocument(uri);
-        const text = document.getText();
-        const next = await copyCreatedDeckPictures(deck, text, deckFolderFiles);
-        await replaceDeckText(document, text, next);
-      }
-    })),
+    vscode.workspace.onDidCreateFiles(event => {
+      if (!isEnabled('decks')) return;
+      // Start reading the saved copies as soon as the event arrives, before earlier folder operations finish.
+      const created = Promise.all(event.files.filter(uri => uri.scheme === 'file' && isDeckPath(uri.fsPath))
+        .map(async uri => {
+          const deck = rootless(uri.fsPath);
+          if (await deckFolderFiles.kind(deck) !== 'file') return null;
+          const bytes = await deckFolderFiles.readBytes(deck).catch(() => null);
+          return bytes && { uri, deck, bytes };
+        }));
+      follow(async () => {
+        for (const file of await created) {
+          if (!file) continue;
+          const { uri, deck, bytes } = file;
+          const document = await vscode.workspace.openTextDocument(uri);
+          const text = document.getText();
+          if (text !== bytes.toString('utf8').replace(/^\uFEFF/, '')) continue;
+          const next = await copyCreatedDeckPictures(deck, text, deckFolderFiles, bytes);
+          await replaceDeckText(document, text, next);
+        }
+      });
+    }),
   );
   return { pages, themes, publisher, library, themeAi };
 }
@@ -221,7 +232,7 @@ function fileUri(file: string): vscode.Uri {
   return vscode.Uri.file(/^[a-z]:$/i.test(file) ? file + '/' : file);
 }
 
-const deckFolderFiles: DeckFolderFiles = {
+const deckFolderFiles: CreatedDeckFiles = {
   async kind(file) {
     try {
       const stat = await fs.promises.lstat(fileUri(file).fsPath);
@@ -240,6 +251,20 @@ const deckFolderFiles: DeckFolderFiles = {
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
     return open?.getText() ?? fs.promises.readFile(uri.fsPath, 'utf8');
   },
+  async findFiles(glob, limit) {
+    const files = await vscode.workspace.findFiles(glob, null, limit);
+    return files.filter(uri => uri.scheme === 'file').map(uri => rootless(uri.fsPath));
+  },
+  readBytes(file) {
+    return fs.promises.readFile(fileUri(file).fsPath);
+  },
+  async resolves(file) {
+    return fs.promises.stat(fileUri(file).fsPath).then(() => true, error => {
+      const code = (error as NodeJS.ErrnoException).code;
+      return code !== 'ENOENT' && code !== 'ENOTDIR' && code !== 'ELOOP';
+    });
+  },
+  log(message) { console.warn('[Decks]', message); },
   async sameFolder(from, to) {
     if (from.toLowerCase() !== to.toLowerCase()) return false;
     try {

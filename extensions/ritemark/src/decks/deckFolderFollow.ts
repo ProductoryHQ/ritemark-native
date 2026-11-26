@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { deckPictureFolderName, isDeckPath } from './deckFileName';
+import { deckNameOf, deckPictureFolderName, isDeckPath, DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
 import { folderOf, movedTarget, placeAfterMoves, projectPath, rewriteDeckPictures, rewriteMarkdownTargets } from './deckLibraryFormat';
 
 export type DeckMove = { from: string; to: string };
@@ -110,22 +110,67 @@ export async function copyDeckPictures(text: string, source: string, deck: strin
   return rewriteDeckPictures(text, target => movedTarget(target, dir, dir, after));
 }
 
-export async function copyCreatedDeckPictures(deck: string, text: string, fs: DeckFolderFiles): Promise<string> {
-  if (await fs.kind(ownDeckFolder(deck))) return text;
+export interface CreatedDeckFiles extends DeckFolderFiles {
+  findFiles(glob: string, limit: number): Promise<string[]>;
+  readBytes(file: string): Promise<Buffer>;
+  resolves(file: string): Promise<boolean>;
+  log(message: string): void;
+}
+
+const COPY_SEARCH_LIMIT = 32;
+
+/** Recover the source of an Explorer copy, whose create event only names the destination. */
+export async function copyCreatedDeckPictures(deck: string, text: string, fs: CreatedDeckFiles, bytes: Buffer): Promise<string> {
   const dir = folderOf(deck);
-  const links = linkedFiles(text, dir);
+  const to = ownDeckFolder(deck);
+  const stem = deckNameOf(deck);
+  const originalStem = stem.replace(/ copy(?: [0-9]+)?$/, '');
+  const links = new Set<string>();
+  rewriteDeckPictures(text, target => {
+    const file = projectPath(target, dir);
+    if (file !== null) links.add(file);
+    return target;
+  }, true);
   if (!links.size) return text;
-  const siblings = new Map((await fs.siblingDecks(dir))
-    .filter(sibling => ownDeckFolder(sibling) !== ownDeckFolder(deck))
-    .map(sibling => [ownDeckFolder(sibling), sibling]));
-  // A copy can link to more than one deck. Give it the first linked sibling's folder.
-  const prefix = dir ? dir + '/' : '';
-  const sources = new Set([...links].filter(file => file.startsWith(prefix)).map(file => prefix + file.slice(prefix.length).split('/')[0]));
-  for (const folder of sources) {
-    const source = siblings.get(folder);
-    if (!source) continue;
-    const next = await copyDeckPictures(text, source, deck, fs.copy);
-    if (next !== text) return next;
+
+  // A duplicate beside the original already resolves its pictures. It still needs its own folder.
+  const siblingFolder = (dir ? dir + '/' : '') + originalStem + ' files';
+  const needsOwnFolder = siblingFolder !== to && linksInto(links, siblingFolder) && !(await fs.kind(to));
+  const resolved = await Promise.all([...links].map(file => fs.resolves(file)));
+  const hasMissingLinks = resolved.includes(false);
+  if (!hasMissingLinks && !needsOwnFolder) return text;
+
+  const stems = new Set([stem, originalStem]);
+  const names = [...stems].flatMap(name => {
+    const literal = name.replace(/[\[\]{}*?,]/g, char => `[${char}]`);
+    return [literal + DECK_EXTENSION, literal + LEGACY_DECK_EXTENSION];
+  });
+  const candidates = await fs.findFiles(`**/{${names.join(',')}}`, COPY_SEARCH_LIMIT);
+  const matches: string[] = [];
+  // A full result set may hide another identical deck.
+  let complete = candidates.length < COPY_SEARCH_LIMIT;
+  if (complete) {
+    for (const candidate of new Set(candidates)) {
+      if (candidate === deck || !isDeckPath(candidate) || !stems.has(deckNameOf(candidate))) continue;
+      const saved = await fs.readBytes(candidate).catch(() => null);
+      if (!saved) {
+        complete = false;
+        break;
+      }
+      if (saved.equals(bytes)) matches.push(candidate);
+      if (matches.length > 1) break;
+    }
   }
-  return text;
+  if (!complete || matches.length !== 1) {
+    fs.log(`Could not identify a unique copy source for "${deck}".`);
+    return text;
+  }
+
+  const source = matches[0];
+  const sourceDir = folderOf(source);
+  if (!hasMissingLinks && sourceDir !== dir) return text;
+  const from = ownDeckFolder(source);
+  const copied = from !== to && !inside(to, from) && await fs.copy(from, to);
+  const after = placeAfterMoves(copied ? [{ from, to }] : []);
+  return rewriteDeckPictures(text, target => movedTarget(target, sourceDir, dir, after), true);
 }

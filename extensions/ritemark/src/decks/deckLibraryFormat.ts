@@ -101,8 +101,11 @@ export function placeAfterMoves(moves: Array<{ from: string; to: string }>): (pa
 /** A link label as Markdown matches it: case and runs of space don't count. */
 const labelKey = (label: string) => label.trim().replace(/\s+/g, ' ').toLowerCase();
 
-/** An inline picture: `![alt](target "title")`, the alt with one level of brackets, the title in "", '' or (). */
-const INLINE_PICTURE = /(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)(<[^>\n]*>|(?:[^()\s]|\([^()\s]*\))+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))/g;
+/** A destination with an optional title in "", '' or (). */
+const INLINE_DESTINATION = String.raw`(<[^>\n]*>|(?:[^()\s]|\([^()\s]*\))+)((?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\))`;
+const INLINE_PICTURE = new RegExp(String.raw`(!\[(?:[^[\]]|\[[^\]]*\])*\]\(\s*)` + INLINE_DESTINATION, 'g');
+// Match the closing label delimiter so a link wrapped around a picture can be rebased too.
+const INLINE_LINK_OR_PICTURE = new RegExp(String.raw`(\]\(\s*)` + INLINE_DESTINATION, 'g');
 /** An HTML picture's source: `<img … src="target">`. */
 const HTML_PICTURE = /(<img\b[^>]*?(?<![\w-])src\s*=\s*)(["'])([^"'>]*)\2/gi;
 /** A reference picture's use: `![alt][label]`, `![label][]` or `![label]`. */
@@ -190,23 +193,23 @@ export function pictureReferenceLabels(markdown: string): Set<string> {
 
 /**
  * The pictures of some Markdown, each target rewritten by `rewrite`: inline pictures (`![…](target)`, any title), HTML
- * pictures (`<img src>`), and the definitions reference pictures use (`![…][label]` and `[label]: target`). Links stay,
- * and nothing inside a code block (fenced or indented) or a code span is touched: a prompt's words are the person's own.
+ * pictures (`<img src>`), and the definitions reference pictures use (`![…][label]` and `[label]: target`). With `includeLinks`,
+ * inline links and link definitions are rewritten too. Nothing inside a code block (fenced or indented) or a code span is touched: a prompt's words are the person's own.
  */
-export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string, labels?: Set<string>): string {
+export function rewritePictureTargets(markdown: string, rewrite: (target: string) => string, labels?: Set<string>, includeLinks = false): string {
   const lines = markdown.split('\n');
   const code = codeLines(lines);
-  // Only the definitions reference pictures use are rewritten (a link's stays): this text's own labels, or the deck's.
-  const pictureLabels = labels ?? pictureReferenceLabels(markdown);
+  const pictureLabels = labels ?? (includeLinks ? undefined : pictureReferenceLabels(markdown));
+  const inline = includeLinks ? INLINE_LINK_OR_PICTURE : INLINE_PICTURE;
   return lines.map((line, index) => {
     if (code[index]) return line;
     const definition = DEFINITION.exec(line);
-    if (definition && pictureLabels.has(labelKey(definition[2]))) {
+    if (definition && (includeLinks || pictureLabels?.has(labelKey(definition[2])))) {
       return `${definition[1]}${rewrittenTarget(definition[3], rewrite)}${definition[4]}`;
     }
     // Code spans stay as written: only the text between them is read.
     return line.split(/(`+[^`]*`+)/).map((part, at) => (at % 2 === 1 ? part : part
-      .replace(INLINE_PICTURE, (_match, open: string, target: string, close: string) => `${open}${rewrittenTarget(target, rewrite)}${close}`)
+      .replace(inline, (_match, open: string, target: string, close: string) => `${open}${rewrittenTarget(target, rewrite)}${close}`)
       .replace(HTML_PICTURE, (_match, open: string, quote: string, target: string) => `${open}${quote}${rewrite(target)}${quote}`))).join('');
   }).join('\n');
 }
@@ -214,18 +217,18 @@ export function rewritePictureTargets(markdown: string, rewrite: (target: string
 /**
  * A deck's text with every picture's target rewritten by `rewrite`: each slide's `image:` line and the pictures in a
  * block slide's Markdown, and the pictures in the handout. Everything else, byte for byte. Used when a deck is moved or
- * renamed in Ritemark, so its pictures still show (17 November); the picture files themselves are never touched.
+ * renamed in Ritemark, so its pictures still show (17 November). Copies also opt into rewriting Markdown links.
  */
-export function rewriteDeckPictures(text: string, rewrite: (target: string) => string): string {
+export function rewriteDeckPictures(text: string, rewrite: (target: string) => string, includeLinks = false): string {
   const deck = parseDeck(text);
   let out = text;
   // The handout is one text (a definition at its end serves a picture in any part): its labels are read from all of it
   // (review of #771). A slide's Markdown is drawn on its own, so it reads its own.
-  const handoutLabels = pictureReferenceLabels(text);
+  const handoutLabels = includeLinks ? undefined : pictureReferenceLabels(text);
   // From the last slide back, so the places read from the text still hold.
   for (let index = deck.slides.length - 1; index >= 0; index--) {
     const slide = deck.slides[index];
-    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite, handoutLabels) + out.slice(slide.handoutEnd);
+    out = out.slice(0, slide.handoutStart) + rewritePictureTargets(out.slice(slide.handoutStart, slide.handoutEnd), rewrite, handoutLabels, includeLinks) + out.slice(slide.handoutEnd);
     const bodyStart = out.indexOf('\n', slide.start) + 1;
     if (bodyStart <= 0 || out.slice(bodyStart, bodyStart + slide.body.length) !== slide.body) continue;
     const data = slideDataOf(slide.kind, slide.body);
@@ -234,13 +237,13 @@ export function rewriteDeckPictures(text: string, rewrite: (target: string) => s
     let body = image !== data.image ? writeSlideData(slide.kind, slide.body, { ...data, image }) : slide.body;
     if (isBlockSlide(slide.kind)) {
       const parts = splitBlockSlide(body);
-      body = parts.head + rewritePictureTargets(parts.markdown, rewrite);
+      body = parts.head + rewritePictureTargets(parts.markdown, rewrite, undefined, includeLinks);
     }
     if (body !== slide.body) out = out.slice(0, bodyStart) + body + out.slice(bodyStart + slide.body.length);
   }
   // The words before the first slide, after the front matter.
   const introEnd = deck.slides.length ? deck.slides[0].start : out.length;
-  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite, handoutLabels) + out.slice(introEnd);
+  return out.slice(0, deck.bodyStart) + rewritePictureTargets(out.slice(deck.bodyStart, introEnd), rewrite, handoutLabels, includeLinks) + out.slice(introEnd);
 }
 
 /** A path as the project knows it, from the folder it was written in; null when it is no relative path. */
