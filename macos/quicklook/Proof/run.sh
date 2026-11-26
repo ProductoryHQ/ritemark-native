@@ -148,7 +148,6 @@ settings_snapshot() {
       return 1
     fi
   fi
-  settings_image=true
   "$WORK/probe" --settings-ocr "$png" > "$ocr" 2>> "$output/capture.log" || return 1
   {
     printf '\n--- %s ---\n' "$label"
@@ -173,17 +172,16 @@ settings_snapshot() {
 
 settings_capture() {
   local output="$PROOF/settings" settings_url attempt action_status settings_category=false display_height
-  local settings_image=false settings_pane=false settings_section=false
-  local resize_allowed=false scroll_allowed=false
-  mkdir -p "$output" || return 1
+  local settings_pane=false settings_section=false
+  mkdir -p "$output" || return 2
   settings_url="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
-    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)" || return 1
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)" || return 2
   printf '\n## System Settings\n\nLink: `%s`.\n\n' "$settings_url" >> "$RESULTS"
   : > "$output/capture.log"
   : > "$output/ocr.txt"
   if ! open -b com.apple.systempreferences "$settings_url" >> "$output/capture.log" 2>&1; then
     printf -- '- Settings failed to open the link ([log](settings/capture.log)).\n' >> "$RESULTS"
-    return 1
+    return 2
   fi
   # Poll through cold launch. Reissue the link once if LaunchServices opened the app
   # without navigating to the requested pane.
@@ -196,7 +194,7 @@ settings_capture() {
     fi
   done
 
-  if display_height="$("$WORK/probe" --settings-display-height 2>> "$output/capture.log")" &&
+  if ! { display_height="$("$WORK/probe" --settings-display-height 2>> "$output/capture.log")" &&
      osascript - "$display_height" >> "$output/capture.log" 2>&1 <<'APPLESCRIPT'
 on run argv
   set targetHeight to (item 1 of argv as integer) - 64
@@ -214,15 +212,14 @@ on run argv
   end timeout
 end run
 APPLESCRIPT
-  then resize_allowed=true
-  else printf 'Resize failed or was refused. Trying scroll.\n' >> "$output/capture.log"
+  }; then
+    printf 'Resize failed or was refused. Trying scroll.\n' >> "$output/capture.log"
   fi
   sleep 1
   settings_snapshot taller-window && return 0
 
   action_status=0
   "$WORK/probe" --settings-scroll-end >> "$output/capture.log" 2>&1 || action_status=$?
-  [[ "$action_status" != 2 ]] && scroll_allowed=true
   if [[ "$action_status" == 0 ]]; then
     sleep 1
     settings_snapshot scroll-end && return 0
@@ -242,16 +239,15 @@ APPLESCRIPT
     fi
     local wheel_status=0
     "$WORK/probe" --settings-scroll >> "$output/capture.log" 2>&1 || wheel_status=$?
-    [[ "$wheel_status" != 2 ]] && scroll_allowed=true
     [[ "$wheel_status" == 0 ]] || break
     sleep 1
     settings_snapshot "scroll-$attempt" && return 0
   done
-  if [[ "$settings_image" == false || ( "$resize_allowed" == false && "$scroll_allowed" == false ) ]]; then
-    printf -- '- Settings coverage gap. Capture or pane controls unavailable ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
+  if [[ "$settings_section" == false ]]; then
+    printf -- '- Settings coverage gap. The Extensions section was not captured ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
     return 2
   fi
-  printf -- '- Settings wording unconfirmed ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
+  printf -- '- Settings contradiction. The Extensions section was captured without the Quick Look label ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
   return 1
 }
 
@@ -259,7 +255,7 @@ settings_status=confirmed
 settings_method=none
 settings_capture || case "$?" in
   2) settings_status=gap ;;
-  *) settings_status=failed ;;
+  *) settings_status=contradiction ;;
 esac
 printf '%s\t%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" "$settings_method" > "$PROOF/settings.tsv"
 printf '\nSettings verdict: **%s** (%s).\n' "$settings_status" "$settings_method" >> "$RESULTS"

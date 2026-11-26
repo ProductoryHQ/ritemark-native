@@ -116,7 +116,21 @@ func settingsAction(_ action: String) throws {
                               wheel1: -275, wheel2: 0, wheel3: 0) else {
         throw ProbeError.absentRepresentation
     }
-    event.location = CGPoint(x: rect.minX + rect.width * 0.75, y: rect.midY)
+    // WindowServer bounds and the Quartz cursor both use global display points.
+    #if arch(x86_64)
+    let point = CGPoint(x: rect.minX + rect.width * 0.7, y: rect.minY + rect.height * 0.6)
+    #else
+    let point = CGPoint(x: rect.minX + rect.width * 0.75, y: rect.midY)
+    #endif
+    fputs("Settings scroll: global point \(point), window bounds \(rect)\n", stderr)
+    #if arch(x86_64)
+    // Align the cursor with the event location so the wheel targets the content pane.
+    guard CGWarpMouseCursorPosition(point) == .success else {
+        fputs("Could not move the cursor to the Settings scroll point.\n", stderr)
+        throw ProbeError.absentRepresentation
+    }
+    #endif
+    event.location = point
     event.post(tap: .cghidEventTap)
 }
 
