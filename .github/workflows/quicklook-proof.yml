@@ -1,0 +1,41 @@
+# Sprint 177 Quick Look proof on disposable runners.
+name: Quick Look runner proof (macOS)
+
+'on':
+  push:
+    branches: ['ql-proof/**']
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26, macos-26-intel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/quicklook-proof"
+          { sw_vers; uname -m; sysctl -n machdep.cpu.brand_string; } \
+            | tee "$RUNNER_TEMP/quicklook-proof/runner.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build both universal Quick Look extensions
+        run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build"
+
+      - name: Run native provider and registration proof
+        run: |
+          bash macos/quicklook/Proof/run.sh "$RUNNER_TEMP/quicklook-build" \
+            "$RUNNER_TEMP/quicklook-proof" "$RUNNER_TEMP/quicklook-work"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quicklook-${{ matrix.runner }}
+          path: ${{ runner.temp }}/quicklook-proof
+          retention-days: 30
