@@ -109,24 +109,22 @@ export function preprocessImageHTML(html: string): string {
   const temp = document.createElement('div')
   temp.innerHTML = html
 
-  // Find all paragraphs that contain only an image (and maybe whitespace)
+  // Find all paragraphs that hold only pictures (and maybe whitespace)
   temp.querySelectorAll('p').forEach(p => {
-    const img = p.querySelector('img')
-    if (img) {
-      // Check if paragraph only contains the image (no text content besides whitespace)
-      const textContent = p.textContent?.trim() || ''
-      const imgAlt = img.getAttribute('alt') || ''
-
-      // If the only text content is the img alt text (or empty), unwrap the image
-      if (textContent === '' || textContent === imgAlt) {
-        // Sprint 137: the paragraph's place as written (no blank line before
-        // it) moves to the image that replaces it.
-        const tight = p.getAttribute('data-md-tight')
-        if (tight !== null) img.setAttribute('data-md-tight', tight)
-        // Replace paragraph with just the image
-        p.replaceWith(img)
-      }
-    }
+    const imgs = Array.from(p.querySelectorAll('img'))
+    if (imgs.length === 0) return
+    // Check the paragraph holds only its pictures (no text content besides whitespace)
+    const textContent = p.textContent?.trim() || ''
+    const onlyAlt = imgs.length === 1 && textContent === (imgs[0].getAttribute('alt') || '')
+    if (textContent !== '' && !onlyAlt) return
+    // Sprint 137: the paragraph's place as written (no blank line before
+    // it) moves to the first image that replaces it.
+    const tight = p.getAttribute('data-md-tight')
+    if (tight !== null) imgs[0].setAttribute('data-md-tight', tight)
+    // #1075: replace the paragraph with every picture it holds, in order. Keeping
+    // only the first deleted the others (`![a](a.png) ![b](b.png)` saved as
+    // `![a](a.png)`). A link around a picture is still dropped, as before (#554).
+    p.replaceWith(...imgs)
   })
 
   return temp.innerHTML
