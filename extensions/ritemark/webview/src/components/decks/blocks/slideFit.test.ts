@@ -9,9 +9,10 @@
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
-import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, isCoverSlide } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, contentPlaceOf, isCoverSlide, lonePictureClass } from '../../../../../src/decks/blocks/slideRenderer'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, measureFlowAt, overflowsSideways, setStageFit, stageFitFor, subscribeStageFit } from './slideFit'
-import { loadSlide } from './slideEditorHarness'
+import { loadSlide, saveSlide } from './slideEditorHarness'
+import { isTitlePlace, slidePlaceholderOf } from './slideEditorMarkdown'
 import { CARET_CLASS } from './slideDivView'
 import { caretBoxPos } from './blockBar'
 import { imagePathOf, missingDecorations } from './slidePictures'
@@ -131,6 +132,28 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.equal(isCoverSlide('![](a.png)\n\n# Title'), false, 'a picture over a title (review of #771)')
   const html = blockCanvasMarkup({ markdown: '# Kuidas assistent\n\n![](images/tall.png)' }, { step: 0, pictureUrl: () => 'u' })
   assert.ok(!html.includes('is-cover'))
+}
+
+// The layout harness has no browser geometry. The stage shares the renderer's centring rule once
+// its editable placeholder is out of the flex flow.
+{
+  const markdown = '![](<Pictures files/large.png>)'
+  const pictureDoc = loadSlide(markdown)
+  const title = pictureDoc.type.schema.nodes.heading.create({ level: 1 })
+  const doc = pictureDoc.copy(pictureDoc.content.addToStart(title))
+  assert.equal(title.textContent, '')
+  assert.equal(slidePlaceholderOf(title, doc, isTitlePlace(doc, title, 0)), 'Title')
+  assert.equal(lonePictureClass(saveSlide(doc), null), 'is-lone-pic')
+  assert.match(blockCanvasMarkup({ markdown }, { pictureUrl: () => 'large.png' }), /is-lone-pic/)
+  const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  assert.match(css, /\.deck-sl\.is-blocks\.is-editing\.is-lone-pic \.blk-flow > h1\.is-empty\[data-placeholder="Title"\] \{[^}]*position: absolute;/,
+    'the stage title placeholder takes no room in the shared picture layout')
+
+  const state = EditorState.create({ doc })
+  const titled = saveSlide(state.tr.insertText('A title', 1).doc)
+  assert.equal(lonePictureClass(titled, null), '')
+  assert.equal(contentPlaceOf(titled, undefined, null), 'top')
+  assert.match(blockCanvasMarkup({ markdown: titled }, { pictureUrl: () => 'large.png' }), /<h1>A title<\/h1>\s*<img/)
 }
 
 // A picture whose file is gone says so, with its name, in the deck view; the page never says so (no `missing`).
