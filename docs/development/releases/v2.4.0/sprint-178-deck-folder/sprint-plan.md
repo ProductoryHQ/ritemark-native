@@ -36,7 +36,7 @@ The Decks README section "A deck's own folder (26 November)" in `ritemark-dev` (
 3. **Links.** New links are `Kickoff files/x.png`, written in the form the deck format already uses for a path with a space, in both the `image:` header and a Markdown picture. PR 2 starts with a round-trip test of both forms before it changes the writer. A rename rewrites only links that point into the deck's own folder, with the existing `rewriteDeckPictures`.
 4. **Publish and the same link.** The page, `fonts/` and `logos/` are written into `<deck> files/`. On an old deck's next Publish, the files Ritemark wrote beside the deck are taken back with the existing take-back rules: the page by its meta mark while its bytes are unchanged, fonts and logos by the record. They are then written in the new folder. A file Ritemark didn't write is never moved or deleted. The record moves to the new page path in the same step, and the uploaded file names keep the published link. PR 3 pins "same link on Copy link" in a test before it changes the writer. If gather's common folder would change the page's path on the site, the gather keeps the old relative layout for that record.
 5. **Search, Home and the library** skip files inside a `<name> files/` folder that has a `<name>.rtms` beside it. A folder with the same name and no deck beside it is an ordinary folder.
-6. **Duplicate.** PR 4 finds every way Ritemark duplicates a deck (the Slide library, "copy of an earlier deck") and makes each one copy the folder and rewrite the copy's links. The Documents tree has no Duplicate of its own, and the sprint adds none.
+6. **Duplicate.** PR 4 finds every way Ritemark duplicates a deck (the Slide library, "copy of an earlier deck") and makes each one copy the folder and rewrite the copy's links. The Documents tree has no Duplicate of its own, and the sprint adds none. For Copy/Paste and Alt-drag in Documents, PR 4 also checks for a unique byte-identical deck with the same name or the name before the copy suffix. A copy into another folder brings the deck's own files and rebases its other relative links.
 
 ## PRs
 
@@ -59,7 +59,7 @@ PR 1 goes first, because if the patch fails its size limit, R3 changes (option B
 
 ## Release notes draft
 
-- **Keep a deck's files together.** Pictures and the published page now go into one folder named after the deck. It folds under the deck in your documents.
+- **Keep a deck's files together.** Pictures and the published page go in a folder beside the deck. When you rename, move, copy or trash a deck in Documents, its folder follows.
 
 ## Approval
 

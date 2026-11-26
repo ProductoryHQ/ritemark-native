@@ -193,11 +193,20 @@ async function main(): Promise<void> {
     '',
   ].join('\n');
   const steps: string[] = [];
+  const folders = new Map<string, string[]>([['Clients/Harbour/AI assistants files', ['side.png']]]);
+  const copyFolder = async (from: string, to: string) => {
+    const pictures = folders.get(from);
+    if (!pictures || folders.has(to)) return false;
+    folders.set(to, [...pictures]);
+    return true;
+  };
   let deckText = emptyDeckText(() => 0.5);
   const result = await copyEarlierDeck('Clients/Harbour/AI assistants.deck.md', {
     deck: 'Courses/Untitled.rtms',
-    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source : null),
+    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source.replace('images/cover.png', 'AI assistants files/side.png') : null),
     taken: fileName => fileName === 'AI assistants (copy).rtms',
+    copyFolder,
+    updateCopy: async (_relative, before, after) => { assert.equal(deckText, before); deckText = after; },
     replace: async text => { deckText = text; steps.push('replace and save'); return true; },
     rename: async (fileName, line) => { steps.push(`rename ${fileName}, then: ${line}`); return true; },
     notice: text => { steps.push(`notice ${text}`); },
@@ -207,12 +216,15 @@ async function main(): Promise<void> {
   assert.equal(copiedNotice('AI assistants'), 'This deck is now a copy of AI assistants.');
   const copied = parseDeck(deckText);
   assert.deepEqual({ theme: copied.theme, look: /^look: borderless$/m.test(deckText), slides: copied.slides.length }, { theme: 'Slide library/Themes/Evening.theme.md', look: true, slides: 2 });
-  assert.equal(parseSlideBody(copied.slides[0].body).image, '../Clients/Harbour/images/cover.png');
+  assert.equal(parseSlideBody(copied.slides[0].body).image, 'AI assistants (copy 2) files/side.png');
+  assert.deepEqual(folders.get('Courses/AI assistants (copy 2) files'), ['side.png']);
   assert.match(deckText, /\[the brief\]\(\.\.\/Clients\/Harbour\/Brief\.md\)/);
   // Gone meanwhile: nothing changes, and the bar says why
   const gone: string[] = [];
   assert.equal(await copyEarlierDeck('Old.deck.md', {
     deck: 'Untitled.rtms',
+    copyFolder: async () => false,
+    updateCopy: async () => assert.fail('no pictures copied'),
     read: async () => null,
     taken: () => false,
     replace: async () => { gone.push('replace'); return true; },
@@ -224,6 +236,8 @@ async function main(): Promise<void> {
   const kept: string[] = [];
   assert.equal(await copyEarlierDeck('Kickoff.deck.md', {
     deck: 'Untitled.rtms',
+    copyFolder: async () => false,
+    updateCopy: async () => assert.fail('no pictures copied'),
     read: async () => source,
     taken: () => false,
     replace: async () => true,

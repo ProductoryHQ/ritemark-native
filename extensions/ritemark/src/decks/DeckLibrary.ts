@@ -7,6 +7,7 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
+import { insideDeckFolder, listedDeckFolders } from './deckFolderListing';
 import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withTextHandoutMark, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
   appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
@@ -224,7 +225,10 @@ export class DeckLibrary {
     const query = (options.query ?? '').trim().toLowerCase();
     const terms = searchTerms(query);
     const found: DeckSummary[] = [];
-    for (const file of await this.files.list()) {
+    const files = await this.files.list();
+    const owned = listedDeckFolders(files.map(file => file.path));
+    for (const file of files) {
+      if (!isDeckPath(file.path) || insideDeckFolder(file.path, owned)) continue;
       const topic = isTopicPath(file.path);
       if (where === 'library' && !topic) continue;
       if (where === 'other' && topic) continue;

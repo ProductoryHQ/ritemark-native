@@ -90,6 +90,13 @@ async function run() {
   assert.ok(topic.includes('# Our own'), 'the library gets it as a block slide');
   // Sprint 172: a topic named as one made before (`AI assistants.deck.md`) is that file, never a new `.rtms` beside it
   {
+    const withAssets = new DeckLibrary(project({
+      'Kickoff.rtms': DECK,
+      'Kickoff files/Kickoff.html': DECK,
+      'Kickoff files/Internal.rtms': DECK,
+      'Notes files/x.rtms': DECK,
+    }));
+    assert.deepEqual((await withAssets.listDecks()).map(deck => deck.path).sort(), ['Kickoff.rtms', 'Notes files/x.rtms']);
     const legacy = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Talks/Day one.rtms': DECK });
     const legacyLibrary = new DeckLibrary(legacy);
     const write = await legacyLibrary.addToLibrary('Talks/Day one.rtms', 'AI assistants', { kind: 'statement', body: 'id: t8\ntitle: One more', handout: '' });
