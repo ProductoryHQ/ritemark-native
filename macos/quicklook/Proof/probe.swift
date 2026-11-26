@@ -49,7 +49,10 @@ func settingsAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
 func settingsElement(in element: AXUIElement, matching predicate: (AXUIElement) -> Bool) -> AXUIElement? {
     if predicate(element) { return element }
     let children: [AXUIElement] = settingsAttribute(element, kAXChildrenAttribute) ?? []
-    return children.reversed().lazy.compactMap { settingsElement(in: $0, matching: predicate) }.first
+    for child in children.reversed() {
+        if let found = settingsElement(in: child, matching: predicate) { return found }
+    }
+    return nil
 }
 
 func selectSettingsCategory(in window: AXUIElement, root: AXUIElement) throws {
