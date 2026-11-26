@@ -40,6 +40,10 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
+import { setTimeout as delay } from 'node:timers/promises';
+import { AcpManager } from './acpManager';
+import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
+import { turnFailureCard } from '../runtime/turnFailureCopy';
 import * as os from 'os';
 import * as path from 'path';
 import { renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
@@ -48,7 +52,7 @@ const { AcpRuntime, AcpSession, buildAcpPromptText, isBoardToolPermission, ENDED
 type AcpRuntime = import('./AcpRuntime').AcpRuntime;
 type AcpSession = import('./AcpRuntime').AcpSession;
 import type { AgentRuntime, RuntimeSessionConfig } from '../runtime/AgentRuntime';
-import type { RequestPermissionRequest, WriteTextFileRequest } from '@agentclientprotocol/sdk';
+import type { RequestPermissionRequest, RequestPermissionResponse, WriteTextFileRequest } from '@agentclientprotocol/sdk';
 
 // ── Mock AcpManager ──────────────────────────────────────────────────────────
 
@@ -68,6 +72,7 @@ const mockManager = {
   },
   setModel: async (_sessionId: string, _model: string) => { calls.push('setModel'); },
   // Sprint 130 (G4): the turn's last assistant message, by ACP messageId.
+  preparePrompt: async (sessionId: string) => sessionId,
   lastAgentMessage: (_sessionId: string) => 'The final answer.',
   getThinkingEffortCapability: () => ({
     selectable: ['low', 'medium', 'high'],
@@ -79,6 +84,7 @@ const mockManager = {
     calls.push(`setThinkingEffort:${effort}`);
     return effort === 'auto' ? 'medium' : effort;
   },
+  cancelTurn: async (_sessionId: string) => { calls.push('cancelTurn'); },
   cancel: async (_sessionId: string) => { calls.push('cancel'); },
   closeSession: (_sessionId: string) => { calls.push('closeSession'); },
   dispose: () => { calls.push('dispose'); },
@@ -160,7 +166,7 @@ async function testNoProviderErrorIsActionable(): Promise<void> {
  * A hung provider must not strand the turn forever. The ACP path had no timeout
  * of its own (Claude and Codex both do), so a non-responding model left the UI
  * at "Starting OpenCode…" with no way out but Stop. The turn must now settle as
- * an actionable error and cancel the abandoned session.
+ * an actionable error and cancel the abandoned turn.
  */
 async function testHungTurnTimesOut(): Promise<void> {
   const runtime = new AcpRuntime();
@@ -172,12 +178,15 @@ async function testHungTurnTimesOut(): Promise<void> {
   const session = addSession(runtime, 'conv-hang', config);
 
   const cancelled: string[] = [];
-  // A prompt that never resolves, and a cancel we can observe.
+  // Both the prompt and the cancel write hang. The card must still appear.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (runtime as any)._manager = {
     ...mockManager,
     prompt: () => new Promise(() => { /* hangs forever */ }),
-    cancel: async (sid: string) => { cancelled.push(sid); },
+    cancelTurn: (sid: string) => {
+      cancelled.push(sid);
+      return new Promise<void>(() => { /* write never completes */ });
+    },
   };
 
   // timeoutMinutes is minutes; 1/60000 min = 1ms so the test does not wait 15m.
@@ -185,11 +194,208 @@ async function testHungTurnTimesOut(): Promise<void> {
 
   assert.equal(reported?.status, 'error', 'a hung turn must settle as an error, not hang');
   assert.match(reported?.error ?? '', /did not respond/i, 'the error must be actionable, not a raw hang');
-  assert.equal(cancelled.length, 1, 'the abandoned upstream session must be cancelled');
-  console.log('✓ Test 11: a hung OpenCode turn times out and cancels the session');
+  assert.equal(cancelled.length, 1, 'the abandoned upstream turn must be cancelled');
+  console.log('✓ Test 11: a hung turn settles even if the cancel write stalls');
+}
+
+const GEMINI_BUSY = 'Internal error: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.';
+
+async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progress' | 'permission' | 'permission-ceiling' | 'tool' | 'tool-ceiling'): Promise<void> {
+  const script = `
+    const send = (message) => console.log(JSON.stringify({ jsonrpc: '2.0', ...message }));
+    const reply = (id, result) => send({ id, result });
+    const chunk = (sessionUpdate, text, sessionId = 'fake') => send({ method: 'session/update', params: {
+      sessionId, update: { sessionUpdate, content: { type: 'text', text } },
+    } });
+    const mode = process.argv[1];
+    let sessionCount = 0;
+    let promptId;
+    let cancelled = false;
+    let permissionCancelled = false;
+    require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
+      const { id, method, params, result } = JSON.parse(line);
+      if (method === 'initialize') reply(id, { protocolVersion: 1, agentCapabilities: {} });
+      if (method === 'session/new') reply(id, { sessionId: ++sessionCount === 1 ? 'fake' : 'replacement', configOptions: [] });
+      if (method === 'session/prompt') {
+        if (params.prompt[0].text === 'follow-up') {
+          if (!cancelled && params.sessionId !== 'replacement') return send({ id, error: { code: -32603, message: 'Previous prompt still running' } });
+          if (mode === 'permission-ceiling' && !permissionCancelled) {
+            return send({ id, error: { code: -32603, message: 'Permission still pending' } });
+          }
+          if (mode === 'stuck-cancel') chunk('agent_message_chunk', 'late reply');
+          chunk('agent_message_chunk', 'second reply', params.sessionId);
+          return reply(id, { stopReason: 'end_turn' });
+        }
+        promptId = id;
+        if (mode === 'busy') send({ id, error: { code: -32603,
+          message: ${JSON.stringify(GEMINI_BUSY)}, data: { errorName: 'APIError' } } });
+        if (mode === 'progress') {
+          setTimeout(() => {
+            let count = 0;
+            chunk('agent_thought_chunk', 'thinking');
+            const interval = setInterval(() => {
+              chunk('agent_thought_chunk', 'thinking');
+              if (++count === 8) {
+                clearInterval(interval);
+                reply(id, { stopReason: 'end_turn' });
+              }
+            }, 50);
+          }, 200);
+        }
+        if (mode === 'tool' || mode === 'tool-ceiling') {
+          const update = (sessionUpdate, toolCallId, status) => send({ method: 'session/update',
+            params: { sessionId: 'fake', update: { sessionUpdate, toolCallId, status, title: 'browser' } } });
+          update('tool_call', 'first', 'in_progress');
+          if (mode === 'tool') {
+            // ACP: a tool_call's status is optional and defaults to pending.
+            update('tool_call', 'second', undefined);
+            setTimeout(() => update('tool_call_update', 'first', 'completed'), 200);
+            setTimeout(() => update('tool_call_update', 'second', 'failed'), 550);
+          }
+        }
+        if (mode === 'permission' || mode === 'permission-ceiling') send({ id: 500, method: 'session/request_permission',
+          params: { sessionId: 'fake', toolCall: { toolCallId: 'ask', title: 'run' },
+            options: [
+              { optionId: 'allow_once', name: 'Allow', kind: 'allow_once' },
+              { optionId: 'allow_always', name: 'Always allow', kind: 'allow_always' },
+              { optionId: 'reject_once', name: 'Reject', kind: 'reject_once' },
+            ] } });
+      }
+      if (id === 500 && !method) {
+        if (mode === 'permission') reply(promptId, { stopReason: 'end_turn' });
+        permissionCancelled = result?.outcome?.outcome === 'cancelled';
+      }
+      if (method === 'session/cancel' && mode !== 'stuck-cancel') {
+        const cancelledId = promptId;
+        setTimeout(() => {
+          chunk('agent_thought_chunk', 'late thought');
+          chunk('agent_message_chunk', 'late reply');
+          cancelled = true;
+          reply(cancelledId, { stopReason: 'cancelled' });
+        }, 50);
+      }
+    });
+  `;
+  const runtime = new AcpRuntime();
+  const progress: string[] = [];
+  let requestId: string | undefined;
+  let permissionResult: RequestPermissionResponse | undefined;
+  let reported: Parameters<NonNullable<RuntimeSessionConfig['onCodexComplete']>>[0] | undefined;
+  const config: RuntimeSessionConfig = {
+    ...dummyConfig,
+    onApprovalRequest: (request) => { requestId = request.requestId; },
+    onCodexComplete: (result) => { reported = result; },
+  };
+  const manager = new AcpManager({
+    binaryPath: process.execPath,
+    args: ['-e', script, mode],
+    workspaceRoot: os.tmpdir(),
+    requestPermission: async (params) => {
+      const response: RequestPermissionResponse = await (runtime as any)._handlePermission(params);
+      permissionResult = response;
+      return response;
+    },
+    approveWrite: async () => true,
+    onProgress: (event) => { progress.push(event.message); },
+  }, 150);
+  try {
+    const sessionId = await manager.start();
+    const ceilingMs = mode.endsWith('-ceiling') ? 900 : undefined;
+    const silent = mode === 'silent' || mode === 'stuck-cancel';
+    const quietMs = silent ? 100 : 300;
+    const session = new AcpSession('conv-quiet', sessionId, config, runtime, undefined, quietMs, ceilingMs);
+    (runtime as any)._manager = manager;
+    (runtime as any)._sessions.set(session.conversationId, session);
+    (runtime as any)._sessionsByAcpId.set(sessionId, session);
+    const startedAt = performance.now();
+    const finished = session.prompt({
+      prompt: 'hi',
+      timeoutMinutes: silent ? 15 : mode === 'tool-ceiling' ? 0.01 : undefined,
+    });
+    const within = async (promise: Promise<unknown>) => {
+      const deadline = new AbortController();
+      try {
+        await Promise.race([promise, delay(3_000, undefined, { signal: deadline.signal }).then(() => {
+          assert.fail(`${mode} turn did not settle within the test deadline`);
+        })]);
+      } finally {
+        deadline.abort();
+      }
+    };
+    if (mode === 'permission' || mode === 'permission-ceiling') {
+      await delay(500);
+      assert.ok(requestId, 'agent requested permission');
+      assert.equal(reported, undefined, 'the turn waits for permission past the quiet limit');
+      if (mode === 'permission') session.respondToApproval(requestId, true, false);
+    }
+    if (mode === 'tool' || mode === 'tool-ceiling') {
+      await delay(475);
+      assert.equal(reported, undefined, 'a pending or running tool pauses the quiet timeout');
+    }
+    await within(finished);
+    if (silent) {
+      assert.ok(performance.now() - startedAt < 500, 'the quiet card appears at the injected 100 ms window');
+    }
+    if (mode === 'tool') {
+      assert.ok(performance.now() - startedAt >= 825, 'the quiet window restarts after the final tool update');
+    }
+    if (mode === 'progress' || mode === 'permission') {
+      assert.equal(reported?.status, 'completed');
+    } else {
+      assert.equal(reported?.status, 'error');
+      const presentation = presentRuntimeError('opencode', reported?.error, undefined, { code: reported?.errorCode });
+      assert.ok(presentation);
+      const card = turnFailureCard({
+        runtimeId: 'opencode',
+        kind: presentation.errorKind,
+        detail: presentation.errorDetail,
+        sentence: presentation.message,
+      });
+      if (silent || mode === 'tool') {
+        assert.deepEqual(card, {
+          title: "OpenCode couldn't finish this request",
+          message: 'Send your message again.',
+        });
+      } else if (ceilingMs) {
+        const minutes = mode === 'tool-ceiling' ? 0.01 : 0.015;
+        assert.ok(reported?.error?.startsWith(`OpenCode did not respond within ${minutes} minutes.`));
+        if (mode === 'tool-ceiling') {
+          const elapsedMs = performance.now() - startedAt;
+          assert.ok(elapsedMs >= 575 && elapsedMs < 875, 'the configured ceiling fires around 600 ms');
+        }
+        assert.ok(card, 'the ceiling produces a failure card');
+      } else {
+        assert.equal(reported?.errorCode, 'APIError');
+        assert.equal(card?.title, 'OpenCode is busy right now');
+      }
+      if (mode === 'permission-ceiling') {
+        assert.equal(session.pendingApprovals.size, 0);
+        session.respondToApproval(requestId!, true, false);
+        assert.deepEqual(permissionResult, { outcome: { outcome: 'cancelled' } });
+      }
+      if (silent || mode === 'permission-ceiling') {
+        const followUpStartedAt = performance.now();
+        await within(session.prompt({ prompt: 'follow-up' }));
+        assert.equal(reported?.status, 'completed', reported?.error);
+        assert.equal(reported?.lastAgentMessage, 'second reply');
+        if (mode === 'stuck-cancel') {
+          assert.ok(performance.now() - followUpStartedAt < 500, 'the follow-up is sent after the bounded drain');
+          assert.equal(session.acpSessionId, 'replacement');
+          assert.equal(manager.hasSession(sessionId), false);
+        }
+        assert.ok(!progress.some((line) => line.startsWith('late ')), 'abandoned updates are dropped');
+      }
+    }
+  } finally {
+    runtime.dispose();
+  }
 }
 
 async function run() {
+  for (const mode of ['silent', 'stuck-cancel', 'busy', 'progress', 'permission', 'permission-ceiling', 'tool', 'tool-ceiling'] as const) {
+    await testQuietStream(mode);
+    console.log(`✓ ACP quiet-stream fixture: ${mode}`);
+  }
   // Test 1: AcpRuntime structurally satisfies AgentRuntime
   {
     const runtime: AgentRuntime = new AcpRuntime();
@@ -237,20 +443,24 @@ async function run() {
     console.log('✓ Test 4: respondToApproval() resolves pending approval');
   }
 
-  // Test 5: disposing one session rejects only ITS pending approvals
+  // Test 5: disposing one session cancels only its approvals and denies pending writes
   {
     const runtime = new AcpRuntime();
     const a = addSession(runtime, 'conv-a');
     const b = addSession(runtime, 'conv-b');
 
-    const results: string[] = [];
-    a.pendingApprovals.set('a1', (r) => results.push(`a1:${r.approved}`));
-    b.pendingApprovals.set('b1', (r) => results.push(`b1:${r.approved}`));
+    const cancelled: unknown[] = [];
+    a.pendingApprovals.set('a1', (decision) => cancelled.push(decision));
+    b.pendingApprovals.set('b1', () => assert.fail("sibling's approval must stay pending"));
 
+    const pendingWrite: Promise<boolean> = (runtime as any)._handleWriteApproval({
+      sessionId: a.acpSessionId, path: '/tmp/test/draft.md', content: 'draft',
+    });
     a.dispose();
-    assert.deepStrictEqual(results, ['a1:false'], 'only the disposed session had its approvals rejected');
+    assert.equal(await pendingWrite, false, 'disposing a session denies its pending write');
+    assert.deepStrictEqual(cancelled, [undefined], 'the disposed session had its pending approval cancelled');
     assert.strictEqual(b.pendingApprovals.size, 1, "sibling's pending approval survives");
-    console.log('✓ Test 5: disposing one session rejects only its own approvals');
+    console.log('✓ Test 5: disposing one session cancels only its approvals and denies pending writes');
   }
 
   // Test 6: prompt() calls setModel and manager.prompt()

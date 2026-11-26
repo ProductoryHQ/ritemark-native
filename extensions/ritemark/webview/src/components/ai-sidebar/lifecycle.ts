@@ -105,6 +105,7 @@ export function finalizeCodexTurnResult(
       : {}),
     isRunning: false,
     pendingQuestion: undefined,
+    approval: undefined,
     // Sprint 143 (#544): a wait to try again ends with the turn.
     retry: undefined,
     planText: fallbackPlanText,
