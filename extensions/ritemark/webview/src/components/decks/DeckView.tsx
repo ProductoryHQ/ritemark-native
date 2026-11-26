@@ -2425,7 +2425,7 @@ export function DeckView({
               {editor && slide && bigWidth > 0 ? (
                 <>
                   <div className="deck-stage-gear" style={{ width: bigWidth }}>
-                    <Tooltip label="Slide settings" side="top" asChild suppressed={gearSettingsOpen}>
+                    <Tooltip label="Slide settings" side="left" asChild suppressed={gearSettingsOpen}>
                       <Button
                         type="button"
                         variant="toolbar"
