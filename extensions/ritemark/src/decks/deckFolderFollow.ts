@@ -50,7 +50,7 @@ export async function followDeckMoves(
   const stayed = (folder: string, reason: string) => {
     if (reported.has(folder)) return;
     reported.add(folder);
-    fs.notice(`${path.posix.basename(folder)} stayed where it was, because ${reason}.`);
+    fs.notice(`“${path.posix.basename(folder)}” stayed where it was, because ${reason}`);
   };
   for (const deck of decks) {
     if (!isDeckPath(deck.from) || !isDeckPath(deck.to)) continue;
@@ -59,15 +59,15 @@ export async function followDeckMoves(
     if (from === to || result.some(move => move.from === from || inside(from, move.from))) continue;
     if (await fs.kind(from) !== 'folder') continue;
     if (inside(deck.to, from)) {
-      stayed(from, 'the deck moved into it');
+      stayed(from, 'the deck was moved into it.');
     } else if (await fs.kind(to) && !(await fs.sameFolder?.(from, to))) {
-      stayed(from, 'that name is already taken at the destination');
+      stayed(from, `“${path.posix.basename(to)}” is already there. The deck's pictures still show.`);
     } else {
       try {
         await fs.rename(from, to);
         result.push({ from, to });
       } catch {
-        stayed(from, 'it could not be moved');
+        stayed(from, "it couldn't be moved. The deck's pictures still show.");
       }
     }
   }
@@ -95,7 +95,7 @@ export async function trashDeckFolders(decks: readonly string[], deleted: readon
     try {
       await fs.trash(folder);
     } catch {
-      fs.notice(`${path.posix.basename(folder)} stayed where it was, because it could not be moved to the Trash.`);
+      fs.notice(`“${path.posix.basename(folder)}” stayed where it was, because it couldn't be moved to the Trash.`);
     }
   }
 }

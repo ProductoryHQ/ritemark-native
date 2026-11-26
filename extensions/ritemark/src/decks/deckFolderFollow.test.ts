@@ -74,7 +74,16 @@ test('taken folder name leaves the pictures in place and gives one notice', asyn
   const move = { from: original, to: 'work/archive/Kickoff.rtms' };
   assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff files/', '../Kickoff files/').replace('other.png', '../other.png'));
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, ['Kickoff files stayed where it was, because that name is already taken at the destination.']);
+  assert.deepEqual(notices, ["“Kickoff files” stayed where it was, because “Kickoff files” is already there. The deck's pictures still show."]);
+});
+
+test('a rename onto a taken folder name names the taken name', async () => {
+  const { fs, content, changes, notices } = fixture();
+  content.set('work/Review files', 'taken by a file');
+  const move = { from: original, to: 'work/Review.rtms' };
+  await rebase(fs, [move], move);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, ["“Kickoff files” stayed where it was, because “Review files” is already there. The deck's pictures still show."]);
 });
 
 test('the folder stays when the deck moves into it', async () => {
@@ -82,7 +91,7 @@ test('the folder stays when the deck moves into it', async () => {
   const move = { from: original, to: assets + '/Kickoff.rtms' };
   assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff files/', '').replace('other.png', '../other.png'));
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, ['Kickoff files stayed where it was, because the deck moved into it.']);
+  assert.deepEqual(notices, ['“Kickoff files” stayed where it was, because the deck was moved into it.']);
 });
 
 test('delete uses the Trash, except when a sibling links in or the folder is already in the event', async () => {
@@ -105,7 +114,7 @@ test('unavailable Trash leaves the folder and reports once', async () => {
   fs.trash = async () => { throw new Error('unavailable'); };
   await trashDeckFolders([original, original], [original, original], fs);
   assert.ok(folders.has(assets));
-  assert.deepEqual(notices, ['Kickoff files stayed where it was, because it could not be moved to the Trash.']);
+  assert.deepEqual(notices, ["“Kickoff files” stayed where it was, because it couldn't be moved to the Trash."]);
 });
 
 test('Copy/Paste copies pictures and rewrites only the new deck, unless its folder is taken', async () => {
