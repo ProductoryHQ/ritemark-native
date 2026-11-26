@@ -118,7 +118,8 @@ export function markdownClipboardProps(schema: Schema): EditorProps {
 
 /** Preserve ProseMirror's slice depths and node context across editors. */
 function stripSliceMarkdownAttributes(slice: string): string {
-  const match = /^(\d+ \d+(?: -\d+)? )([\s\S]*)$/.exec(slice)
+  // Read the context as ProseMirror does (`(.*)`: up to the first line break), so nothing it reads escapes the strip.
+  const match = /^(\d+ \d+(?: -\d+)? )(.*)/.exec(slice)
   if (!match) return slice
   let context: unknown
   try {
@@ -126,7 +127,8 @@ function stripSliceMarkdownAttributes(slice: string): string {
   } catch {
     return slice
   }
-  if (!Array.isArray(context)) return slice
+  // ProseMirror also reads an array-like object; anything but a real array loses its context here (2nd High review).
+  if (!Array.isArray(context)) return match[1] + '[]'
 
   let changed = false
   for (let index = 1; index < context.length; index += 2) {

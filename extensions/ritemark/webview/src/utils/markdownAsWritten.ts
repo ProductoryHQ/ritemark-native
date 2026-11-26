@@ -816,7 +816,8 @@ export function serializeList(service: TurndownService, list: HTMLElement): stri
       markdown += gap ? '\n\n' : '\n'
     }
   })
-  const extraIndent = Number(list.getAttribute('data-md-indent'))
+  // A list starts at most 3 spaces in (4 would make it code); a pasted value is never trusted past that.
+  const extraIndent = Math.min(3, Math.floor(Number(list.getAttribute('data-md-indent'))) || 0)
   return extraIndent > 0 && !tabs ? indentAll(markdown, ' '.repeat(extraIndent)) : markdown
 }
 
@@ -956,7 +957,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       if (previousInline(element)?.nodeName === 'BR') return '\\\n'
       if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
-      if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
+      // A hard break is 2 or more spaces; bounded so a crafted value can never make the save throw.
+      if (spaces) return ' '.repeat(Math.min(64, Math.max(2, Number(spaces[1])))) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).
       return '\\\n'
     },

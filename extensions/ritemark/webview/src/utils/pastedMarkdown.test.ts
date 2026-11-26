@@ -173,3 +173,25 @@ test('a data URL is written byte for byte with two copies in the editor HTML', (
   assert.equal(pipeline.markdownToEditorHTML(written).split(data).length - 1, 2)
   assert.equal(saveDocument(opened), written)
 })
+
+test('a crafted slice context (array-like or followed by a line break) brings no Markdown spelling in', () => {
+  // The 5th High review round: ProseMirror reads an array-like context and stops its JSON at the first line break.
+  const arrayLike = `<p data-pm-slice='1 1 {"length":4,"0":"bulletList","1":{"mdIndent":"600000000"},"2":"listItem","3":{}}'>x</p>`
+  const lineBreak = `<p data-pm-slice='1 1 ["bulletList",{"mdIndent":"600000000"},"listItem",{}]\njunk'>x</p>`
+  for (const html of [arrayLike, lineBreak]) {
+    const doc = paste(fidelitySchema(), html, props)
+    const markdown = editorMarkdown(doc)
+    assert.ok(markdown.length < 100, `the save stays small: ${markdown.slice(0, 40)}`)
+    assert.ok(!/ {4}/.test(markdown), 'no list turned into code by a crafted indent')
+  }
+})
+
+test('a written list indent and hard-break spaces are bounded on save', () => {
+  const html = '<ul data-md-indent="600000000"><li><p>x</p></li></ul><p>a<br data-md-break="spaces-999999999">b</p>'
+  const doc = openDocument('- x').doc
+  const view = clipboardView(doc.type.schema, {})
+  void view
+  const saved = pipeline.editorHTMLToMarkdown(html)
+  assert.ok(saved.length < 200, 'the save never throws or grows without bound')
+  assert.ok(!/^ {4}/m.test(saved), 'a list is never indented into code')
+})
