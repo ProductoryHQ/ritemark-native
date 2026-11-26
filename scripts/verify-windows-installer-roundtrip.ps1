@@ -31,7 +31,9 @@ param(
 
   # Optional: scripts/verify-windows-app-starts.ps1, run after the fresh
   # install and after the update.
-  [string]$AppStartVerifierPath
+  [string]$AppStartVerifierPath,
+
+  [switch]$VerifyAssociationDefaults
 )
 
 $ErrorActionPreference = 'Stop'
@@ -229,6 +231,15 @@ $ErrorActionPreference = 'Stop'
     }
   }
 
+  $associationTasks = @()
+  if ($VerifyAssociationDefaults) {
+    if (-not $previousInstaller) {
+      throw 'Verifying replacement defaults requires the update round trip.'
+    }
+    $associationTasks = @('/TASKS=associatewithfiles')
+    $userProcessEnvironment.RITEMARK_CI_VERIFY_ASSOCIATIONS = '1'
+  }
+
   # HKCU must be inspected inside the same proven standard-user boundary.
   function Invoke-RegistryProbe([string]$mode) {
     $resultPath = Join-Path $profileRoot "Ritemark-Ci-Registry-$mode.json"
@@ -256,10 +267,10 @@ $ErrorActionPreference = 'Stop'
     -Label 'installer' `
     -FilePath $stagedInstaller `
     -Environment $userProcessEnvironment `
-    -ArgumentList @(
+    -ArgumentList (@(
       '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
       "/DIR=$installRoot", "/LOG=$installLog"
-    )
+    ) + $associationTasks)
   if ($install.ExitCode -ne 0) {
     if (Test-Path -LiteralPath $installLog) {
       Write-Host '--- Inno Setup install log ---'
@@ -350,14 +361,18 @@ $ErrorActionPreference = 'Stop'
     $updateInstallLog = Join-Path $profileRoot 'Ritemark-update-install.log'
     $updateUninstallLog = Join-Path $profileRoot 'Ritemark-update-uninstall.log'
 
+    # Enable the association task in the pinned v1.14.0 installer so its
+    # .md/.markdown uninstall records carry forward into the update. It
+    # predates .rtms, so exercising a legacy .rtms record requires a pinned
+    # v2.3.x installer that logged uninsdeletevalue for the deck default.
     $previousInstall = Invoke-UserProcess `
       -Label 'previous-installer' `
       -FilePath $stagedPreviousInstaller `
       -Environment $userProcessEnvironment `
-      -ArgumentList @(
+      -ArgumentList (@(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
         "/DIR=$installRoot", "/LOG=$previousInstallLog"
-      )
+      ) + $associationTasks)
     if ($previousInstall.ExitCode -ne 0) {
       throw "The previous release's silent install failed ($($previousInstall.ExitCode))."
     }
@@ -365,10 +380,10 @@ $ErrorActionPreference = 'Stop'
       -Label 'update-installer' `
       -FilePath $stagedInstaller `
       -Environment $userProcessEnvironment `
-      -ArgumentList @(
+      -ArgumentList (@(
         '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', '/CURRENTUSER',
         "/DIR=$installRoot", "/LOG=$updateInstallLog"
-      )
+      ) + $associationTasks)
     if ($updateInstall.ExitCode -ne 0) {
       throw "Installing over the previous release failed ($($updateInstall.ExitCode))."
     }
@@ -396,6 +411,9 @@ $ErrorActionPreference = 'Stop'
     if ($null -eq $updateUninstaller) {
       throw 'The update left no uninstaller.'
     }
+    if ($VerifyAssociationDefaults) {
+      $null = Invoke-RegistryProbe 'replace-association-defaults'
+    }
     $updateUninstall = Invoke-UserProcess `
       -Label 'update-uninstaller' `
       -FilePath $updateUninstaller.FullName `
@@ -415,7 +433,11 @@ $ErrorActionPreference = 'Stop'
     if (Test-Path -LiteralPath $startMenu) {
       throw 'Uninstalling after the update left the Ritemark Start menu group behind.'
     }
-    $null = Invoke-RegistryProbe 'verify-uninstalled'
+    if ($VerifyAssociationDefaults) {
+      $null = Invoke-RegistryProbe 'verify-replacement-defaults'
+    } else {
+      $null = Invoke-RegistryProbe 'verify-uninstalled'
+    }
 
     if ($staleFiles.Count -gt 0 -or $updateStartFailure) {
       $problems = @()

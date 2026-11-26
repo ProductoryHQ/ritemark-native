@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getDefaultLLMModel, getModelConfig, modelListWaiting, modelOptionsWithPersistedSelection, setModelConfig } from './modelConfig';
+import { getDefaultLLMModel, getLLMModels, getModelConfig, modelListWaiting, modelOptionsWithPersistedSelection, setModelConfig } from './modelConfig';
 
 const available = [{ id: 'current', name: 'Current' }];
 assert.deepEqual(modelOptionsWithPersistedSelection(available, 'current'), {
@@ -11,6 +11,18 @@ assert.deepEqual(modelOptionsWithPersistedSelection(available, 'retired'), {
   unavailable: true,
 });
 assert.deepEqual(modelOptionsWithPersistedSelection(available, undefined), {
+  models: available,
+  unavailable: false,
+});
+
+const hidden = { id: 'saved', name: 'Saved model', hidden: true };
+setModelConfig({ ...getModelConfig(), geminiLLM: [...available, hidden] });
+assert.equal(getLLMModels('gemini').find(model => model.id === hidden.id)?.name, hidden.name);
+assert.deepEqual(modelOptionsWithPersistedSelection(getLLMModels('gemini'), hidden.id), {
+  models: available,
+  unavailable: false,
+});
+assert.deepEqual(modelOptionsWithPersistedSelection(getLLMModels('gemini'), undefined), {
   models: available,
   unavailable: false,
 });

@@ -89,7 +89,7 @@ export function contentHeightOf(flow: HTMLElement): number {
  * never split mid-word (17 November: "Töölauaagen|did"), so a word wider than its box is the fit's to solve, as words
  * past the bottom are.
  */
-const WORD_BOXES = 'h1, h2, h3, h4, h5, h6, p, li, th, td, blockquote, .blk-box, .blk-column, .blk-steps'
+export const WORD_BOXES = 'h1, h2, h3, h4, h5, h6, p, li, th, td, blockquote, .blk-box, .blk-column, .blk-steps'
 
 /**
  * Does a word (or a table) run out of its box, or out of the slide, sideways? A box's words may not reach into its

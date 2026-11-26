@@ -323,7 +323,10 @@ export class DeckPresenter implements vscode.Disposable {
     }
     // The keys go to the window placed last: the focus inside its page, not only on its window.
     const focused = (running.presenter ?? running.wall).panel;
-    if (!running.ended) focused.reveal(focused.viewColumn, false);
+    if (!running.ended) {
+      focused.reveal(focused.viewColumn, false);
+      await post(origin.panel.webview, { type: 'deck/present-started' });
+    }
   }
 
   /** Stop the presentation: both windows close and the deck view returns to the slide the presenter ended on. */
@@ -812,7 +815,7 @@ function deckTitle(document: vscode.TextDocument): string {
   return deckNameOf(path.basename(document.uri.fsPath));
 }
 
-type DeckPresentMessage = { type: 'deck/present-ended'; index: number } | { type: 'deck/present-failed'; message: string };
+type DeckPresentMessage = { type: 'deck/present-started' } | { type: 'deck/present-ended'; index: number } | { type: 'deck/present-failed'; message: string };
 
 async function post(webview: vscode.Webview, message: WallHostMessage | DeckPresentMessage): Promise<boolean> {
   try {

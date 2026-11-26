@@ -11,11 +11,17 @@ $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 $canaryKey = Join-Path $uninstallRoot 'RitemarkCiCanary'
 # Set by the install round trip only: the folder the installer was given. With
 # it, the probe also checks the deck file type (.rtms, Sprint 172), which every
-# install registers and every uninstall removes. The canary's synthetic
-# registration has no install and leaves it unset.
+# install registers. The canary's synthetic registration leaves it unset.
 $installRoot = $env:RITEMARK_CI_INSTALL_ROOT
 $deckExtensionKey = 'HKCU:\Software\Classes\.rtms'
 $deckProgIdKey = 'HKCU:\Software\Classes\Ritemark.rtms'
+$verifyAssociations = $env:RITEMARK_CI_VERIFY_ASSOCIATIONS -eq '1'
+$associationDefaults = [ordered]@{
+  '.rtms' = 'Ritemark.rtms'
+  '.md' = 'Ritemark.md'
+  '.markdown' = 'Ritemark.md'
+}
+$otherProgId = 'Other.md'
 # Every installer from 2.3.0 on must register it. An earlier one (a preserved
 # installer replayed by the canary, or a build before the release's version
 # bump) is checked only if it wrote the keys; the harness may move ahead of a
@@ -49,7 +55,7 @@ function Get-RitemarkRegistrations {
 
 function Get-DefaultRegistryValue([string]$path) {
   if (-not (Test-Path -LiteralPath $path)) { return $null }
-  return [string](Get-Item -LiteralPath $path -ErrorAction Stop).GetValue('')
+  return (Get-Item -LiteralPath $path -ErrorAction Stop).GetValue('')
 }
 
 function Get-DeckFileType {
@@ -82,6 +88,13 @@ switch ($mode) {
   }
   'verify-installed' {}
   'verify-uninstalled' {}
+  'replace-association-defaults' {
+    New-Item -Path "HKCU:\Software\Classes\$otherProgId" -Value 'Other editor' -Force | Out-Null
+    foreach ($extension in $associationDefaults.Keys) {
+      Set-Item -LiteralPath "HKCU:\Software\Classes\$extension" -Value $otherProgId
+    }
+  }
+  'verify-replacement-defaults' {}
   default {
     throw "Unsupported RITEMARK_CI_REGISTRY_MODE: $mode"
   }
@@ -89,6 +102,12 @@ switch ($mode) {
 
 $registrations = @(Get-RitemarkRegistrations)
 $deckFileType = if ([string]::IsNullOrWhiteSpace($installRoot)) { $null } else { Get-DeckFileType }
+$defaults = [ordered]@{}
+if ($verifyAssociations) {
+  foreach ($extension in $associationDefaults.Keys) {
+    $defaults[$extension] = Get-DefaultRegistryValue "HKCU:\Software\Classes\$extension"
+  }
+}
 $result = [ordered]@{
   Mode = $mode
   Identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
@@ -98,6 +117,7 @@ $result = [ordered]@{
   Publishers = @($registrations | ForEach-Object { $_.Publisher })
   DisplayVersions = @($registrations | ForEach-Object { $_.DisplayVersion })
   DeckFileType = $deckFileType
+  AssociationDefaults = $defaults
 }
 
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $resultPath -Encoding utf8NoBOM
@@ -114,7 +134,7 @@ if ($mode -eq 'verify-installed') {
   }
 }
 
-if ($mode -eq 'verify-uninstalled' -and $registrations.Count -ne 0) {
+if (($mode -in 'verify-uninstalled', 'verify-replacement-defaults') -and $registrations.Count -ne 0) {
   throw "Uninstall left $($registrations.Count) Ritemark registration(s) for the current user."
 }
 
@@ -148,5 +168,24 @@ if ($null -ne $deckFileType) {
       throw "Uninstall left the deck file type behind (.rtms key: $($deckFileType.ExtensionKey), Ritemark.rtms key: $($deckFileType.ProgIdKey))."
     }
     Write-Host 'The deck file type is gone: no .rtms or Ritemark.rtms key for the current user.'
+  }
+}
+
+if ($verifyAssociations) {
+  foreach ($extension in $associationDefaults.Keys) {
+    $expected = switch ($mode) {
+      'verify-installed' { $associationDefaults[$extension] }
+      'replace-association-defaults' { $otherProgId }
+      'verify-replacement-defaults' { $otherProgId }
+    }
+    if ($defaults[$extension] -ne $expected) {
+      throw "HKCU $extension names '$($defaults[$extension])', expected '$expected' in $mode."
+    }
+  }
+  if ($mode -in 'verify-uninstalled', 'verify-replacement-defaults') {
+    if ($deckFileType.ProgIdKey -or $deckFileType.InOpenWith -or
+        (Test-Path -LiteralPath 'HKCU:\Software\Classes\Ritemark.md')) {
+      throw 'Uninstall left a Ritemark file association registration behind.'
+    }
   }
 }
