@@ -211,3 +211,15 @@ for (const [name, markdown] of cases) {
 }
 
 console.log(`slideBlocks.roundtrip: ${same}/${cases.length} byte for byte and stable; an edit changes only its bytes`)
+
+// The stage displays the mapped URL and writes the deck's angle-bracket destination back.
+{
+  const path = 'Kickoff files/photo.png'
+  const markdown = '![](<Kickoff files/photo.png>)'
+  const url = 'https://file%2B.vscode-resource.vscode-cdn.net/Kickoff%20files/photo.png?v=1'
+  const doc = load(markdown, { [path]: url })
+  assert.equal(save(doc), markdown)
+  assert.equal(doc.firstChild?.attrs.src, url)
+  assert.equal(doc.firstChild?.attrs.title, path)
+  assert.equal(save(load(save(doc), { [path]: url })), markdown)
+}

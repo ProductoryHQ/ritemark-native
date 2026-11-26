@@ -143,15 +143,21 @@ export function applyImageMappings(html: string, imageMappings: Record<string, s
   // Process each mapping
   let result = html
   for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
-    // Escape special regex characters in the path
-    const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Replace src="relativePath" with src="webviewUri" title="relativePath"
-    // This preserves the relative path for turndown to use when saving
-    const srcRegex = new RegExp(`src="${escapedPath}"`, 'g')
-    result = result.replace(srcRegex, `src="${webviewUri}" title="${relativePath}"`)
+    // Marked preserves percent escapes when encoding a URL. The preceding DOM
+    // pass can also escape ampersands in the src attribute.
+    const encoded = encodeURI(relativePath).replace(/%25/g, '%')
+    const forms = [relativePath, encoded, escapeAttribute(relativePath), escapeAttribute(encoded)]
+    const escapedPaths = [...new Set(forms)].map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    const srcRegex = new RegExp(`(\\ssrc=")(?:${escapedPaths.join('|')})"`, 'g')
+    result = result.replace(srcRegex, (_match, attribute: string) =>
+      `${attribute}${escapeAttribute(webviewUri)}" title="${escapeAttribute(relativePath)}"`)
   }
 
   return result
+}
+
+function escapeAttribute(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /**

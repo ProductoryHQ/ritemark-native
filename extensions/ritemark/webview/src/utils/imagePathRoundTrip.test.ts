@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { createEditorTurndownService } from './editorMarkdown'
+import { marked } from 'marked'
+import { installTestDocument } from './markdownFidelity'
+import { applyImageMappings, createEditorTurndownService, markdownToEditorHTML } from './editorMarkdown'
 import { isRelativeImagePath, isWebviewResourceUri, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 
 // ── Which paths count as "beside the document" ─────────────────────────────
@@ -34,5 +36,29 @@ assert.equal(save('<img src="https://example.com/a.png" title="img/other.png" al
   'a relative-looking title never overrides a real remote src')
 // An unmapped local image (file missing at load) stays as written.
 assert.equal(save('<img src="img/missing.png" alt="a">'), '![a](img/missing.png)')
+
+installTestDocument()
+for (const path of ['Kickoff files/photo.png', 'Kickoff [files]/Õppepäev $& photo.png']) {
+  const markdown = `![](<${path}>)`
+  const html = marked.parse(markdown, { async: false })
+  const mappings = { [path]: display }
+  for (const mapped of [
+    applyImageMappings(html, mappings),
+    applyImageMappings(`<img src="${path}" alt="">`, mappings),
+    markdownToEditorHTML(markdown, mappings),
+  ]) {
+    const container = document.createElement('div')
+    container.innerHTML = mapped
+    const image = container.querySelector('img')
+    assert.equal(image?.getAttribute('src'), display)
+    assert.equal(image?.getAttribute('title'), path)
+  }
+}
+
+const documentPath = './my images/a b.png'
+const documentMarkdown = `![a](<${documentPath}>)`
+const documentHtml = markdownToEditorHTML(documentMarkdown, { [documentPath]: display })
+assert.ok(documentHtml.includes(`src="${display}"`))
+assert.equal(save(documentHtml), documentMarkdown)
 
 console.log('imagePathRoundTrip: all assertions passed')
