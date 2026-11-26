@@ -92,15 +92,40 @@ async function main(): Promise<void> {
   {
     const { root, folder } = project();
     const turns: PictureTurn[] = [];
-    const first = await makePicture(deps({ turns }), { request: request({ name: 'Where agents work' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const first = await makePicture(deps({ turns }), { request: request({ name: 'Where agents work' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(first, { kind: 'made', file: 'where-agents-work.png' });
     assert.deepStrictEqual(fs.readFileSync(path.join(folder, 'images', 'where-agents-work.png')), PNG);
     assert.strictEqual(turns.length, 1);
     assert.strictEqual(turns[0].attachments.length, 0, 'a new picture sends no picture');
-    const again = await makePicture(deps(), { request: request({ name: 'Where agents work' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const again = await makePicture(deps(), { request: request({ name: 'Where agents work' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(again, { kind: 'made', file: 'where-agents-work-2.png' }, 'Try another keeps the first picture');
     assert.ok(fs.existsSync(path.join(folder, 'images', 'where-agents-work.png')));
     console.log('✓ made: in images/, with a name that never replaces another');
+  }
+
+  // A deck keeps its old picture where it was. A file at the new folder name blocks the write.
+  {
+    const { root, folder } = project();
+    const documentPath = path.join(folder, 'Kickoff.rtms');
+    const deckFolder = path.join(folder, 'Kickoff files');
+    const oldFolder = path.join(folder, 'images');
+    fs.mkdirSync(oldFolder);
+    fs.writeFileSync(path.join(oldFolder, 'old.png'), PNG);
+    fs.writeFileSync(deckFolder, 'keep this file');
+    const input = {
+      request: request({ slideId: 's1', mode: 'change', source: 'images/old.png' }),
+      documentPath, root, signal: new AbortController().signal,
+    };
+    assert.deepStrictEqual(await makePicture(deps(), input), {
+      kind: 'failed', problem: "“Kickoff files” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.",
+    });
+    assert.strictEqual(fs.readFileSync(deckFolder, 'utf8'), 'keep this file');
+    fs.unlinkSync(deckFolder);
+    const turns: PictureTurn[] = [];
+    assert.deepStrictEqual(await makePicture(deps({ turns }), input), { kind: 'made', file: 'a-calm-lake-at-dawn.png' });
+    assert.strictEqual(turns[0].attachments.length, 1, 'the old deck link still resolves');
+    assert.deepStrictEqual(fs.readFileSync(path.join(oldFolder, 'old.png')), PNG);
+    assert.deepStrictEqual(fs.readFileSync(path.join(deckFolder, 'a-calm-lake-at-dawn.png')), PNG);
   }
 
   // ── Not signed in: ChatGPT's sign-in card opens, nothing is sent, nothing is written.
@@ -108,7 +133,7 @@ async function main(): Promise<void> {
     const { root, folder } = project();
     const signIns = { count: 0 };
     const turns: PictureTurn[] = [];
-    const outcome = await makePicture(deps({ chatgptReady: async () => false, signIns, turns }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const outcome = await makePicture(deps({ chatgptReady: async () => false, signIns, turns }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(outcome, { kind: 'sign-in' });
     assert.strictEqual(signIns.count, 1);
     assert.strictEqual(turns.length, 0, 'no turn without ChatGPT');
@@ -123,13 +148,13 @@ async function main(): Promise<void> {
     const slow: PictureMakerDeps['runTurn'] = (turn) => new Promise<OneShotTurnResult>((_resolve, reject) => {
       turn.signal.addEventListener('abort', () => reject(new Error(ONE_SHOT_CANCELLED)));
     });
-    const running = makePicture(deps({ runTurn: slow }), { request: request(), documentFolder: folder, root, signal: controller.signal });
+    const running = makePicture(deps({ runTurn: slow }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: controller.signal });
     setTimeout(() => controller.abort(), 10);
     assert.deepStrictEqual(await running, { kind: 'cancelled' });
     assert.ok(!fs.existsSync(path.join(folder, 'images')));
     // A picture that comes back after Cancel isn't saved either.
     const late = new AbortController();
-    const done = makePicture(deps({ runTurn: async () => { late.abort(); return { text: '', picturesMade: [{ base64: PNG.toString('base64') }] }; } }), { request: request(), documentFolder: folder, root, signal: late.signal });
+    const done = makePicture(deps({ runTurn: async () => { late.abort(); return { text: '', picturesMade: [{ base64: PNG.toString('base64') }] }; } }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: late.signal });
     assert.deepStrictEqual(await done, { kind: 'cancelled' });
     assert.ok(!fs.existsSync(path.join(folder, 'images')));
     console.log('✓ Cancel: stopped, nothing saved');
@@ -142,16 +167,16 @@ async function main(): Promise<void> {
     fs.writeFileSync(path.join(folder, 'images', 'old.jpg'), JPEG);
     fs.writeFileSync(path.join(folder, 'images', 'logo.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
     const turns: PictureTurn[] = [];
-    const outcome = await makePicture(deps({ turns }), { request: request({ mode: 'change', source: 'images/old.jpg', description: 'Make it night' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const outcome = await makePicture(deps({ turns }), { request: request({ mode: 'change', source: 'images/old.jpg', description: 'Make it night' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.strictEqual(outcome.kind, 'made');
     assert.strictEqual(turns[0].attachments.length, 1);
     assert.deepStrictEqual({ ...turns[0].attachments[0], data: Buffer.from(turns[0].attachments[0].data, 'base64') }, { id: 'picture', kind: 'image', name: 'old.jpg', mediaType: 'image/jpeg', data: JPEG });
     assert.ok(fs.existsSync(path.join(folder, 'images', 'old.jpg')), 'the old picture stays in images/');
-    const svg = await makePicture(deps(), { request: request({ mode: 'change', source: './images/logo.svg' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const svg = await makePicture(deps(), { request: request({ mode: 'change', source: './images/logo.svg' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(svg, { kind: 'failed', problem: PICTURE_PROBLEMS.sourceKind });
-    const outside = await makePicture(deps(), { request: request({ mode: 'change', source: '../../etc/passwd' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const outside = await makePicture(deps(), { request: request({ mode: 'change', source: '../../etc/passwd' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(outside, { kind: 'failed', problem: PICTURE_PROBLEMS.source });
-    const missing = await makePicture(deps(), { request: request({ mode: 'change', source: 'images/gone.png' }), documentFolder: folder, root, signal: new AbortController().signal });
+    const missing = await makePicture(deps(), { request: request({ mode: 'change', source: 'images/gone.png' }), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(missing, { kind: 'failed', problem: PICTURE_PROBLEMS.source });
     console.log('✓ Change: the picture is sent; one outside the project, missing or an SVG is not');
   }
@@ -176,13 +201,13 @@ async function main(): Promise<void> {
     assert.strictEqual(generatedImagesFolder({ CODEX_HOME: '/tmp/home-x' }, '/Users/u'), path.join('/tmp/home-x', 'generated_images'));
     assert.strictEqual(generatedImagesFolder({}, '/Users/u'), path.join('/Users/u', '.codex', 'generated_images'));
     assert.strictEqual(pictureKindOf(Buffer.from('<svg/>')), null);
-    const limit = await makePicture(deps({ runTurn: async () => ({ text: 'Sorry', picturesMade: [], pictureFailure: 'usageLimitExceeded' }) }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const limit = await makePicture(deps({ runTurn: async () => ({ text: 'Sorry', picturesMade: [], pictureFailure: 'usageLimitExceeded' }) }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(limit, { kind: 'failed', problem: PICTURE_PROBLEMS.limit });
-    const apiKey = await makePicture(deps({ authMethod: async () => 'apiKey' }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const apiKey = await makePicture(deps({ authMethod: async () => 'apiKey' }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(apiKey, { kind: 'failed', problem: PICTURE_PROBLEMS.apiKey }, 'an API-key Codex has no image tool: said, not "try other words"');
-    const none = await makePicture(deps({ generatedFolder: codexFolder, runTurn: async () => ({ text: 'I can\'t', picturesMade: [{ savedPath: path.join(generated, 'notes.txt') }] }) }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const none = await makePicture(deps({ generatedFolder: codexFolder, runTurn: async () => ({ text: 'I can\'t', picturesMade: [{ savedPath: path.join(generated, 'notes.txt') }] }) }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(none, { kind: 'failed', problem: PICTURE_PROBLEMS.none });
-    const broken = await makePicture(deps({ runTurn: async () => { throw new Error('ChatGPT turn failed: 500'); } }), { request: request(), documentFolder: folder, root, signal: new AbortController().signal });
+    const broken = await makePicture(deps({ runTurn: async () => { throw new Error('ChatGPT turn failed: 500'); } }), { request: request(), documentPath: path.join(folder, 'Notes.md'), root, signal: new AbortController().signal });
     assert.deepStrictEqual(broken, { kind: 'failed', problem: PICTURE_PROBLEMS.failed });
     console.log('✓ Codex\'s picture: only from generated_images and only a picture; the limit is named');
   }

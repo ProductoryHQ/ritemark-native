@@ -1,8 +1,7 @@
 /**
  * Experience 46, "Small details that do the right thing", item 8 (Keynote's slide navigator): several pictures dropped
  * on the strip make a Picture slide each, at the drop place, in the files' order. Each slide is titled from its file
- * name, the extension taken off and dashes and underscores turned into spaces; the pictures are copied into `images/`
- * beside the deck (the host's `deck/save-image`, as a pasted or dropped picture is), and the slides go in as one
+ * name, the extension taken off and dashes and underscores turned into spaces; the pictures are copied into the deck's own folder (the host's `deck/save-image`, as a pasted or dropped picture is), and the slides go in as one
  * transaction, so one Cmd+Z takes them all back. A single picture dropped on the strip behaves as before: the strip
  * doesn't take it.
  *

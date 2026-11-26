@@ -42,7 +42,7 @@ export type DeckRequest =
    * theme, Paper or Ember; with `use`, this deck's `theme:` line names it (through the view, one Undo). Then its tab opens.
    */
   | { type: 'deck/new-theme'; name: string; start: 'copy' | 'paper' | 'ember'; use: boolean }
-  /** A picture pasted or dropped on a slide: saved in `images/` beside the deck, for the slide with this id. */
+  /** A picture pasted or dropped on a slide: saved in the deck's own folder, for the slide with this id. */
   | { type: 'deck/save-image'; slideId: string; dataUrl: string; filename: string }
   /** The deck's current slide, for the Slide library's "Insert after slide N". */
   | { type: 'deck/current'; index: number; count: number }

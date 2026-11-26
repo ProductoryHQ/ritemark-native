@@ -1,9 +1,44 @@
 import TurndownService from 'turndown'
+import { Lexer, marked, type Marked, type Tokens } from 'marked'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
 import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { pictureTarget } from '../../../src/decks/blocks/legacyToBlocks'
 import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
 import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
+
+/** Marked encodes the destination for display, and host mappings may use its unencoded path. */
+function matchesImageSource(href: string, src: string): boolean {
+  if (href === src) return true
+  try {
+    const encode = (url: string) => encodeURI(url).replace(/%25/g, '%')
+    return encode(href) === encode(src)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The local file a webview display URI shows (`https://file+.vscode-resource.vscode-cdn.net/<path>?v=…` or
+ * `vscode-resource:/<path>`), without its cache query. Only for a picture that has no relative path left.
+ */
+function localPathOfDisplayUri(src: string): string {
+  try {
+    const url = new URL(src)
+    const path = decodeURIComponent(url.pathname)
+    return /^\/[a-z]:\//i.test(path) ? path.slice(1) : path
+  } catch {
+    return src.replace(/[?#].*$/, '')
+  }
+}
+
+/** Marked's image text and title contain HTML entities which the DOM already decoded. */
+function decodeImageText(el: HTMLImageElement, text: string): string {
+  if (!text.includes('&')) return text
+  const decoder = el.ownerDocument.createElement('span')
+  decoder.innerHTML = text.replace(/</g, '&lt;')
+  return decoder.textContent ?? ''
+}
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -27,7 +62,7 @@ import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBracket
  *    editor's `data-md-*` attributes (paste, Word's Save as Markdown) gets one
  *    plain form: `- item`, tight lists, `---`, `| --- |`, a backslash break.
  */
-export function createTurndownService(): TurndownService {
+export function createTurndownService(instance: Pick<Marked, 'defaults'> = marked): TurndownService {
   const service = new TurndownService({
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
@@ -101,16 +136,41 @@ export function createTurndownService(): TurndownService {
     filter: 'img',
     replacement(_content, node) {
       const el = node as HTMLImageElement
-      // Experience 49: a description typed in the bar is written so it never breaks the image line (markdownAlt).
-      const alt = markdownAlt(el.alt || '')
+      const alt = el.getAttribute('alt') ?? ''
       const title = el.getAttribute('title') || ''
-      const displaySrc = el.getAttribute('src') || el.src
-      const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
-        ? title
-        : displaySrc
-      // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
+      const displaySrc = el.getAttribute('src') ?? el.src
+      const writtenSrc = el.getAttribute('data-md-image-src')
+      const writtenTarget = el.getAttribute('data-md-image-target')
+      const displayOnly = isWebviewResourceUri(displaySrc.trim())
+      const useTitle = isRelativeImagePath(title) && (displayOnly ||
+        ((writtenSrc !== null || writtenTarget === null) && displaySrc !== writtenSrc && title.startsWith('./')))
+      let src = useTitle ? title : displaySrc
+      // Never serialize a display URI. With no relative path left, write the local file it shows rather than drop the
+      // picture: a picture the person sees must never vanish from their file on save.
+      if (isWebviewResourceUri(src.trim())) {
+        src = isRelativeImagePath(title) && !isWebviewResourceUri(title.trim()) ? title : localPathOfDisplayUri(src.trim())
+      }
+      const label = `![${markdownAlt(alt)}]`
+      let markdown = label + `(${pictureTarget(src)})`
+      if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
+        const writtenLabel = alt === el.getAttribute('data-md-image-alt')
+          ? el.getAttribute('data-md-image-label')
+          : null
+        const candidate = (writtenLabel ?? label) + writtenTarget
+        const blocks = new Lexer(instance.defaults).lex(candidate)
+        const paragraph = blocks[0] as Tokens.Paragraph | undefined
+        const tokens = paragraph?.type === 'paragraph' ? paragraph.tokens : []
+        const token = tokens[0] as Tokens.Image | undefined
+        const caption = useTitle ? el.getAttribute('data-md-image-title') ?? '' : title
+        if (blocks.length === 1 && tokens.length === 1 && token?.type === 'image' && token.raw === candidate &&
+            !isWebviewResourceUri(token.href.trim()) && matchesImageSource(token.href, src) &&
+            decodeImageText(el, token.text) === alt && decodeImageText(el, token.title ?? '') === caption) {
+          markdown = candidate
+        }
+      }
+      // Experience 49: keep a valid picture look block beside the image.
       const block = el.getAttribute('data-picture') ?? ''
-      return blockImage(`![${alt}](${src})${parsePictureBlock(block) ? block : ''}`, el)
+      return blockImage(markdown + (parsePictureBlock(block) ? block : ''), el)
     },
   })
 

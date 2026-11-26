@@ -3,10 +3,10 @@
  * document and for a deck (one webview kind, one set of messages).
  *
  *  - `picture/check` {requestId}: is ChatGPT ready? Not ready opens its sign-in card on the AI's sheet.
- *  - `picture/make` (`PictureRequest`): the picture made and saved into `images/` beside the file.
+ *  - `picture/make` (`PictureRequest`): the picture made and saved beside the file.
  *  - `picture/cancel` {requestId}: stops that request's turn.
  *  - Answers `picture/status` {requestId, state: 'ready' | 'sign-in' | 'made' | 'failed' | 'cancelled', path?, url?,
- *    problem?}. The editor that asked places a made picture itself (a deck's path is `images/…`, a document's
+ *    problem?}. The editor that asked places a made picture itself (a deck's path is `<deck name> files/…`, a document's
  *    `./images/…`, as their pasted pictures).
  *
  * A dev run's stand-in (`RITEMARK_PICTURE_STANDIN`, a PNG's path, only in a development build with `VSCODE_DEV=1`):
@@ -22,6 +22,7 @@ import type { AgentId } from '../agent/types';
 import { createRuntime } from '../runtime/runtimeFactory';
 import { ONE_SHOT_CANCELLED, runOneShotTurnResult, type OneShotSettings, type OneShotTurnResult } from '../runtime/oneShotTurn';
 import type { RuntimeAvailability } from '../runtime/availability';
+import { deckPictureFolderName } from '../decks/deckFileName';
 import { PICTURE_PROBLEMS, decodePictureRequest, generatedImagesFolder, makePicture, type PictureMakerDeps, type PictureTurn } from './chatgptPicture';
 
 /** What the AI's sheet gives this host. */
@@ -174,18 +175,19 @@ export class ChatgptPictureHost {
     const mine = this.running.get(webview) ?? new Map<string, AbortController>();
     this.running.set(webview, mine);
     mine.set(request.requestId, controller);
-    const documentFolder = path.dirname(document.uri.fsPath);
+    const documentPath = document.uri.fsPath;
+    const documentFolder = path.dirname(documentPath);
+    const pictureFolder = request.slideId ? deckPictureFolderName(documentPath) : 'images';
     const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? documentFolder;
     try {
-      const outcome = await makePicture(this.deps(), { request, documentFolder, root, signal: controller.signal });
+      const outcome = await makePicture(this.deps(), { request, documentPath, root, signal: controller.signal });
       // A Cancel or a closed editor after the picture was saved: it is neither placed nor told.
       if (outcome.kind === 'made' && controller.signal.aborted) {
-        await fs.promises.unlink(path.join(documentFolder, 'images', outcome.file)).catch(() => undefined);
+        await fs.promises.unlink(path.join(documentFolder, pictureFolder, outcome.file)).catch(() => undefined);
         void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: 'cancelled' });
       } else if (outcome.kind === 'made') {
-        const url = webview.asWebviewUri(vscode.Uri.file(path.join(documentFolder, 'images', outcome.file))).toString();
-        // A deck writes `images/…` (as its pasted pictures), a document `./images/…` (as its pasted pictures).
-        const written = request.slideId ? `images/${outcome.file}` : `./images/${outcome.file}`;
+        const url = webview.asWebviewUri(vscode.Uri.file(path.join(documentFolder, pictureFolder, outcome.file))).toString();
+        const written = `${request.slideId ? '' : './'}${pictureFolder}/${outcome.file}`;
         void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: 'made', path: written, url });
       } else {
         void webview.postMessage({ type: 'picture/status', requestId: request.requestId, state: outcome.kind, ...(outcome.kind === 'failed' ? { problem: outcome.problem } : {}) });

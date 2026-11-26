@@ -12,7 +12,7 @@ import type { SlideData } from '../../../../../src/decks/deckFormat'
 import { pictureTarget } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { lookOf, markdownAlt } from '../../../../../src/markdown/pictureLook'
 import { imagePathOf } from '../../../extensions/pictures/PictureNode'
-import { removePicture } from '../../../extensions/pictures/pictureCommands'
+import { newPictureSpelling, removePicture } from '../../../extensions/pictures/pictureCommands'
 
 export type SidePlace = 'left' | 'right' | 'behind'
 
@@ -52,7 +52,7 @@ export function flowToSide(
   const old = current.image?.trim()
   if (old) {
     // The place's picture comes into the words where this one was.
-    const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: current.url ?? old, title: old, alt: current.alt ?? '', picture: null })
+    const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...newPictureSpelling, src: current.url ?? old, title: old, alt: current.alt ?? '', picture: null })
     return { doc: tr.doc, header }
   }
   const tr = removePicture(state, pos)

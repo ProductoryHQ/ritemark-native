@@ -96,11 +96,11 @@ export interface OpenedDocument {
 }
 
 /** Open a file's text in the editor. */
-export function openDocument(text: string): OpenedDocument {
+export function openDocument(text: string, imageMappings?: Record<string, string>): OpenedDocument {
   const schema = fidelitySchema()
   const split = splitFrontMatter(text)
   const projection = canonicalMarkdownProjection(split.content)
-  const html = projection.trim() ? markdownToEditorHTML(projection) : ''
+  const html = projection.trim() ? markdownToEditorHTML(projection, imageMappings) : ''
   const doc = PMDOMParser.fromSchema(schema).parse(elementFromString(html))
   return { text, split, projection, doc }
 }

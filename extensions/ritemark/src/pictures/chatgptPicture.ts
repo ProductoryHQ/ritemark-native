@@ -5,9 +5,8 @@
  * The picture is made by the bundled Codex's own image tool (`image_gen`, on the ChatGPT plan, no API key), in a
  * one-shot turn of its own (`runOneShotTurnResult`): read-only, every approval refused, no conversation. ChatGPT gets
  * the person's words and, on a slide, the slide's words; to change a picture, that picture too. Never other files.
- * Codex saves the picture under its own `generated_images/`; Ritemark copies it into `images/` beside the document or
- * deck, under a name that never replaces another file, as a paste is saved. Only ChatGPT makes pictures here: Claude
- * doesn't, so it is the only AI named.
+ * Codex saves the picture under its own `generated_images/`; Ritemark copies it into the deck's own folder or
+ * into `images/` beside a document. Like a pasted picture, it is saved under a name that never replaces another file.
  *
  * With ChatGPT not signed in, nothing is sent: the AI's sheet opens on ChatGPT's own sign-in card.
  *
@@ -19,6 +18,8 @@ import * as path from 'path';
 import type { MadePicture } from '../codex/codexProtocol';
 import type { UnifiedAttachment } from '../runtime/AgentRuntime';
 import { ONE_SHOT_CANCELLED, type OneShotTurnResult } from '../runtime/oneShotTurn';
+import { deckPictureFolderName } from '../decks/deckFileName';
+import { DeckPictureFolderTaken, ensureDeckPictureFolder } from '../decks/deckPictureFolder';
 import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
 import { pictureFileInside } from '../utils/imagePaths';
 import { sanitizeImageBaseName, writeImageRelativeTo } from '../utils/imageWriter';
@@ -160,7 +161,7 @@ export async function readMadePicture(made: MadePicture, generatedFolder: string
   return null;
 }
 
-/** What one request came to. `file` is the new picture's name in `images/`. */
+/** What one request came to. `file` is the new picture's filename. */
 export type PictureOutcome =
   | { kind: 'made'; file: string }
   | { kind: 'sign-in' }
@@ -225,13 +226,14 @@ export async function sourceAttachment(documentFolder: string, root: string, sou
 
 /**
  * One request: ChatGPT's readiness (else its sign-in card, and nothing sent), the picture to change, the turn, then the
- * picture saved into `images/` beside the document (`documentFolder`) under a name that replaces no other file.
+ * picture saved next to the document or deck under a name that replaces no other file.
  */
 export async function makePicture(
   deps: PictureMakerDeps,
-  input: { request: PictureRequest; documentFolder: string; root: string; signal: AbortSignal },
+  input: { request: PictureRequest; documentPath: string; root: string; signal: AbortSignal },
 ): Promise<PictureOutcome> {
-  const { request, documentFolder, root, signal } = input;
+  const { request, documentPath, root, signal } = input;
+  const documentFolder = path.dirname(documentPath);
   if (!(await deps.chatgptReady())) {
     await deps.openSignIn();
     return { kind: 'sign-in' };
@@ -270,15 +272,20 @@ export async function makePicture(
   }
 
   try {
-    const imagesDir = path.join(documentFolder, 'images');
-    // Only while the document's folder is there, as a paste is saved.
-    await ensureProjectSubfolder(documentFolder, imagesDir);
+    // Only while the parent folder is there, as a paste is saved.
+    const imagesDir = request.slideId
+      ? await ensureDeckPictureFolder(documentPath)
+      : await ensureProjectSubfolder(documentFolder, 'images');
     if (signal.aborted) return { kind: 'cancelled' };
     // The write is synchronous: a Cancel after it is the host's to answer (it removes this new file).
     const file = writeImageRelativeTo(imagesDir, `${pictureBaseName(request)}.${picture.extension}`, picture.bytes.toString('base64'));
     return { kind: 'made', file };
   } catch (error) {
     deps.log?.(`[pictures] Couldn't save ChatGPT's picture: ${error instanceof Error ? error.message : String(error)}`);
-    return { kind: 'failed', problem: PICTURE_PROBLEMS.save };
+    if (error instanceof DeckPictureFolderTaken) return { kind: 'failed', problem: error.message };
+    const problem = request.slideId
+      ? `The picture couldn't be saved in ${deckPictureFolderName(documentPath)}.`
+      : PICTURE_PROBLEMS.save;
+    return { kind: 'failed', problem };
   }
 }
