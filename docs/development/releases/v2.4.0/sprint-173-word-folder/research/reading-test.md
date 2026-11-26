@@ -437,97 +437,402 @@ Set 4 on `fbcfd642`: **fail**. Runs 1 and 2 passed criterion 3: every step named
 
 Criteria 1 and 4 were not judged by hand, because run 3 already fails. Criterion 5 passed in all three runs. Set 4 retains its verdict. The next fix makes the rule general: a listing piped only through filters that read their input (`grep`, `sort`, `uniq`, `head`, `tail`, `wc`, `cut`, `tr`) is a folder step. A fresh set follows.
 
-Fresh set verdict — pending (3 of 3 required).
+Set 5 on `7960b92b`: **3 of 3 pass**. Build 7960b92b (2.3.0 dev), model ChatGPT · GPT-6.2 Sol, 26 November 2026. Criteria 1 and 4 judged by hand: each link's claim beside the passage it targets, and each document finding beside the document's own sentence. Links to the two unread documents (Confidential appendix, Branch visit form scan) are counted for the right document but not judged for passage.
 
 #### Run 1
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T16:51:42.775Z
+- Build — 2.3.0 dev (7960b92b17e4933d9540cd1fca128448b9b99e00)
+- Model — ChatGPT · GPT-6.2 Sol
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix — Password-protected. Open it in Word with the password, or save a separate copy without the password if you’re authorized to do so.
 
 **Answer (verbatim)**
 
 ```markdown
+## Steering group overview
+
+Branch visits are falling, but the remaining demand points toward advice and help with the app. [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits) records 2.1 million visits, down from 2.6 million in 2024. [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling) says the visits that remain are longer and more often about advice.
+
+**Recommended next decisions**
+
+1. **Confirm the board’s decision before committing funds.** [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board) makes Phase 2 conditional on board approval. Confirm the outcome of the scheduled 18 November meeting before committing to the €79,000 plus VAT in [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT).
+2. **If approved, choose two app-desk pilot branches and agree success measures before launch.** Track whether customers resolve their app issues, whether queues improve, and whether access to advice is maintained. [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=test%20an%20app%20desk%20in%20two%20branches) sets the two-site scope; [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days) calls for a review after 17 days.
+3. **Confirm the December staff briefing and defer decisions on individual branches.** Check that branch-level costs are available, and weigh them alongside customer access and pilot results before recommending changes. [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told%20about%20the%20review%20in%20December) records the staff briefing and requests cost per visit by branch.
+
+## Findings by document
+
+- [Engagement brief: branch network review](01%20Brief/Engagement%20brief.docx#q=A%20target%20model%20for%20branches%20in%20three%20sizes) calls for a model with three branch sizes and a phased plan with costs and actions for the first 90 days.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day) reports about 140 visits a day, roughly half from older customers paying bills.
+- [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled) reports that card-dispute calls doubled after the May app change, and that branch staff handle escalations without access to call notes.
+- [Interview – head of operations](02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit) puts the cost at €18.40 per branch visit versus €3.10 per call.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Both%20tellers%20say%20the%20busiest%20hour%20is%20lunchtime) identifies lunchtime as the busiest hour and says most questions are about the app.
+- [Workshop notes, 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door) records nine votes for an app desk at the door, the most of any idea.
+- [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches%20for%20help%20with%20the%20app) identifies branch support with the app as something older customers rely on.
+- [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase) proposes 12 weeks to design three branch sizes with staff, pilot an app desk in two branches, and plan the first moves.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve) calls for a €6,200 pilot reserve.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran%2042%20branches) reports 42 branches and 118 cash machines at year-end.
+- [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Actions) assigns Operations to provide cost per visit by branch by 4 November.
+
+## Presentation, slide by slide
+
+- Slide 1 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) says to start with three branch types. Speaker notes: Use the amber ledger for the pilot register.
+- Slide 2 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room%20on%20Tuesdays) says to reserve the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+- Slide 3 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open) says to keep the west entrance open. Speaker notes: Place the folding ramp by the side door.
+- Slide 4 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first) says to train eight advisers first. Speaker notes: Use the mock till during rehearsal.
+- Slide 5 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve) says to keep €6,200 in reserve. Speaker notes: none
+- Slide 6 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days) says to review the pilot after 17 days. Speaker notes: Bring the blue tally sheet to the review.
+
+## Documents I could not read
+
+- [Confidential appendix](04%20Drafts/Confidential%20appendix.docx) — Password-protected. Open it in Word with the password, or save a separate copy without the password if you’re authorized to do so.
+- [Branch visit form, Riverside (scan)](Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1) — A one-page scan with no readable text. Open it in the PDF viewer to read the page visually.
+
+No files were changed.
 ```
 
 **Step labels**
 
+- Looked in the project folder
+- Read Workshop notes 14 October
+- Couldn't open Confidential appendix · it has a password
+- Read Proposal phase 2 v3
+- Read Interview – branch manager, Riverside
+- Read Findings draft v2
+- Read Interview – head of operations
+- Read Interview – customer service lead
+- Read Decision briefing · 6 slides
+- Read Interview – two tellers, Harbour Street
+- Read Engagement brief
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Steering group minutes 21 October
+- Read Annual report 2025, branch section · 1 page
+
+**Document findings to check**
+
+- Findings draft v2
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+- Opened the right document — 26/26 (100.0%)
+- Include a passage target — 25/26 (96.2%)
+- Confirmed to land on the claim — 0/26 (0.0%)
+
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=test%20an%20app%20desk%20in%20two%20branches` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told%20about%20the%20review%20in%20December` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief: branch network review — `01%20Brief/Engagement%20brief.docx#q=A%20target%20model%20for%20branches%20in%20three%20sizes` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day` — opened 02 Interviews/Interview – branch manager, Riverside.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Both%20tellers%20say%20the%20busiest%20hour%20is%20lunchtime` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Workshop notes, 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches%20for%20help%20with%20the%20app` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran%2042%20branches` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Actions` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room%20on%20Tuesdays` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Confidential appendix — `04%20Drafts/Confidential%20appendix.docx` — opened 04 Drafts/Confidential appendix.docx — opens the right document yes — find marked a passage yes — lands on the claim no
+- Branch visit form, Riverside (scan) — `Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1` — opened Reference/Branch visit form, Riverside (scan).pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+
+**Judged by hand**
+
+- Password document's line — Confidential appendix — Password-protected. Open it in Word with the password, or save a separate copy without the password if you're authorized to do so.
+
+**C4 counts** — opens the right document 26/26; with a passage target 24/24 judged links (the two unread links are not judged); lands on the claim 23/24 (95.8%). Nos: 1.
+
+No — Steering group minutes, 21 October: claim "assigns Operations to provide cost per visit by branch by 4 November". Link `#q=Actions` opens only the heading "Actions". The supporting line ("Operations: cost per visit by branch, by 4 November") sits under it, but the passage the link finds is the single word. Counted as no, strictly. Without it, 24/24.
+
+Partial claims whose extra detail is from the same document (yes): Findings draft, "longer and more often about advice" (same sentence); Minutes, cost per visit by branch (same document); Brief, "phased plan with costs and actions for the first 90 days" (same list); Riverside, older customers paying bills (same sentence); Customer service lead, no call notes (same passage); Annual report, 118 cash machines (same sentence).
+
+**C1 to check**
+
+- Findings draft v2 — pass. Bullet: "identifies branch support with the app as something older customers rely on." Document: "Older customers rely on branches for help with the app".
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — pass
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — pass (23/24, 95.8%)
+5. Password notice and way forward — pass
+6. Source style — pass
+
+Run verdict — PASS
 
 #### Run 2
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T16:52:34.147Z
+- Build — 2.3.0 dev (7960b92b17e4933d9540cd1fca128448b9b99e00)
+- Model — ChatGPT · GPT-6.2 Sol
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix — Password-protected. Open it in Word with the password and, if authorised, save a separate unprotected copy for review.
 
 **Answer (verbatim)**
 
 ```markdown
+## Steering group overview
+
+Branch visits are falling, but the visits that remain are longer and more often about advice, according to [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling%20but%20the%20visits%20that%20remain%20are%20longer%20and%20about%20advice). The [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits%3A%202.1%20million) records 2.1 million visits, down from 2.6 million in 2024. The evidence supports testing a different branch model before committing to moves or closures.
+
+## Recommended next decisions
+
+1. **Confirm the board’s decision before authorising phase 2.** [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board%27s%20decision) made phase 2 conditional on the board’s decision; the folder does not record the outcome. If approved, decide whether to commit the €79,000 plus VAT quoted in [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT) before the quote expires on 31 December 2026.
+2. **Agree the pilot scope and success measures.** [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) calls for three branch types, while [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=test%20an%20app%20desk%20in%20two%20branches) budgets for app desks in two branches. Confirm whether the two app desks are part of a broader three-type pilot, and agree how to measure wait times, app queries resolved and access to advice.
+3. **Confirm who will brief staff in December.** [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told%20about%20the%20review%20in%20December) sets the timing, and [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=They%20worry%20the%20review%20means%20closures) explains why it matters. Say what the pilot will test and what has not been decided.
+
+## Document findings
+
+- [Engagement brief: branch network review](01%20Brief/Engagement%20brief.docx#q=Visits%20fell%2031%25%20in%20three%20years) records a 31% fall in branch visits over three years while call volumes rose.
+- [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled) reports that card-dispute calls doubled after the May app change and that branch staff handle escalations without access to call notes.
+- [Interview – head of operations](02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit) puts the cost at €18.40 per branch visit versus €3.10 per call.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day) reports about 140 visits a day, roughly half from older customers paying bills.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Most%20questions%20are%20about%20the%20app) says most questions are about the app; both tellers want an app desk near the entrance.
+- [Workshop notes, 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door) records nine votes for an app desk at the door, the most of any idea listed.
+- [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches%20for%20help%20with%20the%20app) identifies older customers’ reliance on branches for help with the app.
+- [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase) proposes 12 weeks to design three branch sizes with staff, test app desks and plan the first moves.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) calls for starting with three branch types.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran%2042%20branches) records 42 branches and 118 cash machines at year end.
+- [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=The%20findings%20go%20to%20the%20board%20on%2018%20November) scheduled the findings for the 18 November board meeting and put phase 2 on hold pending the board’s decision.
+
+## Decision briefing, slide by slide
+
+- Slide 1 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) calls for three branch types. Speaker notes: Use the amber ledger for the pilot register.
+- Slide 2 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room%20on%20Tuesdays) reserves the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+- Slide 3 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open) calls for keeping the west entrance open. Speaker notes: Place the folding ramp by the side door.
+- Slide 4 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first) calls for training eight advisers first. Speaker notes: Use the mock till during rehearsal.
+- Slide 5 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve) sets aside €6,200 in reserve. Speaker notes: none
+- Slide 6 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days) calls for reviewing the pilot after 17 days. Speaker notes: Bring the blue tally sheet to the review.
+
+## Documents I couldn’t read
+
+[Confidential appendix](04%20Drafts/Confidential%20appendix.docx) — Password-protected. Open it in Word with the password and, if authorised, save a separate unprotected copy for review.
+
+[Branch visit form, Riverside (scan)](Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1) — The single page is an image with no readable text. Open it in the PDF viewer to read it visually.
 ```
 
 **Step labels**
 
+- Looked in the project folder
+- Couldn't open Confidential appendix · it has a password
+- Read Workshop notes 14 October
+- Read Decision briefing · 6 slides
+- Read Interview – customer service lead
+- Read Interview – head of operations
+- Read Proposal phase 2 v3
+- Read Findings draft v2
+- Read Interview – branch manager, Riverside
+- Read Interview – two tellers, Harbour Street
+- Read Steering group minutes 21 October
+- Read Engagement brief
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Annual report 2025, branch section · 1 page
+
+**Document findings to check**
+
+- Interview – two tellers, Harbour Street
+- Findings draft v2
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+- Opened the right document — 27/27 (100.0%)
+- Include a passage target — 26/27 (96.3%)
+- Confirmed to land on the claim — 0/27 (0.0%)
+
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling%20but%20the%20visits%20that%20remain%20are%20longer%20and%20about%20advice` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits%3A%202.1%20million` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board%27s%20decision` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=test%20an%20app%20desk%20in%20two%20branches` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told%20about%20the%20review%20in%20December` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=They%20worry%20the%20review%20means%20closures` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief: branch network review — `01%20Brief/Engagement%20brief.docx#q=Visits%20fell%2031%25%20in%20three%20years` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day` — opened 02 Interviews/Interview – branch manager, Riverside.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Most%20questions%20are%20about%20the%20app` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Workshop notes, 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches%20for%20help%20with%20the%20app` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran%2042%20branches` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=The%20findings%20go%20to%20the%20board%20on%2018%20November` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room%20on%20Tuesdays` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Confidential appendix — `04%20Drafts/Confidential%20appendix.docx` — opened 04 Drafts/Confidential appendix.docx — opens the right document yes — find marked a passage yes — lands on the claim no
+- Branch visit form, Riverside (scan) — `Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1` — opened Reference/Branch visit form, Riverside (scan).pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+
+**Judged by hand**
+
+- Password document's line — Confidential appendix — Password-protected. Open it in Word with the password and, if authorised, save a separate unprotected copy for review.
+
+**C4 counts** — opens the right document 27/27; with a passage target 25/25 judged; lands on the claim 25/25 (100%). Nos: 0.
+
+Partial claims whose extra detail is from the same document (yes): Minutes, 18 November board date plus "phase 2 on hold" (same Decisions list); Tellers, "explains why it matters" (worry about closures, asked to be told early, same sentence); Tellers, app desk near the entrance (same passage); Proposal, "test app desks" (same sentence).
+
+**C1 to check**
+
+- Interview – two tellers, Harbour Street — pass. Bullet: "says most questions are about the app; both tellers want an app desk near the entrance." Document: "Most questions are about the app. They would like an 'app desk' near the door."
+- Findings draft v2 — pass. Bullet: "identifies older customers' reliance on branches for help with the app." Document: "Older customers rely on branches for help with the app".
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — pass
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — pass (25/25, 100%)
+5. Password notice and way forward — pass
+6. Source style — pass
+
+Run verdict — PASS
 
 #### Run 3
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T16:53:22.950Z
+- Build — 2.3.0 dev (7960b92b17e4933d9540cd1fca128448b9b99e00)
+- Model — ChatGPT · GPT-6.2 Sol
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix could not be read because it is password-protected. To make it readable for review, unlock it in Word and save a separate copy without the password if you’re authorized to do so.
 
 **Answer (verbatim)**
 
 ```markdown
+## Steering group overview
+
+Branch visits fell from 2.6 million in 2024 to 2.1 million in 2025, according to [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits). But the visits that remain are longer and more focused on advice, according to [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling). The evidence supports testing a different branch model before committing to closures.
+
+## Next decisions
+
+1. **Confirm the board’s decision before commissioning phase 2.** [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits) made phase 2 contingent on the board’s decision; no board decision was found in the readable documents. If approved, decide whether to accept the €79,000 plus VAT offer in [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total) before it expires on 31 December 2026.
+2. **Agree on pilot sites and success measures.** Before launching the two-branch app-desk test in [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase), set baselines for waiting times, repeat visits for app help, and access to advice. Use the 17-day review in [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot) as an early checkpoint, not a rollout decision.
+3. **Confirm the December staff briefing and assign ownership for the case-note problem.** [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told) commits to telling staff in December. The case-note gap in [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=no%20access%20to%20the%20call%20notes) needs a separate owner because [Engagement brief: branch network review](01%20Brief/Engagement%20brief.docx#q=IT%20systems) excludes IT systems.
+
+## Findings by document
+
+- [Engagement brief: branch network review](01%20Brief/Engagement%20brief.docx#q=The%20board%20wants%20a%20plan) sets a March 2027 deadline for the network plan.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day) reports about 140 visits a day, half from older customers paying bills.
+- [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled) reports that card-dispute calls doubled after the May app change.
+- [Interview – head of operations](02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit) puts the cost at €18.40 per branch visit versus €3.10 per call.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Both%20tellers%20say) identifies lunchtime as the busiest hour and the app as the subject of most questions.
+- [Workshop notes, 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door) records nine votes for an app desk at the entrance, the most of any idea listed.
+- [Findings, draft 2](04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches) finds that older customers rely on branches for help with the app.
+- [Proposal: phase 2](04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase) proposes 12 weeks to design three branch sizes with staff, test an app desk in two branches, and plan the first changes.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) sets the pilot scope at three branch types.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran) records 42 branches and 118 cash machines at year-end.
+- [Steering group minutes, 21 October](Steering%20group%20minutes%2021%20October.docx#q=cost%20per%20visit%20by%20branch) assigned Operations to provide cost per visit by branch by 4 November.
+- [Confidential appendix](04%20Drafts/Confidential%20appendix.docx) could not be read because it is password-protected. To make it readable for review, unlock it in Word and save a separate copy without the password if you’re authorized to do so.
+- [Branch visit form, Riverside (scan)](Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1) could not be read because the scan has no readable text layer. Open it in the PDF viewer to read it visually.
+
+## Presentation, slide by slide
+
+- Slide 1 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types) starts the pilot with three branch types. Speaker notes: Use the amber ledger for the pilot register.
+- Slide 2 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room) reserves the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+- Slide 3 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open) keeps the west entrance open. Speaker notes: Place the folding ramp by the side door.
+- Slide 4 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first) calls for training eight advisers first. Speaker notes: Use the mock till during rehearsal.
+- Slide 5 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve) sets aside €6,200 in reserve. Speaker notes: none
+- Slide 6 — [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days) schedules a pilot review after 17 days. Speaker notes: Bring the blue tally sheet to the review.
 ```
 
 **Step labels**
 
+- Looked in the project folder
+- Read Findings draft v2
+- Couldn't open Confidential appendix · it has a password
+- Read Interview – customer service lead
+- Read Interview – branch manager, Riverside
+- Read Proposal phase 2 v3
+- Read Decision briefing · 6 slides
+- Read Interview – head of operations
+- Read Workshop notes 14 October
+- Read Interview – two tellers, Harbour Street
+- Read Engagement brief
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Steering group minutes 21 October
+- Read Annual report 2025, branch section · 1 page
+
+**Document findings to check**
+
+- Engagement brief
+- Workshop notes 14 October
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+- Opened the right document — 28/28 (100.0%)
+- Include a passage target — 27/28 (96.4%)
+- Confirmed to land on the claim — 0/28 (0.0%)
+
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=Branch%20visits` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Visits%20are%20falling` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Staff%20are%20told` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=no%20access%20to%20the%20call%20notes` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief: branch network review — `01%20Brief/Engagement%20brief.docx#q=IT%20systems` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief: branch network review — `01%20Brief/Engagement%20brief.docx#q=The%20board%20wants%20a%20plan` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day` — opened 02 Interviews/Interview – branch manager, Riverside.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers%2C%20Harbour%20Street.docx#q=Both%20tellers%20say` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Workshop notes, 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings, draft 2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Older%20customers%20rely%20on%20branches` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal: phase 2 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=A%20twelve-week%20phase` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025%2C%20branch%20section.pdf#p=1&q=At%20year%20end%20the%20bank%20ran` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Steering group minutes, 21 October — `Steering%20group%20minutes%2021%20October.docx#q=cost%20per%20visit%20by%20branch` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Confidential appendix — `04%20Drafts/Confidential%20appendix.docx` — opened 04 Drafts/Confidential appendix.docx — opens the right document yes — find marked a passage yes — lands on the claim no
+- Branch visit form, Riverside (scan) — `Reference/Branch%20visit%20form%2C%20Riverside%20%28scan%29.pdf#p=1` — opened Reference/Branch visit form, Riverside (scan).pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=2&q=Reserve%20the%20quiet%20room` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=3&q=Keep%20the%20west%20entrance%20open` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=4&q=Train%20eight%20advisers%20first` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=5&q=Keep%20%E2%82%AC6%2C200%20in%20reserve` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Review%20the%20pilot%20after%2017%20days` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+
+**Judged by hand**
+
+- Password document's line — Confidential appendix could not be read because it is password-protected. To make it readable for review, unlock it in Word and save a separate copy without the password if you're authorized to do so.
+
+**C4 counts** — opens the right document 28/28; with a passage target 26/26 judged; lands on the claim 26/26 (100%). Nos: 0.
+
+Partial claims whose extra detail is from the same document (yes): Customer service lead, no access to call notes (same passage; the "separate owner because the brief excludes IT systems" part is supported by the brief's own link, "IT systems and the mortgage centre are out of scope"); Workshop, "entrance" for "door" (same row); Proposal, "first changes" for "first moves" (same sentence).
+
+**C1 to check**
+
+- Engagement brief — pass. Bullet: "sets a March 2027 deadline for the network plan." Document: "The board wants a plan for the network by March 2027." (The fact is in the document, not in `facts.json`'s word list, which is why the runner left it as to check.)
+- Workshop notes 14 October — pass. Bullet: "records nine votes for an app desk at the entrance, the most of any idea listed." Document table: "App desk at the door | 9" (others 7 and 4).
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — pass
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — pass (26/26, 100%)
+5. Password notice and way forward — pass
+6. Source style — pass
+
+Run verdict — PASS
+
+### Set verdict — 3 of 3 pass on 7960b92b.
 
 ### ChatGPT on Windows
 

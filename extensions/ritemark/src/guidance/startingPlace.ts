@@ -30,7 +30,8 @@ export type StartingPlacesByAgent = Readonly<Record<AgentId, StartingPlace>>;
 export const READ_KINDS_PASSED: ReadingGate = {
   // Sprint 173 G1: 3 of 3 on the Mac on 11819457 (research/reading-test.md, Claude on Mac, set 3).
   'claude-code': { darwin: true, win32: false },
-  codex: { darwin: false, win32: false },
+  // Sprint 173 G1: 3 of 3 on the Mac on 7960b92b (research/reading-test.md, ChatGPT on Mac, set 5).
+  codex: { darwin: true, win32: false },
   opencode: { darwin: false, win32: false },
 };
 
