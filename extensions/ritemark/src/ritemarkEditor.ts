@@ -472,12 +472,12 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const imageMappings: Record<string, string> = {};
     const docDir = path.dirname(documentUri.fsPath);
 
-    // Match markdown images: ![alt](path)
-    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    // The editor writes local destinations with spaces as ![alt](<path>).
+    const imageRegex = /!\[[^\]]*\]\((?:<([^>\r\n]+)>|([^)]+))\)/g;
     let match;
 
     while ((match = imageRegex.exec(markdown)) !== null) {
-      const imagePath = match[2];
+      const imagePath = match[1] ?? match[2];
 
       // Only local paths beside the document: ./a.png, ../a.png and the
       // common bare form img/a.png. The webview restores exactly these on

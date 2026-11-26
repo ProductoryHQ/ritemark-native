@@ -61,16 +61,14 @@ export function aboveLineFor(height: number, ratio: number): number {
   return Math.max(ABOVE_PANE_MIN, Math.min(height - ABOVE_PANE_MIN, line))
 }
 
-/** The slide's side margin on the stage and its widest; and, above, the room the pane keeps around the slide: its full
- *  height less 32 (the Experience lead, 17 November, "Nothing around the slide but the slide": the rows above and under
- *  the slide leave the stage, so the slide gets that height). */
+/** Side margin, maximum width beside the handout, and vertical room in height-fitted views. */
 export const STAGE_MARGIN = 24
 export const BIG_MAX = 900
-export const ABOVE_STAGE_ROOM = 32
+export const ABOVE_STAGE_ROOM = 36 + 16
 
 /**
  * The height of what the stage holds under the slide (a row still there, such as the speaker notes', with its margin),
- * from the stage group's height and the slide's as drawn: the group is the slide, the rows under it and 16 above and
+ * from the stage group's height and the slide's as drawn: the group is the slide, the rows under it and 36 above and
  * under them. Never negative.
  */
 export function rowsUnder(groupHeight: number, slideHeight: number): number {
@@ -79,9 +77,8 @@ export function rowsUnder(groupHeight: number, slideHeight: number): number {
 
 /**
  * The slide's width on a stage `width` × `height`. Beside, the slide is bound by its width (and sits centred in its
- * pane's height); above, it takes its pane's full height less 32 and less `under`, the rows still under it (measured,
- * `rowsUnder`), at 16:9, capped by the width, so the stage never overflows its pane. With no row under it, the slide
- * is the pane less 32.
+ * pane's height); above, it takes its pane's height less the vertical reserve and less `under`, the rows still under it (measured,
+ * `rowsUnder`), at 16:9, capped by the width, so the stage never overflows its pane.
  */
 export function slideWidthFor(width: number, height: number, above: boolean, under = 0): number {
   const byWidth = Math.min(width - STAGE_MARGIN * 2, BIG_MAX)
@@ -92,7 +89,7 @@ export function slideWidthFor(width: number, height: number, above: boolean, und
 /**
  * Slide only (the design: "Slide only gives the slide the whole room, and the strip stays"; Jarmo, 17 November: "align
  * slide to center... and fill the space"): the largest 16:9 slide in the room `width` × `height` between the strip and
- * the AI pane (or the window's edge), less the side margins and 32 in height and the rows still under it, with no
+ * the AI pane (or the window's edge), less the side margins and vertical reserve and the rows still under it, with no
  * 900 cap. The stage centres it both ways.
  */
 export function fullSlideWidthFor(width: number, height: number, under = 0): number {

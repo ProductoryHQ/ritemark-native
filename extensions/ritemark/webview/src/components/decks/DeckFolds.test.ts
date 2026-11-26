@@ -192,7 +192,7 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(view.includes("${slideAlone ? ' is-alone' : ''}") && view.includes('above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 }'), 'its group the slide\'s width')
   // A row under the slide scrolls with the stage; it never sizes the slide (review: it shrank as the row wrapped).
   assert.ok(view.includes('if (!above || slideAlone) return'), 'rows measured only above, beside the handout')
-  assert.ok(css.includes('.deck-stage.is-alone { align-items: center; }') && css.includes('.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }'), 'centred both ways')
+  assert.ok(css.includes('.deck-stage.is-alone { align-items: center; }') && css.includes('.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding-bottom: 16px; }'), 'centred both ways')
 }
 
 console.log('DeckFolds: passed')

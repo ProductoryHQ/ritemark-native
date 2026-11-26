@@ -47,6 +47,7 @@ const MARK_ICON: Record<BoxesMark, PhosphorIconName> = { icon: 'smiley', number:
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '', tabs: 'Add a tab' }
 
 export interface SlideBlockBarProps {
+  settingsOpen?: boolean
   editor: TipTapEditor | null
   /** The slide's frame (unscaled; the slide is scaled inside it): the handles are drawn in it. */
   frame: HTMLDivElement | null
@@ -257,7 +258,7 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
   )
 }
 
-export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBlockBarProps) {
+export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsOpen }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
@@ -396,6 +397,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [editor, frame, measure])
 
   const showing = open && !!chosen && !!placed
+  const barShowing = showing && !settingsOpen
   placedRef.current = placed
   dragRef.current = !!drag
   // Another block (or none) chosen: no item of the last one is pointed at or has its menu open.
@@ -422,7 +424,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [frame])
   // Esc or a press outside the bar and the slide closes it (the slide's frame is its trigger: a press there is the
   // block's own, and opens it again).
-  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, returnFocus: () => null, enabled: showing })
+  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, returnFocus: () => null, enabled: barShowing })
 
   // Under the block, the page's own size; above it when there is no room under it; never off the window.
   // Inside the slide's pane (the Experience lead on #773): when the bar is wider than the pane, its own group folds
@@ -433,7 +435,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   useEffect(() => { setFold(0) }, [foldKey])
   useLayoutEffect(() => {
     const bar = barRef.current
-    if (!showing || !placed || !bar || !chosen) { setBarAt(null); return }
+    if (!barShowing || !placed || !bar || !chosen) { setBarAt(null); return }
     if (focusIcon.current && iconTrigger.current) {
       focusIcon.current = false
       iconTrigger.current.focus({ preventScroll: true })
@@ -448,7 +450,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const left = inPane ?? Math.max(8, placed.pane.left + 8)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
-  }, [showing, placed, chosen, drag, fold])
+  }, [barShowing, placed, chosen, drag, fold])
 
   useLayoutEffect(() => {
     if (!pendingIcon) return
@@ -718,7 +720,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
         </>
       ) : null, layer)}
       {/* Hidden while a handle drags, so it never covers where the block lands (the app run's drag shot). */}
-      {showing && !drag
+      {barShowing && !drag
         ? createPortal(
             <div
               ref={barRef}

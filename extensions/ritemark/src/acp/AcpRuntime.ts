@@ -46,12 +46,13 @@ import {
 } from '../runtime/continuation';
 import type { ExplicitThinkingEffort } from '../runtime/thinkingEffort';
 import { thinkingEffortLabel } from '../runtime/thinkingEffort';
-import { acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
+import { ACP_QUIET_STREAM_ERROR, acpTurnErrorCode } from '../runtime/runtimeErrorPresentation';
 import { noteOpenCodeModels } from '../ai/modelCatalog';
 import { workspaceFilesOnly } from '../runtime/turnFiles';
 import { activeFileLines } from '../decks/currentSlide';
 
-type PendingApproval = (result: { approved: boolean; alwaysAllow: boolean }) => void;
+type ApprovalDecision = { approved: boolean; alwaysAllow: boolean };
+type PendingApproval = (result: ApprovalDecision | undefined) => void;
 
 const _toolsInjector = new RitemarkToolsInjector();
 
@@ -90,13 +91,11 @@ export function isBoardToolPermission(params: RequestPermissionRequest): boolean
   return false;
 }
 
-/**
- * Ceiling for a single OpenCode turn. Matches Claude's 15-minute inactivity
- * timeout in spirit — long enough for a real slow turn, short enough that a hung
- * provider does not strand the UI forever. Overridable per turn via
- * RuntimeTurnConfig.timeoutMinutes.
- */
-const DEFAULT_ACP_TIMEOUT_MINUTES = 15;
+// The 90-second quiet window is separate from the inactivity setting, which sets the turn ceiling.
+const ACP_QUIET_STREAM_MS = 90_000;
+const ACP_TURN_CEILING_MS = 15 * 60_000;
+// Give the notification time to flush before completion can dispose the subprocess.
+const ACP_CANCEL_WRITE_MS = 1_000;
 
 /**
  * Compose the text sent to OpenCode for one turn. Pure — no I/O — so the
@@ -168,10 +167,12 @@ export class AcpSession implements RuntimeSession {
   constructor(
     readonly conversationId: string,
     /** The ACP session id on the shared connection. */
-    readonly acpSessionId: string,
+    private _acpSessionId: string,
     config: RuntimeSessionConfig,
     private readonly _runtime: AcpRuntime,
     private _continuationContext?: NormalizedRuntimeContext,
+    private readonly _quietStreamMs = ACP_QUIET_STREAM_MS,
+    private readonly _turnCeilingMs = ACP_TURN_CEILING_MS,
   ) {
     this._config = config;
   }
@@ -186,6 +187,8 @@ export class AcpSession implements RuntimeSession {
       : config.continuation?.fallbackContext;
   }
 
+  get acpSessionId(): string { return this._acpSessionId; }
+
   async prompt(turn: RuntimeTurnConfig): Promise<void> {
     const manager = this._runtime.getManager();
     if (!manager) {
@@ -196,22 +199,38 @@ export class AcpSession implements RuntimeSession {
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
-    // Inject the shared capability context once per session (ACP has no system
-    // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
-    // ACP-flavoured render of src/ai/capabilityContext.ts.
-    const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
-    const { text: rawPromptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
-    const continuationContext = this._continuationContext;
-    this._continuationContext = undefined;
-    const promptText = frameRuntimePrompt(rawPromptText, continuationContext);
-    if (capabilityContext && capabilityContext.trim()) {
-      this._capabilityContextInjected = true;
-    }
-    if (imageAttachmentCount > 0) {
-      config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
-    }
-
     try {
+      const previousSessionId = this.acpSessionId;
+      const readySessionId = await manager.preparePrompt(previousSessionId);
+      if (readySessionId !== previousSessionId) {
+        this._runtime._replaceSessionId(this, previousSessionId, readySessionId, manager);
+        this._acpSessionId = readySessionId;
+        this._capabilityContextInjected = false;
+        this._manualThinkingEffortApplied = false;
+        this._continuationContext = config.continuation?.fallbackContext;
+        const compatibility = config.continuation?.compatibility;
+        if (compatibility) {
+          config.onContinuationCheckpoint?.(continuationCheckpoint(
+            readySessionId, compatibility, this._continuationContext?.coveredThroughEventId ?? null,
+          ));
+        }
+      }
+
+      // Inject the shared capability context once per session (ACP has no system
+      // prompt). config.extraSystemPrompt is set by UnifiedViewProvider to the
+      // ACP-flavoured render of src/ai/capabilityContext.ts.
+      const capabilityContext = this._capabilityContextInjected ? undefined : config.extraSystemPrompt;
+      const { text: rawPromptText, imageAttachmentCount } = buildAcpPromptText(turn, { capabilityContext });
+      const continuationContext = this._continuationContext;
+      this._continuationContext = undefined;
+      const promptText = frameRuntimePrompt(rawPromptText, continuationContext);
+      if (capabilityContext && capabilityContext.trim()) {
+        this._capabilityContextInjected = true;
+      }
+      if (imageAttachmentCount > 0) {
+        config.onProgress({ type: 'text', message: `Note: ${imageAttachmentCount} image attachment(s) converted to text (OpenCode BYOK does not support inline multimodal in this version).`, timestamp: Date.now() });
+      }
+
       // Apply model for this turn (strip 'opencode:' composite prefix if present).
       // Must be inside try/catch — setModel throws if the model ID is invalid.
       if (config.model) {
@@ -257,29 +276,50 @@ export class AcpSession implements RuntimeSession {
         });
       }
 
-      // A BYOK provider can hang a turn indefinitely — no response, no error —
-      // and the ACP path had no timeout of its own, unlike Claude (15-min
-      // inactivity) and Codex (slow-RPC handling). The turn then sat at
-      // "Starting OpenCode…" forever with no way out but Stop. Bound it here and
-      // cancel the hung session so it settles as an actionable error.
-      const timeoutMs = (turn.timeoutMinutes ?? DEFAULT_ACP_TIMEOUT_MINUTES) * 60_000;
-      let timedOut = false;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      // #658: this session is mid-turn from here; its conversation's page is the one OpenCode's browser tools act in.
-      // Taken only around the prompt, which the timeout bounds: setModel and setThinkingEffort have no timeout of
-      // their own, and a hang there must not hold the browser from another conversation.
+      const ceilingMinutes = turn.timeoutMinutes ?? this._turnCeilingMs / 60_000;
+      const ceilingMs = turn.timeoutMinutes === undefined ? this._turnCeilingMs : ceilingMinutes * 60_000;
+      let quietTimer: ReturnType<typeof setTimeout> | undefined;
+      let cancelWriteTimer: ReturnType<typeof setTimeout> | undefined;
+      let approvals = 0;
+      let toolsRunning = false;
+      let finished = false;
+      const abort = new AbortController();
+      let fail!: (error: Error) => void;
+      const failed = new Promise<never>((_, reject) => { fail = reject; });
+      const stop = (error: Error) => {
+        if (finished || abort.signal.aborted) return;
+        fail(error);
+        abort.abort(error);
+        clearTimeout(quietTimer);
+        clearTimeout(ceilingTimer);
+      };
+      const onActivity = () => {
+        clearTimeout(quietTimer);
+        if (finished || abort.signal.aborted || approvals > 0 || toolsRunning) return;
+        quietTimer = setTimeout(() => {
+          stop(Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
+        }, this._quietStreamMs);
+      };
+
+      // #658: hold this conversation's browser page only while its prompt is active.
       this._runtime.beginBrowserTurn(this, config.browserPage);
-      const prompted = manager.prompt(this.acpSessionId, promptText);
+      const ceilingTimer = setTimeout(() => {
+        stop(new Error(`OpenCode did not respond within ${ceilingMinutes} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+      }, ceilingMs);
+      onActivity();
+      const prompted = manager.prompt(this.acpSessionId, promptText, {
+        onActivity,
+        onApproval: (waiting) => {
+          approvals += waiting ? 1 : -1;
+          onActivity();
+        },
+        onToolRunning: (running) => {
+          toolsRunning = running;
+          onActivity();
+        },
+      }, abort.signal);
       try {
-        const result = await Promise.race([
-          prompted,
-          new Promise<never>((_, reject) => {
-            timer = setTimeout(() => {
-              timedOut = true;
-              reject(new Error(`OpenCode did not respond within ${Math.round(timeoutMs / 60_000)} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
-            }, timeoutMs);
-          }),
-        ]);
+        const result = await Promise.race([prompted, failed]);
         this.markDispatchAccepted();
         // ACP calls a successful terminal state `end_turn`, while the shared
         // Ritemark/Codex result contract calls it `completed`. Forwarding the
@@ -299,22 +339,32 @@ export class AcpSession implements RuntimeSession {
           ...(filesModified.length ? { filesModified } : {}),
         });
       } catch (err) {
-        // On timeout, stop the abandoned turn upstream so it does not keep
-        // running against a session the user has already been told failed.
-        if (timedOut) {
+        // The prompt may still be pending after a timeout.
+        if (abort.signal.aborted) {
           // #658: its browser calls still in flight are refused until its prompt settles, not sent to another page.
           this._runtime.holdEndedBrowserTurn(this, prompted);
-          void manager.cancel(this.acpSessionId).catch(() => { /* already failing */ });
+          this.rejectPendingApprovals();
+          this.recentlyPermissionedWrites.clear();
+          await Promise.race([
+            manager.cancelTurn(this.acpSessionId).catch(() => { /* already failing */ }),
+            new Promise<void>((resolve) => { cancelWriteTimer = setTimeout(resolve, ACP_CANCEL_WRITE_MS); }),
+          ]);
         }
         throw err;
       } finally {
-        if (timer) clearTimeout(timer);
+        finished = true;
+        clearTimeout(quietTimer);
+        clearTimeout(cancelWriteTimer);
+        clearTimeout(ceilingTimer);
         this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
-      config.onCodexComplete?.({ status: 'error', error: describeAcpTurnError(raw), ...(errorCode ? { errorCode } : {}) });
+      config.onCodexComplete?.({
+        status: 'error', error: describeAcpTurnError(raw),
+        ...(errorCode ? { errorCode } : {}),
+      });
     }
   }
 
@@ -362,7 +412,7 @@ export class AcpSession implements RuntimeSession {
   /** @internal */
   rejectPendingApprovals(): void {
     for (const resolve of this.pendingApprovals.values()) {
-      resolve({ approved: false, alwaysAllow: false });
+      resolve(undefined);
     }
     this.pendingApprovals.clear();
   }
@@ -523,6 +573,16 @@ export class AcpRuntime implements AgentRuntime {
     }
   }
 
+  /** @internal Route updates and approvals to the existing conversation after session replacement. */
+  _replaceSessionId(session: AcpSession, previousId: string, nextId: string, manager: AcpManager): void {
+    if (this._manager !== manager || this._sessions.get(session.conversationId) !== session) {
+      manager.closeSession(nextId);
+      throw new Error('OpenCode conversation was closed while restarting its session.');
+    }
+    this._sessionsByAcpId.delete(previousId);
+    this._sessionsByAcpId.set(nextId, session);
+  }
+
   private _stopIpcServer(): void {
     this._ipcServer?.stop();
     this._ipcServer = null;
@@ -570,8 +630,8 @@ export class AcpRuntime implements AgentRuntime {
   private readonly _endedTurns = new Map<AcpSession, { timer?: ReturnType<typeof setTimeout> }>();
 
   /**
-   * #658: a session's turn timed out. `endBrowserTurn` gives its page up at once, but the cancel is not awaited, and a
-   * browser call already on its way from that turn names no conversation: it would go to another conversation's page.
+   * #658: a session's turn timed out. Sending cancel does not guarantee that its prompt has settled, and a browser
+   * call already on its way from that turn names no conversation: it would go to another conversation's page.
    * So every browser call is refused until the timed-out prompt settles, the session is forgotten, or
    * `ENDED_OPENCODE_TURN_HOLD_MS` passes.
    */
@@ -698,12 +758,15 @@ export class AcpRuntime implements AgentRuntime {
       ? { requestId, agentId: 'opencode', kind: 'file-write', filePath: file }
       : { requestId, agentId: 'opencode', kind: 'shell-command', command: tool, workingDir: file ?? '' };
 
-    const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
+    const decision = await new Promise<ApprovalDecision | undefined>(
       (resolve) => {
         session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );
+
+    if (!decision) return { outcome: { outcome: 'cancelled' } };
+    const { approved } = decision;
 
     // C1: recorded on THIS session only. Another chat writing the same path
     // still has to ask.
@@ -745,14 +808,14 @@ export class AcpRuntime implements AgentRuntime {
       filePath: request.path,
     };
 
-    const { approved } = await new Promise<{ approved: boolean; alwaysAllow: boolean }>(
+    const decision = await new Promise<ApprovalDecision | undefined>(
       (resolve) => {
         session.pendingApprovals.set(requestId, resolve);
         config.onApprovalRequest(req);
       },
     );
 
-    return approved;
+    return decision?.approved ?? false;
   }
 
   /**

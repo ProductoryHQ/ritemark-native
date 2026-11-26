@@ -129,7 +129,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: false, changed: true }), {
 assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From the library, which has a newer version', amber: true })
 
 // ---- Where things are (17 November): no gear in the bar; the slide's own menus open Slide settings…, a popover
-// anchored beside where it came from; nothing above or under the slide.
+// anchored beside where it came from.
 {
   const view = here('./DeckView.tsx')
   const bar = view.slice(view.indexOf('<header className="deck-bar"'), view.indexOf('</header>'))
@@ -146,15 +146,15 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.match(popover, /^<Popover open=\{settingsFor !== null\} onOpenChange=\{open => \{ if \(!open\) setSettingsFor\(null\) \}\}>/)
   assert.match(popover, /<PopoverAnchor virtualRef=\{settingsAnchor\} \/>/)
   assert.doesNotMatch(popover, /PopoverTrigger/)
-  assert.match(popover, /side=\{settingsPlacement\?\.side \?\? 'right'\}\s+align="start"/)
+  assert.match(popover, /side=\{gearSettingsOpen \? 'bottom' : settingsPlacement\?\.side \?\? 'right'\}\s+align=\{gearSettingsOpen \? 'end' : 'start'\}/)
   assert.match(popover, /onCloseAutoFocus=\{event => \{[\s\S]*?back\.focus\(/, 'the focus back to where the menu was opened')
-  assert.match(popover, /className=\{stageSettingsOpen \? 'deck-settings' : 'deck-settings deck-settings-folded'\}/)
+  assert.match(popover, /className=\{stageSettingsOpen && !gearSettingsOpen \? 'deck-settings' : 'deck-settings deck-settings-folded'\}/)
   // A visible slide takes priority. With the stage folded, the thumbnail and part number retain their anchors.
-  assert.match(view, /const stageSlide = stageRef\.current\?\.querySelector<HTMLElement>\('\.deck-big'\)[\s\S]*?setSettingsFor\(\{ index, id, anchor: stageSlide \? stageSettingsAnchor\(stageRef\) : where\.anchor, side: stageSlide \? 'stage' : where\.side \}\)/)
+  assert.match(view, /const stageSlide = stageRef\.current\?\.querySelector<HTMLElement>\('\.deck-big'\)[\s\S]*?setSettingsFor\(\{ index, id, anchor: stageSlide && !fromGear \? stageSettingsAnchor\(stageRef\) : anchor, side: stageSlide \? 'stage' : side, fromGear \}\)/)
   assert.match(view, /settings: index => openSettings\(index, \(\) => \{\s+const thumb = stripRef\.current\?\.querySelector<HTMLElement>\(`\[data-thumb="\$\{index\}"\] \.deck-thumb-slide`\)\s+return thumb \? \{ anchor: thumb, side: 'right', back: stripRef\.current \} : null/)
   assert.match(view, /const partSettings = useCallback\(\(index: number, slot: PartMenuSlot\) => openSettings\(index, \(\) => \(\s+slot\.element\.isConnected\s+\? \{ anchor: slot\.element\.parentElement\?\.querySelector<HTMLElement>\('\.deck-part-number'\) \?\? slot\.element, side: 'right', back: slot\.element\.querySelector\('button'\) \}/)
   assert.match(view, /openSettings\(currentRef\.current, anchor => \{\s+if \(!anchor\) return null[\s\S]*?return \{ anchor, side: 'stage', back: anchor\.querySelector<HTMLElement>\('\.ProseMirror'\)/)
-  assert.match(popover, /portalContainer=\{stageSettingsOpen \? settingsSlot : undefined\}/, 'stage settings share the stage scroller')
+  assert.match(popover, /portalContainer=\{stageSettingsOpen && !gearSettingsOpen \? settingsSlot : undefined\}/, 'stage settings share the stage scroller')
   assert.match(popover, /collisionBoundary=\{stageSettingsOpen \? stageRef.current : undefined\}/)
   assert.doesNotMatch(popover, /maxHeight/, 'the card keeps its natural height')
   assert.match(view, /settingsSize\.height > 0\s*\? slideSettingsPlacement/)
@@ -224,6 +224,29 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.ok(!css.includes('deck-thumb-dot'), 'the badge replaces the newer-version dot')
 }
 
+// #1109: the stage gear shares the menu's settings and returns focus through the same popover.
+{
+  const view = here('./DeckView.tsx')
+  const popover = view.slice(view.indexOf('<Popover open={settingsFor !== null}'), view.indexOf('</Popover>'))
+  const stage = view.slice(view.indexOf('{slideShown ? (\n          <div\n            ref={stageRef}'), view.indexOf('{handoutShown && slideShown ? ('))
+  assert.match(stage, /deck-stage-group[^]*?editor && slide && bigWidth > 0[^]*?aria-label="Slide settings"/)
+  assert.equal(view.match(/className="deck-stage-gear"/g)?.length, 1)
+  for (const path of ['./present/DeckPresenterView.tsx', './present/DeckWall.tsx', './SlideStrip.tsx', './handout/SlidePartHead.ts']) {
+    assert.doesNotMatch(here(path), /deck-stage-gear|gear-six/)
+  }
+  assert.match(here('./decks.css'), /\.deck-stage \.deck-stage-group \{[^}]*padding: 36px 0 48px/)
+  assert.match(view, /data-state=\{gearSettingsOpen \? 'open' : 'closed'\}/)
+  assert.match(view, /<Tooltip label="Slide settings"[^>]*>\s+<Button[^]*?size="icon-xs"[^]*?aria-pressed=\{gearSettingsOpen\}[^]*?<SlideIconGlyph name="gear-six" size=\{16\}/)
+  assert.match(view, /openSettings\(currentRef.current, \(\) => gear.isConnected[\s\S]*?anchor: gear, side: 'stage', back: gear, fromGear: true/)
+  assert.match(popover, /side=\{gearSettingsOpen \? 'bottom'[^]*?align=\{gearSettingsOpen \? 'end'/)
+  assert.equal(view.match(/<SlideSettings\s/g)?.length, 1)
+  assert.match(view, /settingsOpen=\{settingsFor !== null\}/)
+  assert.match(popover, /onCloseAutoFocus=\{[^]*?settingsReturn.current[^]*?back.focus\(/)
+  assert.match(here('./Stage.tsx'), /settingsOpen=\{settingsOpen\}/)
+  assert.match(here('./blocks/SlideEditor.tsx'), /<SlideBlockBar[^>]+settingsOpen=\{settingsOpen\}/)
+  assert.match(here('./blocks/SlideBlockBar.tsx'), /const barShowing = showing && !settingsOpen[^]*?\{barShowing && !drag/)
+}
+
 // #981: stage dimensions exclude the strip, bar and AI column.
 {
   const popup = { width: 316, height: 330 }
@@ -264,7 +287,7 @@ assert.deepEqual(libraryBadge({ library: true, newer: true }), { label: 'From th
   assert.equal(press(499, 399), false)
   assert.equal(press(500, 400, new EventTarget()), false)
   assert.equal(isStageScrollbarPress(null, { target: null, offsetX: 500, offsetY: 400 }), false)
-  assert.match(here('./DeckView.tsx'), /onPointerDownOutside=\{event => \{\s+if \(stageSettingsOpen && isStageScrollbarPress\(stageRef.current, event.detail.originalEvent\)\) \{\s+event.preventDefault\(\)/)
+  assert.match(here('./DeckView.tsx'), /onPointerDownOutside=\{event => \{\s+if \(stageSettingsOpen && !gearSettingsOpen && isStageScrollbarPress\(stageRef.current, event.detail.originalEvent\)\) \{\s+event.preventDefault\(\)/)
 }
 
 // #981: a kind change replaces the measured element while the same anchor stays open.
