@@ -24,7 +24,7 @@ Use `--question "<text>"` to run the three S38 prompts. For these runs, criteria
 1. All 13 documents have a matching fact or an explicit, valid unread reason. The fixture has two known unread cases (the scan and the confidential appendix).
 2. The notes belong to their own slides and slide 5 is explicitly reported as having none.
 3. Every visible step label names a document or folder. Commands and paths fail this check.
-4. All source links must open the right document, and at least 90% of all source links must land on a passage or slide that supports the claim. The runner reports how many opened the right document and how many include a passage target. A link without a passage counts as a no. For links with passage targets, record a yes or no for each after checking the passage or slide yourself. A find match alone does not establish that the passage supports the claim.
+4. All source links must open the right document, and at least 90% of all source links must land on a passage or slide that supports the claim. The runner reports how many opened the right document and how many include a passage target. A link without a passage counts as a no. For links with passage targets, record a yes or no for each after checking the passage or slide yourself. A find match alone does not establish that the passage supports the claim. A link lands on the claim when the passage it opens supports the claim the link is attached to. An added detail from the same document is fine. An added detail from another document makes it a no.
 5. The confidential appendix is named, described as having a password, and accompanied by a way forward.
 6. The visible answer has no numbered sources, bracketed filenames or paths.
 
@@ -36,7 +36,9 @@ For fixed-question runs, fill all six criteria with pass or fail. Each AI needs 
 
 First set — **1 of 3 on `ab50cad1`**. Runs 1 and 3 failed on runner strictness (see `claude-mac-records.md` in the gate evidence). The recorded verdict stands. A fresh set follows after the runner fix.
 
-Fresh set verdict — pending (3 of 3 required).
+Set 2 — **0 of 3 on `be4866cd`** on 26 November 2026 due to runner strictness (see `claude-mac-records.md` in the gate evidence). The recorded verdict stands. A fresh set follows after the runner fix.
+
+Set 3 verdict — pending (3 of 3 required).
 
 #### Run 1
 
