@@ -55,3 +55,43 @@ test('keeps unsupported commands and outside paths visible', () => {
     }
   }
 });
+
+for (const command of [
+  String.raw`/bin/bash -lc "ls -la; find . -type f | grep -v '/\\.'"`,
+  String.raw`/bin/bash -lc "find . -type f | grep -v '/\\.'"`,
+]) {
+  test(command, () => {
+    const step = classify(command);
+    assert.equal(stepLabel({ type: 'done', tool: 'commandExecution', message: '', timestamp: 0, step: { ...step, status: 'completed' } })?.label,
+      'Looked in the project folder');
+  });
+}
+
+test('classifies folder listings piped through stdin filters', () => {
+  for (const command of [
+    String.raw`find . -type f | grep -v '/\.'`,
+    'find . -type f 2>/dev/null | sort',
+    'ls | grep -vi hidden | egrep -ixe foo -e bar | fgrep -e-fixed | sort -urnfV | uniq -c | head -n 5 | tail -2 | wc -l',
+    "ls|cut -d ' ' -f 1,3-5|tr a-z A-Z|tr -d ' ' 2>/dev/null",
+  ]) {
+    assert.deepEqual(classify(command), { id: 'command', command, kind: 'folder', path: '.' });
+  }
+  assert.equal(classify('ls Reference | sort && find ./Reference/ -print | wc').path, 'Reference');
+});
+
+test('keeps unsupported pipeline stages and redirections visible', () => {
+  for (const command of [
+    'find . -type f | xargs rm', 'find . -type f | tee list.txt', 'find . | grep x > out',
+    'cat a.docx | grep x', 'find /etc -type f | sort', 'ls | sh', 'ls |& sort', 'ls || sort',
+    'find . -exec ls {} + | sort', 'ls | sed -n 1p', 'ls | awk x',
+    'ls | grep x file', 'ls | grep -e x file', 'ls | grep -f patterns', 'ls | grep -e', 'ls | grep -v',
+    'ls | sort file', 'ls | sort -o file', 'ls | uniq infile outfile', 'ls | head -n 2 file',
+    'ls | tail file', 'ls | wc file', "ls | cut -d ' ' -f 1 file", 'ls | tr -d x y',
+    'ls A | sort && find B -print | wc', 'ls | sort |',
+    'ls 2>/dev/null extra | sort', 'ls 2>/dev/null.txt | sort', 'ls 2>/dev/null 2>/dev/null | sort',
+    'ls 2>/dev/null < input | sort', 'ls > /dev/null | sort', 'ls | grep ">"', 'ls | grep "$x"',
+    "ls | grep '\`x\`'", 'ls |\nsort',
+  ]) {
+    assert.deepEqual(classify(command), { id: 'command', command, kind: 'shell' });
+  }
+});
