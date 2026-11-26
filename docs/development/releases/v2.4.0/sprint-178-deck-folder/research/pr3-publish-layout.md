@@ -56,4 +56,12 @@ The migration tests exercise the unchanged Copy link, a deck alone, a shared fon
 
 The browser's Publish uses the hosted render when it can match the local preview bytes, using the recorded fit to reproduce fitted pages after reopening. An unmeasured live save with the same public digest reuses that fit when it reproduces the published HTML hash. If it cannot reproduce those bytes, it directs the reader to Publish from the deck.
 
+### Round 6 result · 26 November
+
+Ritemark keeps the site’s existing Copy link and serves a root page at `/index.html`. A checked asset referenced from above the deck’s folder gets `/pictures/<sha256-prefix>.<ext>` with a 12-character prefix of the source bytes, widened on collision, and a lowercase extension. Sources with matching bytes and extensions share one hosted address. The verified upload still rereads and checks each source. Assets at or below the deck’s folder keep their existing paths, and the three baseline HTML pins match byte for byte. Previously published nested pages keep their recorded index address.
+
+Gather checks the real project paths, assigns the addresses, and rewrites the hosted HTML before its key scan and before freezing the verified plan. The What goes list uses each file’s original project path, such as `Sales/map.png`. Git-ignored and out-of-project files remain excluded and named. Live saves, including saves to a legacy beside-the-deck page, use the same mapping after the existing outside-folder approval.
+
+The layout, gather, deckPublish, pageFile, liveUpdate, publishRecords and deckVersion tests passed, as did the 125 deck-suite commands through Node’s tsx loader and `npx tsc --noEmit -p ./`. The sandbox refused the deck CLI’s IPC socket and the Cloudflare and PublishController suites’ localhost listeners with `listen EPERM`.
+
 Proposed taken-page line: “Kickoff.html” is already in “Kickoff files”, and Ritemark didn’t make it from the deck, so it stays as it is. Rename that file to publish the deck.

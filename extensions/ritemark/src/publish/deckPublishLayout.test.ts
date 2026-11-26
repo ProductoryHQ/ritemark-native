@@ -377,3 +377,155 @@ test('the hosted refusal names both files at a shared address', { skip: process.
     },
   }), { message: '“photo.png” and “images\\photo.png” would go to the same address on the page, so nothing was sent. Rename one of them and publish again.' });
 });
+
+for (const mode of ['manual', 'live', 'legacy live'] as const) {
+  test(`an upward Slide library picture keeps the Copy link after a ${mode} update`, async t => {
+    const project = await testProject({
+      'Training/inside.png': PNG,
+      'Sales/map.png': PNG,
+    });
+    t.after(project.cleanup);
+    const deckPath = project.page('Training/Kickoff.rtms');
+    const besideDeckPath = project.page('Training/Kickoff.html');
+    const legacy = mode === 'legacy live';
+    const realPath = legacy ? besideDeckPath : project.page('Training/Kickoff files/Kickoff.html');
+    const makePage = async (upward: boolean) => {
+      const text = ['---', 'deck: 2', '---', '', '```slide', '# Kickoff', '```', '', '![Inside](inside.png)',
+        ...(upward ? ['![Map](../Sales/map.png)'] : [])].join('\n');
+      const input = { deckPath, text, theme: BUILT_IN_THEME };
+      const assets = { slideCss: '', fonts: [] };
+      const built = await buildDeckPage(input, assets);
+      const local = await buildDeckPage({ ...input, pagePath: realPath }, assets);
+      await project.write(path.relative(project.dir, realPath), local.html);
+      return { realPath, projectFolder: project.dir, hostedDeck: { besideDeckPath, html: built.html, assetAddresses: [] }, digest: built.digest };
+    };
+    const records = new PublishRecordStore(project.page('storage'));
+    const deploys: VerifiedUpload[] = [];
+    const accountId = 'a'.repeat(32);
+    const siteName = 'kickoff-123abc';
+    const host: PublishControllerDeps['host'] = {
+      snapshot: () => ({ state: 'connected', accountName: 'Training', subdomain: 'training' }),
+      accountId: () => accountId,
+      refreshSubdomain: async () => 'training', connectWithToken: async () => { throw new Error('unexpected connect'); },
+      disconnect: async () => {}, chooseSubdomain: async () => 'training', siteExists: async () => true,
+      publish: async (name, upload, { replacing }) => {
+        assert.equal(name, siteName);
+        assert.equal(replacing, deploys.length > 0);
+        deploys.push(upload);
+        return { name, address: siteAddress(name, 'training', upload.pageUrlPath) };
+      },
+      unpublish: async () => {}, waitUntilOnline: async () => 'online',
+    };
+    let sheets = 0;
+    const controller = new PublishController({
+      host, records, gather: gatherPage, isFeatureEnabled: () => true, setReady: () => {}, postSettings: () => {}, log: () => {},
+      ui: {
+        openExternal: async () => true, askToken: async () => {}, showConnect: () => {},
+        showSheet: async ({ plan, onConfirm }) => {
+          sheets++;
+          assert.ok(plan);
+          assert.ok(sheetModelOf(plan, 'Training').files.some(
+            row => row.name === 'map.png' && row.folder === 'Sales' && row.kind === 'picture'));
+          assert.equal(deploys.length, 1);
+          assert.equal((await onConfirm({ anyway: false })).kind, 'close');
+          return { kind: 'publish', plan };
+        },
+        showFailure: line => assert.fail(line), showWaiting: () => () => {}, showBrief: () => {},
+      },
+    });
+    controller.setPublishEntryAvailable(true);
+    const initial = await makePage(false);
+    await controller.publishPage({
+      plan: await gatherPage(realPath, project.dir, { hostedDeck: legacy ? undefined : initial.hostedDeck }),
+      consent: 'sheet', pagePart: siteName,
+    });
+    const before = (await controller.recordFor(realPath))?.address;
+    assert.equal(before, 'https://kickoff-123abc.training.workers.dev/');
+
+    const updated = await makePage(true);
+    assert.ok(updated.hostedDeck.html.includes('src="../Sales/map.png"'));
+    if (mode === 'manual') {
+      assert.equal(await controller.publishFromBar(updated), 'published');
+      assert.equal(sheets, 1);
+    } else {
+      assert.equal(await controller.setLive(realPath, true), true);
+      const preference = (await controller.recordFor(realPath))?.live;
+      assert.ok(preference);
+      const release = controller.holdPage(realPath);
+      assert.ok(release);
+      t.after(release);
+      const attempt = {
+        preference, active: () => true, digest: updated.digest, legacyDeck: legacy,
+        pageSha: createHash('sha256').update(updated.hostedDeck.html).digest('hex'),
+      };
+      const page = legacy ? { ...updated, hostedDeck: undefined } : updated;
+      const paused = await controller.updateLive(page, { ...attempt, resume: false });
+      assert.equal(paused.kind, 'paused');
+      assert.deepEqual(paused.pause.outsideFiles, ['Sales/map.png']);
+      assert.equal(deploys.length, 1);
+      assert.deepEqual(await controller.updateLive(page, { ...attempt, resume: true }), { kind: 'updated', pictures: ['map.png'] });
+      if (legacy) {
+        const plan = await gatherPage(realPath, project.dir, { legacyDeckLive: true, publishedPagePath: 'Kickoff.html' });
+        await fs.appendFile(realPath, '<p>Edited after gather</p>');
+        await assert.rejects(readVerifiedUpload(plan), /Kickoff\.html changed/);
+      }
+    }
+    assert.equal((await controller.recordFor(realPath))?.address, before);
+    const neutral = `/pictures/${createHash('sha256').update(PNG).digest('hex').slice(0, 12)}.png`;
+    assert.equal(deploys.length, 2);
+    const [initialUpload, updatedUpload] = deploys;
+    assert.equal(updatedUpload.pageUrlPath, initialUpload.pageUrlPath);
+    assert.deepEqual(Object.keys(buildManifest(updatedUpload.files).manifest), ['/index.html', '/inside.png', neutral]);
+    assert.match(Buffer.from(updatedUpload.files[0].bytes).toString('utf8'), new RegExp(`src="${neutral}"`));
+  });
+}
+
+test('upward assets check Git and project scope, share identical bytes and widen around occupied addresses', async t => {
+  const hash = createHash('sha256').update(PNG).digest('hex');
+  const reserved = `pictures/${hash.slice(0, 12)}.png`;
+  const neutral = `/pictures/${hash.slice(0, 13)}.png`;
+  const project = await testProject({
+    'Sales/map.PNG': PNG,
+    'Other/copy.png': PNG,
+    'Sales/ignore.png': PNG,
+    'Sales/Typeface.WOFF2': 'font bytes',
+    [`Training/${reserved}`]: PNG,
+    '.gitignore': '/Sales/ignore.png\n',
+  });
+  t.after(project.cleanup);
+  execFileSync('git', ['init', '-q'], { cwd: project.dir });
+  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  const besideDeckPath = project.page('Training/Kickoff.html');
+  const fontAddress = `/pictures/${createHash('sha256').update('font bytes').digest('hex').slice(0, 12)}.woff2`;
+  const query = 'api_key=' + 'Ab9'.repeat(8);
+  const html = [
+    '<style>/* url(../Sales/map.PNG) */ @font-face{font-family:"Test";src:url(../Sales/Typeface.WOFF2)}</style>',
+    '<div style="background-image:url(&quot;../Sales/map.PNG&quot;)"></div>',
+    '<img src="../Sales/map.PNG" srcset="../Other/copy.png 2x">',
+    '<img src="../Sales/map.PNG"><img src="../Sales/ignore.png"><img src="../../outside.png">',
+    '<p>../Sales/map.PNG</p>',
+    `<img src="${reserved}">`,
+    `<img src="../Sales/map.PNG?${query}">`,
+  ].join('\n');
+  const plan = await gatherPage(realPath, project.dir, { hostedDeck: { besideDeckPath, html, assetAddresses: [] } });
+  const sheet = sheetModelOf(plan, 'Training');
+  assert.deepEqual(sheet.leftOut.map(({ display, reason }) => [display, reason]), [
+    ['../../outside.png', 'outside'], ['Sales/ignore.png', 'gitIgnored'],
+  ]);
+  assert.ok(sheet.files.some(row => row.name === 'copy.png' && row.folder === 'Other'));
+  const upload = await readVerifiedUpload(plan);
+  assert.deepEqual(upload.files.map(file => file.urlPath), ['/index.html', neutral, `/${reserved}`, fontAddress]);
+  const rewritten = Buffer.from(upload.files[0].bytes).toString('utf8');
+  assert.ok(rewritten.includes(`background-image:url(&quot;${neutral}&quot;)`));
+  assert.ok(rewritten.includes(`src="${neutral}" srcset="${neutral} 2x"`));
+  assert.ok(rewritten.includes(`src:url(${fontAddress})`));
+  assert.ok(rewritten.includes('/* url(../Sales/map.PNG) */'));
+  assert.ok(rewritten.includes('<p>../Sales/map.PNG</p>'));
+  const keyLine = rewritten.split('\n').at(-1)!;
+  assert.equal(keyLine, `<img src="${neutral}?${query}">`);
+  assert.deepEqual(plan.keyHits.map(hit => ({
+    rule: hit.rule, key: rewritten.split('\n')[hit.line - 1].slice(hit.column, hit.endColumn),
+  })), [{ rule: 'query-key', key: query.split('=')[1] }]);
+  await project.write('Other/copy.png', 'changed after the sheet');
+  await assert.rejects(readVerifiedUpload(plan), /copy\.png changed/);
+});

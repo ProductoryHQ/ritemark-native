@@ -545,7 +545,7 @@ export class DeckPublisher implements vscode.Disposable {
           }
           if (live && moved && !built.fit.length && record?.deckFit?.length && record.deckDigest === built.digest) {
             const fitted = await this.buildPage(document, body, look, record.deckFit, pagePath);
-            const publishedSha = record.files.find(file => isPagePath(file.path))?.sha256;
+            const publishedSha = record.deckSourceSha256 ?? record.files.find(file => isPagePath(file.path))?.sha256;
             if (createHash('sha256').update(fitted.hostedHtml).digest('hex') === publishedSha) {
               built = fitted;
               hostedDeck = this.hostedDeck(legacyKey, fitted);
@@ -556,12 +556,13 @@ export class DeckPublisher implements vscode.Disposable {
             const bytes = existing.kind === 'project' && samePath(existing.realPath, pageKey)
               ? await fs.promises.readFile(pageKey).catch(() => undefined) : undefined;
             const existingSha = bytes && createHash('sha256').update(bytes).digest('hex');
-            if (existing.kind === 'project' && bytes && record.files.some(file => path.basename(file.path) === path.basename(pageKey) && file.sha256 === existingSha)) {
+            const publishedSha = record.deckSourceSha256 ?? record.files.find(file => path.basename(file.path) === path.basename(pageKey))?.sha256;
+            if (existing.kind === 'project' && bytes && publishedSha === existingSha) {
               legacyDigest = readPageMeta(bytes.subarray(0, 4096).toString('utf8')).digest ?? undefined;
               if (legacyDigest === built.digest && existingSha) {
                 // A timetable-only save can arrive before the view measures fit again. Keep the checked published
                 // HTML in place, but still gather its assets so changes to a picture's bytes can go.
-                reusePublishedHtml = await feature.controller.matchesPublishedBytes(existing, record.contentHash).catch(() => false);
+                reusePublishedHtml = await feature.controller.matchesPublishedBytes(existing, record).catch(() => false);
                 if (reusePublishedHtml) livePageSha = existingSha;
               }
             }
@@ -620,7 +621,7 @@ export class DeckPublisher implements vscode.Disposable {
         }
         const describe = await locateLiveIssues(deckPath, text, built);
         const result = await feature.controller.updateLive({ ...location, hostedDeck }, {
-          ...live, digest: built.digest, legacyDigest, describe,
+          ...live, digest: built.digest, legacyDigest, legacyDeck: !moved, describe,
           pageSha: livePageSha ?? createHash('sha256').update(built.hostedHtml).digest('hex'),
         });
         return result.kind === 'stopped' ? await legacyStopped() : result;

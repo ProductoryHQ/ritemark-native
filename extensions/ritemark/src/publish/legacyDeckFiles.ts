@@ -69,7 +69,7 @@ export async function trashLegacyDeckFiles(
     const resolved = await Promise.all(files.map(file => fs.realpath(file).catch(() => file)));
     references.set(sibling, [...files, ...resolved].map(file => normalizeForCompare(file)));
   }
-  if (await matchesLegacyDeckPage(page, publishedPage.sha256).catch(() => false)) {
+  if (await matchesLegacyDeckPage(page, record.deckSourceSha256 ?? publishedPage.sha256).catch(() => false)) {
     if (await trash(page).then(() => true, () => false)) references.delete(page);
   }
   const shared = new Set([...references.values()].flat());

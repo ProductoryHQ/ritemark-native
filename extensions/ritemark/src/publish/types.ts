@@ -12,6 +12,8 @@ export type FileKind = 'page' | 'picture' | 'style' | 'script' | 'font' | 'other
 export interface GatheredFile {
   /** Its path as the page reaches it, from the publish root, with `/` separators. The published tree's layout. */
   relPath: string;
+  /** A deck asset assigned a neutral URL outside the deck’s served folder. */
+  relocated?: true;
   /** Its path from the project folder, with `/` separators (for the sheet's folder and for the records). */
   projectPath: string;
   /** The file on disk, by real path: the source read during gather and upload. */

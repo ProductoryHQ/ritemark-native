@@ -700,10 +700,11 @@ export class PublishController {
     return changed;
   }
 
-  private gatherPage(page: ProjectPage, record?: PublishRecord): Promise<GatheredPlan> {
-    return page.hostedDeck
+  private gatherPage(page: ProjectPage, record?: PublishRecord, legacyDeckLive = false): Promise<GatheredPlan> {
+    legacyDeckLive ||= Boolean(record?.deckSourceSha256 && !record.deckFolder && record.pagePath === page.realPath);
+    return page.hostedDeck || legacyDeckLive
       ? gatherPage(page.realPath, page.projectFolder, {
-        hostedDeck: page.hostedDeck, publishedPagePath: record?.files.find(file => isPagePath(file.path))?.path,
+        hostedDeck: page.hostedDeck, legacyDeckLive, publishedPagePath: record?.files.find(file => isPagePath(file.path))?.path,
       })
       : this.deps.gather(page.realPath, page.projectFolder);
   }
@@ -721,8 +722,8 @@ export class PublishController {
   }
 
   /** Whether preserving the fitted local HTML also preserves every byte readers already have. */
-  async matchesPublishedBytes(page: ProjectPage, hash: string): Promise<boolean> {
-    return (await this.deps.gather(page.realPath, page.projectFolder)).contentHash === hash;
+  async matchesPublishedBytes(page: ProjectPage, record: PublishRecord): Promise<boolean> {
+    return (await this.gatherPage(page, record)).contentHash === record.contentHash;
   }
 
   /** Preview only. Supply the newly rendered page in memory and scan its local references as usual. */
@@ -761,6 +762,7 @@ export class PublishController {
     input: LiveAttempt & {
       sending?: () => void;
       legacyDigest?: string;
+      legacyDeck?: boolean;
       digest: string;
       pageSha: string;
       describe?: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined;
@@ -772,9 +774,10 @@ export class PublishController {
     const connection: LiveIssue = { kind: 'connection', detail: 'Cloudflare needs you to connect again.' };
     const active = () => input.active() && this.canPublish();
     try {
-      const plan = await this.gatherPage(page, record);
+      const plan = await this.gatherPage(page, record, input.legacyDeck);
       const issue = liveIssue(plan, input.resume && record.live.pause?.kind === 'outside' ? record.live.pause.scope : undefined);
-      if (!plan.tooBig.some(file => file.projectPath === plan.files[0]?.projectPath) && plan.files[0]?.sha256 !== input.pageSha) {
+      const sourceSha = hostedPageOf(plan)?.sourceSha256 ?? plan.files[0]?.sha256;
+      if (!plan.tooBig.some(file => file.projectPath === plan.files[0]?.projectPath) && sourceSha !== input.pageSha) {
         return { kind: 'offline', detail: 'The page file changed while Ritemark was checking it.' };
       }
       const described = input.describe?.(plan, issue) ?? issue;
@@ -790,7 +793,7 @@ export class PublishController {
       const oldPage = plan.files.find(file => file.kind === 'page')?.relPath;
       let result: LiveResult = { kind: 'unchanged' };
       if (plan.contentHash !== record.contentHash && !(beforeDigest && beforeDigest === digest
-        && oldPage && before.has(oldPage) && before.size === assets.length + 1
+        && oldPage && before.has(oldPage) && !sheetNeeded(record, plan)
         && assets.every(file => before.get(file.relPath) === file.sha256))) {
         input.sending?.();
         this.livePlans.set(plan, { record, active });
@@ -800,7 +803,7 @@ export class PublishController {
           this.livePlans.delete(plan);
         }
         const added = assets.filter(file => file.kind === 'picture' && !before.has(file.relPath));
-        result = { kind: 'updated', pictures: [...new Set(added.map(file => plainPart(path.basename(file.relPath))))] };
+        result = { kind: 'updated', pictures: [...new Set(added.map(file => plainPart(path.basename(file.projectPath))))] };
       }
       if (record.live.pause) await this.deps.records.changeLive(record, { on: true, id: record.live.id });
       return result;
@@ -882,8 +885,9 @@ export class PublishController {
         try {
           const next = recordFor(plan, { accountId, siteName: site.name, address: site.address }, new Date(this.now()));
           if (hostedDeck) {
-            next.deckFolder = true;
+            if (!hostedDeck.fromDisk) next.deckFolder = true;
             if (hostedDeck.fit) next.deckFit = hostedDeck.fit;
+            if (hostedDeck.sourceSha256 !== plan.files[0].sha256) next.deckSourceSha256 = hostedDeck.sourceSha256;
           }
           const deckVersion = site.deckVersion ?? current?.deckVersion ?? record?.deckVersion;
           if (deckVersion !== undefined) next.deckVersion = deckVersion;
@@ -894,7 +898,7 @@ export class PublishController {
               next.deckDigest = /<meta name="ritemark-deck" content="([0-9a-f]{64})">/.exec(head)?.[1];
             }
           }
-          const migrating = previousPath && current?.pagePath === previousPath;
+          const migrating = previousPath && previousPath !== pagePath && current?.pagePath === previousPath;
           await this.deps.records.put(next, migrating ? previousPath : undefined);
           if (migrating && this.deps.legacyFiles) {
             await trashLegacyDeckFiles(current, plan, hostedDeck?.assetAddresses ?? [], this.deps.legacyFiles).catch(() => undefined);

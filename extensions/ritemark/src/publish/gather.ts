@@ -24,7 +24,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
-import { cssReferences, moduleReferences, pageReferences, Reference, scriptBuildsReferences } from './references';
+import { cssReferences, moduleReferences, pageReferences, Reference, rewritePageAssets, scriptBuildsReferences } from './references';
 import { plainPart } from './plainText';
 import { cleanPicture, hasPictureSignature } from './pictureClean';
 import { isText, scanText } from './secretScan';
@@ -42,6 +42,8 @@ import {
 
 export class HostedDeckLayoutError extends Error {}
 
+const BAD_HOSTED_LAYOUT = "Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again.";
+
 export interface HostedDeckPage {
   readonly besideDeckPath: string;
   readonly html: string;
@@ -51,6 +53,8 @@ export interface HostedDeckPage {
 
 export interface GatherOptions {
   hostedDeck?: HostedDeckPage;
+  /** Use a legacy deck's beside-the-deck HTML from disk. */
+  legacyDeckLive?: boolean;
   publishedPagePath?: string;
   platform?: NodeJS.Platform;
   realpath?: (p: string) => Promise<string>;
@@ -153,7 +157,7 @@ function commonFolder(paths: string[], p: typeof path.posix | typeof path.win32)
 
 /** Every plan `gatherPage` made, by identity. A plan written by hand, or copied, is not among them. */
 const gatheredPlans = new WeakSet<object>();
-const hostedPages = new WeakMap<GatheredPlan, HostedDeckPage>();
+const hostedPages = new WeakMap<GatheredPlan, HostedDeckPage & { sourceSha256: string; fromDisk: boolean }>();
 
 /** The immutable HTML string that gather scanned, and the previous record key. */
 export function hostedPageOf(plan: GatheredPlan) {
@@ -186,6 +190,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
 
   if (!isInside(pagePath, projectFolder, platform)) throw new Error('This page is outside this project.');
   const hosted = options.hostedDeck;
+  const keepHostedLayout = Boolean(hosted || options.legacyDeckLive);
   const hostedPath = hosted?.besideDeckPath ?? pagePath;
   if (!isInside(hostedPath, projectFolder, platform)) throw new Error('This page is outside this project.');
   if (hosted) {
@@ -193,14 +198,14 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     const expected = p.join(p.dirname(hostedPath), `${name} files`, p.basename(hostedPath));
     if (key(pagePath) !== key(expected) || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
       || address.endsWith('/.') || address.endsWith('/..'))) {
-      throw new HostedDeckLayoutError("Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again.");
+      throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
     }
   }
   const moved = new Map((hosted?.assetAddresses ?? []).map(address => [
     key(p.resolve(p.dirname(hostedPath), address)), p.resolve(p.dirname(pagePath), address),
   ]));
   const pageBytes = hosted ? Buffer.from(hosted.html) : await readFile(pagePath);
-  const pageText = pageBytes.toString('utf8');
+  let pageText = pageBytes.toString('utf8');
   const page = pageReferences(pageText);
   const pageUrl = pathToFileURL(hostedPath);
   let base: URL = pageUrl;
@@ -339,7 +344,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     if (!acceptedKeys.has(key(l.lexical)) && !acceptedKeys.has(key(l.real))) addLeftOut(l.display, 'link');
   }
 
-  // Sizes, hashes and the key scan, over the page and every file that goes
+  // Check and hash the physical assets before assigning any neutral hosted addresses.
   const all: { lexical: string; real: string; size: number; hostedPath: string }[] = [
     { lexical: pagePath, real: pagePath, size: pageBytes.length, hostedPath },
     ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size, hostedPath: c.hostedPath })),
@@ -361,6 +366,10 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     }
     if (f.size > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: f.size });
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
+      continue;
+    }
+    if (file.kind === 'page' && keepHostedLayout) {
       gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
       continue;
     }
@@ -396,32 +405,78 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
   }
 
-  const publishedPath = hosted && options.publishedPagePath;
+  const publishedPath = keepHostedLayout && options.publishedPagePath;
+  const deckFolder = p.dirname(hostedPath);
   const root = publishedPath
-    ? p.resolve(p.dirname(hostedPath), ...publishedPath.split('/').slice(1).map(() => '..'))
-    : commonFolder(gathered.map(({ lexical }) => lexical), p);
+    ? p.resolve(deckFolder, ...publishedPath.split('/').slice(1).map(() => '..'))
+    : keepHostedLayout ? deckFolder : commonFolder(gathered.map(({ lexical }) => lexical), p);
   if (publishedPath && (toSlash(p.relative(root, hostedPath)) !== publishedPath
-    || !isInside(p.join(root, 'index.html'), projectFolder, platform)
-    || gathered.some(({ lexical }) => !isInside(lexical, root, platform)))) {
-    throw new HostedDeckLayoutError('These files would change the published page’s address. Nothing was sent.');
+    || !isInside(p.join(root, 'index.html'), projectFolder, platform))) {
+    throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
   }
+
   const files = gathered.map(({ file, lexical }) => {
-    file.relPath = toSlash(p.relative(root, lexical));
+    if (keepHostedLayout && !isInside(lexical, deckFolder, platform)) file.relocated = true;
+    else file.relPath = toSlash(p.relative(root, lexical));
     return file;
   });
 
-  // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
-  if (hosted) {
-    const pageFolder = path.posix.dirname(files[0].relPath);
+  // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4).
+  if (keepHostedLayout) {
+    const pageFile = files[0];
+    const pageFolder = path.posix.dirname(pageFile.relPath);
     const indexPath = pageFolder === '.' ? '/index.html' : `/${pageFolder}/index.html`;
     const served = new Map([[indexPath, gathered[0].name], ['/version.json', 'version.json']]);
     for (const { file, name } of gathered.slice(1)) {
+      if (file.relocated) continue;
       const address = `/${file.relPath}`;
       const other = served.get(address);
       if (other !== undefined) {
         throw new HostedDeckLayoutError(`“${plainPart(other)}” and “${plainPart(name)}” would go to the same address on the page, so nothing was sent. Rename one of them and publish again.`);
       }
       served.set(address, name);
+    }
+    const neutral = new Map<string, { sourceSha256: string; sha256: string }>();
+    const relocated = new Map<string, string>();
+    for (const { file, lexical } of gathered) {
+      if (!file.relocated || !file.sha256) continue;
+      const hash = file.sourceSha256 ?? file.sha256;
+      const ext = encodeURIComponent(p.extname(lexical).toLowerCase())
+        .replace(/[!'()*]/g, char => `%${char.charCodeAt(0).toString(16)}`);
+      let length = 12;
+      for (;;) {
+        const address = `/pictures/${hash.slice(0, length)}${ext}`;
+        const occupant = neutral.get(address);
+        if (!served.has(address) && (!occupant || (occupant.sourceSha256 === hash && occupant.sha256 === file.sha256))) {
+          neutral.set(address, { sourceSha256: hash, sha256: file.sha256 });
+          relocated.set(key(lexical), address);
+          file.relPath = address.slice(1);
+          break;
+        }
+        if (length === hash.length) throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
+        length++;
+      }
+    }
+    if (relocated.size) {
+      pageText = rewritePageAssets(pageText, value => {
+        const target = resolveRef(value, base, hostedPath, platform);
+        if (target.kind !== 'file') return undefined;
+        const address = relocated.get(key(target.fsPath));
+        const suffix = value.search(/[?#]/);
+        return address && (suffix < 0 ? address : address + value.slice(suffix));
+      });
+    }
+    const sent = Buffer.from(pageText);
+    pageFile.size = sent.length;
+    if (sent.length > MAX_FILE_BYTES && pageBytes.length <= MAX_FILE_BYTES) {
+      tooBig.push({ projectPath: pageFile.projectPath, size: sent.length });
+    }
+    if (pageBytes.length <= MAX_FILE_BYTES && sent.length <= MAX_FILE_BYTES) {
+      pageFile.sha256 = createHash('sha256').update(sent).digest('hex');
+      if (isText(sent)) {
+        const hits = scanText(pageText).map(hit => ({ ...hit, projectPath: pageFile.projectPath, realPath: pagePath }));
+        keyHits.unshift(...hits);
+      }
     }
   }
   const plan = frozenPlan({
@@ -436,9 +491,10 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     keyHits,
     contentHash: contentHashOf(files),
   });
-  if (hosted) hostedPages.set(plan, Object.freeze({
-    html: pageText, besideDeckPath: hostedPath, assetAddresses: Object.freeze([...hosted.assetAddresses]),
-    fit: hosted.fit && Object.freeze([...hosted.fit]),
+  if (keepHostedLayout) hostedPages.set(plan, Object.freeze({
+    html: pageText, sourceSha256: createHash('sha256').update(pageBytes).digest('hex'), besideDeckPath: hostedPath,
+    assetAddresses: Object.freeze([...(hosted?.assetAddresses ?? [])]), fit: hosted?.fit && Object.freeze([...hosted.fit]),
+    fromDisk: !hosted,
   }));
   return plan;
 }
