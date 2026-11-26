@@ -45,6 +45,7 @@ If you run training or share slides with clients, you can update the page they a
 
 - **Copy cells from an Excel workbook.** Copying cells in Ritemark's Excel view now puts their text on the clipboard.
 - **Attach Office files from chat.** The paperclip now accepts Word, Excel and PowerPoint files.
+- **Open a chat link once.** A web link in an AI answer opens your browser, with no extra question afterwards.
 - **Hear button names on a phone.** Screen readers now announce the More and Contents buttons by name on published deck pages.
 - **Print slides with their theme.** On paper and in a PDF, each slide spans the column and keeps its theme's colours.
 - **Keep empty lines on a slide.** A blank line you add between blocks no longer disappears when you leave the slide.
