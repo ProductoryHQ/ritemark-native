@@ -31,7 +31,8 @@
 import type { Node as PMNode, Schema } from '@tiptap/pm/model'
 import { NodeSelection, Selection, TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { liftTarget } from '@tiptap/pm/transform'
-import { MARK_LOOK, OPEN_FENCE, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, boxesMarkOf, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type BoxesMark, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { MARK_LOOK, OPEN_FENCE, boxesShowIcons, REVEAL_KEY, REVEAL_LIST_CLOSE, REVEAL_LIST_OPEN, REVEAL_ONE, boxesMarkOf, columnWidthOf, isRevealWrapperAttrs, parseFenceAttributes, revealsOne, slideBlockClassOf, withFenceValue, wrapperLineWithoutReveal, type BoxesMark, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { boxIconOf, UNKNOWN_ICON } from '../slide/iconSet'
 import { SLIDE_COMMAND, setBlockValue, slideDivNode } from './slideCommands'
 import { addTab, columnsToTabs, tabsAround, tabsToColumns } from '../../../extensions/tabs/tabsCommands'
 
@@ -66,7 +67,7 @@ export const REVEAL_TIP = 'In Present, show the items one by one: the slide open
 
 /**
  * When the bar is wider than the slide's pane, its own groups fold one by one (the lead on #773), in this order: the
- * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then Width or the Columns count, then
+ * alignment first, then Reveal (it keeps its toggle, as an icon with its tooltip), then the Columns count, then
  * Style, and last Boxes' Mark (Sprint 167 PR 2), a menu already, which keeps its value as its icon only, the word in its
  * tooltip. `fold` counts the folds; a group is folded from its number on.
  */
@@ -86,6 +87,45 @@ export function divAttributesOf(node: PMNode): FenceAttributes {
   if (node.type.name !== 'slideDiv') return NO_ATTRIBUTES
   const open = OPEN_FENCE.exec(String(node.attrs.open ?? ''))
   return (open ? parseFenceAttributes(open[2]) : null) ?? NO_ATTRIBUTES
+}
+
+/** The look used to draw a box's badge. */
+export function boxLookAt(doc: PMNode, pos: number | undefined): string {
+  return pos === undefined ? 'boxes' : divAttributesOf(doc.resolve(pos).parent).values.look ?? 'boxes'
+}
+
+/** The position of the innermost box (`::: box`) holding the selection's head, or null. */
+export function caretBoxPos(state: EditorState): number | null {
+  const $head = state.selection.$head
+  for (let depth = $head.depth; depth > 0; depth--) {
+    const node = $head.node(depth)
+    if (node.type.name === 'slideDiv' && slideBlockClassOf(divAttributesOf(node)) === 'box') return $head.before(depth)
+  }
+  return null
+}
+
+/** The caret's box and its icon, including an unknown name as written. */
+export function caretBoxIcon(state: EditorState) {
+  const pos = caretBoxPos(state)
+  const node = pos === null ? null : state.doc.nodeAt(pos)
+  if (pos === null || !node || !boxesShowIcons(boxLookAt(state.doc, pos))) return null
+  const icon = boxIconOf(divAttributesOf(node).values.icon)
+  return { pos, current: icon?.name ?? null, glyph: icon?.phosphor ?? UNKNOWN_ICON }
+}
+
+export function isBoxIconShortcut(event: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey' | 'defaultPrevented'>): boolean {
+  return event.key === 'F10' && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.defaultPrevented
+}
+
+export type BoxIconMenuCloseReason = 'trigger' | 'outside' | 'escape' | 'mouse-pick' | 'keyboard-pick'
+
+export function boxIconMenuReturnFocus(
+  openedByKeyboard: boolean,
+  reason: BoxIconMenuCloseReason,
+): 'trigger' | 'editor' | null {
+  if (reason === 'outside') return null
+  if (reason === 'mouse-pick') return 'editor'
+  return openedByKeyboard ? 'trigger' : 'editor'
 }
 
 const divKind = (node: PMNode) => (node.type.name === 'slideDiv' ? slideBlockClassOf(divAttributesOf(node)) : null)
@@ -177,7 +217,7 @@ export const MARK_TIP: Readonly<Record<BoxesMark, string>> = {
   dot: 'A dot on each box',
   arrow: 'An arrow on each box',
 }
-export const MARK_MENU_TIP = 'What each box shows at its top: its icon, its number, a dot or an arrow'
+export const MARK_MENU_TIP = 'Mark on every box'
 
 /**
  * Mark on a Boxes block's bar (README item C): its look on the block's own line (`look="steps"`), or none for Icon, one

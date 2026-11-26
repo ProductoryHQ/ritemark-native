@@ -95,6 +95,8 @@ port.on('message', (message: HostToWorkerMessage) => {
       pendingReads = pendingReads.then(async () => {
         const result = await readProjectDocument(message.document, message.roots, pause).catch(() => ({
           text: "Ritemark couldn't read this file. Try opening it in its usual app.",
+          reason: 'worker' as const,
+          isError: true,
         }));
         post({ type: 'read', requestId: message.requestId, result });
       });

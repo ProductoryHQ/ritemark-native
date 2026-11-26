@@ -18,6 +18,7 @@
  * Patterned on codexManager.ts (lifecycle + progress mapping + trace logging).
  */
 
+import { documentReadReasonOf, documentStepKind, isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import type {
   AgentProgress,
   AgentProgressType,
@@ -108,6 +109,7 @@ interface AcpSessionState {
   lastMessage: { id: string | null; text: string };
   /** Sprint 155: the files this turn's completed `edit` tool calls changed. */
   turnChanges: AcpTurnChanges;
+  toolSteps: Map<string, { tool: string; step: ToolStep }>;
   /** Full live option set returned by ACP session setup / config mutation. */
   configOptions: SessionConfigOption[];
   /** Original provider selection used when Composer returns to Auto. */
@@ -208,6 +210,7 @@ export class AcpManager {
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
       turnChanges: new AcpTurnChanges(),
+      toolSteps: new Map(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -229,6 +232,7 @@ export class AcpManager {
       cancelRequested: false,
       lastMessage: { id: null, text: '' },
       turnChanges: new AcpTurnChanges(),
+      toolSteps: new Map(),
       configOptions: session.configOptions ?? [],
       initialThoughtLevel: thoughtLevelCurrent(session.configOptions ?? []),
       currentModel: null,
@@ -362,6 +366,7 @@ export class AcpManager {
     state.cancelRequested = false;
     state.lastMessage = { id: null, text: '' };
     state.turnChanges.reset();
+    state.toolSteps.clear();
 
     let result: PromptResponse;
     try {
@@ -489,9 +494,9 @@ export class AcpManager {
    * the technical-plan mapping table:
    *   agent_message_chunk → text
    *   agent_thought_chunk → thinking
-   *   tool_call           → tool_use (tool title + first location path)
+   *   tool_call           → tool_use (including arguments for named steps)
    *   plan                → plan_text
-   * tool_call_update / available_commands_update / usage_update are ignored for
+   * tool_call_update refreshes named steps. available_commands_update / usage_update are ignored for
    * the baseline UI (audit R-7).
    *
    * Sprint 99: routes on `params.sessionId`. An update for an unknown or
@@ -535,16 +540,6 @@ export class AcpManager {
         }
         break;
       }
-      case 'tool_call': {
-        traceAcp('manager', 'update:tool_call', { sessionId, title: update.title, kind: update.kind });
-        state.turnChanges.note(update);
-        state.sawContentThisTurn = true;
-        this.emit(sessionId, 'tool_use', update.title, {
-          tool: update.title,
-          file: update.locations?.[0]?.path,
-        });
-        break;
-      }
       case 'plan': {
         state.sawContentThisTurn = true;
         const text = update.entries.map((entry) => `- ${entry.content}`).join('\n');
@@ -559,11 +554,39 @@ export class AcpManager {
         );
         break;
       }
+      case 'tool_call':
       case 'tool_call_update': {
-        // Not surfaced in the baseline UI, but a completed edit is how the
-        // turn's changed files are known (Sprint 155).
+        traceAcp('manager', `update:${update.sessionUpdate}`, { sessionId, title: update.title, kind: update.kind, status: update.status });
         state.turnChanges.note(update);
-        traceAcp('manager', 'update:tool_call_update', { sessionId, status: update.status, kind: update.kind });
+        const start = update.sessionUpdate === 'tool_call';
+        if (start) state.sawContentThisTurn = true;
+        const previous = state.toolSteps.get(update.toolCallId);
+        const raw = update.rawInput as { path?: unknown; filePath?: unknown; command?: unknown; pattern?: unknown; tool?: unknown } | undefined;
+        const tool = update.title ?? previous?.tool ?? '';
+        const documentTool = isDocumentReadTool(tool) || (typeof raw?.tool === 'string' && isDocumentReadTool(raw.tool));
+        const inputPath = raw?.path ?? raw?.filePath;
+        const file = typeof inputPath === 'string' ? inputPath : update.locations?.[0]?.path ?? previous?.step.path;
+        const command = typeof raw?.command === 'string' ? raw.command : previous?.step.command;
+        let kind = previous?.step.kind;
+        if (documentTool) kind = 'read';
+        else if (update.kind === 'execute' || /^(?:bash|terminal)(?:$|[ :])/i.test(tool) || command) kind = 'shell';
+        else if (/^(?:glob|ls|list)(?:$|[ :])/i.test(tool) || (update.kind === 'read' && file && !documentStepKind(file) && /[\\/]$/.test(file))) kind = 'folder';
+        else if (update.kind === 'read') kind = 'read';
+
+        if (kind) {
+          let step: ToolStep = { id: update.toolCallId, kind, path: file, command: command ?? (kind === 'shell' ? tool : typeof raw?.pattern === 'string' ? raw.pattern : undefined) };
+          const stepTool = documentTool ? 'read_document' : tool;
+          if (update.status === 'completed' || update.status === 'failed') {
+            const output = update.content?.length ? update.content : update.rawOutput;
+            step = toolStepResult(step, output, update.status === 'failed', documentTool, documentReadReasonOf(update.rawOutput));
+            state.toolSteps.delete(update.toolCallId);
+          } else {
+            state.toolSteps.set(update.toolCallId, { tool: stepTool, step });
+          }
+          this.emit(sessionId, 'tool_use', tool, { tool: stepTool, file, step });
+        } else if (start) {
+          this.emit(sessionId, 'tool_use', tool, { tool, file });
+        }
         break;
       }
       default:
@@ -592,12 +615,13 @@ export class AcpManager {
     }
   }
 
-  private emit(sessionId: string, type: AgentProgressType, message: string, extra?: { tool?: string; file?: string }): void {
+  private emit(sessionId: string, type: AgentProgressType, message: string, extra?: { tool?: string; file?: string; step?: ToolStep }): void {
     this.config.onProgress({
       type,
       message,
       tool: extra?.tool,
       file: extra?.file,
+      ...(extra?.step ? { step: extra.step } : {}),
       timestamp: Date.now(),
     }, sessionId);
   }

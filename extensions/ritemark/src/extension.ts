@@ -653,7 +653,7 @@ export function activate(context: vscode.ExtensionContext) {
       return answer.ok ? { ok: true } : { ok: false, message: answer.message };
     },
     hasWorkingTurn: () => unifiedViewProvider.hasWorkingTurn(),
-    setStartingPlace: (place, hasAbout) => unifiedViewProvider.setStartingPlace(place, hasAbout),
+    setStartingPlace: (places, hasAbout) => unifiedViewProvider.setStartingPlace(places, hasAbout),
     onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(listener),
     onChatOrigin: (listener) => unifiedViewProvider.onChatOrigin(listener),
     openConversation: (conversationId) => unifiedViewProvider.openConversation(conversationId),

@@ -213,9 +213,10 @@ test('#850: a box whose icon Ritemark doesn\'t know keeps its badge, with the da
   // No icon, or an empty one: no badge at all.
   assert.ok(!blockSlideHtml(':::: boxes\n::: box\n### Idea\n:::\n::::').includes('blk-icon'));
   assert.ok(!boxes('').includes('blk-icon') && !boxes('  ').includes('blk-icon'));
-  // Looks that draw their own mark draw no icon, known or not; Arrows draws its arrow.
-  for (const look of ['steps', 'line']) assert.ok(!blockSlideHtml(`:::: {.boxes look="${look}"}\n::: {.box icon="xyz"}\nA\n:::\n::::`).includes('blk-icon'), look);
-  assert.ok(!blockSlideHtml(':::: {.boxes look="arrows"}\n::: {.box icon="xyz"}\nA\n:::\n::::').includes('is-unknown'));
+  for (const look of ['steps', 'line', 'arrows']) {
+    const html = blockSlideHtml(`:::: {.boxes look="${look}"}\n::: {.box icon="xyz"}\nA\n:::\n::::`);
+    assert.equal(html.includes('blk-icon is-unknown'), look === 'steps', look);
+  }
   // The look: the badge's place, size and soft accent ground as every icon's; the dashed circle in the placeholder colour, on a card and borderless.
   const css = fs.readFileSync(path.join(__dirname, '../../../webview/src/components/decks/slide/slide.css'), 'utf8').replace(/\s+/g, ' ');
   assert.ok(css.includes('.deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }'), 'the placeholder colour');

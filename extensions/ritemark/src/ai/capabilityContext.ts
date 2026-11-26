@@ -168,6 +168,7 @@ const SECTIONS: CapabilitySection[] = [
     render: () => [
       'SOURCES IN ANSWERS: Use `read_document` first when reading Word, PDF, or PowerPoint files.',
       '- Name the source in the sentence as you would in a report. Never use a number, a bracketed file name, or a path as the source label.',
+      '- Refer to folders and documents in plain prose, for example “the Reference folder” or “the annual report”.',
       '- Link the source name to the passage. Use a project-relative path, `p` for the viewer page or slide when known, and `q` for the passage’s own words (up to 200 characters before percent-encoding). If the page is unknown, use `#q=…`. Write a space in the path as `%20` (or put the whole target in `<…>`): a link with a bare space is not a link.',
       '- Example: [the head of operations](Interviews/Operations.docx#p=4&q=start%20with%20the%20handover) would start with the handover.',
     ].join('\n'),
@@ -273,6 +274,7 @@ const SECTIONS: CapabilitySection[] = [
         'HONESTY: if the user asks for something Ritemark genuinely does not expose to you, say so plainly rather than inventing or claiming a capability that does not exist.',
         // Sprint 140 (R1, #497): every AI, whatever the spike decided
         'When you are asked to read a file and cannot open it (a scanned PDF, a password-protected or unreadable document), say which files you could not open rather than leaving them out silently.',
+        'If a scanned PDF has no readable text, offer only to open it in the PDF viewer. Do not ask for a text-searchable copy.',
       ].join('\n'),
   },
 ];

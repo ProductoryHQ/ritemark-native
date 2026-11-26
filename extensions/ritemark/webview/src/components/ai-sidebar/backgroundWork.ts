@@ -6,6 +6,7 @@
  * keeps reporting after that turn ended — sometimes after Claude has opened
  * a new turn of its own. Card updates therefore find the card in any turn.
  */
+import { updateStep } from './stepLabel';
 import type { AgentConversationTurn, AgentProgress, SubagentProgress } from './types';
 
 type CardStatus = SubagentProgress['status'];
@@ -24,7 +25,7 @@ function cardStatusFor(progress: AgentProgress): CardStatus | null {
 function patchCard(card: SubagentProgress, progress: AgentProgress): SubagentProgress {
   // Activity of the subagent itself (its tools, its thinking).
   if (progress.type === 'subagent_progress' || (progress.parentToolUseId && !progress.subagentStatus && progress.type !== 'subagent_done')) {
-    return { ...card, activities: [...card.activities, progress] };
+    return { ...card, activities: updateStep(card.activities, progress) };
   }
   const status = cardStatusFor(progress);
   const next: SubagentProgress = {

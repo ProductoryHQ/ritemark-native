@@ -13,6 +13,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { useAISidebarStore } = await import('./store');
 const { createConversationState } = await import('./conversationState');
 const { AgentTurnBlock } = await import('./AgentView');
+const { ActivityStatusLine } = await import('./ActivityStatusLine');
 const { CodexTurn } = await import('./CodexView');
 const { getActiveApprovedPlanForClaude } = await import('./lifecycle');
 
@@ -38,7 +39,7 @@ function assertBefore(markup: string, card: string, text = prose) {
   assert.ok(textAt >= 0 && cardAt > textAt, 'full assistant prose should render above the card');
 }
 
-const snippet = prose.slice(0, 150) + '...';
+const snippet = prose.slice(0, 150) + '…';
 const pending = { toolUseId: 'ask', questions: [item] };
 const agentTurn = () => current().agentConversation[0];
 
@@ -203,3 +204,30 @@ for (const runtime of ['codex', 'opencode'] as const) {
     assert.ok(!resumed.includes(question));
   });
 }
+
+test('Claude renders the collapsed S17 read summary below the completed answer', () => {
+  startClaudeTurn();
+  progress('tool_use', 'Using ToolSearch', 'ToolSearch');
+  for (const [index, interview] of ['Riverside', 'Customer service', 'Operations', 'Harbour Street'].entries()) {
+    const step = { id: String(index), kind: 'read' as const, path: `Interviews/${interview}.docx` };
+    const base = { type: 'tool_use' as const, tool: 'mcp__ritemark_documents__read_document', message: '', timestamp: index };
+    send({ type: 'agent-progress', conversationId, progress: { ...base, step } });
+    send({ type: 'agent-progress', conversationId, progress: { ...base, step: { ...step, status: 'completed' } } });
+  }
+  assert.equal(agentTurn().activities.length, 4);
+  assert.doesNotMatch(renderClaude(), /Read 4 Word documents/);
+  progress('done', 'Completed in 9.8s');
+
+  const text = 'The interviews recommend asking how we can help.';
+  send({
+    type: 'agent-result', conversationId, text,
+    metrics: { durationMs: 9800, waitedMs: 2000, costUsd: null, model: null },
+  });
+  const markup = renderClaude();
+  assertBefore(markup, 'Read 4 Word documents · 8s', text);
+  assert.match(markup, /<details class="[^"]*"><summary[^>]*>Read 4 Word documents · 8s<\/summary>/);
+  assert.doesNotMatch(markup, /ToolSearch|Completed in 9\.8s/);
+  // Zustand reads the initial snapshot during server rendering.
+  Object.assign(store.getInitialState(), store.getState());
+  assert.match(renderToStaticMarkup(React.createElement(ActivityStatusLine)), /Done in 8s/);
+});

@@ -12,7 +12,8 @@ import { EditorState, TextSelection } from '@tiptap/pm/state'
 import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, isCoverSlide } from '../../../../../src/decks/blocks/slideRenderer'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, measureFlowAt, overflowsSideways, setStageFit, stageFitFor, subscribeStageFit } from './slideFit'
 import { loadSlide } from './slideEditorHarness'
-import { CARET_CLASS, caretBoxPos } from './slideDivView'
+import { CARET_CLASS } from './slideDivView'
+import { caretBoxPos } from './blockBar'
 import { imagePathOf, missingDecorations } from './slidePictures'
 
 // ---- A flow laid out by a small model: words a given height and a word a given width, both scaled by `--fit`, as the

@@ -8,6 +8,7 @@
  * One server per OpenCode process; disposed when the process ends.
  */
 
+import type { DocumentReadReason } from '../documents/documentRead';
 import * as crypto from 'crypto';
 import * as net from 'net';
 import * as os from 'os';
@@ -54,6 +55,7 @@ export interface RitemarkIpcToolDefinition {
 
 /** The answer to one request: the group's tools, or a call's text. */
 export interface RitemarkIpcResult {
+  reason?: DocumentReadReason;
   tools?: RitemarkIpcToolDefinition[];
   text?: string;
   isError?: boolean;

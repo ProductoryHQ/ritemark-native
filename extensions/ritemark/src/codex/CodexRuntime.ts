@@ -15,6 +15,8 @@
  * only the destination lookup inside each callback became thread-aware.
  */
 
+import type { DocumentReadReason } from '../documents/documentRead';
+import { isDocumentReadTool, toolStepResult, type ToolStep } from '../runtime/toolStep';
 import * as crypto from 'crypto';
 import { CODEX_ERROR_EVENT, CODEX_RETRY_WAIT_EVENT, CodexAppServer } from './codexAppServer';
 import { CodexRetryPairing, parseCodexRetryNotice, type CodexRetryNotice, type CodexRetryWaitHeard } from './codexRetry';
@@ -924,16 +926,18 @@ export class CodexRuntime implements AgentRuntime {
 
     this._appServer.on(
       'item/started',
-      (params: { item: { type: string; id: string }; threadId: string; turnId: string }) => {
+      (params: { item: { type: string; id: string; command?: string; tool?: string }; threadId: string; turnId: string }) => {
         const session = this._sessionForThread(params.threadId, 'item/started');
         const config = session?.config;
         if (!session || !config) return;
         const itemType = params.item?.type;
         // A new assistant message starts: the last one is no longer the last.
         if (itemType === 'agentMessage') session._lastAgentMessage = { itemId: params.item.id ?? null, text: '' };
-        if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning') {
+        if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && !isDocumentReadTool(params.item.tool)) {
           const label = itemType === 'agentMessage' ? 'Thinking...' : `Running: ${itemType}`;
-          config.onProgress({ type: 'tool_use', message: label, tool: itemType, timestamp: Date.now() });
+          const step: ToolStep | undefined = itemType === 'commandExecution'
+            ? { id: params.item.id, kind: 'shell', command: params.item.command } : undefined;
+          config.onProgress({ type: 'tool_use', message: label, tool: itemType, timestamp: Date.now(), ...(step ? { step } : {}) });
         }
       },
     );
@@ -970,7 +974,7 @@ export class CodexRuntime implements AgentRuntime {
       config?.onCodexPlanUpdate?.(params.explanation, params.plan);
     });
 
-    this._appServer.on('item/completed', (params: { item: { type: string; id: string; text?: unknown }; threadId?: string }) => {
+    this._appServer.on('item/completed', (params: { item: { type: string; id: string; text?: unknown; tool?: string; command?: string; status?: string }; threadId?: string }) => {
       const session = this._sessionForThread(params.threadId, 'item/completed');
       const config = session?.config;
       if (!session || !config) return;
@@ -986,8 +990,11 @@ export class CodexRuntime implements AgentRuntime {
       if (itemType === 'agentMessage' && typeof params.item.text === 'string' && params.item.text.trim()) {
         session._lastAgentMessage = { itemId: params.item.id ?? null, text: params.item.text };
       }
-      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage') {
-        config.onProgress({ type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now() });
+      if (itemType && itemType !== 'userMessage' && itemType !== 'reasoning' && itemType !== 'agentMessage' && !isDocumentReadTool(params.item.tool)) {
+        const step: ToolStep | undefined = itemType === 'commandExecution'
+          ? { id: params.item.id, kind: 'shell', command: params.item.command, status: params.item.status === 'completed' ? 'completed' : 'failed' }
+          : undefined;
+        config.onProgress({ type: 'done', message: `Done: ${itemType}`, tool: itemType, timestamp: Date.now(), ...(step ? { step } : {}) });
       }
     });
 
@@ -1093,9 +1100,22 @@ export class CodexRuntime implements AgentRuntime {
             try { toolArgs = JSON.parse(params.arguments) as Record<string, unknown>; } catch { toolArgs = {}; }
           }
           if (config?.onDynamicToolCall) {
+            const step: ToolStep | undefined = isDocumentReadTool(toolName) ? {
+              id: typeof params.itemId === 'string' ? params.itemId : `dynamic:${request.id}`,
+              kind: 'read',
+              path: typeof toolArgs?.path === 'string' ? toolArgs.path : undefined,
+            } : undefined;
+            const progress = (step: ToolStep) => config.onProgress({
+              type: 'tool_use', message: '', tool: toolName, timestamp: Date.now(), step,
+            });
+            if (step) progress(step);
+            const respond = (reply: { text: string; success: boolean; reason?: DocumentReadReason }) => {
+              if (step) progress(toolStepResult(step, reply.text, !reply.success, true, reply.reason));
+              this._appServer?.sendToolCallResponse(request.id, reply.text, reply.success);
+            };
             void config.onDynamicToolCall(toolName, toolArgs, request.id).then(
-              (reply) => this._appServer?.sendToolCallResponse(request.id, reply.text, reply.success),
-              () => this._appServer?.sendToolCallResponse(request.id, `Tool error: ${toolName}`, false),
+              respond,
+              () => respond({ text: `Tool error: ${toolName}`, success: false }),
             );
           } else {
             this._appServer?.sendToolCallResponse(request.id, `Unknown dynamic tool: ${toolName}`, false);

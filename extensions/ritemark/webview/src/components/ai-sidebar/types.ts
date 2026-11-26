@@ -4,6 +4,8 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { StartingPlacesByAgent } from '../../../../src/guidance/startingPlace';
+import type { ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { LiveDeckStep } from '../../../../src/conversations/types';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
@@ -64,9 +66,10 @@ export interface ModelOption {
   hidden?: boolean;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'notice' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
+  step?: ToolStep;
   type: AgentProgressType;
   message: string;
   tool?: string;
@@ -438,6 +441,7 @@ export interface CodexConversationTurn {
   result?: {
     liveDeckSteps?: LiveDeckStep[];
     status: string;
+    activityDurationMs?: number;
     error?: string;
     /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
     errorKind?: RuntimeErrorKind;
@@ -513,7 +517,7 @@ export type ExtensionMessage =
   | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
-  | { type: 'starting-place'; place: string; hasAbout: boolean }
+  | { type: 'starting-place'; places: StartingPlacesByAgent; hasAbout: boolean }
   // Sprint 162 PR 5: an AI's theme change under its reply, and what Undo did
   | { type: 'theme-change/add'; conversationId: string; change: ThemeChangeChipView }
   | { type: 'theme-change/undone'; id: string; words: string }

@@ -6,6 +6,9 @@
  * approval dialogs for shell commands and file changes.
  */
 
+import { ActivityCard } from './ActivityCard';
+import { ActivityDetails } from './ActivityDetails';
+import { activityHeadline, readSummary, stepLabel, visibleStepActivities } from './stepLabel';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
@@ -53,7 +56,7 @@ export function CodexView() {
   }, [codexConversation]);
 
   if (codexConversation.length === 0) {
-    // Sprint 140 (R8): the same starting points as Claude's and OpenCode's empty chat; the compatibility notice stays
+    // Sprint 140 (R8): the shared starting-points component; the compatibility notice stays
     // above them. Named as people know it (Sprint 133): ChatGPT.
     return (
       <StartingPoints
@@ -151,7 +154,7 @@ export function CodexTurn({
   onDiscardPlan: (turnId: string, feedback?: string) => void;
 }) {
   const hasActivities = turn.activities.length > 0;
-  const lastActivity = hasActivities ? turn.activities[turn.activities.length - 1] : null;
+  const hasNamedSteps = turn.activities.some((activity) => stepLabel(activity));
   const rawPlanText = turn.planText || ((turn.result && !turn.result.error) ? turn.streamingText : '');
   const displayPlanText = extractPlanDisplayText(rawPlanText);
   // Only show plan cards when the user explicitly requested plan mode.
@@ -184,11 +187,11 @@ export function CodexTurn({
       </UserPromptBubble>
 
       {/* Collapsible activities */}
-      {hasActivities && (
+      {hasNamedSteps && turn.isRunning && <ActivityDetails activities={turn.activities} running />}
+      {hasActivities && !hasNamedSteps && (
         <ActivitySection
           activities={turn.activities}
           isRunning={turn.isRunning}
-          lastActivity={lastActivity}
           runtimeLabel={runtimeLabel}
         />
       )}
@@ -268,6 +271,14 @@ export function CodexTurn({
         </div>
       )}
 
+      {hasNamedSteps && !turn.isRunning && (
+        <ActivitySection
+          activities={turn.activities}
+          isRunning={false}
+          runtimeLabel={runtimeLabel}
+          activeMs={turn.result?.activityDurationMs}
+        />
+      )}
       <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
 
       {/* Sprint 103 R7: the per-turn "Waiting for plan review" line is gone —
@@ -323,29 +334,37 @@ function PlanCard({
  * When expanded: shows all individual activity lines.
  */
 function ActivitySection({
-  activities,
+  activities: turnActivities,
   isRunning,
-  lastActivity,
   runtimeLabel,
+  activeMs,
 }: {
   activities: AgentProgress[];
   isRunning: boolean;
-  lastActivity: AgentProgress | null;
   /** ChatGPT or OpenCode: the provider's own words are labelled as theirs. */
   runtimeLabel: string;
+  activeMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  const workspacePath = useAISidebarStore((state) => state.workspacePath);
+  const visible = visibleStepActivities(turnActivities, workspacePath);
+  const notices = visible.filter((activity) => activity.type === 'notice');
+  const activities = visible.filter((activity) => activity.type !== 'notice');
   const count = activities.length;
+  const noticeRows = notices.length > 0 ? <ActivityDetails activities={notices} running /> : null;
+  if (!count) return noticeRows;
+  const details = isRunning ? activities : visible;
   // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action. A row
   // that opens them says whose words they are (the Experience lead): "What ChatGPT said".
   const actions = activities.filter((activity) => activity.type !== 'error').length;
   const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
   const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
-  const latestMessage = lastActivity?.message || '';
+  const latestMessage = activityHeadline(activities[count - 1]);
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">
+      {isRunning && noticeRows}
       {/* Summary row — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -364,7 +383,7 @@ function ActivitySection({
         <span className="text-[11px] opacity-50 truncate">
           {isRunning
             ? `${latestMessage}${count > 1 ? ` (${count} actions)` : ''}`
-            : theirWords ?? completed
+            : theirWords ?? readSummary(activities, activeMs) ?? completed
           }
         </span>
       </button>
@@ -372,8 +391,10 @@ function ActivitySection({
       {/* Expanded details */}
       {expanded && (
         <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
-          {activities.map((activity, i) => (
-            <ActivityLine key={i} activity={activity} />
+          {details.map((activity, i) => (
+            activity.type === 'notice' || activity.type === 'thinking' || stepLabel(activity)
+              ? <ActivityCard key={i} activity={activity} />
+              : <ActivityLine key={i} activity={activity} />
           ))}
         </div>
       )}

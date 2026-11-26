@@ -17,7 +17,9 @@ RITEMARK_BUILD_CHANNEL=test RITEMARK_TEST_PROFILE=/private/tmp/rm-reading-claude
   --user-data-dir=/private/tmp/rm-reading-claude-1
 ```
 
-For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
+For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--require gemini` with `--ai opencode`. The runner selects a Google model for this run. The existing launcher and vault wrapper are Mac-only. Windows needs the Gate 2 isolated launcher and vault wrapper before its scripted runs. Paste the generated Markdown into the matching run below. Keep the JSON with the evidence.
+
+Use `--question "<text>"` to run the three S38 prompts. For these runs, criteria 1, 2, 4 and 5 are marked `n/a`. The runner checks step labels and source style and records any links the answer includes. Judge each S38 answer against its requested scope. Regenerate older fixtures to pick up the additional accepted facts for criterion 1.
 
 1. All 13 documents have a matching fact or an explicit, valid unread reason. The fixture has two known unread cases (the scan and the confidential appendix).
 2. The notes belong to their own slides and slide 5 is explicitly reported as having none.
@@ -26,7 +28,7 @@ For ChatGPT, use `--require openai` with `--ai chatgpt`. For OpenCode, use `--re
 5. The confidential appendix is named, described as having a password, and accompanied by a way forward.
 6. The visible answer has no numbered sources, bracketed filenames or paths.
 
-Fill all six criteria with pass or fail. Each AI needs three passing runs out of three on each platform. After a failure, retain its evidence and start a fresh set after the fix. G2 opens the Word and PDF starting points per AI after it passes on Mac and keeps them on if Windows also passes at Gate 2.
+For fixed-question runs, fill all six criteria with pass or fail. Each AI needs three passing runs out of three on each platform. After a failure, retain its evidence and start a fresh set after the fix. G2 opens the Word and PDF starting points per AI after it passes on Mac and keeps them on if Windows also passes at Gate 2.
 
 ## Run records
 

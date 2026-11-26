@@ -6,6 +6,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { StartingPoints } from './StartingPoints';
+import { ActivityDetails } from './ActivityDetails';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
@@ -136,6 +137,8 @@ export function AgentTurnBlock({
           conversation-level ActivityStatusLine (Sprint 103 R7's single status
           point) — removed; its subagent badge lives there now. */}
 
+      {turn.isRunning && <ActivityDetails activities={turn.activities} running />}
+
       {/* Result */}
       {turn.result && <AgentResponse turn={turn} />}
       <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
@@ -177,7 +180,7 @@ export function AgentView() {
   }, []);
 
   if (agentConversation.length === 0) {
-    // Sprint 140 (R8): the starting points, the same for every AI, which fill the box rather than send at once.
+    // Sprint 140 (R8): the chosen AI's starting points, which fill the box rather than send at once.
     return <StartingPoints aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} />;
   }
 

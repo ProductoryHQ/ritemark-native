@@ -65,13 +65,14 @@ import {
   type PromptQueues,
   type QueueItem,
 } from './promptQueue';
+import { isHiddenToolActivity, updateStep } from './stepLabel';
 import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import { appendStreamedText } from '../../../../src/agent/types';
-import type { StartingPlace } from '../../../../src/guidance/startingPlace';
+import type { StartingPlace, StartingPlacesByAgent } from '../../../../src/guidance/startingPlace';
 import { signInAttentionOf, type SheetSignInAi, type SheetSignInRequest, type SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
 import { slideAtSendOf, type CurrentSlide, type SlideAtSend } from '../../../../src/decks/currentSlide';
@@ -134,7 +135,6 @@ export function refillOnReopen(box: string, request: { text: string; cursor?: nu
   return { text: request.text, cursor: request.cursor ?? request.text.length };
 }
 
-/** Sprint 140 (R8): the empty sheet's places, as the host names them (`src/guidance/startingPlace.ts`). */
 /** Sprint 162 PR 5: a theme change's chip as the host sends it, checked field by field. */
 function themeChipOf(value: unknown): ThemeChangeChipView | null {
   if (!value || typeof value !== 'object') return null;
@@ -143,6 +143,7 @@ function themeChipOf(value: unknown): ThemeChangeChipView | null {
   return { id: chip.id, kind: chip.kind, themeName: chip.themeName };
 }
 
+/** The empty sheet's places as the host names them in startingPlace.ts. */
 const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample', 'theme'];
 
 let msgCounter = 0;
@@ -266,6 +267,7 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
 }
 
 interface AISidebarState {
+  workspacePath?: string;
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
   isOnline: boolean;
@@ -353,7 +355,7 @@ interface AISidebarState {
    */
   startChatFromHost: (request: ChatStartMessage) => void;
   /** Sprint 140 (R8): the empty sheet's starting place, from the host. */
-  startingPlace: { place: StartingPlace; hasAbout: boolean } | null;
+  startingPlace: { places: StartingPlacesByAgent; hasAbout: boolean } | null;
   /** Sprint 140 (R8, D4): a fill for the composer of one chat, with where the cursor waits; ChatInput takes it. */
   composerFill: { conversationId: string; text: string; cursor: number; nonce: number } | null;
   /** Put words in the open chat's box, focused, the cursor at `cursor`; `origin` tells the host where they came from. */
@@ -2964,6 +2966,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             byokProviderModels,
             // Sprint 103 R6: capability map from the host registry.
             runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
+            workspacePath: message.workspacePath || undefined,
             conversations,
           });
 
@@ -3061,10 +3064,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set(updates);
 
           // The Codex binary/auth is app-global, so a not-ready status blocks the
-          // running turn in EVERY thread that has one — not just the visible one.
+          // running ChatGPT turn in every thread that has one.
           if (message.status.state !== 'ready') {
             for (const id of Object.keys(get().conversations)) {
-              patchLastCodexTurn(id, (lastTurn) => ({
+              patchLastCodexTurn(id, (lastTurn) => lastTurn.runtime === 'opencode' ? null : ({
                 ...lastTurn,
                 approval: undefined,
                 isRunning: false,
@@ -3239,8 +3242,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'starting-place': {
-          const place = STARTING_PLACES.find((candidate) => candidate === message.place);
-          if (place) set({ startingPlace: { place, hasAbout: message.hasAbout === true } });
+          const claude = STARTING_PLACES.find((place) => place === message.places?.['claude-code']);
+          const codex = STARTING_PLACES.find((place) => place === message.places?.codex);
+          const opencode = STARTING_PLACES.find((place) => place === message.places?.opencode);
+          if (claude && codex && opencode) {
+            set({ startingPlace: { places: { 'claude-code': claude, codex, opencode }, hasAbout: message.hasAbout === true } });
+          }
           break;
         }
 
@@ -3269,6 +3276,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const targetId = routeInbound(message);
           if (!targetId) break;
           const progress = message.progress as AgentProgress;
+          if (isHiddenToolActivity(progress)) break;
 
           patchLastAgentTurn(targetId, (lastTurn) => {
             if (progress.type === 'text' || progress.type === 'plan_text') {
@@ -3298,7 +3306,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               return {
                 ...lastTurn,
                 assistantText: undefined,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: [...(lastTurn.subagents || []), newSubagent],
               };
             }
@@ -3306,10 +3314,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Add activity to the matching subagent
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.parentToolUseId
-                    ? { ...sa, activities: [...sa.activities, progress] }
+                    ? { ...sa, activities: updateStep(sa.activities, progress) }
                     : sa
                 ),
               };
@@ -3318,7 +3326,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Mark subagent as done
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.subagentId
                     ? { ...sa, status: 'done' as const, result: progress.message }
@@ -3332,7 +3340,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             return {
               ...lastTurn,
               assistantText: resetsQuestionContext ? undefined : lastTurn.assistantText,
-              activities: [...lastTurn.activities, progress],
+              activities: updateStep(lastTurn.activities, progress),
             };
           });
           break;
@@ -3541,7 +3549,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
-            activities: [...lastTurn.activities, message.progress as AgentProgress],
+            activities: updateStep(lastTurn.activities, message.progress as AgentProgress),
             // Sprint 143 (#544): the AI went on; its wait is over.
             retry: undefined,
           }));
@@ -3802,6 +3810,11 @@ type ActiveConversationSlice = Pick<AISidebarState, 'conversations' | 'activeCon
 export function selectActiveConversation(state: ActiveConversationSlice): ConversationState {
   const id = state.activeConversationId;
   return (id ? state.conversations[id] : undefined) ?? NO_ACTIVE_CONVERSATION;
+}
+
+/** The current AI's starting place for the document in front. */
+export function selectStartingPlace(state: AISidebarState): StartingPlace | undefined {
+  return state.startingPlace?.places[selectActiveConversation(state).selectedAgent];
 }
 
 /**

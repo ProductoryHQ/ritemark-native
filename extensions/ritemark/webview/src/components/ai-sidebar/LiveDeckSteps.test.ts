@@ -33,7 +33,7 @@ function checkLines(markup: string) {
     assert.ok(offset < markup.indexOf('data-activity-state="done"'));
     assert.equal(markup.lastIndexOf(message), offset, 'one line per step');
     assert.ok(offset > markup.lastIndexOf('</details>'), 'the step follows Claude’s Activity fold');
-    assert.ok(offset > markup.lastIndexOf('action completed'), 'the step follows the ChatGPT or OpenCode Activity fold');
+    assert.ok(offset > markup.lastIndexOf('actions completed'), 'the step follows the ChatGPT or OpenCode Activity fold');
   }
 }
 
@@ -59,15 +59,40 @@ for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
   });
   const live = projectionToConversation(projectConversation(running));
   const turn = (live.agentConversation[0] ?? live.codexConversation[0]);
-  turn.activities.push(activity);
+  const starting = { 'claude-code': 'Starting Claude (selected-model)', codex: 'Starting ChatGPT…', opencode: 'Starting OpenCode…' }[runtimeId];
+  const substitution = "Saved model isn't available right now — using default model.";
+  const mismatch = 'Model mismatch — running on default model, but selected model was requested.';
+  const notices = runtimeId === 'claude-code' ? [substitution, mismatch] : [substitution];
+  turn.activities.push(
+    { type: 'init', message: starting, timestamp: 0 },
+    ...notices.map((message): AgentProgress => ({ type: 'notice', message, timestamp: 1 })),
+    { type: 'done', message: 'Completed in 1.2s', timestamp: 2 },
+  );
   if ('streamingText' in turn) turn.streamingText = answer;
+  hydrateConversations([{ ...live,
+    agentConversation: live.agentConversation.map((turn) => ({ ...turn, isRunning: false, result: { text: answer, filesModified: [] } })),
+    codexConversation: live.codexConversation.map((turn) => ({ ...turn, isRunning: false, result: { status: 'completed' } })),
+  }], id);
+  const noticeOnlyMarkup = render();
+  assert.doesNotMatch(noticeOnlyMarkup, /actions? completed|Activity \(\d+ steps?/);
+  assert.ok(noticeOnlyMarkup.includes(substitution.replace(/'/g, '&#x27;')));
+
   hydrateConversations([live], id);
   useAISidebarStore.setState({ conversationRolloutMode: 'host-canonical' });
+  const runningMarkup = render();
+  assert.ok(!runningMarkup.includes(starting));
+  for (const notice of notices) assert.ok(runningMarkup.includes(notice.replace(/'/g, '&#x27;')), runningMarkup);
+  turn.activities.push(activity);
   useAISidebarStore.getState().handleExtensionMessage(runtimeId === 'claude-code'
     ? { type: 'agent-result', conversationId: id, text: answer, liveDeckSteps: steps }
     : { type: 'codex-result', conversationId: id, status: 'completed', liveDeckSteps: steps });
   const liveMarkup = render();
-  assert.match(liveMarkup, runtimeId === 'claude-code' ? /Activity \(1 steps/ : /1 action completed/);
+  assert.match(liveMarkup, runtimeId === 'claude-code' ? /Activity \(1 step\)/ : /1 action completed/);
+  assert.ok(!liveMarkup.includes(starting));
+  if (runtimeId === 'claude-code') {
+    for (const notice of notices) assert.ok(liveMarkup.includes(notice.replace(/'/g, '&#x27;')), liveMarkup);
+  }
+  assert.doesNotMatch(liveMarkup, /Completed in 1\.2s/);
   checkLines(liveMarkup);
 
   const record = decodeConversationRecordV1(JSON.parse(JSON.stringify({

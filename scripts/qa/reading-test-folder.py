@@ -21,28 +21,57 @@ DECK = '04 Drafts/Decision briefing.pptx'
 # Fact phrases apply to both the shared set and the generated equivalent.
 BASE = [
     ('01 Brief/Engagement brief.docx', 'IT systems and the mortgage centre are outside the scope.',
-     ['mortgage centre', 'mortgage center']),
+     ['mortgage centre', 'mortgage center', 'it systems', '31%', '31 percent',
+      'call volumes rose', 'calls rose', '12 interviews', 'twelve interviews',
+      'two workshops', '2 workshops', 'branches in three sizes', 'first 90 days',
+      'staffing numbers are indicative', 'headcount plan']),
     ('02 Interviews/Interview – branch manager, Riverside.docx',
-     'Riverside receives about 140 visits a day, with queues peaking on Mondays.', ['140 visits']),
+     'Riverside receives about 140 visits a day, with queues peaking on Mondays.',
+     ['140 visits', 'mondays', 'after the 25th', 'paying bills', 'bill payments',
+      'conversation, not the transaction', 'quiet room for advice', 'fewer counters',
+      'two hours', '2 hours', 'paperwork']),
     ('02 Interviews/Interview – customer service lead.docx',
-     'Calls about card disputes doubled after the May app change.', ['card disputes']),
+     'Calls about card disputes doubled after the May app change.',
+     ['card disputes', 'card-dispute', 'may app change', 'app change in may', 'escalation path',
+      'call notes', 'shared case view', 'hand-offs', 'handoffs']),
     ('02 Interviews/Interview – head of operations.docx',
-     'A visit costs €18.40, compared with €3.10 for a call.', ['18.40', '18.4']),
+     'A visit costs €18.40, compared with €3.10 for a call.',
+     ['18.40', '18.4', '3.10', '3.1', '11 years old', 'eleven years old', 'complaints last',
+      'complaints for a year', 'complaints for a month', 'six smallest branches', '6 smallest branches', 'post office']),
     ('02 Interviews/Interview – two tellers, Harbour Street.docx',
-     'The tellers suggest an app desk near the door.', ['near the door', 'by the door', 'at the entrance']),
+     'The tellers suggest an app desk near the door.',
+     ["app desk near the door", "app desk' near the door", 'app desk by the door', 'app desk at the entrance',
+      'lunchtime', 'lunch hour', 'questions about the app', 'app questions', 'review means closures', 'fear closures']),
     ('03 Workshop/Workshop notes 14 October.docx',
-     'Small branches could share one manager.', ['share one manager', 'shared manager', 'share a manager']),
+     'Small branches could share one manager.',
+     ['share one manager', 'shared manager', 'share a manager', 'twelve branch managers', '12 branch managers',
+      'two facilitators', '2 facilitators', 'three hours', '3 hours', 'advice, not transactions',
+      'app pushes people to branches', 'app fails', 'app desk at the door', '9 votes', '7 votes', '4 votes',
+      'evening opening', 'open in the evening']),
     ('04 Drafts/Findings draft v2.docx',
-     'Older customers rely on branches for help with the app.', ['older customers', 'older clients']),
+     'Older customers rely on branches for help with the app.',
+     ['six times', '6 times', '6x', 'rely on branches for help with the app', 'case notes', 'end of their life',
+      'staff want to be told early', 'longer visits', 'visits are longer', 'transactions that have moved to the app']),
     ('04 Drafts/Proposal phase 2 v3.docx',
-     'The twelve-week phase will cost €79,000 plus VAT.', ['79,000', '79000', '79 000', '79k']),
+     'The twelve-week phase will cost €79,000 plus VAT.',
+     ['79,000', '79000', '79 000', '79k', 'twelve-week', '12-week', 'twelve weeks', '12 weeks',
+      'design with staff', 'three branch sizes', 'app desk in two branches', 'app desk in 2 branches',
+      'two-branch', 'four-week pilot', '4-week pilot', 'first moves', 'business case',
+      '38,000', '22,000', '19,000', '38000', '22000', '19000', '38k', '22k', '19k',
+      '31 december', 'december 31']),
     ('Steering group minutes 21 October.docx',
-     'Operations will provide cost per visit by branch by 4 November.', ['4 November', 'November 4', 'Nov 4']),
+     'Operations will provide cost per visit by branch by 4 November.',
+     ['4 november', 'november 4', 'nov 4', 'cost per visit by branch', '18 november', 'november 18', 'nov 18',
+      '11 november', 'november 11', 'nov 11', "board's decision", 'board decision', 'board approval',
+      'told in december', 'staff in december', 'december announcement', 'head of retail']),
     ('Reference/Annual report 2025, branch section.pdf',
-     'At year end the bank ran 42 branches and 118 cash machines.', ['118 cash machines', '118 atms']),
+     'At year end the bank ran 42 branches and 118 cash machines.',
+     ['118 cash machines', '118 atms', '2.1 million', '2.6 million', '87%', '87 percent',
+      'reviewed in 2026', '2026 review', 'march 2027']),
     ('Reference/Branch visit form, Riverside (scan).pdf',
      'At 12:10 there were nine people in the queue. Only two of four counters were open.',
-     ['12:10', 'two of four counters', '2 of 4 counters']),
+     ['12:10', 'nine people', '9 people', 'two of four counters', '2 of 4 counters', 'counters open: 2 of 4',
+      'advice room', 'out of order', '9 oct 2026', '9 october 2026', 'october 9']),
 ]
 
 # Notes are deliberately distinct from the slide text and from one another.
@@ -101,6 +130,14 @@ def write_word(path, body):
     doc.add_paragraph(body)
     doc.save(path)
     scrub(path)
+
+
+def word_heading(path):
+    from docx import Document
+
+    return next((paragraph.text.strip() for paragraph in Document(path).paragraphs
+                 if paragraph.text.strip() and paragraph.style
+                 and (paragraph.style.name == 'Title' or paragraph.style.name.startswith('Heading '))), None)
 
 
 def write_pdf(path, body, scan):
@@ -163,6 +200,7 @@ def build(folder):
             write_pdf(path, body, '(scan)' in path.name)
         documents.append({
             'file': relative, 'words': words,
+            'heading': word_heading(path) if path.suffix == '.docx' else None,
             'unreadReason': 'scan' if '(scan)' in path.name else None,
         })
 

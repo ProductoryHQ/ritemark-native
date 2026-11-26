@@ -99,6 +99,8 @@ async function main() {
   const locked = await read('Protected.docx');
   assert.match(locked.text, /it has a password\. Open it in Word, or save a copy without the password/i);
   assert.ok(!locked.isError);
+  assert.equal(locked.reason, 'password');
+  assert.equal((await read('Missing.docx')).isError, true);
   await writeFile(path.join(project, 'Damaged.docx'), word.subarray(0, 120));
   assert.match((await read('Damaged.docx')).text, /damaged/i);
   await writeFile(path.join(project, 'Old.doc'), Buffer.alloc(0));
@@ -107,7 +109,7 @@ async function main() {
   await truncate(path.join(project, 'Large.pdf'), DEFAULT_SEARCH_LIMITS.pdfBytes + 1);
   assert.match((await read('Large.pdf')).text, /too big.*50 MB/i);
   await writeFile(path.join(project, 'Scan.pdf'), await pdf((doc) => { doc.rect(10, 10, 50, 50).fill(); }));
-  assert.match((await read('Scan.pdf')).text, /a scan with no text \(1 page\)/);
+  assert.match((await read('Scan.pdf')).text, /a scan with no text \(1 page\)\. Open it in the PDF viewer\.$/);
 
   await writeFile(path.join(project, 'Evicted.docx'), Buffer.alloc(0));
   await truncate(path.join(project, 'Evicted.docx'), 8192);
