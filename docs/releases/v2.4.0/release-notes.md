@@ -55,6 +55,7 @@ If you run training or share slides with clients, you can update the page they a
 - **Read the deck bar with a long note.** A long note no longer squeezes the theme and **Publish** buttons.
 - **Work with pictures and tables without covered text.** A small picture's bar no longer covers the line below. A table's menu stays in the window, and its add buttons sit on its edges.
 - **Keep hidden places hidden.** A place you turned off no longer shows for a moment when Ritemark opens.
+- **See when OpenCode can't answer.** If its AI service is busy or goes quiet, chat says so, and you can send your message again.
 - **Choose icons for boxes that had numbers.** Switch a Boxes block from numbers to icons, and the icon menu opens for the box you're in.
 - **Keep your other apps' file links on Windows.** If another app opens your .md files, removing Ritemark leaves that in place.
 
