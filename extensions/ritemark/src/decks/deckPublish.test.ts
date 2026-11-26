@@ -335,6 +335,8 @@ async function main(): Promise<void> {
     fs.writeFileSync(deckPath, text);
     const body = splitFrontMatter(text).content;
     livePublisher.rememberLiveInput(document as never, undefined, { text: body, look: 'card', steps: [2] });
+    assert.deepEqual((await livePublisher.savedPageInput(deckPath, text)).steps, [2]);
+    assert.equal((await livePublisher.savedPageInput(deckPath, text + '\nNew words')).measureFit, true);
     await livePublisher.liveAction(document as never, 'on');
     await ready;
     const fromLive = liveHtml;
