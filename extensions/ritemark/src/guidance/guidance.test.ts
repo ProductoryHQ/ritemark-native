@@ -177,17 +177,20 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   // ── The starting place (R8, R1; S33–S38, S43) ──
 
   assert.deepEqual(READ_KINDS_PASSED, {
-    'claude-code': { darwin: false, win32: false },
+    'claude-code': { darwin: true, win32: false },
     codex: { darwin: false, win32: false },
     opencode: { darwin: false, win32: false },
-  }, 'the shipped gate is closed for every AI and platform');
+  }, 'the shipped gate: Claude on the Mac passed G1 (3 of 3); every other AI and platform stays closed');
   const placeOnMac = (front: Parameters<typeof startingPlaceOf>[0], project: ReadyKind) =>
     startingPlaceOf(front, project, 'claude-code', 'darwin');
   assert.equal(placeOnMac(null, 'files'), 'project', 'S33');
   assert.equal(placeOnMac(null, 'empty'), 'empty_project', 'S34');
   assert.equal(placeOnMac(null, 'sample'), 'sample', 'S38');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
-  assert.equal(placeOnMac({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
+  assert.equal(placeOnMac({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its Word starting points open');
+  assert.equal(placeOnMac({ viewType: 'ritemark.pdfViewer', fileName: 'Annual report.pdf' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its PDF starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'darwin'), 'project', 'S35: ChatGPT has not passed yet: the project\'s');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'claude-code', 'win32'), 'project', 'S40: Claude on Windows waits for Gate 2');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
   assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 300 }, 'files'), 'long_text', 'short is below 300');

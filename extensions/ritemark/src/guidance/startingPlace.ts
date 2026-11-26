@@ -28,7 +28,8 @@ export type StartingPlacesByAgent = Readonly<Record<AgentId, StartingPlace>>;
 
 /** Sprint 173 (G2): enable Word and PDF together after this AI passes on this platform. */
 export const READ_KINDS_PASSED: ReadingGate = {
-  'claude-code': { darwin: false, win32: false },
+  // Sprint 173 G1: 3 of 3 on the Mac on 11819457 (research/reading-test.md, Claude on Mac, set 3).
+  'claude-code': { darwin: true, win32: false },
   codex: { darwin: false, win32: false },
   opencode: { darwin: false, win32: false },
 };
