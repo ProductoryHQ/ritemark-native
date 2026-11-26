@@ -360,9 +360,14 @@ test('every runtime shares every capability section (edit-tool aside)', () => {
 });
 
 test('Sprint 173 S21: Claude, ChatGPT and OpenCode get the same source instructions', () => {
-  const sources = (['claude-code', 'codex', 'opencode'] as const).map((runtime) =>
+  const contexts = (['claude-code', 'codex', 'opencode'] as const).map((runtime) =>
     renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: true, board: true, deck: true }))
-      .split('\n\n').find((section) => section.startsWith('SOURCES IN ANSWERS:')));
+  );
+  for (const context of contexts) {
+    assert.ok(context.includes('If a scanned PDF has no readable text, offer only to open it in the PDF viewer. Do not ask for a text-searchable copy.'));
+  }
+  const sources = contexts.map((context) =>
+    context.split('\n\n').find((section) => section.startsWith('SOURCES IN ANSWERS:')));
   const [instructions] = sources;
   assert.ok(instructions);
   assert.ok(sources.every((source) => source === instructions));

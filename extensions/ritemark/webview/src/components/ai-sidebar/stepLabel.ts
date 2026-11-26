@@ -47,25 +47,38 @@ export function stepLabel(activity: AgentProgress) {
   const { command, status } = step;
   const path = step.path?.trim() ? step.path : step.kind === 'read' ? activity.file : undefined;
   const warning = status === 'failed';
+  const reason = step.warning?.trim();
   const detail = [path, command].filter(Boolean).join('\n');
   if (step.kind === 'shell') {
     const documents = /\.(?:docx?|pdf|pptx?)(?=$|[\s"'\x60,;)\]])/i.test(command ?? '');
-    const label = documents ? 'Reading documents' : status === 'completed' ? 'Ran a command' : 'Running a command';
-    return { label, detail, warning, icon: 'terminal' as const };
+    const label = warning ? "Couldn't run the command" : documents ? 'Reading documents' : status === 'completed' ? 'Ran a command' : 'Running a command';
+    const note = reason || (command
+      ? 'the command failed. Open step details to check the command'
+      : 'the command failed. Try the request again');
+    return {
+      label: warning ? `${label} · ${note}` : label,
+      detail, warning, icon: 'terminal' as const,
+    };
   }
   if (step.kind === 'folder') {
     const folder = basename(path ?? '');
     const where = folder && folder !== '.' && folder !== '..' && !folder.includes(':') ? folder : 'the project folder';
     const counts = status === 'completed' && documentCounts(step.listing ?? []);
     const label = warning ? `Couldn't look in ${where}` : status === 'completed' ? `Looked in ${where}` : `Looking in ${where}`;
-    return { label: counts ? `${label}: ${counts}` : label, detail, warning, icon: 'folder-simple' as const };
+    const note = warning ? reason || 'check that the folder exists and you can open it' : undefined;
+    return {
+      label: note ? `${label} · ${note}` : counts ? `${label}: ${counts}` : label,
+      detail, warning, icon: 'folder-simple' as const,
+    };
   }
   const base = basename(path ?? '');
   const file = base === '.' || base === '..' || /^[a-z]:$/i.test(base) ? '' : base;
   const kind = documentStepKind(file);
   const name = (kind ? splitFileName(file).name : file) || 'document';
   const verb = warning ? "Couldn't open" : status === 'completed' ? 'Read' : 'Reading';
-  const note = warning ? step.warning : step.units;
+  const note = warning
+    ? reason || (path ? 'check that the file exists and you can open it' : 'choose a file inside the project to try again')
+    : step.units;
   return {
     label: `${verb} ${name}${note ? ` · ${note}` : ''}`,
     detail,
@@ -90,6 +103,11 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
       command: step.command ?? previous.step?.command,
     },
   };
+  if (previous.step?.status === 'failed' && step.status === 'completed') {
+    let end = index + 1;
+    while (next[end]?.type === 'thinking') end++;
+    next.splice(index + 1, end - index - 1);
+  }
   return next;
 }
 
@@ -98,12 +116,47 @@ export function isTurnLifecycleActivity(activity: AgentProgress): boolean {
   return activity.type === 'init' || (activity.type === 'done' && !activity.tool && !activity.step);
 }
 
-/** A folder search can retry with another pattern and a new tool ID. */
+function retryKey(activity: AgentProgress): string | undefined {
+  const { step } = activity;
+  if (!step) return;
+  if (step.kind === 'shell') return step.command ? JSON.stringify([step.kind, step.command]) : undefined;
+  const target = step.path?.trim() || activity.file?.trim();
+  if (target) {
+    return JSON.stringify([step.kind, target.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')]);
+  }
+}
+
+/** Remove superseded attempts from the turn's visible steps. */
 export function visibleStepActivities(activities: AgentProgress[]): AgentProgress[] {
+  const rows = activities.filter((activity) => !isTurnLifecycleActivity(activity) && !isHiddenToolActivity(activity));
+  const superseded = new Set<number>();
+  const outcomes = new Set<string>();
+  let nextAction: AgentProgress | undefined;
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const activity = rows[index];
+    if (activity.type === 'thinking') continue;
+    const key = retryKey(activity);
+    if (activity.step?.status === 'failed') {
+      // A rejected read without a target can only be matched to the next
+      // document call. Never use an unrelated success to hide a known refusal.
+      const missingTargetRetry = !key && !activity.step.warning
+        && isDocumentReadTool(activity.tool) && isDocumentReadTool(nextAction?.tool)
+        && Boolean(nextAction?.step?.status);
+      if ((key && outcomes.has(key)) || missingTargetRetry) {
+        superseded.add(index);
+        if (missingTargetRetry || (nextAction && retryKey(nextAction) === key)) {
+          for (let next = index + 1; rows[next]?.type === 'thinking'; next++) superseded.add(next);
+        }
+      }
+    }
+    if (key && activity.step?.status) outcomes.add(key);
+    nextAction = activity;
+  }
+
   const visible: AgentProgress[] = [];
   const folders = new Map<string, number>();
-  for (const activity of activities) {
-    if (isTurnLifecycleActivity(activity) || isHiddenToolActivity(activity)) continue;
+  for (const [index, activity] of rows.entries()) {
+    if (superseded.has(index)) continue;
     const { step } = activity;
     if (step?.kind !== 'folder' || step.status !== 'completed') {
       visible.push(activity);
@@ -133,6 +186,21 @@ export function readSummary(activities: AgentProgress[], activeMs = 0): string |
   if (counts) return `Read ${counts}${activeMs > 0 ? ` · ${Math.round(activeMs / 1000)} s` : ''}`;
 }
 
+/** Strip formatting before shortening a Thinking preview, including a link cut by an older runtime. */
+export function thinkingText(markdown: string): string {
+  return markdown
+    .replace(/!?\[([^\]\n]+)\]\((?:[^()\n]|\([^()\n]*\))*(?:\)|$)/g, (_link, label: string) => {
+      const text = label.replace(/%20/gi, ' ');
+      return documentStepKind(text) ? basename(text) : text;
+    })
+    .replace(/\*\*|__|~~|`/g, '')
+    .replace(/(?<!\w)([*_])([^\n]+?)\1(?!\w)/g, '$2')
+    .replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function activityHeadline(activity?: AgentProgress): string {
-  return activity && !isHiddenToolActivity(activity) ? stepLabel(activity)?.label ?? activity.message : '';
+  if (!activity || isHiddenToolActivity(activity)) return '';
+  return activity.type === 'thinking' ? thinkingText(activity.message) : stepLabel(activity)?.label ?? activity.message;
 }

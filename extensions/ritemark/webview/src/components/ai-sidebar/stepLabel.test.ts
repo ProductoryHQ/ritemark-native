@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { toolStepResult, type ToolStep } from '../../../../src/runtime/toolStep';
-import { readSummary, stepLabel, updateStep, visibleStepActivities } from './stepLabel';
+import { readSummary, stepLabel, thinkingText, updateStep, visibleStepActivities } from './stepLabel';
 import type { AgentProgress } from './types';
 
 function progress(step: ToolStep, tool = 'read_document'): AgentProgress {
@@ -80,8 +80,6 @@ assert.deepEqual(visibleStepActivities(running), [words, pendingPdf]);
 assert.deepEqual(visibleStepActivities(updateStep(running, pdf)).map((row) => stepLabel(row)?.label),
   ['Looked in the project folder: 2 Word documents', 'Looked in the project folder: 1 PDF']);
 
-console.log('stepLabel: S17–S20 and folder retries passed');
-
 for (const tool of ['ToolSearch', 'TodoWrite', 'Task', 'Agent', 'ExitPlanMode', 'EnterPlanMode', 'mcp__server__lookup']) {
   assert.equal(updateStep(activities, { type: 'tool_use', tool, message: `Using ${tool}`, timestamp: 0 }), activities);
 }
@@ -90,9 +88,9 @@ assert.equal(stepLabel(progress(locked, 'mcp__ritemark_documents__read_document'
 const proposal = '04 Drafts/Proposal phase 2 v3.docx';
 const unnamedRead: ToolStep = { id: 'proposal', kind: 'read' };
 const failedRead = progress(toolStepResult(unnamedRead, 'Tool input was rejected.', true, true));
-assert.equal(stepLabel({ ...failedRead, file: proposal })?.label, "Couldn't open Proposal phase 2 v3");
+assert.equal(stepLabel({ ...failedRead, file: proposal })?.label, "Couldn't open Proposal phase 2 v3 · check that the file exists and you can open it");
 const started = { ...progress(unnamedRead), file: proposal };
-assert.equal(stepLabel(updateStep([started], failedRead)[0])?.label, "Couldn't open Proposal phase 2 v3");
+assert.equal(stepLabel(updateStep([started], failedRead)[0])?.label, "Couldn't open Proposal phase 2 v3 · check that the file exists and you can open it");
 const namedFailure = toolStepResult(unnamedRead, "Couldn't read Proposal phase 2 v3.docx. The file may be damaged.", true, true, 'damaged');
 assert.equal(stepLabel(progress(namedFailure))?.label, "Couldn't open Proposal phase 2 v3 · the file may be damaged");
 
@@ -115,3 +113,29 @@ for (const [starting, completed] of [
   assert.equal(recorded[recorded.length - 1], done);
   assert.equal(readSummary(visibleStepActivities(recorded), 18000), 'Read 4 Word documents · 18 s');
 }
+
+const retryThought: AgentProgress = {
+  type: 'thinking', message: "The tool needs a `path` parameter, so I'll load the schema and retry.", timestamp: 1,
+};
+const finalThought: AgentProgress = { type: 'thinking', message: 'The draft is readable.', timestamp: 2 };
+for (const tool of ['mcp__ritemark_documents__read_document', 'ritemark_documents/read_document', 'read_document']) {
+  const failure = { ...failedRead, tool };
+  const retry = progress({ id: 'retry', kind: 'read', path: proposal, status: 'completed' }, tool);
+  assert.deepEqual(visibleStepActivities([failure, retryThought, retry, finalThought]), [retry, finalThought]);
+  assert.deepEqual(visibleStepActivities([{ ...failure, file: proposal }, retryThought, retry]), [retry]);
+  assert.deepEqual(visibleStepActivities([{ ...failure, file: 'Elsewhere/Proposal phase 2 v3.docx' }, retry]), [
+    { ...failure, file: 'Elsewhere/Proposal phase 2 v3.docx' }, retry,
+  ]);
+  assert.deepEqual(visibleStepActivities([progress(locked, tool), retry]), [progress(locked, tool), retry]);
+  const stillFailed = progress(namedFailure, tool);
+  assert.deepEqual(visibleStepActivities([failure, retryThought, stillFailed, finalThought]), [stillFailed, finalThought]);
+  assert.deepEqual(updateStep([failure, retryThought], { ...retry, step: { ...retry.step!, id: unnamedRead.id } })
+    .map((activity) => stepLabel(activity)?.label), ['Read Proposal phase 2 v3']);
+  assert.equal(stepLabel(failure)?.label, "Couldn't open document · choose a file inside the project to try again");
+}
+assert.equal(thinkingText('**[Annual report 2025, branch section](Reference/Annual%20report.pdf#p=4)**'), 'Annual report 2025, branch section');
+assert.equal(thinkingText('**[Annual report](Reference/Annual%20report%20…'), 'Annual report');
+assert.equal(thinkingText('**[Branch visit form](Reference/form%20(scan).pdf)** is _unreadable_.'), 'Branch visit form is unreadable.');
+assert.equal(thinkingText('The tool needs a `path` parameter.'), 'The tool needs a path parameter.');
+assert.equal(thinkingText('[Reference/Annual%20report.pdf](Reference/Annual%20report.pdf)'), 'Annual report.pdf');
+console.log('stepLabel tests passed.');

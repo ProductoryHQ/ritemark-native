@@ -8,7 +8,7 @@
 
 import { ActivityCard } from './ActivityCard';
 import { ActivityDetails } from './ActivityDetails';
-import { activityHeadline, isTurnLifecycleActivity, readSummary, stepLabel } from './stepLabel';
+import { activityHeadline, readSummary, stepLabel, visibleStepActivities } from './stepLabel';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
@@ -348,8 +348,7 @@ function ActivitySection({
   const [expanded, setExpanded] = useState(false);
 
   const notices = isRunning ? turnActivities.filter((activity) => activity.type === 'notice') : [];
-  const activities = turnActivities.filter((activity) =>
-    !isTurnLifecycleActivity(activity) && (!isRunning || activity.type !== 'notice'));
+  const activities = visibleStepActivities(turnActivities).filter((activity) => !isRunning || activity.type !== 'notice');
   const count = activities.length;
   const runningNotices = notices.length > 0 ? <ActivityDetails activities={notices} running /> : null;
   if (!count) return runningNotices;
@@ -390,7 +389,7 @@ function ActivitySection({
       {expanded && (
         <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
           {activities.map((activity, i) => (
-            activity.type === 'notice' || stepLabel(activity)
+            activity.type === 'notice' || activity.type === 'thinking' || stepLabel(activity)
               ? <ActivityCard key={i} activity={activity} />
               : <ActivityLine key={i} activity={activity} />
           ))}

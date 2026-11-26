@@ -273,6 +273,7 @@ const SECTIONS: CapabilitySection[] = [
         'HONESTY: if the user asks for something Ritemark genuinely does not expose to you, say so plainly rather than inventing or claiming a capability that does not exist.',
         // Sprint 140 (R1, #497): every AI, whatever the spike decided
         'When you are asked to read a file and cannot open it (a scanned PDF, a password-protected or unreadable document), say which files you could not open rather than leaving them out silently.',
+        'If a scanned PDF has no readable text, offer only to open it in the PDF viewer. Do not ask for a text-searchable copy.',
       ].join('\n'),
   },
 ];

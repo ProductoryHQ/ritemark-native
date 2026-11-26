@@ -3062,10 +3062,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set(updates);
 
           // The Codex binary/auth is app-global, so a not-ready status blocks the
-          // running turn in EVERY thread that has one — not just the visible one.
+          // running ChatGPT turn in every thread that has one.
           if (message.status.state !== 'ready') {
             for (const id of Object.keys(get().conversations)) {
-              patchLastCodexTurn(id, (lastTurn) => ({
+              patchLastCodexTurn(id, (lastTurn) => lastTurn.runtime === 'opencode' ? null : ({
                 ...lastTurn,
                 approval: undefined,
                 isRunning: false,

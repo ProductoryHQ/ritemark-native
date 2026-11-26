@@ -5,7 +5,7 @@
 import { useId, useState } from 'react';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
-import { isHiddenToolActivity, stepLabel } from './stepLabel';
+import { isHiddenToolActivity, stepLabel, thinkingText } from './stepLabel';
 import { Icon } from '../ui/Icon';
 import type { AgentProgress } from './types';
 
@@ -63,9 +63,9 @@ export function ActivityCard({ activity }: ActivityCardProps) {
     const indicator = step.warning ? 'warning' : activity.step?.status === 'completed' ? 'check' : 'circle-notch';
     const row = (
       <>
-        <Icon name={indicator} className="size-3" tone="inherit" />
-        <Icon name={step.icon} className="size-3.5" tone="inherit" />
-        <span className="min-w-0 truncate">{step.label}</span>
+        <Icon name={indicator} className="size-3 shrink-0" tone="inherit" />
+        <Icon name={step.icon} className="size-3.5 shrink-0" tone="inherit" />
+        <span className={step.warning ? 'min-w-0 whitespace-normal text-left [overflow-wrap:anywhere]' : 'min-w-0 truncate'}>{step.label}</span>
       </>
     );
     const color = step.warning ? 'text-[var(--r-warning-ink)]' : 'text-[var(--r-ink-muted)]';
@@ -102,7 +102,7 @@ export function ActivityCard({ activity }: ActivityCardProps) {
           {getActivityLabel(activity)}
         </span>
         {activity.message && (
-          <span className="ml-1.5">{activity.message}</span>
+          <span className="ml-1.5">{activity.type === 'thinking' ? thinkingText(activity.message) : activity.message}</span>
         )}
       </span>
     </div>

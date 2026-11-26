@@ -170,7 +170,7 @@ export async function readAsMarkdown(
         for (const item of items) chars += item.str?.length ?? 0;
       }
       if (chars < SCANNED_PDF_TEXT_THRESHOLD) {
-        return { kind, reason: 'scan' as const, text: `${name} is a scan with no text (${units(total, 'page')}). Open it in the PDF viewer or use a copy with searchable text.` };
+        return { kind, reason: 'scan' as const, text: `${name} is a scan with no text (${units(total, 'page')}). Open it in the PDF viewer.` };
       }
       const status = from === 1 && to === total ? 'whole text' : from === to ? `page ${from}` : `pages ${from}–${to}`;
       return reading(name, kind, units(total, 'page'), cut ? `${status === 'whole text' ? '' : status + ', '}${cut}` : status, text, cut);

@@ -109,7 +109,7 @@ async function main() {
   await truncate(path.join(project, 'Large.pdf'), DEFAULT_SEARCH_LIMITS.pdfBytes + 1);
   assert.match((await read('Large.pdf')).text, /too big.*50 MB/i);
   await writeFile(path.join(project, 'Scan.pdf'), await pdf((doc) => { doc.rect(10, 10, 50, 50).fill(); }));
-  assert.match((await read('Scan.pdf')).text, /a scan with no text \(1 page\)/);
+  assert.match((await read('Scan.pdf')).text, /a scan with no text \(1 page\)\. Open it in the PDF viewer\.$/);
 
   await writeFile(path.join(project, 'Evicted.docx'), Buffer.alloc(0));
   await truncate(path.join(project, 'Evicted.docx'), 8192);
