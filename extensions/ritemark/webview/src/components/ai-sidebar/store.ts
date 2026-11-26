@@ -72,7 +72,7 @@ import { resolveInboundConversationId } from './conversationRouting';
 import { MAX_PINNED_CONVERSATIONS } from './conversationActionsModel';
 import { projectionToConversation, reconciledOpenCodeModel, reconcileRestoredModels, type RestoreCatalogs } from './conversationProjection';
 import { appendStreamedText } from '../../../../src/agent/types';
-import type { StartingPlace } from '../../../../src/guidance/startingPlace';
+import type { StartingPlace, StartingPlacesByAgent } from '../../../../src/guidance/startingPlace';
 import { signInAttentionOf, type SheetSignInAi, type SheetSignInRequest, type SheetSignInView } from '../../../../src/views/agentSidebarProtocol';
 import { requestTurnReveal } from './turnReveal';
 import { slideAtSendOf, type CurrentSlide, type SlideAtSend } from '../../../../src/decks/currentSlide';
@@ -135,7 +135,6 @@ export function refillOnReopen(box: string, request: { text: string; cursor?: nu
   return { text: request.text, cursor: request.cursor ?? request.text.length };
 }
 
-/** Sprint 140 (R8): the empty sheet's places, as the host names them (`src/guidance/startingPlace.ts`). */
 /** Sprint 162 PR 5: a theme change's chip as the host sends it, checked field by field. */
 function themeChipOf(value: unknown): ThemeChangeChipView | null {
   if (!value || typeof value !== 'object') return null;
@@ -144,6 +143,7 @@ function themeChipOf(value: unknown): ThemeChangeChipView | null {
   return { id: chip.id, kind: chip.kind, themeName: chip.themeName };
 }
 
+/** The empty sheet's places as the host names them in startingPlace.ts. */
 const STARTING_PLACES: readonly StartingPlace[] = ['project', 'empty_project', 'word_or_pdf', 'short_text', 'long_text', 'table', 'sample', 'theme'];
 
 let msgCounter = 0;
@@ -355,7 +355,7 @@ interface AISidebarState {
    */
   startChatFromHost: (request: ChatStartMessage) => void;
   /** Sprint 140 (R8): the empty sheet's starting place, from the host. */
-  startingPlace: { place: StartingPlace; hasAbout: boolean } | null;
+  startingPlace: { places: StartingPlacesByAgent; hasAbout: boolean } | null;
   /** Sprint 140 (R8, D4): a fill for the composer of one chat, with where the cursor waits; ChatInput takes it. */
   composerFill: { conversationId: string; text: string; cursor: number; nonce: number } | null;
   /** Put words in the open chat's box, focused, the cursor at `cursor`; `origin` tells the host where they came from. */
@@ -3242,8 +3242,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         }
 
         case 'starting-place': {
-          const place = STARTING_PLACES.find((candidate) => candidate === message.place);
-          if (place) set({ startingPlace: { place, hasAbout: message.hasAbout === true } });
+          const claude = STARTING_PLACES.find((place) => place === message.places?.['claude-code']);
+          const codex = STARTING_PLACES.find((place) => place === message.places?.codex);
+          const opencode = STARTING_PLACES.find((place) => place === message.places?.opencode);
+          if (claude && codex && opencode) {
+            set({ startingPlace: { places: { 'claude-code': claude, codex, opencode }, hasAbout: message.hasAbout === true } });
+          }
           break;
         }
 
@@ -3806,6 +3810,11 @@ type ActiveConversationSlice = Pick<AISidebarState, 'conversations' | 'activeCon
 export function selectActiveConversation(state: ActiveConversationSlice): ConversationState {
   const id = state.activeConversationId;
   return (id ? state.conversations[id] : undefined) ?? NO_ACTIVE_CONVERSATION;
+}
+
+/** The current AI's starting place for the document in front. */
+export function selectStartingPlace(state: AISidebarState): StartingPlace | undefined {
+  return state.startingPlace?.places[selectActiveConversation(state).selectedAgent];
 }
 
 /**

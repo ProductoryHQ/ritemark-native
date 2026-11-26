@@ -12,7 +12,8 @@ import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCoun
 import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
 import { AI_NAMES, cardAi, EVENT_KIND, FILES_PRESS_SETTLE_MS, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords } from './readyRequest';
-import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
+import { READ_KINDS_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
+import type { ReadyKind } from './readyRequest';
 import { makeTempDir } from '../testing/tempDir';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
@@ -175,23 +176,26 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   // ── The starting place (R8, R1; S33–S38, S43) ──
 
-  assert.deepEqual(READ_KINDS_EVERY_AI_PASSED, { word: false, pdf: false }, 'the spike\'s gate: closed until every AI has passed (research/word-spike.md)');
-  assert.equal(startingPlaceOf(null, 'files'), 'project', 'S33');
-  assert.equal(startingPlaceOf(null, 'empty'), 'empty_project', 'S34');
-  assert.equal(startingPlaceOf(null, 'sample'), 'sample', 'S38');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', { word: true, pdf: false }), 'word_or_pdf', 'S35: gate open');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: true, pdf: false }), 'project', 'a PDF follows its own kind');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: false, pdf: true }), 'word_or_pdf');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 300 }, 'files'), 'long_text', 'short is below 300');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Participants.csv' }, 'files'), 'table', 'S37: a CSV');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.excelViewer', fileName: 'Budget.xlsx' }, 'files'), 'table', 'S37: a spreadsheet in the table editor');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pptxViewer', fileName: 'Deck.pptx' }, 'sample'), 'sample', 'S43: anything else: the project\'s');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.flowEditor', fileName: 'Weekly.flow.json' }, 'empty'), 'empty_project', 'S43');
-  assert.equal(startingPlaceOf({ viewType: undefined, fileName: 'notes.txt', words: 3 }, 'files'), 'short_text', 'a plain text file');
+  assert.deepEqual(READ_KINDS_PASSED, {
+    'claude-code': { darwin: false, win32: false },
+    codex: { darwin: false, win32: false },
+    opencode: { darwin: false, win32: false },
+  }, 'the shipped gate is closed for every AI and platform');
+  const placeOnMac = (front: Parameters<typeof startingPlaceOf>[0], project: ReadyKind) =>
+    startingPlaceOf(front, project, 'claude-code', 'darwin');
+  assert.equal(placeOnMac(null, 'files'), 'project', 'S33');
+  assert.equal(placeOnMac(null, 'empty'), 'empty_project', 'S34');
+  assert.equal(placeOnMac(null, 'sample'), 'sample', 'S38');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
+  assert.equal(placeOnMac({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 300 }, 'files'), 'long_text', 'short is below 300');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Participants.csv' }, 'files'), 'table', 'S37: a CSV');
+  assert.equal(placeOnMac({ viewType: 'ritemark.excelViewer', fileName: 'Budget.xlsx' }, 'files'), 'table', 'S37: a spreadsheet in the table editor');
+  assert.equal(placeOnMac({ viewType: 'ritemark.pptxViewer', fileName: 'Deck.pptx' }, 'sample'), 'sample', 'S43: anything else: the project\'s');
+  assert.equal(placeOnMac({ viewType: 'ritemark.flowEditor', fileName: 'Weekly.flow.json' }, 'empty'), 'empty_project', 'S43');
+  assert.equal(placeOnMac({ viewType: undefined, fileName: 'notes.txt', words: 3 }, 'files'), 'short_text', 'a plain text file');
   assert.equal(wordCount('---\ntitle: x y z\n---\n# Board report\n\nThe year in [three](./x.md) numbers. <!-- not this -->'), 7, 'front matter, comments and link targets left out');
 
   console.log('guidance: all assertions passed');
