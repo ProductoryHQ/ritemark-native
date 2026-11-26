@@ -91,6 +91,55 @@ test('accepts a password-free copy and the project folder label from the Claude 
   assert.equal(scoreRun({ ...sample, stepLabels: ['ToolSearchUsing ToolSearch'] }, facts).criteria[3], 'fail');
 });
 
+test('criterion 4 allows the deck overview link without a passage, as in Claude run 3', () => {
+  const [document, deck] = sample.links;
+  const links = [
+    ...Array(12).fill(document),
+    { ...deck, hasPassage: false, landsOnClaim: 'no' },
+    ...Array(6).fill(deck),
+    document,
+  ];
+  const score = (links) => scoreRun({ ...sample, links }, facts);
+  const confirmed = links.map((link) => ({ ...link, landsOnClaim: link.hasPassage ? 'yes' : 'no' }));
+  assert.equal(score(links).criteria[4], 'to check');
+  assert.equal(score(confirmed).criteria[4], 'pass');
+  assert.deepEqual(score(confirmed).linkCounts, { total: 20, rightDocument: 20, withPassage: 19, onClaim: 19 });
+  const withoutPassages = (link, i) => i < 2 ? { ...link, hasPassage: false, landsOnClaim: 'no' } : link;
+  assert.equal(score(links.map(withoutPassages)).criteria[4], 'fail');
+  assert.equal(score(confirmed.map((link, i) => i === 0 ? { ...link, landsOnClaim: 'no' } : link)).criteria[4], 'pass');
+  assert.equal(score(confirmed.map((link, i) => i < 2 ? { ...link, landsOnClaim: 'no' } : link)).criteria[4], 'fail');
+  assert.equal(score(confirmed.map((link, i) => i === 0 ? { ...link, opensRightDocument: false } : link)).criteria[4], 'fail');
+});
+
+test('criterion 1 accepts the tellers’ quoted app desk finding', () => {
+  const tellers = 'Interview – two tellers, Harbour Street';
+  const score = (detail, words) => scoreRun({
+    ...sample, visibleAnswer: `${answer}\n- ${tellers}: ${detail}`,
+  }, { ...facts, documents: [...facts.documents, { file: tellers + '.docx', words }] }).criteria[1];
+  for (const quoted of ['"app desk"', "'app desk'", '“app desk”', '‘app desk’']) {
+    assert.equal(score(`Most questions are about the app. They would like an ${quoted} near the door.`,
+      ['app desk near the door']), 'pass');
+    assert.equal(score('They would like an app desk near the door.', [`${quoted} near the door`]), 'pass');
+  }
+  assert.equal(score("The tellers’ plan is a walk-in desk.", ["tellers' plan is a walk–in desk"]), 'pass');
+});
+
+test('criterion 5 accepts common ways forward and requires more than a password notice', () => {
+  const score = (wayForward) => scoreRun({
+    ...sample, visibleAnswer: answer.replace('Please provide the password.', wayForward),
+  }, facts).criteria[5];
+  for (const wayForward of [
+    'Open it in Word, or save an unprotected copy.',
+    'Try a copy without the password.',
+    'Try a copy without a password.',
+    'Remove the password.',
+    'Send a password-free copy.',
+  ]) {
+    assert.equal(score(wayForward), 'pass', wayForward);
+  }
+  assert.equal(score(''), 'fail');
+});
+
 test('scores each multiline unread entry up to its next document or blank line', () => {
   const multiline = answer.replace('Visit form is an image-only scan.', 'Visit form\nIt is an image-only scan.')
     .replace('Locked appendix has a password.', 'Locked appendix\nIt has a password.');
