@@ -262,6 +262,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [barAt, setBarAt] = useState<{ left: number; top: number } | null>(null)
+  const [pendingIcon, setPendingIcon] = useState<{ blockPos: number; pos: number } | null>(null)
   const [drag, setDrag] = useState<{ kind: 'move'; y: number; width: number; left: number } | { kind: 'split'; x: number; top: number; height: number } | { kind: 'item'; from: number; line: DropLine | null } | null>(null)
   // Sprint 167 PR 5: the item the pointer is at (the handle follows it), and the item whose menu is open.
   const [hoverItem, setHoverItem] = useState<number | null>(null)
@@ -449,6 +450,23 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
   }, [showing, placed, chosen, drag, fold])
 
+  useLayoutEffect(() => {
+    if (!pendingIcon) return
+    setPendingIcon(null)
+    if (!editor || editor.isDestroyed || chosen?.pos !== pendingIcon.blockPos || chosen.kind !== 'boxes'
+      || boxesMarkOf(divAttributesOf(chosen.node)) !== 'icon') return
+    const trigger = placed?.caretBox?.pos === pendingIcon.pos ? iconTrigger.current : null
+    if (trigger) {
+      // Radix opens from pointerdown on its trigger and anchors the menu to that same button.
+      if (trigger.getAttribute('aria-expanded') !== 'true') {
+        trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse' }))
+      }
+    } else {
+      const anchor = editor.view.nodeDOM(pendingIcon.pos)
+      if (anchor instanceof HTMLElement) pickIcon?.(pendingIcon.pos, anchor, null)
+    }
+  }, [pendingIcon, editor, chosen, placed, pickIcon])
+
   if (!editor || !chosen || !placed || !layer) return null
 
   const run = (tr: Transaction | null) => { apply(tr); editor.view.focus() }
@@ -471,10 +489,12 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const block = chosenBlockAt(state)
     if (block?.kind !== 'boxes') return
     const pos = choice === 'icon' ? boxForEmptyIconMenu(state, block) : null
-    run(setBoxesMark(state, block.pos, choice))
-    if (pos === null || !pickIcon) return
-    const anchor = editor.view.nodeDOM(pos)
-    if (anchor instanceof HTMLElement) pickIcon(pos, anchor, null)
+    const tr = setBoxesMark(state, block.pos, choice)
+    const changed = apply(tr)
+    editor.view.focus()
+    if (pos === null || (tr && !changed)) return
+    measure()
+    setPendingIcon({ blockPos: block.pos, pos })
   }
   const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
   const add = () => {
