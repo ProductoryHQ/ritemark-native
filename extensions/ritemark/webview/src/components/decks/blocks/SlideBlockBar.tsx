@@ -314,8 +314,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       const item = dom.querySelector('li')?.getBoundingClientRect()
       if (words && item) markerX = (block.kind === 'steps' ? item.left + (words.left - item.left) * 0.3 : item.left - (item.left - screen.left) / 2) - origin.left
     }
-    const paneRect = (frame.closest('.deck-stage') as HTMLElement | null)?.getBoundingClientRect()
-    const pane = paneRect ? { left: paneRect.left, right: paneRect.right } : { left: 0, right: window.innerWidth }
+    const pane = { left: origin.left, right: origin.right }
     // The caret's box shows the icon handle while it has no icon: its view draws the empty place (hidden on the stage)
     // only then, and only under the looks that draw icons.
     let icon: Placed['icon'] = null
@@ -422,7 +421,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
 
   // Under the block, the page's own size; above it when there is no room under it; never off the window.
   // Inside the slide's pane (the Experience lead on #773): when the bar is wider than the pane, its own group folds
-  // into menus that show their value, from the right: alignment, then Width (or the count), then Style. A new block or
+  // into menus that show their value, from the right: alignment, then the count, then Style. A new block or
   // a new pane width starts again unfolded.
   const [fold, setFold] = useState(0)
   const foldKey = `${chosen?.pos}:${chosen?.kind}:${placed ? Math.round(placed.pane.right - placed.pane.left) : 0}`
@@ -434,7 +433,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       focusIcon.current = false
       iconTrigger.current.focus({ preventScroll: true })
     }
-    const width = bar.offsetWidth
+    const width = bar.getBoundingClientRect().width
     const height = bar.offsetHeight
     const room = window.innerHeight
     let top = placed.screen.bottom + barGap(chosen.kind)
@@ -700,7 +699,14 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
               }}
               role="toolbar"
               aria-label={`${BAR_KIND_LABEL[chosen.kind]} block`}
-              style={{ left: barAt?.left ?? -9999, top: barAt?.top ?? -9999 }}
+              style={{
+                left: barAt?.left ?? -9999,
+                top: barAt?.top ?? -9999,
+                ...(fold === MAX_FOLD ? {
+                  maxWidth: Math.max(0, Math.min(window.innerWidth - 8, placed.pane.right - 8) - Math.max(8, placed.pane.left + 8)),
+                  flexWrap: 'wrap',
+                } : {}),
+              }}
             >
               {agenda ? (
                 <Tooltip label={AGENDA_TIP}>
@@ -757,7 +763,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   }))} />
                   {boxIconButton}
                   <Sep />
-                  <Group label="Width" folded={fold >= FOLD_AT.size} options={[
+                  <Group label="Width" folded options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },
                     ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: width.toUpperCase(), tip: `Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`, pick: () => setValue('width', width) })),
                   ]} />

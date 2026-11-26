@@ -648,10 +648,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide.is-behind-chosen::after { content: ""; position: absolute; inset: 0; z-index: 6; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--r-accent); pointer-events: none; }
 .deck-slide.is-behind-chosen .deck-sl.pic-behind .photo.is-chosen::after { content: none; }
 @media (prefers-reduced-motion: reduce) { .deck-slide > .deck-behind-chip { transition: none; } }
-.deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
+.deck-block-bar { position: fixed; z-index: 40; width: max-content; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
 .deck-block-bar .deck-bar-seg { display: inline-flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
 .deck-block-bar .deck-bar-seg .deck-bar-choice { height: 24px; padding: 0 8px; }
 .deck-block-bar .deck-bar-seg .deck-bar-choice[data-state="active"] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15); }
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-block-bar .deck-bar-seg .deck-bar-choice { color: rgb(255 255 255 / 60%); }
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-block-bar .deck-bar-seg .deck-bar-choice[data-state="active"] { background: color-mix(in srgb, var(--r-surface) 82%, white); color: white; box-shadow: 0 1px 3px rgb(0 0 0 / 30%); }
 .deck-block-bar .deck-bar-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--r-hairline-strong); }
 /* The Agenda's type (small details 14): a label, not a menu, since it turns into nothing; its tooltip says what it lists. */
 .deck-block-bar .deck-bar-type-fixed { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; font: 600 13px/28px 'Sofia Sans', sans-serif; color: var(--r-ink-strong); outline: none; }

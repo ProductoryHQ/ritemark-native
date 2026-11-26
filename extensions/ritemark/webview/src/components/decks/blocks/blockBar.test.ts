@@ -812,7 +812,8 @@ stable(COLUMNS, 'three columns')
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
     assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
     assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
-    for (const group of ['Style', 'Width', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
+    for (const group of ['Style', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
+    assert.match(barSource, /<Group label="Width" folded options=/)
     assert.match(barSource, /fold < MAX_FOLD/)
   }
   // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).

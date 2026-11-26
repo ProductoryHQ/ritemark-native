@@ -11,13 +11,16 @@ import { strict as assert } from 'node:assert'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createDocument } from '@mixmark-io/domino'
+import domino, { createDocument } from '@mixmark-io/domino'
+import { EditorState, TextSelection, type Plugin } from '@tiptap/pm/state'
+import { DecorationSet, EditorView, type NodeView } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { isBlockSlide, isSlideKind, parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 import { legacyToBlocks } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
-import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
+import { caretBoxIcon, chosenBlockAt, setBoxesMark } from './blockBar'
 import { loadSlide } from './slideEditorHarness'
 import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
 import { quoteBy } from './slideQuote'
@@ -174,12 +177,14 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
     pickIcon: (_pos, _anchor, current) => { calls.push(`pick ${current}`) },
     hintIcon: (_pos, _anchor, name) => { calls.push(`hint ${name}`) },
   }
-  const makeView = (slideDivWithView(handlers).config.addNodeView as () => (props: unknown) => { dom: HTMLElement })()
+  const extension = slideDivWithView(handlers)
+  const makeView = (extension.config.addNodeView as () => (props: unknown) => { dom: HTMLElement })()
   // domino has no `append`, which the node view uses (a browser does): for this check only.
   const elementProto = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div'))) as { append?: unknown; appendChild: (node: unknown) => unknown }
   if (typeof (document.createElement('div') as { append?: unknown }).append !== 'function') {
     Object.defineProperty(elementProto, 'append', { configurable: true, value(this: typeof elementProto, ...nodes: unknown[]) { for (const node of nodes) this.appendChild(node) } })
   }
+  const plugins = extension.config.addProseMirrorPlugins as () => Plugin[]
   const stageBadge = (markdown: string) => {
     const doc = loadSlide(markdown)
     let boxPos = -1
@@ -187,7 +192,10 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
       if (boxPos < 0 && node.type.name === 'slideDiv' && String(node.attrs.class).split(' ').includes('box')) boxPos = pos
     })
     assert.ok(boxPos >= 0, `a box in ${markdown}`)
-    const view = makeView({ node: doc.nodeAt(boxPos), getPos: () => boxPos, editor: { state: { doc } } })
+    const state = EditorState.create({ doc, plugins: plugins() })
+    const [boxLooks] = state.plugins
+    const decorations = (boxLooks.props.decorations!.call(boxLooks, state) as DecorationSet).find(boxPos, boxPos + 1)
+    const view = makeView({ node: doc.nodeAt(boxPos), getPos: () => boxPos, decorations })
     return view.dom.firstElementChild as HTMLElement
   }
   const slide = (icon: string) => `:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`
@@ -249,5 +257,28 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
     assert.equal(mark.innerHTML.includes(pathOf('truck')), showsIcon, `${look}: stage icon`)
     assert.equal(mark.className, showsIcon ? 'blk-icon is-pickable' : look === 'arrows' ? 'blk-mark' : '', look)
   }
+  // Drive the Mark command through ProseMirror's real view update, keeping the same boxes and their caret.
+  const doc = loadSlide(':::: boxes\n::: {.box icon="truck"}\nKnown\n:::\n::: {.box icon="xyz-unknown"}\nUnknown\n:::\n::: box\nEmpty\n:::\n::::')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: (domino as unknown as { createWindow(): Window }).createWindow() })
+
+  const liveView = new EditorView(document.createElement('div'), {
+    state: EditorState.create({ doc, plugins: plugins() }),
+    nodeViews: { slideDiv: (node, _view, getPos, decorations) => makeView({ node, getPos, decorations }) as NodeView },
+  })
+  for (const mark of [...BOXES_MARKS, 'icon', 'dot', 'icon'] as const) {
+    const tr = setBoxesMark(liveView.state, 0, mark)
+    if (tr) liveView.dispatch(tr)
+    const showsIcons = mark === 'icon' || mark === 'number'
+    liveView.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'slideDiv' || node.attrs.class !== 'box') return
+      const state = liveView.state.apply(liveView.state.tr.setSelection(TextSelection.create(liveView.state.doc, pos + 2)))
+      const badge = (liveView.nodeDOM(pos) as HTMLElement).firstElementChild as HTMLElement
+      assert.equal(chosenBlockAt(state)?.kind, 'boxes')
+      assert.equal(!!caretBoxIcon(state), badge.classList.contains('is-pickable'), `${mark}: icon control matches the stage slot`)
+      assert.equal(badge.classList.contains('blk-icon'), showsIcons, `${mark}: ${node.textContent} icon or placeholder`)
+      assert.equal(badge.classList.contains('blk-mark'), mark === 'arrow', `${mark}: arrow`)
+    })
+  }
+  liveView.destroy()
   console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
 }

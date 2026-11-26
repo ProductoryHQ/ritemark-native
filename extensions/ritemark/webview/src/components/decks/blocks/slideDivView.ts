@@ -18,7 +18,7 @@
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
-import type { EditorView } from '@tiptap/pm/view'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
 import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconBadge } from '../../../../../src/decks/blocks/slideRenderer'
@@ -82,7 +82,7 @@ class SlideDivView implements NodeView {
   constructor(
     private node: PMNode,
     private readonly getPos: () => number | undefined,
-    private readonly doc: () => PMNode,
+    private look: string,
     private readonly handlers: SlideDivHandlers | null,
   ) {
     this.kind = slideBlockClassOf(attributesOf(node))
@@ -144,7 +144,7 @@ class SlideDivView implements NodeView {
     const deco = this.deco
     if (!deco) return
     // Number is drawn by CSS. The decoration holds the icon under Icon or Number, or the arrow under Arrow.
-    const look = boxLookAt(this.doc(), this.getPos())
+    const look = this.look
     // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
     const showsIcons = boxesShowIcons(look)
     const badge = showsIcons ? boxIconBadge(attrs.values.icon) : null
@@ -190,12 +190,10 @@ class SlideDivView implements NodeView {
     deco.setAttribute('aria-label', label)
   }
 
-  update(node: PMNode): boolean {
+  update(node: PMNode, decorations: readonly Decoration[]): boolean {
     if (node.type !== this.node.type || slideBlockClassOf(attributesOf(node)) !== this.kind) return false
-    // A Boxes block's look draws its boxes' marks: another look draws the block and its boxes again (ProseMirror
-    // doesn't update unchanged children; review of #765).
-    if (this.kind === 'boxes' && (attributesOf(node).values.look ?? 'boxes') !== (attributesOf(this.node).values.look ?? 'boxes')) return false
     this.node = node
+    this.look = drawnBoxLook(decorations)
     this.render()
     return true
   }
@@ -252,15 +250,39 @@ function slideCaretBox(): Plugin {
   })
 }
 
+function drawnBoxLook(decorations: readonly Decoration[]): string {
+  return decorations.find(deco => deco.spec.boxLook !== undefined)?.spec.boxLook ?? 'boxes'
+}
+
+// A box's drawing depends on its parent. Send that look as a decoration so ProseMirror updates even an
+// unchanged box, using the incoming document rather than a getPos lookup while the view tree is being built.
+function slideBoxLooks(): Plugin {
+  return new Plugin({
+    props: {
+      decorations(state) {
+        const { doc } = state
+        const boxes: Decoration[] = []
+        doc.descendants((node, pos) => {
+          if (node.type.name === 'slideDiv' && decorated(slideBlockClassOf(attributesOf(node)))) {
+            const boxLook = boxLookAt(doc, pos)
+            if (boxLook !== 'boxes') boxes.push(Decoration.node(pos, pos + node.nodeSize, {}, { boxLook }))
+          }
+        })
+        return DecorationSet.create(doc, boxes)
+      },
+    },
+  })
+}
+
 /** The `:::` node with the renderer's drawing, as the stage's slide editor uses it; with the stage's handlers in PR 3. */
 export function slideDivWithView(handlers: SlideDivHandlers | null) {
   return SlideDiv.extend({
     addNodeView() {
-      return ({ node, getPos, editor }) => new SlideDivView(node, getPos as () => number | undefined, () => editor.state.doc, handlers)
+      return ({ node, getPos, decorations }) => new SlideDivView(node, getPos as () => number | undefined, drawnBoxLook(decorations), handlers)
     },
     // The box being edited shows its empty icon place (17 November): the stage's editor, which has the handlers.
     addProseMirrorPlugins() {
-      return handlers ? [slideCaretBox()] : []
+      return handlers ? [slideBoxLooks(), slideCaretBox()] : [slideBoxLooks()]
     },
   })
 }
