@@ -17,6 +17,7 @@
  * that came while it ran, and the first walk misses none. Chats follow the
  * store's index; tasks are replaced from each board snapshot.
  */
+import { isDeckPath } from '../../decks/deckFileName';
 import * as nodePath from 'node:path';
 import type {
   IndexSource,
@@ -492,6 +493,7 @@ export class Indexer {
     for (const event of events) {
       const root = this.rootOf(event.path);
       if (!root) continue;
+      if (event.kind !== 'changed' && isDeckPath(event.path)) this.scheduleRewalk();
       if (isRuleFile(event.path, root.root.path)) {
         // A .gitignore in a folder search leaves out (node_modules, a dot folder, an ignored folder) changes nothing.
         const folder = this.relative(root, nodePath.dirname(event.path));

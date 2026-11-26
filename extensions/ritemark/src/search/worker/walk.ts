@@ -17,6 +17,7 @@
  * A file kept only online is listed, never read (cloudFiles.ts); `.gitignore`
  * files and the pointer check obey the same rule.
  */
+import { deckFolderCheck, deckFolderNames, insideDeckFolder } from '../../decks/deckFolderListing';
 import ignore, { type Ignore } from 'ignore';
 import * as nodePath from 'node:path';
 import type { DocumentFormat } from '../protocol';
@@ -216,6 +217,10 @@ export class RootRules {
   }
 }
 
+function inDeckFolder(root: string, fs: WalkFs) {
+  return deckFolderCheck(root, async dir => (await fs.readdir(dir)).filter(entry => entry.isFile()).map(entry => entry.name));
+}
+
 function toRelative(rootPath: string, target: string): string {
   return nodePath.relative(rootPath, target).split(nodePath.sep).join('/');
 }
@@ -288,6 +293,7 @@ export async function walkTree(
 ): Promise<boolean> {
   const { root, rules } = rootRules;
   if (documents.length >= maxNames) return true;
+  if (start !== root.path && await inDeckFolder(root.path, fs)(toRelative(root.path, start) + '/')) return false;
   const queue: string[] = [start];
   let visited = 0;
   // Files are listed in the walk's order and stat'ed STAT_CONCURRENCY at a time, across folders: one stat after
@@ -334,6 +340,7 @@ export async function walkTree(
       if (text) rootRules.addGitRules(relativeDir, text);
     }
     const hasAgents = relativeDir === '' && entries.some((entry) => entry.name.toLowerCase() === 'agents.md');
+    const owned = deckFolderNames(entries.filter(entry => entry.isFile()).map(entry => entry.name));
     for (const entry of entries) {
       const name = entry.name;
       if (name.startsWith('.') || name === 'node_modules') continue;
@@ -352,7 +359,7 @@ export async function walkTree(
         }
       }
       if (isDirectory) {
-        if (!rootRules.excluded(relative, true)) queue.push(target);
+        if (!insideDeckFolder(name + '/', owned) && !rootRules.excluded(relative, true)) queue.push(target);
         continue;
       }
       if (!isFile || name.startsWith('~$')) continue;
@@ -428,7 +435,7 @@ export async function classifyPath(
   } catch {
     return null;
   }
-  if (!stat.isFile()) return null;
+  if (!stat.isFile() || await inDeckFolder(rootRules.root.path, fs)(relative)) return null;
   const dir = nodePath.dirname(target);
   if (!relative.includes('/') && name.toLowerCase() === 'claude.md') {
     try {

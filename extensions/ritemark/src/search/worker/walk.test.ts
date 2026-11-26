@@ -84,6 +84,11 @@ async function main() {
     await fsp.symlink(path.join(root, 'elsewhere'), path.join(root, 'linked-folder'));
     await fsp.symlink(path.join(root, 'Notes.md'), path.join(root, 'Linked note.md'));
 
+    await write(root, 'Kickoff.rtms');
+    await write(root, 'Kickoff files/Kickoff.html');
+    await write(root, 'Kickoff files/fonts/internal.md');
+    await write(root, 'Notes files/x.md');
+
     const rulesOut = new Map<string, RootRules>();
     const { documents, limited } = await walkProject(
       [{ path: root, name: 'fixture' }],
@@ -97,7 +102,9 @@ async function main() {
     assert.deepEqual(found, [
       'AGENTS.md',
       'Budget.CSV',
+      'Kickoff.rtms',
       'Linked note.md',
+      'Notes files/x.md',
       'Notes.md',
       'Report.docx',
       'Scan.pdf',

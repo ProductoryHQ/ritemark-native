@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — v2.4.0
 
+- In Documents, a deck’s folder follows when you rename, move, copy or trash the deck. Copies from the start card get their own folder too.
 - Select an Excel chart and press Cmd+C or Ctrl+C to copy it as a picture (#1038).
 - Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar (#1036).
 - Excel column, bar, line, pie, doughnut, area and scatter charts appear in their original positions and on chart sheets. Column, bar and line charts update when you change a number they use and follow the workbook’s text formatting and chart layout (#1031, #1034).

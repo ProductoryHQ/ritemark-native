@@ -59,7 +59,7 @@ PR 1 goes first, because if the patch fails its size limit, R3 changes (option B
 
 ## Release notes draft
 
-- **Keep a deck's files together.** Pictures and the published page now go into one folder named after the deck. It folds under the deck in your documents.
+- **Keep a deck's files together.** Pictures and the published page go in a folder beside the deck. When you rename, move, copy or trash a deck in Documents, its folder follows.
 
 ## Approval
 
