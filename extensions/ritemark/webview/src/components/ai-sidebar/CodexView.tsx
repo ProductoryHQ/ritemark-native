@@ -347,11 +347,14 @@ function ActivitySection({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const notices = isRunning ? turnActivities.filter((activity) => activity.type === 'notice') : [];
-  const activities = visibleStepActivities(turnActivities).filter((activity) => !isRunning || activity.type !== 'notice');
+  const workspacePath = useAISidebarStore((state) => state.workspacePath);
+  const visible = visibleStepActivities(turnActivities, workspacePath);
+  const notices = visible.filter((activity) => activity.type === 'notice');
+  const activities = visible.filter((activity) => activity.type !== 'notice');
   const count = activities.length;
-  const runningNotices = notices.length > 0 ? <ActivityDetails activities={notices} running /> : null;
-  if (!count) return runningNotices;
+  const noticeRows = notices.length > 0 ? <ActivityDetails activities={notices} running /> : null;
+  if (!count) return noticeRows;
+  const details = isRunning ? activities : visible;
   // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action. A row
   // that opens them says whose words they are (the Experience lead): "What ChatGPT said".
   const actions = activities.filter((activity) => activity.type !== 'error').length;
@@ -361,7 +364,7 @@ function ActivitySection({
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">
-      {runningNotices}
+      {isRunning && noticeRows}
       {/* Summary row — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
@@ -388,7 +391,7 @@ function ActivitySection({
       {/* Expanded details */}
       {expanded && (
         <div className="mt-1 ml-5 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
-          {activities.map((activity, i) => (
+          {details.map((activity, i) => (
             activity.type === 'notice' || activity.type === 'thinking' || stepLabel(activity)
               ? <ActivityCard key={i} activity={activity} />
               : <ActivityLine key={i} activity={activity} />

@@ -267,6 +267,7 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
 }
 
 interface AISidebarState {
+  workspacePath?: string;
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
   isOnline: boolean;
@@ -2965,6 +2966,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             byokProviderModels,
             // Sprint 103 R6: capability map from the host registry.
             runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
+            workspacePath: message.workspacePath || undefined,
             conversations,
           });
 

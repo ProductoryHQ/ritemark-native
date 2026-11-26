@@ -216,18 +216,18 @@ test('Claude renders the collapsed S17 read summary below the completed answer',
   }
   assert.equal(agentTurn().activities.length, 4);
   assert.doesNotMatch(renderClaude(), /Read 4 Word documents/);
-  progress('done', 'Completed in 20.0s');
+  progress('done', 'Completed in 9.8s');
 
   const text = 'The interviews recommend asking how we can help.';
   send({
     type: 'agent-result', conversationId, text,
-    metrics: { durationMs: 20000, waitedMs: 2000, costUsd: null, model: null },
+    metrics: { durationMs: 9800, waitedMs: 2000, costUsd: null, model: null },
   });
   const markup = renderClaude();
-  assertBefore(markup, 'Read 4 Word documents · 18 s', text);
-  assert.match(markup, /<details class="[^"]*"><summary[^>]*>Read 4 Word documents · 18 s<\/summary>/);
-  assert.doesNotMatch(markup, /ToolSearch|Completed in 20\.0s/);
+  assertBefore(markup, 'Read 4 Word documents · 8s', text);
+  assert.match(markup, /<details class="[^"]*"><summary[^>]*>Read 4 Word documents · 8s<\/summary>/);
+  assert.doesNotMatch(markup, /ToolSearch|Completed in 9\.8s/);
   // Zustand reads the initial snapshot during server rendering.
   Object.assign(store.getInitialState(), store.getState());
-  assert.match(renderToStaticMarkup(React.createElement(ActivityStatusLine)), /Done in 18s/);
+  assert.match(renderToStaticMarkup(React.createElement(ActivityStatusLine)), /Done in 8s/);
 });

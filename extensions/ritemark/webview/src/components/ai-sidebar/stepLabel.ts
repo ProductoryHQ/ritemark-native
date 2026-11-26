@@ -1,6 +1,7 @@
 import { splitFileName } from '../../../../src/decks/deckFileName';
 import { documentStepKind, isDocumentReadTool, type ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentProgress } from './types';
+import { formatSeconds } from './activityState';
 
 const names = {
   word: ['Word document', 'Word documents'],
@@ -116,26 +117,43 @@ export function isTurnLifecycleActivity(activity: AgentProgress): boolean {
   return activity.type === 'init' || (activity.type === 'done' && !activity.tool && !activity.step);
 }
 
-function retryKey(activity: AgentProgress): string | undefined {
+function retryKey(activity: AgentProgress, workspacePath?: string): string | undefined {
   const { step } = activity;
   if (!step) return;
   if (step.kind === 'shell') return step.command ? JSON.stringify([step.kind, step.command]) : undefined;
   const target = step.path?.trim() || activity.file?.trim();
   if (target) {
-    return JSON.stringify([step.kind, target.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '')]);
+    const path = target.replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+    const root = workspacePath?.replace(/\\/g, '/').replace(/\/+$/, '');
+    const prefix = root === undefined ? undefined : root + '/';
+    const inWorkspace = prefix && (/^[a-z]:\//i.test(prefix)
+      ? path.toLowerCase().startsWith(prefix.toLowerCase())
+      : path.startsWith(prefix));
+    return JSON.stringify([step.kind, inWorkspace ? path.slice(prefix.length) : path]);
   }
 }
 
+function isRetryThought(activity?: AgentProgress): boolean {
+  return activity?.type === 'thinking' && /\b(?:retry(?:ing)?|try again)\b/i.test(activity.message);
+}
+
 /** Remove superseded attempts from the turn's visible steps. */
-export function visibleStepActivities(activities: AgentProgress[]): AgentProgress[] {
+export function visibleStepActivities(activities: AgentProgress[], workspacePath?: string): AgentProgress[] {
   const rows = activities.filter((activity) => !isTurnLifecycleActivity(activity) && !isHiddenToolActivity(activity));
   const superseded = new Set<number>();
-  const outcomes = new Set<string>();
+  const outcomes = new Map<string, number>();
   let nextAction: AgentProgress | undefined;
   for (let index = rows.length - 1; index >= 0; index--) {
     const activity = rows[index];
-    if (activity.type === 'thinking') continue;
-    const key = retryKey(activity);
+    if (activity.type === 'thinking') {
+      // Some runtimes omit a rejected tool call. Explicit parameter-retry
+      // narration still belongs to the retry when the next document read ends.
+      if (isRetryThought(activity) && /\bparameter\b/i.test(activity.message)
+        && nextAction?.step?.kind === 'read' && nextAction.step.status) superseded.add(index);
+      continue;
+    }
+    if (activity.type === 'notice') continue;
+    const key = retryKey(activity, workspacePath);
     if (activity.step?.status === 'failed') {
       // A rejected read without a target can only be matched to the next
       // document call. Never use an unrelated success to hide a known refusal.
@@ -144,12 +162,20 @@ export function visibleStepActivities(activities: AgentProgress[]): AgentProgres
         && Boolean(nextAction?.step?.status);
       if ((key && outcomes.has(key)) || missingTargetRetry) {
         superseded.add(index);
-        if (missingTargetRetry || (nextAction && retryKey(nextAction) === key)) {
+        // Claude can announce a retry in the same message as an attempt that
+        // is itself superseded. Preserve ordinary narration before a call.
+        const previous = rows[index - 1];
+        if (isRetryThought(previous)) superseded.add(index - 1);
+        const retryIndex = key ? outcomes.get(key) : undefined;
+        if (retryIndex !== undefined && isRetryThought(rows[retryIndex - 1])) {
+          superseded.add(retryIndex - 1);
+        }
+        if (missingTargetRetry || (key && nextAction && retryKey(nextAction, workspacePath) === key)) {
           for (let next = index + 1; rows[next]?.type === 'thinking'; next++) superseded.add(next);
         }
       }
     }
-    if (key && activity.step?.status) outcomes.add(key);
+    if (key && activity.step?.status) outcomes.set(key, index);
     nextAction = activity;
   }
 
@@ -183,19 +209,24 @@ export function readSummary(activities: AgentProgress[], activeMs = 0): string |
     }
   }
   const counts = documentCounts(paths);
-  if (counts) return `Read ${counts}${activeMs > 0 ? ` · ${Math.round(activeMs / 1000)} s` : ''}`;
+  if (counts) return `Read ${counts}${activeMs > 0 ? ` · ${formatSeconds(activeMs / 1000)}` : ''}`;
 }
 
 /** Strip formatting before shortening a Thinking preview, including a link cut by an older runtime. */
 export function thinkingText(markdown: string): string {
   return markdown
-    .replace(/!?\[([^\]\n]+)\]\((?:[^()\n]|\([^()\n]*\))*(?:\)|$)/g, (_link, label: string) => {
-      const text = label.replace(/%20/gi, ' ');
+    .replace(/!?\[((?:[^\[\]\n]|\[[^\[\]\n]*\])+)\]\((?:[^()\n]|\([^()\n]*\))*(?:\)|$)/g, (_link, label: string) => {
+      let text: string;
+      try {
+        text = decodeURIComponent(label);
+      } catch {
+        text = label.replace(/%20/gi, ' ');
+      }
       return documentStepKind(text) ? basename(text) : text;
     })
     .replace(/\*\*|__|~~|`/g, '')
     .replace(/(?<!\w)([*_])([^\n]+?)\1(?!\w)/g, '$2')
-    .replace(/^\s*(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/^\s*(?:#{1,6}|>|[-*+])\s+/gm, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

@@ -138,8 +138,9 @@ export function presentActivityState(
 }
 
 export function formatSeconds(totalSeconds: number): string {
-  if (totalSeconds < 60) return `${totalSeconds.toFixed(totalSeconds < 10 ? 1 : 0)}s`;
-  const m = Math.floor(totalSeconds / 60);
-  const s = Math.round(totalSeconds % 60);
+  const seconds = Math.round(totalSeconds);
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
   return `${m}m ${s}s`;
 }

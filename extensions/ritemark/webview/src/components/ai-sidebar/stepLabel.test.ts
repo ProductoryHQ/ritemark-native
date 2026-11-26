@@ -21,8 +21,8 @@ for (const activity of [...activities].reverse()) {
 assert.equal(activities.length, 4);
 assert.equal(stepLabel(activities[0])?.label, 'Read Interview – branch manager, Riverside');
 assert.equal(stepLabel(activities[0])?.icon, 'file-doc');
-assert.equal(readSummary(activities, 18000), 'Read 4 Word documents · 18 s');
-assert.equal(readSummary([...activities, activities[0]], 18000), 'Read 4 Word documents · 18 s');
+assert.equal(readSummary(activities, 18000), 'Read 4 Word documents · 18s');
+assert.equal(readSummary([...activities, activities[0]], 18000), 'Read 4 Word documents · 18s');
 
 // S18: only the detail contains the command. Exercise native Claude reads too.
 const command = 'textutil -convert txt "Reference/Annual report.docx" -stdout';
@@ -111,7 +111,7 @@ for (const [starting, completed] of [
   assert.deepEqual(visibleStepActivities([notice, ...recorded]), [notice, ...activities, toolDone]);
   assert.equal(recorded[0], init);
   assert.equal(recorded[recorded.length - 1], done);
-  assert.equal(readSummary(visibleStepActivities(recorded), 18000), 'Read 4 Word documents · 18 s');
+  assert.equal(readSummary(visibleStepActivities(recorded), 18000), 'Read 4 Word documents · 18s');
 }
 
 const retryThought: AgentProgress = {
@@ -138,4 +138,36 @@ assert.equal(thinkingText('**[Annual report](Reference/Annual%20report%20…'), 
 assert.equal(thinkingText('**[Branch visit form](Reference/form%20(scan).pdf)** is _unreadable_.'), 'Branch visit form is unreadable.');
 assert.equal(thinkingText('The tool needs a `path` parameter.'), 'The tool needs a path parameter.');
 assert.equal(thinkingText('[Reference/Annual%20report.pdf](Reference/Annual%20report.pdf)'), 'Annual report.pdf');
+assert.equal(thinkingText('[Reference/%C3%9Clevaade%202025.pdf](x.pdf)'), 'Ülevaade 2025.pdf');
+assert.equal(thinkingText('[Reference/%C3%20report.pdf](x.pdf)'), '%C3 report.pdf');
+assert.equal(thinkingText('2025. aastal oli'), '2025. aastal oli');
+assert.equal(thinkingText('[a [b] c](d.pdf)'), 'a [b] c');
+
+const draftsFolder = progress({ id: 'drafts', kind: 'folder', path: '04 Drafts', status: 'completed' }, 'Glob');
+const liveRetryThought: AgentProgress = {
+  type: 'thinking', message: "The parameter is path, so I'll retry with that.", timestamp: 1,
+};
+const findingsPath = '04 Drafts/Findings draft v2.docx';
+const findings = progress({ id: 'findings', kind: 'read', path: findingsPath, status: 'completed' });
+const absoluteFailure = progress({ id: 'native-failure', kind: 'read', path: `/project/${findingsPath}`, status: 'failed' }, 'Read');
+// Replay the captured rows, with and without a separate failed-call event.
+const proposalRead = progress({ id: 'proposal-read', kind: 'read', path: proposal, status: 'completed' });
+const confidential = progress({ ...locked, path: '04 Drafts/Confidential appendix.docx' });
+const briefing = progress({ id: 'briefing', kind: 'read', path: '04 Drafts/Decision briefing.pptx', status: 'completed', units: '6 slides' });
+const closingThought: AgentProgress = {
+  type: 'thinking', message: 'The 04 Drafts folder holds four documents. I could read three of them.', timestamp: 2,
+};
+const draftReads = [findings, proposalRead, confidential, briefing, closingThought];
+assert.deepEqual(visibleStepActivities([draftsFolder, liveRetryThought, ...draftReads], '/project'), [
+  draftsFolder, ...draftReads,
+]);
+assert.deepEqual(visibleStepActivities([draftsFolder, liveRetryThought, absoluteFailure, ...draftReads], '/project'), [
+  draftsFolder, ...draftReads,
+]);
+assert.deepEqual(visibleStepActivities([absoluteFailure, draftsFolder, liveRetryThought, findings, finalThought], '/project'), [
+  draftsFolder, findings, finalThought,
+]);
+assert.deepEqual(visibleStepActivities([absoluteFailure, findings], '/pro'), [absoluteFailure, findings]);
+assert.deepEqual(visibleStepActivities([finalThought, absoluteFailure, findings], '/project'), [finalThought, findings]);
+assert.equal(readSummary([findings], 7800), 'Read 1 Word document · 8s');
 console.log('stepLabel tests passed.');

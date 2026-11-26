@@ -69,6 +69,14 @@ for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
     { type: 'done', message: 'Completed in 1.2s', timestamp: 2 },
   );
   if ('streamingText' in turn) turn.streamingText = answer;
+  hydrateConversations([{ ...live,
+    agentConversation: live.agentConversation.map((turn) => ({ ...turn, isRunning: false, result: { text: answer, filesModified: [] } })),
+    codexConversation: live.codexConversation.map((turn) => ({ ...turn, isRunning: false, result: { status: 'completed' } })),
+  }], id);
+  const noticeOnlyMarkup = render();
+  assert.doesNotMatch(noticeOnlyMarkup, /actions? completed|Activity \(\d+ steps?/);
+  assert.ok(noticeOnlyMarkup.includes(substitution.replace(/'/g, '&#x27;')));
+
   hydrateConversations([live], id);
   useAISidebarStore.setState({ conversationRolloutMode: 'host-canonical' });
   const runningMarkup = render();
@@ -79,7 +87,7 @@ for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
     ? { type: 'agent-result', conversationId: id, text: answer, liveDeckSteps: steps }
     : { type: 'codex-result', conversationId: id, status: 'completed', liveDeckSteps: steps });
   const liveMarkup = render();
-  assert.match(liveMarkup, runtimeId === 'claude-code' ? /Activity \(3 steps/ : /2 actions completed/);
+  assert.match(liveMarkup, runtimeId === 'claude-code' ? /Activity \(1 step\)/ : /1 action completed/);
   assert.ok(!liveMarkup.includes(starting));
   if (runtimeId === 'claude-code') {
     for (const notice of notices) assert.ok(liveMarkup.includes(notice.replace(/'/g, '&#x27;')), liveMarkup);
