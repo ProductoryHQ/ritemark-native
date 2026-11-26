@@ -165,6 +165,8 @@
 .deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > :is(h2, h3, h4, h5, h6) { padding-top: 0; }
 .deck-sl.is-blocks h1 + h2 { padding-top: 0; margin-bottom: .7em; }
 .deck-sl.is-blocks p { margin: 0 0 calc(12px * var(--fit, 1)); }
+/* An empty line adds the flow's own line height. The preceding block supplies the usual gap. */
+.deck-sl.is-blocks .blk-flow p.blk-empty-line { margin: 0; }
 .deck-sl.is-blocks ul, .deck-sl.is-blocks ol { margin: 0 0 calc(12px * var(--fit, 1)); padding-left: 1.25em; }
 /* Lists keep their markers wherever the slide is drawn (the webview's Tailwind preflight takes them off). */
 .deck-sl.is-blocks ul { list-style: disc outside; }
@@ -337,13 +339,15 @@
 .deck-sl.is-blocks .blk-column > :last-child, .deck-sl.is-blocks .blk-box > :last-child { margin-bottom: 0; }
 /* Boxes: a row of cards, with an icon or the look's own mark. */
 .deck-sl.is-blocks .blk-boxes { gap: calc(16px * var(--fit, 1)); margin: 0 0 calc(12px * var(--fit, 1)); counter-reset: blk-box; }
-.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: calc(18px * var(--fit, 1)); border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); font-size: .86em; }
+.deck-sl.is-blocks .blk-box { counter-increment: blk-box; display: flex; flex-direction: column; align-items: flex-start; --box-gap: 4px; gap: var(--box-gap); min-width: 0; padding: calc(18px * var(--fit, 1)); border-radius: var(--s-r, 14px); background: var(--s-box, rgba(255,255,255,.07)); box-shadow: inset 0 0 0 1.5px var(--s-boxe, transparent); font-size: .86em; }
 .deck-sl.is-blocks .blk-box > * { margin-bottom: 0; }
 .deck-sl.is-blocks .blk-box h3 { font-size: 1.1em; }
 .deck-sl.is-blocks .blk-icon, .deck-sl.is-blocks .blk-mark { display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 10px; border-radius: 50%; background: var(--s-accs, rgba(242,181,68,.16)); color: var(--s-acct, #F2B544); }
 .deck-sl.is-blocks .blk-mark { border-radius: 8px; width: 34px; height: 34px; }
 /* #850: a box whose icon Ritemark doesn't know keeps its badge, with a dashed circle in the theme's placeholder colour. */
 .deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
+/* Each spacer adds a line without introducing an extra flex gap in a box. */
+.deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > p.blk-empty-line:not(:only-child) { margin-top: calc(-1 * var(--box-gap)); }
 .deck-sl.is-blocks .blk-boxes[data-look="steps"] > .blk-box::before { content: counter(blk-box); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }
 .deck-sl.is-blocks .blk-boxes[data-look="line"] > .blk-box::before { content: ''; display: block; width: 18px; height: 18px; margin-bottom: 12px; border-radius: 50%; background: var(--s-acc, #F2B544); box-shadow: 0 0 0 6px var(--s-accs, rgba(242,181,68,.18)); }
 /* Sprint 164 PR 3 (the decks README, "Label, a block of its own"): a short line in the theme's accent, as a pill, in

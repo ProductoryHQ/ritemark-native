@@ -100,3 +100,21 @@ export function fullSlideWidthFor(width: number, height: number, under = 0): num
   const byHeight = Math.floor(((height - ABOVE_STAGE_ROOM - Math.max(0, under)) * 16) / 9)
   return Math.max(0, Math.min(byWidth, byHeight))
 }
+
+/** Place the full settings card within the stage. Below, its height plus the gap joins the stage's scroll flow. */
+export function slideSettingsPlacement(
+  stageWidth: number, stageHeight: number, slideLeft: number, slideWidth: number,
+  popup: { width: number; height: number }, gap: number, padding: number,
+): { side: 'right' | 'left' | 'bottom'; room: number } {
+  if (popup.height + padding * 2 <= stageHeight) {
+    const sideRoom = popup.width + gap + padding
+    if (stageWidth - slideLeft - slideWidth >= sideRoom) return { side: 'right', room: 0 }
+    if (slideLeft >= sideRoom) return { side: 'left', room: 0 }
+  }
+  return { side: 'bottom', room: popup.height + gap }
+}
+
+/** Keep the normal slide size when fitting the card below would make the slide too small. */
+export function slideWidthWithSettings(normalWidth: number, fittedWidth: number, room: number): number {
+  return room > 0 && fittedWidth >= normalWidth / 2 ? Math.min(normalWidth, fittedWidth) : normalWidth
+}

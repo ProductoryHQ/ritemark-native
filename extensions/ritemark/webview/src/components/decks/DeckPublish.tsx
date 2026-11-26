@@ -101,10 +101,11 @@ interface DeckPublishProps {
   view: DeckViewMode
   onShowPause: (target: PauseTarget) => void
   /** `name`: the file the words end with (#931: cut in its middle when the bar is short of room). */
+  onPageNotice: (text: string, kind: unknown, operation: unknown) => void
   onNotice: (text: string, action?: { label: string; tip: string; run: () => void; icon?: 'folder-open'; ariaLabel?: string }, name?: string) => void
 }
 
-export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice, onShowPause }: DeckPublishProps) {
+export function DeckPublish({ slides, theme, borderless, assets, text, view, onNotice, onPageNotice, onShowPause }: DeckPublishProps) {
   const [state, setState] = useState<DeckPageState | null>(null)
   // A Publish or a Save as PDF waiting for its slides' fit: the slides, the text and the look as they were at the
   // press, and which it was (the PDF's kind named at the press, never read again later).
@@ -132,14 +133,14 @@ export function DeckPublish({ slides, theme, borderless, assets, text, view, onN
   useEffect(() => {
     const stop = onMessage(message => {
       if (message.type === 'deck/page-state' && isState(message.state)) setState(message.state)
-      if (message.type === 'deck/page-notice' && typeof message.text === 'string') onNotice(message.text)
+      if (message.type === 'deck/page-notice' && typeof message.text === 'string') onPageNotice(message.text, message.kind, message.operation)
       if (message.type === 'deck/pdf-saved' && typeof message.name === 'string') {
         onNotice(savedNotice(message.name), showInFolder(message.name), message.name)
       }
     })
     sendToExtension('deck/page-state')
     return stop
-  }, [onNotice])
+  }, [onNotice, onPageNotice])
 
   return (
     <>

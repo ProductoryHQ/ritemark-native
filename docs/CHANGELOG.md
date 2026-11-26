@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Turn on Update on every save to keep a published deck’s page up to date (#1007).
 - The deck’s publish button shows when a page is live, updating, paused, or offline, and explains what to do when an update pauses.
 
+### Changed
+
+- Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
+
 ### Fixed
 
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
@@ -38,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
 - Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).
+- **Long notes in the deck bar give way first (#950).** The note shortens before Publish loses its label, and the theme button shows its full name or just its swatch. The full note and theme name are in their tooltips.
 
 ## [Unreleased] — v2.3.0
 

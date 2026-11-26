@@ -63,7 +63,7 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   assert.ok(present.querySelectorAll('button').every((part) => part.classList.contains('h-[30px]')), 'Present: 30 px')
   const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8')
   const at = (marker: string) => { const index = view.indexOf(marker); assert.ok(index >= 0, marker); return index }
-  assert.ok(at('className="flex-1"') < at('deck-saved') && at('deck-saved') < at('<DeckPublish ') && at('<DeckPublish ') < at('<PresentButton '), "the bar's order")
+  assert.ok(at('className="deck-bar-spacer"') < at('deck-saved') && at('deck-saved') < at('<DeckPublish ') && at('<DeckPublish ') < at('<PresentButton '), "the bar's order")
   assert.ok(/<PresentButton [^\n]*\/>\s*<\/header>/.test(view), 'Present is last on the bar')
 }
 
