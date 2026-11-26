@@ -514,7 +514,9 @@ export type ExtensionMessage =
   // Sprint 148 (R8): search passes the matching message's turn, shown in view.
   | { type: 'conversation/select'; conversationId: string; turnId?: string }
   // Sprint 133 (R6): the welcome's landing opens a new chat with the AI the person signed in with.
-  | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
+  | { type: 'landing:new-chat'; runtimeId: AgentId } & (
+    { placeholder: string; fromStatus?: never } | { placeholder?: never; fromStatus: true }
+  )
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
   | { type: 'starting-place'; places: StartingPlacesByAgent; hasAbout: boolean }

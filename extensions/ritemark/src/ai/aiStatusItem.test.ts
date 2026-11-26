@@ -27,10 +27,10 @@ class EventEmitter<T> {
   dispose(): void { this.listeners = []; }
 }
 
-interface FakeItem { id: string; text: string; tooltip?: string; color?: { id: string }; command?: string; shown: boolean; accessibilityInformation?: { label: string; role?: string } }
+interface FakeItem { id: string; text: string; tooltip?: string; color?: { id: string }; command?: string | { command: string; arguments?: unknown[] }; shown: boolean; accessibilityInformation?: { label: string; role?: string } }
 const items: FakeItem[] = [];
-const commands = new Map<string, () => unknown>();
-const executed: string[] = [];
+const commands = new Map<string, (...args: unknown[]) => unknown>();
+const executed: unknown[][] = [];
 let selectedAgent = 'claude-code';
 const configListeners: Listener<{ affectsConfiguration: (key: string) => boolean }>[] = [];
 const secretListeners: Listener<unknown>[] = [];
@@ -57,8 +57,8 @@ const vscodeStub = {
     },
   },
   commands: {
-    registerCommand: (id: string, run: () => unknown) => { commands.set(id, run); return { dispose() {} }; },
-    executeCommand: (id: string) => { executed.push(id); return Promise.resolve(); },
+    registerCommand: (id: string, run: (...args: unknown[]) => unknown) => { commands.set(id, run); return { dispose() {} }; },
+    executeCommand: (id: string, ...args: unknown[]) => { executed.push([id, ...args]); return Promise.resolve(); },
   },
 };
 const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]) => unknown })._load;
@@ -119,7 +119,16 @@ async function main(): Promise<void> {
   assert.equal(items.length, 1, 'one item, its words only: no dot in 2.1');
   const [words] = items;
   assert.equal(words.id, 'ritemark.aiStatus');
-  assert.equal(words.command, 'ritemark.aiStatus.open');
+  async function click(expected: unknown[]): Promise<void> {
+    const command = words.command;
+    assert.ok(command);
+    const id = typeof command === 'string' ? command : command.command;
+    const args = typeof command === 'string' ? [] : command.arguments ?? [];
+    assert.equal(id, 'ritemark.aiStatus.open');
+    assert.ok(commands.has(id));
+    await commands.get(id)!(...args);
+    assert.deepEqual(executed.splice(0), [expected]);
+  }
 
   // An offline start: the first round failed, so connectivity still guesses online, and Claude is signed in. The item
   // claims nothing until the internet answers.
@@ -148,6 +157,8 @@ async function main(): Promise<void> {
   mock.timers.tick(1);
   await flush();
   assert.equal(words.text, 'ChatGPT ready', 'the open chat names its AI');
+  await click(['ritemark.showAIPanel', 'codex']);
+  assert.equal(words.tooltip, 'Signed in to ChatGPT\nStart a new chat with ChatGPT');
   assert.equal(lastReady(), 'codex', 'Sprint 156: the open chat\'s usable AI is remembered');
 
   // Its last turn failed on sign-in.
@@ -155,6 +166,8 @@ async function main(): Promise<void> {
   for (const l of openChatListeners) l();
   await settle();
   assert.equal(words.text, 'ChatGPT: sign in again');
+  await click(['ritemark.showAIPanel']);
+  assert.equal(words.tooltip, 'Your ChatGPT sign-in has ended\nOpen the AI column to sign in');
 
   // A ChatGPT sign-in or repair that has only started re-reads nothing.
   probes.length = 0;
@@ -173,7 +186,7 @@ async function main(): Promise<void> {
   emitClaudeStatusInvalidated('logout');
   await settle();
   assert.equal(words.text, 'Claude: sign in');
-  assert.equal(words.tooltip, 'Sign in to Claude to work with it here');
+  assert.equal(words.tooltip, 'Sign in to Claude to work with it here\nOpen the AI column to sign in');
   assert.deepEqual(probes, ['claude-code', 'opencode', 'codex'], 'the target, then the others cheapest first');
   assert.equal(lastReady(), undefined, 'Sprint 156: an AI that can\'t take a turn is never stored, and ChatGPT found ready by the others\' probe isn\'t either');
 
@@ -182,7 +195,8 @@ async function main(): Promise<void> {
   emitCodexStatusInvalidated('logout');
   await settle();
   assert.equal(words.text, 'No AI yet');
-  assert.equal(words.tooltip, 'Sign in to an AI to work with it here');
+  assert.equal(words.tooltip, 'Sign in to an AI to work with it here\nOpen the AI column to sign in');
+  await click(['ritemark.showAIPanel']);
   assert.equal(lastReady(), undefined, 'Sprint 156: nothing usable, nothing stored');
 
   // The internet goes: Offline comes first; and back.
@@ -239,10 +253,6 @@ async function main(): Promise<void> {
   openChat = null;
   for (const l of openChatListeners) l();
   await settle();
-
-  // The click opens the AI's sheet.
-  await commands.get('ritemark.aiStatus.open')?.();
-  assert.deepEqual(executed, ['ritemark.showAIPanel']);
 
   mock.timers.reset();
   console.log('aiStatusItem.test.ts passed');

@@ -346,8 +346,8 @@ interface AISidebarState {
    */
   landingPlaceholder: { conversationId: string; runtimeId: AgentId; text: string } | null;
   /** The landing waits until its runtime's model is known (OpenCode's needs the providers' keys first). */
-  pendingLanding: { runtimeId: AgentId; text: string; since: number; start?: ChatStartMessage } | null;
-  openLandingChat: (runtimeId: AgentId, text: string) => void;
+  pendingLanding: { runtimeId: AgentId; text: string; since: number; start?: ChatStartMessage; statusChatId?: string } | null;
+  openLandingChat: (runtimeId: AgentId, text: string, fromStatus?: boolean) => void;
   applyPendingLanding: () => void;
   /**
    * Sprint 140 (R5): the host's "open a visible chat with this request in this AI": a new chat in front (a blank
@@ -2302,9 +2302,32 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
      * wipes the current one and no longer resets any provider session — the old
      * "new chat destroys the live one" semantic is gone.
      */
-    openLandingChat: (runtimeId, text) => {
-      get().startNewConversation();
-      set({ pendingLanding: { runtimeId, text, since: Date.now() } });
+    openLandingChat: (runtimeId, text, fromStatus) => {
+      const state = get();
+      const current = activeConversation();
+      // #1088: a status bar click never throws away an unsent draft: it only focuses that chat.
+      if (fromStatus && current) {
+        const hasDraft = !state.composerEmpty || Boolean(state.composerDrafts[current.id])
+          || state.composerFill?.conversationId === current.id;
+        if (hasDraft) {
+          state.switchConversation(current.id);
+          return;
+        }
+      }
+
+      // R10: a blank chat already open is the new chat (one empty thread at a time); it takes the clicked AI below.
+      state.startNewConversation();
+      const fresh = activeConversation();
+      if (fromStatus && fresh) {
+        if (fresh.pendingRuntime.runtimeId !== runtimeId) {
+          state.setPendingRuntime({ runtimeId, modelId: '' });
+        }
+        if (fresh.selectedAgent !== runtimeId) state.selectAgent(runtimeId);
+        // The sidebar may still be starting. The new, empty box takes this
+        // focus request when it mounts, even if the first focus attempt was early.
+        state.fillComposer('', 0);
+      }
+      set({ pendingLanding: { runtimeId, text, since: Date.now(), statusChatId: fromStatus ? fresh?.id : undefined } });
       get().applyPendingLanding();
     },
 
@@ -2361,7 +2384,13 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       const pending = get().pendingLanding;
       const conversation = activeConversation();
       if (!pending || !conversation) return;
-      if (conversation.selectedAgent !== pending.runtimeId || conversation.pendingRuntime.runtimeId !== pending.runtimeId) {
+      if (pending.statusChatId && (pending.statusChatId !== conversation.id
+          || conversation.pendingRuntime.runtimeId !== pending.runtimeId || !isConversationEmpty(conversation))) {
+        set({ pendingLanding: null });
+        return;
+      }
+      if (conversation.selectedAgent !== pending.runtimeId || conversation.pendingRuntime.runtimeId !== pending.runtimeId
+          || (pending.statusChatId && !conversation.pendingRuntime.modelId)) {
         const state = get();
         const modelId = resolveAvailableRuntimeModel(pending.runtimeId, {
           claude: conversation.selectedModel,
@@ -2401,7 +2430,8 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       }
       set({
         pendingLanding: null,
-        landingPlaceholder: { conversationId: conversation.id, runtimeId: pending.runtimeId, text: pending.text },
+        landingPlaceholder: pending.statusChatId ? null
+          : { conversationId: conversation.id, runtimeId: pending.runtimeId, text: pending.text },
       });
     },
 
@@ -3191,7 +3221,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
 
         case 'landing:new-chat':
-          get().openLandingChat(message.runtimeId, message.placeholder);
+          get().openLandingChat(message.runtimeId, message.placeholder ?? '', message.fromStatus === true);
           break;
 
         case 'chat/start': {

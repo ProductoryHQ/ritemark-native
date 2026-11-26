@@ -14,6 +14,7 @@ import { initConnectivity } from './ai/connectivity';
 import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
+import type { AgentId } from './agent/types';
 import { anthropicKeyChanged, getSetupStatus, registerAnthropicKeyReader } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
@@ -813,9 +814,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register show AI panel command
   context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.showAIPanel', () => {
-      vscode.commands.executeCommand('ritemark.unifiedView.focus');
-    })
+    vscode.commands.registerCommand('ritemark.showAIPanel', (agentId?: AgentId) =>
+      agentId ? unifiedViewProvider.openLandingChat(agentId) : vscode.commands.executeCommand('ritemark.unifiedView.focus')
+    )
   );
 
   // Register search command (opens VS Code search)

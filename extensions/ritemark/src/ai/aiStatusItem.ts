@@ -91,7 +91,6 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
   const internet = sources.internet ?? CONNECTIVITY;
   const words = vscode.window.createStatusBarItem('ritemark.aiStatus', vscode.StatusBarAlignment.Right, 100);
   words.name = 'Ritemark AI status';
-  words.command = 'ritemark.aiStatus.open';
   context.subscriptions.push(words);
 
   const cache = new Map<AgentId, { at: number; value: RuntimeAvailability }>();
@@ -118,13 +117,18 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
     return probe;
   }
 
-  function draw(view: AiStatusView): void {
+  function draw(view: AiStatusView, target: AgentId): void {
     if (view.state === 'waiting') {
       words.hide(); // a signed-in AI before the internet has answered: claim nothing yet
       return;
     }
     words.text = view.text;
-    words.tooltip = view.tooltip;
+    const ready = view.state === 'ready';
+    const signIn = view.state === 'no-ai' || view.state === 'sign-in' || view.state === 'sign-in-again';
+    const action = ready ? `Start a new chat with ${RUNTIME_LABELS[target]}`
+      : signIn ? 'Open the AI column to sign in' : 'Open the AI column';
+    words.tooltip = `${view.tooltip}\n${action}`;
+    words.command = { command: 'ritemark.aiStatus.open', title: action, arguments: ready ? [target] : [] };
     words.accessibilityInformation = { label: view.text };
     words.show();
   }
@@ -162,7 +166,7 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
       view = describeAiStatus({ ...base, online: true, internetAnswered: internet.hasAnswered(), usable, anyUsable });
     }
     if (mine !== generation) return; // a newer request has started; its answer wins
-    draw(view);
+    draw(view, target);
   }
 
   function schedule(forget?: AgentId[]): void {
@@ -197,9 +201,8 @@ export function initAiStatusItem(context: vscode.ExtensionContext, sources: AiSt
       if (event.affectsConfiguration('ritemark.ai.selectedAgent')) schedule();
     }),
     sources.onDidChangeOpenChat(() => schedule()),
-    // The click opens the AI's sheet on the open chat. With no AI yet and an empty chat, the sheet's own gate shows
-    // its sign-in card (`sidebarGate.ts`), so the item adds no message of its own.
-    vscode.commands.registerCommand('ritemark.aiStatus.open', () => vscode.commands.executeCommand('ritemark.showAIPanel')),
+    vscode.commands.registerCommand('ritemark.aiStatus.open', (agentId?: AgentId) =>
+      vscode.commands.executeCommand('ritemark.showAIPanel', ...(agentId ? [agentId] : []))),
     { dispose: () => { if (timer) clearTimeout(timer); } },
   );
 
