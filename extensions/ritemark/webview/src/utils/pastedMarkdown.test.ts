@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { EditorState, type Transaction } from '@tiptap/pm/state'
+import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state'
 import { EditorView, type EditorProps } from '@tiptap/pm/view'
 import type { Schema } from '@tiptap/pm/model'
 import { loadSlide, saveSlide } from '../components/decks/blocks/slideEditorHarness'
@@ -87,6 +87,64 @@ test('a copy from a different session loses its Markdown spelling', () => {
   tagged.setAttribute('data-ritemark-clipboard', 'another-session')
   assert.equal(editorMarkdown(paste(doc.type.schema, dom.innerHTML, props)), 'Before\n\n---')
 })
+
+test('a list pasted from another tab keeps both items separate from the paragraph', () => {
+  const list = openDocument('* one\n* two').doc
+  const view = clipboardView(list.type.schema, props)
+  const { dom } = EditorView.prototype.serializeForClipboard.call(view as unknown as EditorView, list.slice(0, list.content.size))
+  const tagged = dom.querySelector('[data-ritemark-clipboard]')!
+  for (const token of ['another-session', null]) {
+    if (token) tagged.setAttribute('data-ritemark-clipboard', token)
+    else tagged.removeAttribute('data-ritemark-clipboard')
+    const target = openDocument('Para.').doc
+    view.state = EditorState.create({ doc: target, selection: TextSelection.create(target, 6) })
+    EditorView.prototype.pasteHTML.call(view as unknown as EditorView, dom.innerHTML, {} as ClipboardEvent)
+    assert.equal(editorMarkdown(view.state.doc), 'Para.\n\n- one\n- two')
+  }
+})
+
+test('external slice context preserves the depths, wrapper count, nodes and non-Markdown attributes', () => {
+  const element = document.createElement('p')
+  element.setAttribute('data-md-tight', 'true')
+  const context = ['orderedList', { start: 5, mdDelim: ')' }, 'listItem', null, 'paragraph', { mdTight: 'true' }]
+  element.setAttribute('data-pm-slice', '2 3 -1 ' + JSON.stringify(context))
+  const container = document.createElement('div')
+  container.innerHTML = props.transformPastedHTML!(element.outerHTML, {} as EditorView)
+  const result = container.firstElementChild!
+  assert.equal(result.getAttribute('data-pm-slice'), '2 3 -1 ' + JSON.stringify([
+    'orderedList', { start: 5 }, 'listItem', null, 'paragraph', {},
+  ]))
+  assert.equal(result.hasAttribute('data-md-tight'), false)
+  element.setAttribute('data-pm-slice', '2 3 -1 [invalid')
+  container.innerHTML = props.transformPastedHTML!(element.outerHTML, {} as EditorView)
+  assert.equal(container.firstElementChild!.getAttribute('data-pm-slice'), '2 3 -1 [invalid')
+})
+
+for (const [name, load, save] of [
+  ['document', (md: string) => openDocument(md).doc, editorMarkdown],
+  ['slide', loadSlide, saveSlide],
+] as const) {
+  const doc = load('Before')
+  const copyProps = pipeline.markdownClipboardProps(doc.type.schema)
+  const view = clipboardView(doc.type.schema, copyProps)
+  const { dom } = EditorView.prototype.serializeForClipboard.call(view as unknown as EditorView, doc.slice(0, doc.content.size))
+  const tagged = dom.querySelector('[data-ritemark-clipboard]')!
+  for (const [kind, html, expected] of [
+    ['hr', '<hr data-md-hr="---&#10;&#10;&lt;!-- x --&gt;">', '---'],
+    ['info', '<pre data-md-info="js&#10;second"><code class="language-js">x</code></pre>', '```js\nx\n```'],
+    ['marker', '<ul data-md-marker="-x"><li>Item</li></ul>', '- Item'],
+    ['delimiter', '<ol data-md-delim="x"><li>Item</li></ol>', '1. Item'],
+    ['delims', '<table data-md-delims="| ---&#10;--- |"><tr><th>A</th></tr><tr><td>B</td></tr></table>', '| A |\n| --- |\n| B |'],
+  ]) {
+    test(`${name} falls back for invalid ${kind} metadata`, () => {
+      assert.equal(save(paste(doc.type.schema, tagged.outerHTML + html, copyProps)), 'Before\n\n' + expected)
+      const external = tagged.cloneNode() as Element
+      external.textContent = tagged.textContent
+      external.removeAttribute('data-ritemark-clipboard')
+      assert.equal(save(paste(doc.type.schema, external.outerHTML + html, copyProps)), 'Before\n\n' + expected)
+    })
+  }
+}
 
 test('the image writer checks block structure, alt and title even with trusted metadata', () => {
   for (const html of [

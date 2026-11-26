@@ -116,6 +116,31 @@ export function markdownClipboardProps(schema: Schema): EditorProps {
   return { clipboardSerializer, transformPastedHTML: stripPastedMarkdownAttributes }
 }
 
+/** Preserve ProseMirror's slice depths and node context across editors. */
+function stripSliceMarkdownAttributes(slice: string): string {
+  const match = /^(\d+ \d+(?: -\d+)? )([\s\S]*)$/.exec(slice)
+  if (!match) return slice
+  let context: unknown
+  try {
+    context = JSON.parse(match[2])
+  } catch {
+    return slice
+  }
+  if (!Array.isArray(context)) return slice
+
+  let changed = false
+  for (let index = 1; index < context.length; index += 2) {
+    const attrs = context[index]
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) continue
+    for (const key of Object.keys(attrs)) {
+      if (!key.startsWith('md')) continue
+      delete attrs[key]
+      changed = true
+    }
+  }
+  return changed ? match[1] + JSON.stringify(context) : slice
+}
+
 /** Strip Markdown spelling metadata before ProseMirror parses external paste or drop HTML. */
 function stripPastedMarkdownAttributes(html: string): string {
   if (!/data-md-|data-pm-slice/i.test(html)) return html
@@ -126,8 +151,8 @@ function stripPastedMarkdownAttributes(html: string): string {
   if (elements.some(element => element.getAttribute(clipboardSessionAttribute) === clipboardSession)) return html
 
   for (const element of elements) {
-    // Slice context can also carry serialized ProseMirror node attributes.
-    element.removeAttribute('data-pm-slice')
+    const slice = element.getAttribute('data-pm-slice')
+    if (slice !== null) element.setAttribute('data-pm-slice', stripSliceMarkdownAttributes(slice))
     for (const attribute of Array.from(element.attributes)) {
       if (attribute.name.startsWith('data-md-')) element.removeAttribute(attribute.name)
     }
