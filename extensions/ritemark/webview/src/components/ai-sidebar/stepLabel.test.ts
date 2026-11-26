@@ -146,6 +146,13 @@ assert.equal(thinkingText('[a [b] c](d.pdf)'), 'a [b] c');
 assert.equal(thinkingText('Findings draft v2.docx **Summary:*…'), 'Findings draft v2.docx Summary:…');
 assert.equal(thinkingText('**Summary:** *the cost per visit is…'), 'Summary: the cost per visit is…');
 assert.equal(thinkingText('Cost is 5*3 and a * b stays.'), 'Cost is 5*3 and a * b stays.');
+// The host's cut ends with "..." (AgentRunner, 150 characters), wherever it falls.
+assert.equal(thinkingText('Findings draft v2.docx **Summary:*...'), 'Findings draft v2.docx Summary:...');
+assert.equal(thinkingText('Read [Annual report 2025, branch section](Reference/Annual%20re...'), 'Read Annual report 2025, branch section');
+assert.equal(thinkingText('Read [Annual report 2025, bra...'), 'Read Annual report 2025, bra...');
+assert.equal(thinkingText('Read [Annual report 2025]...'), 'Read Annual report 2025...');
+assert.equal(thinkingText('The `path...'), 'The path...');
+assert.equal(thinkingText('Keep [sic] in the middle of a sentence.'), 'Keep [sic] in the middle of a sentence.');
 
 const draftsFolder = progress({ id: 'drafts', kind: 'folder', path: '04 Drafts', status: 'completed' }, 'Glob');
 const liveRetryThought: AgentProgress = {

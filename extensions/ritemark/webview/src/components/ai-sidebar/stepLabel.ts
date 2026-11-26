@@ -227,9 +227,13 @@ export function thinkingText(markdown: string): string {
     .replace(/\*\*|__|~~|`/g, '')
     .replace(/(?<!\w)([*_])([^\n]+?)\1(?!\w)/g, '$2')
     .replace(/^\s*(?:#{1,6}|>|[-*+])\s+/gm, '')
-    // An emphasis mark whose pair was cut off by a preview's truncation ("**Summary:** *cut…").
+    // Marks a preview's cut left without their pair (the host cuts Claude's at 150 characters and adds "..."):
+    // a lone emphasis mark ("**Summary:** *cut..."), a link label cut before its "]" ("[Annual rep..."), and a
+    // label whose target was cut off ("[Annual report]..."). The preview reads as plain words wherever the cut falls.
     .replace(/(^|\s)\*+(?=\S)/g, '$1')
-    .replace(/(\S)\*+(?=\s|$|…)/g, '$1')
+    .replace(/(\S)\*+(?=\s|$|…|\.{3})/g, '$1')
+    .replace(/\[([^\[\]\n]*)\](?=\s*(?:…|\.{3})?\s*$)/, '$1')
+    .replace(/\[(?=[^\]\n]*$)/, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
