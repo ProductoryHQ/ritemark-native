@@ -59,7 +59,12 @@ for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
   });
   const live = projectionToConversation(projectConversation(running));
   const turn = (live.agentConversation[0] ?? live.codexConversation[0]);
-  turn.activities.push(activity);
+  const starting = `Starting ${runtimeId}`;
+  turn.activities.push(
+    { type: 'init', message: starting, timestamp: 0 },
+    activity,
+    { type: 'done', message: 'Completed in 1.2s', timestamp: 2 },
+  );
   if ('streamingText' in turn) turn.streamingText = answer;
   hydrateConversations([live], id);
   useAISidebarStore.setState({ conversationRolloutMode: 'host-canonical' });
@@ -68,6 +73,8 @@ for (const runtimeId of ['claude-code', 'codex', 'opencode'] as const) {
     : { type: 'codex-result', conversationId: id, status: 'completed', liveDeckSteps: steps });
   const liveMarkup = render();
   assert.match(liveMarkup, runtimeId === 'claude-code' ? /Activity \(1 steps/ : /1 action completed/);
+  assert.ok(!liveMarkup.includes(starting));
+  assert.doesNotMatch(liveMarkup, /Completed in 1\.2s/);
   checkLines(liveMarkup);
 
   const record = decodeConversationRecordV1(JSON.parse(JSON.stringify({

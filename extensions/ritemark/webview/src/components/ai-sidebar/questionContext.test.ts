@@ -13,6 +13,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { useAISidebarStore } = await import('./store');
 const { createConversationState } = await import('./conversationState');
 const { AgentTurnBlock } = await import('./AgentView');
+const { ActivityStatusLine } = await import('./ActivityStatusLine');
 const { CodexTurn } = await import('./CodexView');
 const { getActiveApprovedPlanForClaude } = await import('./lifecycle');
 
@@ -215,6 +216,7 @@ test('Claude renders the collapsed S17 read summary below the completed answer',
   }
   assert.equal(agentTurn().activities.length, 4);
   assert.doesNotMatch(renderClaude(), /Read 4 Word documents/);
+  progress('done', 'Completed in 20.0s');
 
   const text = 'The interviews recommend asking how we can help.';
   send({
@@ -224,5 +226,8 @@ test('Claude renders the collapsed S17 read summary below the completed answer',
   const markup = renderClaude();
   assertBefore(markup, 'Read 4 Word documents · 18 s', text);
   assert.match(markup, /<details class="[^"]*"><summary[^>]*>Read 4 Word documents · 18 s<\/summary>/);
-  assert.doesNotMatch(markup, /ToolSearch/);
+  assert.doesNotMatch(markup, /ToolSearch|Completed in 20\.0s/);
+  // Zustand reads the initial snapshot during server rendering.
+  Object.assign(store.getInitialState(), store.getState());
+  assert.match(renderToStaticMarkup(React.createElement(ActivityStatusLine)), /Done in 18s/);
 });

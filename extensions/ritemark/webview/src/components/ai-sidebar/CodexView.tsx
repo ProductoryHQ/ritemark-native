@@ -8,7 +8,7 @@
 
 import { ActivityCard } from './ActivityCard';
 import { ActivityDetails } from './ActivityDetails';
-import { activityHeadline, readSummary, stepLabel } from './stepLabel';
+import { activityHeadline, isTurnLifecycleActivity, readSummary, stepLabel } from './stepLabel';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { useRef, useEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
@@ -155,7 +155,6 @@ export function CodexTurn({
 }) {
   const hasActivities = turn.activities.length > 0;
   const hasNamedSteps = turn.activities.some((activity) => stepLabel(activity));
-  const lastActivity = hasActivities ? turn.activities[turn.activities.length - 1] : null;
   const rawPlanText = turn.planText || ((turn.result && !turn.result.error) ? turn.streamingText : '');
   const displayPlanText = extractPlanDisplayText(rawPlanText);
   // Only show plan cards when the user explicitly requested plan mode.
@@ -193,7 +192,6 @@ export function CodexTurn({
         <ActivitySection
           activities={turn.activities}
           isRunning={turn.isRunning}
-          lastActivity={lastActivity}
           runtimeLabel={runtimeLabel}
         />
       )}
@@ -277,7 +275,6 @@ export function CodexTurn({
         <ActivitySection
           activities={turn.activities}
           isRunning={false}
-          lastActivity={lastActivity}
           runtimeLabel={runtimeLabel}
           activeMs={turn.result?.activityDurationMs}
         />
@@ -337,28 +334,28 @@ function PlanCard({
  * When expanded: shows all individual activity lines.
  */
 function ActivitySection({
-  activities,
+  activities: turnActivities,
   isRunning,
-  lastActivity,
   runtimeLabel,
   activeMs,
 }: {
   activities: AgentProgress[];
   isRunning: boolean;
-  lastActivity: AgentProgress | null;
   /** ChatGPT or OpenCode: the provider's own words are labelled as theirs. */
   runtimeLabel: string;
   activeMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  const activities = turnActivities.filter((activity) => !isTurnLifecycleActivity(activity));
   const count = activities.length;
+  if (!count) return null;
   // Sprint 139: the provider's own words after a failure are kept here, but they aren't an action. A row
   // that opens them says whose words they are (the Experience lead): "What ChatGPT said".
   const actions = activities.filter((activity) => activity.type !== 'error').length;
   const theirWords = actions < count ? `What ${runtimeLabel} said` : undefined;
   const completed = actions > 0 ? `${actions} action${actions !== 1 ? 's' : ''} completed` : undefined;
-  const latestMessage = activityHeadline(lastActivity ?? undefined);
+  const latestMessage = activityHeadline(activities[count - 1]);
 
   return (
     <div className="rounded-md border border-transparent bg-transparent px-1">

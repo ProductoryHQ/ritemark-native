@@ -369,6 +369,7 @@ test('Sprint 173 S21: Claude, ChatGPT and OpenCode get the same source instructi
   assert.match(instructions, /Use `read_document` first when reading Word, PDF, or PowerPoint/);
   assert.match(instructions, /Name the source in the sentence as you would in a report/);
   assert.match(instructions, /Never use a number, a bracketed file name, or a path as the source label/);
+  assert.ok(instructions.includes('Refer to folders and documents in plain prose, for example “the Reference folder” or “the annual report”.'));
   assert.match(instructions, /the passage’s own words/);
   assert.match(instructions, /\[the head of operations\]\(Interviews\/Operations\.docx#p=4&q=start%20with%20the%20handover\)/);
 });

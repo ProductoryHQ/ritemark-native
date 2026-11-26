@@ -95,3 +95,19 @@ const started = { ...progress(unnamedRead), file: proposal };
 assert.equal(stepLabel(updateStep([started], failedRead)[0])?.label, "Couldn't open Proposal phase 2 v3");
 const namedFailure = toolStepResult(unnamedRead, "Couldn't read Proposal phase 2 v3.docx. The file may be damaged.", true, true, 'damaged');
 assert.equal(stepLabel(progress(namedFailure))?.label, "Couldn't open Proposal phase 2 v3 · the file may be damaged");
+
+// Turn boundaries stay in the event stream, while completed tools stay in the steps.
+const toolDone: AgentProgress = { type: 'done', tool: 'commandExecution', message: 'Done: commandExecution', timestamp: 1 };
+for (const [starting, completed] of [
+  ['Starting Claude (selected-model)', 'Completed in 18.0s'],
+  ['Starting ChatGPT…', ''],
+  ['Starting OpenCode…', ''],
+]) {
+  const init: AgentProgress = { type: 'init', message: starting, timestamp: 0 };
+  const done: AgentProgress = { type: 'done', message: completed, timestamp: 2 };
+  const recorded = updateStep([...updateStep([], init), ...activities, toolDone], done);
+  assert.deepEqual(visibleStepActivities(recorded), [...activities, toolDone]);
+  assert.equal(recorded[0], init);
+  assert.equal(recorded[recorded.length - 1], done);
+  assert.equal(readSummary(visibleStepActivities(recorded), 18000), 'Read 4 Word documents · 18 s');
+}

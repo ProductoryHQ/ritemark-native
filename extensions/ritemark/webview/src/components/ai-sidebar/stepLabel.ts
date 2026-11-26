@@ -93,12 +93,17 @@ export function updateStep(activities: AgentProgress[], incoming: AgentProgress)
   return next;
 }
 
+export function isTurnLifecycleActivity(activity: AgentProgress): boolean {
+  // Codex also uses "done" for completed tool calls, which are still steps.
+  return activity.type === 'init' || (activity.type === 'done' && !activity.tool && !activity.step);
+}
+
 /** A folder search can retry with another pattern and a new tool ID. */
 export function visibleStepActivities(activities: AgentProgress[]): AgentProgress[] {
   const visible: AgentProgress[] = [];
   const folders = new Map<string, number>();
   for (const activity of activities) {
-    if (isHiddenToolActivity(activity)) continue;
+    if (isTurnLifecycleActivity(activity) || isHiddenToolActivity(activity)) continue;
     const { step } = activity;
     if (step?.kind !== 'folder' || step.status !== 'completed') {
       visible.push(activity);
