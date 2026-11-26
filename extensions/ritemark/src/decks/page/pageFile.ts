@@ -235,7 +235,7 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
  * be a file beside the deck (a missing one draws its empty place, as in the deck view).
  */
 /** What a page is made from; `print` only for Save slides as PDF and Save handout as PDF (`buildPrintPage`). */
-type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; print?: 'slides' | 'handout' };
+type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; measureFit?: boolean; print?: 'slides' | 'handout' };
 
 export async function buildDeckPage(
   input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
@@ -293,7 +293,7 @@ async function buildPage(
   // pictures the other holds aren't named, so they are neither copied to the print's folder nor waited for.
   const printed = (key: string) => input.print === undefined || key.startsWith(pictureKey('', 'slide')) === (input.print === 'slides');
   const urls = new Map([...found].filter(([key]) => printed(key)).map(([key, picture]) => [key, placed ? placed(picture) : picture.address]));
-  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), print: input.print });
+  const html = pageHtml(deck, assets, { digest, pictureUrl: (picture, from) => urls.get(pictureKey(picture, from)) ?? null, name: deckNameOf(input.deckPath), print: input.print, measureFit: input.measureFit });
   return { deck, digest, html };
 }
 

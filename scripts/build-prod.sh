@@ -495,6 +495,8 @@ echo ""
 echo -e "${BLUE}Step 6/9: Provenance & Post-Build Validation${NC}"
 echo "----------------------------------------"
 
+./scripts/build-quicklook.sh --install "$APP_PATH"
+
 EXTENSION_SHA_PATH="$PROJECT_DIR/VSCode-$TARGET/ritemark-extension-pre-sign.sha256"
 node ./scripts/tree-sha256.mjs "$EXT_DEST" > "$EXTENSION_SHA_PATH"
 if ! grep -Eq '^[a-f0-9]{64}$' "$EXTENSION_SHA_PATH"; then

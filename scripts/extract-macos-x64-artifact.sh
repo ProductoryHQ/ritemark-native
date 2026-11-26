@@ -60,6 +60,32 @@ if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
   exit 1
 fi
 
+# The tarball preserves the PlugIns tree as well as the extension payload.
+# Check the pre-sign digest before promoting the extracted build.
+PROVENANCE_PATH="$APP_PATH/Contents/Resources/app/ritemark-build-provenance.json"
+EXPECTED_PLUGINS_SHA="$(node -e '
+  const { inputs, quickLookPreSignSha256 } = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+  if (inputs?.quickLook && !quickLookPreSignSha256) {
+    console.error("ERROR: x64 archive is missing its Quick Look pre-sign digest");
+    process.exit(1);
+  }
+  process.stdout.write(quickLookPreSignSha256 ?? "");
+' "$PROVENANCE_PATH")"
+if [[ -n "$EXPECTED_PLUGINS_SHA" ]] || [[ -e "$APP_PATH/Contents/PlugIns/RitemarkDeckThumbnail.appex" ]] ||
+   [[ -e "$APP_PATH/Contents/PlugIns/RitemarkDeckPreview.appex" ]]; then
+  for kind in Thumbnail Preview; do
+    if [[ ! -d "$APP_PATH/Contents/PlugIns/RitemarkDeck$kind.appex" ]]; then
+      echo "ERROR: x64 archive is missing the Quick Look $kind bundle" >&2
+      exit 1
+    fi
+  done
+  if [[ ! "$EXPECTED_PLUGINS_SHA" =~ ^[a-f0-9]{64}$ ]] ||
+     [[ "$(node "$SCRIPT_DIR/tree-sha256.mjs" "$APP_PATH/Contents/PlugIns")" != "$EXPECTED_PLUGINS_SHA" ]]; then
+    echo "ERROR: extracted Quick Look PlugIns do not match the CI attestation" >&2
+    exit 1
+  fi
+fi
+
 mkdir -p "$(dirname "$DESTINATION")"
 mv "$EXTRACTED" "$DESTINATION"
 echo "Verified macOS x64 artifact extracted to: $DESTINATION"

@@ -126,7 +126,7 @@ test('a shell from before the manifest draws no slots: nothing to fill', () => {
 
 const DECKS = 'ritemark.features.decks';
 const SLIDES = 'workbench.view.extension.ritemark-slide-library';
-const slidesPlace = { id: SLIDES, title: 'Slide library', order: 0.55, icon: 'media/slide-library-icon.svg', setting: DECKS };
+const slidesPlace = { id: SLIDES, title: 'Slide library', order: 0.55, icon: 'media/slide-library-icon.svg', setting: DECKS, settingDefault: false };
 
 /**
  * This package.json with a Slide library place behind the `decks` flag, as the Decks branch has it, changed by
@@ -157,11 +157,12 @@ function productWithSlides(place = slidesPlace) {
   return changed;
 }
 
-test('a place with a setting passes when its setting is a boolean off by default and every view in it is shown on config.<setting>', () => {
+test('a place with a setting accepts matching boolean defaults and views shown on config.<setting>', () => {
   assert.deepEqual(frameMismatches(productWithSlides(), withSlides(), identifiers), []);
+  assert.deepEqual(frameMismatches(productWithSlides({ ...slidesPlace, settingDefault: true }), pkg, identifiers), []);
 });
 
-test('a place\'s setting that isn\'t a boolean of the extension\'s, or is on by default, or a view shown on anything else, is refused', () => {
+test('a place\'s setting that isn\'t a boolean of the extension\'s, or has a different default, or a view shown on anything else, is refused', () => {
   assert.deepEqual({
     notASetting: frameMismatches(productWithSlides({ ...slidesPlace, setting: 'ritemark.features.slides' }), withSlides(), identifiers),
     notABoolean: frameMismatches(productWithSlides(), withSlides(changed => { changed.contributes.configuration.find(entry => entry.properties?.[DECKS]).properties[DECKS] = { type: 'string', default: 'off' }; }), identifiers),
@@ -176,13 +177,24 @@ test('a place\'s setting that isn\'t a boolean of the extension\'s, or is on by 
       `place ${SLIDES}: its setting "${DECKS}" is not a boolean setting in package.json`,
     ],
     onByDefault: [
-      `place ${SLIDES}: its setting ${DECKS} is true by default; a place with a setting is off by default (one that is on has no setting)`,
+      `place ${SLIDES}: settingDefault must be a boolean matching ${DECKS} in package.json (manifest: false, package.json: true)`,
     ],
     anotherWhen: [
       `place ${SLIDES}: its view ritemark.slideLibraryHelp is shown on "config.${DECKS} && workspaceFolderCount > 0", the manifest seeds it on "config.${DECKS}"`,
       `place ${SLIDES}: its view ritemark.slideLibraryAlways is shown on undefined, the manifest seeds it on "config.${DECKS}"`,
     ],
   });
+});
+
+test('settingDefault must be boolean and paired with a setting', () => {
+  for (const settingDefault of [undefined, 'false']) {
+    assert.deepEqual(frameMismatches(productWithSlides({ ...slidesPlace, settingDefault }), withSlides(), identifiers), [
+      `place ${SLIDES}: settingDefault must be a boolean matching ${DECKS} in package.json (manifest: ${JSON.stringify(settingDefault)}, package.json: false)`,
+    ]);
+  }
+  assert.deepEqual(frameMismatches(productWithSlides({ ...slidesPlace, setting: undefined, settingDefault: true }), pkg, identifiers), [
+    `place ${SLIDES}: settingDefault requires a setting`,
+  ]);
 });
 
 test('a setting on VS Code\'s own place (Documents) is refused: only an extension\'s place is shown on one', () => {
@@ -208,9 +220,9 @@ test('two places off by default missing from an older manifest: each is accepted
 });
 
 test('a place off by default that the manifest draws always (no setting) is refused, naming the setting it needs', () => {
-  const { setting: _setting, ...always } = slidesPlace;
+  const { setting: _setting, settingDefault: _settingDefault, ...always } = slidesPlace;
   assert.deepEqual(frameMismatches(productWithSlides(always), withSlides(), identifiers), [
-    `place ${SLIDES}: off by default in package.json (config.${DECKS}), but the manifest draws it always: give it "setting": "${DECKS}"`,
+    `place ${SLIDES}: off by default in package.json (config.${DECKS}), but the manifest draws it always: give it "setting": "${DECKS}", "settingDefault": false`,
   ]);
 });
 

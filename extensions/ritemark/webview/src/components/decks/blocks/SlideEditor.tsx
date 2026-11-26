@@ -57,7 +57,7 @@ import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
 import { onDocChanged } from '../../../lib/docChange'
 import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, SlideEmptyLines, slidePlaceholderOf, withoutPictureSplitArtifacts } from './slideEditorMarkdown'
 import { SlideLabel, labelNode } from './slideLabel'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
@@ -386,7 +386,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     codeBlock: SlideCodeBlock,
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     // Sprint 168 PR 1 (#863): a quote's attribution marked as the renderer marks it.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
+    afterImage: [OuterHistory, SlideEmptyLines, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource), SlideLabel],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
@@ -399,7 +399,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
 
   const editor = useEditor({
     extensions,
-    content: slideHTML(nodeMarkdown, assets),
+    onBeforeCreate: ({ editor }) => {
+      editor.setOptions({ content: loadSlideDoc(editor.schema, nodeMarkdown, assets).toJSON() })
+    },
     editorProps: {
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
@@ -1424,5 +1426,6 @@ const contextKit: MenuKit = {
 
 /** The slide editor's own load of a Markdown, as its first content was parsed, with the pictures' addresses it has. */
 function loadSlideDoc(schema: Schema, markdown: string, assets: Record<string, string>): PMNode {
-  return createNodeFromContent(slideHTML(markdown, assets), schema, { slice: false }) as PMNode
+  const doc = createNodeFromContent(slideHTML(markdown, assets), schema, { slice: false }) as PMNode
+  return withoutPictureSplitArtifacts(doc)
 }

@@ -288,6 +288,10 @@ jobs:
         working-directory: r
         run: ./scripts/stamp-deck-document-type.sh "VSCode-darwin-x64/Ritemark.app"
 
+      - name: Install the universal Quick Look extensions
+        working-directory: r
+        run: ./scripts/build-quicklook.sh --install "VSCode-darwin-x64/Ritemark.app"
+
       - name: Embed and verify build provenance
         working-directory: r
         run: |
@@ -406,6 +410,10 @@ jobs:
             echo "OK: welcome assets and sample project present"
           else
             echo "FAIL: welcome assets or sample project missing"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          if ! ./scripts/validate-build-output.sh darwin-x64 --quick-look-only; then
             ERRORS=$((ERRORS + 1))
           fi
 

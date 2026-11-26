@@ -360,7 +360,7 @@ const SLIDE = '```slide title\nid: t1\ntitle: Harbour\n```\n\nWelcome to the har
   assert.match(bridge, /const path: string \| null = themePathOf\(themePath\)/, 'a deck naming no theme asks for Evening\'s file')
   // The host's readers all fall back to the project's own Evening file, then to the built-in theme.
   const pages = readFileSync(fileURLToPath(new URL('../../../../src/decks/deckPages.ts', import.meta.url)), 'utf8')
-  assert.match(pages, /const evening = await readProjectTheme\(root, BUILT_IN_THEME_PATH\)/)
+  assert.match(pages, /const evening = await readProjectThemeBytes\(root, BUILT_IN_THEME_PATH\)/)
   for (const reader of ['deckPublish.ts', 'present/DeckPresenter.ts', 'SlideLibraryViewProvider.ts'])
     assert.match(readFileSync(fileURLToPath(new URL(`../../../../src/decks/${reader}`, import.meta.url)), 'utf8'), /themePathOf\(/, reader)
   assert.equal(parseTheme('not a theme').name, 'Evening', 'a file that is no theme reads as Evening too')
