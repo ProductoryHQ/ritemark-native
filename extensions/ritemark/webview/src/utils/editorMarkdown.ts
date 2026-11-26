@@ -105,9 +105,11 @@ export function ensureCommentMarkedPipeline(): void {
  * Without this, TipTap creates both an empty paragraph AND an image node,
  * causing extra spacing above images when reopening files.
  */
-export function preprocessImageHTML(html: string): string {
+export function preprocessImageHTML(html: string, imageMappings?: Record<string, string>): string {
   const temp = document.createElement('div')
   temp.innerHTML = html
+
+  mapImages(temp, imageMappings)
 
   // Find all paragraphs that hold only pictures (and maybe whitespace)
   temp.querySelectorAll('p').forEach(p => {
@@ -136,28 +138,34 @@ export function preprocessImageHTML(html: string): string {
  * original relative path in the title attribute for Turndown.
  */
 export function applyImageMappings(html: string, imageMappings: Record<string, string>): string {
-  if (!imageMappings || Object.keys(imageMappings).length === 0) {
-    return html
-  }
-
-  // Process each mapping
-  let result = html
-  for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
-    // Marked preserves percent escapes when encoding a URL. The preceding DOM
-    // pass can also escape ampersands in the src attribute.
-    const encoded = encodeURI(relativePath).replace(/%25/g, '%')
-    const forms = [relativePath, encoded, escapeAttribute(relativePath), escapeAttribute(encoded)]
-    const escapedPaths = [...new Set(forms)].map(path => path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    const srcRegex = new RegExp(`(\\ssrc=")(?:${escapedPaths.join('|')})"`, 'g')
-    result = result.replace(srcRegex, (_match, attribute: string) =>
-      `${attribute}${escapeAttribute(webviewUri)}" title="${escapeAttribute(relativePath)}"`)
-  }
-
-  return result
+  const container = document.createElement('div')
+  container.innerHTML = html
+  mapImages(container, imageMappings)
+  return container.innerHTML
 }
 
-function escapeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function mapImages(container: HTMLElement, imageMappings?: Record<string, string>): void {
+  const entries = Object.entries(imageMappings ?? {})
+  const mappings = new Map(entries.map(([path, uri]) => [path, { path, uri }]))
+  // Match marked's URL encoding, including its preservation of existing percent escapes.
+  for (const [path, uri] of entries) {
+    const encoded = encodeURI(path).replace(/%25/g, '%')
+    if (!mappings.has(encoded)) mappings.set(encoded, { path, uri })
+  }
+
+  for (const image of Array.from(container.querySelectorAll('img'))) {
+    const src = image.getAttribute('src')
+    if (src === null) continue
+    const mapping = mappings.get(src)
+    if (mapping) {
+      image.setAttribute('src', mapping.uri)
+      image.setAttribute('title', mapping.path)
+    }
+    if (image.hasAttribute('data-md-image-target')) {
+      image.setAttribute('data-md-image-src', mapping?.path ?? src)
+      image.setAttribute('data-md-image-alt', image.getAttribute('alt') ?? '')
+    }
+  }
 }
 
 /**
@@ -192,9 +200,7 @@ function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tok
 export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked, prepareTokens?: (tokens: Token[]) => void): string {
   // Sprint 161: the slide editor passes its own scoped instance (`slideEditorMarkdown.ts`), never this one.
   const html = parseAsWritten(markdown, instance, prepareTokens)
-  let processed = preprocessTaskListHTML(html)
-  processed = preprocessImageHTML(processed)
-  return imageMappings ? applyImageMappings(processed, imageMappings) : processed
+  return preprocessImageHTML(preprocessTaskListHTML(html), imageMappings)
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +249,7 @@ export const MarkdownAsWritten = Extension.create({
       { types: ['table'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.table) },
       { types: ['codeBlock'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.codeBlock, false) },
       // Experience 49: a picture's attribute block as written (`{width=50%}`), written back after its image line.
-      { types: ['image'], attributes: { picture: dataAttribute('data-picture', false) } },
+      { types: ['image'], attributes: { ...dataAttributes(AS_WRITTEN_ATTRIBUTES.image, false), picture: dataAttribute('data-picture', false) } },
       // A block split off with Enter is new writing: a blank line before it.
       { types: TIGHT_BLOCKS, attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.tight, false) },
       {

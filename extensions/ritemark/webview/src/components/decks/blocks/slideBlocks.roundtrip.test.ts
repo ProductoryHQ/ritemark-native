@@ -4,6 +4,8 @@
  * second open, and an edit in one column changes only those bytes. Run with `npx tsx`.
  */
 import { strict as assert } from 'node:assert'
+import { test } from 'node:test'
+import { typeAtEndOfLastParagraph } from '../../../utils/markdownFidelity'
 import { EditorState } from '@tiptap/pm/state'
 import { loadSlide as load, saveSlide as save } from './slideEditorHarness'
 
@@ -223,3 +225,22 @@ console.log(`slideBlocks.roundtrip: ${same}/${cases.length} byte for byte and st
   assert.equal(doc.firstChild?.attrs.title, path)
   assert.equal(save(load(save(doc), { [path]: url })), markdown)
 }
+
+for (const picture of ['![](Kickoff%20files/photo.png)', '![](<Kickoff files/photo.png>)']) {
+  test(`editing slide text keeps ${picture}`, () => {
+    const source = `${picture}\n\nWords.`
+    const url = 'vscode-webview://assets/photo.png'
+    const doc = load(source, { 'Kickoff files/photo.png': url })
+    assert.equal(doc.firstChild?.attrs.src, url)
+    const edited = typeAtEndOfLastParagraph(doc, ' Edited.')
+    assert.ok(edited)
+    assert.equal(save(edited), `${picture}\n\nWords. Edited.`)
+  })
+}
+
+test('a new slide picture with a space uses angle brackets', () => {
+  const doc = load('Words.')
+  const image = doc.type.schema.nodes.image.create({ src: 'vscode-webview://assets/x.png', title: 'Kickoff files/x.png' })
+  const tr = EditorState.create({ doc }).tr.insert(doc.content.size, image)
+  assert.equal(save(tr.doc), 'Words.\n\n![](<Kickoff files/x.png>)')
+})

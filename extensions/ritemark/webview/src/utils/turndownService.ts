@@ -102,17 +102,23 @@ export function createTurndownService(): TurndownService {
     filter: 'img',
     replacement(_content, node) {
       const el = node as HTMLImageElement
-      // Experience 49: a description typed in the bar is written so it never breaks the image line (markdownAlt).
-      const alt = markdownAlt(el.alt || '')
+      const alt = el.getAttribute('alt') ?? ''
       const title = el.getAttribute('title') || ''
-      const displaySrc = el.getAttribute('src') || el.src
-      const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
-        ? title
-        : displaySrc
+      const displaySrc = el.getAttribute('src') ?? el.src
+      const writtenSrc = el.getAttribute('data-md-image-src')
+      const useTitle = displaySrc !== writtenSrc &&
+        (title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc)))
+      const src = useTitle ? title : displaySrc
       // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
       const block = el.getAttribute('data-picture') ?? ''
-      const target = isRelativeImagePath(src) ? pictureTarget(src) : src
-      return blockImage(`![${alt}](${target})${parsePictureBlock(block) ? block : ''}`, el)
+      const sameFile = src === writtenSrc
+      const writtenLabel = sameFile && alt === el.getAttribute('data-md-image-alt')
+        ? el.getAttribute('data-md-image-label')
+        : null
+      const writtenTarget = sameFile ? el.getAttribute('data-md-image-target') : null
+      const label = writtenLabel ?? `![${markdownAlt(alt)}]`
+      const target = writtenTarget ?? `(${pictureTarget(src)})`
+      return blockImage(label + target + (parsePictureBlock(block) ? block : ''), el)
     },
   })
 

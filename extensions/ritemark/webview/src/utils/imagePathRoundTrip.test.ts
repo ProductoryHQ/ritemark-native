@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
+import { test } from 'node:test'
 import { marked } from 'marked'
-import { installTestDocument } from './markdownFidelity'
+import { installTestDocument, openDocument, saveDocument, typeAtEndOfLastParagraph } from './markdownFidelity'
 import { applyImageMappings, createEditorTurndownService, markdownToEditorHTML } from './editorMarkdown'
 import { isRelativeImagePath, isWebviewResourceUri, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 
@@ -61,4 +62,56 @@ const documentHtml = markdownToEditorHTML(documentMarkdown, { [documentPath]: di
 assert.ok(documentHtml.includes(`src="${display}"`))
 assert.equal(save(documentHtml), documentMarkdown)
 
-console.log('imagePathRoundTrip: all assertions passed')
+for (const [picture, path] of [
+  ['![](image(1).png)', 'image(1).png'],
+  ['![](images/Eiffel_Tower_(Paris).jpg)', 'images/Eiffel_Tower_(Paris).jpg'],
+  ['![](images/a%20b.png)', 'images/a b.png'],
+  ['![](<a b.png>)', 'a b.png'],
+  ['![An \\[example\\]](<https://example.com/a%20b.png> "Caption")', undefined],
+] as const) {
+  test(`editing text keeps ${picture}`, () => {
+    const source = `${picture}\n\nWords.\n`
+    const opened = openDocument(source, path ? { [path]: display } : undefined)
+    if (path) assert.equal(opened.doc.firstChild?.attrs.src, display)
+    const edited = typeAtEndOfLastParagraph(opened.doc, ' Edited.')
+    assert.ok(edited)
+    assert.equal(saveDocument(opened, edited), source.replace('Words.', 'Words. Edited.'))
+  })
+}
+
+for (const literal of [
+  'Use `<img src="images/a.png">`',
+  '```html\n<img src="images/a.png">\n```',
+  'Use src="images/a.png" here.',
+]) {
+  test(`mapping keeps literal text ${JSON.stringify(literal)}`, () => {
+    const source = `![](images/a.png)\n\n${literal}\n\nWords.\n`
+    const opened = openDocument(source, { 'images/a.png': display })
+    const edited = typeAtEndOfLastParagraph(opened.doc, ' Edited.')
+    assert.ok(edited)
+    assert.equal(saveDocument(opened, edited), source.replace('Words.', 'Words. Edited.'))
+  })
+}
+
+test('changing the alt keeps the original destination spelling', () => {
+  assert.equal(
+    save(markdownToEditorHTML('![Old](<image(1).png>)').replace('alt="Old"', 'alt="New"')),
+    '![New](<image(1).png>)',
+  )
+})
+
+test('a changed destination is formatted for the new path', () => {
+  const html = markdownToEditorHTML('![](<old.png>)')
+  for (const [path, target] of [
+    ['image(1).png', 'image(1).png'],
+    ['image(1.png', '<image(1.png>'],
+    ['image)1(.png', '<image)1(.png>'],
+    ['a b.png', '<a b.png>'],
+    ['a<b>.png', '<a%3Cb%3E.png>'],
+  ]) {
+    const container = document.createElement('div')
+    container.innerHTML = html
+    container.querySelector('img')!.setAttribute('src', path)
+    assert.equal(save(container.innerHTML), `![](${target})`)
+  }
+})

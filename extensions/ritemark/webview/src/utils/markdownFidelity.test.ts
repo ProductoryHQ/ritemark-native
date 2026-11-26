@@ -194,6 +194,15 @@ for (const [source, expected] of [
   assert.deepEqual(inventory(openDocument(once).doc).images, sourceInventory(source).images, `#1075: ${JSON.stringify(source)}: every picture survives`)
 }
 
+// ---- picture destinations and labels after an edit elsewhere ----
+{
+  const source = readFileSync(corpus('picture-destinations.md'), 'utf8')
+  const opened = openDocument(source)
+  const edited = typeAtEndOfLastParagraph(opened.doc, ' EDITED')
+  assert.ok(edited)
+  assert.equal(saveDocument(opened, edited), source.replace('Edit this paragraph.', 'Edit this paragraph. EDITED'))
+}
+
 // ---- the look: the same document as on main, apart from these ----
 /**
  * Where the editor now shows what the file holds and `main` did not (R6, R3),
