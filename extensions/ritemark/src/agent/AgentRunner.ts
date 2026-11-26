@@ -1943,7 +1943,7 @@ export function processAssistantMessage(
         emitProgress('plan_text', block.text);
       } else {
         const snippet = block.text.substring(0, 150);
-        emitProgress('thinking', snippet.length < block.text.length ? snippet + '...' : snippet);
+        emitProgress('thinking', snippet.length < block.text.length ? snippet + '…' : snippet);
         if (emitQuestionContext && !parentToolUseId) {
           emitProgress('text', block.text);
         }

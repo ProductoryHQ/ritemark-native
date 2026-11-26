@@ -111,7 +111,7 @@ async function testSynchronousQuestionAnswer(splitFrames: boolean) {
   session._emitQuestion = (question: { toolUseId: string; questions: Array<{ question: string }> }) => {
     assert.deepEqual(emitted.map(({ type, message }) => [type, message]), [
       ['text', ''],
-      ['thinking', text.slice(0, 150) + '...'],
+      ['thinking', text.slice(0, 150) + '…'],
       ['text', text],
       ['tool_use', 'Using AskUserQuestion'],
     ], 'tool result clears context, then both the snippet and full prose precede the question');

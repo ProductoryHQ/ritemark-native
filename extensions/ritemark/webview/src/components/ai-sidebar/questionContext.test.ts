@@ -39,7 +39,7 @@ function assertBefore(markup: string, card: string, text = prose) {
   assert.ok(textAt >= 0 && cardAt > textAt, 'full assistant prose should render above the card');
 }
 
-const snippet = prose.slice(0, 150) + '...';
+const snippet = prose.slice(0, 150) + '…';
 const pending = { toolUseId: 'ask', questions: [item] };
 const agentTurn = () => current().agentConversation[0];
 
