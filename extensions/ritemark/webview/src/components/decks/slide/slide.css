@@ -346,6 +346,7 @@
 .deck-sl.is-blocks .blk-mark { border-radius: 8px; width: 34px; height: 34px; }
 /* #850: a box whose icon Ritemark doesn't know keeps its badge, with a dashed circle in the theme's placeholder colour. */
 .deck-sl.is-blocks .blk-icon.is-unknown { color: var(--s-ph, rgba(255,255,255,.35)); }
+.deck-sl.is-blocks .blk-icon.is-empty { visibility: hidden; }
 /* Each spacer adds a line without introducing an extra flex gap in a box. */
 .deck-sl.is-blocks :is(.blk-box, .blk-box > .blk-inner) > p.blk-empty-line:not(:only-child) { margin-top: calc(-1 * var(--box-gap)); }
 .deck-sl.is-blocks .blk-boxes[data-look="steps"] > .blk-box::before { content: counter(blk-box); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 10px; border-radius: 50%; box-shadow: inset 0 0 0 2.5px var(--s-acc, #F2B544); color: var(--s-acct, #F2B544); font: 700 17px/1 var(--s-fh, 'Sofia Sans'); }

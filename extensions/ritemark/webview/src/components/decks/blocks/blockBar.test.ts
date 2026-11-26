@@ -35,6 +35,7 @@ import { saveSlideMarkdown } from './slideEditorMarkdown'
 import { editorHTML } from '../../../utils/markdownFidelity'
 import { SlideSync } from './slideSync'
 import { markableBox } from './slideDivView'
+import { boxForEmptyIconMenu } from './itemHandle'
 import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
@@ -713,6 +714,30 @@ stable(COLUMNS, 'three columns')
   }
 }
 
+// ---- #1103: Mark opens the same Radix trigger as a press on the bar's box-icon button.
+{
+  const markdown = [':::: {.boxes look="arrows"}', '::: box', 'First', ':::', '', '::: box', 'Second', ':::', '::::'].join('\n')
+  const state = stateWith(markdown, 'Second')
+  const block = chosenBlockAt(state)!
+  const target = boxForEmptyIconMenu(state, block)
+  assert.notEqual(target, null)
+  assert.notEqual(target, boxForEmptyIconMenu(stateWith(markdown, 'First'), block))
+  assert.equal(caretBoxIcon(state), null)
+  const iconState = state.apply(setBoxesMark(state, block.pos, 'icon')!)
+  assert.equal(caretBoxIcon(iconState)?.pos, target, 'the newly rendered button is for the same box')
+
+  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  const editor = readFileSync(new URL('./SlideEditor.tsx', import.meta.url), 'utf8')
+  const tools = readFileSync(new URL('./SlideBlockTools.tsx', import.meta.url), 'utf8')
+  assert.match(bar, /choice === 'icon' \? boxForEmptyIconMenu[\s\S]*?apply\(tr\)[\s\S]*?measure\(\)\s*setPendingIcon\(\{ blockPos: block\.pos, pos \}\)/)
+  assert.match(bar, /useLayoutEffect\(\(\) => \{\s*if \(!pendingIcon\) return[\s\S]*?placed\?\.caretBox\?\.pos === pendingIcon\.pos \? iconTrigger\.current : null[\s\S]*?trigger\.dispatchEvent\(new PointerEvent\('pointerdown'/)
+  assert.match(bar, /<BoxIconButton\s+box=\{placed\.caretBox\}\s+trigger=\{iconTrigger\}/)
+  assert.match(bar, /<DropdownMenuTrigger asChild>\s*<Button\s+ref=\{trigger\}[^>]*aria-label="Icon"/)
+  assert.match(bar, /\} else \{\s*const anchor = editor\.view\.nodeDOM\(pendingIcon\.pos\)\s*if \(anchor instanceof HTMLElement\) pickIcon\?\.\(pendingIcon\.pos, anchor, null\)/)
+  assert.match(tools, /onOpenChange=\{open => \{ if \(!open\) onClose\(\) \}\}/)
+  assert.match(editor, /onClose=\{\(\) => setIconPick\(null\)\}/)
+}
+
 // ---- Focus after closing the box icon menu, by opening mode and close reason.
 {
   const cases: [BoxIconMenuCloseReason, 'trigger' | 'editor' | null, 'trigger' | 'editor' | null][] = [
@@ -1034,7 +1059,7 @@ stable(COLUMNS, 'three columns')
   const boxIcon = barSource.indexOf('{boxIconButton}', markAt)
   assert.ok(style > 0 && markAt > style && boxIcon > markAt && size > boxIcon, 'Style, Mark, box icon, Size')
   assert.ok(!barSource.slice(markAt, boxIcon).includes('<Sep />'), 'Mark and box icon share a group')
-  assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
+  assert.match(barSource.slice(markAt, boxIcon), /pick: \(\) => pickMark\(choice\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
   // accessible name keeps the value.

@@ -23,7 +23,7 @@ import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
-import { boxIconOf } from '../../../webview/src/components/decks/slide/iconSet';
+import { boxIconOf, UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
 import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
@@ -69,13 +69,16 @@ export function picturePathOf(href: string): string {
 /**
  * A box's icon badge, as every view draws it (the strip, the wall, the presenter view, the page and, through
  * `slideDivView`, the stage): its icon, or for a name Ritemark doesn't know (#850) the dashed circle, `is-unknown`, which
- * slide.css draws in the theme's placeholder colour on the badge's usual ground. `unknown` is that name as written; null
- * when the box names no icon.
+ * slide.css draws in the theme's placeholder colour on the badge's usual ground. A missing icon can use a dashed
+ * placeholder on the stage or an empty slot in a mixed Icon block elsewhere. `unknown` carries an unrecognized name.
  */
-export function boxIconBadge(name: string | undefined): { className: string; svg: string; unknown: string | null } | null {
+export function boxIconBadge(name: string | undefined, missing?: 'placeholder' | 'spacer'): { className: string; svg: string; unknown: string | null } | null {
   const icon = boxIconOf(name);
-  if (!icon || !isPageIconName(icon.phosphor)) return null;
-  return { className: icon.known ? 'blk-icon' : 'blk-icon is-unknown', svg: iconSvg(icon.phosphor, 28), unknown: icon.known ? null : icon.name };
+  if (!icon && !missing) return null;
+  if (!icon && missing === 'spacer') return { className: 'blk-icon is-empty', svg: '', unknown: null };
+  const glyph = icon?.phosphor ?? UNKNOWN_ICON;
+  if (!isPageIconName(glyph)) return null;
+  return { className: icon?.known ? 'blk-icon' : 'blk-icon is-unknown', svg: iconSvg(glyph, 28), unknown: icon?.known ? null : icon?.name ?? null };
 }
 
 interface SlideDivToken {
@@ -97,7 +100,7 @@ interface RenderState {
   pictureUrl: (path: string) => string | null;
   /** 17 November: a picture whose file the host didn't find: drawn as missing, with its file's name. */
   missing: (path: string) => boolean;
-  looks: string[];
+  boxes: { look: string; reserveIconSpace: boolean }[];
   /** The decks README, small details 14: the deck's sections an Agenda block lists, and the slide's place for Present. */
   agenda: AgendaDrawing | null;
   at: number | null;
@@ -130,7 +133,7 @@ interface RenderState {
   tabs: { chosen: readonly number[] | null; next: number };
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, boxes: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
 
 let state: RenderState = freshState();
 
@@ -291,21 +294,24 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       return `<div class="blk-${kind}"${item}>${within()}</div>\n`;
     case 'boxes': {
       const look = token.attrs.values.look ?? 'boxes';
-      state.looks.push(look);
+      const boxes = token.tokens.filter((child): child is Token & SlideDivToken =>
+        child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box');
+      const reserveIconSpace = boxesShowIcons(look) && look !== 'steps' && boxes.some(box => box.attrs.values.icon?.trim());
+      state.boxes.push({ look, reserveIconSpace });
       try {
-        const boxes = token.tokens.filter(child => child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box').length;
-        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes))}${revealMark}>${within()}</div>\n`;
+        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes.length))}${revealMark}>${within()}</div>\n`;
       } finally {
-        state.looks.pop();
+        state.boxes.pop();
       }
     }
     case 'box': {
-      const look = state.looks[state.looks.length - 1] ?? 'boxes';
+      const block = state.boxes[state.boxes.length - 1];
+      const look = block?.look ?? 'boxes';
       let mark = '';
       if (look === 'arrows') mark = `<span class="blk-mark">${iconSvg('arrow-right', 20)}</span>`;
       else if (boxesShowIcons(look)) {
-        const badge = boxIconBadge(token.attrs.values.icon);
-        if (badge) mark = `<span class="${badge.className}">${badge.svg}</span>`;
+        const badge = boxIconBadge(token.attrs.values.icon, parent?.kind === 'boxes' && block?.reserveIconSpace ? 'spacer' : undefined);
+        if (badge) mark = `<span class="${badge.className}"${badge.svg ? '' : ' aria-hidden="true"'}>${badge.svg}</span>`;
       }
       return `<div class="blk-box"${item}>${mark}${within()}</div>\n`;
     }

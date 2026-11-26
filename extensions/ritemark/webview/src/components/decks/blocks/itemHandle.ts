@@ -23,7 +23,7 @@ import { Fragment, type Node as PMNode } from '@tiptap/pm/model'
 import { Selection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { slideBlockClassOf } from '../../../../../src/decks/blocks/fencedDiv'
 import { SLIDE_COMMAND } from './slideCommands'
-import { HANDLE_SIZE, MAX_COLUMNS, RING_LINE, chosenBlockAt, deleteBlock, divAttributesOf, gripSpot, notesIn, removeColumn, ringGap, withoutWidths, type BarKind, type Box, type ChosenBlock } from './blockBar'
+import { HANDLE_SIZE, MAX_COLUMNS, RING_LINE, caretBoxPos, chosenBlockAt, deleteBlock, divAttributesOf, gripSpot, notesIn, removeColumn, ringGap, withoutWidths, type BarKind, type Box, type ChosenBlock } from './blockBar'
 
 /** What one item of a block is called in its menu. */
 export type ItemKind = 'box' | 'column' | 'step' | 'item'
@@ -92,6 +92,15 @@ export function blockItems(block: ChosenBlock): BlockItem[] {
     notesFrom = null
   })
   return items
+}
+
+/** The box to offer the icon chooser for when Mark → Icon is picked on an all-plain block. */
+export function boxForEmptyIconMenu(state: EditorState, block: ChosenBlock): number | null {
+  if (block.kind !== 'boxes') return null
+  const boxes = blockItems(block)
+  if (boxes.some(box => divAttributesOf(box.node).values.icon?.trim())) return null
+  const caret = caretBoxPos(state)
+  return boxes.find(box => box.pos === caret)?.pos ?? boxes[0]?.pos ?? null
 }
 
 /** The item holding the caret, by its index; null when the caret is in none of them. */
