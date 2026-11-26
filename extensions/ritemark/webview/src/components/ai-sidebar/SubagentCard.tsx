@@ -18,6 +18,8 @@ import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { ActivityCard } from './ActivityCard';
+import { visibleStepActivities } from './stepLabel';
+import { useAISidebarStore } from './store';
 import type { SubagentProgress } from './types';
 import { subagentStatusText } from './backgroundWork';
 
@@ -42,7 +44,9 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
     ended: <Icon name="minus" size={12} className="!text-[var(--r-ink-muted)]" />,
   }[subagent.status];
 
-  const hasActivities = subagent.activities.length > 0;
+  const workspacePath = useAISidebarStore((state) => state.workspacePath);
+  const activities = visibleStepActivities(subagent.activities, workspacePath);
+  const hasActivities = activities.length > 0;
   const statusText = subagentStatusText(subagent);
   const canStop = Boolean(onStop && subagent.taskId && (subagent.status === 'running' || subagent.status === 'stopping'));
 
@@ -110,7 +114,7 @@ export function SubagentCard({ subagent, onStop }: SubagentCardProps) {
       {/* Expanded content */}
       {isExpanded && hasActivities && (
         <div className="mt-1.5 space-y-0.5 border-l border-[var(--r-hairline)] pl-5">
-          {subagent.activities.map((activity, i) => (
+          {activities.map((activity, i) => (
             <ActivityCard key={`${activity.timestamp}-${i}`} activity={activity} />
           ))}
         </div>

@@ -451,6 +451,31 @@ async function run() {
     console.log('✓ Test 8: B1 — a conversation switching approval mode or tools cannot reset a sibling');
   }
 
+  {
+    const { runtime, mock } = makeRuntime(['thread-docs']);
+    const events: AgentProgress[] = [];
+    await openTurn(runtime, 'conv-docs', {
+      ...dummyConfig,
+      onProgress: (progress) => events.push(progress),
+      codexDynamicTools: [{ ...TOOL_A, name: 'read_document' }],
+      onDynamicToolCall: async () => ({ text: 'The file is locked.', success: true, reason: 'password' }),
+    });
+    mock.emit('item/started', {
+      threadId: 'thread-docs', item: { type: 'commandExecution', id: 'shell', command: 'textutil "Ref.docx"' },
+    });
+    mock.emit('server-request', {
+      id: 81, method: 'item/tool/call', params: {
+        threadId: 'thread-docs', itemId: 'read', tool: 'read_document', arguments: { path: 'Reference/Locked.docx' },
+      },
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(events.find(({ step }) => step?.id === 'shell')?.step?.command, 'textutil "Ref.docx"');
+    const steps = events.flatMap(({ step }) => step?.id === 'read' ? [step] : []);
+    assert.equal(steps[0].path, 'Reference/Locked.docx');
+    assert.equal(steps[1].warning, 'it has a password');
+    runtime.dispose();
+  }
+
   // ── Test 8b: Sprint 130 W5 — Ritemark's dynamic tools: given at thread
   // start, a call routed to onDynamicToolCall, and a new tool set starts a
   // new thread (a thread keeps the tools it started with, P2).

@@ -1777,7 +1777,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               if (modelSubstitution) {
                 this._modelSubstitutionNamed.add(conversationId);
                 sessionConfig.onProgress({
-                  type: 'init',
+                  type: 'notice',
                   message: modelSubstitutionNotice(agentId as AgentId, modelSubstitution.from, modelSubstitution.to),
                   timestamp: Date.now(),
                 });

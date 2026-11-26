@@ -109,7 +109,8 @@ function speakerNotes(root: Element): string {
   return elements(shapeTree(root), PRESENTATION, 'sp').flatMap((shape) => {
     const properties = elements(elements(shape, PRESENTATION, 'nvSpPr')[0], PRESENTATION, 'nvPr')[0];
     const placeholder = elements(properties, PRESENTATION, 'ph')[0];
-    return placeholder?.getAttribute('type') === 'body' ? paragraphs(elements(shape, PRESENTATION, 'txBody')[0]) : [];
+    const type = placeholder?.getAttribute('type');
+    return placeholder && (!type || type === 'body') ? paragraphs(elements(shape, PRESENTATION, 'txBody')[0]) : [];
   }).join('\n\n').trim();
 }
 
@@ -145,7 +146,9 @@ export async function powerpointMarkdown(bytes: Uint8Array) {
     total: paths.length,
     async slide(number: number) {
       const path = paths[number - 1];
-      const body = [...slideBlocks(shapeTree(await part(path, PRESENTATION, 'sld')))].filter(Boolean).join('\n\n');
+      const root = await part(path, PRESENTATION, 'sld');
+      const hidden = root.getAttribute('show') === '0';
+      const body = [...slideBlocks(shapeTree(root))].filter(Boolean).join('\n\n');
       let notes = '';
       const relsPath = relationshipPart(path);
       if (entries.has(relsPath)) {
@@ -154,7 +157,7 @@ export async function powerpointMarkdown(bytes: Uint8Array) {
           isRelationship(rel, 'notesSlide'));
         if (notesRel) notes = speakerNotes(await part(relationshipTarget(notesRel, path, 'notesSlide'), PRESENTATION, 'notes'));
       }
-      return { body, notes };
+      return { body, notes, hidden };
     },
   };
 }

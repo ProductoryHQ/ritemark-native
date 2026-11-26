@@ -723,3 +723,29 @@ function main() {
 }
 
 main();
+
+// Readiness belongs to the runtime that owns the turn, even across a handoff.
+try {
+  const openCode = makeCodexTurn({ runtime: 'opencode', isRunning: true });
+  const openThread = createConversationState('open', { selectedAgent: 'codex', codexConversation: [openCode] });
+  const codexThread = createConversationState('codex', {
+    selectedAgent: 'opencode',
+    codexConversation: [makeCodexTurn({ runtime: 'codex', isRunning: true })],
+  });
+  hydrateConversations([openThread, codexThread], openThread.id);
+  useAISidebarStore.getState().handleExtensionMessage({
+    type: 'codex:status',
+    status: {
+      enabled: true, state: 'needs-auth', version: null, authMethod: null,
+      email: null, plan: null, error: null, diagnostics: [], repairCommand: null,
+      binaryPath: null, compatibility: null,
+    },
+  });
+  const { conversations } = useAISidebarStore.getState();
+  assert.deepEqual(conversations.open.codexConversation[0], openCode);
+  assert.equal(conversations.codex.codexConversation[0].result?.error, 'ChatGPT is not ready.');
+} finally {
+  resetStore();
+}
+
+console.log('Runtime switching tests passed.');

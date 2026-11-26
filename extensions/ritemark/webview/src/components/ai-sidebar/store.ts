@@ -65,6 +65,7 @@ import {
   type PromptQueues,
   type QueueItem,
 } from './promptQueue';
+import { isHiddenToolActivity, updateStep } from './stepLabel';
 import { deriveActivityState } from './activityState';
 import { applyTaskProgress, endRunningCards, markCardStopping, tasksEndedLine } from './backgroundWork';
 import { resolveInboundConversationId } from './conversationRouting';
@@ -266,6 +267,7 @@ function stampConversationId<T extends { conversationId?: string }>(turns: T[], 
 }
 
 interface AISidebarState {
+  workspacePath?: string;
   // ── Connection state (APP-GLOBAL) ──
   hasApiKey: boolean;
   isOnline: boolean;
@@ -2964,6 +2966,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             byokProviderModels,
             // Sprint 103 R6: capability map from the host registry.
             runtimeCapabilities: message.runtimeCapabilities ?? get().runtimeCapabilities,
+            workspacePath: message.workspacePath || undefined,
             conversations,
           });
 
@@ -3061,10 +3064,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           set(updates);
 
           // The Codex binary/auth is app-global, so a not-ready status blocks the
-          // running turn in EVERY thread that has one — not just the visible one.
+          // running ChatGPT turn in every thread that has one.
           if (message.status.state !== 'ready') {
             for (const id of Object.keys(get().conversations)) {
-              patchLastCodexTurn(id, (lastTurn) => ({
+              patchLastCodexTurn(id, (lastTurn) => lastTurn.runtime === 'opencode' ? null : ({
                 ...lastTurn,
                 approval: undefined,
                 isRunning: false,
@@ -3269,6 +3272,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const targetId = routeInbound(message);
           if (!targetId) break;
           const progress = message.progress as AgentProgress;
+          if (isHiddenToolActivity(progress)) break;
 
           patchLastAgentTurn(targetId, (lastTurn) => {
             if (progress.type === 'text' || progress.type === 'plan_text') {
@@ -3298,7 +3302,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               return {
                 ...lastTurn,
                 assistantText: undefined,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: [...(lastTurn.subagents || []), newSubagent],
               };
             }
@@ -3306,10 +3310,10 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Add activity to the matching subagent
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.parentToolUseId
-                    ? { ...sa, activities: [...sa.activities, progress] }
+                    ? { ...sa, activities: updateStep(sa.activities, progress) }
                     : sa
                 ),
               };
@@ -3318,7 +3322,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
               // Mark subagent as done
               return {
                 ...lastTurn,
-                activities: [...lastTurn.activities, progress],
+                activities: updateStep(lastTurn.activities, progress),
                 subagents: lastTurn.subagents?.map((sa) =>
                   sa.id === progress.subagentId
                     ? { ...sa, status: 'done' as const, result: progress.message }
@@ -3332,7 +3336,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             return {
               ...lastTurn,
               assistantText: resetsQuestionContext ? undefined : lastTurn.assistantText,
-              activities: [...lastTurn.activities, progress],
+              activities: updateStep(lastTurn.activities, progress),
             };
           });
           break;
@@ -3541,7 +3545,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           patchLastCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
-            activities: [...lastTurn.activities, message.progress as AgentProgress],
+            activities: updateStep(lastTurn.activities, message.progress as AgentProgress),
             // Sprint 143 (#544): the AI went on; its wait is over.
             retry: undefined,
           }));

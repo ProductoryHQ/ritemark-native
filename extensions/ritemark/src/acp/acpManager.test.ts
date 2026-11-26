@@ -56,6 +56,9 @@ rl.on('line',(line)=>{
     if(process.env.AGENT_EDITS==='1'){
       // Sprint 155: OpenCode's shape — announced pending, filled in running, ended completed.
       const ws=process.env.AGENT_WS;
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'doc1',title:'ritemark_documents_read_document',status:'pending'}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'doc1',status:'in_progress',rawInput:{path:'Reference/Locked.docx'}}});
+      notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'doc1',status:'completed',content:[{type:'content',content:{type:'text',text:'Locked.docx: it has a password.'}}]}});
       notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'r1',title:'read',status:'pending',kind:'read',locations:[]}});
       notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call_update',toolCallId:'r1',status:'completed',kind:'read',locations:[{path:ws+'/Advokatuur.md'}]}});
       notify('session/update',{sessionId:sid,update:{sessionUpdate:'tool_call',toolCallId:'e1',title:'edit',status:'pending',kind:'edit',locations:[]}});
@@ -214,6 +217,10 @@ async function run() {
     const sid = await mgr.start();
     await mgr.prompt(sid, 'edit it');
     assert.deepStrictEqual(mgr.turnFilesModified(sid), ['/ws/Module 2.md', '/ws/New.md'], 'completed edits only: not the read, not the failed edit');
+    const steps = events.flatMap(({ step }) => step?.id === 'doc1' ? [step] : []);
+    assert.equal(steps[1].path, 'Reference/Locked.docx');
+    assert.equal(steps[2].warning, 'it has a password');
+    assert.equal(steps[2].status, 'failed');
     mgr.dispose();
     console.log('✓ Sprint 155: OpenCode counts completed edit calls, not read');
   }

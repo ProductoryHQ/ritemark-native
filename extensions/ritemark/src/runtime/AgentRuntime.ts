@@ -1,3 +1,4 @@
+import type { DocumentReadReason } from '../documents/documentRead';
 import type { AgentId, AgentLiveHooks, AgentProgress, AgentQuestion, AgentQuestionItem, AgentSettingSource, ActiveFileContext, ClaudeModelDeclaration } from '../agent/types';
 import type {
   RuntimeContinuationDescriptorV1,
@@ -222,7 +223,7 @@ export interface RuntimeSessionConfig {
    */
   codexDynamicTools?: DynamicToolDefinition[];
   /** Called when Codex calls one of `codexDynamicTools`. */
-  onDynamicToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean }>;
+  onDynamicToolCall?: (toolName: string, args: Record<string, unknown>, requestId: string | number) => Promise<{ text: string; success: boolean; reason?: DocumentReadReason }>;
 }
 
 export interface RuntimeTurnConfig {

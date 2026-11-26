@@ -122,7 +122,9 @@ assert.equal(presentActivityState('done', {})!.label, 'Done');
 assert.equal(presentActivityState('plan-review')!.tone, 'amber');
 
 // formatSeconds
-assert.equal(formatSeconds(5.4), '5.4s');
+assert.equal(formatSeconds(5.4), '5s');
+assert.equal(formatSeconds(59.8), '1m 0s');
+assert.equal(presentActivityState('done', { activeSeconds: 7.8 })?.label, 'Done in 8s');
 assert.equal(formatSeconds(92), '1m 32s');
 
 // ── R8 migration: policyOf ──

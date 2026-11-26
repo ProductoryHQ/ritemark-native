@@ -10,6 +10,7 @@ import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { useActiveConversation, useAISidebarStore } from './store';
+import { activityHeadline } from './stepLabel';
 import { deriveActivityState, presentActivityState } from './activityState';
 import { activeDurationMs } from './types';
 import { useReadyAlternative } from './TurnFailureCard';
@@ -52,10 +53,13 @@ export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?
     : (lastAgent.timestamp >= lastCodex.timestamp ? lastAgent : lastCodex);
 
   const metrics = last && 'result' in last ? (last.result as { metrics?: { durationMs: number; waitedMs?: number; costUsd: number | null; model: string | null } } | undefined)?.metrics : undefined;
-  const activeSeconds = metrics ? activeDurationMs(metrics) / 1000 : undefined;
+  const activeMs = last?.result && 'activityDurationMs' in last.result
+    ? last.result.activityDurationMs
+    : metrics ? activeDurationMs(metrics) : undefined;
+  const activeSeconds = activeMs === undefined ? undefined : activeMs / 1000;
   const waitedSeconds = metrics?.waitedMs ? metrics.waitedMs / 1000 : undefined;
   const liveActivity = last?.isRunning
-    ? last.activities[last.activities.length - 1]?.message?.slice(0, 80)
+    ? activityHeadline(last.activities[last.activities.length - 1]).slice(0, 80)
     : undefined;
   const runningSubagents = last?.isRunning && 'subagents' in last
     ? ((last as { subagents?: Array<{ status: string }> }).subagents?.filter((x) => x.status === 'running').length ?? 0)

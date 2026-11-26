@@ -6,6 +6,7 @@ import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { StartingPoints } from './StartingPoints';
+import { ActivityDetails } from './ActivityDetails';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
@@ -135,6 +136,8 @@ export function AgentTurnBlock({
       {/* 2026-08-05 Jarmo: the per-turn spinner box duplicated the
           conversation-level ActivityStatusLine (Sprint 103 R7's single status
           point) — removed; its subagent badge lives there now. */}
+
+      {turn.isRunning && <ActivityDetails activities={turn.activities} running />}
 
       {/* Result */}
       {turn.result && <AgentResponse turn={turn} />}
