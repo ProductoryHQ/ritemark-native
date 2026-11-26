@@ -290,7 +290,9 @@ const body = { tagName: 'BODY', isContentEditable: false, closest: () => null }
   const view = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(view.includes('const fullSlide = slideShown && !handoutShown'))
   assert.ok(view.includes('const stageWheel = stageWheelOf(slideShown, handoutShown)'), 'the views the wheel listens in')
-  assert.ok(/if \(!stageWheel \|\| !stage\) return/.test(view), 'the wheel: in Slide only and in Slide and handout')
+  assert.ok(/if \(!stageWheel \|\| !stage \|\| settingsRoom\) return/.test(view), 'let the stage scroll normally with the settings card below')
+  assert.match(view, /if \(!stageWheel \|\| !stage \|\| settingsRoom\) return.*?const onWheel = \(event: WheelEvent\) => \{ if \(\(event.target as Element \| null\)\?\.closest\('\.deck-settings'\)\) return/,
+    'wheel input over a stage settings card exits before slide navigation')
   assert.ok(!/if \(!fullSlide \|\| !stage\) return/.test(view), 'no longer in Slide only alone (#855)')
   assert.ok(/if \(!fullSlide\) return/.test(view), 'the keys: in Slide only, as before')
   assert.ok(/const goTo = useCallback\([^]*?pick\(next\)/.test(view), "the strip's own pick moves the slide (and scrolls the handout to its part)")

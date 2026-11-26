@@ -169,7 +169,7 @@ async function main(): Promise<void> {
     return true;
   });
   const notices: string[] = [];
-  const publish = () => publisher.publish(document as never, splitFrontMatter(text).content, 'card', [], line => notices.push(line));
+  const publish = () => publisher.publish(document as never, splitFrontMatter(text).content, 'card', [], (line, kind) => notices.push(`${kind}: ${line}`));
   const state = async () => {
     const read = await publisher.stateOf(document as never);
     return read.kind === 'published' ? (read.changed ? 'Published · changed' : 'Published') : read.kind;
@@ -178,7 +178,7 @@ async function main(): Promise<void> {
   try {
     // --- Publish: the page goes up with Fern, its font and its logo
     await publish();
-    assert.deepEqual(notices, []);
+    assert.deepEqual(notices.splice(0), ['success: ']);
     assert.equal(published, 1);
     assert.equal(await state(), 'Published');
     const live = pageFiles();
@@ -257,7 +257,7 @@ async function main(): Promise<void> {
 
     // --- Update the page: the deck as it is now, with its theme as saved; Published again
     await publish();
-    assert.deepEqual(notices, []);
+    assert.deepEqual(notices.splice(0), ['success: ']);
     assert.equal(published, 2);
     assert.match(page(), /#7C3AED/i, 'the page wears the theme as saved');
     assert.doesNotMatch(page(), /#C2410C/i);

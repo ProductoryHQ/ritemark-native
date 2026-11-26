@@ -730,6 +730,7 @@ jobs:
             -PreviousInstallerPath $env:PREVIOUS_INSTALLER_PATH `
             -PreviousInstallerSha256 $env:PREVIOUS_RELEASE_INSTALLER_SHA256 `
             -AppStartVerifierPath '..\ci-harness\scripts\verify-windows-app-starts.ps1' `
+            -VerifyAssociationDefaults `
             -EvidenceDirectory 'installer-output\roundtrip-evidence'
 
       - name: Upload signed Windows artifacts

@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { GEMINI_MODEL_IDS } from './modelConfig';
 import { GEMINI_API_ORIGIN, geminiHeaders, geminiUrl, listGeminiModels } from './geminiRequest';
 
 const KEY = 'test-placeholder-not-a-key';
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
   });
 
   await test('S49: models.list sends the header and no key in the URL', async () => {
-    const { fetchImpl, calls } = mockFetch([{ body: { models: [{ name: 'models/gemini-4-argon' }] } }]);
+    const { fetchImpl, calls } = mockFetch([{ body: { models: [{ name: `models/${GEMINI_MODEL_IDS.NEON_4}` }] } }]);
     const listing = await listGeminiModels(KEY, { fetchImpl });
     assert.equal(listing.models.length, 1);
     assert.equal(calls[0].headers['x-goog-api-key'], KEY);
