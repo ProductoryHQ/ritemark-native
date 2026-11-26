@@ -32,7 +32,7 @@ import {
   type BoxIconMenuCloseReason, type ChosenBlock,
 } from './blockBar'
 import { markableBox } from './slideDivView'
-import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
+import { blockItems, boxForEmptyIconMenu, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
 import { SlideIconPickerContent } from './SlideBlockTools'
 import { SlideIconGlyph } from '../slide/SlideIconGlyph'
 import { SlideItemHandle } from './SlideItemHandle'
@@ -466,6 +466,16 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const now = chosenBlockAt(editor.state)
     return now && now.kind === chosen.kind ? make(now.pos) : null
   }
+  const pickMark = (choice: BoxesMark) => {
+    const state = editor.state
+    const block = chosenBlockAt(state)
+    if (block?.kind !== 'boxes') return
+    const pos = choice === 'icon' ? boxForEmptyIconMenu(state, block) : null
+    run(setBoxesMark(state, block.pos, choice))
+    if (pos === null || !pickIcon) return
+    const anchor = editor.view.nodeDOM(pos)
+    if (anchor instanceof HTMLElement) pickIcon(pos, anchor, null)
+  }
   const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
   const add = () => {
     // Sprint 163: a new tab opens with its name chosen, so typing names it (its band reads the pending name).
@@ -763,7 +773,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                     icon: MARK_ICON[choice],
                     label: MARK_LABEL[choice],
                     tip: MARK_TIP[choice],
-                    pick: () => run(act(pos => setBoxesMark(editor.state, pos, choice))),
+                    pick: () => pickMark(choice),
                   }))} />
                   {boxIconButton}
                   <Sep />

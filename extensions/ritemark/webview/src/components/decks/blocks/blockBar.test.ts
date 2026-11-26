@@ -713,6 +713,16 @@ stable(COLUMNS, 'three columns')
   }
 }
 
+// ---- #1103: Mark uses the same change-then-choose pattern as Behind.
+{
+  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  const editor = readFileSync(new URL('./SlideEditor.tsx', import.meta.url), 'utf8')
+  const tools = readFileSync(new URL('./SlideBlockTools.tsx', import.meta.url), 'utf8')
+  assert.match(bar, /choice === 'icon' \? boxForEmptyIconMenu[\s\S]*?run\(setBoxesMark[\s\S]*?pickIcon\(pos, anchor, null\)/)
+  assert.match(tools, /onOpenChange=\{open => \{ if \(!open\) onClose\(\) \}\}/)
+  assert.match(editor, /onClose=\{\(\) => setIconPick\(null\)\}/)
+}
+
 // ---- Focus after closing the box icon menu, by opening mode and close reason.
 {
   const cases: [BoxIconMenuCloseReason, 'trigger' | 'editor' | null, 'trigger' | 'editor' | null][] = [
@@ -1034,7 +1044,7 @@ stable(COLUMNS, 'three columns')
   const boxIcon = barSource.indexOf('{boxIconButton}', markAt)
   assert.ok(style > 0 && markAt > style && boxIcon > markAt && size > boxIcon, 'Style, Mark, box icon, Size')
   assert.ok(!barSource.slice(markAt, boxIcon).includes('<Sep />'), 'Mark and box icon share a group')
-  assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
+  assert.match(barSource.slice(markAt, boxIcon), /pick: \(\) => pickMark\(choice\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
   // accessible name keeps the value.
