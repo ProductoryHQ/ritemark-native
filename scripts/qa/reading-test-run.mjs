@@ -36,7 +36,7 @@ const containsFact = (text, words) => {
 };
 const pathText = /(?:\bfile:\/\/|\b[A-Z]:[\\/]|(?:^|[\s`"'(])(?:~|\.{1,2})?[\\/]\S|(?:[\w.-]+[\\/])+[\w.-]+\.(?:docx|pdf|pptx)\b)/im;
 const passwordReason = /\b(?:has a password|password[- ]protected|encrypted with a password|requires a password)\b/i;
-const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted|unprotected|password-free)\s+copy\b|\bcopy\s+without\s+(?:the|a)\s+password\b|\bremove\s+the\s+password\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+its\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
+const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted|unprotected|password-free)\s+copy\b|\bcopy\s+without\s+(?:(?:the|a)\s+password|password\s+protection)\b|\bopen\b[^.!?\n]{0,55}\bwith\s+the\s+password\b|\bremove\s+the\s+password\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+its\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
 const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can't) (?:open|read|extract)\b[^\n]*\b(?:corrupt(?:ed)?|damaged|unsupported|permission denied|access denied|missing|not found|timed out)\b/i;
 const scanReason = /\b(?:no (?:searchable |selectable |extractable |readable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
@@ -440,7 +440,7 @@ async function ask(ui, ai, runtime, question, report) {
     }
     return true;
   `);
-  const stepLabels = await ui.chat(`
+  const stepRows = await ui.chat(`
     ${lastTurn}
     const rows = turn.querySelectorAll(${JSON.stringify(ai === 'claude'
       ? 'details[open] > summary + div > div'
@@ -448,10 +448,10 @@ async function ask(ui, ai, runtime, question, report) {
     return [...rows].flatMap(row => {
       const fiber = row[Object.keys(row).find(key => key.startsWith('__reactFiber$'))];
       const activity = fiber?.return?.memoizedProps?.activity;
-      return activity && /^(init|thinking|text|done|error)$/.test(activity.type) ? [] : [row.innerText.trim()];
+      return activity && /^(init|thinking|text|done|error)$/.test(activity.type) ? [] : [{ label: row.innerText.trim(), commandId: activity?.tool === 'commandExecution' ? activity.step?.id : undefined }];
     });
   `);
-  return { ...answer, stepLabels };
+  return { ...answer, stepLabels: stepRows.map(({ label }) => label), stepRows };
 }
 
 export async function tryLinks(ui, folder, facts, links, results) {
@@ -551,6 +551,18 @@ function launch(args) {
   return spawnSync(path.join(here, 'dev-launch-isolated.sh'), args, { encoding: 'utf8' });
 }
 
+export function badCommandsFromTrace(trace, commandIds) {
+  const commands = new Set();
+  for (const [, payload] of trace.matchAll(/^\[[^\]\n]+\] \[rpc:event\] item\/(?:started|completed) (.+)$/gm)) {
+    let item;
+    try { ({ item } = JSON.parse(payload)); } catch { continue; }
+    if (item?.type === 'commandExecution' && commandIds.has(item.id) && typeof item.command === 'string' && item.command) {
+      commands.add(item.command);
+    }
+  }
+  return [...commands];
+}
+
 function formatRun(run) {
   const fence = '`'.repeat(Math.max(3, ...(run.answer.match(/`+/g) ?? []).map((s) => s.length + 1)));
   const bullets = (items) => items.length ? items.map((line) => `- ${line}`).join('\n') : 'None recorded.';
@@ -575,7 +587,14 @@ ${fence}
 **Step labels**
 
 ${bullets(run.stepLabels)}
-${pendingCoverage.length ? `
+${run.badCommands.length ? `
+**Commands behind failing step labels**
+
+${run.badCommands.map((command) => {
+  const fence = '`'.repeat(Math.max(3, ...(command.match(/`+/g) ?? []).map((s) => s.length + 1)));
+  return `${fence}sh\n${command}\n${fence}`;
+}).join('\n\n')}
+` : ''}${pendingCoverage.length ? `
 **Document findings to check**
 
 ${bullets(pendingCoverage)}
@@ -633,13 +652,14 @@ async function main() {
 
   const report = { number, ai: values.ai, platform: 'Mac', date: new Date().toISOString(), question, customQuestion: values.question !== undefined, answer: '', stepLabels: [], links: [] };
   let runDir;
+  let stepRows = [];
   const abort = new AbortController();
   const interrupt = () => abort.abort(new Error('Run interrupted.'));
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
   try {
     const started = launch(['start', '--name', `reading-${values.ai}`, '--folder', folder, `--user-data-dir=${profile}`,
-      ...(values.ai === 'opencode' ? ['--runtime-trace'] : [])]);
+      '--runtime-trace']);
     runDir = field(started.stdout ?? '', 'RUN_DIR');
     const port = Number(field(started.stdout ?? '', 'PORT'));
     if (started.status !== 0 || !runDir || !port) throw new Error('dev-launch-isolated.sh start failed. Check the dev build, launch window and empty test profile.');
@@ -648,7 +668,9 @@ async function main() {
     const revision = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: buildRoot, encoding: 'utf8' });
     report.build = `${version} dev (${revision.stdout?.trim() || 'revision unavailable'})`;
     const ui = browser(port, abort.signal);
-    Object.assign(report, await ask(ui, values.ai, runtime, question, report));
+    const { stepRows: rows, ...result } = await ask(ui, values.ai, runtime, question, report);
+    stepRows = rows;
+    Object.assign(report, result);
     const anchors = report.links;
     report.links = [];
     await tryLinks(ui, folder, facts, anchors, report.links);
@@ -686,6 +708,23 @@ async function main() {
         report.error += ` Could not save failure evidence: ${error.message}`;
       }
     }
+    Object.assign(report, scoreRun(report, facts));
+    report.badCommands = [];
+    if (values.ai === 'chatgpt' && runDir && report.badSteps.length) {
+      const ids = new Set(stepRows.filter(({ label, commandId }) => commandId && report.badSteps.includes(label))
+        .map(({ commandId }) => commandId));
+      if (ids.size) {
+        try {
+          const trace = fs.readFileSync(path.join(runDir, 'trace', 'ritemark-codex-trace.log'), 'utf8');
+          report.badCommands = badCommandsFromTrace(trace, ids);
+        } catch (error) {
+          if (error.code !== 'ENOENT') {
+            report.error = [report.error, `Could not read command trace (${error.code ?? 'unknown error'}).`].filter(Boolean).join(' ');
+            process.exitCode = 1;
+          }
+        }
+      }
+    }
     if (runDir) {
       const stopped = launch(['stop', runDir]);
       if (stopped.status === 0 && /^LEFT=0\r?$/m.test(stopped.stdout ?? '')) {
@@ -695,7 +734,6 @@ async function main() {
         process.exitCode = 1;
       }
     }
-    Object.assign(report, scoreRun(report, facts));
     writeReport();
     fs.writeFileSync(stem + '.md', redact(formatRun(report)));
     if (report.error) console.error(redact(report.error));

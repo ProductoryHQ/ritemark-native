@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { evidenceRedactor, retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
+import { badCommandsFromTrace, evidenceRedactor, retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
 
 const facts = JSON.parse(`{
   "folder": "Review",
@@ -142,6 +142,20 @@ test('criterion 5 accepts common ways forward and requires more than a password 
   assert.equal(score(''), 'fail');
 });
 
+for (const line of [
+  'Open it in Word with the password and save a separate copy without password protection for review.',
+  'Open it in Word with the password and, if authorized, save a separate copy without password protection for review.',
+  'Open it in Word with the password.',
+  'Use a copy without password protection.',
+  'Review a separate unprotected copy.',
+  'It has a password.',
+]) {
+  test(`criterion 5 scores: ${line}`, () => {
+    const visibleAnswer = answer.replace('Please provide the password.', line);
+    assert.equal(scoreRun({ ...sample, visibleAnswer }, facts).criteria[5], line === 'It has a password.' ? 'fail' : 'pass');
+  });
+}
+
 test('scores each multiline unread entry up to its next document or blank line', () => {
   const multiline = answer.replace('Visit form is an image-only scan.', 'Visit form\nIt is an image-only scan.')
     .replace('Locked appendix has a password.', 'Locked appendix\nIt has a password.');
@@ -254,6 +268,23 @@ test('rejects facts attributed to the wrong fixture document', () => {
     const visibleAnswer = `${findings} — summary of findings\n${nextLine}`;
     assert.equal(scoreRun({ ...sample, visibleAnswer }, fixture).coverage[0].result, 'to check', visibleAnswer);
   }
+});
+
+test('collects distinct Codex commands for failing rows only', () => {
+  const event = (phase, id, command, type = 'commandExecution') =>
+    `[2026-11-26T09:00:00.000Z] [rpc:event] item/${phase} ${JSON.stringify({ item: { id, command, type } })}`;
+  const trace = [
+    event('started', 'bad1', 'ls; rm x'),
+    event('started', 'good', 'ls'),
+    event('started', 'bad2', 'ls; rm x'),
+    event('completed', 'bad1', 'ls; rm x'),
+    event('completed', 'bad3', '/bin/bash -lc "find . -delete"'),
+    event('started', 'other', 'ignored', 'agentMessage'),
+    '[2026-11-26T09:00:00.000Z] [rpc:event] item/completed {"item":…',
+  ].join('\n');
+  assert.deepEqual(badCommandsFromTrace(trace, new Set(['bad1', 'bad2', 'bad3', 'other'])),
+    ['ls; rm x', '/bin/bash -lc "find . -delete"']);
+  assert.deepEqual(badCommandsFromTrace(trace, new Set()), []);
 });
 
 test('redacts exact test keys and provider-shaped secrets from failure evidence', () => {
