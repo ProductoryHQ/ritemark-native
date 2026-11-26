@@ -56,7 +56,7 @@ import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from 
 import { transitionOf, transitionValue } from './present/wallMotion'
 import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
 import type { ThemeChangeView } from '../../../../src/decks/themeChange'
-import { deckNameOf } from '../../../../src/decks/deckFileName'
+import { deckNameOf, savedDeckPictureFolder } from '../../../../src/decks/deckFileName'
 import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
@@ -150,6 +150,7 @@ interface PictureDrop {
   before: string | null | undefined
   pictures: Array<{ id: string; title: string }>
   paths: Map<string, string | null>
+  failure?: string
 }
 
 /**
@@ -1463,11 +1464,12 @@ export function DeckView({
 
   // Item 8: the pictures dropped on the strip, by the new slide id each was saved for, until all of a drop's are saved.
   const pictureDrops = useRef(new Map<string, PictureDrop>())
-  const pictureSaved = useCallback((slideId: string, path: string | null): boolean => {
+  const pictureSaved = useCallback((slideId: string, path: string | null, failure?: string): boolean => {
     const drop = pictureDrops.current.get(slideId)
     if (!drop) return false
     pictureDrops.current.delete(slideId)
     drop.paths.set(slideId, path)
+    drop.failure ??= failure
     if (drop.paths.size < drop.pictures.length) return true
     const saved: SavedPicture[] = drop.pictures.flatMap(picture => {
       const at = drop.paths.get(picture.id)
@@ -1484,7 +1486,10 @@ export function DeckView({
       inserted = dispatchStepRef.current(insertPictureSlides(target.state, at, saved, textHandoutRef.current))
       if (inserted) requestAnimationFrame(() => pickRef.current(at))
     }
-    if (saved.length && !inserted) reportFailure('drop-pictures', 'The pictures are saved in images/, but their slides could not be added.')
+    if (saved.length && !inserted) {
+      const folder = savedDeckPictureFolder(saved[0].path) ?? "the deck's folder"
+      reportFailure('drop-pictures', `The pictures are saved in ${folder}, but their slides could not be added.`)
+    } else if (!saved.length && drop.failure) reportFailure('drop-pictures', drop.failure)
     else if (failed) reportFailure('drop-pictures', failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.`)
     else clearFailure('drop-pictures')
     return true
@@ -1593,7 +1598,7 @@ export function DeckView({
           setNotice({ text: copiedNote(index + 1) })
         })
     },
-    // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
+    // Item 8: each picture saved in the deck's folder for the slide id it will have; the slides go in once all are saved.
     dropPictures: (at, files) => {
       if (!editor || files.length === 0) return
       // Never an id another drop still waits to use.
@@ -1811,7 +1816,8 @@ export function DeckView({
   useEffect(() => onMessage(message => {
     // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
     if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
-      && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null)) return
+      && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null,
+        message.type === 'deck/image-failed' && typeof message.message === 'string' ? message.message : undefined)) return
     if (!editor || editor.isDestroyed) return
     if (message.type === 'deck/image-failed') {
       reportFailure('save-image', typeof message.message === 'string' ? message.message : 'The picture could not be saved.')

@@ -52,6 +52,8 @@ check('the host\'s answers move the field and the strip', () => {
 check('the strip\'s words (experience 46 and 49)', () => {
   assert.equal(doneWords('new'), 'ChatGPT made the picture. It\'s in images/.')
   assert.equal(doneWords('change'), 'ChatGPT changed the picture. The old one is still in images/.')
+  assert.equal(doneWords('new', 'Kickoff files'), "ChatGPT made the picture. It's in Kickoff files.")
+  assert.equal(doneWords('change', 'Kickoff files'), 'ChatGPT changed the picture. The new one is in Kickoff files.')
   assert.equal(sentWords({ mode: 'new', words: 'x' }), 'ChatGPT gets these words and the slide\'s words.')
   assert.equal(sentWords({ mode: 'change' }), 'ChatGPT gets these words and this picture.')
 })

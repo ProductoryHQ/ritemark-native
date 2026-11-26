@@ -4,6 +4,10 @@
 
 Parent release: v2.4.0 (Jarmo, 26 November). Jarmo's testing note of 26 November says "one slide can populate a lot of folders into project folder --- this is not good". He answered the Experience lead's recommendation with "jah, teeme nii".
 
+## Change on 26 November: beside the deck in 2.4
+
+Patch 023 (PR #1105) folded the folder under the deck. Its High review then found four places where VS Code assumes a nested child is a file: reveal, Enter on a closed deck, copy/paste, and paste or F2 into its own folder. Fixing those would take more spots than the Experience lead's limit allows. The lead recommended (B), and Jarmo agreed ("ok", 26 November, in the lead's session). In 2.4, `Kickoff files/` sits beside the deck, with no patch. The fold comes after 2.4 as its own change (#1108). So R3's fold and PR 1 are out of this sprint, and everything else stands: one folder per deck, created when needed, with rename, move, delete and copy following the deck (PR 4). The Decks README says so in its "Beside the deck in 2.4; folded under it later" bullet.
+
 ## The spec
 
 The Decks README section "A deck's own folder (26 November)" in `ritemark-dev` (`product/design/experience/experiences/decks/README.md`, commit bd2f206) is what this sprint is checked against. In short:

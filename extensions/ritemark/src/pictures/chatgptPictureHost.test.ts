@@ -10,9 +10,11 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Module = require('module') as { _resolveFilename: (request: string, ...rest: unknown[]) => string };
 let workspaceRoot = '';
+const disposable = () => ({ dispose() {} });
 const vscodeStub = {
   Uri: { file: (fsPath: string) => ({ fsPath, scheme: 'file', toString: () => `file://${fsPath}` }) },
   workspace: {
+    onDidChangeTextDocument: disposable,
     getWorkspaceFolder: () => ({ uri: { fsPath: workspaceRoot } }),
     getConfiguration: () => ({ get: (_key: string, fallback: unknown) => fallback }),
   },
@@ -30,10 +32,13 @@ Module._resolveFilename = function (request: string, ...rest: unknown[]) {
 
 import * as assert from 'assert';
 import * as fs from 'fs';
+import { emptyDeckText } from '../decks/newDeck';
 import * as path from 'path';
 import { makeTempDir } from '../testing/tempDir';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { ChatgptPictureHost, pictureStandIn } = require('./chatgptPictureHost') as typeof import('./chatgptPictureHost');
+
+const { DeckPages } = require('../decks/deckPages') as typeof import('../decks/deckPages');
 
 const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('the stand-in')]);
 
@@ -61,7 +66,8 @@ async function main(): Promise<void> {
   workspaceRoot = root;
   const fixture = path.join(root, 'stand-in.png');
   fs.writeFileSync(fixture, PNG);
-  const deckFile = path.join(root, 'Training.deck.md');
+  const deckFile = path.join(root, 'Kickoff.rtms');
+  fs.writeFileSync(deckFile, emptyDeckText());
   const docFile = path.join(root, 'notes', 'Notes.md');
   fs.mkdirSync(path.dirname(docFile));
   const deck = { uri: { scheme: 'file', fsPath: deckFile } } as unknown as import('vscode').TextDocument;
@@ -91,15 +97,16 @@ async function main(): Promise<void> {
     console.log('✓ the check: ChatGPT ready');
   }
 
-  // ── A deck: the picture saved into images/ beside the deck, told first as a saved picture for its slide.
+  // ── A deck: the picture saved into Kickoff files/ beside the deck, told first as a saved picture for its slide.
   {
     const { posted, view } = webview();
+    assert.ok(!fs.existsSync(path.join(root, 'Kickoff files')), 'a new deck has no picture folder');
     host.handle(deck, view, { type: 'picture/make', requestId: 'm1', mode: 'new', description: 'Three robots', name: 'Where agents work', slideId: 's-2' } as never);
     await until(() => posted.length === 1);
-    const url = `vscode-webview://test${path.join(root, 'images', 'where-agents-work.png')}`;
+    const url = `vscode-webview://test${path.join(root, 'Kickoff files', 'where-agents-work.png')}`;
     // Only the status: the slide editor that asked places it (never the shared paste channel, deck/image-saved).
-    assert.deepStrictEqual(posted[0], { type: 'picture/status', requestId: 'm1', state: 'made', path: 'images/where-agents-work.png', url });
-    assert.deepStrictEqual(fs.readFileSync(path.join(root, 'images', 'where-agents-work.png')), PNG);
+    assert.deepStrictEqual(posted[0], { type: 'picture/status', requestId: 'm1', state: 'made', path: 'Kickoff files/where-agents-work.png', url });
+    assert.deepStrictEqual(fs.readFileSync(path.join(root, 'Kickoff files', 'where-agents-work.png')), PNG);
     // Change on a picture the host can't send (a web address: no path): answered, so the strip never waits forever.
     host.handle(deck, view, { type: 'picture/make', requestId: 'm0', mode: 'change', description: 'Night' } as never);
     await until(() => posted.length === 2);
@@ -107,7 +114,43 @@ async function main(): Promise<void> {
     host.handle(deck, view, { type: 'picture/make', requestId: 'm00', mode: 'new', description: '   ' } as never);
     await until(() => posted.length === 3);
     assert.match(String(posted[2].problem), /Describe the picture/, 'an empty request is told so, not "not a file"');
-    console.log('✓ a deck: saved in images/, placed as a saved picture; a request it can\'t take is answered');
+    console.log('✓ a deck: saved in Kickoff files/, placed as a saved picture; a request it can\'t take is answered');
+  }
+
+  // The editor's shared paste, drop and picker writer, and its asset lookup on reopening.
+  {
+    const manualPath = path.join(root, 'Pictures.rtms');
+    fs.writeFileSync(manualPath, emptyDeckText());
+    const manualDeck = { uri: vscodeStub.Uri.file(manualPath), getText: () => fs.readFileSync(manualPath, 'utf8') } as unknown as import('vscode').TextDocument;
+    const { posted, view } = webview();
+    const panel = { webview: view, onDidChangeViewState: disposable } as unknown as import('vscode').WebviewPanel;
+    const pages = new DeckPages();
+    const connection = pages.connect(manualDeck, panel);
+    try {
+      const folder = path.join(root, 'Pictures files');
+      assert.ok(!fs.existsSync(folder), 'opening a new deck creates no picture folder');
+      const save = { type: 'deck/save-image', slideId: 's1', filename: 'x.png', dataUrl: `data:image/png;base64,${PNG.toString('base64')}` };
+      fs.writeFileSync(folder, 'existing file');
+      await pages.handle(manualDeck, view, save);
+      assert.deepStrictEqual(posted.shift(), {
+        type: 'deck/image-failed', slideId: 's1', message: 'A file named Pictures files blocks saving pictures.',
+      });
+      assert.strictEqual(fs.readFileSync(folder, 'utf8'), 'existing file');
+      fs.unlinkSync(folder);
+      await pages.handle(manualDeck, view, save);
+      assert.strictEqual(posted[0].path, 'Pictures files/x.png');
+      assert.deepStrictEqual(fs.readFileSync(path.join(folder, 'x.png')), PNG);
+      await pages.handle(manualDeck, view, save);
+      assert.strictEqual(posted[1].path, 'Pictures files/x-2.png');
+      fs.mkdirSync(path.join(root, 'images'));
+      fs.writeFileSync(path.join(root, 'images', 'old.png'), PNG);
+      await pages.handle(manualDeck, view, { type: 'deck/assets', paths: ['Pictures files/x.png', 'images/old.png'] });
+      assert.deepStrictEqual(Object.keys(posted[2].assets as Record<string, string>), ['Pictures files/x.png', 'images/old.png']);
+      assert.deepStrictEqual(posted[2].missing, []);
+    } finally {
+      connection.dispose();
+      pages.dispose();
+    }
   }
 
   // ── Try another in a document: a new file next to the document, `./images/…`, the first one kept.

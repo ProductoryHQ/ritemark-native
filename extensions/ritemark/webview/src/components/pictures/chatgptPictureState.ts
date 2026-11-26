@@ -3,6 +3,8 @@
  * their own (`chatgptPicture.test.ts`). The view and the hook are `ChatgptPicture.tsx`.
  */
 
+import { savedDeckPictureFolder } from '../../../../src/decks/deckFileName'
+
 export type PictureMode = 'new' | 'change'
 
 /** The place a picture is made for: a picture in an editor's words (followed through edits), or a slide's side. */
@@ -37,12 +39,15 @@ export type MakerPhase =
   | { phase: 'asking'; ask: PictureAsk }
   | { phase: 'making'; ask: PictureAsk; description: string; requestId: string }
   /** `undo`: the strip's Undo for a picture that came while its editor was gone (`picturesAway.ts`). */
-  | { phase: 'done'; ask: PictureAsk; description: string; undo?: () => void }
+  | { phase: 'done'; ask: PictureAsk; description: string; folder?: string; undo?: () => void }
   | { phase: 'failed'; ask: PictureAsk; description: string; problem: string }
   | { phase: 'sign-in'; ask: PictureAsk }
 
 /** The words the strip says when ChatGPT is done (experience 46 and 49). */
-export function doneWords(mode: PictureMode): string {
+export function doneWords(mode: PictureMode, folder?: string): string {
+  if (folder) return mode === 'change'
+    ? `ChatGPT changed the picture. The new one is in ${folder}.`
+    : `ChatGPT made the picture. It's in ${folder}.`
   return mode === 'change' ? 'ChatGPT changed the picture. The old one is still in images/.' : 'ChatGPT made the picture. It\'s in images/.'
 }
 
@@ -102,7 +107,8 @@ export function phaseAfterStatus(current: MakerPhase, message: { requestId?: unk
     // The place now holds the made picture: it is followed by that picture's path (a slide's side too, so Try another
     // replaces the made one).
     const place = current.ask.place.kind === 'flow' || current.ask.place.path !== undefined ? { ...current.ask.place, path: message.path } : current.ask.place
-    return { phase: 'done', ask: { ...current.ask, place }, description: current.description }
+    const folder = savedDeckPictureFolder(message.path)
+    return { phase: 'done', ask: { ...current.ask, place }, description: current.description, ...(folder ? { folder } : {}) }
   }
   if (message.state === 'sign-in') return { phase: 'sign-in', ask: current.ask }
   if (message.state === 'failed') {

@@ -10,13 +10,13 @@
  *    version from the same words). A press outside or Esc closes it.
  *  - **Not signed in:** the host opens ChatGPT's sign-in card on the AI's sheet; the strip says where to look.
  *
- * The host makes the picture and saves it into `images/` (`src/pictures/chatgptPictureHost.ts`). Where the picture goes
+ * The host makes the picture and saves it beside the document or in the deck’s folder (`src/pictures/chatgptPictureHost.ts`). Where the picture goes
  * is each editor's: `beforeMake` readies the place (a slide's replace target, the deck's slide id) and `placeMade`
  * puts a made picture in a document. Only ChatGPT is named, because Claude doesn't make pictures.
  *
  * Only Cancel and a closed editor stop a request. A slide left while its picture is made lets the request go on
  * (`away`, `picturesAway.ts`): it lands on that slide in the deck, and the strip is back when the slide is. A place gone
- * (the picture deleted or replaced meanwhile) places nothing; the made picture stays in `images/`.
+ * (the picture deleted or replaced meanwhile) places nothing; the made picture stays on disk.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -139,7 +139,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const pos = followPicture(transaction.doc, transaction.mapping, current.ask.place.pos, path ? attrs => sameRelativeImagePath(imagePathOf(attrs) ?? '', path) : undefined)
       if (pos === null) {
         // The picture went: nothing stays anchored on nothing. A request still running goes on, and its picture, never
-        // placed, stays in images/ (the person's words aren't lost because a place was); nothing is coming for the
+        // placed, stays on disk (the person's words aren't lost because a place was); nothing is coming for the
         // slide, so its thumbnail's spinner goes.
         if (current.phase === 'making') {
           picturesMaking().end(current.requestId)
@@ -168,7 +168,7 @@ export function usePictureMaker(options: PictureMakerOptions) {
       const asked = current.phase === 'making' ? current.description : ''
       const placed = latest.current.placeMade?.(placeOfMade(current, next), { path: status.path, url: status.url }, describing(asked))
       if (placed === false) {
-        // The place went (the picture replaced by hand meanwhile): nothing is placed; the picture stays in images/.
+        // The place went (the picture replaced by hand meanwhile): nothing is placed; the picture stays on disk.
         if (current.phase === 'making') latest.current.onSettled?.(current.ask)
         setState({ phase: 'idle' })
         return
@@ -421,7 +421,7 @@ export function PictureMakerView({ maker, rectOf, insideOf, boundsOf }: PictureM
     body = (
       <div className="flex items-center gap-2 py-1 pl-3 pr-1.5" role="status" aria-live="polite">
         <Icon name="check-circle" size={14} tone="inherit" />
-        <span className="whitespace-nowrap text-[13px]">{doneWords(state.ask.mode)}</span>
+        <span className="whitespace-nowrap text-[13px]">{doneWords(state.ask.mode, state.folder)}</span>
         <Tooltip label="Put the picture back as it was">
           <Button type="button" variant="ghost" size="compact" onClick={maker.undo}>
             <Icon name="arrow-counter-clockwise" size={14} tone="inherit" />

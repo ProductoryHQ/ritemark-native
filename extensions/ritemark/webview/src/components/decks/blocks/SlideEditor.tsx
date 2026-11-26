@@ -1056,7 +1056,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pictureMaker = usePictureMaker({
     editor,
     rectOf: pictureRect,
-    // The slide's id marks the request as a deck's (its pictures are written `images/…`).
+    // The slide's id marks the request as a deck's (its pictures go in the deck's folder).
     beforeMake: ask => {
       const slideId = slideRef.current.data.id || 'slide'
       if (ask.place.kind === 'side') return { slideId }
@@ -1067,7 +1067,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (place.kind === 'side') {
         // The side keeps its place; its focus point starts fresh, and its description is the words asked unless the
         // person wrote their own (#800).
-        // A side picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+        // A side picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays on disk.
         if (place.path !== undefined && !sameSidePath(header.image, place.path)) return false
         const alt = describe(header.alt ?? '', header.image?.trim() || null)
         writeSlide(null, { image: made.path, alt: alt || undefined, focus: undefined })
@@ -1075,7 +1075,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       }
       if (!editor || editor.isDestroyed) return false
       const old = editor.state.doc.nodeAt(place.pos)
-      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays on disk.
       if (place.path && !(old && samePicture(old.attrs, place.path))) return false
       const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
       return apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))

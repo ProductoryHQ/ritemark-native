@@ -29,6 +29,19 @@ export function deckNameOf(fileName: string): string {
   return base.replace(DECK_ENDING, '');
 }
 
+/** The name of the folder beside the deck that holds the files it makes. */
+export function deckPictureFolderName(deckPath: string): string {
+  return `${deckNameOf(deckPath)} files`;
+}
+
+/** The folder in a newly saved deck picture's relative path. */
+export function savedDeckPictureFolder(picturePath: string): string | undefined {
+  const slash = picturePath.lastIndexOf('/');
+  if (slash < 0) return undefined;
+  const folder = picturePath.slice(0, slash);
+  return folder.endsWith(' files') ? folder : undefined;
+}
+
 /** A new deck's file name: `<name>.rtms`. */
 export function deckFileName(name: string): string {
   return `${name}${DECK_EXTENSION}`;

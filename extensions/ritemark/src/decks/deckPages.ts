@@ -19,7 +19,7 @@ import { timetableStatus } from './timetableDisplay';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
-import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
+import { DeckPictureFolderTaken, ensureDeckPictureFolder } from './deckPictureFolder';
 import { deckModeOf } from './deckMode';
 import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type DeckTheme, type ThemeEntry } from './deckTheme';
 import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
@@ -928,21 +928,19 @@ async function readProjectThemeBytes(root: string, themePath: string): Promise<B
 }
 
 /**
- * A picture pasted or dropped on a slide, saved as the editor saves a pasted picture: in `images/` beside the deck
+ * A picture pasted or dropped on a slide, saved in the deck's own folder
  * (only while the deck's folder is there), under a cleaned name that never overwrites another file.
  */
 async function savePicture(document: vscode.TextDocument, webview: vscode.Webview, slideId: string, dataUrl: string, filename: string): Promise<DeckHostMessage> {
   try {
     const parsed = parseImageDataUrl(dataUrl);
     if (!parsed) throw new Error('That is not a picture.');
-    const folder = path.dirname(document.uri.fsPath);
-    const imagesDir = path.join(folder, 'images');
-    await ensureProjectSubfolder(folder, imagesDir);
+    const imagesDir = await ensureDeckPictureFolder(document.uri.fsPath);
     const written = writeImageRelativeTo(imagesDir, `${path.basename(filename, path.extname(filename))}.${parsed.extension}`, parsed.base64);
     const url = webview.asWebviewUri(vscode.Uri.file(path.join(imagesDir, written))).toString();
-    return { type: 'deck/image-saved', slideId, path: `images/${written}`, url };
+    return { type: 'deck/image-saved', slideId, path: `${path.basename(imagesDir)}/${written}`, url };
   } catch (error) {
     console.warn('[Decks] Could not save a picture:', error);
-    return { type: 'deck/image-failed', slideId, message: 'The picture could not be saved beside the deck.' };
+    return { type: 'deck/image-failed', slideId, message: error instanceof DeckPictureFolderTaken ? error.message : 'The picture could not be saved beside the deck.' };
   }
 }
