@@ -45,7 +45,7 @@ import { feedbackDue, guidanceCard, localDay } from './guidanceState';
 import { type GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
 import { AI_NAMES, AI_ORDER, canSignInHere, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind, type ReadyRecord } from './readyRequest';
-import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
+import { startingPlacesForAgents, wordCount, type FrontEditor, type StartingPlacesByAgent } from './startingPlace';
 
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
 const KEY_NAMES: readonly HomeKeyName[] = ['google-ai-key', 'openai-api-key', 'anthropic-api-key', 'openrouter-api-key'];
@@ -102,7 +102,7 @@ export interface GuidanceDependencies {
   /** The board's Give, for the sample's card; null without a board. */
   give(cardId: string, runtimeId: AgentId): Promise<{ ok: boolean; message?: string } | null>;
   hasWorkingTurn(): boolean;
-  setStartingPlace(place: string, hasAbout: boolean): void;
+  setStartingPlace(places: StartingPlacesByAgent, hasAbout: boolean): void;
   onTurnAccepted(listener: (turn: AcceptedTurn) => void): vscode.Disposable;
   onChatOrigin(listener: (origin: ChatOrigin) => void): vscode.Disposable;
   /** Sprint 142 (R5b): open a chat on the AI's sheet by its id. */
@@ -751,7 +751,7 @@ export class GuidanceHost implements vscode.Disposable {
       fsp.access(path.join(root, 'AGENTS.md')).then(() => true, () => false),
     ]);
     const kind = readyKindOf({ empty: listed.names.length === 0, sample });
-    this.deps.setStartingPlace(startingPlaceOf(this.frontEditor(), kind), hasAbout);
+    this.deps.setStartingPlace(startingPlacesForAgents(this.frontEditor(), kind, process.platform), hasAbout);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

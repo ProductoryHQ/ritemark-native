@@ -180,7 +180,7 @@ export function AgentView() {
   }, []);
 
   if (agentConversation.length === 0) {
-    // Sprint 140 (R8): the starting points, the same for every AI, which fill the box rather than send at once.
+    // Sprint 140 (R8): the chosen AI's starting points, which fill the box rather than send at once.
     return <StartingPoints aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} />;
   }
 

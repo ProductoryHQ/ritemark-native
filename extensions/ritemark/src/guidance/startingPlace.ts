@@ -5,6 +5,7 @@
  */
 
 import * as path from 'path';
+import type { AgentId } from '../agent/types';
 import type { ReadyKind } from './readyRequest';
 
 /** The `starting_point_used` event's `place` (R15). */
@@ -21,14 +22,16 @@ export function startingPlaceFrom(value: unknown): StartingPlace | undefined {
 /** A text document is short below this many words (R8). */
 export const SHORT_TEXT_WORDS = 300;
 
-/**
- * The #497 spike's gate (R1, R8; research/word-spike.md): the Word-or-PDF
- * starting points are offered for a kind only when every AI passed it. On
- * 26 October only ChatGPT could be run (it passed both), so both stay closed
- * until Claude and OpenCode are run; a Word file or PDF in front gets the
- * project's starting points meanwhile.
- */
-export const READ_KINDS_EVERY_AI_PASSED: Readonly<{ word: boolean; pdf: boolean }> = { word: false, pdf: false };
+type ReadingPlatform = 'darwin' | 'win32';
+export type ReadingGate = Readonly<Record<AgentId, Readonly<Record<ReadingPlatform, boolean>>>>;
+export type StartingPlacesByAgent = Readonly<Record<AgentId, StartingPlace>>;
+
+/** Sprint 173 (G2): enable Word and PDF together after this AI passes on this platform. */
+export const READ_KINDS_PASSED: ReadingGate = {
+  'claude-code': { darwin: false, win32: false },
+  codex: { darwin: false, win32: false },
+  opencode: { darwin: false, win32: false },
+};
 
 export interface FrontEditor {
   /** The custom editor's view type, or undefined for VS Code's own text editor. */
@@ -48,15 +51,18 @@ export function projectPlace(kind: ReadyKind): StartingPlace {
 
 /**
  * The place for what is in front: a Word file or PDF (if the gate allows its
- * kind), a text document by its length, a table (a CSV, or a spreadsheet in the
+ * chosen AI on this platform), a text document by its length, a table (a CSV, or a spreadsheet in the
  * table editor); anything else (a web page, a picture, a presentation, a flow,
  * a transcript), or nothing but Home and the Task board, gets the project's.
  */
-export function startingPlaceOf(front: FrontEditor | null, project: ReadyKind, passed = READ_KINDS_EVERY_AI_PASSED): StartingPlace {
+export function startingPlaceOf(front: FrontEditor | null, project: ReadyKind, agent: AgentId, platform: NodeJS.Platform, passed = READ_KINDS_PASSED): StartingPlace {
   if (!front) return projectPlace(project);
   const extension = path.extname(front.fileName).toLowerCase();
-  if (front.viewType === 'ritemark.docxViewer' || extension === '.docx') return passed.word ? 'word_or_pdf' : projectPlace(project);
-  if (front.viewType === 'ritemark.pdfViewer' || extension === '.pdf') return passed.pdf ? 'word_or_pdf' : projectPlace(project);
+  if (front.viewType === 'ritemark.docxViewer' || extension === '.docx' ||
+      front.viewType === 'ritemark.pdfViewer' || extension === '.pdf') {
+    const canRead = (platform === 'darwin' || platform === 'win32') && passed[agent][platform];
+    return canRead ? 'word_or_pdf' : projectPlace(project);
+  }
   if (front.viewType === 'ritemark.excelViewer' || extension === '.csv') return 'table';
   // Sprint 162 PR 5 (frame 11): a theme's tab keeps the colour check's starting point
   if (front.viewType === 'ritemark.editor' && /\.theme\.md$/i.test(front.fileName)) return 'theme';
@@ -64,6 +70,20 @@ export function startingPlaceOf(front: FrontEditor | null, project: ReadyKind, p
     return (front.words ?? 0) < SHORT_TEXT_WORDS ? 'short_text' : 'long_text';
   }
   return projectPlace(project);
+}
+
+/** Resolve all choices on the host so switching AIs needs no new message. */
+export function startingPlacesForAgents(
+  front: FrontEditor | null,
+  project: ReadyKind,
+  platform: NodeJS.Platform,
+  passed = READ_KINDS_PASSED,
+): StartingPlacesByAgent {
+  return {
+    'claude-code': startingPlaceOf(front, project, 'claude-code', platform, passed),
+    codex: startingPlaceOf(front, project, 'codex', platform, passed),
+    opencode: startingPlaceOf(front, project, 'opencode', platform, passed),
+  };
 }
 
 /** Words in a Markdown text, for the short/long rule: front matter, markup and links' targets left out. */

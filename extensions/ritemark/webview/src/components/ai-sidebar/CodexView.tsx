@@ -56,7 +56,7 @@ export function CodexView() {
   }, [codexConversation]);
 
   if (codexConversation.length === 0) {
-    // Sprint 140 (R8): the same starting points as Claude's and OpenCode's empty chat; the compatibility notice stays
+    // Sprint 140 (R8): the shared starting-points component; the compatibility notice stays
     // above them. Named as people know it (Sprint 133): ChatGPT.
     return (
       <StartingPoints

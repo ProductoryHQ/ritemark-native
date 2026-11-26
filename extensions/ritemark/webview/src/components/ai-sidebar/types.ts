@@ -4,6 +4,7 @@
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { StartingPlacesByAgent } from '../../../../src/guidance/startingPlace';
 import type { ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { LiveDeckStep } from '../../../../src/conversations/types';
@@ -516,7 +517,7 @@ export type ExtensionMessage =
   | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
-  | { type: 'starting-place'; place: string; hasAbout: boolean }
+  | { type: 'starting-place'; places: StartingPlacesByAgent; hasAbout: boolean }
   // Sprint 162 PR 5: an AI's theme change under its reply, and what Undo did
   | { type: 'theme-change/add'; conversationId: string; change: ThemeChangeChipView }
   | { type: 'theme-change/undone'; id: string; words: string }

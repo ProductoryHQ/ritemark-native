@@ -9,7 +9,7 @@ import { openSourcePassage, previewSourcePassage, type ReadSource } from './open
  */
 
 import * as vscode from 'vscode';
-import { startingPlaceFrom, type StartingPlace } from '../guidance/startingPlace';
+import { startingPlaceFrom, type StartingPlace, type StartingPlacesByAgent } from '../guidance/startingPlace';
 import * as fs from 'fs';
 import { basename } from 'node:path';
 import { pickerFolder } from '../utils/dialogDefaults';
@@ -308,7 +308,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   /** Sprint 140 (R5): a chat Home's ready request asked for before the sidebar's page was ready. */
   private _pendingChatStart: ChatStartRequest | null = null;
   /** Sprint 140 (R8): the empty sheet's starting place, sent again whenever the page (re)loads. */
-  private _startingPlace: { place: string; hasAbout: boolean } | null = null;
+  private _startingPlace: { places: StartingPlacesByAgent; hasAbout: boolean } | null = null;
   /** Sprint 140 (R6, R15): who hears about each accepted turn, and about the sheet's guidance origins. */
   private readonly _turnListeners: Array<(turn: AcceptedTurn) => void> = [];
   private readonly _originListeners: Array<(origin: ChatOrigin) => void> = [];
@@ -2196,10 +2196,14 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   }
 
   /** Sprint 140 (R8): the empty sheet's starting place and whether About this project exists. */
-  public setStartingPlace(place: string, hasAbout: boolean): void {
-    if (this._startingPlace?.place === place && this._startingPlace.hasAbout === hasAbout) return;
-    this._startingPlace = { place, hasAbout };
-    if (this._view && this._sidebarReady) void this._view.webview.postMessage({ type: 'starting-place', place, hasAbout });
+  public setStartingPlace(places: StartingPlacesByAgent, hasAbout: boolean): void {
+    const previous = this._startingPlace;
+    if (previous?.hasAbout === hasAbout &&
+        previous.places['claude-code'] === places['claude-code'] &&
+        previous.places.codex === places.codex &&
+        previous.places.opencode === places.opencode) return;
+    this._startingPlace = { places, hasAbout };
+    if (this._view && this._sidebarReady) void this._view.webview.postMessage({ type: 'starting-place', ...this._startingPlace });
   }
 
   /**
