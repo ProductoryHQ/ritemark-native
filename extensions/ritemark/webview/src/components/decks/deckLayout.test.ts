@@ -95,15 +95,15 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(slideWidthFor(500, 300, false), 452)
   assert.equal(slideWidthFor(2000, 300, false), BIG_MAX, 'at most 900')
   // 1440 × 900 with the AI open (the dev window's desk: 900 × 780 beside the strip), the line at half: the slide takes
-  // the pane's height less 32, at 16:9 (the Experience lead measured 636, up from 498 with the rows around it).
+  // the pane's height less 36 for the gear and 16 below, at 16:9.
   const line = aboveLineFor(780, 0.5)
   assert.equal(line, 390)
-  assert.equal(slideWidthFor(900, line, true), 636)
+  assert.equal(slideWidthFor(900, line, true), 600)
   assert.equal(slideWidthFor(1000, 800, true), 900, 'a tall pane: the width and 900 cap it')
   assert.equal(slideWidthFor(600, 800, true), 552, 'a narrow pane: the width caps it')
   assert.equal(slideWidthFor(1000, 20, true), 0, 'never negative')
   // A row still under the slide (today the speaker notes', 48 px with its margin), measured from the stage as drawn:
-  // the slide shrinks so the stage fits its pane, never overflowing it. With no row, it is the pane less 32 again.
+  // the slide shrinks so the stage fits its pane, never overflowing it. With no row, it is the pane less the vertical reserve.
   // Slide only fills the room (Jarmo, 17 November: "align slide to center... and fill the space"): his ~2000 px
   // window, the AI folded, the strip open: no 900 cap; bound by the height on a wide room, by the width on a tall one.
   assert.equal(fullSlideWidthFor(1810, 860), Math.floor(((860 - ABOVE_STAGE_ROOM) * 16) / 9), 'a wide room: the height binds')
@@ -111,15 +111,15 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   assert.equal(fullSlideWidthFor(700, 900), 700 - 48, 'a tall room: the width binds')
   assert.equal(fullSlideWidthFor(1810, 860, 40), Math.floor(((860 - ABOVE_STAGE_ROOM - 40) * 16) / 9), 'a row under it')
   assert.equal(fullSlideWidthFor(30, 20), 0, 'never negative')
-  assert.equal(rowsUnder(16 + 358 + 48 + 16, 358), 48, 'the notes row, measured')
-  assert.equal(rowsUnder(16 + 358 + 16, 358), 0, 'no row')
+  assert.equal(rowsUnder(36 + 358 + 48 + 16, 358), 48, 'the notes row, measured')
+  assert.equal(rowsUnder(36 + 358 + 16, 358), 0, 'no row')
   assert.equal(rowsUnder(300, 358), 0, 'never negative')
   assert.equal(rowsUnder(Number.NaN, 358), 0)
   const withRow = slideWidthFor(900, 390, true, 48)
-  assert.equal(withRow, 551, 'a row present: (390 - 32 - 48) × 16/9')
+  assert.equal(withRow, 515, 'a row present: (390 - 52 - 48) × 16/9')
   assert.ok(Math.round(withRow * 9 / 16) + ABOVE_STAGE_ROOM + 48 <= 390, 'the stage fits its pane: no overflow, no scrollbar')
-  assert.equal(slideWidthFor(900, 390, true, 0), 636, 'the row gone: back to the pane less 32')
-  assert.equal(slideWidthFor(900, 390, true, -5), 636, 'a negative row counts as none')
+  assert.equal(slideWidthFor(900, 390, true, 0), 600, 'the row gone: only the vertical reserve')
+  assert.equal(slideWidthFor(900, 390, true, -5), 600, 'a negative row counts as none')
   // The handout hidden, above: the full room, the slide bound by the width, the row under it fits.
   assert.equal(slideWidthFor(900, 780, true, 48), 852)
   assert.ok(Math.round(852 * 9 / 16) + ABOVE_STAGE_ROOM + 48 <= 780)
@@ -129,7 +129,7 @@ const { initialRatio, DEFAULT_RATIO } = await import('./deckDocument')
   const viewSource = readFileSync(new URL('./DeckView.tsx', import.meta.url), 'utf8').replace(/\s+/g, ' ')
   assert.ok(viewSource.includes('slideWidthFor(stageWidth, stageHeight, above, aboveUnder)'))
   assert.ok(viewSource.includes('const under = rowsUnder(group.offsetHeight - (settingsSlot?.offsetHeight ?? 0), big.offsetHeight)') && viewSource.includes('if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)'))
-  // Above, the slide always fits its pane's height, with 32 to spare.
+  // Above, the slide always fits its pane's height, with its vertical reserve.
   for (const height of [200, 300, 414, 600]) assert.ok(Math.round(slideWidthFor(1200, height, true) * 9 / 16) + ABOVE_STAGE_ROOM <= height)
 }
 

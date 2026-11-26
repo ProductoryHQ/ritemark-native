@@ -130,6 +130,7 @@ export interface SlideEditorProps {
   onNeedCaret?: () => void
   /** The right-click menu's Slide settings… (17 November): the popover beside the slide. */
   onSlideSettings?: () => void
+  settingsOpen?: boolean
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
   /** PR 3: the picture the / menu's Picture asked for, saved beside the deck: it goes where the / was. */
@@ -220,7 +221,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
 
 const NO_MISSING: ReadonlySet<string> = new Set()
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, settingsOpen, splitRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -1272,7 +1273,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             </Tooltip>
           ))}
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
-          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
+          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} settingsOpen={settingsOpen} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
           {/* The bubble menu in a box of its own that stays in the frame (`BubbleMenuBox`): TipTap takes its element
