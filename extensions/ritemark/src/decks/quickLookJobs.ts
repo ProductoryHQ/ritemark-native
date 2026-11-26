@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { testChannelRequested } from '../analytics/consent';
 import { deckVersionOf, isReadableDeckVersion } from './deckFormat';
 import { drawDeckPdf, prepareDeckPdf, type PdfDeps, type PrintInput } from './deckPdf';
 import { picturePaths } from './page/pageFile';
@@ -10,7 +11,7 @@ export async function canStartQuickLook(
   platform: NodeJS.Platform, enabled: boolean, decks: boolean, hasPrint: () => Promise<boolean>, hasBundles: () => Promise<boolean>,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<boolean> {
-  const devOverride = env.RITEMARK_BUILD_CHANNEL === 'test' && env.RITEMARK_QUICKLOOK_DEV === '1';
+  const devOverride = testChannelRequested(env) && env.RITEMARK_QUICKLOOK_DEV === '1';
   return platform === 'darwin' && enabled && decks && (devOverride || await hasBundles()) && await hasPrint();
 }
 

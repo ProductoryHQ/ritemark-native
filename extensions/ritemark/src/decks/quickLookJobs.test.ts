@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { fitFlow, fitValue } from '../../webview/src/components/decks/blocks/slideFit';
+import { fitFlow, fitValue, WORD_BOXES } from '../../webview/src/components/decks/blocks/slideFit';
 import { makeTempDir } from '../testing/tempDir';
 import { DeckPdfSaver, type PdfDeps } from './deckPdf';
 import { BUILT_IN_THEME } from './deckTheme';
@@ -68,7 +68,7 @@ test('only an opted-in test launch skips the bundle probe', async () => {
     const env = { RITEMARK_BUILD_CHANNEL: channel, RITEMARK_QUICKLOOK_DEV: channel === 'test' ? '0' : '1' };
     assert.equal(await canStartQuickLook('darwin', true, true, noProbe, async () => false, env), false, channel);
   }
-  const env = { RITEMARK_BUILD_CHANNEL: 'test', RITEMARK_QUICKLOOK_DEV: '1' };
+  const env = { RITEMARK_BUILD_CHANNEL: ' TEST ', RITEMARK_QUICKLOOK_DEV: '1' };
   assert.equal(await canStartQuickLook('darwin', true, true, async () => true, noProbe, env), true);
   assert.equal(await canStartQuickLook('darwin', true, true, async () => false, noProbe, env), false);
   assert.equal(await canStartQuickLook('win32', true, true, noProbe, noProbe, env), false);
@@ -189,7 +189,18 @@ test('the print page matches the webview fit and measures again before printing'
   let cover = false;
   let sideways = false;
   let beforePrint!: () => void;
-  const getComputedStyle = () => ({ display: 'block', position: 'static' });
+  let wordWidth = 60;
+  let paddingRight = '0px';
+  const word = { getBoundingClientRect: () => ({ right: fit * wordWidth }) };
+  const box = {
+    children: [word],
+    clientWidth: 100,
+    get scrollWidth() { return Math.max(this.clientWidth, fit * wordWidth); },
+    getBoundingClientRect: () => ({ right: 100 }),
+  };
+  const getComputedStyle = (element: unknown) => ({
+    display: 'block', position: 'static', paddingRight: element === box ? paddingRight : '0px',
+  });
   const originalStyle = Object.getOwnPropertyDescriptor(globalThis, 'getComputedStyle');
   Object.defineProperty(globalThis, 'getComputedStyle', { configurable: true, value: getComputedStyle });
   t.after(() => {
@@ -203,13 +214,14 @@ test('the print page matches the webview fit and measures again before printing'
       offsetLeft: 0,
       get offsetWidth() { return sideways ? fit * 240 : 100; },
       get offsetHeight() { return fit * textHeight; },
+      children: [box],
     }],
     clientWidth: 200,
     clientHeight: 100,
     scrollHeight: 100,
     offsetWidth: 200,
     getBoundingClientRect: () => ({ width: 200 }),
-    querySelectorAll: () => [],
+    querySelectorAll: (selector: string) => selector === WORD_BOXES && selector.includes('.blk-box') ? [box] : [],
   };
   runInNewContext(script, {
     document: { querySelectorAll: () => [flow] },
@@ -235,4 +247,12 @@ test('the print page matches the webview fit and measures again before printing'
   textHeight = 60;
   beforePrint();
   assertFit(0.76, 'sideways overflow');
+  sideways = false;
+  wordWidth = 108;
+  beforePrint();
+  assertFit(0.92, 'word wider than its box');
+  wordWidth = 100;
+  paddingRight = '12px';
+  beforePrint();
+  assertFit(0.84, 'word reaches into box padding');
 });

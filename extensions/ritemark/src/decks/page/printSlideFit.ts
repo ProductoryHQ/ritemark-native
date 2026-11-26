@@ -1,4 +1,5 @@
 import { BLOCK_FIT_STEPS } from '../blocks/slideRenderer';
+import { WORD_BOXES } from '../../../webview/src/components/decks/blocks/slideFit';
 
 /**
  * Quick Look's hidden print page has no editor to report fit steps. Start
@@ -8,7 +9,7 @@ import { BLOCK_FIT_STEPS } from '../blocks/slideRenderer';
 export const PRINT_SLIDE_FIT = `
 (() => {
   const steps = ${JSON.stringify(BLOCK_FIT_STEPS)};
-  const wordBoxes = 'h1, h2, h3, h4, h5, h6, p, li, th, td, blockquote, .blk-box, .blk-column, .blk-steps';
+  const wordBoxes = ${JSON.stringify(WORD_BOXES)};
   const px = value => parseFloat(value) || 0;
   function inFlow(style) {
     return style.display !== 'none' && style.position !== 'absolute' && style.position !== 'fixed';
