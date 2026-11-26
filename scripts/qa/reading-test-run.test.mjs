@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evidenceRedactor, retryDestroyedContext, scoreRun, tryLinks } from './reading-test-run.mjs';
@@ -350,4 +352,68 @@ test('checks later links after a tab close fails and closes repeated destination
   assert.equal(results[2].error, 'Simulated CDP failure.');
   assert.equal(results[3].targetFile, facts.deck.file);
   assert.deepEqual(results.map(({ opensRightDocument }) => opensRightDocument), [false, true, false, true]);
+});
+
+const round2 = JSON.parse(readFileSync(new URL('./reading-test-round2.answers.json', import.meta.url)));
+const round2Facts = {
+  documents: [
+    { file: 'Reference/Branch visit form, Riverside (scan).pdf', words: ['12:10'], unreadReason: 'scan' },
+    { file: 'Reference/Annual report 2025, branch section.pdf', words: ['2.1 million'] },
+  ],
+  passwordDocument: '04 Drafts/Confidential appendix.docx',
+  deck: round2.deck,
+};
+const scoreRound2 = (input, fixture = round2Facts) => scoreRun({ stepLabels: [], ...input }, fixture);
+
+test('Claude round 2 run 1 associates standalone unread titles with their reasons', () => {
+  for (const unread of [round2.unread, { answer: round2.unread.answer },
+    { answer: round2.unread.answer.replaceAll('\n- It', '\nIt') }]) {
+    const score = scoreRound2(unread);
+    assert.equal(score.coverage[0].result, 'unread');
+    assert.equal(score.criteria[5], 'pass');
+  }
+  const separated = round2.unread.answer.replace('(scan)\n', '(scan)\n\n');
+  assert.equal(scoreRound2({ answer: separated }).coverage[0].result, 'missing');
+  const nextTitle = round2.unread.answer.replace('Confidential appendix\n', 'Confidential appendix\nAnnual report 2025\n');
+  assert.equal(scoreRound2({ answer: nextTitle }).criteria[5], 'fail');
+});
+
+test('Claude round 2 run 1 matches the December staff announcement in generated facts', () => {
+  const emitted = execFileSync('python3', ['-B', '-c',
+    'import json, runpy, sys; print(json.dumps(runpy.run_path(sys.argv[1])["BASE"]))',
+    fileURLToPath(new URL('./reading-test-folder.py', import.meta.url))]);
+  const documents = JSON.parse(emitted).map(([file, , words]) => ({ file, words }));
+  const score = (answer) => scoreRound2({ answer }, { ...round2Facts, documents });
+  const minutes = (answer) => score(answer).coverage.find(({ file }) => file.startsWith('Steering group minutes')).result;
+  assert.equal(minutes(round2.minutes), 'read');
+  assert.equal(minutes('Steering group minutes 21 October: the cost per visit is six times the cost per call.'), 'missing');
+  assert.equal(score('Annual report 2025, branch section: a plan is due in March 2027.').coverage
+    .find(({ file }) => file.includes('Annual report')).result, 'missing');
+});
+
+test('Claude round 2 run 2 accepts the annual report short title only when unique', () => {
+  const input = { answer: round2.annual };
+  assert.equal(scoreRound2(input).coverage[1].result, 'read');
+  const [scan, annual] = round2Facts.documents;
+  const other = { ...annual, file: 'Annual report 2025 (summary).pdf' };
+  const ambiguous = { ...round2Facts, documents: [scan, annual, other] };
+  assert.deepEqual(scoreRound2(input, ambiguous).coverage.slice(1, 3).map(({ result }) => result),
+    ['missing', 'missing']);
+  assert.equal(scoreRound2(input, { ...round2Facts, documents: [scan, other] }).coverage[1].result, 'read');
+});
+
+test('Claude round 2 runs 2 and 3 cover the deck with individually linked slides', () => {
+  for (const input of [round2.deck2, round2.deck3]) {
+    const deck = (run) => scoreRound2(run).coverage.at(-1).result;
+    assert.equal(deck(input), 'read');
+    assert.equal(deck({ ...input, links: input.links.slice(1) }), 'missing');
+    assert.equal(deck({ ...input, answer: input.answer.replace('types.', 'options.'),
+      visibleAnswer: input.visibleAnswer.replace('branch types', 'options') }), 'missing');
+    const [first, second] = input.links;
+    assert.equal(deck({ ...input, answer: input.answer.replace(first.href, second.href) }), 'missing');
+  }
+});
+
+test('Claude round 2 run 2 reports the scan has no readable text', () => {
+  assert.equal(scoreRound2({ answer: round2.scan2 }).coverage[0].result, 'unread');
 });

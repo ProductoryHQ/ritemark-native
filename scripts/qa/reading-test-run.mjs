@@ -38,8 +38,10 @@ const pathText = /(?:\bfile:\/\/|\b[A-Z]:[\\/]|(?:^|[\s`"'(])(?:~|\.{1,2})?[\\/]
 const passwordReason = /\b(?:has a password|password[- ]protected|encrypted with a password|requires a password)\b/i;
 const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted|unprotected|password-free)\s+copy\b|\bcopy\s+without\s+(?:the|a)\s+password\b|\bremove\s+the\s+password\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+its\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
 const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can't) (?:open|read|extract)\b[^\n]*\b(?:corrupt(?:ed)?|damaged|unsupported|permission denied|access denied|missing|not found|timed out)\b/i;
-const scanReason = /\b(?:no (?:searchable |selectable |extractable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
+const scanReason = /\b(?:no (?:searchable |selectable |extractable |readable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
+const slideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*)?\[?slide\s+(\d+)\b/i;
+const entryName = (line) => titleWords(line.replace(/^(?:[-*+] |\d+[.)] )?/, ''));
 
 export function evidenceRedactor(env = process.env) {
   const keys = Object.entries(env)
@@ -53,39 +55,69 @@ export function evidenceRedactor(env = process.env) {
 
 export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [], customQuestion = false }, facts) {
   const lines = visibleAnswer.split(/\r?\n/).map((line) => line.trim());
+  const markdownLines = answer.split(/\r?\n/).map((line) => line.trim());
   const files = [...facts.documents.map(({ file }) => file), facts.passwordDocument, facts.deck.file];
   const entries = new Map(files.map((file) => [file, []]));
-  const namesByFile = new Map(files.map((file) => {
+  const rawNamesByFile = new Map(files.map((file) => {
     const heading = facts.documents.find((document) => document.file === file)?.heading;
-    return [file, [...new Set([title(file), heading].filter(Boolean).map(titleWords).filter(Boolean))]];
+    return [file, [title(file), heading].filter(Boolean)];
   }));
-  const titles = [...namesByFile].flatMap(([file, names]) =>
-    names.flatMap(titleAliases).map((name) => ({ file, name })))
+  const namesByFile = new Map([...rawNamesByFile].map(([file, names]) => [file, names.map(titleWords)]));
+  const candidates = [...rawNamesByFile].flatMap(([file, names]) => names.flatMap((raw) => {
+    const name = titleWords(raw);
+    const prefix = titleWords(raw.split(/[,\(]/, 1)[0]);
+    return [...new Set([...titleAliases(name), ...(prefix.includes(' ') ? [prefix] : [])])]
+      .filter(Boolean).map((alias) => ({ file, name: alias, full: alias === name }));
+  }));
+  const titles = candidates.filter(({ file, name, full }) => full || !candidates.some((other) =>
+    other.file !== file && (other.name === name || other.name.startsWith(name + ' '))))
     .sort((a, b) => b.name.length - a.name.length);
+  const startsEntry = (heading) => titles.find(({ name }) => heading === name || heading.startsWith(name + ' '));
+  const mentionsOther = (heading, file) => files.some((other) => other !== file
+    && containsFact(heading, namesByFile.get(other).flatMap(entryEndingNames)));
   let entryFile;
   let entry;
   for (const line of lines) {
-    const heading = titleWords(line.replace(/^(?:[-*+] |\d+[.)] )?/, ''));
-    const file = titles.find(({ name }) => heading === name || heading.startsWith(name + ' '))?.file;
+    const heading = entryName(line);
+    const file = startsEntry(heading)?.file;
     if (file) {
       entryFile = file;
       entry = [line];
       entries.get(file).push(entry);
-    } else if (!line || /^(?:[-*+] |\d+[.)] |slide\s+\d+\b)/i.test(line)
-      || (entry && files.some((other) => other !== entryFile
-        && containsFact(heading, namesByFile.get(other).flatMap(entryEndingNames))))) {
+    } else if (!line || /^(?:[-*+] |\d+[.)] )/.test(line) || slideStart.test(line)
+      || (entry && mentionsOther(heading, entryFile))) {
       entry = undefined;
     } else {
       entry?.push(line);
     }
   }
   const rowsFor = (file) => entries.get(file).map((row) => row.join(' '));
-  const passwordRows = customQuestion ? [] : rowsFor(facts.passwordDocument).filter((row) => passwordReason.test(row));
+  // Rendered Markdown can insert a blank line between a paragraph and its list.
+  // Use source line boundaries for reasons following a standalone title.
+  const unreadRows = new Map(files.map((file) => [file, []]));
+  let unreadEntry;
+  for (const line of markdownLines) {
+    const visible = line.replace(/\[([^\]\n]+)\]\([^\n]*?\)/g, '$1');
+    const heading = entryName(visible);
+    const match = startsEntry(heading);
+    if (match && heading === match.name) {
+      entryFile = match.file;
+      unreadEntry = [visible];
+      unreadRows.get(entryFile).push(unreadEntry);
+    } else if (!line || match || /^#{1,6}\s/.test(line) || slideStart.test(line)
+      || (unreadEntry && mentionsOther(heading, entryFile))) {
+      unreadEntry = undefined;
+    } else {
+      unreadEntry?.push(visible);
+    }
+  }
+  const unreadRowsFor = (file) => [...rowsFor(file), ...unreadRows.get(file).map((row) => row.join(' '))];
+  const passwordRows = customQuestion ? [] : unreadRowsFor(facts.passwordDocument).filter((row) => passwordReason.test(row));
   const passwordLine = passwordRows.find((row) => wayForward.test(row)) ?? passwordRows[0] ?? null;
   const coverage = customQuestion ? [] : facts.documents.map(({ file, words, unreadReason }) => {
     const rows = rowsFor(file);
     if (rows.some((row) => containsFact(row, words))) return { file, result: 'read' };
-    if (rows.some((row) => otherUnreadReason.test(row) || (unreadReason === 'scan' && scanReason.test(row)))) return { file, result: 'unread' };
+    if (unreadRowsFor(file).some((row) => otherUnreadReason.test(row) || (unreadReason === 'scan' && scanReason.test(row)))) return { file, result: 'unread' };
     return { file, result: 'missing' };
   });
   if (!customQuestion) coverage.push({ file: facts.passwordDocument, result: passwordLine ? 'unread' : 'missing' });
@@ -94,7 +126,7 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   const slideRows = new Map();
   let duplicateSlide = false;
   for (const line of lines) {
-    const match = /^(?:[-*+]\s+)?(?:\*\*)?slide\s+(\d+)\b/i.exec(line);
+    const match = slideStart.exec(line);
     if (!match) continue;
     const number = Number(match[1]);
     if (slideRows.has(number)) duplicateSlide = true;
@@ -113,10 +145,22 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     };
   });
   const deckRows = rowsFor(facts.deck.file);
-  const deckRead = deckRows.length > 0 && slides.every((slide) => slide.content);
+  const linkedSlides = new Set();
+  for (const line of markdownLines) {
+    const match = slideStart.exec(line);
+    if (!match) continue;
+    const number = Number(match[1]);
+    if (links.some(({ href, targetFile, hasPassage }) => {
+      if (targetFile !== facts.deck.file || !hasPassage || !line.includes(`](${href})`)) return false;
+      const page = new URLSearchParams(href.split('#')[1]).get('p');
+      return page === null || page === String(number);
+    })) linkedSlides.add(number);
+  }
+  const deckRead = slides.every(({ content }) => content) && (deckRows.length > 0
+    || slides.every(({ number }) => linkedSlides.has(number)));
   if (!customQuestion) coverage.push({
     file: facts.deck.file,
-    result: deckRead ? 'read' : deckRows.some((line) => otherUnreadReason.test(line)) ? 'unread' : 'missing',
+    result: deckRead ? 'read' : unreadRowsFor(facts.deck.file).some((line) => otherUnreadReason.test(line)) ? 'unread' : 'missing',
   });
 
   const names = ['the project folder', facts.folder, ...files.flatMap((file) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
