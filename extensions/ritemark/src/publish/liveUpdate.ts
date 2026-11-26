@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { isInside } from '../browser/localPage';
 import type { LivePause, LivePauseKind } from './publishRecords';
+import { hostedPageOf } from './gather';
 import type { GatheredPlan } from './types';
 
 export type LiveResult =
@@ -26,7 +27,7 @@ export function liveIssue(plan: GatheredPlan, acceptedScope?: string): LiveIssue
   if (plan.keyHits.length) return { kind: 'key', detail: "The page's text has what looks like a key." };
   if (plan.tooMany || plan.tooBig.length) return { kind: 'limits', detail: 'The page uses more files or larger files than Cloudflare allows.' };
   if (plan.leftOut.some(row => row.reason === 'outside')) return { kind: 'outside', detail: 'The page refers to a file outside this project.' };
-  const folder = path.dirname(plan.pagePath);
+  const folder = path.dirname(hostedPageOf(plan)?.besideDeckPath ?? plan.pagePath);
   const outside = plan.files.filter(file => !isInside(file.realPath, folder)
     || !isInside(path.resolve(plan.projectFolder, file.projectPath), folder));
   if (outside.length) {

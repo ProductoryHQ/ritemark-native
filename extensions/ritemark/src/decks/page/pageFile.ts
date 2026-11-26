@@ -41,11 +41,23 @@ export interface PageFs {
   unlink(target: string): Promise<void>;
 }
 
+async function writeNewFile(target: string, data: string | Buffer): Promise<void> {
+  const handle = await fs.promises.open(target, 'wx');
+  try {
+    await handle.writeFile(data);
+    await handle.close();
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    await fs.promises.unlink(target).catch(() => undefined);
+    throw error;
+  }
+}
+
 export const nodePageFs: PageFs = {
   lstat: target => fs.promises.lstat(target),
   stat: target => fs.promises.stat(target),
   readFile: target => fs.promises.readFile(target, 'utf8'),
-  writeFile: (target, data) => fs.promises.writeFile(target, data, { encoding: 'utf8', flag: 'wx' }),
+  writeFile: writeNewFile,
   rename: (from, to) => fs.promises.rename(from, to),
   link: (from, to) => fs.promises.link(from, to),
   unlink: target => fs.promises.unlink(target),
@@ -69,8 +81,8 @@ export function deckNameOf(deckPath: string): string {
 }
 
 /** Where a deck's page goes: `<deck name>.html` beside it. */
-export function pagePathFor(deckPath: string): string {
-  return path.join(path.dirname(deckPath), `${deckNameOf(deckPath)}.html`);
+export function pagePathFor(deckPath: string, folder = path.dirname(deckPath)): string {
+  return path.join(folder, `${deckNameOf(deckPath)}.html`);
 }
 
 /** The two marks of a page Ritemark wrote from a deck, read from the page's head. */
@@ -114,28 +126,39 @@ function besidePage(pagePath: string, ending: string): string {
  * `to` is taken, then the first name dropped. False when `to` was taken. Where the file system can't give a second
  * name (FAT and exFAT, some network and synced folders, whatever the error), a move after a last check stands in.
  */
-async function placeNoReplace(pageFs: PageFs, from: string, to: string): Promise<boolean> {
+async function placeNoReplace(pageFs: PageFs, from: string, to: string, html: string): Promise<boolean> {
   try {
     await pageFs.link(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
-    if ((await pageAt(pageFs, to)).kind !== 'none') return false;
-    await pageFs.rename(from, to);
-    return true;
+    try {
+      await pageFs.writeFile(to, html);
+      return true;
+    } catch (writeError) {
+      if ((writeError as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
+      throw writeError;
+    }
   }
   await pageFs.unlink(from).catch(() => undefined);
   return true;
 }
 
+export function takenDeckPageLine(pagePath: string): string {
+  return `“${path.basename(pagePath)}” is already in “${path.basename(path.dirname(pagePath))}”, and Ritemark didn’t make it from the deck, so it stays as it is. Rename that file to publish the deck.`;
+}
+
 /**
- * Write the page beside the deck. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
+ * Write the page at its chosen location. A file Ritemark didn't write for a deck (or a link, or a folder) is never touched:
  * the result says why in one line. The page is written under a hidden name first, so a half-written page is never what
  * Publish reads. Where nothing is, it goes in only if nothing arrived meanwhile, in one step (`placeNoReplace`: Codex
  * on #729); a page Ritemark wrote is replaced by a move over it, after a last check, so the place is never empty.
  */
-export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string): Promise<WriteResult> {
-  const pagePath = pagePathFor(deckPath);
-  const refused = (): WriteResult => ({ kind: 'refused', pagePath, line: foreignPageLine(pagePath) });
+export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: string, pagePath = pagePathFor(deckPath)): Promise<WriteResult> {
+  const refused = (): WriteResult => ({
+    kind: 'refused', pagePath,
+    line: pagePath === pagePathFor(deckPath) ? foreignPageLine(pagePath)
+      : takenDeckPageLine(pagePath),
+  });
   let there = await pageAt(pageFs, pagePath);
   if (there.kind === 'foreign') return refused();
   if (there.kind === 'ours' && there.html === html) return { kind: 'written', pagePath, created: false, unchanged: true };
@@ -143,7 +166,7 @@ export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: stri
   await pageFs.writeFile(temporary, html);
   try {
     if (there.kind === 'none') {
-      if (await placeNoReplace(pageFs, temporary, pagePath)) return { kind: 'written', pagePath, created: true, unchanged: false };
+      if (await placeNoReplace(pageFs, temporary, pagePath, html)) return { kind: 'written', pagePath, created: true, unchanged: false };
       // Something arrived meanwhile: another window's page for this deck is replaced, anything else stays.
       there = await pageAt(pageFs, pagePath);
       if (there.kind !== 'ours') return refused();
@@ -155,6 +178,24 @@ export async function writeDeckPage(pageFs: PageFs, deckPath: string, html: stri
   } finally {
     await pageFs.unlink(temporary).catch(() => undefined);
   }
+}
+
+/** Whether the expected beside-deck path still belongs to the deck. */
+export async function ownsLegacyDeckPage(pagePath: string): Promise<boolean> {
+  return (await pageAt(nodePageFs, pagePath)).kind !== 'foreign';
+}
+
+/** A legacy deck page's mark and last published bytes must both agree. */
+export async function matchesLegacyDeckPage(pagePath: string, sha256: string | undefined): Promise<boolean> {
+  if (!sha256) return false;
+  const there = await pageAt({
+    ...nodePageFs,
+    readFile: async target => {
+      const bytes = await fs.promises.readFile(target);
+      return createHash('sha256').update(bytes).digest('hex') === sha256 ? bytes.toString('utf8') : '';
+    },
+  }, pagePath);
+  return there.kind === 'ours';
 }
 
 /**
@@ -171,21 +212,28 @@ export async function removeDeckPage(pageFs: PageFs, pagePath: string, html: str
 
 /** Every picture the public deck names, and where: the slides' `image:` lines and the handouts' pictures (relative ones). */
 export function picturePaths(deck: PublicDeck): Array<{ path: string; from: PictureFrom }> {
-  const found = new Map<string, { path: string; from: PictureFrom }>();
-  const add = (picture: string, from: PictureFrom) => {
-    if (isRelativeTarget(picture)) found.set(pictureKey(picture, from), { path: picture.trim(), from });
+  return pictureLocations(deck).map(({ path, from }) => ({ path, from }));
+}
+
+function pictureLocations(deck: PublicDeck) {
+  const found = new Map<string, { path: string; from: PictureFrom; slideIndex?: number }>();
+  const add = (picture: string, from: PictureFrom, slideIndex?: number) => {
+    if (!isRelativeTarget(picture)) return;
+    const key = pictureKey(picture, from);
+    if (found.get(key)?.slideIndex === undefined) found.set(key, { path: picture.trim(), from, slideIndex });
   };
-  for (const slide of deck.slides) {
-    if (slide.data.image) add(slide.data.image, 'slide');
-    // A block slide's own pictures (Sprint 161), by the paths its renderer asks for them.
-    if (slide.data.markdown) for (const picture of blockPicturePaths(slide.data.markdown)) add(picture, 'slide');
+  for (const [index, slide] of deck.slides.entries()) {
+    if (slide.data.image) add(slide.data.image, 'slide', index);
+    if (slide.data.markdown) for (const picture of blockPicturePaths(slide.data.markdown)) add(picture, 'slide', index);
   }
-  for (const markdown of [deck.preamble, ...deck.slides.map(slide => slide.handout)]) {
-    if (!markdown) continue;
+  const handout = (markdown: string, slideIndex?: number) => {
+    if (!markdown) return;
     marked.walkTokens(lexHandout(markdown), token => {
-      if (token.type === 'image') add(token.href, 'handout');
+      if (token.type === 'image') add(token.href, 'handout', slideIndex);
     });
-  }
+  };
+  handout(deck.preamble);
+  deck.slides.forEach((slide, index) => handout(slide.handout, index));
   return [...found.values()];
 }
 
@@ -194,20 +242,22 @@ async function foundPictures(deck: PublicDeck, deckPath: string, pageFs: Pick<Pa
   return new Map([...(await foundPictureFiles(deck, deckPath, pageFs))].map(([key, found]) => [key, found.address]));
 }
 
+type FoundPicture = { address: string; file: string; slideIndex?: number };
+
 /** The same, with each picture's file on disk. */
-async function foundPictureFiles(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, { address: string; file: string }>> {
+async function foundPictureFiles(deck: PublicDeck, deckPath: string, pageFs: Pick<PageFs, 'stat'>): Promise<Map<string, FoundPicture>> {
   const folder = path.dirname(deckPath);
-  const checked = await Promise.all(picturePaths(deck).map(async picture => {
+  const checked = await Promise.all(pictureLocations(deck).map(async (picture): Promise<readonly [string, FoundPicture] | null> => {
     const file = pictureFile(picture.path, picture.from);
     const onDisk = path.resolve(folder, ...file.split('/'));
     try {
-      return (await pageFs.stat(onDisk)).isFile() ? [pictureKey(picture.path, picture.from), { address: pictureAddress(file), file: onDisk }] as const : null;
+      return (await pageFs.stat(onDisk)).isFile() ? [pictureKey(picture.path, picture.from), { address: pictureAddress(file), file: onDisk, slideIndex: picture.slideIndex }] : null;
     } catch {
       // Not there: the slide draws its empty picture place, the handout the picture's words.
       return null;
     }
   }));
-  return new Map(checked.filter((entry): entry is readonly [string, { address: string; file: string }] => entry !== null));
+  return new Map(checked.filter((entry): entry is readonly [string, FoundPicture] => entry !== null));
 }
 
 /**
@@ -238,11 +288,17 @@ function publicDeckOf(deckPath: string, text: string, theme: DeckTheme, steps?: 
 type PageInput = { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; measureFit?: boolean; print?: 'slides' | 'handout' };
 
 export async function buildDeckPage(
-  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[] },
+  input: { deckPath: string; text: string; theme: DeckTheme; steps?: readonly number[]; pagePath?: string; onPicture?: (file: string, slideIndex?: number) => void },
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'> = nodePageFs,
 ): Promise<BuiltPage> {
-  return buildPage(input, assets, pageFs, null);
+  const folder = input.pagePath && path.dirname(input.pagePath);
+  return buildPage(input, assets, pageFs, picture => {
+    input.onPicture?.(picture.file, picture.slideIndex);
+    return folder && folder !== path.dirname(input.deckPath)
+      ? pictureAddress(path.relative(folder, picture.file).split(path.sep).join('/'))
+      : picture.address;
+  });
 }
 
 /** Sprint 170: the folder Save as PDF prints from holds each picture under this name, `pictures/<n><.ext>`. */
@@ -281,7 +337,7 @@ async function buildPage(
   input: PageInput,
   assets: PageAssets,
   pageFs: Pick<PageFs, 'stat'>,
-  placed: ((picture: { address: string; file: string }) => string) | null,
+  placed: ((picture: FoundPicture) => string) | null,
 ): Promise<BuiltPage> {
   const deck = publicDeckOf(input.deckPath, input.text, input.theme, input.steps);
   const found = await foundPictureFiles(deck, input.deckPath, pageFs);
@@ -411,17 +467,7 @@ export const nodeFontFs: FontFs = {
   readFile: target => fs.promises.readFile(target),
   // Create-only; a file it created and couldn't finish (a full disk, a dropped network folder) is taken back, since it
   // is Ritemark's own, and a half font must never stop the next Publish (the review of #777).
-  writeFile: async (target, data) => {
-    const handle = await fs.promises.open(target, 'wx');
-    try {
-      await handle.writeFile(data);
-      await handle.close();
-    } catch (error) {
-      await handle.close().catch(() => undefined);
-      await fs.promises.unlink(target).catch(() => undefined);
-      throw error;
-    }
-  },
+  writeFile: writeNewFile,
   mkdir: async target => { await fs.promises.mkdir(target); },
   readdir: target => fs.promises.readdir(target),
   link: (from, to) => fs.promises.link(from, to),

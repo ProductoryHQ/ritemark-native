@@ -24,7 +24,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
-import { cssReferences, moduleReferences, pageReferences, Reference, scriptBuildsReferences } from './references';
+import { cssReferences, moduleReferences, pageReferences, Reference, rewritePageAssets, scriptBuildsReferences } from './references';
+import { plainPart } from './plainText';
 import { cleanPicture, hasPictureSignature } from './pictureClean';
 import { isText, scanText } from './secretScan';
 import {
@@ -39,7 +40,28 @@ import {
   PublishPlan,
 } from './types';
 
+/** The file types a neutral address keeps (Sprint 178 PR 3): pictures, fonts and the page's own kinds. */
+const NEUTRAL_EXTENSIONS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.svg', '.bmp', '.ico', '.tif', '.tiff', '.heic',
+  '.woff', '.woff2', '.ttf', '.otf', '.css', '.js', '.json', '.mp4', '.webm', '.mp3', '.wav', '.pdf',
+]);
+
+export class HostedDeckLayoutError extends Error {}
+
+const BAD_HOSTED_LAYOUT = "Ritemark couldn't check where this deck's page and its files are, so nothing was sent. Try Publish again.";
+
+export interface HostedDeckPage {
+  readonly besideDeckPath: string;
+  readonly html: string;
+  readonly assetAddresses: readonly string[];
+  readonly fit?: readonly number[];
+}
+
 export interface GatherOptions {
+  hostedDeck?: HostedDeckPage;
+  /** Use a legacy deck's beside-the-deck HTML from disk. */
+  legacyDeckLive?: boolean;
+  publishedPagePath?: string;
   platform?: NodeJS.Platform;
   realpath?: (p: string) => Promise<string>;
   stat?: (p: string) => Promise<{ isFile(): boolean; size: number }>;
@@ -122,6 +144,7 @@ interface Pending {
   size: number;
   as: Reference['as'];
   display: string;
+  hostedPath: string;
 }
 
 /** The deepest folder that holds every path. */
@@ -140,6 +163,12 @@ function commonFolder(paths: string[], p: typeof path.posix | typeof path.win32)
 
 /** Every plan `gatherPage` made, by identity. A plan written by hand, or copied, is not among them. */
 const gatheredPlans = new WeakSet<object>();
+const hostedPages = new WeakMap<GatheredPlan, HostedDeckPage & { sourceSha256: string; fromDisk: boolean }>();
+
+/** The immutable HTML string that gather scanned, and the previous record key. */
+export function hostedPageOf(plan: GatheredPlan) {
+  return hostedPages.get(plan);
+}
 
 /** Whether a plan is one `gatherPage` made (and froze), so PR 4's upload can refuse anything else. */
 export function isGatheredPlan(plan: unknown): plan is GatheredPlan {
@@ -166,10 +195,25 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   const key = (x: string) => (platform === 'win32' ? x.toLowerCase() : x);
 
   if (!isInside(pagePath, projectFolder, platform)) throw new Error('This page is outside this project.');
-  const pageBytes = await readFile(pagePath);
-  const pageText = pageBytes.toString('utf8');
+  const hosted = options.hostedDeck;
+  const keepHostedLayout = Boolean(hosted || options.legacyDeckLive);
+  const hostedPath = hosted?.besideDeckPath ?? pagePath;
+  if (!isInside(hostedPath, projectFolder, platform)) throw new Error('This page is outside this project.');
+  if (hosted) {
+    const name = p.basename(hostedPath, '.html');
+    const expected = p.join(p.dirname(hostedPath), `${name} files`, p.basename(hostedPath));
+    if (key(pagePath) !== key(expected) || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
+      || address.endsWith('/.') || address.endsWith('/..'))) {
+      throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
+    }
+  }
+  const moved = new Map((hosted?.assetAddresses ?? []).map(address => [
+    key(p.resolve(p.dirname(hostedPath), address)), p.resolve(p.dirname(pagePath), address),
+  ]));
+  const pageBytes = hosted ? Buffer.from(hosted.html) : await readFile(pagePath);
+  let pageText = pageBytes.toString('utf8');
   const page = pageReferences(pageText);
-  const pageUrl = pathToFileURL(pagePath);
+  const pageUrl = pathToFileURL(hostedPath);
   let base: URL = pageUrl;
   if (page.base) {
     try {
@@ -210,18 +254,19 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   while (level.length > 0 && accepted.length <= MAX_FILES) {
     const candidates: Pending[] = [];
     for (const { ref, base: from } of level) {
-      const resolved = resolveRef(ref.value, from, pagePath, platform);
+      const resolved = resolveRef(ref.value, from, hostedPath, platform);
       if (resolved.kind === 'skip') continue;
       if (resolved.kind === 'outside') {
         addLeftOut(resolved.display, 'outside');
         continue;
       }
-      const lexical = resolved.fsPath;
+      const logical = resolved.fsPath;
+      const lexical = moved.get(key(logical)) ?? logical;
       const isLink = ref.as === 'link';
       if (ref.as === 'picture') picturePaths.add(key(lexical));
-      if (seen.has(key(lexical))) continue;
-      if (!isLink) seen.add(key(lexical));
-      if (!isInside(lexical, projectFolder, platform)) {
+      if (seen.has(key(logical))) continue;
+      if (!isLink) seen.add(key(logical));
+      if (!isInside(logical, projectFolder, platform) || !isInside(lexical, projectFolder, platform)) {
         addLeftOut(displayOf(ref.value), 'outside');
         continue;
       }
@@ -241,7 +286,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       const relLexical = p.relative(projectFolder, lexical);
       const relReal = p.relative(projectFolder, real);
       const shown = toSlash(relLexical);
-      const segments = [...segmentsOf(relLexical), ...segmentsOf(relReal)];
+      const segments = [...segmentsOf(relLexical), ...segmentsOf(relReal), ...segmentsOf(p.relative(projectFolder, logical))];
       if (segments.some((s) => s.startsWith('.'))) {
         addLeftOut(shown, 'hidden');
         continue;
@@ -261,7 +306,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
         }
         continue;
       }
-      candidates.push({ fsPath: lexical, realPath: real, size: info.size, as: ref.as, display: shown });
+      candidates.push({ fsPath: lexical, realPath: real, size: info.size, as: ref.as, display: shown, hostedPath: logical });
     }
 
     // Git decides for the whole level at once, before anything in it is followed
@@ -287,7 +332,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       accepted.push(c);
       if (c.size > MAX_FILE_BYTES) continue;
       const ext = p.extname(c.fsPath).toLowerCase();
-      const fileBase = pathToFileURL(c.fsPath);
+      const fileBase = pathToFileURL(c.hostedPath);
       const isStyle = c.as === 'style' || ext === '.css';
       if (!isStyle && c.as !== 'module' && ext !== '.mjs') continue;
       // a file that grew past the limit since its stat goes as too big (below) and is not followed
@@ -305,12 +350,12 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     if (!acceptedKeys.has(key(l.lexical)) && !acceptedKeys.has(key(l.real))) addLeftOut(l.display, 'link');
   }
 
-  // Sizes, hashes and the key scan, over the page and every file that goes
-  const all: { lexical: string; real: string; size: number }[] = [
-    { lexical: pagePath, real: pagePath, size: pageBytes.length },
-    ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size })),
+  // Check and hash the physical assets before assigning any neutral hosted addresses.
+  const all: { lexical: string; real: string; size: number; hostedPath: string }[] = [
+    { lexical: pagePath, real: pagePath, size: pageBytes.length, hostedPath },
+    ...accepted.map((c) => ({ lexical: c.fsPath, real: c.realPath, size: c.size, hostedPath: c.hostedPath })),
   ];
-  const gathered: { file: GatheredFile; lexical: string }[] = [];
+  const gathered: { file: GatheredFile; lexical: string; name: string }[] = [];
   const tooBig: PublishPlan['tooBig'] = [];
   const keyHits: KeyHit[] = [];
   for (const f of all) {
@@ -327,7 +372,11 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     }
     if (f.size > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: f.size });
-      gathered.push({ file, lexical: f.lexical });
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
+      continue;
+    }
+    if (file.kind === 'page' && keepHostedLayout) {
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
       continue;
     }
     const bytes = f.lexical === pagePath ? pageBytes : await readFile(f.real);
@@ -335,7 +384,7 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     // A file can grow between its stat and this read: the limit holds for the bytes read, which are what would go
     if (bytes.length > MAX_FILE_BYTES) {
       tooBig.push({ projectPath, size: bytes.length });
-      gathered.push({ file, lexical: f.lexical });
+      gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
       continue;
     }
     if (file.kind !== 'page' && hasPictureSignature(bytes)) file.kind = 'picture';
@@ -359,17 +408,84 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
       }
       if (file.kind === 'script' && scriptBuildsReferences(text)) scriptBuilt = true;
     }
-    gathered.push({ file, lexical: f.lexical });
+    gathered.push({ file, lexical: f.hostedPath, name: p.basename(f.lexical) });
   }
 
-  const root = commonFolder(gathered.map(({ lexical }) => lexical), p);
+  const publishedPath = keepHostedLayout && options.publishedPagePath;
+  const deckFolder = p.dirname(hostedPath);
+  const root = publishedPath
+    ? p.resolve(deckFolder, ...publishedPath.split('/').slice(1).map(() => '..'))
+    : keepHostedLayout ? deckFolder : commonFolder(gathered.map(({ lexical }) => lexical), p);
+  if (publishedPath && (toSlash(p.relative(root, hostedPath)) !== publishedPath
+    || !isInside(p.join(root, 'index.html'), projectFolder, platform))) {
+    throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
+  }
+
   const files = gathered.map(({ file, lexical }) => {
-    file.relPath = toSlash(p.relative(root, lexical));
+    if (keepHostedLayout && !isInside(lexical, deckFolder, platform)) file.relocated = true;
+    else file.relPath = toSlash(p.relative(root, lexical));
     return file;
   });
 
-  // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4)
-  return frozenPlan({
+  // Frozen and remembered: what the sheet showed is exactly what the upload reads (PR 4).
+  if (keepHostedLayout) {
+    const pageFile = files[0];
+    const pageFolder = path.posix.dirname(pageFile.relPath);
+    const indexPath = pageFolder === '.' ? '/index.html' : `/${pageFolder}/index.html`;
+    const served = new Map([[indexPath, gathered[0].name], ['/version.json', 'version.json']]);
+    for (const { file, name } of gathered.slice(1)) {
+      if (file.relocated) continue;
+      const address = `/${file.relPath}`;
+      const other = served.get(address);
+      if (other !== undefined) {
+        throw new HostedDeckLayoutError(`“${plainPart(other)}” and “${plainPart(name)}” would go to the same address on the page, so nothing was sent. Rename one of them and publish again.`);
+      }
+      served.set(address, name);
+    }
+    const neutral = new Map<string, { sourceSha256: string; sha256: string }>();
+    const relocated = new Map<string, string>();
+    for (const { file, lexical } of gathered) {
+      if (!file.relocated || !file.sha256) continue;
+      const hash = file.sourceSha256 ?? file.sha256;
+      // Only a known web file type keeps its extension; any other goes up as .bin, so no part of a name leaves.
+      const ext = NEUTRAL_EXTENSIONS.has(p.extname(lexical).toLowerCase()) ? p.extname(lexical).toLowerCase() : '.bin';
+      let length = 12;
+      for (;;) {
+        const address = `/pictures/${hash.slice(0, length)}${ext}`;
+        const occupant = neutral.get(address);
+        if (!served.has(address) && (!occupant || (occupant.sourceSha256 === hash && occupant.sha256 === file.sha256))) {
+          neutral.set(address, { sourceSha256: hash, sha256: file.sha256 });
+          relocated.set(key(lexical), address);
+          file.relPath = address.slice(1);
+          break;
+        }
+        if (length === hash.length) throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
+        length++;
+      }
+    }
+    if (relocated.size) {
+      pageText = rewritePageAssets(pageText, value => {
+        const target = resolveRef(value, base, hostedPath, platform);
+        if (target.kind !== 'file') return undefined;
+        const address = relocated.get(key(target.fsPath));
+        const suffix = value.search(/[?#]/);
+        return address && (suffix < 0 ? address : address + value.slice(suffix));
+      });
+    }
+    const sent = Buffer.from(pageText);
+    pageFile.size = sent.length;
+    if (sent.length > MAX_FILE_BYTES && pageBytes.length <= MAX_FILE_BYTES) {
+      tooBig.push({ projectPath: pageFile.projectPath, size: sent.length });
+    }
+    if (pageBytes.length <= MAX_FILE_BYTES && sent.length <= MAX_FILE_BYTES) {
+      pageFile.sha256 = createHash('sha256').update(sent).digest('hex');
+      if (isText(sent)) {
+        const hits = scanText(pageText).map(hit => ({ ...hit, projectPath: pageFile.projectPath, realPath: pagePath }));
+        keyHits.unshift(...hits);
+      }
+    }
+  }
+  const plan = frozenPlan({
     pagePath,
     projectFolder,
     root,
@@ -381,6 +497,12 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
     keyHits,
     contentHash: contentHashOf(files),
   });
+  if (keepHostedLayout) hostedPages.set(plan, Object.freeze({
+    html: pageText, sourceSha256: createHash('sha256').update(pageBytes).digest('hex'), besideDeckPath: hostedPath,
+    assetAddresses: Object.freeze([...(hosted?.assetAddresses ?? [])]), fit: hosted?.fit && Object.freeze([...hosted.fit]),
+    fromDisk: !hosted,
+  }));
+  return plan;
 }
 
 /** sha256 over each file's published path and hash, sorted: equal exactly when the same bytes go to the same places. */

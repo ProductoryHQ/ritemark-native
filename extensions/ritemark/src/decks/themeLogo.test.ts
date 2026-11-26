@@ -184,7 +184,7 @@ async function main(): Promise<void> {
 
   await test('the review of #785: the fonts go back with a logo that can\'t be written; the wall reads the theme at its first look', () => {
     const publish = fs.readFileSync(path.join(extension, 'src/decks/deckPublish.ts'), 'utf8');
-    assert.ok(publish.indexOf('fonts = fontsWritten;') < publish.indexOf('await writePageFonts(nodeFontFs, deckPath, logoFiles, LOGO_PLACE)'), 'the fonts are kept for taking back before the logo is written');
+    assert.ok(publish.indexOf('fonts = fontsWritten;') < publish.indexOf('await writePageFonts(nodeFontFs, assetAnchor, logoFiles, LOGO_PLACE)'), 'the fonts are kept for taking back before the logo is written');
     const presenter = fs.readFileSync(path.join(extension, 'src/decks/present/DeckPresenter.ts'), 'utf8');
     assert.match(presenter, /theme: \{ path: UNREAD_THEME, value: BUILT_IN_THEME \}/, 'a deck naming no theme reads the project\'s own Evening on the wall too');
     assert.match(fs.readFileSync(path.join(extension, 'src/decks/themePages.ts'), 'utf8'), /createFileSystemWatcher\(`\*\*\/\$\{THEMES_FOLDER\}\/\*\*\/\*\.\{svg,png,SVG,PNG\}`\)/, 'a logo put back is drawn again');
