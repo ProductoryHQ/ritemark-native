@@ -120,7 +120,7 @@ export function othersOf(projects: readonly { name: string; waiting: ProjectWait
 /**
  * What moved shows on Home once for a profile that came from Ritemark 1 (R11):
  * the welcome records `ritemark.updatedFrom1x` as `{ at }` when an update
- * welcome finishes, and Got it records it seen.
+ * welcome finishes, and the first visible delivery records it seen.
  */
 export function showWhatMoved(updatedFrom1x: unknown, seen: unknown): boolean {
   const updated = updatedFrom1x === true || (typeof updatedFrom1x === 'object' && updatedFrom1x !== null);

@@ -14,8 +14,11 @@ STAND_IN="$WORK/Ritemark.app"
 APP=/Applications/Ritemark.app
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 RESULTS="$PROOF/results.md"
+STATE_MODULE="$ROOT/extensions/ritemark/src/decks/quickLook/pluginkitState.ts"
+os_version="$(sw_vers -productVersion)"
+cpu="$(uname -m)"
 mkdir -p "$PROOF/registration"
-printf '# Quick Look runner proof\n' > "$RESULTS"
+printf '# Quick Look runner proof\n\nmacOS %s · %s\n' "$os_version" "$cpu" > "$RESULTS"
 since="$(date '+%Y-%m-%d %H:%M:%S')"
 collect_logs() {
   local status=$?
@@ -75,18 +78,38 @@ xcrun swiftc -module-cache-path "$WORK/module-cache" "$SOURCE"/Shared/*.swift \
 } >> "$RESULTS"
 xcrun swiftc -module-cache-path "$WORK/module-cache" -parse-as-library "$SOURCE/Proof/probe.swift" -o "$WORK/probe"
 
-listing() {
-  for point in thumbnail preview; do
-    pluginkit -m -vv -i "$host_id.deck-$point" > "$PROOF/registration/$1.$point.txt" 2>&1 || true
-  done
+installed_id() {
+  plutil -extract CFBundleIdentifier raw -o - "$STAND_IN/Contents/PlugIns/RitemarkDeck$1.appex/Contents/Info.plist"
 }
 
+thumbnail_id="$(installed_id Thumbnail)"
+preview_id="$(installed_id Preview)"
+
+listing() {
+  pluginkit -m -vv -i "$thumbnail_id" > "$PROOF/registration/$1.thumbnail.txt" 2>&1 || true
+  pluginkit -m -vv -i "$preview_id" > "$PROOF/registration/$1.preview.txt" 2>&1 || true
+}
+
+election() {
+  local phase="$1" kind="$2" bundle_id="$3"
+  local raw="registration/$phase.$kind.election"
+  local state
+  state="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" "$bundle_id" "$PROOF/$raw")"
+  printf -- '- %s %s (`%s`) — **%s** ([stdout](%s.txt), [stderr and exit status](%s.log), [registered paths](registration/%s.%s.txt))\n' \
+    "$phase" "$kind" "$bundle_id" "$state" "$raw" "$raw" "$phase" "$kind" >> "$RESULTS"
+}
+
+printf '\n## Discovery and election\n\n' >> "$RESULTS"
 listing 01-before-install
 if [[ -e "$APP" ]]; then
   echo "Destination already exists: $APP" >&2
   exit 1
 fi
 sudo ditto "$STAND_IN" "$APP"
+listing 02-before-launch
+election 02-before-launch thumbnail "$thumbnail_id"
+election 02-before-launch preview "$preview_id"
 /usr/bin/log stream --style compact --level info \
   --predicate 'subsystem == "ai.productory.ritemark.quicklook" AND process BEGINSWITH "RitemarkDeck"' \
   > "$PROOF/provider-stream.txt" 2> "$PROOF/provider-stream.stderr" &
@@ -96,10 +119,10 @@ if ! open "$APP" --args "$PROOF/host.pid" > "$PROOF/registration/launch.txt" 2>&
   exit 1
 fi
 for attempt in {1..15}; do
-  listing 02-after-launch
+  listing 03-after-launch
   if [[ -s "$PROOF/host.pid" ]] &&
-    grep -Fq "$host_id.deck-thumbnail(" "$PROOF/registration/02-after-launch.thumbnail.txt" &&
-    grep -Fq "$host_id.deck-preview(" "$PROOF/registration/02-after-launch.preview.txt"; then break; fi
+    grep -Fq "$thumbnail_id(" "$PROOF/registration/03-after-launch.thumbnail.txt" &&
+    grep -Fq "$preview_id(" "$PROOF/registration/03-after-launch.preview.txt"; then break; fi
   sleep 1
 done
 if [[ ! -s "$PROOF/host.pid" ]]; then
@@ -107,6 +130,133 @@ if [[ ! -s "$PROOF/host.pid" ]]; then
   exit 1
 fi
 printf '\nHost launched with PID %s.\n' "$(cat "$PROOF/host.pid")" >> "$RESULTS"
+printf '\n' >> "$RESULTS"
+election 03-after-launch thumbnail "$thumbnail_id"
+election 03-after-launch preview "$preview_id"
+
+settings_snapshot() {
+  local label="$1" output="$PROOF/settings" window_id
+  local png="$output/$label.png" ocr="$output/$label.ocr.txt"
+  printf '\nCapture %s\n' "$label" >> "$output/capture.log"
+  if window_id="$("$WORK/probe" --settings-window 2>> "$output/capture.log")" &&
+     screencapture -x -o -l "$window_id" "$png" >> "$output/capture.log" 2>&1 &&
+     [[ -s "$png" ]]; then
+    printf 'Window capture: ID %s\n' "$window_id" >> "$output/capture.log"
+  else
+    printf 'Trying display capture.\n' >> "$output/capture.log"
+    if ! screencapture -x -m "$png" >> "$output/capture.log" 2>&1 || [[ ! -s "$png" ]]; then
+      return 1
+    fi
+  fi
+  "$WORK/probe" --settings-ocr "$png" > "$ocr" 2>> "$output/capture.log" || return 1
+  {
+    printf '\n--- %s ---\n' "$label"
+    cat "$ocr"
+  } >> "$output/ocr.txt"
+
+  if grep -Fqi 'Login Items & Extensions' "$ocr"; then
+    settings_pane=true
+  fi
+  # Use a standalone heading so the pane title cannot count as the Extensions section.
+  if [[ "$settings_pane" == true ]] && grep -Eiq '^[[:space:]]*Extensions[[:space:]]*$' "$ocr"; then
+    settings_section=true
+  fi
+  if [[ "$settings_section" == true ]] && grep -Eiq '^[[:space:]]*Quick Look[[:space:]]*$' "$ocr"; then
+    printf -- '- Confirmed via **%s**. OCR saw “Login Items & Extensions”, “Extensions” and “Quick Look” ([PNG](settings/%s.png), [OCR](settings/ocr.txt), [capture log](settings/capture.log)).\n' \
+      "$label" "$label" >> "$RESULTS"
+    settings_method="$label"
+    return 0
+  fi
+  return 1
+}
+
+settings_capture() {
+  local output="$PROOF/settings" settings_url attempt action_status settings_category=false display_height
+  local settings_pane=false settings_section=false
+  mkdir -p "$output" || return 2
+  settings_url="$(node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \
+    "$SOURCE/Proof/read-election.mjs" "$STATE_MODULE" --settings-url)" || return 2
+  printf '\n## System Settings\n\nLink: `%s`.\n\n' "$settings_url" >> "$RESULTS"
+  : > "$output/capture.log"
+  : > "$output/ocr.txt"
+  if ! open -b com.apple.systempreferences "$settings_url" >> "$output/capture.log" 2>&1; then
+    printf -- '- Settings failed to open the link ([log](settings/capture.log)).\n' >> "$RESULTS"
+    return 2
+  fi
+  # Poll through cold launch. Reissue the link once if LaunchServices opened the app
+  # without navigating to the requested pane.
+  for attempt in {1..15}; do
+    sleep 2
+    settings_snapshot "initial-$attempt" && return 0
+    [[ "$settings_pane" == true ]] && break
+    if [[ "$attempt" == 7 ]]; then
+      open -b com.apple.systempreferences "$settings_url" >> "$output/capture.log" 2>&1 || true
+    fi
+  done
+
+  if ! { display_height="$("$WORK/probe" --settings-display-height 2>> "$output/capture.log")" &&
+     osascript - "$display_height" >> "$output/capture.log" 2>&1 <<'APPLESCRIPT'
+on run argv
+  set targetHeight to (item 1 of argv as integer) - 64
+  with timeout of 5 seconds
+    tell application "System Events"
+      tell (first application process whose bundle identifier is "com.apple.systempreferences")
+        set {windowWidth, windowHeight} to size of front window
+        if targetHeight > windowHeight then
+          set position of front window to {0, 32}
+          set size of front window to {windowWidth, targetHeight}
+        end if
+        return size of front window
+      end tell
+    end tell
+  end timeout
+end run
+APPLESCRIPT
+  }; then
+    printf 'Resize failed or was refused. Trying scroll.\n' >> "$output/capture.log"
+  fi
+  sleep 1
+  settings_snapshot taller-window && return 0
+
+  action_status=0
+  "$WORK/probe" --settings-scroll-end >> "$output/capture.log" 2>&1 || action_status=$?
+  if [[ "$action_status" == 0 ]]; then
+    sleep 1
+    settings_snapshot scroll-end && return 0
+  fi
+  for attempt in {1..9}; do
+    # Try grouping even if scrolling was refused but resizing exposed Extensions.
+    if [[ "$settings_section" == true && "$settings_category" == false ]] &&
+       "$WORK/probe" --settings-category >> "$output/capture.log" 2>&1; then
+      settings_category=true
+      sleep 1
+      settings_snapshot by-category && return 0
+    fi
+    [[ "$attempt" != 9 ]] || break
+    if [[ "$attempt" == 1 && "$action_status" == 0 ]]; then
+      "$WORK/probe" --settings-scroll-start >> "$output/capture.log" 2>&1 || true
+      sleep 1
+    fi
+    local wheel_status=0
+    "$WORK/probe" --settings-scroll >> "$output/capture.log" 2>&1 || wheel_status=$?
+    [[ "$wheel_status" == 0 ]] || break
+    sleep 1
+    settings_snapshot "scroll-$attempt" && return 0
+  done
+  if [[ "$settings_section" == false ]]; then
+    printf -- '- Settings coverage gap. The Extensions section was not captured ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
+    return 2
+  fi
+  printf -- '- Settings contradiction. The Extensions section was captured without the Quick Look label ([capture log](settings/capture.log), [OCR](settings/ocr.txt)).\n' >> "$RESULTS"
+  return 1
+}
+
+# Screen capture availability is independent of the Settings wording or accessibility.
+preview_screen_available=true
+if ! screencapture -x "$WORK/preview-capture-check.png" > "$PROOF/preview-capture-check.log" 2>&1 ||
+   [[ ! -s "$WORK/preview-capture-check.png" ]]; then
+  preview_screen_available=false
+fi
 
 preview_capture() (
   local source="$1" output="$2" marker="$3" phase="$4" kind="$5"
@@ -115,6 +265,13 @@ preview_capture() (
   qlmanage -p "$source" > "$output/preview.log" 2>&1 &
   local pid=$!
   trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+  if [[ "$preview_screen_available" == false ]]; then
+    # Keep the native preview request and provider checks when screen capture is unavailable.
+    sleep 5
+    printf -- '- %s preview UI — coverage gap (screen capture unavailable, qlmanage PID %s).\n' \
+      "$kind" "$pid" >> "$RESULTS"
+    return 0
+  fi
   # Poll the screenshot for the expected content rather than taking a single snapshot.
   for attempt in {1..8}; do
     sleep 1
@@ -170,24 +327,40 @@ exercise() {
   return "$status"
 }
 
-if exercise default "$WORK/fixtures"; then
-  printf '\nBoth Quick Look points passed after first launch with default election.\n' | tee -a "$RESULTS"
+default_status=0
+exercise default "$WORK/fixtures" || default_status=$?
+
+# Capture Settings after the default requests, before changing the election.
+settings_status=confirmed
+settings_method=none
+settings_capture || case "$?" in
+  2) settings_status=gap ;;
+  *) settings_status=contradiction ;;
+esac
+printf '%s\t%s\t%s\t%s\n' "$os_version" "$cpu" "$settings_status" "$settings_method" > "$PROOF/settings.tsv"
+printf '\nSettings verdict: **%s** (%s).\n' "$settings_status" "$settings_method" >> "$RESULTS"
+killall 'System Settings' 2>/dev/null || true
+
+if [[ "$default_status" == 0 ]]; then
+  printf '\nQuick Look verdict: **PASS** after first launch with default election.\n' | tee -a "$RESULTS"
 else
   printf '\nDefault launch proof failed. Controlled discovery and election follow.\n' | tee -a "$RESULTS"
   "$LSREGISTER" -f -R -trusted "$APP"
-  listing 03-explicit-registration
-  for point in thumbnail preview; do
-    pluginkit -e use -i "$host_id.deck-$point"
+  listing 04-explicit-registration
+  for bundle_id in "$thumbnail_id" "$preview_id"; do
+    pluginkit -e use -i "$bundle_id"
   done
-  listing 04-explicit-election
+  listing 05-explicit-election
+  election 05-explicit-election thumbnail "$thumbnail_id"
+  election 05-explicit-election preview "$preview_id"
   qlmanage -r
   qlmanage -r cache
   mkdir -p "$WORK/elected-fixtures"
   python3 "$SOURCE/Proof/seed.py" "$cache" "$WORK/elected-fixtures" "$private_fixtures/elected" >> "$PROOF/cache.txt"
   if exercise elected "$WORK/elected-fixtures"; then
-    printf '\nBoth Quick Look points passed after explicit registration and election.\n' | tee -a "$RESULTS"
+    printf '\nQuick Look verdict: **PASS** after explicit registration and election.\n' | tee -a "$RESULTS"
   else
-    printf '\nQuick Look proof also failed after explicit election. See per-request artifacts.\n' | tee -a "$RESULTS"
+    printf '\nQuick Look verdict: **FAIL** after explicit election. See per-request artifacts.\n' | tee -a "$RESULTS"
     exit 1
   fi
 fi

@@ -17,7 +17,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import type { TaskBoardHost } from '../taskBoard/taskBoardHost';
 import type { GuidanceHost } from '../guidance/GuidanceHost';
-import { HOME_VIEW_TYPE, HomeHost } from '../views/HomePanel';
+import { HOME_VIEW_TYPE, HomeHost, type HomeHostDependencies } from '../views/HomePanel';
 import { registerPermanentTabs, registerPlaceClicks } from '../views/permanentTabs';
 import { ProjectsViewProvider } from '../views/ProjectsViewProvider';
 import { createAboutFile, nodeAboutFileFs, readAboutState } from './aboutFile';
@@ -41,6 +41,7 @@ export interface ProjectsHostDependencies {
   stopWorkingChats: () => Promise<void>;
   /** Sprint 140: the first day's guidance, Home's one card; null without a project. */
   guidance: GuidanceHost | null;
+  quickLookGuidance?: HomeHostDependencies['quickLookGuidance'];
   /** Sprint 142 (R3): a message the AI's sheet accepted, which ends Home's switch note. */
   onTurnAccepted?: (listener: () => void) => vscode.Disposable;
 }
@@ -160,6 +161,7 @@ export function registerProjects(deps: ProjectsHostDependencies): ProjectsHost {
     openConversation: deps.openConversation,
     onProjectsChanged: () => projectsView?.refresh(),
     guidance: deps.guidance,
+    quickLookGuidance: deps.quickLookGuidance,
     onTurnAccepted: deps.onTurnAccepted,
   }) : undefined;
   const revealHome = async (): Promise<void> => {

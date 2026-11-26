@@ -11,13 +11,13 @@ import { PRINT_COMMAND } from './deckPdf';
 import type { DeckPublisher } from './deckPublish';
 import { loadPageAssets } from './page/pageAssets';
 import { QuickLookCache, quickLookRoot, sha256 } from './quickLookCache';
-import { cacheSavedSlides, canStartQuickLook, dependencyStamps } from './quickLookJobs';
+import { cacheSavedSlides, dependencyStamps } from './quickLookJobs';
+import { quickLookAvailable } from './quickLook/availability';
 
 export async function startQuickLook(
   context: vscode.ExtensionContext, publisher: DeckPublisher, projects: ProjectList, ready: Promise<void>,
 ): Promise<void> {
-  if (!await canStartQuickLook(process.platform, isEnabled('deck-quick-look'), isEnabled('decks'),
-    async () => (await vscode.commands.getCommands(false)).includes(PRINT_COMMAND), () => hasQuickLookBundles(vscode.env.appRoot))) return;
+  if (!await quickLookAvailable()) return;
   const product = JSON.parse(await fs.promises.readFile(path.join(vscode.env.appRoot, 'product.json'), 'utf8')) as {
     darwinBundleIdentifier?: string;
   };
@@ -87,12 +87,4 @@ export async function startQuickLook(
     purgeOwners: listed => cache.purgeUnlisted(listed),
     prune: () => cache.prune(),
   }));
-}
-
-async function hasQuickLookBundles(appRoot: string): Promise<boolean> {
-  // appRoot is <app>/Contents/Resources/app for the packaged macOS shell.
-  const plugins = path.resolve(appRoot, '..', '..', 'PlugIns');
-  const found = await Promise.all(['RitemarkDeckThumbnail.appex', 'RitemarkDeckPreview.appex'].map(name =>
-    fs.promises.stat(path.join(plugins, name)).then(stat => stat.isDirectory(), () => false)));
-  return found.every(Boolean);
 }

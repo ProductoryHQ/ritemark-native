@@ -26,6 +26,7 @@ import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTas
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
 import { registerDecks, type DecksHost } from './decks/decksHost';
+import { registerQuickLookGuidance } from './decks/quickLook/registerGuidance';
 import { startQuickLook } from './decks/quickLookService';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
@@ -659,7 +660,9 @@ export function activate(context: vscode.ExtensionContext) {
   }) : null;
   if (guidance) context.subscriptions.push(guidance);
 
+  const quickLookGuidance = registerQuickLookGuidance(context);
   projectsHost = registerProjects({
+    quickLookGuidance,
     context,
     taskBoard,
     boardEnabled: () => isEnabled('task-board'),

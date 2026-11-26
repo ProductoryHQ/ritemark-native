@@ -6,10 +6,132 @@ enum ProbeError: Error {
     case timeout, absentRepresentation, wrongRepresentation, imageMismatch, missingText
 }
 
-func recognizedText(_ url: URL) throws -> String {
+func recognizedText(_ url: URL, separator: String = " ") throws -> String {
     let request = VNRecognizeTextRequest()
     try VNImageRequestHandler(url: url).perform([request])
-    return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: separator)
+}
+
+private let settingsBundleID = "com.apple.systempreferences"
+
+func settingsWindows() -> [[String: Any]] {
+    let owners = NSRunningApplication.runningApplications(withBundleIdentifier: settingsBundleID)
+        .map(\.processIdentifier)
+    let windows = CGWindowListCopyWindowInfo([.excludeDesktopElements], kCGNullWindowID)
+        as? [[String: Any]] ?? []
+    fputs("Settings PIDs: \(owners); WindowServer entries: \(windows.count)\n", stderr)
+    return windows.filter { window in
+        let pid = window[kCGWindowOwnerPID as String] as? pid_t
+        let name = window[kCGWindowOwnerName as String] as? String
+        guard pid.map(owners.contains) == true || name == "System Settings" || name == "System Preferences" else {
+            return false
+        }
+        fputs("Settings window: \(window)\n", stderr)
+        let bounds = window[kCGWindowBounds as String] as? [String: Any]
+        return window[kCGWindowLayer as String] as? Int == 0
+            && (bounds?["Width"] as? Double ?? 0) >= 400
+            && (bounds?["Height"] as? Double ?? 0) >= 300
+    }
+}
+
+func settingsWindowID() -> Int? {
+    let windows = settingsWindows()
+    let window = windows.first { $0[kCGWindowIsOnscreen as String] as? Bool == true } ?? windows.first
+    return window?[kCGWindowNumber as String] as? Int
+}
+
+func settingsAttribute<T>(_ element: AXUIElement, _ attribute: String) -> T? {
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+    return value as? T
+}
+
+func settingsElement(in element: AXUIElement, matching predicate: (AXUIElement) -> Bool) -> AXUIElement? {
+    if predicate(element) { return element }
+    let children: [AXUIElement] = settingsAttribute(element, kAXChildrenAttribute) ?? []
+    for child in children.reversed() {
+        if let found = settingsElement(in: child, matching: predicate) { return found }
+    }
+    return nil
+}
+
+func selectSettingsCategory(in window: AXUIElement, root: AXUIElement) throws {
+    func control(in element: AXUIElement, label: String, roles: [String]) -> AXUIElement? {
+        settingsElement(in: element) { item in
+            let role: String = settingsAttribute(item, kAXRoleAttribute) ?? ""
+            return roles.contains(role) && [kAXTitleAttribute, kAXDescriptionAttribute, kAXValueAttribute].contains {
+                settingsAttribute(item, $0) as String? == label
+            }
+        }
+    }
+
+    let categoryRoles = [kAXButtonRole, kAXMenuItemRole, kAXRadioButtonRole]
+    var item = control(in: window, label: "By Category", roles: categoryRoles)
+    if item == nil, let popup = control(in: window, label: "By App", roles: [kAXPopUpButtonRole]),
+       AXUIElementPerformAction(popup, kAXPressAction as CFString) == .success {
+        item = control(in: root, label: "By Category", roles: [kAXMenuItemRole])
+        if item == nil {
+            _ = AXUIElementPerformAction(popup, kAXCancelAction as CFString)
+        }
+    }
+    guard let item, AXUIElementPerformAction(item, kAXPressAction as CFString) == .success else {
+        throw ProbeError.absentRepresentation
+    }
+}
+
+func settingsAction(_ action: String) throws {
+    if action != "--settings-scroll" {
+        guard AXIsProcessTrusted() else {
+            fputs("Accessibility permission unavailable for \(action).\n", stderr)
+            exit(2)
+        }
+        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: settingsBundleID).first else {
+            throw ProbeError.absentRepresentation
+        }
+        let root = AXUIElementCreateApplication(app.processIdentifier)
+        let window: AXUIElement = settingsAttribute(root, kAXFocusedWindowAttribute) ?? root
+        if action == "--settings-category" {
+            try selectSettingsCategory(in: window, root: root)
+        } else {
+            guard let area = settingsElement(in: window, matching: { element in
+                let role: String? = settingsAttribute(element, kAXRoleAttribute)
+                let vertical: AXUIElement? = settingsAttribute(element, kAXVerticalScrollBarAttribute)
+                return role == kAXScrollAreaRole && vertical != nil
+            }), let bar: AXUIElement = settingsAttribute(area, kAXVerticalScrollBarAttribute),
+                  AXUIElementSetAttributeValue(bar, kAXValueAttribute as CFString,
+                                               NSNumber(value: action == "--settings-scroll-end" ? 1 : 0)) == .success
+            else { throw ProbeError.absentRepresentation }
+        }
+        return
+    }
+    guard CGPreflightPostEventAccess() else {
+        fputs("Event posting permission unavailable for scroll.\n", stderr)
+        exit(2)
+    }
+    let windows = settingsWindows()
+    guard let window = windows.first(where: { $0[kCGWindowIsOnscreen as String] as? Bool == true }),
+          let bounds = window[kCGWindowBounds as String] as? [String: Any],
+          let rect = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+          let event = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1,
+                              wheel1: -275, wheel2: 0, wheel3: 0) else {
+        throw ProbeError.absentRepresentation
+    }
+    // WindowServer bounds and the Quartz cursor both use global display points.
+    #if arch(x86_64)
+    let point = CGPoint(x: rect.minX + rect.width * 0.7, y: rect.minY + rect.height * 0.6)
+    #else
+    let point = CGPoint(x: rect.minX + rect.width * 0.75, y: rect.midY)
+    #endif
+    fputs("Settings scroll: global point \(point), window bounds \(rect)\n", stderr)
+    #if arch(x86_64)
+    // Align the cursor with the event location so the wheel targets the content pane.
+    guard CGWarpMouseCursorPosition(point) == .success else {
+        fputs("Could not move the cursor to the Settings scroll point.\n", stderr)
+        throw ProbeError.absentRepresentation
+    }
+    #endif
+    event.location = point
+    event.post(tap: .cghidEventTap)
 }
 
 func save(_ image: CGImage, to url: URL) throws {
@@ -158,7 +280,20 @@ enum Probe {
             if arguments.first == "--ocr" {
                 let text = try recognizedText(URL(fileURLWithPath: arguments[1]))
                 print(text)
-                guard text.uppercased().contains(arguments[2]) else { throw ProbeError.missingText }
+                let expectedLabels = arguments.dropFirst(2)
+                guard !expectedLabels.isEmpty, expectedLabels.allSatisfy({
+                    text.localizedCaseInsensitiveContains($0)
+                }) else { throw ProbeError.missingText }
+            } else if arguments.first == "--settings-ocr" {
+                print(try recognizedText(URL(fileURLWithPath: arguments[1]), separator: "\n"))
+            } else if arguments.first == "--settings-display-height" {
+                print(Int(CGDisplayBounds(CGMainDisplayID()).height))
+            } else if let action = arguments.first,
+                      ["--settings-scroll-end", "--settings-scroll-start", "--settings-scroll", "--settings-category"].contains(action) {
+                try settingsAction(action)
+            } else if arguments.first == "--settings-window" {
+                guard let window = settingsWindowID() else { throw ProbeError.absentRepresentation }
+                print(window)
             } else {
                 try checkThumbnails(fixtures: URL(fileURLWithPath: arguments[0], isDirectory: true),
                                     output: URL(fileURLWithPath: arguments[1], isDirectory: true),

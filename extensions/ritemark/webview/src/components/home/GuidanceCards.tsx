@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { HomeAi, HomeAiId, HomeGuidance, HomeRequest } from '../../../../src/projects/protocol'
+import type { HomeAi, HomeAiId, HomeGuidance, HomeMessage, HomeRequest } from '../../../../src/projects/protocol'
 import type { WelcomeProviderId } from '../../../../src/welcome/protocol'
 import { Button } from '../ui/button'
 import { DropdownMenuItem } from '../ui/dropdown-menu'
@@ -198,8 +198,11 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   )
 }
 
-export function FeedbackCard({ card }: { card: FeedbackCardState }) {
-  const [text, setText] = useState('')
+export function FeedbackCard({ card, text, onText }: {
+  card: FeedbackCardState
+  text: string
+  onText: (text: string) => void
+}) {
   const empty = !text.trim()
   return (
     <section className="rh-guide rh-ask" aria-labelledby="rh-ask-head">
@@ -213,7 +216,7 @@ export function FeedbackCard({ card }: { card: FeedbackCardState }) {
         aria-label={card.heading}
         aria-describedby="rh-ask-lede"
         disabled={card.sending}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => onText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !empty && !card.sending) send({ type: 'home/feedback-send', text })
         }}
@@ -239,17 +242,54 @@ export function FeedbackCard({ card }: { card: FeedbackCardState }) {
 }
 
 /** The one guidance card, or nothing (R2). */
-export function GuidanceCard({ guidance, whatMoved }: { guidance: HomeGuidance | null; whatMoved: ReactNode }) {
+export function GuidanceCard({ guidance: selected, whatMoved }: { guidance: HomeGuidance | null; whatMoved: ReactNode }) {
   const [keysResult, setKeysResult] = useState<{ ok: boolean; message: string | null } | null>(null)
+  const [draft, setDraft] = useState<{ text: string; card: FeedbackCardState } | null>(null)
+  const hasDraft = useRef(false)
   useEffect(() => {
-    const onMessage = (event: MessageEvent<{ type?: string; ok?: boolean; message?: string | null }>) => {
+    const onMessage = (event: MessageEvent<HomeMessage>) => {
       if (event.data?.type === 'home/keys-saved') setKeysResult({ ok: Boolean(event.data.ok), message: event.data.message ?? null })
+      if (event.data?.type === 'home/feedback-answered') {
+        hasDraft.current = false
+        setDraft(null)
+      }
     }
     window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
+    return () => {
+      window.removeEventListener('message', onMessage)
+      if (hasDraft.current) send({ type: 'home/feedback-draft-changed', hasDraft: false })
+    }
   }, [])
+  // A slot decision may already be in transit when the first keystroke reaches the host.
+  const guidance = selected?.card !== 'feedback' && draft ? draft.card : selected
   if (!guidance) return null
   if (guidance.card === 'what-moved') return <>{whatMoved}</>
   if (guidance.card === 'ready-request') return <ReadyRequestCard card={guidance} keysResult={keysResult} onKeysClosed={() => setKeysResult(null)} />
-  return <FeedbackCard card={guidance} />
+  if (guidance.card === 'quick-look') {
+    return (
+      <section className="rh-guide" aria-labelledby="rh-quick-look-note">
+        <p className="rh-guide-body rh-guide-lead" id="rh-quick-look-note"><Icon name="presentation" size={16} tone="inherit" />{guidance.body}</p>
+        <div className="rh-guide-go">
+          <Tooltip label="Opens Login Items & Extensions">
+            <Button size="compact" onClick={() => send({ type: 'home/quick-look-open' })}>{guidance.button}</Button>
+          </Tooltip>
+          <Tooltip label="Hides this note">
+            <Button variant="ghost" size="compact" className="rh-quiet" onClick={() => send({ type: 'home/quick-look-dismiss' })}>Not now</Button>
+          </Tooltip>
+        </div>
+      </section>
+    )
+  }
+  return <FeedbackCard
+    card={guidance}
+    text={draft?.text ?? ''}
+    onText={(text) => {
+      const present = text.length > 0
+      setDraft(present ? { text, card: guidance } : null)
+      if (present !== hasDraft.current) {
+        hasDraft.current = present
+        send({ type: 'home/feedback-draft-changed', hasDraft: present })
+      }
+    }}
+  />
 }

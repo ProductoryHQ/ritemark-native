@@ -18,15 +18,18 @@ import { isPointerOnly } from '../projects/aboutFile';
 import { recentItems, RECENT_EXTENSIONS, othersOf, showWhatMoved, startCommand, switchNoteEndsOnHost, waitingItems } from '../projects/homeState';
 import { projectInitials, readProject, setProjectCover, setProjectLine, nodeProjectFileFs } from '../projects/projectFile';
 import type { ProjectList } from '../projects/ProjectList';
-import { decodeHomeRequest, type HomeRequest, type HomeState } from '../projects/protocol';
+import { decodeHomeRequest, type HomeGuidance, type HomeRequest, type HomeState } from '../projects/protocol';
 import { isShellPageSignal } from '../shellPageSignals';
 import { ProjectSwitcher, type SwitchedFrom } from '../projects/switchProject';
 import type { ProjectWaiting, WaitingReader } from '../projects/waiting';
 import { UPDATED_FROM_1X_KEY } from '../welcome/updateDetection';
 import { displayPlace } from '../welcome/recentProjects';
+import { guidanceCard, type GuidanceCard } from '../guidance/guidanceState';
 import type { GuidanceHost, HomeGuidanceInput } from '../guidance/GuidanceHost';
 import { normalizeProjectUri } from '../conversations/projectScope';
 import { pickerFolder } from '../utils/dialogDefaults';
+import type { QuickLookGuidance } from '../decks/quickLook/guidance';
+import { openSettingsLabel, settingsNote } from '../decks/quickLook/guidance';
 
 export const HOME_VIEW_TYPE = HOME_TAB_VIEW_TYPE; // Sprint 152 (R7): the frame manifest's (frameIdentifiers.ts)
 export const WHAT_MOVED_SEEN_KEY = 'ritemark.whatMovedSeen';
@@ -52,6 +55,7 @@ export interface HomeHostDependencies {
   onProjectsChanged: () => void;
   /** Sprint 140: the first day's guidance (Home's one card); null in a window with none. */
   guidance: GuidanceHost | null;
+  quickLookGuidance?: QuickLookGuidance & { onDidChange: vscode.Event<void> };
   /** Sprint 142 (R3): a message the AI's sheet accepted. */
   onTurnAccepted?: (listener: () => void) => vscode.Disposable;
 }
@@ -62,6 +66,9 @@ export class HomeHost implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private redrawTimer: ReturnType<typeof setTimeout> | undefined;
   private ready = false;
+  private guidanceHasDraft = false;
+  private guidanceSlot: { decision?: Promise<HomeGuidance | null> } = {};
+  private homeVisible = false;
   private recentPaths = new Map<string, string>();
   private waitingIds = new Map<string, { source: 'card' | 'chat'; id: string }>();
   private snapshot: BoardSnapshot | null = null;
@@ -103,6 +110,13 @@ export class HomeHost implements vscode.Disposable {
     }));
     // Sprint 140: the guidance card follows a sign-in, a press, a send
     if (deps.guidance) this.disposables.push(deps.guidance.onDidChange(() => this.scheduleRedraw(0)));
+    if (deps.quickLookGuidance) this.disposables.push(
+      deps.quickLookGuidance.onDidChange(() => this.scheduleRedraw(0)),
+      // Global memento updates from other windows are read again when this Home comes back into focus.
+      vscode.window.onDidChangeWindowState(({ focused }) => {
+        if (focused && this.panel?.visible) this.scheduleRedraw(0);
+      }),
+    );
     // Sprint 142 (R3): a message sent on the AI's sheet ends the switch note
     if (deps.onTurnAccepted && this.switchedFrom) this.disposables.push(deps.onTurnAccepted(() => this.endSwitchedNote('turn-accepted')));
   }
@@ -198,6 +212,9 @@ export class HomeHost implements vscode.Disposable {
   private attach(panel: vscode.WebviewPanel): void {
     this.panel = panel;
     this.ready = false;
+    this.guidanceHasDraft = false;
+    this.guidanceSlot = {};
+    this.homeVisible = panel.visible;
     panel.iconPath = {
       light: vscode.Uri.joinPath(this.deps.context.extensionUri, HOME_TAB_ICON_LIGHT),
       dark: vscode.Uri.joinPath(this.deps.context.extensionUri, HOME_TAB_ICON_DARK),
@@ -213,22 +230,26 @@ export class HomeHost implements vscode.Disposable {
         }
         void this.handle(decoded.request).catch((error) => console.error('[Home] Request failed:', error));
       }),
-      panel.onDidChangeViewState(() => {
-        if (panel.visible) {
-          this.deps.waiting.invalidate();
-          this.scheduleRedraw(0);
-          // The list beside Home counts from the same fresh read (R3, S9)
-          this.deps.onProjectsChanged();
-        } else {
-          // Sprint 142 (R3): another tab chosen or opened on Home's desk ends the switch note
-          this.endSwitchedNote('home-hidden');
-        }
-      }),
+      panel.onDidChangeViewState(() => this.homeVisibilityChanged(panel.visible)),
     ];
     panel.onDidDispose(() => {
       subscriptions.forEach((subscription) => subscription.dispose());
       if (this.panel === panel) this.panel = undefined;
     });
+  }
+
+  private homeVisibilityChanged(visible: boolean): void {
+    const reopened = visible && !this.homeVisible;
+    this.homeVisible = visible;
+    if (!visible) {
+      this.endSwitchedNote('home-hidden');
+      return;
+    }
+    if (reopened && !this.guidanceHasDraft) this.guidanceSlot = {};
+    this.deps.waiting.invalidate();
+    this.scheduleRedraw(0);
+    // The list beside Home counts from the same fresh read (R3, S9).
+    this.deps.onProjectsChanged();
   }
 
   private scheduleRedraw(delay = REDRAW_DEBOUNCE_MS): void {
@@ -244,6 +265,7 @@ export class HomeHost implements vscode.Disposable {
     const folder = this.deps.folder;
     switch (request.type) {
       case 'home/ready':
+        this.guidanceHasDraft = false;
         this.ready = true;
         await this.push();
         return;
@@ -290,7 +312,7 @@ export class HomeHost implements vscode.Disposable {
       }
       case 'home/what-moved-seen':
         await this.deps.context.globalState.update(WHAT_MOVED_SEEN_KEY, true);
-        await this.push();
+        await this.guidanceEnded();
         return;
       case 'home/go-back': {
         const from = this.switchedFrom;
@@ -351,6 +373,7 @@ export class HomeHost implements vscode.Disposable {
         return;
       case 'home/ready-request-hide':
         await this.deps.guidance?.hide(folder.uri.toString());
+        await this.guidanceEnded();
         return;
       case 'home/sign-in':
         // Sprint 156 (PR B): Ask with's sign-in; the card's own press comes through home/ready-request
@@ -368,16 +391,36 @@ export class HomeHost implements vscode.Disposable {
         await this.panel?.webview.postMessage({ type: 'home/keys-saved', ...result });
         return;
       }
+      case 'home/feedback-draft-changed':
+        this.guidanceHasDraft = request.hasDraft;
+        return;
       case 'home/feedback-send':
-        await this.deps.guidance?.sendFeedbackLine(request.text);
+        if (await this.deps.guidance?.sendFeedbackLine(request.text)) await this.feedbackAnswered();
+        return;
+      case 'home/quick-look-open':
+      case 'home/quick-look-dismiss':
+        await this.deps.quickLookGuidance?.retire(request.type === 'home/quick-look-open');
+        await this.guidanceEnded();
         return;
       case 'home/feedback-not-now':
         await this.deps.guidance?.feedbackNotNow();
+        await this.feedbackAnswered();
         return;
       case 'home/feedback-mail':
-        await this.deps.guidance?.mailFeedbackLine(request.text);
+        if (await this.deps.guidance?.mailFeedbackLine(request.text)) await this.feedbackAnswered();
         return;
     }
+  }
+
+  private async feedbackAnswered(): Promise<void> {
+    this.guidanceHasDraft = false;
+    await this.panel?.webview.postMessage({ type: 'home/feedback-answered' });
+    await this.guidanceEnded();
+  }
+
+  private async guidanceEnded(): Promise<void> {
+    this.guidanceSlot = {};
+    await this.push();
   }
 
   /** What the guidance needs from this host's own reads (Sprint 140). */
@@ -457,8 +500,8 @@ export class HomeHost implements vscode.Disposable {
   }
 
   /** Home's state, read now. */
-  private async state(): Promise<HomeState> {
-    const { folder, context } = this.deps;
+  private async state(slot: HomeHost['guidanceSlot']): Promise<HomeState> {
+    const { folder } = this.deps;
     // The open project's folder can go while its window is open: its Home shows the not-found box, as a project of
     // the list does, and the list marks it (R13, S53).
     if (!this.missing && !(await folderIsThere(folder.uri.fsPath))) {
@@ -493,15 +536,7 @@ export class HomeHost implements vscode.Disposable {
     })));
     // Last changed, and whether the project holds anything at all.
     const recent = await this.recentFiles();
-    // Sprint 140 (R2): the one guidance card under Waiting for you
-    const whatMoved = showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY));
-    const guidanceInput = this.deps.guidance ? await this.guidanceInput(recent) : null;
-    const guidance = this.deps.guidance && guidanceInput
-      ? await this.deps.guidance.homeGuidance(guidanceInput).catch((error) => {
-          console.warn('[Home] The guidance card could not be read:', error);
-          return whatMoved ? { card: 'what-moved' as const } : null;
-        })
-      : whatMoved ? { card: 'what-moved' as const } : null;
+    const guidance = await this.slotGuidance(recent, slot);
     return {
       platform,
       project: {
@@ -523,6 +558,44 @@ export class HomeHost implements vscode.Disposable {
       missing: this.missing ? { id: this.missing.id, name: this.missing.name, mark: this.missing.mark, place: this.missing.place, here: this.missing.folderUri === folder.uri.toString() } : null,
       notice: this.notice ?? (details.unreadable && !this.unreadableSeen ? 'Ritemark can’t read this project’s settings file (.ritemark/project.json), so it shows the defaults and leaves the file as it is.' : null),
     };
+  }
+
+  /** Only opening Home or ending a card starts a new decision. Redraws refresh the chosen card's content. */
+  private async slotGuidance(
+    recent: { empty: boolean; pointers: Set<string> },
+    slot = this.guidanceSlot,
+  ): Promise<HomeGuidance | null> {
+    if (slot !== this.guidanceSlot) return null;
+    if (!slot.decision) {
+      if (!this.panel?.visible || this.missing) return null;
+      slot.decision = this.readGuidance(recent);
+      return slot.decision;
+    }
+    const selected = await slot.decision;
+    if (selected?.card === 'ready-request' || selected?.card === 'feedback') {
+      return await this.readGuidance(recent, selected.card) ?? selected;
+    }
+    return selected;
+  }
+
+  private async readGuidance(
+    recent: { empty: boolean; pointers: Set<string> },
+    selected?: GuidanceCard,
+  ): Promise<HomeGuidance | null> {
+    const { context, guidance, quickLookGuidance } = this.deps;
+    const whatMoved = showWhatMoved(context.globalState.get<unknown>(UPDATED_FROM_1X_KEY), context.globalState.get<unknown>(WHAT_MOVED_SEEN_KEY));
+    const quickLook = !selected && !whatMoved && (await quickLookGuidance?.eligible() ?? false);
+    if (guidance) {
+      try {
+        const input = await this.guidanceInput(recent);
+        if (input) return await guidance.homeGuidance(input, { quickLook, selected });
+      } catch (error) {
+        console.warn('[Home] The guidance card could not be read:', error);
+      }
+    }
+    const card = selected ?? guidanceCard({ whatMoved, quickLook, readyRequest: false, feedback: false });
+    if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
+    return card === 'what-moved' ? { card } : null;
   }
 
   private async recentFiles(): Promise<{ items: HomeState['recent']; empty: boolean; pointers: Set<string> }> {
@@ -554,13 +627,20 @@ export class HomeHost implements vscode.Disposable {
   }
 
   private async push(): Promise<void> {
-    if (!this.panel || !this.ready) return;
-    const state = await this.state();
-    await this.panel.webview.postMessage({ type: 'home/state', state });
-    // #926: the ready-request card is on screen; its count goes once per project (GuidanceHost.readyCardShown)
-    // (not under a not-found box, which Home draws instead of the card)
-    if (this.panel?.visible && !state.missing && state.guidance?.card === 'ready-request') {
-      void this.deps.guidance?.readyCardShown(this.deps.folder.uri.toString(), state.guidance).catch((error) => console.warn('[Home] The ready card count failed:', error));
+    const panel = this.panel;
+    if (!panel || !this.ready) return;
+    const slot = this.guidanceSlot;
+    const state = await this.state(slot);
+    if (this.panel !== panel || this.guidanceSlot !== slot) return;
+    const delivered = await panel.webview.postMessage({ type: 'home/state', state });
+    if (delivered && this.panel === panel && panel.visible && !state.missing && state.guidance?.card === 'what-moved'
+        && !this.deps.context.globalState.get(WHAT_MOVED_SEEN_KEY)) {
+      // This note belongs to the first landing after the upgrade.
+      await this.deps.context.globalState.update(WHAT_MOVED_SEEN_KEY, true);
+    }
+    // The visible ready request records its day and, once per project, its #926 impression.
+    if (delivered && this.panel === panel && panel.visible && !state.missing && state.guidance?.card === 'ready-request') {
+      void this.deps.guidance?.readyCardShown(this.deps.folder.uri.toString(), state.guidance).catch((error) => console.warn('[Home] The ready card impression failed:', error));
     }
     if (state.switchedFrom && this.switchedShownAt === null && this.panel?.visible) this.switchedShownAt = Date.now();
   }
