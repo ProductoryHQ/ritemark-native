@@ -383,7 +383,16 @@ async function ask(ui, ai, runtime, question, report) {
   await ui.insert(question);
   await ui.waitFor(() => ui.chat(`return ${textarea}?.value === ${JSON.stringify(question)};`),
     10, 'The question did not reach the message box.');
-  if (!(await ui.clickChat('d.querySelector(\'button[aria-label="Send"]:not(:disabled)\')'))) throw new Error('Send is unavailable.');
+  const send = 'd.querySelector(\'button[aria-label="Send"]:not(:disabled)\')';
+  if (!(await ui.waitFor(() => ui.chat(`return !!${send};`), 30))) {
+    const status = await ui.chat(`
+      const notice = d.querySelector('[data-composer] [role="status"][aria-label], [data-composer] [role="alert"][aria-label]');
+      if (notice?.innerText.trim()) return notice.innerText.trim().replace(/\\s+/g, ' ');
+      return navigator.onLine ? ${textarea}?.placeholder : 'You are offline';
+    `);
+    throw new Error(`Send stayed disabled: ${status || 'composer status unavailable'}`);
+  }
+  if (!(await ui.clickChat(send))) throw new Error('Send is unavailable.');
 
   const answer = await ui.waitFor(() => ui.chat(`
     ${lastTurn}

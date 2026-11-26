@@ -372,7 +372,7 @@ start_run() {
 	fi
 
 	local -a trace_env=()
-	if (( runtime_trace )); then trace_env=("TMPDIR=$run_dir/trace"); fi
+	if (( runtime_trace )); then trace_env=("RITEMARK_RUNTIME_TRACE_DIR=$run_dir/trace"); fi
 	local -a cmd=(
 		env -u ELECTRON_RUN_AS_NODE
 		NODE_ENV=development VSCODE_DEV=1 VSCODE_CLI=1 ELECTRON_ENABLE_STACK_DUMPING=1 ELECTRON_ENABLE_LOGGING=1
