@@ -6,10 +6,9 @@ interface CommandAction {
   path?: string | null;
 }
 
-// Tokenize literal words and the two supported separators. Any shell syntax
-// outside this grammar leaves the original step visible.
-function commandParts(command: string): string[][] | undefined {
-  if (/[\r\n|`$<>]/.test(command)) return;
+// Tokenize literal words into pipelines separated by ; or &&.
+function commandParts(command: string): string[][][] | undefined {
+  if (/[\r\n`$]/.test(command)) return;
   // The shell argument may be several quoted pieces joined without a space: Codex
   // writes `"… \\) "'! -name …'`, single-quoting the `!` that double quotes would expand.
   const wrapper = /^(?:\/bin\/)?(?:bash|zsh|sh)\s+-l?c\s+((?:'[^']*'|"(?:[^"\\]|\\.)*")+)$/.exec(command.trim());
@@ -18,31 +17,85 @@ function commandParts(command: string): string[][] | undefined {
       .map(([, single, double]) => single ?? double.replace(/\\([\\"])/g, '$1')).join('');
   }
 
-  const token = /\s+|&&|;|"[^"\\]*"|'[^'\\]*'|\\[()]|[^\s"'*?\[\]{}~#\\();&]+/y;
-  const parts: string[][] = [[]];
+  const token = /\s+|&&|[;|]|2>\/dev\/null|"[^"\\<>]*"|'[^'<>]*'|\\[()]|[^\s"'*?\[\]{}~#\\();&|<>]+/y;
+  let stage: string[] = [];
+  let pipeline = [stage];
+  const parts = [pipeline];
   let needsSpace = false;
+  let redirected = false;
   for (let i = 0; i < command.length; i = token.lastIndex) {
     token.lastIndex = i;
     const word = token.exec(command)?.[0];
     if (!word) return;
     if (/^\s/.test(word)) {
       needsSpace = false;
-    } else if (word === ';' || word === '&&') {
-      if (!parts[parts.length - 1].length) return;
-      parts.push([]);
+    } else if (word === ';' || word === '&&' || word === '|') {
+      if (!stage.length) return;
+      stage = [];
+      if (word === '|') pipeline.push(stage);
+      else parts.push(pipeline = [stage]);
       needsSpace = false;
+      redirected = false;
     } else {
-      if (needsSpace) return;
-      parts[parts.length - 1].push(word.replace(/^(['"])(.*)\1$/, '$2').replace(/^\\([()])$/, '$1'));
+      if (needsSpace || redirected) return;
+      if (word === '2>/dev/null') {
+        if (!stage.length) return;
+        redirected = true;
+      } else {
+        stage.push(word[0] === "'" || word[0] === '"' ? word.slice(1, -1) : word.replace(/^\\([()])$/, '$1'));
+      }
       needsSpace = true;
     }
   }
-  if (parts[parts.length - 1].length) return parts;
+  if (stage.length) return parts;
 }
 
 const operand = (value?: string): value is string => !!value && !value.startsWith('-');
 const absolute = /^(?:[/\\]|[a-z]:)/i;
 const outside = /(?:^|[/\\])\.\.(?:[/\\]|$)|^(?:[/\\]|[a-z]:)/i;
+
+function grepFilter(args: string[]): boolean {
+  let hasExplicitPattern = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (/^-[viEFxwcno]+$/.test(arg)) continue;
+    const patternOption = /^-[viEFxwcno]*e(.*)$/s.exec(arg);
+    if (patternOption) {
+      if (!patternOption[1] && ++i === args.length) return false;
+      hasExplicitPattern = true;
+      continue;
+    }
+    return !hasExplicitPattern && !arg.startsWith('-') && i === args.length - 1;
+  }
+  return hasExplicitPattern;
+}
+
+function stdinFilter([program, ...args]: string[]): boolean {
+  switch (program) {
+    case 'grep':
+    case 'egrep':
+    case 'fgrep':
+      return grepFilter(args);
+    case 'sort':
+      return args.every(arg => /^-[urnfV]+$/.test(arg));
+    case 'uniq':
+      return args.every(arg => /^-[cud]+$/.test(arg));
+    case 'head':
+    case 'tail':
+      return args.length === 0 || (args.length === 1 && /^-\d+$/.test(args[0]))
+        || (args.length === 2 && args[0] === '-n' && /^\d+$/.test(args[1]));
+    case 'wc':
+      return args.every(arg => /^-[lcw]+$/.test(arg));
+    case 'cut':
+      return args.length === 4 && args[0] === '-d' && args[1].length === 1 && args[2] === '-f'
+        && /^(?:\d+(?:-\d*)?|-\d+)(?:,(?:\d+(?:-\d*)?|-\d+))*$/.test(args[3]);
+    case 'tr':
+      return (args.length === 2 && args[0] === '-d' && operand(args[1]))
+        || (args.length === 2 && args.every(operand));
+    default:
+      return false;
+  }
+}
 
 function readOnlyFind(filters: string[]): boolean {
   let depth = 0;
@@ -123,12 +176,13 @@ export function commandStep(
       : root && normalized.startsWith(root + '/') ? normalized.slice(root.length + 1) : normalized;
   };
 
-  if (parts.length > 1) {
+  if (parts.length > 1 || parts[0].length > 1) {
     let folder = '.';
     let listsProject = false;
-    for (const words of parts) {
-      const target = readOnlyTarget(words);
-      if (target?.kind !== 'folder' || outside.test(target.path ?? '.')) return step;
+    for (const [source, ...filters] of parts) {
+      const target = readOnlyTarget(source);
+      if (target?.kind !== 'folder' || !filters.every(stdinFilter)) return step;
+      if (parts.length > 1 && outside.test(target.path ?? '.')) return step;
       const path = projectPathFor(target.path ?? '.');
       if (outside.test(path) || (path !== '.' && folder !== '.' && path !== folder)) return step;
       if (path === '.') listsProject = true;
@@ -137,7 +191,7 @@ export function commandStep(
     return { ...step, kind: 'folder', path: listsProject ? '.' : folder };
   }
 
-  const target = readOnlyTarget(parts[0]);
+  const target = readOnlyTarget(parts[0][0]);
   if (!target || (actions?.length ?? 0) > 1) return step;
   const action = actions?.[0]?.type === 'unknown' ? undefined : actions?.[0];
   if (action && (target.kind === 'read' ? action.type !== 'read'

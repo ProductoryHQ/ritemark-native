@@ -428,6 +428,15 @@ find . -type f \( -name '*.docx' -o -name '*.pdf' -o -name '*.pptx' \)
 
 Criterion 5 produced false negatives in run 2. Criteria 1 and 4 are to check. Set 3 retains its verdict. A fresh set follows after the fixes.
 
+Set 4 on `fbcfd642`: **fail**. Runs 1 and 2 passed criterion 3: every step named a document or the project folder. Run 3 had two "Ran a command" rows. The runner's `badCommands` gave the folder listings piped through a filter:
+
+```sh
+/bin/bash -lc "ls -la; find . -type f | grep -v '/\\.'"
+/bin/bash -lc "find . -type f | grep -v '/\\.'"
+```
+
+Criteria 1 and 4 were not judged by hand, because run 3 already fails. Criterion 5 passed in all three runs. Set 4 retains its verdict. The next fix makes the rule general: a listing piped only through filters that read their input (`grep`, `sort`, `uniq`, `head`, `tail`, `wc`, `cut`, `tr`) is a folder step. A fresh set follows.
+
 Fresh set verdict — pending (3 of 3 required).
 
 #### Run 1
