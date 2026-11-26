@@ -41,7 +41,7 @@ import { blockDataOf } from '../../../../../src/decks/blocks/convertDeck'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
 import { BLOCK_CANVAS_HEIGHT, BLOCK_CANVAS_WIDTH, contentPlaceClass, contentPlaceFitKey, contentPlaceOf, drawsLogo, isCoverSlide, logoCanvasMarks, lonePictureClass, sidePictureOf, themeSlideLogo } from '../../../../../src/decks/blocks/slideRenderer'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
-import { createEditorSchemaExtensions, stripPastedMarkdownAttributes } from '../../../utils/editorMarkdown'
+import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
 import { getUniqueImageFilename, readFileAsBase64, takeImageFile } from '../../../lib/pastedImage'
 import { SlashCommands } from '../../../extensions/SlashCommands'
 import { SlideCodeBlock } from '../../../extensions/CodeBlockWithCopyExtension'
@@ -403,7 +403,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       editor.setOptions({ content: loadSlideDoc(editor.schema, nodeMarkdown, assets).toJSON() })
     },
     editorProps: {
-      transformPastedHTML: stripPastedMarkdownAttributes,
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
       // Sprint 163: a Tabs block pasted where none may go (another's pane, a box, Steps, a table cell) comes in as its

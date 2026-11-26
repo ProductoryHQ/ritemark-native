@@ -12,9 +12,9 @@ Object.defineProperty(globalThis, 'window', { value: {}, configurable: true })
 function clipboardView(schema: Schema, props: EditorProps) {
   return {
     state: EditorState.create({ schema }),
-    someProp(name: keyof EditorProps, use: (prop: unknown) => unknown) {
+    someProp(name: keyof EditorProps, use?: (prop: unknown) => unknown) {
       const prop = props[name]
-      return prop && use(prop)
+      return prop && (use ? use(prop) : prop)
     },
     dispatch(tr: Transaction) {
       this.state = this.state.apply(tr)
@@ -28,7 +28,7 @@ function paste(schema: Schema, html: string, props: EditorProps) {
   return view.state.doc
 }
 
-const props = { transformPastedHTML: pipeline.stripPastedMarkdownAttributes }
+const props = pipeline.markdownClipboardProps(fidelitySchema())
 const src = 'https://x/cat.png'
 const canonical = `![cat](${src})`
 const picture = (target: string) => `<img src="${src}" alt="cat" data-md-image-src="${src}" ` +
@@ -49,15 +49,54 @@ for (const [name, load, save] of [
     assert.equal(save(paste(load('').type.schema, html, props)), 'Before\n\n---\n\n| A |\n| --- |\n| B |')
   })
 
+  const forged = '<p data-pm-slice="0 0 []">Before</p>'
+  const hidden = '&#10;&#10;&lt;!-- hidden --&gt;&#10;&#10;[link](https://example.com)'
+  const forgedPictures = [
+    picture(`(${src})`).replace('![cat]', `![cat${hidden}]`),
+    picture(`(${src} &quot;hidden title&quot;)`),
+  ]
+  for (const [index, html] of forgedPictures.entries()) {
+    test(`${name} rejects forged slice picture metadata (${index})`, () => {
+      assert.equal(save(paste(load('').type.schema, forged + html, props)), `Before\n\n${canonical}`)
+    })
+  }
+
+  test(`${name} rejects forged slice block metadata`, () => {
+    const html = forged + `<hr data-md-hr="___${hidden}"><ul data-md-marker="*${hidden}"><li><p>Item</p></li></ul>` +
+      '<table data-md-delims="| :-----: extra |"><tbody><tr><th>A</th></tr><tr><td>B</td></tr></tbody></table>'
+    assert.equal(save(paste(load('').type.schema, html, props)), 'Before\n\n---\n\n- Item\n\n| A |\n| --- |\n| B |')
+  })
+
   test(`${name} internal copy and paste keeps Markdown spelling`, () => {
-    const written = `Before\n\n___\n\n![cat](<${src}>)`
+    const written = `Before\n\n___\n\n![cat](<${src}>)\n\n![](image(1).png "Cap")\n\n![](Kickoff%20files/a.png)`
     const doc = load(written)
-    const view = clipboardView(doc.type.schema, {})
+    const copyProps = pipeline.markdownClipboardProps(doc.type.schema)
+    const view = clipboardView(doc.type.schema, copyProps)
     const { dom } = EditorView.prototype.serializeForClipboard.call(view as unknown as EditorView, doc.slice(0, doc.content.size))
     assert.ok(dom.querySelector('[data-pm-slice]'))
-    assert.equal(save(paste(doc.type.schema, dom.innerHTML, props)), written)
+    assert.equal(save(paste(doc.type.schema, dom.innerHTML, copyProps)), written)
   })
 }
+
+test('a copy from a different session loses its Markdown spelling', () => {
+  const doc = openDocument('Before\n\n___\n').doc
+  const view = clipboardView(doc.type.schema, props)
+  const { dom } = EditorView.prototype.serializeForClipboard.call(view as unknown as EditorView, doc.slice(0, doc.content.size))
+  const tagged = dom.querySelector('[data-ritemark-clipboard]')
+  assert.ok(tagged)
+  tagged.setAttribute('data-ritemark-clipboard', 'another-session')
+  assert.equal(editorMarkdown(paste(doc.type.schema, dom.innerHTML, props)), 'Before\n\n---')
+})
+
+test('the image writer checks block structure, alt and title even with trusted metadata', () => {
+  for (const html of [
+    picture(`(${src})`).replace('![cat]', '![cat&#10;&#10;extra]'),
+    picture(`(${src})`).replace('![cat]', '![dog]'),
+    picture(`(${src} &quot;hidden title&quot;)`),
+  ]) {
+    assert.equal(editorMarkdown(paste(fidelitySchema(), html, {})), canonical)
+  }
+})
 
 test('the image writer rejects a target followed by an extra inline token', () => {
   const html = picture(`(${src}) *extra*`)

@@ -372,7 +372,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
   hardBreak: ['data-md-break'],
   horizontalRule: ['data-md-hr'],
   link: ['data-md-link'],
-  image: ['data-md-image-label', 'data-md-image-target', 'data-md-image-src', 'data-md-image-alt'],
+  image: ['data-md-image-label', 'data-md-image-target', 'data-md-image-src', 'data-md-image-alt', 'data-md-image-title'],
   table: ['data-md-delims', 'data-md-spacing', 'data-md-widths'],
   codeBlock: ['data-md-info'],
   /** No blank line between a block and the one before it. */

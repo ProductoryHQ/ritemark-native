@@ -19,6 +19,28 @@ function matchesImageSource(href: string, src: string): boolean {
 }
 
 /**
+ * The local file a webview display URI shows (`https://file+.vscode-resource.vscode-cdn.net/<path>?v=…` or
+ * `vscode-resource:/<path>`), without its cache query. Only for a picture that has no relative path left.
+ */
+function localPathOfDisplayUri(src: string): string {
+  try {
+    const url = new URL(src)
+    const path = decodeURIComponent(url.pathname)
+    return /^\/[a-z]:\//i.test(path) ? path.slice(1) : path
+  } catch {
+    return src.replace(/[?#].*$/, '')
+  }
+}
+
+/** Marked's image text and title contain HTML entities which the DOM already decoded. */
+function decodeImageText(el: HTMLImageElement, text: string): string {
+  if (!text.includes('&')) return text
+  const decoder = el.ownerDocument.createElement('span')
+  decoder.innerHTML = text.replace(/</g, '&lt;')
+  return decoder.textContent ?? ''
+}
+
+/**
  * Create a fresh TurndownService configured with Ritemark's canonical
  * HTML → Markdown rules. Use this for any HTML-to-MD conversion (paste-flow
  * "Copy as Markdown", DOCX-preview Save as Markdown, etc.) so output style
@@ -119,10 +141,15 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
       const displaySrc = el.getAttribute('src') ?? el.src
       const writtenSrc = el.getAttribute('data-md-image-src')
       const writtenTarget = el.getAttribute('data-md-image-target')
-      // An image loaded as written only needs a separate source when the host mapped it for display.
-      const useTitle = (writtenSrc !== null || writtenTarget === null) && displaySrc !== writtenSrc &&
-        (title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc)))
-      const src = useTitle ? title : displaySrc
+      const displayOnly = isWebviewResourceUri(displaySrc.trim())
+      const useTitle = isRelativeImagePath(title) && (displayOnly ||
+        ((writtenSrc !== null || writtenTarget === null) && displaySrc !== writtenSrc && title.startsWith('./')))
+      let src = useTitle ? title : displaySrc
+      // Never serialize a display URI. With no relative path left, write the local file it shows rather than drop the
+      // picture: a picture the person sees must never vanish from their file on save.
+      if (isWebviewResourceUri(src.trim())) {
+        src = isRelativeImagePath(title) && !isWebviewResourceUri(title.trim()) ? title : localPathOfDisplayUri(src.trim())
+      }
       const label = `![${markdownAlt(alt)}]`
       let markdown = label + `(${pictureTarget(src)})`
       if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
@@ -130,10 +157,14 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
           ? el.getAttribute('data-md-image-label')
           : null
         const candidate = (writtenLabel ?? label) + writtenTarget
-        const tokens = Lexer.lexInline(candidate, instance.defaults)
-        const token = tokens[0]
-        if (tokens.length === 1 && token.type === 'image' && token.raw === candidate &&
-            matchesImageSource((token as Tokens.Image).href, src)) {
+        const blocks = new Lexer(instance.defaults).lex(candidate)
+        const paragraph = blocks[0] as Tokens.Paragraph | undefined
+        const tokens = paragraph?.type === 'paragraph' ? paragraph.tokens : []
+        const token = tokens[0] as Tokens.Image | undefined
+        const caption = useTitle ? el.getAttribute('data-md-image-title') ?? '' : title
+        if (blocks.length === 1 && tokens.length === 1 && token?.type === 'image' && token.raw === candidate &&
+            !isWebviewResourceUri(token.href.trim()) && matchesImageSource(token.href, src) &&
+            decodeImageText(el, token.text) === alt && decodeImageText(el, token.title ?? '') === caption) {
           markdown = candidate
         }
       }

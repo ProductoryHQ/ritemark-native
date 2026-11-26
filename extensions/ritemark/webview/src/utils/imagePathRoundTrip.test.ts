@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { marked } from 'marked'
+import { getSchema } from '@tiptap/core'
+import { EditorState } from '@tiptap/pm/state'
+import { replacePicture, replacePictureKeepingCaret } from '../extensions/pictures/pictureCommands'
+import { loadSlide, saveSlide } from '../components/decks/blocks/slideEditorHarness'
 import { installTestDocument, openDocument, saveDocument, typeAtEndOfLastParagraph } from './markdownFidelity'
-import { applyImageMappings, createEditorTurndownService, markdownToEditorHTML } from './editorMarkdown'
+import { DeckSlide } from '../components/decks/handout/deckSchema'
+import { putSlidePicture } from '../components/decks/blocks/slidePictureSwap'
+import { flowToSide } from '../components/decks/blocks/slidePicturePlace'
+import { slidesOf } from '../components/decks/deckDocument'
+import { applyImageMappings, createEditorSchemaExtensions, createEditorTurndownService, markdownToEditorHTML } from './editorMarkdown'
 import { isRelativeImagePath, isWebviewResourceUri, sameRelativeImagePath } from '../../../src/utils/imagePaths'
 
 // ── Which paths count as "beside the document" ─────────────────────────────
@@ -64,6 +72,7 @@ assert.equal(save(documentHtml), documentMarkdown)
 
 for (const [picture, path] of [
   ['![](image(1).png)', 'image(1).png'],
+  ['![](image(1).png "Cap")', 'image(1).png'],
   ['![](images/Eiffel_Tower_(Paris).jpg)', 'images/Eiffel_Tower_(Paris).jpg'],
   ['![](images/a%20b.png)', 'images/a b.png'],
   ['![](<a b.png>)', 'a b.png'],
@@ -114,4 +123,43 @@ test('a changed destination is formatted for the new path', () => {
     container.querySelector('img')!.setAttribute('src', path)
     assert.equal(save(container.innerHTML), `![](${target})`)
   }
+})
+
+const deckSchema = getSchema(createEditorSchemaExtensions({ deck: [DeckSlide] }))
+for (const old of ['https://example.com/a.png', 'missing.png']) {
+  for (const [name, replace] of [
+    ['Replace picture', replacePicture],
+    ['ChatGPT picture', replacePictureKeepingCaret],
+  ] as const) {
+    test(`${name} saves a relative path after replacing ${old}`, () => {
+      const opened = openDocument(`![](${old})\n\nWords.\n`)
+      const tr = replace(EditorState.create({ doc: opened.doc }), 0, { src: display, title: 'new.png' })
+      assert.ok(tr)
+      for (const key of ['mdImageLabel', 'mdImageTarget', 'mdImageSrc', 'mdImageAlt']) {
+        assert.equal(tr.doc.firstChild?.attrs[key], null, key)
+      }
+      assert.equal(saveDocument(opened, tr.doc), '![](new.png)\n\nWords.\n')
+    })
+  }
+
+  test(`slide swap saves a relative path after replacing ${old}`, () => {
+    const slide = deckSchema.nodes.deckSlide.create({ kind: '', body: `![](${old})\n\nWords.` })
+    const state = EditorState.create({ doc: deckSchema.node('doc', null, [slide]) })
+    const swap = putSlidePicture(state, { slide: { index: 0 }, side: false, path: old, nth: 0 },
+      { picture: { path: 'new.png', url: display, describe: () => '' } }, { load: loadSlide, save: saveSlide })
+    assert.ok(swap)
+    assert.equal(slidesOf(swap.tr.doc)[0]?.data.markdown, '![](new.png)\n\nWords.')
+  })
+}
+
+test('a webview image without a relative path keeps its local file, never the display address, never dropped', () => {
+  assert.equal(save(`<img src="${display}" alt="a">`), '![a](/Users/me/docs/img/a.png)')
+})
+
+test('swapping a side picture into the slide words drops the previous picture spelling', () => {
+  const doc = loadSlide('![](<missing.png>)')
+  const swap = flowToSide(EditorState.create({ doc }), 0, 'right', { image: 'new.png', url: display })
+  assert.ok(swap)
+  assert.equal(swap.doc.firstChild?.attrs.mdImageTarget, null)
+  assert.equal(saveSlide(swap.doc), '![](new.png)')
 })

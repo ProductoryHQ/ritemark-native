@@ -21,6 +21,9 @@
 import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
 import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
+import { DOMSerializer, type Schema } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorProps } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import BulletList from '@tiptap/extension-bullet-list'
 import ListItem from '@tiptap/extension-list-item'
@@ -96,18 +99,37 @@ export function ensureCommentMarkedPipeline(): void {
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
 }
 
+const clipboardSessionAttribute = 'data-ritemark-clipboard'
+const clipboardSession = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+  byte.toString(16).padStart(2, '0')).join('')
+
+/** ProseMirror serializes both copy and cut through this prop before writing text/html. */
+export function markdownClipboardProps(schema: Schema): EditorProps {
+  const serializer = DOMSerializer.fromSchema(schema)
+  const clipboardSerializer = new DOMSerializer(serializer.nodes, serializer.marks)
+  clipboardSerializer.serializeFragment = (fragment, options, target) => {
+    const dom = serializer.serializeFragment(fragment, options, target)
+    const firstElement = Array.from(dom.childNodes).find((node): node is Element => node.nodeType === 1)
+    firstElement?.setAttribute(clipboardSessionAttribute, clipboardSession)
+    return dom
+  }
+  return { clipboardSerializer, transformPastedHTML: stripPastedMarkdownAttributes }
+}
+
 /** Strip Markdown spelling metadata before ProseMirror parses external paste or drop HTML. */
-export function stripPastedMarkdownAttributes(html: string): string {
-  if (!/data-md-/i.test(html)) return html
+function stripPastedMarkdownAttributes(html: string): string {
+  if (!/data-md-|data-pm-slice/i.test(html)) return html
 
   const template = document.createElement('template')
   template.innerHTML = html
-  const slice = template.content.querySelector('[data-pm-slice]')?.getAttribute('data-pm-slice')
-  if (slice && /^\d+ \d+(?: -\d+)? /.test(slice)) return html
+  const elements = Array.from(template.content.querySelectorAll('*'))
+  if (elements.some(element => element.getAttribute(clipboardSessionAttribute) === clipboardSession)) return html
 
-  for (const element of Array.from(template.content.querySelectorAll('*'))) {
+  for (const element of elements) {
+    // Slice context can also carry serialized ProseMirror node attributes.
+    element.removeAttribute('data-pm-slice')
     for (const attribute of Array.from(element.attributes)) {
-      if (attribute.name.toLowerCase().startsWith('data-md-')) element.removeAttribute(attribute.name)
+      if (attribute.name.startsWith('data-md-')) element.removeAttribute(attribute.name)
     }
   }
   return template.innerHTML
@@ -175,6 +197,8 @@ function mapImages(container: HTMLElement, imageMappings?: Record<string, string
     if (src === null) continue
     const mapping = mappings.get(src)
     if (mapping) {
+      const caption = image.getAttribute('title')
+      if (caption && image.hasAttribute('data-md-image-target')) image.setAttribute('data-md-image-title', caption)
       image.setAttribute('src', mapping.uri)
       image.setAttribute('title', mapping.path)
     }
@@ -254,6 +278,10 @@ function dataAttributes(names: readonly string[], keepOnSplit = true) {
  */
 export const MarkdownAsWritten = Extension.create({
   name: 'markdownAsWritten',
+
+  addProseMirrorPlugins() {
+    return [new Plugin({ props: markdownClipboardProps(this.editor.schema) })]
+  },
 
   addGlobalAttributes() {
     return [
