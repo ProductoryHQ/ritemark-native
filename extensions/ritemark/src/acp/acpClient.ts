@@ -15,6 +15,7 @@
 
 import { spawn, ChildProcess } from 'child_process';
 import { Writable, Readable } from 'stream';
+import { createInterface } from 'readline';
 import { stopProcessTree } from '../utils/runProcess';
 import type {
   InitializeResponse,
@@ -232,7 +233,7 @@ export class AcpClient {
     if (!this.connection) {
       return;
     }
-    this.connection.cancel({ sessionId });
+    await this.connection.cancel({ sessionId });
     this.trace?.('client', 'cancel:sent', { sessionId });
   }
 
@@ -277,8 +278,8 @@ export class AcpClient {
     }
 
     if (proc.stderr) {
-      proc.stderr.on('data', (data: Buffer) => {
-        const line = data.toString().trim();
+      createInterface({ input: proc.stderr, crlfDelay: Infinity }).on('line', (raw: string) => {
+        const line = raw.trim();
         if (!line) {
           return;
         }
