@@ -122,6 +122,15 @@ export function removePicture(state: EditorState, pos: number): Transaction | nu
   return ownStep(tr)
 }
 
+/** A new source has no Markdown spelling inherited from the previous picture. */
+export const newPictureSpelling = {
+  mdImageLabel: null,
+  mdImageTarget: null,
+  mdImageSrc: null,
+  mdImageAlt: null,
+  mdImageTitle: null,
+}
+
 /**
  * Another picture in this one's place (Replace picture…, a double click, or a paste or drop onto it): its size and
  * alignment stay; its crop, focus point and description (with its caption) start fresh, since they were the old
@@ -132,7 +141,10 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
   if (!node) return null
   const written = (node.attrs.picture as string | null) ?? ''
   const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined, caption: undefined }))
-  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: picture.src, title: picture.title, alt: '', picture: block || null })
+  const tr = state.tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs, ...newPictureSpelling,
+    src: picture.src, title: picture.title, alt: '', picture: block || null,
+  })
   tr.setSelection(NodeSelection.create(tr.doc, pos))
   return ownStep(tr)
 }

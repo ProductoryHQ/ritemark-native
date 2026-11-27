@@ -135,7 +135,7 @@ const draw = (view: DeckViewMode, above = false) =>
     }
     return view.slice(at)
   }
-  const bar = view.slice(view.indexOf('<header className="deck-bar">'), view.indexOf('</header>'))
+  const bar = view.slice(view.indexOf('<header className="deck-bar"'), view.indexOf('</header>'))
   const strip = bar.indexOf("aria-label=\"Slides\"")
   const switchAt = bar.indexOf('<DeckViewSwitch')
   const count = bar.indexOf('className="deck-count"')
@@ -171,7 +171,7 @@ const draw = (view: DeckViewMode, above = false) =>
   const decksDir = new URL('../../../../src/decks/', import.meta.url)
   const pageSources = readdirSync(decksDir, { recursive: true }).map(String).filter(name => /\.tsx?$/.test(name) && !/\.test\./.test(name) && /^page\/|deckPublish|deckPages/.test(name))
   assert.ok(pageSources.includes('deckPublish.ts') && pageSources.includes('deckPages.ts'), 'the page code is read')
-  for (const name of pageSources) assert.ok(!/DeckFolds|OPENING_FOLD|deckFold/.test(readFileSync(new URL(name, decksDir), 'utf8')), `${name} keeps its own default`)
+  for (const name of pageSources) assert.ok(!/\b(?:DeckFolds|OPENING_FOLD|deckFold)\b/.test(readFileSync(new URL(name, decksDir), 'utf8')), `${name} keeps its own default`)
   assert.ok(!/sendToExtension\([^)]*fold/i.test(view), 'never sent to the host')
   const insert = block('insert: (at, kind) => {')
   assert.ok(/if \(slideShownRef\.current\) \{[^}]*setFocusTitleOf/.test(insert) && insert.includes('setTextSelection(pos)'), 'the caret goes to the handout')
@@ -192,7 +192,7 @@ const draw = (view: DeckViewMode, above = false) =>
   assert.ok(view.includes("${slideAlone ? ' is-alone' : ''}") && view.includes('above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 }'), 'its group the slide\'s width')
   // A row under the slide scrolls with the stage; it never sizes the slide (review: it shrank as the row wrapped).
   assert.ok(view.includes('if (!above || slideAlone) return'), 'rows measured only above, beside the handout')
-  assert.ok(css.includes('.deck-stage.is-alone { align-items: center; }') && css.includes('.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }'), 'centred both ways')
+  assert.ok(css.includes('.deck-stage.is-alone { align-items: center; }') && css.includes('.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding-bottom: 16px; }'), 'centred both ways')
 }
 
 console.log('DeckFolds: passed')

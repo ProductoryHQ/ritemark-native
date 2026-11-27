@@ -7,11 +7,13 @@
  * from any other deck, is a copy carrying `from: <path>#<id> @<stamp>`. The UI and the AI's tools call the same
  * operations here (README decision 9, dual use).
  */
+import { insideDeckFolder, listedDeckFolders } from './deckFolderListing';
 import { deckVersionOf, exerciseTagOf, frontMatterField, isBlockSlide, isReadableDeckVersion, newId, parseFrom, slideDataOf, withPartHeading, withTextHandoutMark, withWrittenHandout, writeFrom, writeSlideData, type SlideData } from './deckFormat';
 import {
-  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, partText, rebaseSlide, replaceSlidePart, slideStamp, slideStamps,
+  appendPart, folderOf, insertPartsText, newTopicText, normalizePath, pairedStamp, partText, replaceSlidePart, slideStamp, slideStamps, stampBaselines,
   slidesOfText, type DeckSlideText,
 } from './deckLibraryFormat';
+import { transferSlide, type DeckPictureFiles } from './deckPictureCopy';
 import { BUILT_IN_THEME_PATH, BUILT_IN_THEME_TEXT } from './deckTheme';
 import { convertedPart, saysBlockDeck, withDeckVersion } from './blocks/convertDeck';
 import { agendaOf } from './blocks/slideRenderer';
@@ -22,6 +24,7 @@ export const LIBRARY_FOLDER = 'Slide library';
 
 /** The project's deck files, by project-relative path (`/` separated). */
 export interface DeckFiles {
+  pictures?: DeckPictureFiles;
   /** Every deck in the project (`.rtms`, and older `.deck.md`). */
   list(): Promise<Array<{ path: string; modified: number }>>;
   /** A file's text (an open document's, unsaved changes included), or null. */
@@ -143,6 +146,15 @@ function sourceOf(from: string | undefined): { path: string; id: string; stamp: 
   return source;
 }
 
+function withCopyStamp(part: CopiedPart, folder: string, stamp: string): CopiedPart {
+  const data = slideDataOf(part.kind, part.body);
+  const source = parseFrom(data.from);
+  if (!source) return part;
+  const copy = slideStamp(part.kind, data, part.handout, folder);
+  if (stamp === copy) return part;
+  return { ...part, body: writeSlideData(part.kind, part.body, { ...data, from: writeFrom({ ...source, stamp: pairedStamp(stamp, copy) }) }) };
+}
+
 /** What search looks through on a slide: its words and its handout, lower case (the place's search and the AI's). */
 export const slideSearchText = (slide: DeckSlideText) => [
   slide.data.title, slide.data.subtitle, slide.kind === 'exercise' ? exerciseTagOf(slide.data) : undefined, ...(slide.data.items ?? []).flatMap(item => [item.heading, item.text]),
@@ -224,7 +236,10 @@ export class DeckLibrary {
     const query = (options.query ?? '').trim().toLowerCase();
     const terms = searchTerms(query);
     const found: DeckSummary[] = [];
-    for (const file of await this.files.list()) {
+    const files = await this.files.list();
+    const owned = listedDeckFolders(files.map(file => file.path));
+    for (const file of files) {
+      if (!isDeckPath(file.path) || insideDeckFolder(file.path, owned)) continue;
       const topic = isTopicPath(file.path);
       if (where === 'library' && !topic) continue;
       if (where === 'other' && topic) continue;
@@ -283,17 +298,23 @@ export class DeckLibrary {
     const used = new Set(taken);
     const sourceFolder = folderOf(sourcePath);
     const targetFolder = folderOf(targetPath);
-    return ids.map(id => {
+    const parts: CopiedPart[] = [];
+    const selected = ids.map(id => {
       const slide = slides.find(entry => entry.data.id === id);
       if (!slide) throw new Error(`${deckName(sourcePath)} has no slide ${id}.`);
+      return { id, slide };
+    });
+    for (const { id, slide } of selected) {
       const stamp = slideStamp(slide.kind, slide.data, slide.handout, sourceFolder);
       const copyId = newId(used);
       used.add(copyId);
       const data: SlideData = { ...slide.data, id: copyId, from: writeFrom({ path: sourcePath, id, stamp }), kept: undefined };
-      const rebased = rebaseSlide(writeSlideData(slide.kind, slide.body, data), slide.handout, sourceFolder, targetFolder, slide.kind);
+      const rebased = await transferSlide(writeSlideData(slide.kind, slide.body, data), slide.handout, slide.kind, sourcePath, targetPath, this.files.pictures);
       // Sprint 161 (PR 2): a copy goes in as a block slide; the words its old layout hid are a comment in its handout.
-      return convertedPart({ kind: slide.kind, body: rebased.body, handout: rebased.handout }, targetFolder);
-    });
+      const part = convertedPart({ kind: slide.kind, body: rebased.body, handout: rebased.handout }, targetFolder);
+      parts.push(withCopyStamp(part, targetFolder, stamp));
+    }
+    return parts;
   }
 
   /**
@@ -342,6 +363,7 @@ export class DeckLibrary {
       // A from: line written before 16 November counted the part's heading: either stamp is the slide as it was.
       const copyStamps = slideStamps(copy.kind, slideDataOf(copy.kind, copy.body), copy.handout, folder);
       const sourceStamps = slide ? slideStamps(slide.kind, slide.data, slide.handout, folderOf(source.path)) : null;
+      const { sourceStamp, copyStamp } = stampBaselines(source.stamp);
       states.push({
         id: copy.id,
         library: isTopicPath(source.path),
@@ -349,8 +371,8 @@ export class DeckLibrary {
         sourcePath: source.path,
         // A copy that reads as its source, heading aside, is neither changed nor behind (Codex on #750: a heading-only
         // edit under a from: stamp that counted the old heading matched neither stamp).
-        changed: source.stamp !== null && !copyStamps.includes(source.stamp) && copyStamps[0] !== sourceStamps?.[0],
-        newer: sourceStamps !== null && source.stamp !== null && !sourceStamps.includes(source.stamp) && sourceStamps[0] !== copyStamps[0],
+        changed: copyStamp !== null && !copyStamps.includes(copyStamp) && copyStamps[0] !== sourceStamps?.[0],
+        newer: sourceStamps !== null && sourceStamp !== null && !sourceStamps.includes(sourceStamp) && sourceStamps[0] !== copyStamps[0],
         missing: !slide,
       });
     }
@@ -370,12 +392,13 @@ export class DeckLibrary {
     const previous = await this.files.read(source.path);
     if (previous === null) throw new Error(`${deckName(source.path)} is no longer there.`);
     writableDeckText(source.path, previous);
-    const { body, handout } = this.asSourcePart(copy, source.id, deckPath, source.path);
+    const { body, handout } = await this.asSourcePart(copy, source.id, deckPath, source.path);
     const text = replaceSlidePart(asBlockDeck(previous, [copy.kind]), source.id, partText(copy.kind, body, handout));
     if (text === null) throw new Error(`${deckName(source.path)} no longer has that slide.`);
     await this.files.write(source.path, text);
     const stamp = slideStamp(copy.kind, slideDataOf(copy.kind, body), handout, folderOf(source.path));
-    return { from: writeFrom({ path: source.path, id: source.id, stamp }), path: source.path, previous, written: text };
+    const copyStamp = slideStamp(copy.kind, data, copy.handout, folderOf(deckPath));
+    return { from: writeFrom({ ...source, stamp: pairedStamp(stamp, copyStamp) }), path: source.path, previous, written: text };
   }
 
   /** Use it: the source's slide and handout as a part for the copy (its id kept), with a fresh `from:` stamp. */
@@ -388,9 +411,10 @@ export class DeckLibrary {
     if (!slide) throw new Error(`${deckName(source.path)} no longer has that slide.`);
     const stamp = slideStamp(slide.kind, slide.data, slide.handout, folderOf(source.path));
     const next: SlideData = { ...slide.data, id: data.id, from: writeFrom({ path: source.path, id: source.id, stamp }), kept: undefined, skip: data.skip };
-    const rebased = rebaseSlide(writeSlideData(slide.kind, slide.body, next), slide.handout, folderOf(source.path), folderOf(deckPath), slide.kind);
+    const rebased = await transferSlide(writeSlideData(slide.kind, slide.body, next), slide.handout, slide.kind, source.path, deckPath, this.files.pictures);
     // As a block slide (Sprint 161, PR 2): the deck view takes it in one step, which converts the deck too.
-    return convertedPart({ kind: slide.kind, body: rebased.body, handout: rebased.handout }, folderOf(deckPath));
+    const part = convertedPart({ kind: slide.kind, body: rebased.body, handout: rebased.handout }, folderOf(deckPath));
+    return withCopyStamp(part, folderOf(deckPath), stamp);
   }
 
   /**
@@ -406,13 +430,14 @@ export class DeckLibrary {
     if (previous !== null) writableDeckText(path, previous);
     const taken = previous ? slidesOfText(previous).map(slide => slide.data.id).filter((id): id is string => !!id) : [];
     const id = newId(taken);
-    const { body, handout } = this.asSourcePart(copy, id, deckPath, path);
+    const { body, handout } = await this.asSourcePart(copy, id, deckPath, path);
     const part = partText(copy.kind, body, handout);
     await this.builtInTheme();
     const written = previous === null ? newTopicText(BUILT_IN_THEME_PATH, part, isBlockSlide(copy.kind)) : appendPart(asBlockDeck(previous, [copy.kind]), part);
     await this.files.write(path, written, { create: previous === null });
     const stamp = slideStamp(copy.kind, slideDataOf(copy.kind, body), handout, folderOf(path));
-    return { from: writeFrom({ path, id, stamp }), path, previous, written };
+    const copyStamp = slideStamp(copy.kind, slideDataOf(copy.kind, copy.body), copy.handout, folderOf(deckPath));
+    return { from: writeFrom({ path, id, stamp: pairedStamp(stamp, copyStamp) }), path, previous, written };
   }
 
   /**
@@ -534,7 +559,7 @@ export class DeckLibrary {
     if (written !== null && written !== text) await this.files.write(deckPath, written);
   }
 
-  /** Undo a library write: the file's text before it, when nothing changed it since. */
+  /** Restore the previous text when it still matches the write. Create-only pictures stay available. */
   async undoWrite(write: LibraryWrite): Promise<boolean> {
     const now = await this.files.read(write.path);
     if (now !== write.written || write.previous === null) return false;
@@ -543,9 +568,9 @@ export class DeckLibrary {
   }
 
   /** A copy's slide as the library keeps it: the given id, no `from:`, `kept` or `skip`, paths in its folder. */
-  private asSourcePart(copy: CopiedPart, id: string, deckPath: string, sourcePath: string): { body: string; handout: string } {
+  private async asSourcePart(copy: CopiedPart, id: string, deckPath: string, sourcePath: string): Promise<{ body: string; handout: string }> {
     const data = slideDataOf(copy.kind, copy.body);
     const body = writeSlideData(copy.kind, copy.body, { ...data, id, from: undefined, kept: undefined, skip: undefined });
-    return rebaseSlide(body, copy.handout, folderOf(deckPath), folderOf(sourcePath), copy.kind);
+    return transferSlide(body, copy.handout, copy.kind, deckPath, sourcePath, this.files.pictures);
   }
 }

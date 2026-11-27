@@ -10,7 +10,9 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { PublishFailureFeedbackLink } from './PublishFailureFeedbackLink'
+import { Fragment as ReactFragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
+import { updateDeckFailures } from './deckFailures'
 import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
 import { clockMinutes, explicitMinutes, readTimetable, SESSION_LENGTH, SESSION_START } from '../../../../src/decks/timetable'
 import { slideCountWithMinutes } from '../../../../src/decks/timetableDisplay'
@@ -21,6 +23,7 @@ import type { Editor as TipTapEditor } from '@tiptap/react'
 import { Editor, TEXT_COLUMN_WIDTH } from '../Editor'
 import { Button, roomChanged } from '../ui/button'
 import { Icon } from '../ui/Icon'
+import { SlideIconGlyph } from './slide/SlideIconGlyph'
 import { Tooltip } from '../ui/tooltip'
 import { SyncActionButton } from '../header'
 import { documentBarStatus, type DocumentSyncAction } from '../header/DocumentSyncAction'
@@ -29,7 +32,7 @@ import type { DocumentSyncState } from '../../../../src/editorSync/protocol'
 import type { EditorSelection } from '../../types/editor'
 import type { DocumentProperties } from '../properties'
 import { DeckOpenInContext } from './slide/codeToolsClick'
-import { fitNotice } from './noticeCut'
+import { cutName, fitNotice, hideClippedNotice } from './noticeCut'
 import { AgendaContext, useAgendaDrawing } from './slide/agendaContext'
 import { DeckIconsContext } from './slide/IconGrid'
 import { deckIconsInUse } from './slide/iconSearch'
@@ -55,7 +58,7 @@ import { TransitionPreview, previewTarget, type TransitionPreviewRequest } from 
 import { transitionOf, transitionValue } from './present/wallMotion'
 import { ThemeChangeSheet, themeChangeFrom } from './theme/ThemeChangeSheet'
 import type { ThemeChangeView } from '../../../../src/decks/themeChange'
-import { deckNameOf } from '../../../../src/decks/deckFileName'
+import { deckNameOf, savedDeckPictureFolder } from '../../../../src/decks/deckFileName'
 import { applicableChanges, propertyChangesOf, propertyTransaction, propertyValue, sameValue, withPropertyChanges } from './theme/themePick'
 import { Popover, PopoverAnchor, PopoverContent } from '../ui/popover'
 import { SlideMenuItems, SlideStrip, libraryBadge, type StripActions, type StripMark } from './SlideStrip'
@@ -84,7 +87,8 @@ import { PresentButton, usePresentKeys, type PresentFrom } from './present/Prese
 import { DeckPublish, type PauseTarget } from './DeckPublish'
 import { computeResults } from '../../extensions/SearchExtension'
 import { DeckViewSwitch, deckViewState, foldOfView, foldedSides, foldForFind, keepDeckViewState, OPENING_FOLD, type DeckFold, type DeckViewMode } from './DeckFolds'
-import { STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { ABOVE_PANE_MIN, STAGE_MARGIN, aboveLineFor, clampAboveRatio, fullSlideWidthFor, initialAboveRatio, orientationFor, rowsUnder, slideSettingsPlacement, slideWidthWithSettings, slideWidthFor, type DeckOrientation } from './deckLayout'
+import { isStageScrollbarPress, stageSettingsAnchor } from './slideSettingsGeometry'
 import { NO_GESTURE, slideKeyOf, slideKeyTarget, stageScrollAfter, stageWheelOf, wheelPixels, wheelRoute, wheelTaker, type KeyTargetElement } from './slideNav'
 import { slideOrderKeyOf } from './stripKeys'
 import { isMac } from '../../hooks/usePlatform'
@@ -98,6 +102,8 @@ const STRIP_WIDTH = 132
 const TIMETABLE_STRIP_WIDTH = 300
 /** The Add to library sheet beside the slide: its width (the Settings material), and how long a notice stays in the bar. */
 const SETTINGS_WIDTH = 316
+const SETTINGS_GAP = 8
+const SETTINGS_COLLISION_PADDING = 8
 const NOTICE_MS = 8000
 /** Sprint 161 (PR 3, frame 24): the bar's line while the slide on the stage is full. */
 export const SLIDE_FULL = 'This slide is full: its words are at their smallest size.'
@@ -146,6 +152,7 @@ interface PictureDrop {
   before: string | null | undefined
   pictures: Array<{ id: string; title: string }>
   paths: Map<string, string | null>
+  failure?: string
 }
 
 /**
@@ -181,17 +188,29 @@ interface Notice {
  */
 function NoticeWords({ text, name, after }: { text: string; name: string; after: ReactNode }) {
   const boxRef = useRef<HTMLSpanElement>(null)
+  const lineRef = useRef<HTMLSpanElement>(null)
   const shownRef = useRef<HTMLSpanElement>(null)
   const afterRef = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const box = boxRef.current
+    const line = lineRef.current
     const shown = shownRef.current
-    if (!box || !shown) return
+    if (!box || !line || !shown) return
     const prefix = text.slice(0, text.length - name.length)
+    const measure = document.createElement('canvas').getContext('2d')
+    const shortestCut = prefix + cutName(name, 2)
     let live = true
     const fit = () => {
       if (!live) return // a fonts' answer that comes after this notice was replaced
-      const room = box.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      const room = line.clientWidth - (afterRef.current?.offsetWidth ?? 0) - NOTICE_ACTION_GAP
+      if (measure) {
+        const hidden = hideClippedNotice(text, room, shown.dataset.noteHidden, noticeMeasure(shown, measure), shortestCut)
+        if (hidden) {
+          shown.dataset.noteHidden = text
+          return
+        }
+        delete shown.dataset.noteHidden
+      }
       shown.textContent = fitNotice(prefix, name, words => {
         shown.textContent = words
         return shown.scrollWidth <= room
@@ -208,8 +227,8 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
   }, [text, name])
   return (
     <span ref={boxRef} className="deck-notice-cut">
-      <span className="deck-notice-sizer" aria-hidden="true">{text}<span className="deck-notice-room" /></span>
-      <span className="deck-notice-line">
+      <span className="deck-notice-sizer" aria-hidden="true"><span>{text}</span><span className="deck-notice-room" /></span>
+      <span ref={lineRef} className="deck-notice-line">
         <Tooltip label={text} className="deck-notice-words">
           <span ref={shownRef} className="deck-notice-shown" aria-hidden="true" />
         </Tooltip>
@@ -223,15 +242,59 @@ function NoticeWords({ text, name, after }: { text: string; name: string; after:
 /** The gap between a file-name notice's words and its action (decks.css `.deck-notice-line`). */
 const NOTICE_ACTION_GAP = 8
 
+function noticeMeasure(words: HTMLElement, measure: CanvasRenderingContext2D) {
+  const style = getComputedStyle(words)
+  measure.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  return (text: string) => measure.measureText(text).width
+}
+
+/** Check the bar with full controls and room reserved for its warning icons and actions. */
+function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRenderingContext2D | null) {
+  notice.setAttribute('data-measure-words', '')
+  bar.removeAttribute('data-theme-compact')
+  notice.setAttribute('data-measure-min', '')
+  const minimum = notice.getBoundingClientRect().width
+  notice.removeAttribute('data-measure-min')
+  notice.style.setProperty('--deck-notice-min', `${minimum}px`)
+
+  roomChanged() // Ask Publish and Present to measure again with the bar's controls at full width.
+  const last = bar.lastElementChild
+  const right = bar.getBoundingClientRect().right - parseFloat(getComputedStyle(bar).paddingRight)
+  if (last && last.getBoundingClientRect().right > right + 0.01) {
+    bar.setAttribute('data-theme-compact', '')
+    roomChanged()
+  }
+
+  const feedback = notice.querySelector<HTMLElement>('.deck-publish-feedback')
+  if (feedback) {
+    feedback.removeAttribute('data-link-clipped')
+    const failureWords = notice.querySelectorAll<HTMLElement>('.deck-failure-words > .deck-notice-text')
+    // Give the failure reason back the link's room whenever the two cannot fit together.
+    feedback.toggleAttribute('data-link-clipped', Array.from(failureWords).some(words => words.scrollWidth > words.clientWidth))
+  }
+
+  // Measure with all words in flow so a collapsed note can return when there is room.
+  if (measure) {
+    for (const words of notice.querySelectorAll<HTMLElement>(':scope > .deck-notice-words > .deck-notice-text')) {
+      const text = words.textContent ?? ''
+      const room = words.getBoundingClientRect().width
+      const hidden = hideClippedNotice(text, room, words.dataset.noteHidden, noticeMeasure(words, measure))
+      if (hidden) words.dataset.noteHidden = text
+      else delete words.dataset.noteHidden
+    }
+  }
+  notice.removeAttribute('data-measure-words')
+}
+
 const NO_SLOTS: PartMenuSlot[] = []
 /** How far below the handout's top a marked join's line sits, at least, so it and its note are seen. */
 const JOIN_NOTE_ROOM = 12
 
-/** What the Slide settings popover is anchored to: a thumbnail, a part number's ⋯, or a point (the slide's right-click). */
+/** What the Slide settings popover is anchored to: a thumbnail, a part number’s ⋯, or the slide itself. */
 type SettingsAnchor = { getBoundingClientRect: () => DOMRect }
 
 /** Where a Slide settings… came from: what to anchor to, on which side, and where the focus goes back. */
-type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'left'; back: HTMLElement | null }
+type SettingsPlace = { anchor: SettingsAnchor; side: 'right' | 'stage'; back: HTMLElement | null; fromGear?: true }
 
 /**
  * A part number's ⋯ in the handout (experience 46, "Removing a slide from the handout"): the strip's own slide menu, its
@@ -386,12 +449,38 @@ export function DeckView({
   const [showHandoutInNarrowView, setShowHandoutInNarrowView] = useState(false)
   // Slide settings… (17 November): the slide whose popover is open (-1: the deck's look alone, a deck with no slides),
   // where it is anchored and on which side; and where the focus goes back when it closes (where the menu was opened).
-  const [settingsFor, setSettingsFor] = useState<{ index: number; id?: string; anchor: SettingsAnchor; side: 'right' | 'left' } | null>(null)
+  const [settingsFor, setSettingsFor] = useState<(Omit<SettingsPlace, 'back'> & { index: number; id?: string }) | null>(null)
+  const [settingsSlot, setSettingsSlot] = useState<HTMLDivElement | null>(null)
+  const [settingsBox, setSettingsBox] = useState<HTMLDivElement | null>(null)
+  const [settingsSize, setSettingsSize] = useState({ width: 0, height: 0 })
   const settingsAnchor = useRef<SettingsAnchor>({ getBoundingClientRect: () => new DOMRect() })
   if (settingsFor) settingsAnchor.current = settingsFor.anchor
   const settingsReturn = useRef<HTMLElement | null>(null)
   const [settingsAt, setSettingsAt] = useState<{ left: number; top: number } | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [failures, setFailures] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const failuresRef = useRef(failures)
+  const startCardGone = useRef(false)
+  const reportFailure = useCallback((operation: string, text: string) => {
+    if (operation === 'start-card' && startCardGone.current) return
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'failure', text })
+    if (next === failuresRef.current) return
+    failuresRef.current = next
+    setFailures(next)
+    setNotice(null)
+  }, [])
+  const clearFailure = useCallback((operation: string) => {
+    const next = updateDeckFailures(failuresRef.current, operation, { kind: 'success' })
+    failuresRef.current = next
+    setFailures(next)
+  }, [])
+  const hostNotice = useCallback((text: string, kind: unknown, operation: unknown) => {
+    if (typeof operation === 'string') {
+      if (kind === 'failure') { reportFailure(operation, text); return }
+      if (kind === 'success') clearFailure(operation)
+    }
+    if (text) setNotice({ text })
+  }, [reportFailure, clearFailure])
   // The Slide library (PR 4): each copy's source, by the slide's id; the copy just written to the library; and the
   // copies whose library write or read is on its way.
   const [sources, setSources] = useState<Record<string, CopySource>>({})
@@ -427,6 +516,8 @@ export function DeckView({
   // Beside or above (deckLayout.ts): decided from the room once it is measured, and again whenever it changes.
   const [orientation, setOrientation] = useState<DeckOrientation | null>(null)
   const [dragging, setDragging] = useState(false)
+  const barRef = useRef<HTMLElement>(null)
+  const barNoticeRef = useRef<HTMLSpanElement>(null)
   const deskRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
@@ -483,7 +574,10 @@ export function DeckView({
   }, [editor, onPropertiesChange])
 
   // Publish on the bar (Sprint 159 PR 4) says its one line here: why a page wasn't written, or that the link is copied.
-  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => setNotice({ text, action, name }), [])
+  const publishNotice = useCallback((text: string, action?: Notice['action'], name?: string) => {
+    if (name) clearFailure('save-pdf')
+    setNotice({ text, action, name })
+  }, [clearFailure])
 
   const handleEditorReady = useCallback((instance: TipTapEditor) => {
     setEditor(instance)
@@ -621,19 +715,29 @@ export function DeckView({
     if (!editor) return
     const off = onMessage(message => {
       if (message.type !== 'deck/start-card' || !message.state || typeof message.state !== 'object') return
-      setStartState(message.state as StartCardState)
+      const state = message.state as StartCardState
+      if (state.fresh === false) {
+        startCardGone.current = true
+        clearFailure('start-card')
+      }
+      setStartState(state)
       setStartBusy(false)
     })
     sendToExtension('deck/start-card')
     return off
-  }, [editor])
+  }, [editor, clearFailure])
+  const hideStart = useCallback(() => {
+    startCardGone.current = true
+    clearFailure('start-card')
+    setStartGone(true)
+    sendToExtension('deck/start-card-gone')
+  }, [clearFailure])
   // The card goes for good once the deck is started (a second slide, words in the handout), and the host forgets it.
   const started = count > 0 && deckStarted(count, handoutText)
   useEffect(() => {
     if (!startState?.fresh || startGone || !started) return
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [startState, startGone, started])
+    hideStart()
+  }, [startState, startGone, started, hideStart])
   // While it shows without an Ask row, the AI's sign-in is read again when the window comes back (the person may have
   // signed in meanwhile).
   const startShown = !!startRows
@@ -644,10 +748,6 @@ export function DeckView({
     window.addEventListener('focus', again)
     return () => window.removeEventListener('focus', again)
   }, [askAgain])
-  const hideStart = useCallback(() => {
-    setStartGone(true)
-    sendToExtension('deck/start-card-gone')
-  }, [])
   const startWith = useCallback((type: 'deck/start-draft' | 'deck/start-copy', fields: Record<string, unknown>) => {
     setStartBusy(true)
     sendToExtension(type, fields)
@@ -718,8 +818,7 @@ export function DeckView({
   const aboveLine = above && split ? aboveLineFor(deskHeight, aboveRatio) : 0
   const stageWidth = above ? (slideShown ? avail : 0) : stageWidthFor(avail, ratio, handoutShown, slideShown)
   const stageHeight = above && split ? aboveLine : deskHeight
-  // Above, the slide takes its pane's height less 32 and less whatever row is still under it (today the speaker notes'),
-  // measured from the stage as drawn, so the stage never overflows its pane. With no row under it, it's the pane less 32.
+  // Above, the stage reserves room for the gear and measures any rows under the slide before fitting it.
   const [aboveUnder, setAboveUnder] = useState(0)
   // Slide only gives the slide the whole room (the design; Jarmo, 17 November: "align slide to center... and fill the
   // space"): the largest 16:9 between the strip and the AI pane, centred both ways, never the side-by-side 900 cap. A
@@ -748,13 +847,51 @@ export function DeckView({
   // At most half the stage: a card taller than that (All decks… in a project of many decks) scrolls with the stage
   // instead, so the slide never shrinks to nothing and the card is never unmounted by its own size (review).
   const slideCardUnder = startUnderSlide ? Math.min(slideCardRoom, Math.max(0, Math.floor(stageHeight / 2))) : 0
-  const bigWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  const normalSlideWidth = slideAlone ? fullSlideWidthFor(stageWidth, stageHeight, slideCardUnder) : slideWidthFor(stageWidth, stageHeight, above, aboveUnder)
+  const stageSettingsOpen = settingsFor?.side === 'stage'
+  const gearSettingsOpen = settingsFor?.fromGear === true
+  useLayoutEffect(() => {
+    if (!stageSettingsOpen || gearSettingsOpen || !settingsBox) return
+    const measure = () => {
+      const { width, height } = settingsBox.getBoundingClientRect()
+      setSettingsSize(previous => previous.width === width && previous.height === height ? previous : { width, height })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(settingsBox)
+    return () => observer.disconnect()
+  }, [stageSettingsOpen, gearSettingsOpen, settingsBox])
+  // Decide using the normal slide width so reserving space below can't change the choice of side.
+  const normalSlideLeft = above || slideAlone ? (stageWidth - normalSlideWidth) / 2 : STAGE_MARGIN
+  const settingsPlacement = stageSettingsOpen && !gearSettingsOpen && settingsSize.height > 0
+    ? slideSettingsPlacement(stageWidth, stageHeight, normalSlideLeft, normalSlideWidth, settingsSize, SETTINGS_GAP, SETTINGS_COLLISION_PADDING)
+    : null
+  const settingsRoom = settingsPlacement?.room ?? 0
+  // In the stacked split, borrow space from the handout and keep the rest of the card in the stage's scroll flow.
+  const settingsStageHeight = above && split
+    ? stageHeight + Math.min(settingsRoom, Math.max(0, deskHeight - stageHeight - ABOVE_PANE_MIN))
+    : stageHeight
+  const fittedSlideWidth = fullSlideWidthFor(stageWidth, settingsStageHeight - settingsRoom, slideAlone ? slideCardUnder : aboveUnder)
+  const bigWidth = slideWidthWithSettings(normalSlideWidth, fittedSlideWidth, settingsRoom)
+  const settingsSide = settingsPlacement?.side
+  useLayoutEffect(() => {
+    const stage = stageRef.current
+    if (settingsSide !== 'bottom' || !settingsSlot || !settingsBox || !stage) return
+    const frame = requestAnimationFrame(() => {
+      // A tall card opens at its header. Otherwise reveal the whole slot with the smallest scroll.
+      settingsSlot.scrollIntoView({
+        block: settingsSlot.offsetHeight > stage.clientHeight ? 'start' : 'nearest',
+        inline: 'nearest',
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [settingsSide, settingsSlot, settingsBox])
   useLayoutEffect(() => {
     if (!above || slideAlone) return
     const group = stageRef.current?.querySelector<HTMLElement>('.deck-stage-group')
     const big = group?.querySelector<HTMLElement>('.deck-big')
     if (!group || !big) return
-    const under = rowsUnder(group.offsetHeight, big.offsetHeight)
+    const under = rowsUnder(group.offsetHeight - (settingsSlot?.offsetHeight ?? 0), big.offsetHeight)
     // Only a real change, so a row that wraps differently at the new width can't set the size swinging.
     if (Math.abs(under - aboveUnder) > 1) setAboveUnder(under)
   })
@@ -1064,9 +1201,11 @@ export function DeckView({
       const index = Math.max(0, Math.min(message.index, countRef.current - 1))
       requestAnimationFrame(() => pick(index))
     } else if (message.type === 'deck/present-failed' && typeof message.message === 'string') {
-      setNotice({ text: message.message })
+      reportFailure('present', message.message)
+    } else if (message.type === 'deck/present-started') {
+      clearFailure('present')
     }
-  }), [pick])
+  }), [pick, reportFailure, clearFailure])
   const startNumber = slides.find(entry => entry.data.skip !== true)?.index
 
   // The line between the slide and the handout is dragged to change the widths.
@@ -1158,9 +1297,11 @@ export function DeckView({
   }, [pick])
   useEffect(() => {
     const stage = stageRef.current
-    if (!stageWheel || !stage) return
+    // The open card below travels with the stage's native scroll.
+    if (!stageWheel || !stage || settingsRoom) return
     let gesture = NO_GESTURE
     const onWheel = (event: WheelEvent) => {
+      if ((event.target as Element | null)?.closest('.deck-settings')) return
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
       const delta = wheelPixels(event, stage.clientHeight)
       // A pane or a column that holds more than its room scrolls first, then the stage while it can (a short window; in
@@ -1182,7 +1323,7 @@ export function DeckView({
     }
     stage.addEventListener('wheel', onWheel, { passive: false })
     return () => stage.removeEventListener('wheel', onWheel)
-  }, [stageWheel, goTo])
+  }, [stageWheel, goTo, settingsRoom])
   useEffect(() => {
     if (!fullSlide) return
     const onKey = (event: KeyboardEvent) => {
@@ -1285,18 +1426,20 @@ export function DeckView({
 
   /**
    * Slide settings… from a slide's menu (17 November): the slide is made current (its part scrolled to, unless it is
-   * the current one already), then, once the menu has closed and handed its focus back, the popover opens beside where
-   * the menu came from.
+   * the current one already). Once the menu hands back focus, the popover opens beside the slide if visible, or
+   * beside the menu's anchor if the slide is folded away.
    */
-  const openSettings = useCallback((index: number, place: () => SettingsPlace | null) => {
+  const openSettings = useCallback((index: number, place: (stageSlide: HTMLElement | null) => SettingsPlace | null) => {
     if (index !== currentRef.current) pick(index)
     requestAnimationFrame(() => requestAnimationFrame(() => {
-      const where = place()
+      const stageSlide = stageRef.current?.querySelector<HTMLElement>('.deck-big') ?? null
+      const where = place(stageSlide)
       if (!where) return
       settingsReturn.current = where.back
       // The slide's id too, so a popover never shows or changes another slide that came to stand at its number.
       const id = editor ? slidesOf(editor.state.doc)[index]?.data.id : undefined
-      setSettingsFor({ index, id, anchor: where.anchor, side: where.side })
+      const { anchor, side, fromGear } = where
+      setSettingsFor({ index, id, anchor: stageSlide && !fromGear ? stageSettingsAnchor(stageRef) : anchor, side: stageSlide ? 'stage' : side, fromGear })
     }))
   }, [pick, editor])
   /** From a part number's ⋯: beside the number (on its right: the number is on the rail at the handout's left), the focus back to its ⋯. */
@@ -1305,13 +1448,22 @@ export function DeckView({
       ? { anchor: slot.element.parentElement?.querySelector<HTMLElement>('.deck-part-number') ?? slot.element, side: 'right', back: slot.element.querySelector('button') }
       : null
   )), [openSettings])
-  /** From the slide's own right-click menu: at the point it was opened, the focus back to the slide's words. */
-  const stageSettings = useCallback((at: { x: number; y: number }) => openSettings(currentRef.current, () => ({
-    anchor: { getBoundingClientRect: () => new DOMRect(at.x, at.y, 0, 0) },
-    side: 'right',
+  /** From the slide's own right-click menu: beside the slide, with focus returned to its words. */
+  const stageSettings = useCallback(() => openSettings(currentRef.current, anchor => {
+    if (!anchor) return null
     // A slide of a kind this build doesn't know has no editor of its own: the strip takes the focus then.
-    back: stageRef.current?.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current,
-  })), [openSettings])
+    return { anchor, side: 'stage', back: anchor.querySelector<HTMLElement>('.ProseMirror') ?? stripRef.current }
+  }), [openSettings])
+
+  const toggleGearSettings = (gear: HTMLButtonElement) => {
+    if (gearSettingsOpen) {
+      setSettingsFor(null)
+      return
+    }
+    openSettings(currentRef.current, () => gear.isConnected
+      ? { anchor: gear, side: 'stage', back: gear, fromGear: true }
+      : null)
+  }
 
   // ---- the strip's operations: each one transaction, so Undo takes it back whole
   const dispatch = useCallback((tr: Transaction | null) => {
@@ -1333,11 +1485,12 @@ export function DeckView({
 
   // Item 8: the pictures dropped on the strip, by the new slide id each was saved for, until all of a drop's are saved.
   const pictureDrops = useRef(new Map<string, PictureDrop>())
-  const pictureSaved = useCallback((slideId: string, path: string | null): boolean => {
+  const pictureSaved = useCallback((slideId: string, path: string | null, failure?: string): boolean => {
     const drop = pictureDrops.current.get(slideId)
     if (!drop) return false
     pictureDrops.current.delete(slideId)
     drop.paths.set(slideId, path)
+    drop.failure ??= failure
     if (drop.paths.size < drop.pictures.length) return true
     const saved: SavedPicture[] = drop.pictures.flatMap(picture => {
       const at = drop.paths.get(picture.id)
@@ -1354,10 +1507,14 @@ export function DeckView({
       inserted = dispatchStepRef.current(insertPictureSlides(target.state, at, saved, textHandoutRef.current))
       if (inserted) requestAnimationFrame(() => pickRef.current(at))
     }
-    if (saved.length && !inserted) setNotice({ text: 'The pictures are saved in images/, but their slides could not be added.' })
-    else if (failed) setNotice({ text: failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.` })
+    if (saved.length && !inserted) {
+      const folder = savedDeckPictureFolder(saved[0].path) ?? "the deck's folder"
+      reportFailure('drop-pictures', `The pictures are saved in ${folder}, but their slides couldn't be added.`)
+    } else if (!saved.length && drop.failure) reportFailure('drop-pictures', drop.failure)
+    else if (failed) reportFailure('drop-pictures', failed === 1 ? 'A picture could not be saved beside the deck.' : `${failed} pictures could not be saved beside the deck.`)
+    else clearFailure('drop-pictures')
     return true
-  }, [])
+  }, [reportFailure, clearFailure])
 
   /** Part `from` to stand before part `to`, its slide then current: a drag's drop and Cmd+↑ / Cmd+↓ alike. */
   const moveTo = useCallback((from: number, to: number) => {
@@ -1456,9 +1613,13 @@ export function DeckView({
       // An Agenda's picture lists the deck's sections, as the strip draws it, without the editor's hint
       const agenda = { entries: agendaRef.current.entries, hint: false }
       void copySlidePicture({ kind: entry.kind, data: entry.data, theme: look.theme, borderless: look.borderless, assets: look.assets, missing: look.missing, agenda, openIn })
-        .then(copied => setNotice({ text: copied ? copiedNote(index + 1) : COPY_FAILED_NOTE }))
+        .then(copied => {
+          if (!copied) { reportFailure('copy-picture', COPY_FAILED_NOTE); return }
+          clearFailure('copy-picture')
+          setNotice({ text: copiedNote(index + 1) })
+        })
     },
-    // Item 8: each picture saved in `images/` for the slide id it will have; the slides go in once all are saved.
+    // Item 8: each picture saved in the deck's folder for the slide id it will have; the slides go in once all are saved.
     dropPictures: (at, files) => {
       if (!editor || files.length === 0) return
       // Never an id another drop still waits to use.
@@ -1475,7 +1636,7 @@ export function DeckView({
         )
       })
     },
-  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo, pictureSaved])
+  }), [editor, dispatch, dispatchStep, pick, idOf, openSettings, moveTo, pictureSaved, reportFailure, clearFailure])
 
   // Cmd+D, Cmd+↑ and Cmd+↓ (Ctrl on Windows) with a slide chosen on the stage: the focus on the stage outside its words,
   // or on nothing (17 November). The strip takes the same keys itself (stripKeys.ts); words keep their editor's keys.
@@ -1532,14 +1693,30 @@ export function DeckView({
     return () => window.clearTimeout(timer)
   }, [flash])
 
-  // Sprint 170: a notice that comes or goes changes the bar's room: Publish and Present, folded to their icons for a
-  // long one, show their words again once it has gone (ui/button.tsx, `roomChanged`).
-  useLayoutEffect(() => { roomChanged() }, [notice])
+  useLayoutEffect(() => {
+    const bar = barRef.current
+    const notice = barNoticeRef.current
+    if (!bar || !notice) return
+    const measure = document.createElement('canvas').getContext('2d')
+    const fit = () => fitDeckBar(bar, notice, measure)
+    fit()
+    const resize = new ResizeObserver(fit)
+    resize.observe(bar)
+    // Controls can gain or lose room at the same width (for example, when Publish becomes a split button).
+    const content = new MutationObserver(fit)
+    content.observe(bar, { childList: true, characterData: true, subtree: true })
+    document.fonts?.addEventListener('loadingdone', fit)
+    return () => {
+      resize.disconnect()
+      content.disconnect()
+      document.fonts?.removeEventListener('loadingdone', fit)
+    }
+  }, [])
 
-  // A notice in the bar fades after a while.
+  // Only the passing notice expires. Failures live separately until the corresponding action succeeds.
   useEffect(() => {
     if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), NOTICE_MS)
+    const timer = window.setTimeout(() => setNotice(current => current === notice ? null : current), NOTICE_MS)
     return () => window.clearTimeout(timer)
   }, [notice])
 
@@ -1550,11 +1727,11 @@ export function DeckView({
   const shownSlideId = slides[shown]?.data.id
   useEffect(() => {
     setSettingsFor(open => {
-      if (!open) return open
+      if (!open || (open.fromGear && !slideShown)) return null
       return open.index === shown && open.index < count && (open.id === undefined || open.id === shownSlideId) ? open : null
     })
-  }, [shown, shownSlideId, count])
-  // A hidden slide keeps its settings (the Experience lead): hiding the slide hides the stage, not the slide.
+  }, [shown, shownSlideId, count, slideShown])
+  // Settings opened from a menu stay open when the stage is folded.
   // The Add to library sheet belongs to its slide: another slide closes it.
   useEffect(() => { setAddSheet(sheet => (sheet && sheet.number - 1 !== shown ? null : sheet)) }, [shown])
   // The new slide's stage takes the caret when it mounts; the request is spent once that slide is the current one. A
@@ -1660,13 +1837,15 @@ export function DeckView({
   useEffect(() => onMessage(message => {
     // A drop's pictures first, whatever this editor's state: the drop finishes (and says so) against the editor of now.
     if ((message.type === 'deck/image-saved' || message.type === 'deck/image-failed') && typeof message.slideId === 'string'
-      && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null)) return
+      && pictureSaved(message.slideId, message.type === 'deck/image-saved' && typeof message.path === 'string' ? message.path : null,
+        message.type === 'deck/image-failed' && typeof message.message === 'string' ? message.message : undefined)) return
     if (!editor || editor.isDestroyed) return
     if (message.type === 'deck/image-failed') {
-      setNotice({ text: typeof message.message === 'string' ? message.message : 'The picture could not be saved.' })
+      reportFailure('save-image', typeof message.message === 'string' ? message.message : 'The picture could not be saved.')
       return
     }
     if (message.type !== 'deck/image-saved' || typeof message.slideId !== 'string' || typeof message.path !== 'string') return
+    clearFailure('save-image')
     if (caretPictureFor.current === message.slideId) {
       caretPictureFor.current = null
       if (stageSlideId.current === message.slideId && typeof message.url === 'string') {
@@ -1686,7 +1865,7 @@ export function DeckView({
     }
     const kind = placed || entry.kind === 'picture' ? undefined : 'picture'
     dispatch(updateSlide(editor.state, index, kind ? { ...convertKind(entry.data, 'picture'), image: message.path } : { ...entry.data, image: message.path }, kind))
-  }), [editor, dispatch, pictureSaved])
+  }), [editor, dispatch, pictureSaved, reportFailure, clearFailure])
 
   // ---- the Slide library (PR 4)
 
@@ -1758,8 +1937,8 @@ export function DeckView({
   useEffect(() => onMessage(message => {
     if (message.type === 'deck/select-title') setSelectTitle(true)
     // The start card's line: "This deck is now a copy of <name>.", or why it couldn't be
-    else if (message.type === 'deck/notice' && typeof message.text === 'string') setNotice({ text: message.text })
-  }), [])
+    else if (message.type === 'deck/notice' && typeof message.text === 'string') hostNotice(message.text, message.kind, message.operation)
+  }), [hostNotice])
   useEffect(() => {
     if (!selectTitle || slides.length === 0) return
     setSelectTitle(false)
@@ -1838,6 +2017,7 @@ export function DeckView({
     if (!editor || editor.isDestroyed) return
     switch (message.type) {
       case 'deck/source-states': {
+        clearFailure('deck/source-states')
         if (!Array.isArray(message.states)) return
         const next: Record<string, CopySource> = {}
         for (const state of message.states as CopySource[]) if (state && typeof state.id === 'string') next[state.id] = state
@@ -1845,6 +2025,7 @@ export function DeckView({
         return
       }
       case 'deck/library-undone': {
+        clearFailure('deck/undo-library')
         const back = typeof message.token === 'string' ? undoneFrom.current.get(message.token) : undefined
         if (!back) return
         undoneFrom.current.delete(message.token as string)
@@ -1853,15 +2034,19 @@ export function DeckView({
         return
       }
       case 'deck/library-topics': {
+        clearFailure('deck/library-topics')
         if (Array.isArray(message.topics)) setTopics((message.topics as LibraryTopic[]).filter(topic => topic && typeof topic.path === 'string' && typeof topic.name === 'string'))
         return
       }
       case 'deck/library-failed': {
         done(typeof message.id === 'string' ? message.id : null)
-        setNotice({ text: typeof message.message === 'string' ? message.message : 'The Slide library could not do that.' })
+        const text = typeof message.message === 'string' ? message.message : 'The Slide library could not do that.'
+        if (typeof message.operation === 'string') reportFailure(message.operation, text)
+        else setNotice({ text })
         return
       }
       case 'deck/library-written': {
+        clearFailure(message.verb === 'added' ? 'deck/add-to-library' : 'deck/update-library')
         const id = typeof message.id === 'string' ? message.id : null
         done(id)
         const entry = id ? slideById(id) : null
@@ -1905,9 +2090,10 @@ export function DeckView({
           content = Fragment.fromArray(nodes)
         }
         if (!previous || !content || !dispatch(replacePart(editor.state, entry.index, content))) {
-          setNotice({ text: "The library's version could not be put in." })
+          reportFailure('deck/use-library', "The library's version could not be put in.")
           return
         }
+        clearFailure('deck/use-library')
         const hadChange = !!sources[id]?.changed
         // Undo is always offered: words typed while the library was being read are in `previous` too.
         setNotice({
@@ -1946,10 +2132,11 @@ export function DeckView({
         })
         const content = partsFragment(editor, fresh.map(part => ({ kind: part.kind, body: part.body, handout: part.handout })), imageMappings)
         if (!content || !dispatch(restoreSlide(editor.state, at, content))) {
-          setNotice({ text: 'The slides could not be put in.' })
+          reportFailure('insert-slides', 'The slides could not be put in.')
           answer(false)
           return
         }
+        clearFailure('insert-slides')
         answer(true)
         requestAnimationFrame(() => pick(at))
         return
@@ -1963,7 +2150,7 @@ export function DeckView({
         return
       }
     }
-  }), [editor, dispatch, done, slideById, sources, imageMappings, pick])
+  }), [editor, dispatch, done, slideById, sources, imageMappings, pick, reportFailure, clearFailure])
 
   const status = documentBarStatus(syncState, syncAction)
 
@@ -1977,7 +2164,7 @@ export function DeckView({
       const changes = propertyChangesOf(transaction)
       if (changes.length === 0) return
       const { apply, stale } = applicableChanges(propertiesRef.current, changes)
-      if (stale.length > 0) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
+      if (stale.length) setNotice({ text: "The deck's theme or look was changed since, so it is left as it is now." })
       if (apply.length === 0) return
       const next = withPropertyChanges(propertiesRef.current, apply)
       propertiesRef.current = next
@@ -2071,6 +2258,7 @@ export function DeckView({
   const needCaret = useCallback(() => setNotice({ text: 'Click on the slide where it should split, then Split at the cursor.' }), [])
   // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is current).
   // Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
+  const publishFailure = failures.get('publish')
   const fullLine = (
     <>
       <Tooltip label={SLIDE_FULL} className="deck-notice-words">
@@ -2089,7 +2277,7 @@ export function DeckView({
     <DeckIconsContext.Provider value={iconsInUse}>
     <DeckOpenInContext.Provider value={openIn}>
     <div className="deck-view h-screen bg-surface flex flex-col">
-      <header className="deck-bar">
+      <header className="deck-bar" ref={barRef}>
         <Tooltip label={stripShown ? 'Hide the slides' : 'Show the slides'}>
           <Button
             variant="toolbar"
@@ -2112,7 +2300,22 @@ export function DeckView({
               onCommit={time => commitMinutes(shown, time)} />
           ) : slideCountWithMinutes(countLabel, shownTiming)}
         </span>
-        <span className="deck-notice" role="status" aria-live="polite">
+        <span className="deck-notice" ref={barNoticeRef}>
+          <span className="sr-only" role="status" aria-live="polite">
+            {[...failures.values(), notice?.text, slideFull && slideShown && (!notice || notice.withFull) ? SLIDE_FULL : null].filter(Boolean).join(' ')}
+          </span>
+          {Array.from(failures).map(([operation, text]) => (
+            <ReactFragment key={operation}>
+              <Tooltip label={text} className="deck-notice-warning">
+                <span role="img" tabIndex={0} aria-label={text}>
+                  <Icon name="warning" size={16} tone="inherit" />
+                </span>
+              </Tooltip>
+              <span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">
+                <span className="deck-notice-text">{text}</span>
+              </span>
+            </ReactFragment>
+          ))}
           {notice ? (
             <>
               {notice.name && notice.text.endsWith(notice.name) ? (
@@ -2161,8 +2364,9 @@ export function DeckView({
               {notice.withFull && slideFull && slideShown ? fullLine : null}
             </>
           ) : slideFull && slideShown ? fullLine : null}
+          {publishFailure !== undefined && <PublishFailureFeedbackLink operation="publish" line={publishFailure} />}
         </span>
-        <span className="flex-1" />
+        <span className="deck-bar-spacer" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}
         {slideShown ? <DeckComments stops={commentStops} at={stopIndexOf(commentStops, commentAtKey)} current={shown} onGo={goToComment} /> : null}
         <span className="sr-only" role="status" aria-live="polite">{syncAction?.label ?? ''}</span>
@@ -2174,7 +2378,7 @@ export function DeckView({
           // #931: while "Saved as <name>" shows, the deck's own Saved steps aside, so the note has its room
           <span className={`deck-saved${status === 'saved' ? '' : ' invisible'}`}>Saved</span>
         )}
-        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} onShowPause={showPause} />
+        <DeckPublish slides={slides} theme={theme} borderless={borderless} assets={assets} text={currentText} view={viewShown} onNotice={publishNotice} onPageNotice={hostNotice} onShowPause={showPause} />
         <PresentButton slideNumber={count === 0 ? null : shown + 1} startNumber={startNumber === undefined ? null : startNumber + 1} onPresent={present} />
       </header>
 
@@ -2233,40 +2437,69 @@ export function DeckView({
           <div
             ref={stageRef}
             className={`deck-stage${borderless ? ' is-borderless' : ''}${above ? ' is-above' : ''}${slideAlone ? ' is-alone' : ''}`}
-            style={above ? { left: stripWidth, width: stageWidth, height: stageHeight } : { left: stripWidth, width: stageWidth }}
+            style={{ left: stripWidth, width: stageWidth, height: above ? settingsStageHeight : undefined }}
           >
             {/* Above, the slide is centred over the handout's column, and alone in the room: the group is the slide's
                 own width. */}
             <div className="deck-stage-group" style={above || slideAlone ? { width: bigWidth + STAGE_MARGIN * 2 } : undefined}>
               {editor && slide && bigWidth > 0 ? (
-                <Stage
-                  // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
-                  key={slide.data.id ?? `index-${slide.index}`}
-                  editor={editor}
-                  slide={slide}
-                  theme={theme}
-                  borderless={borderless}
-                  assets={assets}
-                  missing={missingPictures}
-                  width={bigWidth}
-                  onWriting={onWriting}
-                  commentCallouts={commentCallouts}
-                  initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
-                  selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
-                  onFocusTaken={titleSelected}
-                  onPicture={onPicture}
-                  // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
-                  commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
-                  onCommentOpened={commentOpened}
-                  onNewSlideBelow={onNewSlideBelow}
-                  onSplit={onSplit}
-                  onFull={setSlideFull}
-                  onNeedCaret={needCaret}
-                  onSlideSettings={stageSettings}
-                  splitRequest={splitRequest}
-                  picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
-                />
+                <>
+                  <div className="deck-stage-gear" style={{ width: bigWidth }}>
+                    <Tooltip label="Slide settings" side="left" asChild suppressed={gearSettingsOpen}>
+                      <Button
+                        type="button"
+                        variant="toolbar"
+                        size="icon-xs"
+                        className="text-ink-muted hover:bg-hairline hover:text-ink-strong data-[state=open]:bg-hairline-strong data-[state=open]:text-ink-strong"
+                        aria-label="Slide settings"
+                        aria-haspopup="dialog"
+                        aria-expanded={gearSettingsOpen}
+                        aria-pressed={gearSettingsOpen}
+                        data-state={gearSettingsOpen ? 'open' : 'closed'}
+                        onClick={event => toggleGearSettings(event.currentTarget)}
+                      >
+                        <SlideIconGlyph name="gear-six" size={16} />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <Stage
+                    // By the slide's id: a new slide at the current place is a new stage, which takes the caret.
+                    key={slide.data.id ?? `index-${slide.index}`}
+                    editor={editor}
+                    slide={slide}
+                    theme={theme}
+                    borderless={borderless}
+                    assets={assets}
+                    missing={missingPictures}
+                    width={bigWidth}
+                    onWriting={onWriting}
+                    commentCallouts={commentCallouts}
+                    initialFocus={focusTitleOf?.index === slide.index ? 'title' : undefined}
+                    selectOnFocus={focusTitleOf?.index === slide.index && focusTitleOf.select}
+                    onFocusTaken={titleSelected}
+                    onPicture={onPicture}
+                    // By the slide's id where it has one, so a slide moved meanwhile never opens another's comment.
+                    commentOpen={commentOpen && (commentOpen.slideId !== undefined ? commentOpen.slideId === slide.data.id : commentOpen.slide === slide.index) ? commentOpen : null}
+                    onCommentOpened={commentOpened}
+                    onNewSlideBelow={onNewSlideBelow}
+                    onSplit={onSplit}
+                    onFull={setSlideFull}
+                    onNeedCaret={needCaret}
+                    onSlideSettings={stageSettings}
+                    settingsOpen={settingsFor !== null}
+                    splitRequest={splitRequest}
+                    picture={stagePicture && stagePicture.slideId === slide.data.id ? stagePicture : null}
+                  />
+                </>
               ) : null}
+              <div
+                ref={setSettingsSlot}
+                className={settingsRoom ? 'deck-settings-below' : undefined}
+                style={settingsRoom ? {
+                  paddingTop: SETTINGS_GAP,
+                  width: Math.min(stageWidth, Math.max(bigWidth + STAGE_MARGIN * 2, settingsSize.width + SETTINGS_COLLISION_PADDING * 2)),
+                } : undefined}
+              />
               {/* #917: in Slide only the same card sits under the slide, at the slide's own width (decks.css). */}
               {startPlace === 'slide' && slide ? startCard({ width: bigWidth }) : null}
               {slide && bigWidth > 0 ? (
@@ -2290,7 +2523,7 @@ export function DeckView({
           <div
             className={`deck-divider${above ? ' is-above' : ''}${dragging ? ' is-dragging' : ''}`}
             // Above, a level line from the strip to the room's right edge; beside, the upright line.
-            style={above ? { left: stripWidth, top: aboveLine } : { left: dividerLeft }}
+            style={above ? { left: stripWidth, top: settingsStageHeight } : { left: dividerLeft }}
             role="separator"
             aria-orientation={above ? 'horizontal' : 'vertical'}
             aria-label={above ? 'Drag to change the heights' : 'Drag to change the widths'}
@@ -2317,7 +2550,7 @@ export function DeckView({
           className={`deck-handout${handoutShown ? '' : ' is-folded'}${slideShown ? '' : ' is-solo'}${above && split ? ' is-above' : ''}`}
           // The handout alone, or below the slide, is a Text document's centred column: its width sets the text's edges
           // (decks.css).
-          style={{ left: dividerLeft, top: above && split ? aboveLine : 0, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
+          style={{ left: dividerLeft, top: above && split ? settingsStageHeight : 0, ['--deck-handout-width' as string]: `${Math.max(0, deskWidth - dividerLeft)}px`, ['--deck-text-column' as string]: `${TEXT_COLUMN_WIDTH}px` }}
           aria-hidden={handoutShown ? undefined : true}
         >
           {findBar}
@@ -2341,18 +2574,34 @@ export function DeckView({
       </div>
       {/* 17 November (Jarmo: "slaidi settings peaks olema siin: mitte kuskil ülal tööriistaribas"; the Experience lead,
           "Nothing around the slide"): Slide settings… in the slide's own menu opens this popover, anchored beside the
-          thumbnail, the part number or the point it came from, top-aligned with it. A Popover: a press outside or Esc
+          thumbnail, the part number or the slide itself. A Popover: a press outside or Esc
           closes it, and the focus goes back to where the menu was opened. */}
       <Popover open={settingsFor !== null} onOpenChange={open => { if (!open) setSettingsFor(null) }}>
         {settingsFor ? <PopoverAnchor virtualRef={settingsAnchor} /> : null}
         <PopoverContent
-          side={settingsFor?.side ?? 'right'}
-          align="start"
-          sideOffset={8}
-          collisionPadding={8}
-          className="deck-settings"
+          ref={setSettingsBox}
+          portalContainer={stageSettingsOpen && !gearSettingsOpen ? settingsSlot : undefined}
+          side={gearSettingsOpen ? 'bottom' : settingsPlacement?.side ?? 'right'}
+          align={gearSettingsOpen ? 'end' : 'start'}
+          sideOffset={gearSettingsOpen ? 4 : SETTINGS_GAP}
+          avoidCollisions={!gearSettingsOpen}
+          collisionBoundary={stageSettingsOpen ? stageRef.current : undefined}
+          collisionPadding={SETTINGS_COLLISION_PADDING}
+          sticky={stageSettingsOpen ? "always" : undefined}
+          style={stageSettingsOpen ? { maxWidth: Math.max(0, stageWidth - SETTINGS_COLLISION_PADDING * 2) } : undefined}
+          className={stageSettingsOpen && !gearSettingsOpen ? 'deck-settings' : 'deck-settings deck-settings-folded'}
+          onPointerDownOutside={event => {
+            if (stageSettingsOpen && !gearSettingsOpen && isStageScrollbarPress(stageRef.current, event.detail.originalEvent)) {
+              event.preventDefault()
+            }
+          }}
+          onInteractOutside={event => {
+            if (gearSettingsOpen && settingsReturn.current?.contains(event.target as Node)) {
+              event.preventDefault()
+            }
+          }}
           // The popup takes the focus itself, not its Close button, so no tooltip opens with it.
-          onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus() }}
+          onOpenAutoFocus={event => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true }) }}
           onCloseAutoFocus={event => {
             const back = settingsReturn.current
             settingsReturn.current = null

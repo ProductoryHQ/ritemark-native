@@ -3,9 +3,8 @@
  * - the cover (Ritemark's picture, or the project's own) with Change image;
  * - the project's mark and name, the folder it works in (opens Documents), its line;
  * - Waiting for you, with what waits in the other projects;
- * - Sprint 140 (R2): at most one guidance card under it: What moved, once, on a
- *   profile updated from Ritemark 1 (experience 32, frame 5); the ready request
- *   (experience 35); or the first-week question (experience 34, frame 1);
+ * - at most one guidance card under it, chosen by the host: the ready request,
+ *   Quick Look, What moved, or the open-source card;
  * - Start something in <project>: Text, Table, Deck (flag `decks`), Web page;
  * - Last changed in <project>; an empty project's drop target (experience 29, frame 1);
  * - a project of the list whose folder is not found (experience 33, frame 2).

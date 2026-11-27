@@ -10,9 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased] — v2.4.0
 
 - Ritemark’s downloads, updates, and AI model list now come from the Ritemark Native GitHub repository.
-
-- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values.
-- Excel column, bar and line charts appear in place and on chart sheets, and update when you change a number they use. They follow the workbook’s text formatting and chart layout.
+- Choose **Tell us about this** when Publish fails or when a Word or PowerPoint preview can’t read a file. Send feedback opens with the safe words from the notice, which you can leave out.
+- In Documents, a deck’s folder follows when you rename, move, copy or trash the deck. Copies from the start card get their own folder too.
+- Select an Excel chart and press Cmd+C or Ctrl+C to copy it as a picture (#1038).
+- Excel combination charts can show a second scale, and selecting a chart shows its title and source cells in the formula bar (#1036).
+- Excel column, bar, line, pie, doughnut, area and scatter charts appear in their original positions and on chart sheets. Column, bar and line charts update when you change a number they use and follow the workbook’s text formatting and chart layout (#1031, #1034).
+- Excel previews explain when a chart sheet contains a chart they can’t draw (#1035).
+- Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values. Today rules follow the local date, and the notice identifies Excel icon sets kept in the file (#1032, #1035).
+- When a published deck has changes, its bar shows a **Publish changes** button. Press it to update the page.
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - When you open a deck, the status bar shows its slide count in place of the word count.
 - Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.
@@ -20,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Home can invite you to star Ritemark or join Discussions. Opening Discussions keeps the invitation available. Both links are always available in Help.
+- Give a thumbs-up or thumbs-down on supported AI answers, add written feedback, or report an AI failure from its card.
+- In Send feedback, preview a picture of your Ritemark window and copy it to the clipboard when you open e-mail. Paste it into the message if you want to include it.
+- AI chat steps show which documents were read and explain when a document could not be opened (#996).
+- Finder can show a saved deck’s first slide on Mac, and pressing Space previews its slides.
 - Equations in Word stay as math when AI reads the document or you save a Markdown copy (#1011).
 - Switch the slide strip to a timed list to enter slide minutes in order. Set a session length to see whether the deck fits, and add a start to see clock times for each slide.
 - Set slide minutes while editing a deck and see how the total fits your session (#1004).
@@ -30,12 +40,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Turn on Update on every save to keep a published deck’s page up to date (#1007).
 - The deck’s publish button shows when a page is live, updating, paused, or offline, and explains what to do when an update pauses.
 
+### Changed
+
+- Close Send feedback with Escape or a click outside the sheet. Your unsent words come back when you reopen it for the same thing in the same window.
+- Publishing a deck writes its local page and any theme fonts or logo it uses into `<deck file>.files/`. Updating an existing published deck keeps its public link when the files fit its current hosted layout.
+- Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
+
 ### Fixed
 
+- The update notice now shows two buttons, **Download the installer** and **Later**, so nothing in it is cut off. Skip this version and Remind me in 7 days stay in Settings → Updates (#1120).
+- A deck's own folder is now named after the deck file (`Kickoff.rtms.files`). It follows the deck, or goes to the Trash with it, only when it holds nothing but the deck's pictures and its published page. A folder with other files stays where it is.
+- A slide added from another deck brings its pictures into this deck's folder, so the deck keeps them when it moves (#1118).
+- Home's folder card no longer counts a deck's pictures and published page as the project's files, and Search and Home show a note you keep in a deck's folder (#1121).
+- Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
 - Screen readers now announce the More and Contents buttons by name on published deck pages at phone widths (#968).
 - Runtime checks now exercise the bundled Codex server’s JSON-RPC methods and compare Windows runtime versions against the manifest (#966).
+- **Long notes in the deck bar give way first (#950).** The note shortens before Publish loses its label, and the theme button shows its full name or just its swatch. The full note and theme name are in their tooltips.
 
 ## [Unreleased] — v2.3.0
 

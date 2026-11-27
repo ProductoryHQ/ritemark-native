@@ -1,3 +1,4 @@
+import { GEMINI_MODEL_IDS, toOpenCodeModelId } from '../ai/modelConfig';
 import assert from 'node:assert/strict';
 import {
   claudeUnavailableModel,
@@ -26,6 +27,8 @@ import {
   turnFailureCard,
   turnOutcome,
 } from './turnFailureCopy';
+
+const GOOGLE_NEON = toOpenCodeModelId('google', GEMINI_MODEL_IDS.NEON_4);
 
 const rawOAuthError = 'Failed to authenticate: OAuth session expired and could not be refreshed';
 
@@ -168,7 +171,7 @@ assert.equal(classifyRuntimeError('codex', 'error sending request for url (https
 
 // A6. OpenCode: Google's credits (seen 2026-10-24, Jarmo), through OpenCode's ACP wrapper.
 const googleCredits = 'Internal error: Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing.';
-assert.deepEqual(classifyRuntimeError('opencode', googleCredits, { turnModel: 'google/gemini-4-argon' }), {
+assert.deepEqual(classifyRuntimeError('opencode', googleCredits, { turnModel: GOOGLE_NEON }), {
   kind: 'limit',
   sentence: 'Google stopped this request. Your Gemini API credits have run out. Add credits in Google AI Studio, then send your message again.',
   detail: { billing: 'google', limit: 'credits' },
@@ -182,7 +185,7 @@ assert.deepEqual(
 );
 // Google's 429 uses the same words; the provider comes from the text, else from the model.
 assert.equal(
-  classifyRuntimeError('opencode', 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits', { turnModel: 'google/gemini-4-argon' })?.detail?.billing,
+  classifyRuntimeError('opencode', 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits', { turnModel: GOOGLE_NEON })?.detail?.billing,
   'google',
 );
 // A8. Anthropic's credits, through OpenCode and through Claude with an API key.
@@ -215,12 +218,12 @@ assert.equal(isGoogleModelRefusal(403, { error: { status: 'PERMISSION_DENIED', m
 assert.equal(isGoogleModelRefusal(404, { error: { status: 'NOT_FOUND', message: 'models/gemini-2.5-flash-lite is not found' } }, 'gemini-2.5-flash-lite'), true);
 
 // A11. OpenCode: a refused or missing key opens Settings' keys.
-assert.deepEqual(classifyRuntimeError('opencode', 'provider authentication required', { code: 'auth_required', turnModel: 'google/gemini-4-argon' }), {
+assert.deepEqual(classifyRuntimeError('opencode', 'provider authentication required', { code: 'auth_required', turnModel: GOOGLE_NEON }), {
   kind: 'sign-in',
   sentence: "Google didn't accept the API key. Check it in AI Settings, then send your message again.",
   detail: { billing: 'google' },
 });
-assert.equal(classifyRuntimeError('opencode', 'API key not valid. Please pass a valid API key.', { turnModel: 'google/gemini-4-argon' })?.kind, 'sign-in');
+assert.equal(classifyRuntimeError('opencode', 'API key not valid. Please pass a valid API key.', { turnModel: GOOGLE_NEON })?.kind, 'sign-in');
 
 // A12. Claude: a plan's limit (SDK `rate_limit`), and a model the SDK says isn't there.
 assert.deepEqual(
@@ -230,6 +233,11 @@ assert.deepEqual(
 assert.deepEqual(classifyRuntimeError('claude-code', 'model not found', { code: 'model_not_found', turnModel: 'claude-opus-5-5', names })?.sentence,
   "Claude couldn't use Opus 5.5. It isn't available in Ritemark right now.");
 assert.equal(classifyRuntimeError('claude-code', 'API Error: Connection error.')?.kind, 'network');
+for (const message of ['This model is currently experiencing high demand', 'Provider overloaded', 'HTTP 429', '503 Service Unavailable']) {
+  assert.equal(classifyRuntimeError('opencode', `Internal error: ${message}`)?.detail?.limit, 'busy');
+}
+assert.equal(classifyRuntimeError('opencode', 'Internal error', { httpStatus: 429 })?.kind, 'provider');
+
 assert.equal(classifyRuntimeError('opencode', 'fetch failed')?.kind, 'network');
 
 // A13. Envelopes unwrapped; ordinary text untouched; nothing to say falls back to one plain sentence.
@@ -468,7 +476,6 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
   assert.equal(retryingLine('codex', 60_000), 'ChatGPT is busy. Trying again in a minute.');
   assert.equal(retryingLine('codex', 0), 'ChatGPT is busy. Trying again in a minute.');
   assert.equal(retryingLine('codex', undefined), 'ChatGPT is busy. Trying again soon.', 'the length unknown');
-  assert.equal(retryingLine('opencode', 120_000), 'OpenCode is busy. Trying again in 2 minutes.', "the AI's own name");
   for (const ms of [419_000, 60_000, undefined]) assert.doesNotMatch(retryingLine('codex', ms), /…|seconds| s\b|Codex/);
   // Continue with <AI> only while more than a minute is left.
   assert.equal(retryingOffersAlternative(419_000), true);
@@ -526,7 +533,7 @@ console.log('runtimeErrorPresentation: Sprint 139 card copy passes');
 
   // A key with no quota for the model ("limit: 0") is never "for now": waiting won't help, so the quota card.
   assert.deepEqual(
-    classifyRuntimeError('opencode', 'Internal error: You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: gemini-4-argon\nPlease retry in 41s.', hints)?.detail,
+    classifyRuntimeError('opencode', `Internal error: You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 0, model: ${GEMINI_MODEL_IDS.NEON_4}\nPlease retry in 41s.`, hints)?.detail,
     { billing: 'google', limit: 'quota' },
   );
   // A daily quota: the model's limit, but Google's seconds are no real time, so the card gives none.

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { test } from 'node:test';
 import { CODEX_MODEL_IDS } from '../../../../src/ai/modelConfig';
 import { AGENTS, type AgentId } from '../../../../src/agent/types';
 import { RUNTIME_CAPABILITIES } from '../../../../src/runtime/capabilities';
@@ -700,6 +702,41 @@ function testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes() {
   }
 }
 
+function testApprovedPlanExecutesWithItsOwnTurnId() {
+  const posted: unknown[] = [];
+  const originalPost = vscode.postMessage;
+  vscode.postMessage = (message) => { posted.push(message); };
+  try {
+    const id = seedActiveConversation({
+      codexConversation: [makeCodexTurn({
+        id: 'plan-turn', requestedPlanMode: true, requiresPlanReview: true,
+        streamingText: 'Review the draft.', result: { status: 'success' },
+      })],
+    });
+    useAISidebarStore.getState().approveCodexPlan('plan-turn');
+    const [plan, execution] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(plan.id, 'plan-turn');
+    assert.equal(plan.streamingText, 'Review the draft.');
+    assert.equal(plan.planDecision, 'approved');
+    assert.notEqual(execution.id, plan.id);
+    const request = posted.find((message) => (message as { type: string }).type === 'agent-execute') as
+      | { conversationId: string; conversationTurnId: string; approvedPlanTurnId: string; prompt: string;
+          displayPrompt: string; conversationContinuation: boolean; planFirst: boolean }
+      | undefined;
+    assert.ok(request);
+    assert.equal(request.conversationId, id);
+    assert.equal(request.approvedPlanTurnId, plan.id);
+    assert.equal(request.conversationTurnId, execution.id);
+    assert.equal(request.displayPrompt, execution.userPrompt);
+    assert.equal(request.conversationContinuation, true);
+    assert.equal(request.planFirst, false);
+    assert.match(request.prompt, /Approved plan:\nReview the draft\./);
+  } finally {
+    vscode.postMessage = originalPost;
+    resetStore();
+  }
+}
+
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
   testSetPendingRuntimeModeOnly();
@@ -719,7 +756,147 @@ function main() {
   testALaterBootstrapKeepsTheThreadsOwnClaudeModel();
   testACatalogFallbackMovesEveryComposerSurfaceTogether();
   testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes();
+  testApprovedPlanExecutesWithItsOwnTurnId();
   console.log('Runtime switching tests passed.');
 }
 
 main();
+
+// Readiness belongs to the runtime that owns the turn, even across a handoff.
+try {
+  const openCode = makeCodexTurn({ runtime: 'opencode', isRunning: true });
+  const openThread = createConversationState('open', { selectedAgent: 'codex', codexConversation: [openCode] });
+  const codexThread = createConversationState('codex', {
+    selectedAgent: 'opencode',
+    codexConversation: [makeCodexTurn({ runtime: 'codex', isRunning: true })],
+  });
+  hydrateConversations([openThread, codexThread], openThread.id);
+  useAISidebarStore.getState().handleExtensionMessage({
+    type: 'codex:status',
+    status: {
+      enabled: true, state: 'needs-auth', version: null, authMethod: null,
+      email: null, plan: null, error: null, diagnostics: [], repairCommand: null,
+      binaryPath: null, compatibility: null,
+    },
+  });
+  const { conversations } = useAISidebarStore.getState();
+  assert.deepEqual(conversations.open.codexConversation[0], openCode);
+  assert.equal(conversations.codex.codexConversation[0].result?.error, 'ChatGPT is not ready.');
+} finally {
+  resetStore();
+}
+
+console.log('Runtime switching tests passed.');
+
+
+test('a missing saved plan ends the approved plan’s continuation in chat', async () => {
+  const load = createRequire(import.meta.url);
+  const Module = load('node:module');
+  const originalLoad = Module._load;
+  const subscribe = () => ({ dispose() {} });
+  const vscodeStub = {
+    EventEmitter: class { event = subscribe; },
+    TerminalLink: class {},
+    commands: { executeCommand: async () => undefined },
+    workspace: {
+      onDidChangeConfiguration: subscribe,
+      getConfiguration: () => ({ get: () => undefined }),
+      createFileSystemWatcher: () => ({ onDidCreate: subscribe, onDidDelete: subscribe, dispose() {} }),
+      onDidDeleteFiles: subscribe,
+      onDidRenameFiles: subscribe,
+      onDidCreateFiles: subscribe,
+      onDidChangeTextDocument: subscribe,
+    },
+    window: { tabGroups: { onDidChangeTabs: subscribe, onDidChangeTabGroups: subscribe }, onDidChangeActiveColorTheme: subscribe },
+    extensions: { onDidChange: subscribe },
+  };
+  Module._load = function (request: string, ...args: unknown[]) {
+    return request === 'vscode' ? vscodeStub : originalLoad.call(this, request, ...args);
+  };
+  let UnifiedViewProvider: { prototype: object };
+  try {
+    ({ UnifiedViewProvider } = load('../../../../src/views/UnifiedViewProvider'));
+  } finally {
+    Module._load = originalLoad;
+  }
+
+  const provider = Object.assign(Object.create(UnifiedViewProvider.prototype), {
+    _viewGeneration: 0,
+    _liveThinkingEffortCapabilities: new Map(),
+    _conversationCheckpointQueues: new Map(),
+    _conversationController: {
+      currentRolloutMode: async () => 'host',
+      savedComposerModel: async () => undefined,
+      runtimeConversation: async () => ({ events: [] }),
+    },
+  });
+  const hostMessages: ExtensionMessage[] = [];
+  let receive!: (message: unknown) => Promise<void>;
+  const view = {
+    visible: false,
+    webview: {
+      onDidReceiveMessage: (handler: typeof receive) => { receive = handler; },
+      postMessage: async (message: ExtensionMessage) => {
+        hostMessages.push(message);
+        deliver(message);
+        return true;
+      },
+    },
+    onDidChangeVisibility: subscribe,
+    onDidDispose: subscribe,
+  };
+  const originalPost = vscode.postMessage;
+  const requests: unknown[] = [];
+  vscode.postMessage = (message) => { requests.push(message); };
+
+  try {
+    void provider.resolveWebviewView(view, {}, {});
+    seedActiveConversation({
+      codexConversation: [makeCodexTurn({
+        id: 'saved-plan', requestedPlanMode: true, requiresPlanReview: true,
+        streamingText: 'Review the draft.', result: { status: 'success' },
+      })],
+    });
+    useAISidebarStore.getState().approveCodexPlan('saved-plan');
+    const request = requests.find((message) => (message as { type: string }).type === 'agent-execute');
+    assert.ok(request);
+    const [, pending] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(pending.isRunning, true);
+
+    await receive(request);
+
+    assert.ok(hostMessages.some((message) => message.type === 'conversation/store-status'
+      && message.message?.endsWith('Approved plan has no matching conversation turn')));
+    const result = hostMessages.find((message) => message.type === 'codex-result');
+    assert.ok(result, 'the host sends a terminal result for the rejected continuation');
+    assert.equal(result.turnId, pending.id);
+    assert.match(result.error ?? '', /couldn.t continue this plan.*send your request again/i);
+    const [plan, execution] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(plan.planDecision, 'approved');
+    assert.equal(execution.result?.error, result.error);
+    assert.equal(execution.isRunning, false);
+  } finally {
+    provider._endViewResolve?.end();
+    vscode.postMessage = originalPost;
+    resetStore();
+  }
+});
+
+
+test('a turn-scoped Codex result leaves a newer turn running', () => {
+  try {
+    const id = seedActiveConversation({
+      codexConversation: [
+        makeCodexTurn({ id: 'continuation', isRunning: true }),
+        makeCodexTurn({ id: 'newer', isRunning: true }),
+      ],
+    });
+    deliver({ type: 'codex-result', conversationId: id, turnId: 'continuation', status: 'error', error: 'Could not continue.' });
+    const [continuation, newer] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(continuation.isRunning, false);
+    assert.equal(continuation.result?.error, 'Could not continue.');
+    assert.equal(newer.isRunning, true);
+  } finally {
+    resetStore();
+  }
+});

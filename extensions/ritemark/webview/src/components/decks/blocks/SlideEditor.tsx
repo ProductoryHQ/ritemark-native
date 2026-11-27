@@ -57,7 +57,7 @@ import { slideDivWithView, type SlideDivHandlers } from './slideDivView'
 import { AGENDA_DRAWN_EVENT, slideAgendaWithView, type AgendaSource } from './slideAgendaView'
 import { onDocChanged } from '../../../lib/docChange'
 import { agendaOf } from '../../../../../src/decks/blocks/slideRenderer'
-import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, slidePlaceholderOf } from './slideEditorMarkdown'
+import { ensureSlideCommentPipeline, isTitlePlace, markdownToSlideEditorHTML, saveSlideMarkdown, SlideEmptyLines, slidePlaceholderOf, withoutPictureSplitArtifacts } from './slideEditorMarkdown'
 import { SlideLabel, labelNode } from './slideLabel'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, setStageFit } from './slideFit'
 import { SLIDE_MISSING_PICTURES, SlidePicture, imagePathOf, slideMissingPictures } from './slidePictures'
@@ -128,8 +128,9 @@ export interface SlideEditorProps {
   onFull?: (full: boolean) => void
   /** PR 3: the bar's Split at the cursor found no caret on the slide to split at. */
   onNeedCaret?: () => void
-  /** The right-click menu's Slide settings… (17 November): the popover at the point the menu was opened. */
-  onSlideSettings?: (at: { x: number; y: number }) => void
+  /** The right-click menu's Slide settings… (17 November): the popover beside the slide. */
+  onSlideSettings?: () => void
+  settingsOpen?: boolean
   /** PR 3: the deck bar's Split at the cursor: each new number splits the slide at the caret. */
   splitRequest?: number
   /** PR 3: the picture the / menu's Picture asked for, saved beside the deck: it goes where the / was. */
@@ -151,7 +152,7 @@ interface SlideTools {
   splitLine: () => boolean
   tab: (direction: 1 | -1) => boolean
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
-  hintIcon: (pos: number, anchor: HTMLElement, name: string) => void
+  hintIcon: (pos: number, anchor: HTMLElement, name: string | null) => void
 }
 
 /** A paragraph that holds only `***`, the caret at its end: Split slide here's shortcut (frame 22). */
@@ -220,7 +221,7 @@ function titleRange(doc: PMNode): { from: number; to: number } | null {
 
 const NO_MISSING: ReadonlySet<string> = new Set()
 
-export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: SlideEditorProps) {
+export function SlideEditor({ outer, slide, width, theme, borderless, assets, missing = NO_MISSING, commentCallouts, onWriting, focusTitle, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, settingsOpen, splitRequest, picture }: SlideEditorProps) {
   // The latest of the stage's callbacks, for the editor's extensions (made once per editor).
   const actionsRef = useRef({ onNewSlideBelow, onSplit, onFull, onNeedCaret })
   actionsRef.current = { onNewSlideBelow, onSplit, onFull, onNeedCaret }
@@ -386,7 +387,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
     codeBlock: SlideCodeBlock,
     // Experience 48: the table's own handles and keys; its right-click items join the slide's own menu below.
     // Sprint 168 PR 1 (#863): a quote's attribution marked as the renderer marks it.
-    afterImage: [OuterHistory, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
+    afterImage: [OuterHistory, SlideEmptyLines, SlideKeys, SlideSlash, CodeFillPlaces, SlideQuoteBy, slideMissingPictures(() => missingRef.current), ...(SlideTableHandles ? [SlideTableHandles] : [])],
     commentCallouts,
     deck: [slideDivWithView(divHandlers), slideAgendaWithView(agendaSource), SlideLabel],
     // Sprint 163: the Tabs block with its band, drawn as the renderer draws it.
@@ -399,7 +400,9 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
 
   const editor = useEditor({
     extensions,
-    content: slideHTML(nodeMarkdown, assets),
+    onBeforeCreate: ({ editor }) => {
+      editor.setOptions({ content: loadSlideDoc(editor.schema, nodeMarkdown, assets).toJSON() })
+    },
     editorProps: {
       attributes: { class: 'blk-flow', spellcheck: 'true', 'aria-label': 'The slide' },
       handlePaste: (_view, event) => takePicture(event.clipboardData, true),
@@ -912,8 +915,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pendingComment = useRef<SlideTarget | null>(null)
   /** The menu closed on a press outside it: the focus stays where that press put it. */
   const closedOutside = useRef(false)
-  /** Where the menu was opened, and its Slide settings… waiting for the menu to close. */
-  const menuPoint = useRef({ x: 0, y: 0 })
+  /** The menu's Slide settings…, waiting for the menu to close. */
   const pendingSettings = useRef(false)
   const startPendingComment = () => {
     const target = pendingComment.current
@@ -1055,7 +1057,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
   const pictureMaker = usePictureMaker({
     editor,
     rectOf: pictureRect,
-    // The slide's id marks the request as a deck's (its pictures are written `images/…`).
+    // The slide's id marks the request as a deck's (its pictures go in the deck's folder).
     beforeMake: ask => {
       const slideId = slideRef.current.data.id || 'slide'
       if (ask.place.kind === 'side') return { slideId }
@@ -1066,7 +1068,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       if (place.kind === 'side') {
         // The side keeps its place; its focus point starts fresh, and its description is the words asked unless the
         // person wrote their own (#800).
-        // A side picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+        // A side picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays on disk.
         if (place.path !== undefined && !sameSidePath(header.image, place.path)) return false
         const alt = describe(header.alt ?? '', header.image?.trim() || null)
         writeSlide(null, { image: made.path, alt: alt || undefined, focus: undefined })
@@ -1074,7 +1076,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
       }
       if (!editor || editor.isDestroyed) return false
       const old = editor.state.doc.nodeAt(place.pos)
-      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays in images/.
+      // The picture replaced by hand meanwhile is not ChatGPT's to replace: the made one stays on disk.
       if (place.path && !(old && samePicture(old.attrs, place.path))) return false
       const alt = describe(String(old?.attrs.alt ?? ''), old ? imagePathOf(old.attrs) : null)
       return apply(replacePictureKeepingCaret(editor.state, place.pos, { src: made.url, title: made.path }, alt))
@@ -1204,7 +1206,6 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             closedOutside.current = false
             pendingComment.current = null
             pendingSettings.current = false
-            menuPoint.current = { x: event.clientX, y: event.clientY }
             menuTarget.current = clickTarget(editor, event)
             setHasSelection(!editor.state.selection.empty)
             setTableTarget(SlideTableHandles ? tableMenuTargetAt(editor.view, event.target) : null)
@@ -1272,7 +1273,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
             </Tooltip>
           ))}
           {/* 17 November: the chosen block's bar, ring and handles (`SlideBlockBar`). */}
-          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} />
+          <SlideBlockBar editor={editor} frame={frame} theme={theme} apply={apply} pickIcon={divHandlers.pickIcon} settingsOpen={settingsOpen} />
           {/* Sprint 163 PR 3: the chosen button's bar (Address, Open, Delete) and its address sheet. */}
           <ButtonBlockTools editor={editor} frame={frame} takeBackNew={takeBackNewButton} />
           {/* The bubble menu in a box of its own that stays in the frame (`BubbleMenuBox`): TipTap takes its element
@@ -1296,7 +1297,7 @@ export function SlideEditor({ outer, slide, width, theme, borderless, assets, mi
           else if (!closedOutside.current) editor.view.focus()
           if (pendingSettings.current) {
             pendingSettings.current = false
-            onSlideSettings?.(menuPoint.current)
+            onSlideSettings?.()
           }
         }}
       >
@@ -1426,5 +1427,6 @@ const contextKit: MenuKit = {
 
 /** The slide editor's own load of a Markdown, as its first content was parsed, with the pictures' addresses it has. */
 function loadSlideDoc(schema: Schema, markdown: string, assets: Record<string, string>): PMNode {
-  return createNodeFromContent(slideHTML(markdown, assets), schema, { slice: false }) as PMNode
+  const doc = createNodeFromContent(slideHTML(markdown, assets), schema, { slice: false }) as PMNode
+  return withoutPictureSplitArtifacts(doc)
 }

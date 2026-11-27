@@ -16,15 +16,16 @@
  *
  * Pure: no DOM, no `vscode`. The host's page and the webview import this one file.
  */
+import { isInvisibleSlideBlock, markSlideEmptyLines, slideEmptyLineExtension } from './slideEmptyLines';
 import { isLineBreakTag } from './lineBreakTag';
 import { Marked, Tokenizer, type Token, type Tokens } from 'marked';
 import { contentPlaceValue, isBlockSlide, sidePictureOf, type ContentPlace, type SlideData } from '../deckFormat';
 import { isRelativeTarget } from '../deckLibraryFormat';
 import { drawsSecondLogo, type DeckTheme, type LogoOn, type LogoPlace } from '../deckTheme';
 import { themeStyle } from '../../../webview/src/components/decks/theme/themeVars';
-import { boxIconOf } from '../../../webview/src/components/decks/slide/iconSet';
+import { boxIconOf, UNKNOWN_ICON } from '../../../webview/src/components/decks/slide/iconSet';
 import { iconSvg, isPageIconName } from '../../../webview/src/components/decks/slide/pageIcons';
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
+import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, fencedDivStart, isRevealWrapperAttrs, revealsOne, scanFencedDiv, slideBlockClassOf, type FenceAttributes } from './fencedDiv';
 import { tableHasWidths, widthsOf } from '../../markdown/tableWidths';
 import { lookOf, pictureBlockTokenizer, pictureMarkup, readSideFocus, type ImageTokenWithLook } from '../../markdown/pictureLook';
 import { agendaHtml, isAgendaClasses, type AgendaDrawing, type AgendaEntry } from './agenda';
@@ -68,13 +69,16 @@ export function picturePathOf(href: string): string {
 /**
  * A box's icon badge, as every view draws it (the strip, the wall, the presenter view, the page and, through
  * `slideDivView`, the stage): its icon, or for a name Ritemark doesn't know (#850) the dashed circle, `is-unknown`, which
- * slide.css draws in the theme's placeholder colour on the badge's usual ground. `unknown` is that name as written; null
- * when the box names no icon.
+ * slide.css draws in the theme's placeholder colour on the badge's usual ground. A missing icon can use a dashed
+ * placeholder on the stage or an empty slot in a mixed Icon block elsewhere. `unknown` carries an unrecognized name.
  */
-export function boxIconBadge(name: string | undefined): { className: string; svg: string; unknown: string | null } | null {
+export function boxIconBadge(name: string | undefined, missing?: 'placeholder' | 'spacer'): { className: string; svg: string; unknown: string | null } | null {
   const icon = boxIconOf(name);
-  if (!icon || !isPageIconName(icon.phosphor)) return null;
-  return { className: icon.known ? 'blk-icon' : 'blk-icon is-unknown', svg: iconSvg(icon.phosphor, 28), unknown: icon.known ? null : icon.name };
+  if (!icon && !missing) return null;
+  if (!icon && missing === 'spacer') return { className: 'blk-icon is-empty', svg: '', unknown: null };
+  const glyph = icon?.phosphor ?? UNKNOWN_ICON;
+  if (!isPageIconName(glyph)) return null;
+  return { className: icon?.known ? 'blk-icon' : 'blk-icon is-unknown', svg: iconSvg(glyph, 28), unknown: icon?.known ? null : icon?.name ?? null };
 }
 
 interface SlideDivToken {
@@ -96,7 +100,7 @@ interface RenderState {
   pictureUrl: (path: string) => string | null;
   /** 17 November: a picture whose file the host didn't find: drawn as missing, with its file's name. */
   missing: (path: string) => boolean;
-  looks: string[];
+  boxes: { look: string; reserveIconSpace: boolean }[];
   /** The decks README, small details 14: the deck's sections an Agenda block lists, and the slide's place for Present. */
   agenda: AgendaDrawing | null;
   at: number | null;
@@ -129,7 +133,7 @@ interface RenderState {
   tabs: { chosen: readonly number[] | null; next: number };
 }
 
-const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, looks: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
+const freshState = (): RenderState => ({ pictureUrl: () => null, missing: () => false, boxes: [], agenda: null, at: null, openIn: true, ticks: false, steps: 0, buttonLinks: false, reveal: { next: 0, shown: null }, parents: [], tabs: { chosen: null, next: 0 } });
 
 let state: RenderState = freshState();
 
@@ -290,21 +294,24 @@ function divHtml(token: SlideDivToken, inner: () => string): string {
       return `<div class="blk-${kind}"${item}>${within()}</div>\n`;
     case 'boxes': {
       const look = token.attrs.values.look ?? 'boxes';
-      state.looks.push(look);
+      const boxes = token.tokens.filter((child): child is Token & SlideDivToken =>
+        child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box');
+      const reserveIconSpace = boxesShowIcons(look) && look !== 'steps' && boxes.some(box => box.attrs.values.icon?.trim());
+      state.boxes.push({ look, reserveIconSpace });
       try {
-        const boxes = token.tokens.filter(child => child.type === 'slideDiv' && slideBlockClassOf((child as unknown as SlideDivToken).attrs) === 'box').length;
-        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes))}${revealMark}>${within()}</div>\n`;
+        return `<div class="blk-boxes" data-look="${esc(look)}"${drawnAttributes(boxesDrawnAttributes(token.attrs, boxes.length))}${revealMark}>${within()}</div>\n`;
       } finally {
-        state.looks.pop();
+        state.boxes.pop();
       }
     }
     case 'box': {
-      const look = state.looks[state.looks.length - 1] ?? 'boxes';
+      const block = state.boxes[state.boxes.length - 1];
+      const look = block?.look ?? 'boxes';
       let mark = '';
       if (look === 'arrows') mark = `<span class="blk-mark">${iconSvg('arrow-right', 20)}</span>`;
-      else if (!OWN_MARK_LOOKS.has(look)) {
-        const badge = boxIconBadge(token.attrs.values.icon);
-        if (badge) mark = `<span class="${badge.className}">${badge.svg}</span>`;
+      else if (boxesShowIcons(look)) {
+        const badge = boxIconBadge(token.attrs.values.icon, parent?.kind === 'boxes' && block?.reserveIconSpace ? 'spacer' : undefined);
+        if (badge) mark = `<span class="${badge.className}"${badge.svg ? '' : ' aria-hidden="true"'}>${badge.svg}</span>`;
       }
       return `<div class="blk-box"${item}>${mark}${within()}</div>\n`;
     }
@@ -390,16 +397,6 @@ function drawnWordsOf(html: string): string {
   });
 }
 
-/**
- * A block a quote holds that is drawn as nothing: a blank line, a comment note (the slide editor's own reader makes it a
- * `ritemarkComment` token), an empty Label.
- */
-function drawsNoBlock(token: Token): boolean {
-  if (token.type === 'space' || token.type === 'ritemarkComment' || isCommentBlock(token)) return true;
-  const label = token.type === 'paragraph' ? labelParagraphOf(token as Tokens.Paragraph) : null;
-  return !!label && isEmptyLabel(label.words);
-}
-
 /** The words a run of inline tokens draws, as text: no tags, no picture, no line break. */
 function inlineWordsOf(tokens: readonly Token[]): string {
   return tokens.map(token => {
@@ -423,13 +420,13 @@ export function splitQuoteByLine(token: Token): void {
   if (token.type !== 'blockquote') return;
   const blocks = (token as Tokens.Blockquote).tokens;
   let at = blocks.length - 1;
-  while (at >= 0 && drawsNoBlock(blocks[at])) at--;
+  while (at >= 0 && (isInvisibleSlideBlock(blocks[at]) || blocks[at].type === 'slideEmptyLines')) at--;
   if (at < 0 || blocks[at].type !== 'paragraph') return;
   const paragraph = blocks[at] as Tokens.Paragraph;
   const inline = paragraph.tokens ?? [];
   if (labelParagraphOf(paragraph) || buttonParagraphOf(inline) || isPictureParagraph(paragraph) || isAlonePicture(paragraph)) return;
   // A last paragraph that opens with the dash under words of its own is the attribution already, whole.
-  if (blocks.slice(0, at).some(block => !drawsNoBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
+  if (blocks.slice(0, at).some(block => !isInvisibleSlideBlock(block)) && isQuoteByWords(drawnWordsOf(inlineWordsOf(inline)))) return;
   const br = inline.map(child => child.type).lastIndexOf('br');
   if (br <= 0) return;
   const words = inline.slice(0, br);
@@ -450,8 +447,9 @@ export function splitQuoteByLine(token: Token): void {
  * renderer's counters (One by one, Steps, Tabs) step as they would without this rule; what draws nothing (a blank line,
  * a comment note, an empty Label) is never "above" the attribution.
  */
-function quoteHtml(blocks: string[]): string {
-  const drawn = blocks.flatMap((html, index) => (html.trim() ? [index] : []));
+function quoteHtml(tokens: Token[], draw: (token: Token) => string): string {
+  const blocks = tokens.map(draw);
+  const drawn = blocks.flatMap((html, index) => (html.trim() && tokens[index].type !== 'slideEmptyLines' ? [index] : []));
   const last = drawn[drawn.length - 1];
   if (drawn.length >= 2 && blocks[last].startsWith('<p>') && isQuoteByWords(drawnWordsOf(blocks[last]))) {
     blocks[last] = `<p class="${QUOTE_BY_CLASS}">${blocks[last].slice('<p>'.length)}`;
@@ -479,7 +477,7 @@ function slideTokenizer(): Tokenizer {
 function createSlideMarked(): Marked {
   const instance = new Marked({ gfm: true, breaks: true, tokenizer: slideTokenizer() });
   instance.use({
-    extensions: [{
+    extensions: [slideEmptyLineExtension(false), {
       // Experience 48: a table with column widths (its delimiter row's dashes, `tableWidths.ts`) is drawn at the slide's
       // width with those shares; any other table exactly as marked draws it.
       name: 'table',
@@ -546,7 +544,7 @@ function createSlideMarked(): Marked {
       // Sprint 168 PR 1 (#863): a quote with its attribution marked (`quoteHtml`).
       name: 'blockquote',
       renderer(this: { parser: { parse: (tokens: Token[]) => string } }, token) {
-        return quoteHtml((token as Tokens.Blockquote).tokens.map(block => this.parser.parse([block])));
+        return quoteHtml((token as Tokens.Blockquote).tokens, block => this.parser.parse([block]));
       },
     }, {
       // Sprint 163: a Tabs block (`::: {.panel-tabset}`, a heading per tab). A div that isn't one is the next rule's.
@@ -638,7 +636,9 @@ export function isCommentBlock(token: Token): boolean {
  * free, and a title slide with one over its title is still a title slide.
  */
 function drawnBlocksOf(markdown: string): Token[] {
-  return lexBlockSlide(markdown).filter(token => token.type !== 'space' && !isCommentBlock(token) && !isLabelToken(token));
+  const tokens = lexBlockSlide(markdown);
+  markSlideEmptyLines(tokens);
+  return tokens.filter(token => token.type !== 'slideEmptyLines' && token.type !== 'space' && !isCommentBlock(token) && !isLabelToken(token));
 }
 
 const picturePathsCache = new Map<string, string[]>();
@@ -755,13 +755,7 @@ function coverOf(markdown: string): boolean {
   return false;
 }
 
-/**
- * Experience 49, 18 November: a picture alone on a slide is centred. `alone`: the slide draws one picture and nothing
- * else, so it sits in the middle both ways; `titled`: only a title above it, so it sits in the middle of the space under
- * the title, across and down (Keynote's Title & Photo). Null for any other slide. A comment never counts; a picture
- * beside or behind is something else on the slide (the caller leaves it out). The Align or Size the person set still
- * wins: its inline style (`outerStyle`) outranks the centring (slide.css's `.is-lone-pic`, `.is-titled-pic`).
- */
+/** A single picture can sit centred on its own or below a title. */
 export type LonePicture = 'alone' | 'titled';
 
 const loneCache = new Map<string, LonePicture | null>();
@@ -773,7 +767,9 @@ export function lonePictureOf(markdown: string): LonePicture | null {
   const onePicture = (token: Token | undefined) => token?.type === 'paragraph' && isPictureParagraph(token as Tokens.Paragraph)
     && ((token as Tokens.Paragraph).tokens ?? []).filter(part => part.type === 'image').length === 1;
   const isTitle = (token: Token | undefined) => token?.type === 'heading' && (token as Tokens.Heading).depth === 1;
-  const lone: LonePicture | null = blocks.length === 1 && onePicture(blocks[0]) ? 'alone' : blocks.length === 2 && isTitle(blocks[0]) && onePicture(blocks[1]) ? 'titled' : null;
+  let lone: LonePicture | null = null;
+  if (blocks.length === 1 && onePicture(blocks[0])) lone = 'alone';
+  if (blocks.length === 2 && isTitle(blocks[0]) && onePicture(blocks[1])) lone = 'titled';
   loneCache.set(markdown, lone);
   return lone;
 }
@@ -787,9 +783,8 @@ export function lonePictureClass(markdown: string, side: string | null): string 
 
 /**
  * Sprint 167 PR 3 (decks README item A): where a slide's content sits when its header says nothing, which is where it
- * is drawn today. A title or section slide (`isCoverSlide`) sits at the bottom, drawn big and low with its own foot room;
- * a picture alone on the slide in the middle (`lonePictureOf`, experience 49); every other slide at the top. Slide
- * settings shows this value chosen, and choosing it again takes the `valign:` line out. The theme holds no positions.
+ * is drawn today. A title or section slide sits at the bottom, with its own foot room. A picture alone sits
+ * in the middle. Other slides start at the top, including Title & Photo, which centres the picture below the title.
  */
 export function contentPlaceDefault(markdown: string, side: string | null): ContentPlace {
   if (isCoverSlide(markdown)) return 'bottom';
@@ -807,7 +802,10 @@ export function contentPlaceOf(markdown: string, valign: string | undefined, sid
  */
 export function contentPlaceClass(markdown: string, valign: string | undefined, side: string | null): string {
   const written = contentPlaceValue(valign);
-  return written && written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
+  if (!written) return '';
+  // Title & Photo centres the picture below its title by default. A chosen place moves both blocks together.
+  if (!side && lonePictureOf(markdown) === 'titled') return `va-${written}`;
+  return written !== contentPlaceDefault(markdown, side) ? `va-${written}` : '';
 }
 
 /**
@@ -976,7 +974,10 @@ export function blockSlideHtml(markdown: string, options: BlockDrawingContext = 
   const shown = typeof options.reveal === 'number' && Number.isFinite(options.reveal) ? Math.max(0, Math.floor(options.reveal)) : null;
   state = { ...freshState(), pictureUrl: options.pictureUrl ?? (() => null), missing: options.missing ?? (() => false), agenda: options.agenda ?? null, at: options.at ?? null, openIn: options.openIn !== false, ticks: options.ticks === true, buttonLinks: options.buttonLinks === true, reveal: { next: 0, shown }, tabs: { chosen: options.tabs ?? null, next: 0 } };
   try {
-    return slideMarked.parse(withStepsLabels(markdown), { async: false }) as string;
+    const tokens = lexBlockSlide(markdown);
+    markSlideEmptyLines(tokens);
+    slideMarked.walkTokens(tokens, splitQuoteByLine);
+    return slideMarked.parser(tokens);
   } finally {
     state = previous;
   }

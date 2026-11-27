@@ -7,12 +7,12 @@ import { getSchema } from '@tiptap/core'
 import { DOMParser as PMDOMParser, type Node as PMNode } from '@tiptap/pm/model'
 import { editorHTML, installTestDocument } from '../../../utils/markdownFidelity'
 import { createEditorSchemaExtensions } from '../../../utils/editorMarkdown'
-import { SlideAgenda, SlideDiv, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown } from './slideEditorMarkdown'
+import { SlideAgenda, SlideDiv, SlideEmptyLines, ensureSlideCommentPipeline, markdownToSlideEditorHTML, slideEditorHTMLToMarkdown, withoutPictureSplitArtifacts } from './slideEditorMarkdown'
 import { SlideLabel } from './slideLabel'
 
 installTestDocument()
 
-export const slideSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda, SlideLabel] }))
+export const slideSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda, SlideLabel, SlideEmptyLines] }))
 
 function elementFromString(html: string): HTMLElement {
   const body = createDocument(`<body>${html}</body>`).body as unknown as HTMLElement
@@ -28,8 +28,8 @@ function elementFromString(html: string): HTMLElement {
 }
 
 /** A block slide's Markdown as the slide editor's document. */
-export function loadSlide(markdown: string): PMNode {
-  return PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown)))
+export function loadSlide(markdown: string, imageMappings?: Record<string, string>): PMNode {
+  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown, imageMappings))))
 }
 
 /** The slide editor's document as Markdown. */
@@ -38,7 +38,7 @@ export function saveSlide(doc: PMNode): string {
 }
 
 /** Sprint 161: the slide editor's schema with the comment flag on (the comment mark and note), as the stage has it. */
-export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda, SlideLabel], commentCallouts: true }))
+export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck: [SlideDiv, SlideAgenda, SlideLabel, SlideEmptyLines], commentCallouts: true }))
 
 /**
  * A block slide's Markdown as the slide editor's document with comments on (`ensureSlideCommentPipeline` first: the
@@ -46,5 +46,5 @@ export const slideCommentSchema = getSchema(createEditorSchemaExtensions({ deck:
  */
 export function loadSlideWithComments(markdown: string): PMNode {
   ensureSlideCommentPipeline()
-  return PMDOMParser.fromSchema(slideCommentSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown)))
+  return withoutPictureSplitArtifacts(PMDOMParser.fromSchema(slideCommentSchema).parse(elementFromString(markdownToSlideEditorHTML(markdown))))
 }

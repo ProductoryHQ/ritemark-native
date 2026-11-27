@@ -22,11 +22,13 @@ import { DeckSlide } from './handout/deckSchema'
 import { DeckDrawnHeadings, drawnHeadingsFollow } from './handout/drawnHeadings'
 import { deckGuardPlugin } from './handout/deckGuard'
 import { deckLinesPlugin } from './handout/deckLines'
-import { deckConvertPlugin } from './handout/deckConvert'
+import { deckConvertPlugin, pictureIntoSlide } from './handout/deckConvert'
 import { derivedHeadings, sealHistory, slidesOf } from './deckDocument'
 import { STRIP_PICTURES_MIN, draggedPictureCount, dropPlaceNow, droppedPictures, insertPictureSlides, newSlideIds, pictureTitleOf } from './stripPictures'
 import { slideMenuItems } from './slideMenuItems'
 import { COPY_FAILED_NOTE, PICTURE_HEIGHT, PICTURE_WIDTH, copiedNote, customProperties, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+
+import { blockPicturePaths } from '../../../../src/decks/blocks/slideRenderer'
 
 installTestDocument()
 ensureCommentMarkedPipeline()
@@ -114,6 +116,20 @@ const DECK = [
   'Two lessons.', '',
 ].join('\n')
 
+// ---- A path with spaces survives the deck editor's save and reopen in both picture forms.
+{
+  const path = 'Kickoff.rtms.files/x.png'
+  const deck = openDeck(DECK.replace('id: a1\n---', 'id: a1\npicture: right\n---'))
+  assert.ok(deck.step(pictureIntoSlide(deck.state, 'a1', path)))
+  assert.ok(deck.step(pictureIntoSlide(deck.state, 'b2', path)))
+  const saved = deck.save()
+  assert.match(saved, /image: Kickoff\.rtms\.files\/x\.png/)
+  assert.ok(saved.includes('![](Kickoff.rtms.files/x.png)'))
+  const reopened = slidesOf(openDeck(saved).state.doc)
+  assert.equal(reopened[0].data.image, path)
+  assert.deepEqual(blockPicturePaths(reopened[1].data.markdown ?? ''), [path])
+}
+
 // ---- Order and placement: between the two slides, in the files' order; the ids are new and the deck's own
 {
   const deck = openDeck(DECK)
@@ -123,9 +139,9 @@ const DECK = [
   assert.equal(new Set(ids).size, 3, 'three ids, none the same')
   assert.ok(ids.every(id => id !== 'a1' && id !== 'b2'), "none of the deck's own")
   const pictures = [
-    { id: ids[0], title: pictureTitleOf('first-shot.png'), path: 'images/first-shot.png' },
-    { id: ids[1], title: pictureTitleOf('Õppepäev_2.png'), path: 'images/Oppepaev_2.png' },
-    { id: ids[2], title: pictureTitleOf('first-shot.png'), path: 'images/first-shot-2.png' },
+    { id: ids[0], title: pictureTitleOf('first-shot.png'), path: 'Kickoff.rtms.files/first-shot.png' },
+    { id: ids[1], title: pictureTitleOf('Õppepäev_2.png'), path: 'Kickoff.rtms.files/Oppepaev_2.png' },
+    { id: ids[2], title: pictureTitleOf('first-shot.png'), path: 'Kickoff.rtms.files/first-shot-2.png' },
   ]
   const depth = undoDepth(deck.state)
   assert.ok(deck.step(insertPictureSlides(deck.state, 1, pictures)))
@@ -133,12 +149,12 @@ const DECK = [
   const slides = slidesOf(deck.state.doc)
   assert.deepEqual(slides.map(slide => slide.data.id), ['a1', ids[0], ids[1], ids[2], 'b2'], 'at the drop place, in the files\' order')
   assert.deepEqual(slides.slice(1, 4).map(slide => slide.data.markdown), [
-    '# First shot\n\n![](images/first-shot.png)',
-    '# Õppepäev 2\n\n![](images/Oppepaev_2.png)',
-    '# First shot\n\n![](images/first-shot-2.png)',
+    '# First shot\n\n![](Kickoff.rtms.files/first-shot.png)',
+    '# Õppepäev 2\n\n![](Kickoff.rtms.files/Oppepaev_2.png)',
+    '# First shot\n\n![](Kickoff.rtms.files/first-shot-2.png)',
   ], 'a Picture slide each: its title and its picture; two of the same name keep their own files')
   const saved = deck.save()
-  assert.match(saved, /```slide\n---\nid: \w+\n---\n# First shot\n\n!\[\]\(images\/first-shot\.png\)\n```\n\n```slide/, 'written as block slides')
+  assert.match(saved, /```slide\n---\nid: \w+\n---\n# First shot\n\n!\[\]\(Kickoff\.rtms\.files\/first-shot\.png\)\n```\n\n```slide/, 'written as block slides')
   assert.ok(saved.indexOf('Ask who has done one.') < saved.indexOf('First shot') && saved.indexOf('first-shot-2') < saved.indexOf('What it taught us'), 'between the two parts')
   // One Cmd+Z takes them all back: the same bytes.
   assert.ok(deck.undo())
@@ -197,7 +213,7 @@ const DECK = [
   assert.equal(deck.save(), before, 'one Undo, the same bytes')
 }
 
-// ---- The copy into images/: the host's writer, as a pasted picture is saved; names never clash
+// ---- The copy into the deck's folder: the host's writer, as a pasted picture is saved; names never clash
 {
   const dir = mkdtempSync(join(tmpdir(), 'strip-pictures-'))
   try {
@@ -217,7 +233,7 @@ const DECK = [
   const here = join(process.cwd(), process.cwd().endsWith('webview') ? 'src/components/decks' : 'webview/src/components/decks')
   const view = readFileSync(join(here, 'DeckView.tsx'), 'utf8')
   const strip = readFileSync(join(here, 'SlideStrip.tsx'), 'utf8')
-  assert.match(view, /sendToExtension\('deck\/save-image', \{ slideId: ids\[index\], dataUrl, filename: getUniqueImageFilename\(file\) \}\)/, 'saved in images/ as a dropped picture is')
+  assert.match(view, /sendToExtension\('deck\/save-image', \{ slideId: ids\[index\], dataUrl, filename: getUniqueImageFilename\(file\) \}\)/, 'uses the deck picture writer')
   assert.match(view, /inserted = dispatchStepRef\.current\(insertPictureSlides\(target\.state, at, saved, textHandoutRef\.current\)\)/, 'one undo step')
   assert.match(view, /const at = dropPlaceNow\(slidesOf\(target\.state\.doc\)\.map\(entry => entry\.data\.id\), drop\.before, drop\.at\)/, 'before the slide it was dropped before')
   assert.match(view, /const at = dropPlaceNow\(slidesOf\(target\.state\.doc\)\.map\(entry => entry\.data\.id\), drop\.before, drop\.at\)/, 'before the slide it was dropped before')

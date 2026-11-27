@@ -19,14 +19,15 @@ import { CloudflareAccount, CONNECTION_SECRET_KEY } from './cloudflare/account';
 import { CloudflareClient } from './cloudflare/client';
 import { CloudflareHost } from './cloudflare/CloudflareHost';
 import { openExternalStubbed } from './devSheetHarness';
-import { gatherPage } from './gather';
+import { gatherPage, HostedDeckLayoutError, type HostedDeckPage } from './gather';
 import { PublishRecordStore } from './publishRecords';
 import { PublishController, sheetHostAvailable, UNTITLED_PAGE, type PublishOutcome, type PageBarState, type PublishUi } from './PublishController';
 import { plainLine, plainPart } from './plainText';
 import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
 import type { SheetOptions } from './sheetModel';
-import { showBriefToast } from '../feedback/feedbackSheet';
+import { FEEDBACK_OPEN_COMMAND, showBriefToast } from '../feedback/feedbackSheet';
+import { failureFeedbackOptions, isSafeFailureFeedbackPart } from '../feedback/feedbackQuoteSafety';
 
 export const PUBLISH_READY_CONTEXT = 'ritemark.publish.ready';
 export const UNPUBLISH_PAGE_COMMAND = 'ritemark.page.unpublish';
@@ -37,6 +38,18 @@ export const PAGE_STATE_COMMAND = '_ritemark.publish.pageState';
 /** Patch 010's: the bar asks `PAGE_STATE_COMMAND` again for this page's URL. */
 export const BAR_REFRESH_COMMAND = '_ritemark.browser.publishStateChanged';
 const OPEN_SETTINGS = 'Open Settings';
+const FAILURE_FEEDBACK = 'Tell us about this';
+
+function showPublishWarning(title: string, line: string, recovery: string, recover: () => void, quoteSafe = true): void {
+  const shown = plainLine(line);
+  const options = quoteSafe && isSafeFailureFeedbackPart(line)
+    ? failureFeedbackOptions(title, shown)
+    : { from: 'failure_card' };
+  void vscode.window.showWarningMessage(shown, recovery, FAILURE_FEEDBACK).then((pick) => {
+    if (pick === recovery) recover();
+    if (pick === FAILURE_FEEDBACK) void vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
+  });
+}
 
 export interface PublishFeature {
   controller: PublishController;
@@ -56,8 +69,9 @@ export interface PublishFeature {
    * controller's state can't tell a cancel apart, since a cancel changes nothing in it, and a press that found the
    * sheet already open (`busy`) is no cancel.
    */
-  publishPage(page: vscode.Uri): Promise<PublishOutcome | undefined>;
+  publishPage(page: vscode.Uri, hostedDeck?: HostedDeckPage): Promise<PublishOutcome | undefined>;
   /** The sheet's What goes and What stays rows for pages made from a deck: the deck host answers for its own pages. */
+  setHostedDeckPage(provider: ((pagePath: string) => Promise<HostedDeckPage | undefined>) | null, assetsHeld?: (file: string) => boolean): void;
   setPageRows(provider: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null): void;
 }
 
@@ -107,9 +121,14 @@ function filePathOf(arg: unknown): string | undefined {
 }
 
 /** The page's real path, as the records are keyed (PR 3: by real path). */
-async function pagePathOf(arg: unknown): Promise<string | undefined> {
+async function pagePathOf(arg: unknown, controller: PublishController): Promise<string | undefined> {
   const fsPath = filePathOf(arg);
-  return fsPath ? fs.promises.realpath(fsPath).catch(() => fsPath) : undefined;
+  if (!fsPath) return undefined;
+  const real = await fs.promises.realpath(fsPath).catch(() => undefined);
+  if (real === fsPath) return real;
+  const folder = await fs.promises.realpath(path.dirname(fsPath)).catch(() => path.dirname(fsPath));
+  const recorded = path.join(folder, path.basename(fsPath));
+  return real && recorded !== real && !await controller.recordFor(recorded) ? real : recorded;
 }
 
 export function createPublishFeature(
@@ -119,6 +138,7 @@ export function createPublishFeature(
 ): PublishFeature {
   let settingsListener: ((projection: WebPagesSettingsProjection) => void) | null = null;
   let ready = false;
+  let hostedDeckPage: ((pagePath: string) => Promise<HostedDeckPage | undefined>) | null = null;
   let pageRows: ((pagePath: string) => Promise<SheetOptions['deck'] | undefined>) | null = null;
   const readyChanged = new vscode.EventEmitter<boolean>();
   const pageStateChanged = new vscode.EventEmitter<string>();
@@ -130,9 +150,16 @@ export function createPublishFeature(
   const host = new CloudflareHost(account, { log });
   const records = new PublishRecordStore(context.globalStorageUri.fsPath);
 
+  let deckAssetsHeld: ((file: string) => boolean) | undefined;
   const controller = new PublishController({
     host,
     records,
+    legacyFiles: {
+      extensionPath: context.extensionPath,
+      held: file => deckAssetsHeld?.(file) ?? false,
+      trash: file => Promise.resolve(vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true, recursive: false })),
+    },
+    hostedDeckPage: path => hostedDeckPage?.(path) ?? Promise.resolve(undefined),
     gather: (pagePath, projectFolder) => gatherPage(pagePath, projectFolder),
     ui: {
       openExternal: async (url) => {
@@ -148,9 +175,7 @@ export function createPublishFeature(
         const answer = await showPublishSheet(context, plan, { ...options, setup, onConfirm });
         return answer;
       },
-      showFailure: (line, retry) => {
-        void vscode.window.showWarningMessage(plainLine(line), 'Try again').then((pick) => { if (pick === 'Try again') retry(); });
-      },
+      showFailure: (line, retry, title, quoteSafe) => showPublishWarning(title, line, 'Try again', retry, quoteSafe),
       // The bar's Unpublish past 10 s: a line that stays while Cloudflare takes the page down, closed when it is down
       showWaiting: (line) => {
         let done: () => void = () => undefined;
@@ -161,11 +186,9 @@ export function createPublishFeature(
       // M6's wait and its end: patch 018's brief toast, which goes by itself (an ordinary message in a shell without it)
       showBrief: (line) => { void showBriefToast(plainLine(line)); },
       // The bar's Unpublish signed out or on another account: Settings ▸ Sharing ▸ Web pages is where Cloudflare is connected
-      showConnect: (line) => {
-        void vscode.window.showWarningMessage(plainLine(line), OPEN_SETTINGS).then((pick) => {
-          if (pick === OPEN_SETTINGS) void vscode.commands.executeCommand('ritemark.aiSettings', 'web-pages');
-        });
-      },
+      showConnect: (line, title, quoteSafe) => showPublishWarning(title, line, OPEN_SETTINGS, () => {
+        void vscode.commands.executeCommand('ritemark.aiSettings', 'web-pages');
+      }, quoteSafe),
     },
     isFeatureEnabled,
     postSettings: (projection) => settingsListener?.(projection),
@@ -184,7 +207,7 @@ export function createPublishFeature(
     pageRows: (pagePath) => (pageRows ? pageRows(pagePath) : Promise.resolve(undefined)),
     log,
   });
-  setPublishHandler((page) => controller.publishFromBar(page));
+  setPublishHandler((page, hostedDeck) => controller.publishFromBar({ ...page, hostedDeck }));
 
   context.subscriptions.push(
     { dispose: () => setPublishHandler(null) },
@@ -198,7 +221,7 @@ export function createPublishFeature(
       if (event.key === CONNECTION_SECRET_KEY) void controller.connectionChanged(() => account.reload());
     }),
     vscode.commands.registerCommand(UNPUBLISH_PAGE_COMMAND, async (arg?: unknown) => {
-      const pagePath = await pagePathOf(arg);
+      const pagePath = await pagePathOf(arg, controller);
       if (!pagePath) return;
       const record = await controller.recordFor(pagePath);
       if (!record) return;
@@ -207,29 +230,31 @@ export function createPublishFeature(
         { modal: true, detail: 'The link stops working for everyone who has it. The file stays in this project.' },
         'Unpublish',
       );
-      if (answer === 'Unpublish') await controller.unpublishPage(pagePath);
+      if (answer === 'Unpublish') await controller.unpublishSite(record.siteName, { fromBar: true });
     }),
     vscode.commands.registerCommand(COPY_LINK_COMMAND, async (arg?: unknown) => {
-      const pagePath = await pagePathOf(arg);
+      const pagePath = await pagePathOf(arg, controller);
       const record = pagePath ? await controller.recordFor(pagePath) : undefined;
       if (record) await vscode.env.clipboard.writeText(record.address);
     }),
     vscode.commands.registerCommand(OPEN_PUBLISHED_COMMAND, async (arg?: unknown) => {
-      const pagePath = await pagePathOf(arg);
+      const pagePath = await pagePathOf(arg, controller);
       const record = pagePath ? await controller.recordFor(pagePath) : undefined;
       if (record) await controller.openSite(record.siteName);
     }),
     vscode.commands.registerCommand(PAGE_STATE_COMMAND, async (arg?: unknown): Promise<PageBarState | undefined> => {
-      const pagePath = await pagePathOf(arg);
+      const pagePath = await pagePathOf(arg, controller);
       if (!pagePath) return undefined;
       // "Published · changed" compares PR 3's content hash of what would go now with the record's. Only a page shown as
       // published needs it: Publishing…, Unpublishing… and an unpublished page skip the gather and scan (round 3). Not
       // memoised: a file saved between two asks must show as changed
       let currentHash: string | undefined;
       const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(pagePath));
-      if (folder?.uri.scheme === 'file' && await controller.needsCurrentHash(pagePath)) {
+      if (folder?.uri.scheme === 'file' && await controller.needsCurrentHash(pagePath)
+        && await fs.promises.realpath(pagePath).catch(() => undefined) === pagePath) {
         const projectFolder = await fs.promises.realpath(folder.uri.fsPath).catch(() => folder.uri.fsPath);
-        currentHash = await gatherPage(pagePath, projectFolder).then((plan) => plan.contentHash, () => undefined);
+        currentHash = await controller.currentPageHash({ realPath: pagePath, projectFolder }).catch(error =>
+          error instanceof HostedDeckLayoutError ? '' : undefined);
       }
       return controller.pageState(pagePath, currentHash);
     }),
@@ -249,7 +274,8 @@ export function createPublishFeature(
     isReady: () => ready,
     onDidChangeReady: readyChanged.event,
     onDidChangePageState: pageStateChanged.event,
-    publishPage: (page) => publishPageToEnd(page),
+    publishPage: (page, hostedDeck) => publishPageToEnd(page, hostedDeck),
+    setHostedDeckPage: (provider, assetsHeld) => { hostedDeckPage = provider; deckAssetsHeld = assetsHeld; },
     setPageRows: (provider) => { pageRows = provider; },
   };
 }

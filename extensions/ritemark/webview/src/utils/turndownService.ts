@@ -1,9 +1,45 @@
 import TurndownService from 'turndown'
+import { Lexer, marked, type Links, type Marked, type Tokens } from 'marked'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
-import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { isRelativeImagePath, isWebviewResourceUri, markdownImageSource, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
+import { pictureTarget } from '../../../src/decks/blocks/legacyToBlocks'
 import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
-import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
+import { pictureDefinition, pictureDefinitionAttribute } from '../extensions/pictures/pictureReferences'
+import { addAsWrittenTurndownRules, blockImage, blockLeading, blockTrailing, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
+
+/** Marked encodes the destination for display, and host mappings may use its unencoded path. */
+function matchesImageSource(href: string, src: string): boolean {
+  if (href === src) return true
+  try {
+    const rendered = markdownImageSource(href)
+    return rendered === src || rendered === markdownImageSource(unescapeMarkdownImagePath(src))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The local file a webview display URI shows (`https://file+.vscode-resource.vscode-cdn.net/<path>?v=…` or
+ * `vscode-resource:/<path>`), without its cache query. Only for a picture that has no relative path left.
+ */
+function localPathOfDisplayUri(src: string): string {
+  try {
+    const url = new URL(src)
+    const path = decodeURIComponent(url.pathname)
+    return /^\/[a-z]:\//i.test(path) ? path.slice(1) : path
+  } catch {
+    return src.replace(/[?#].*$/, '')
+  }
+}
+
+/** Marked's image text and title contain HTML entities which the DOM already decoded. */
+function decodeImageText(el: HTMLImageElement, text: string): string {
+  if (!text.includes('&')) return text
+  const decoder = el.ownerDocument.createElement('span')
+  decoder.innerHTML = text.replace(/</g, '&lt;')
+  return decoder.textContent ?? ''
+}
 
 /**
  * Create a fresh TurndownService configured with Ritemark's canonical
@@ -27,7 +63,7 @@ import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBracket
  *    editor's `data-md-*` attributes (paste, Word's Save as Markdown) gets one
  *    plain form: `- item`, tight lists, `---`, `| --- |`, a backslash break.
  */
-export function createTurndownService(): TurndownService {
+export function createTurndownService(instance: Pick<Marked, 'defaults'> = marked): TurndownService {
   const service = new TurndownService({
     headingStyle: 'atx',
     codeBlockStyle: 'fenced',
@@ -58,20 +94,37 @@ export function createTurndownService(): TurndownService {
   // (`neutraliseBrackets`). Only input with a bracket takes the extra pass; it
   // is parsed in an inert document, as Turndown parses its own string input.
   const turndown = service.turndown.bind(service)
+  let definitions: Links | undefined
+  const serialize = (root: TurndownService.Node): string => {
+    // Nested calls (e.g. one list item) still need the document's definitions.
+    if (definitions) return turndown(root)
+    const links: Links = Object.create(null)
+    const elements = (root as ParentNode).querySelectorAll?.(`hr[${pictureDefinitionAttribute}]`) ?? []
+    for (const element of Array.from(elements)) {
+      const definition = pictureDefinition(element.getAttribute(pictureDefinitionAttribute) ?? '')
+      if (definition) links[definition.tag] ??= { href: definition.href, title: definition.title }
+    }
+    definitions = links
+    try {
+      return turndown(root)
+    } finally {
+      definitions = undefined
+    }
+  }
   service.turndown = (input: string | TurndownService.Node): string => {
     if (typeof document === 'undefined') return turndown(input)
     if (typeof input === 'string') {
-      if (!/[[\]]/.test(input)) return turndown(input)
+      if (!definitions && !/[[\]]/.test(input)) return turndown(input)
       const inert = document.implementation?.createHTMLDocument?.('') ?? document
       const root = inert.createElement('div')
       root.innerHTML = input
       neutraliseBrackets(root)
-      return turndown(root)
+      return serialize(root)
     }
-    if (!/[[\]]/.test(input.textContent ?? '')) return turndown(input)
+    if (!/[[\]]/.test(input.textContent ?? '')) return serialize(input)
     const root = input.cloneNode(true)
     neutraliseBrackets(root)
-    return turndown(root as TurndownService.Node)
+    return serialize(root as TurndownService.Node)
   }
 
   // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
@@ -101,22 +154,60 @@ export function createTurndownService(): TurndownService {
     filter: 'img',
     replacement(_content, node) {
       const el = node as HTMLImageElement
-      // Experience 49: a description typed in the bar is written so it never breaks the image line (markdownAlt).
-      const alt = markdownAlt(el.alt || '')
+      const alt = el.getAttribute('alt') ?? ''
       const title = el.getAttribute('title') || ''
-      const displaySrc = el.getAttribute('src') || el.src
-      const src = title.startsWith('./') || (isRelativeImagePath(title) && isWebviewResourceUri(displaySrc))
-        ? title
-        : displaySrc
-      // Experience 49: the picture's look, as written beside it, only a block the editors read (never other words).
+      const displaySrc = el.getAttribute('src') ?? el.src
+      const writtenSrc = el.getAttribute('data-md-image-src')
+      const writtenTarget = el.getAttribute('data-md-image-target')
+      const displayOnly = isWebviewResourceUri(displaySrc.trim())
+      const useTitle = isRelativeImagePath(title) && (displayOnly ||
+        ((writtenSrc !== null || writtenTarget === null) && displaySrc !== writtenSrc && title.startsWith('./')))
+      let src = useTitle ? title : displaySrc
+      // Never serialize a display URI. With no relative path left, write the local file it shows rather than drop the
+      // picture: a picture the person sees must never vanish from their file on save.
+      if (isWebviewResourceUri(src.trim())) {
+        src = isRelativeImagePath(title) && !isWebviewResourceUri(title.trim()) ? title : localPathOfDisplayUri(src.trim())
+      }
+      const label = `![${markdownAlt(alt)}]`
+      const caption = el.getAttribute('data-md-image-title') ?? (writtenTarget !== null && !useTitle ? title : '')
+      const escapedCaption = caption
+        .replace(/&(?:#(?:[0-9]{1,7}|[xX][0-9a-fA-F]{1,6})|[a-zA-Z][a-zA-Z0-9]+);/g,
+          entity => decodeImageText(el, entity) === entity ? entity : '&amp;' + entity.slice(1))
+        .replace(/\\(?=[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]|$)|"/g, '\\$&')
+      let markdown = label + `(${pictureTarget(src)}${caption ? ` "${escapedCaption}"` : ''})`
+      if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
+        const writtenLabel = alt === el.getAttribute('data-md-image-alt')
+          ? el.getAttribute('data-md-image-label')
+          : null
+        const candidate = (writtenLabel ?? label) + writtenTarget
+        const lexer = new Lexer(instance.defaults)
+        if (definitions) lexer.tokens.links = definitions
+        const blocks = lexer.lex(candidate)
+        const paragraph = blocks[0] as Tokens.Paragraph | undefined
+        const tokens = paragraph?.type === 'paragraph' ? paragraph.tokens : []
+        const token = tokens[0] as Tokens.Image | undefined
+        if (blocks.length === 1 && tokens.length === 1 && token?.type === 'image' && token.raw === candidate &&
+            !isWebviewResourceUri(token.href.trim()) && matchesImageSource(token.href, src) &&
+            decodeImageText(el, token.text) === alt && decodeImageText(el, token.title ?? '') === caption) {
+          markdown = candidate
+        }
+      }
+      // Experience 49: keep a valid picture look block beside the image.
       const block = el.getAttribute('data-picture') ?? ''
-      return blockImage(`![${alt}](${src})${parsePictureBlock(block) ? block : ''}`, el)
+      return blockImage(markdown + (parsePictureBlock(block) ? block : ''), el)
     },
   })
 
   // The as-written rules, which also escape a table cell's pipes (the GFM
   // plugin doesn't, and an unescaped `|` breaks a table holding code).
   addAsWrittenTurndownRules(service)
+  service.addRule('pictureDefinition', {
+    filter: node => node.nodeName === 'HR' && node.hasAttribute(pictureDefinitionAttribute),
+    replacement(_content, node) {
+      const definition = pictureDefinition(node.getAttribute(pictureDefinitionAttribute) ?? '')
+      return definition ? blockLeading(node) + definition.raw + blockTrailing(node) : ''
+    },
+  })
   // Sprint 138 (#481, R2): equations written back as they were, `\$` kept,
   // and a typed `$` escaped only when it would pair up as math on reopening.
   addMathTurndownRules(service)

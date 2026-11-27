@@ -99,10 +99,10 @@ function caretIn(tr: Transaction, tablePos: number, row: number, col: number): T
   return tr
 }
 
-function finish(tr: Transaction): Transaction {
+function finish(tr: Transaction, scroll = true): Transaction {
   closeHistory(tr)
   tr.setMeta(TABLE_COMMAND, true)
-  return tr.scrollIntoView()
+  return scroll ? tr.scrollIntoView() : tr
 }
 
 /** A column's alignment, read from its header cell. */
@@ -206,7 +206,7 @@ export function setColumnWidths(state: EditorState, tablePos: number, percents: 
 // ---------------------------------------------------------------------------
 
 /** A new column at index `at` (0 = before the first, width = after the last). The caret goes to its cell in `focusRow`. */
-export function insertColumn(state: EditorState, tablePos: number, at: number, focusRow = 0): Transaction | null {
+export function insertColumn(state: EditorState, tablePos: number, at: number, focusRow = 0, scroll = true): Transaction | null {
   const table = tableAt(state.doc, tablePos)
   if (!table) return null
   const { width, height, map } = size(table.node)
@@ -235,7 +235,7 @@ export function insertColumn(state: EditorState, tablePos: number, at: number, f
     next.splice(at, 0, share)
     return next
   })
-  return finish(caretIn(tr, tablePos, Math.min(Math.max(focusRow, 0), height - 1), at))
+  return finish(caretIn(tr, tablePos, Math.min(Math.max(focusRow, 0), height - 1), at), scroll)
 }
 
 /** Delete a column; the table goes with its last column. */
@@ -326,7 +326,7 @@ export function sortByColumn(state: EditorState, tablePos: number, col: number, 
  * A new row at index `at`: 1 to height for a body row, 0 for a new header (the old header becomes the first body row).
  * Its cells take their columns' alignment. The caret goes to the new row's cell in `focusCol`.
  */
-export function insertRow(state: EditorState, tablePos: number, at: number, focusCol = 0): Transaction | null {
+export function insertRow(state: EditorState, tablePos: number, at: number, focusCol = 0, scroll = true): Transaction | null {
   const table = tableAt(state.doc, tablePos)
   if (!table) return null
   const { width, height } = size(table.node)
@@ -352,7 +352,7 @@ export function insertRow(state: EditorState, tablePos: number, at: number, focu
     })
   }
   tr.insert(pos, row)
-  return finish(caretIn(tr, tablePos, at, Math.min(Math.max(focusCol, 0), width - 1)))
+  return finish(caretIn(tr, tablePos, at, Math.min(Math.max(focusCol, 0), width - 1)), scroll)
 }
 
 /** Delete a body row (the header row is never deleted). */

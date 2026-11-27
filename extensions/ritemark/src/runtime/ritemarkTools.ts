@@ -49,9 +49,10 @@ import { exerciseTagOf, isDefaultExerciseTag, isSlideKind, type SlideData } from
 import { legacyDataToBlocks } from '../decks/blocks/legacyToBlocks';
 import { DECK_FONT_LIST } from '../decks/deckTheme';
 import type { AiThemeFields } from '../decks/themeChange';
-import type { DocumentKind, DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
+import type { DocumentKind, DocumentReadReason, DocumentReadRequest, DocumentReadResult } from '../documents/documentRead';
 
 export interface ToolResult {
+  reason?: DocumentReadReason;
   text: string;
   isError?: boolean;
 }

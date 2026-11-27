@@ -237,6 +237,14 @@ export async function trackEvent<T extends EventName>(
   return gate ? gate.track(name, properties) : false;
 }
 
+/** PR 3's thumbs and Take back use the ordinary consent-gated analytics path. */
+export function trackAnswerReaction(
+  reaction: EventPayloads['ai_answer_reacted']['reaction'],
+  ai: EventPayloads['ai_answer_reacted']['ai'],
+): Promise<boolean> {
+  return trackEvent('ai_answer_reacted', { reaction, ai });
+}
+
 /** The welcome's events: held in memory until the answer (R8). */
 export async function trackWelcomeEvent<T extends HeldEventName>(
   name: T,

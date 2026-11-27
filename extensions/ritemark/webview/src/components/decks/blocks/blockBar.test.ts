@@ -35,10 +35,12 @@ import { saveSlideMarkdown } from './slideEditorMarkdown'
 import { editorHTML } from '../../../utils/markdownFidelity'
 import { SlideSync } from './slideSync'
 import { markableBox } from './slideDivView'
+import { boxForEmptyIconMenu } from './itemHandle'
+import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
-  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind,
+  BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
+  FOLD_AT, MAX_FOLD, barLeftPastPane, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind, type BoxIconMenuCloseReason,
   MARK_LABEL, MARK_MENU_TIP, MARK_TIP, divAttributesOf, setBoxesMark,
 } from './blockBar'
 
@@ -650,6 +652,22 @@ stable(COLUMNS, 'three columns')
   assert.equal(barLeft(500, 300, pane, 1440), 392, 'moved left to keep 8 px from the divider')
   assert.equal(barLeft(150, 300, pane, 1440), 208, 'never past the pane\'s left edge')
   assert.equal(barLeft(300, 490, pane, 1440), null, 'wider than the pane: the group folds')
+  const widthBeforeDelete = 460
+  const deleteWidth = 32
+  const deleteGap = 2
+  const rowWidth = widthBeforeDelete + deleteWidth + deleteGap
+  assert.equal(barLeft(300, widthBeforeDelete, pane, 1440), 232, 'without Delete the row fits at this fold')
+  assert.equal(barLeft(300, rowWidth, pane, 1440), null, 'the complete row needs another fold')
+  // Wider than the pane even folded: it stays in the window, sliding left over the strip, never off the right edge.
+  assert.equal(barLeftPastPane(506, { left: 400 }, 760), 246, 'over the strip, its right end 8 px inside the window')
+  assert.equal(barLeftPastPane(300, { left: 400 }, 1440), 408, 'room to the right: at the pane\'s left')
+  assert.equal(barLeftPastPane(900, { left: 400 }, 760), 8, 'wider than the window: from its left edge')
+  const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(barSource, /maxWidth:|flexWrap:/, 'measure the complete intrinsic row even at MAX_FOLD')
+  assert.match(barSource, /\{!iconOnly && BAR_KIND_LABEL\[chosen.kind\]\}/, 'the type keeps only its icons at the last fold')
+  assert.match(barSource, /\{!iconOnly && 'Add'\}/, 'Add keeps only its icon at the last fold')
+  assert.match(barSource, /<Group label="Style" folded=\{fold >= FOLD_AT.style\} bare=\{iconOnly\}/)
+  assert.match(barSource, /<Group label="Size" folded bare=\{iconOnly\}/)
   const list = { left: 100, top: 50, width: 400, height: 90 }
   const plus = plusSpot(list, 'list', 112)
   assert.equal(plus.left + HANDLE_SIZE / 2, 112, 'a list\'s + under its bullets')
@@ -667,6 +685,88 @@ stable(COLUMNS, 'three columns')
   // A box's icon handle: centred on its top edge, 12 px of the slide in from its right, the handles' size.
   const icon = iconSpot({ left: 100, top: 200, width: 300, height: 120 }, 0.5)
   assert.deepEqual(icon, { left: 400 - 6 - HANDLE_SIZE, top: 200 - HANDLE_SIZE / 2 })
+}
+
+// ---- #910: the Icon control follows the caret's box and uses the shared picker.
+{
+  const markdown = [
+    '# Outside', '', ':::: boxes', '::: {.box icon="lightbulb"}', 'Known', ':::', '',
+    '::: {.box icon="trukc"}', 'Unknown', ':::', '', '::: box', 'Empty', ':::', '::::',
+  ].join('\n')
+  assert.equal(caretBoxIcon(stateWith(markdown, 'Outside')), null)
+  for (const [text, current, glyph] of [
+    ['Known', 'lightbulb', 'lightbulb'], ['Unknown', 'trukc', 'circle-dashed'], ['Empty', null, 'circle-dashed'],
+  ] as const) {
+    const box = caretBoxIcon(stateWith(markdown, text))
+    assert.ok(box)
+    assert.equal(box.current, current)
+    assert.equal(box.glyph, glyph)
+  }
+
+  const state = stateWith(markdown, 'Unknown')
+  const box = caretBoxIcon(state)!
+  const query = iconMenuStartQuery(box.current)
+  assert.equal(query, 'trukc')
+  const [choice] = iconMenuChoices(query, []).icons
+  assert.equal(choice.phosphor, 'truck')
+  const picked = after(setBlockValue(state, box.pos, 'icon', choice.name))
+  assert.equal(caretBoxIcon(stateWith(picked, 'Unknown'))?.glyph, 'truck')
+  assert.equal(caretBoxIcon(stateWith(picked, 'Known'))?.glyph, 'lightbulb')
+
+  for (const mark of BOXES_MARKS) {
+    const look = MARK_LOOK[mark] ?? 'boxes'
+    const marked = markdown.replace(':::: boxes', `:::: {.boxes look="${look}"}`)
+    const visible = mark === 'icon' || mark === 'number'
+    assert.equal(caretBoxIcon(stateWith(marked, 'Known'))?.glyph, visible ? 'lightbulb' : undefined, mark)
+    assert.equal(caretBoxIcon(stateWith(marked, 'Empty'))?.current, visible ? null : undefined, mark)
+  }
+
+  const shortcut = { key: 'F10', altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, defaultPrevented: false }
+  assert.equal(isBoxIconShortcut(shortcut), true)
+  assert.equal(isBoxIconShortcut({ ...shortcut, key: 'F9' }), false)
+  assert.equal(isBoxIconShortcut({ ...shortcut, altKey: false }), false)
+  for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'defaultPrevented'] as const) {
+    assert.equal(isBoxIconShortcut({ ...shortcut, [key]: true }), false, key)
+  }
+}
+
+// ---- #1103: Mark opens the same Radix trigger as a press on the bar's box-icon button.
+{
+  const markdown = [':::: {.boxes look="arrows"}', '::: box', 'First', ':::', '', '::: box', 'Second', ':::', '::::'].join('\n')
+  const state = stateWith(markdown, 'Second')
+  const block = chosenBlockAt(state)!
+  const target = boxForEmptyIconMenu(state, block)
+  assert.notEqual(target, null)
+  assert.notEqual(target, boxForEmptyIconMenu(stateWith(markdown, 'First'), block))
+  assert.equal(caretBoxIcon(state), null)
+  const iconState = state.apply(setBoxesMark(state, block.pos, 'icon')!)
+  assert.equal(caretBoxIcon(iconState)?.pos, target, 'the newly rendered button is for the same box')
+
+  const bar = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  const editor = readFileSync(new URL('./SlideEditor.tsx', import.meta.url), 'utf8')
+  const tools = readFileSync(new URL('./SlideBlockTools.tsx', import.meta.url), 'utf8')
+  assert.match(bar, /choice === 'icon' \? boxForEmptyIconMenu[\s\S]*?apply\(tr\)[\s\S]*?measure\(\)\s*setPendingIcon\(\{ blockPos: block\.pos, pos \}\)/)
+  assert.match(bar, /useLayoutEffect\(\(\) => \{\s*if \(!pendingIcon\) return[\s\S]*?placed\?\.caretBox\?\.pos === pendingIcon\.pos \? iconTrigger\.current : null[\s\S]*?trigger\.dispatchEvent\(new PointerEvent\('pointerdown'/)
+  assert.match(bar, /<BoxIconButton\s+box=\{placed\.caretBox\}\s+trigger=\{iconTrigger\}/)
+  assert.match(bar, /<DropdownMenuTrigger asChild>\s*<Button\s+ref=\{trigger\}[^>]*aria-label="Icon"/)
+  assert.match(bar, /\} else \{\s*const anchor = editor\.view\.nodeDOM\(pendingIcon\.pos\)\s*if \(anchor instanceof HTMLElement\) pickIcon\?\.\(pendingIcon\.pos, anchor, null\)/)
+  assert.match(tools, /onOpenChange=\{open => \{ if \(!open\) onClose\(\) \}\}/)
+  assert.match(editor, /onClose=\{\(\) => setIconPick\(null\)\}/)
+}
+
+// ---- Focus after closing the box icon menu, by opening mode and close reason.
+{
+  const cases: [BoxIconMenuCloseReason, 'trigger' | 'editor' | null, 'trigger' | 'editor' | null][] = [
+    ['trigger', 'editor', 'trigger'],
+    ['outside', null, null],
+    ['escape', 'editor', 'trigger'],
+    ['mouse-pick', 'editor', 'editor'],
+    ['keyboard-pick', 'editor', 'trigger'],
+  ]
+  for (const [reason, mouseOpened, keyboardOpened] of cases) {
+    assert.equal(boxIconMenuReturnFocus(false, reason), mouseOpened, `mouse-opened: ${reason}`)
+    assert.equal(boxIconMenuReturnFocus(true, reason), keyboardOpened, `keyboard-opened: ${reason}`)
+  }
 }
 
 // ---- The hang on changing slides: the caret's mark goes only on a box the slide draws, in the page.
@@ -740,20 +840,24 @@ stable(COLUMNS, 'three columns')
     assert.equal(after(setReveal(state, chosen.pos, false)), LIST, `${form.split('\n')[2]}: All at once unwraps to the bare list`)
   }
   // The bar's control (the Experience lead, 18 November): one toggle, "One by one", pressed when on, with a tooltip; a
-  // press flips it (off is All at once). It folds just after the alignment: before Width (or the count) and Style.
+  // press flips it (off is All at once). It folds just after the alignment: before the Columns count and Style.
   assert.equal(REVEAL_LABEL, 'One by one')
   assert.ok(/Present/.test(REVEAL_TIP) && /one by one/.test(REVEAL_TIP), REVEAL_TIP)
-  assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Width or count, Style')
+  assert.ok(FOLD_AT.alignment < FOLD_AT.reveal && FOLD_AT.reveal < FOLD_AT.size && FOLD_AT.size < FOLD_AT.style, 'alignment, Reveal, Columns count, Style')
   assert.equal(FOLD_AT.reveal, FOLD_AT.alignment + 1, 'Reveal folds right after the alignment')
   // Sprint 167 PR 2: Boxes' Mark, a menu already, folds last, to its value's icon (review of #878: else the Boxes bar at
   // its last fold was a menu wider than before, and ran past a narrow pane).
   assert.ok(FOLD_AT.style < FOLD_AT.mark, 'Style, then Mark')
-  assert.equal(MAX_FOLD, FOLD_AT.mark, 'every group can fold')
+  assert.ok(FOLD_AT.mark < FOLD_AT.words, 'Mark, then the words')
+  assert.equal(MAX_FOLD, FOLD_AT.words, 'every group can fold, then the words go')
   {
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
-    assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
+    // One by one is a lone toggle with no segment track (the Experience lead, 27 November): off has no ground.
+    assert.ok(!barSource.includes('<Segment label="Reveal">'), 'One by one sits in no segment track')
+    assert.match(barSource, /<Choice\s+plain\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
     assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
-    for (const group of ['Style', 'Width', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
+    for (const group of ['Style', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
+    assert.match(barSource, /<Group label="Size" folded bare=\{iconOnly\} icon="columns" tip=/)
     assert.match(barSource, /fold < MAX_FOLD/)
   }
   // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).
@@ -818,7 +922,7 @@ stable(COLUMNS, 'three columns')
   assert.equal(MARK_LOOK.icon, null, 'Icon writes no look')
   assert.deepEqual(new Set(BOXES_MARKS.map(mark => MARK_LOOK[mark]).filter(look => look !== null)), OWN_MARK_LOOKS, 'Number, Dot, Arrow are the own-mark looks')
   for (const mark of BOXES_MARKS) assert.ok(MARK_TIP[mark].length > 0, `${mark} has a tooltip`)
-  assert.ok(/icon/.test(MARK_MENU_TIP) && /number/.test(MARK_MENU_TIP), MARK_MENU_TIP)
+  assert.equal(MARK_MENU_TIP, 'Mark on every box')
   // An old deck's look reads as its Mark, by the word that draws it; none, `boxes` and a word no look draws are Icon.
   for (const [line, mark] of [
     [':::: boxes', 'icon'], [':::: {.boxes look="boxes"}', 'icon'], [':::: {.boxes look="steps"}', 'number'], [':::: {.boxes look="line"}', 'dot'],
@@ -826,7 +930,7 @@ stable(COLUMNS, 'three columns')
   ] as const) {
     assert.equal(boxesMarkOf(lineOf(line)), mark, line)
     const drawn = blockSlideHtml(`${line}\n::: {.box icon="lightbulb"}\n### A\n:::\n::::`)
-    assert.equal(drawn.includes('class="blk-icon"'), mark === 'icon', `${line}: an icon drawn only under Icon`)
+    assert.equal(drawn.includes('class="blk-icon"'), mark === 'icon' || mark === 'number', `${line}: icon visibility`)
   }
 
   // Each mark round-trips: written on the block's own line only, the same bytes on the next open, read back as itself,
@@ -852,7 +956,7 @@ stable(COLUMNS, 'three columns')
     assert.ok(markdown.includes('icon="lightbulb"') && markdown.includes('icon="target"'), `${mark}: each box keeps its icon in the file`)
     const html = blockSlideHtml(markdown)
     assert.ok(html.includes(`data-look="${MARK_LOOK[mark]}"`), `${mark} drawn as its look`)
-    assert.ok(!html.includes('class="blk-icon"'), `${mark}: no icon drawn`)
+    assert.equal((html.match(/class="blk-icon"/g) ?? []).length, mark === 'number' ? 2 : 0, mark)
     assert.equal((html.match(/class="blk-mark"/g) ?? []).length, mark === 'arrow' ? 3 : 0, `${mark}: an arrow on each box only under Arrow`)
     // And back to Icon: the line as it was, the icons drawn again.
     const back = after(setBoxesMark(again, read.pos, 'icon'))
@@ -965,20 +1069,22 @@ stable(COLUMNS, 'three columns')
     assert.deepEqual(numbers(slideOf(stage.save())), ['1 Two', '2 Three'], 'a delete: the numbers close up')
   }
 
-  // The bar: Mark is a menu that shows its value, right after Filled and Outline (before Width), each choice with its
+  // The bar: Mark is a menu that shows its value, right after Filled and Outline (before Size), each choice with its
   // word and icon; it is a menu already, so it never folds.
   const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
   const style = barSource.indexOf('<Group label="Style"')
   const markAt = barSource.indexOf('<Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(')
-  const width = barSource.indexOf('<Group label="Width"')
-  assert.ok(style > 0 && markAt > style && width > markAt, 'Style, then Mark, then Width')
-  assert.match(barSource, /pick: \(\) => run\(act\(pos => setBoxesMark\(editor\.state, pos, choice\)\)\)/)
+  const size = barSource.indexOf('<Group label="Size"')
+  const boxIcon = barSource.indexOf('{boxIconButton}', markAt)
+  assert.ok(style > 0 && markAt > style && boxIcon > markAt && size > boxIcon, 'Style, Mark, box icon, Size')
+  assert.ok(!barSource.slice(markAt, boxIcon).includes('<Sep />'), 'Mark and box icon share a group')
+  assert.match(barSource.slice(markAt, boxIcon), /pick: \(\) => pickMark\(choice\)/)
   assert.match(barSource, /const MARK_ICON: Record<BoxesMark, PhosphorIconName> = \{ icon: 'smiley', number: 'list-numbers', dot: 'record', arrow: 'arrow-right' \}/)
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
-  // tooltip says it.
+  // accessible name keeps the value.
   assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
-  assert.match(barSource, /\{bare && current\.icon \? null : current\.label\}/)
-  assert.match(barSource, /<Tooltip label=\{bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : tip \?\? label\}>/)
+  assert.match(barSource, /\{bare && triggerIcon \? null : current\.label\}/)
+  assert.match(barSource, /<Tooltip label=\{tip \?\? \(bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : label\)\}>/)
 }
 
 console.log('blockBar: Turn into, Width, Style, Mark, alignment, Columns, the split, Add, Delete, the drag, Tab, the handles and Reveal pass')

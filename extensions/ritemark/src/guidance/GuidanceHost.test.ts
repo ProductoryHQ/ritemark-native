@@ -50,6 +50,7 @@ const none = () => ({ dispose() {} });
 const configListeners: Array<(event: { affectsConfiguration(section: string): boolean }) => void> = [];
 const opened: string[] = [];
 const commands: string[] = [];
+const handlers = new Map<string, () => unknown>();
 const settings = new Map<string, unknown>();
 let openWorks = true;
 const vscodeStub = {
@@ -76,11 +77,12 @@ const vscodeStub = {
     showInformationMessage: async () => undefined,
     showWarningMessage: async () => undefined,
   },
-  commands: { executeCommand: async (id: string) => { commands.push(id); }, registerCommand: none },
+  commands: { executeCommand: async (id: string) => { commands.push(id); return handlers.get(id)?.(); }, registerCommand: (id: string, run: () => unknown) => { handlers.set(id, run); return none(); } },
   env: { openExternal: async (uri: { toString(): string }) => { opened.push(uri.toString()); return openWorks; } },
   extensions: { getExtension: () => undefined },
 };
 // The usage counts the host hands to the consent gate, recorded (the gate's yes, no and holding: consent.test.ts)
+let feedbackSends = 0;
 const counts: Array<{ event: string; held: boolean } & Record<string, unknown>> = [];
 /** What the gate answers a count: false while nothing may be sent (no yes, usage data off, the kill switch). */
 let gateSends = false;
@@ -93,6 +95,7 @@ const load = (Module as unknown as { _load: (request: string, ...rest: unknown[]
     ...(loaded as object),
     __esModule: true,
     trackEvent: async (event: string, properties: Record<string, unknown>) => { counts.push({ ...properties, event, held: false }); return gateSends; },
+    sendFeedback: async () => { feedbackSends++; return true; },
     trackWelcomeEvent: async (event: string, properties: Record<string, unknown>) => { counts.push({ ...properties, event, held: true }); },
   };
 };
@@ -107,6 +110,8 @@ const flush = async () => { for (let i = 0; i < 12; i++) await new Promise((reso
 async function main(): Promise<void> {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval', 'Date'], now: 1_000_000 });
   const { GuidanceHost } = await import('./GuidanceHost');
+  const { GuidanceStore } = await import('./guidanceStore');
+  const { localDay } = await import('./guidanceState');
   const { CodexRuntime } = await import('../codex/CodexRuntime');
   const { emitCodexStatusInvalidated } = await import('../codex/codexStatusEvents');
   const { emitClaudeStatusInvalidated } = await import('../agent/claudeStatusEvents');
@@ -158,7 +163,10 @@ async function main(): Promise<void> {
   const chats: unknown[] = [];
   const folder = makeTempDir('rm-guidance-host-');
   fs.writeFileSync(path.join(folder, 'Brief.docx'), 'x');
-  const host = new GuidanceHost({
+  const store = new GuidanceStore(globalState, '2.2.0', '2.2.0', folder);
+  const deps: ConstructorParameters<typeof GuidanceHost>[0] = {
+    store,
+    appRun: 'second',
     context: {
       extension: { packageJSON: { version: '2.2.0' } },
       globalState,
@@ -176,7 +184,8 @@ async function main(): Promise<void> {
     onTurnAccepted: none,
     onChatOrigin: none,
     claudeSignIn,
-  });
+  };
+  const host = new GuidanceHost(deps);
   const input = {
     folderUri: `file://${folder}`, folderPath: folder, projectName: 'Training work', empty: false, whatMoved: false,
     foundBy: 'opened' as const, chatIndex: [], handoffs: [], skipAtRoot: new Set<string>(),
@@ -191,6 +200,9 @@ async function main(): Promise<void> {
 
   // ── No AI ready: ChatGPT leads, and Ask with is the host's every AI in today's order, the lead included ──
   let shown = await card();
+  assert.equal((await host.homeGuidance({ ...input, whatMoved: true }, { quickLook: true }))?.card, 'what-moved');
+  assert.equal((await host.homeGuidance({ ...input, foundBy: null }, { quickLook: true }))?.card, 'quick-look');
+  assert.equal(store.read().readyShownOn, undefined, 'computing a card does not record an impression');
   assert.equal(shown.ai, 'codex');
   assert.equal(shown.aiName, 'ChatGPT');
   assert.equal(shown.aiReady, false);
@@ -505,7 +517,10 @@ async function main(): Promise<void> {
   counts.splice(0);
   shown = await card();
   gateSends = false; // usage data off, or before the welcome's yes
+  await host.readyCardShown(input.folderUri, { card: 'what-moved' });
+  assert.equal(store.read().readyShownOn, undefined);
   await host.readyCardShown(input.folderUri, shown);
+  assert.equal(store.read().readyShownOn, localDay(new Date()));
   assert.deepEqual(cardCounts(), [{ event: 'ready_card_shown', kind: 'files', ai_ready: shown.aiReady, provider: 'opencode', held: false }], 'handed to the gate, which sends nothing');
   gateSends = true;
   await host.readyCardShown(input.folderUri, shown);
@@ -521,6 +536,7 @@ async function main(): Promise<void> {
   await host.readyCardShown(input.folderUri, shown);
   assert.deepEqual(cardCounts(), [], 'the guidance record rewritten whole: still no second count');
   const reloaded = new GuidanceHost({
+    store: new GuidanceStore(globalState, '2.3.0'),
     context: { extension: { packageJSON: { version: '2.3.0' } }, globalState, secrets: { onDidChange: none, get: async () => undefined } } as never,
     folder: undefined, runtimeAvailability: availability as never, startChat: async () => {}, startCodexSignIn, stopCodexSignIn,
     give: async () => null, hasWorkingTurn: () => false, setStartingPlace: () => {}, onTurnAccepted: none, onChatOrigin: none, claudeSignIn,
@@ -568,6 +584,90 @@ async function main(): Promise<void> {
   for (const listener of configListeners) listener({ affectsConfiguration: (section) => section === 'editor.fontSize' });
   assert.equal(cardChanges, 1, 'only the decks flag redraws the card');
   watching.dispose();
+
+  await store.initializeAppRun('second', true);
+  const noReadyRequest = { ...input, foundBy: null } as const;
+  for (const day of ['2026-11-01', '2026-11-02', '2026-11-03']) {
+    await store.noteDocumentSaved('file', new Date(`${day}T12:00:00`), true);
+  }
+  assert.equal(await host.homeGuidance(noReadyRequest), null, 'the open-source card waits if a ready request showed today');
+  await store.noteReadyShown('2026-11-01');
+  assert.equal((await host.homeGuidance({ ...noReadyRequest, whatMoved: true }))?.card, 'what-moved');
+  assert.equal((await host.homeGuidance(noReadyRequest, { quickLook: true }))?.card, 'quick-look');
+  assert.equal((await host.homeGuidance(noReadyRequest))?.card, 'open-source');
+  assert.equal(await store.openHomePresentation('second'), undefined, 'selection alone does not record a presentation');
+  {
+    // Review round 2 (#1139): a failing marker read fails closed, so Home still draws without the card.
+    const realOpen = store.openHomePresentation.bind(store);
+    const realReserve = store.reserveHomePresentation.bind(store);
+    store.openHomePresentation = async () => { throw Object.assign(new Error('too many open files'), { code: 'EMFILE' }); };
+    store.reserveHomePresentation = async () => false;
+    assert.equal(await host.presentOpenSource(), false, 'a failing marker read fails closed');
+    store.openHomePresentation = realOpen;
+    store.reserveHomePresentation = realReserve;
+  }
+  const { registerFeedback } = await import('../feedback/feedbackSheet');
+  registerFeedback({ subscriptions: [] } as never, {} as never);
+  counts.length = 0;
+  opened.length = 0;
+  for (const [action, release] of [['discussions', '2.2.1'], ['dismiss', '2.2.2']] as const) {
+    const actionStore = new GuidanceStore(globalState, release, release, folder);
+    const actionHost = new GuidanceHost({ ...deps, store: actionStore });
+    assert.equal((await actionHost.homeGuidance(noReadyRequest))?.card, 'open-source');
+    assert.equal(await actionHost.presentOpenSource(), true);
+    const markerFolder = path.join(folder, 'home-presentations');
+    const markers = () => fs.readdirSync(markerFolder).sort().map((name) => [name, fs.readFileSync(path.join(markerFolder, name), 'utf8')]);
+    const originalMarkers = markers();
+    const reloadedStore = new GuidanceStore(globalState, release, release, folder);
+    const reloadedHost = new GuidanceHost({ ...deps, store: reloadedStore });
+    assert.equal((await reloadedHost.homeGuidance(noReadyRequest))?.card, 'open-source', 'a same-run reload restores the card');
+    assert.equal(await reloadedHost.presentOpenSource(), true, 'Home can post the restored presentation');
+    assert.deepEqual(markers(), originalMarkers, 'restoring a presentation spends no display');
+    reloadedHost.dispose();
+    if (action === 'discussions') {
+      openWorks = false;
+      assert.equal(await actionHost.actOnOpenSource(action), false);
+      assert.ok(await actionStore.openHomePresentation('second'));
+      openWorks = true;
+    }
+    const opens = opened.length;
+    assert.equal(await actionHost.actOnOpenSource(action), true);
+    assert.deepEqual(opened.slice(opens), action === 'discussions' ? ['https://github.com/ProductoryHQ/ritemark-native/discussions'] : []);
+    if (action === 'discussions') {
+      assert.ok(await actionStore.openHomePresentation('second'), 'Discussions leaves the presentation open');
+      assert.deepEqual(markers(), originalMarkers);
+    } else {
+      const afterDismiss = new GuidanceHost({ ...deps, store: reloadedStore });
+      assert.equal(await afterDismiss.homeGuidance(noReadyRequest), null, 'Not now survives a reload');
+      assert.equal(await afterDismiss.presentOpenSource(), false);
+      afterDismiss.dispose();
+    }
+    actionHost.dispose();
+  }
+  assert.equal(await host.presentOpenSource(), true, 'dismissals do not stop a different release');
+  opened.length = 0;
+  openWorks = false;
+  assert.equal(await vscodeStub.commands.executeCommand('ritemark.help.github'), false);
+  assert.equal(await host.actOnOpenSource('star'), false, 'a refused Star leaves the card in place');
+  assert.ok(await store.openHomePresentation('second'));
+  openWorks = true;
+  assert.equal(await host.actOnOpenSource('star'), true);
+  assert.equal(await store.openHomePresentation('second'), undefined);
+  const afterStar = new GuidanceHost({ ...deps, store: new GuidanceStore(globalState, '2.2.0', '2.2.0', folder) });
+  assert.equal(await afterStar.homeGuidance(noReadyRequest), null, 'an accepted Star survives a reload');
+  assert.equal(await afterStar.presentOpenSource(), false);
+  afterStar.dispose();
+  const next = new GuidanceStore(globalState, '2.3.0', '2.3.0', folder);
+  assert.equal(await next.homeEligible({ day: '2099-11-25', appRun: 'third' }), false, 'a Star handoff stops future releases too');
+  assert.equal(await vscodeStub.commands.executeCommand('ritemark.help.discussions'), true, 'Help works after Home retires');
+  assert.deepEqual(opened, [
+    'https://github.com/ProductoryHQ/ritemark-native',
+    'https://github.com/ProductoryHQ/ritemark-native',
+    'https://github.com/ProductoryHQ/ritemark-native',
+    'https://github.com/ProductoryHQ/ritemark-native/discussions',
+  ]);
+  assert.deepEqual(counts, [], 'the open-source card, its presentation and its actions send no usage events');
+  assert.equal(feedbackSends, 0, 'the card never sends feedback');
   host.dispose();
   mock.timers.reset();
   fs.rmSync(folder, { recursive: true, force: true });

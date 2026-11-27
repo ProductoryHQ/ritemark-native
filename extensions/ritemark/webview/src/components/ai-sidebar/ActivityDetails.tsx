@@ -2,35 +2,46 @@
  * ActivityDetails — collapsible tool call list using native <details>/<summary>.
  */
 
+import { readSummary, stepLabel, visibleStepActivities } from './stepLabel';
 import { ActivityCard } from './ActivityCard';
 import { activeDurationMs } from './types';
 import { formatSeconds } from './activityState';
+import { useAISidebarStore } from './store';
 import type { AgentProgress, AgentMetrics } from './types';
 
 interface ActivityDetailsProps {
   activities: AgentProgress[];
   metrics?: AgentMetrics;
+  running?: boolean;
 }
 
-export function ActivityDetails({ activities, metrics }: ActivityDetailsProps) {
-  if (!activities.length) return null;
-
-  const stepCount = activities.length;
+export function ActivityDetails({ activities, metrics, running }: ActivityDetailsProps) {
+  const workspacePath = useAISidebarStore((state) => state.workspacePath);
+  const visible = visibleStepActivities(activities, workspacePath);
+  const stepCount = visible.filter((activity) => activity.type !== 'notice').length;
+  if (running || !stepCount) {
+    const steps = visible.filter((activity) => activity.type === 'notice' || stepLabel(activity));
+    return steps.length ? (
+      <div className="space-y-0.5">
+        {steps.map((step, i) => <ActivityCard key={step.step?.id ?? i} activity={step} />)}
+      </div>
+    ) : null;
+  }
   // Sprint 103 R7: report agent working time, not human wait time — in the
   // same format the status line uses (one vocabulary for one fact).
   const activeMs = metrics ? activeDurationMs(metrics) : 0;
   const duration = activeMs > 0 ? formatSeconds(activeMs / 1000) : null;
 
-  const summaryParts = [`${stepCount} steps`];
+  const summaryParts = [`${stepCount} step${stepCount === 1 ? '' : 's'}`];
   if (duration) summaryParts.push(duration);
 
   return (
     <details className="mt-2 rounded-md border border-transparent text-[11px]">
       <summary className="cursor-pointer select-none text-[var(--r-ink-muted)] hover:text-[var(--r-ink-strong)]">
-        Activity ({summaryParts.join(' \u00b7 ')})
+        {readSummary(visible, activeMs) ?? `Activity (${summaryParts.join(' · ')})`}
       </summary>
       <div className="mt-1.5 ml-1 space-y-0.5 border-l border-[var(--r-hairline)] pl-2">
-        {activities.map((a, i) => (
+        {visible.map((a, i) => (
           <ActivityCard key={`${a.timestamp}-${i}`} activity={a} />
         ))}
       </div>

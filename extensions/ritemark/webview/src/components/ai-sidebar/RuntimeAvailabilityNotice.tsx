@@ -151,6 +151,7 @@ export function RuntimeAvailabilityNotice({
       <div className={runtimeId === 'codex' && ring ? `${ring} rounded-xl` : undefined}>
       <RuntimeNotice
         tone={progress ? 'progress' : 'warning'}
+        feedback={['needs-auth', 'error', 'broken'].includes(availability.state)}
         title={stateTitle(runtimeId, availability)}
         message={stateMessage(runtimeId, availability, alternativeRuntime)}
         statusLabel={progress ? 'Waiting for sign-in…' : undefined}

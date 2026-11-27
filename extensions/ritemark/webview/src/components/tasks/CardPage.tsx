@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { consumeLinkClick } from '../../lib/consumeLinkClick'
 import { create } from 'zustand'
 import type { BoardCardView, BoardSnapshot } from '../../../../src/taskBoard/protocol'
 import { CARD_STAGES } from '../../../../src/taskBoard/cardTypes'
@@ -52,7 +53,7 @@ function ConversationLink({ card }: { card: BoardCardView }) {
     <a
       href="#"
       onClick={(event) => {
-        event.preventDefault()
+        consumeLinkClick(event)
         void act({ type: 'board/open-conversation', cardId: card.id })
       }}
     >

@@ -9,10 +9,11 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCounts';
-import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
+import { guidanceCard, localDay, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
 import { AI_NAMES, cardAi, EVENT_KIND, FILES_PRESS_SETTLE_MS, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords } from './readyRequest';
-import { READ_KINDS_EVERY_AI_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
+import { READ_KINDS_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
+import type { ReadyKind } from './readyRequest';
 import { makeTempDir } from '../testing/tempDir';
 
 const repeat = (name: string, n: number) => Array.from({ length: n }, (_, i) => `${i}${name}`);
@@ -61,6 +62,45 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   const capped = await listFileNames(tmp, { limit: 2 });
   assert.equal(capped.more, true, 'the walk stops past its limit');
   fs.rmSync(tmp, { recursive: true, force: true });
+
+  const project = makeTempDir('rm-deck-counts-');
+  try {
+    for (const file of ['Kickoff.rtms', 'Kickoff.rtms.files/photo.png', 'Kickoff.rtms.files/readme.md', 'Kickoff.rtms.files/Kickoff.html', 'Kickoff.rtms.files/fonts/X.woff2', 'Kickoff.rtms.files/logos/l.svg', 'Notes.md', 'Notes.files/zebra.md']) {
+      const target = path.join(project, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'x');
+    }
+    const { names, more } = await listFileNames(project);
+    assert.deepEqual(names.sort(), ['Kickoff.rtms', 'Notes.md', 'readme.md', 'zebra.md']);
+    assert.equal(countsLine(names, more, { decks: true }), '4 files: 3 text documents and 1 deck.');
+    assert.equal(countsLine(names, more, { decks: false }), '4 files: 4 text documents.');
+
+    for (const file of [
+      'Kickoff.rtms.files/logos/logo.png',
+      'Kickoff.deck.md',
+      'Kickoff.deck.md.files/photo.png',
+      'Sales/Pitch.rtms',
+      'Sales/Pitch.rtms.files/a.png',
+    ]) {
+      const target = path.join(project, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'x');
+    }
+    const expanded = await listFileNames(project);
+    assert.deepEqual(expanded.names.sort(), ['Kickoff.deck.md', 'Kickoff.rtms', 'Notes.md', 'Pitch.rtms', 'readme.md', 'zebra.md']);
+
+    if (process.platform !== 'win32') {
+      fs.symlinkSync('Kickoff.rtms', path.join(project, 'Linked.rtms'));
+      const linkedFolder = path.join(project, 'Linked.rtms.files');
+      fs.mkdirSync(linkedFolder);
+      fs.writeFileSync(path.join(linkedFolder, 'linked.html'), 'x');
+      fs.writeFileSync(path.join(linkedFolder, 'linked.md'), 'x');
+      const linked = await listFileNames(project);
+      assert.deepEqual(linked.names.sort(), [...expanded.names, 'Linked.rtms', 'linked.md'].sort());
+    }
+  } finally {
+    fs.rmSync(project, { recursive: true, force: true });
+  }
 
   // ── The ready request's kind and words (R3, S10, S13, S14, S16) ──
 
@@ -132,25 +172,21 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   // ── Home's one card (R2, R14, D1; S7, S8, S61–S63) ──
 
-  const base = { whatMoved: false, readyRequest: false, feedback: false, today: '2026-11-03', readyShownOn: undefined };
+  const base = { whatMoved: false, readyRequest: false, quickLook: false, openSource: false };
   assert.equal(guidanceCard(base), null);
-  assert.equal(guidanceCard({ ...base, whatMoved: true, readyRequest: true, feedback: true }), 'what-moved', 'S8: What moved first');
-  assert.equal(guidanceCard({ ...base, readyRequest: true }), 'ready-request');
-  assert.equal(guidanceCard({ ...base, feedback: true }), 'feedback', 'S61');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true, readyShownOn: '2026-11-03' }), 'ready-request', 'S62: the day it showed, the feedback card waits');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true, readyShownOn: '2026-11-02' }), 'feedback', 'S62: the next day, the feedback card takes the place');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: false, readyShownOn: '2026-11-02' }), 'ready-request', 'S62: and the ready request returns after it');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, quickLook: true }), 'ready-request');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, whatMoved: true }), 'what-moved');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, openSource: true }), 'ready-request');
+  assert.equal(guidanceCard({ ...base, quickLook: true, whatMoved: true }), 'what-moved');
+  assert.equal(guidanceCard({ ...base, quickLook: true, openSource: true }), 'quick-look');
+  assert.equal(guidanceCard({ ...base, whatMoved: true, openSource: true }), 'what-moved');
 
   // ── Saved days and releases (R14, S61, S63) ──
 
   assert.equal(localDay(new Date(2026, 10, 3, 23, 59)), '2026-11-03', 'a local calendar day');
   assert.deepEqual(withSavedDay(['2026-11-01'], '2026-11-01'), ['2026-11-01'], 'one day counts once');
   assert.deepEqual(withSavedDay(['2026-11-02', '2026-11-01', '2026-11-03'], '2026-11-04'), ['2026-11-02', '2026-11-03', '2026-11-04'], 'kept short');
-  assert.equal(feedbackDue({ savedDays: ['a', 'b'], answered: false }), false);
-  assert.equal(feedbackDue({ savedDays: ['a', 'b', 'c'], answered: false }), true, 'S61: the third day');
-  assert.equal(feedbackDue({ savedDays: ['a', 'b', 'c'], answered: true }), false, 'S63: once per release');
-  assert.equal(releaseOf('2.1.0'), '2.1');
-  assert.equal(releaseOf('2.1.3-ext.2'), '2.1', 'S63: an extension update within 2.1 is the same release');
+  assert.equal(guidanceCard({ ...base, openSource: true }), 'open-source');
 
   // ── The store: one global key, defensive reads (E2) ──
 
@@ -164,34 +200,40 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   await store.noteReadyShown('2026-11-02');
   assert.deepEqual([...bag.keys()], [GUIDANCE_KEY], 'one key');
   assert.deepEqual(store.project('file:///p'), { chatId: 'c1', ai: 'codex' });
-  assert.deepEqual(store.release(), { id: '2.1', savedDays: ['2026-11-01', '2026-11-02'] });
-  await store.answerFeedback('not-now');
-  assert.equal(store.release().feedback, 'not-now');
-  const next = new GuidanceStore(memento, '2.2.0');
-  assert.deepEqual(next.release(), { id: '2.2', savedDays: [] }, 'a new release asks again');
+  assert.deepEqual(store.read().savedDays, ['2026-11-01', '2026-11-02']);
+  assert.equal(store.read().release, undefined, 'saves do not write week-question data');
   assert.deepEqual(decodeGuidanceState({ v: 1, projects: { a: { gone: 'nope', ai: 'gpt', chatId: 7 }, b: 'x' }, readyShownOn: 'yesterday', release: { id: '2.1', savedDays: ['2026-1-1', '2026-11-01'], feedback: 'maybe' } }),
-    { v: 1, projects: { a: {} }, release: { id: '2.1', savedDays: ['2026-11-01'] } }, 'anything malformed is dropped');
-  assert.deepEqual(decodeGuidanceState(undefined), { v: 1, projects: {} });
+    { v: 1, projects: { a: {} }, savedDays: ['2026-11-01'], release: { id: '2.1', savedDays: ['2026-11-01'] } }, 'anything malformed is dropped');
+  assert.deepEqual(decodeGuidanceState(undefined), { v: 1, projects: {}, savedDays: [] });
 
   // ── The starting place (R8, R1; S33–S38, S43) ──
 
-  assert.deepEqual(READ_KINDS_EVERY_AI_PASSED, { word: false, pdf: false }, 'the spike\'s gate: closed until every AI has passed (research/word-spike.md)');
-  assert.equal(startingPlaceOf(null, 'files'), 'project', 'S33');
-  assert.equal(startingPlaceOf(null, 'empty'), 'empty_project', 'S34');
-  assert.equal(startingPlaceOf(null, 'sample'), 'sample', 'S38');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'project', 'S35: gate closed: the project\'s');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', { word: true, pdf: false }), 'word_or_pdf', 'S35: gate open');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: true, pdf: false }), 'project', 'a PDF follows its own kind');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }, 'files', { word: false, pdf: true }), 'word_or_pdf');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 300 }, 'files'), 'long_text', 'short is below 300');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.editor', fileName: 'Participants.csv' }, 'files'), 'table', 'S37: a CSV');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.excelViewer', fileName: 'Budget.xlsx' }, 'files'), 'table', 'S37: a spreadsheet in the table editor');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.pptxViewer', fileName: 'Deck.pptx' }, 'sample'), 'sample', 'S43: anything else: the project\'s');
-  assert.equal(startingPlaceOf({ viewType: 'ritemark.flowEditor', fileName: 'Weekly.flow.json' }, 'empty'), 'empty_project', 'S43');
-  assert.equal(startingPlaceOf({ viewType: undefined, fileName: 'notes.txt', words: 3 }, 'files'), 'short_text', 'a plain text file');
+  assert.deepEqual(READ_KINDS_PASSED, {
+    'claude-code': { darwin: true, win32: false },
+    codex: { darwin: true, win32: false },
+    opencode: { darwin: false, win32: false },
+  }, 'the shipped gate: Claude and ChatGPT on the Mac passed G1 (3 of 3); OpenCode and Windows stay closed');
+  const placeOnMac = (front: Parameters<typeof startingPlaceOf>[0], project: ReadyKind) =>
+    startingPlaceOf(front, project, 'claude-code', 'darwin');
+  assert.equal(placeOnMac(null, 'files'), 'project', 'S33');
+  assert.equal(placeOnMac(null, 'empty'), 'empty_project', 'S34');
+  assert.equal(placeOnMac(null, 'sample'), 'sample', 'S38');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Fernhollow Bank.theme.md', words: 12 }, 'files'), 'theme', 'Sprint 162 PR 5: a theme tab keeps the colour check (frame 11)');
+  assert.equal(placeOnMac({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its Word starting points open');
+  assert.equal(placeOnMac({ viewType: 'ritemark.pdfViewer', fileName: 'Annual report.pdf' }, 'files'), 'word_or_pdf', 'Claude passed G1 on the Mac: its PDF starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'darwin'), 'word_or_pdf', 'ChatGPT passed G1 on the Mac: its Word starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.pdfViewer', fileName: 'Annual report.pdf' }, 'files', 'codex', 'darwin'), 'word_or_pdf', 'ChatGPT passed G1 on the Mac: its PDF starting points open');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'opencode', 'darwin'), 'project', 'S35: OpenCode has not passed yet: the project\'s');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'codex', 'win32'), 'project', 'S40: ChatGPT on Windows waits for Gate 2');
+  assert.equal(startingPlaceOf({ viewType: 'ritemark.docxViewer', fileName: 'Fernhollow Bank notes.docx' }, 'files', 'claude-code', 'win32'), 'project', 'S40: Claude on Windows waits for Gate 2');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Outline.md', words: 19 }, 'files'), 'short_text', 'S36');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 900 }, 'files'), 'long_text', 'S36');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Report.md', words: 300 }, 'files'), 'long_text', 'short is below 300');
+  assert.equal(placeOnMac({ viewType: 'ritemark.editor', fileName: 'Participants.csv' }, 'files'), 'table', 'S37: a CSV');
+  assert.equal(placeOnMac({ viewType: 'ritemark.excelViewer', fileName: 'Budget.xlsx' }, 'files'), 'table', 'S37: a spreadsheet in the table editor');
+  assert.equal(placeOnMac({ viewType: 'ritemark.pptxViewer', fileName: 'Deck.pptx' }, 'sample'), 'sample', 'S43: anything else: the project\'s');
+  assert.equal(placeOnMac({ viewType: 'ritemark.flowEditor', fileName: 'Weekly.flow.json' }, 'empty'), 'empty_project', 'S43');
+  assert.equal(placeOnMac({ viewType: undefined, fileName: 'notes.txt', words: 3 }, 'files'), 'short_text', 'a plain text file');
   assert.equal(wordCount('---\ntitle: x y z\n---\n# Board report\n\nThe year in [three](./x.md) numbers. <!-- not this -->'), 7, 'front matter, comments and link targets left out');
 
   console.log('guidance: all assertions passed');

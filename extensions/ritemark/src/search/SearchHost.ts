@@ -126,7 +126,7 @@ export class SearchHost implements vscode.Disposable {
     } catch {
       // A worker that cannot start should give the same answer as one that stops.
     }
-    return { text: "Ritemark couldn't finish reading this file. Try again or open it in its usual app." };
+    return { reason: 'worker', text: "Ritemark couldn't finish reading this file. Try again or open it in its usual app.", isError: true };
   }
 
   get status(): IndexStatus | null {

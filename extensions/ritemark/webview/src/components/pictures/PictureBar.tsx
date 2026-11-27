@@ -22,6 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Switch } from '../ui/switch'
 import { Tooltip } from '../ui/tooltip'
 import { isMac } from '../../hooks/usePlatform'
+import { pictureBarFold, pictureBarPlacement, type Box } from './pictureGeometry'
 
 export type PicturePlace = 'text' | 'left' | 'right' | 'behind'
 
@@ -75,6 +76,8 @@ export interface PictureBarProps {
   bounds?: { left: number; right: number }
   /** A slide-wide place (a side or behind): the bar sits inside it at the bottom, 12 px up, over the picture. */
   inside?: boolean
+  /** The document picture's box and its full-width block, which can reserve room below the picture. */
+  documentRow?: { picture: Box; host: HTMLElement }
   /** The bar's own element, so a press on it is never "outside". */
   barRef?: (element: HTMLDivElement | null) => void
 }
@@ -146,7 +149,7 @@ function DescriptionField({ alt, caption, onWords, withCaption, compact }: { alt
     >
       <Tooltip label="The words a screen reader and a published page read">
         <PopoverTrigger asChild>
-          <Button type="button" variant="toolbar" size="compact" aria-label="Description" data-state={open ? 'active' : undefined}>
+          <Button type="button" variant="toolbar" size="compact" aria-label="Description">
             <Icon name="text-t" size={14} tone="inherit" />
             {compact ? null : 'Description'}
           </Button>
@@ -227,35 +230,49 @@ export function PictureBar(props: PictureBarProps) {
    */
   const [fold, setFold] = useState(0)
   const widths = useRef<number[]>([])
+  const size = sizeOf(look.width, context)
+  const documentRow = anchor ? props.documentRow : undefined
+  const roomHost = documentRow?.host
 
-  // Under the picture, centred on it, inside the window; over the picture's lower edge when there is no room below.
+  useLayoutEffect(() => {
+    return () => { roomHost?.style.removeProperty('--picture-bar-room') }
+  }, [roomHost])
+
+  // The document row bounds both the overlay and its below-picture fallback.
   useLayoutEffect(() => {
     const bar = ref.current
     if (!anchor || !bar) return
-    const width = bar.offsetWidth
-    widths.current[fold] = width
-    const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
-    if (width > room && fold < 3) {
-      setFold(fold + 1)
-      return
-    }
-    if (fold > 0 && widths.current[fold - 1] !== undefined && widths.current[fold - 1] <= room) {
-      setFold(fold - 1)
-      return
-    }
+    const width = bar.getBoundingClientRect().width
     const height = bar.offsetHeight
+    const rowRect = !crop ? roomHost?.getBoundingClientRect() : undefined
+    const row = documentRow && rowRect && {
+      picture: documentRow.picture,
+      width,
+      left: Math.max(0, rowRect.left),
+      right: Math.min(window.innerWidth, rowRect.right),
+    }
+    const reservedRoom = parseFloat(roomHost?.style.getPropertyValue('--picture-bar-room') ?? '') || 0
+    if (!crop || !documentRow) {
+      widths.current[fold] = width
+      const room = (props.bounds ? props.bounds.right - props.bounds.left : window.innerWidth) - 16
+      const nextFold = pictureBarFold(fold, widths.current, room, row, reservedRoom > 0)
+      if (nextFold !== fold) {
+        setFold(nextFold)
+        return
+      }
+    }
     const minX = Math.max(8, (props.bounds?.left ?? 0) + 8)
-    const maxX = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - width - 8
+    const rightEdge = Math.min(window.innerWidth, props.bounds?.right ?? window.innerWidth) - 8
+    const maxX = rightEdge - width
     const x = Math.max(minX, Math.min(maxX, anchor.left + anchor.width / 2 - width / 2))
-    const below = anchor.top + anchor.height + 10
-    const inside = Math.max(8, anchor.top + anchor.height - height - 12)
-    const y = props.inside ? inside : below + height + 8 <= window.innerHeight ? below : Math.max(8, anchor.top + anchor.height - height - 10)
-    setLeft(Math.round(x))
-    setTop(Math.round(y))
+    const placement = pictureBarPlacement(anchor.top + anchor.height, height, window.innerHeight, !!props.inside, row, crop ? reservedRoom : 0)
+    if (placement.room) roomHost?.style.setProperty('--picture-bar-room', `${placement.room}px`)
+    else roomHost?.style.removeProperty('--picture-bar-room')
+    setLeft(placement.left ?? Math.round(x))
+    setTop(placement.top)
   })
 
   if (!anchor) return null
-  const size = sizeOf(look.width, context)
   const keys = (event: KeyboardEvent<HTMLDivElement>) => {
     // A key in the bar's own menu or Description (React hands it on through the portal) is theirs.
     if ((event.target as HTMLElement).closest?.('[data-radix-popper-content-wrapper]')) return
@@ -278,7 +295,7 @@ export function PictureBar(props: PictureBarProps) {
       role="toolbar"
       aria-label={crop ? 'Crop the picture' : 'The picture'}
       className="picture-bar fixed z-[60] flex items-center gap-1 rounded-xl bg-surface px-1.5 py-1 font-ui text-ink-strong shadow-[0_0_0_1px_var(--r-hairline),0_10px_28px_-10px_rgba(30,27,75,.3)]"
-      style={{ left: left ?? -9999, top }}
+      style={{ left: left ?? -9999, top, ...(documentRow && !crop && { width: 'max-content' }) }}
       // The picture stays chosen and the caret where it is: a press on the bar never takes the editor's selection.
       onMouseDown={event => { if (!(event.target as HTMLElement).closest('input, textarea')) event.preventDefault() }}
       onKeyDown={keys}

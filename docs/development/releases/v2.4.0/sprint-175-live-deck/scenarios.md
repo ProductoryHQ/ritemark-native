@@ -2,9 +2,9 @@
 
 Each one becomes a test or a manual check. The deck is Experience 52's made-up Harbour Logistics training (17 slides, published). "Live" means the switch is on.
 
-**S1. Turning it on.** Published deck, switch off, chip "Published · changed". The person presses the switch. The chip reads Updating…, then Live. The page matches the deck. (R1, R4)
+**S1. Turning it on.** Published deck, switch off, the bar showing **Publish changes** (#1142; "Published · changed" until 27 November). The person presses the switch. The chip reads Updating…, then Live. The page matches the deck. (R1, R4)
 
-**S2. Turning it off.** One press in the menu. The chip reads Published. A save then makes it "Published · changed" and sends nothing. (R1, R9)
+**S2. Turning it off.** One press in the menu. The chip reads Published. A save then shows **Publish changes** and sends nothing. (R1, R9)
 
 **S3. A key typed while Live.** Slide 6's handout gets `sk-ant-…7f3a`, saved. Nothing is sent; the chip turns amber Paused; no sheet, toast or dialog. Open pages keep their version. The menu says "Paused at 10:42. Slide 6's text has what looks like a key…" with Show it (slide 6, key marked) and Go on disabled ("Take the key out first"). The key is taken out and saved: still Paused, nothing sent. The person presses Go on: the latest state goes, the chip reads Live. (R10 to R13)
 
@@ -36,7 +36,7 @@ Each one becomes a test or a manual check. The deck is Experience 52's made-up H
 
 **S17. Unpublish.** The page goes, the switch and any pause are cleared; publishing again starts with the switch off. (R2)
 
-**S18. A page from 2.3.** Published before 2.4, never updated: an open page of it never reloads. After one Update the page it does. (R29)
+**S18. A page from 2.3.** Published before 2.4, never updated: an open page of it never reloads. After one Publish changes it does. (R29)
 
 **S19. The page opened with `#6` and no update.** The address behaves as today. (R24)
 

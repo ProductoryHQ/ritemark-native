@@ -21,6 +21,7 @@ function disposable(name: string, throws = false): { dispose(): void } {
 
 let watcherCount = 0;
 let throwingWatcher = -1;
+let focusListener: ((state: { focused: boolean }) => void) | undefined;
 const vscodeStub = {
   RelativePattern: class { constructor(public base: unknown, public pattern: string) {} },
   Uri: { file: (fsPath: string) => ({ fsPath, toString: () => `file://${fsPath}` }) },
@@ -33,6 +34,12 @@ const vscodeStub = {
         onDidDelete: () => disposable(`watcher ${index} delete`),
         onDidChange: () => disposable(`watcher ${index} change`),
       };
+    },
+  },
+  window: {
+    onDidChangeWindowState: (listener: typeof focusListener) => {
+      focusListener = listener;
+      return disposable('window focus');
     },
   },
   extensions: { onDidChange: () => disposable('extensions') },
@@ -52,7 +59,7 @@ async function main(): Promise<void> {
   const { ProjectList } = await import('../projects/ProjectList');
 
   let decksOn = false;
-  function host(): { home: InstanceType<typeof HomeHost>; list: InstanceType<typeof ProjectList> } {
+  function host(withQuickLook = false): { home: InstanceType<typeof HomeHost>; list: InstanceType<typeof ProjectList> } {
     const list = new ProjectList('/nowhere/list.json', {} as never);
     const home = new HomeHost({
       context: {
@@ -69,6 +76,7 @@ async function main(): Promise<void> {
       openConversation: async () => undefined,
       onProjectsChanged: () => undefined,
       guidance: null,
+      quickLookGuidance: withQuickLook ? { onDidChange: () => disposable('Quick Look guidance') } as never : undefined,
     });
     (home as unknown as { panel: { dispose(): void } }).panel = disposable('panel');
     return { home, list };
@@ -130,6 +138,160 @@ async function main(): Promise<void> {
     configListener?.({ affectsConfiguration: (section) => section === 'ritemark.features.decks' });
     configListener?.({ affectsConfiguration: (section) => section === 'editor.fontSize' });
     assert.equal(redraws, 1, 'only the decks flag redraws Home');
+    home.dispose();
+  }
+
+  // A second window re-reads the profile's retirement when its visible Home gains focus.
+  {
+    const { home } = host(true);
+    const panel = home as unknown as { panel: { visible: boolean }; scheduleRedraw(delay: number): void };
+    const redraws: number[] = [];
+    panel.scheduleRedraw = delay => { redraws.push(delay); };
+    focusListener?.({ focused: true });
+    panel.panel.visible = true;
+    focusListener?.({ focused: false });
+    assert.deepEqual(redraws, []);
+    focusListener?.({ focused: true });
+    assert.deepEqual(redraws, [0]);
+    home.dispose();
+    assert.ok(disposed.includes('window focus'));
+  }
+
+  // Eligibility can change between slot decisions while Home's other content redraws.
+  {
+    const { home } = host(true);
+    const internal = home as unknown as {
+      deps: {
+        context: { globalState: { get(key: string): boolean | undefined; update(key: string, value: boolean): Promise<void> } };
+        quickLookGuidance: { eligible(): Promise<boolean> };
+      };
+      panel: { visible: boolean };
+      slotGuidance(recent: { empty: boolean; pointers: Set<string> }): Promise<{ card: string } | null>;
+      homeVisibilityChanged(visible: boolean): void;
+      handle(request: unknown): Promise<void>;
+    };
+    const values = new Map<string, boolean>();
+    internal.deps.context.globalState = {
+      get: key => values.get(key),
+      update: async (key, value) => { values.set(key, value); },
+    };
+    let saved = false;
+    internal.deps.quickLookGuidance.eligible = async () => saved;
+    const card = async () => (await internal.slotGuidance({ empty: false, pointers: new Set() }))?.card;
+    const show = (visible: boolean) => {
+      internal.panel.visible = visible;
+      internal.homeVisibilityChanged(visible);
+    };
+
+    show(true);
+    assert.equal(await card(), undefined);
+    saved = true;
+    assert.equal(await card(), undefined, 'a first deck save does not fill an open slot');
+    show(false);
+    show(true);
+    assert.equal(await card(), 'quick-look', 'reopening Home decides the slot again');
+
+    values.set('ritemark.updatedFrom1x', true);
+    show(false);
+    show(true);
+    assert.equal(await card(), 'what-moved');
+    await internal.handle({ type: 'home/what-moved-seen' });
+    assert.equal(await card(), 'quick-look', 'ending a card decides the slot again');
+    home.dispose();
+  }
+
+  // Only a delivered ready card in a visible Home records the day and impression.
+  {
+    const { home } = host();
+    const internal = home as unknown as {
+      deps: { guidance: { readyCardShown(): Promise<void> } };
+      ready: boolean;
+      panel: { visible: boolean; webview: { postMessage(): Promise<boolean> }; dispose(): void };
+      state(): Promise<{ guidance: { card: string }; missing: object | null }>;
+      push(): Promise<void>;
+    };
+    let impressions = 0;
+    let delivered = false;
+    const state = { guidance: { card: 'ready-request' }, missing: null as object | null };
+    internal.deps.guidance = { readyCardShown: async () => { impressions++; } };
+    internal.ready = true;
+    internal.panel.visible = true;
+    internal.panel.webview = { postMessage: async () => delivered };
+    internal.state = async () => state;
+    await internal.push();
+    delivered = true;
+    internal.panel.visible = false;
+    await internal.push();
+    internal.panel.visible = true;
+    state.missing = {};
+    await internal.push();
+    state.missing = null;
+    state.guidance.card = 'quick-look';
+    await internal.push();
+    assert.equal(impressions, 0);
+    state.guidance.card = 'ready-request';
+    await internal.push();
+    assert.equal(impressions, 1);
+    home.dispose();
+  }
+
+  // Opening a visible slot claims the card once before two redraws can hand it to Home.
+  for (const claimed of [false, true]) {
+    const { home } = host();
+    type Action = import('../projects/protocol').OpenSourceAction;
+    type State = { guidance: { card: 'open-source' } | null; missing: object | null };
+    const internal = home as unknown as {
+      deps: { guidance: { presentOpenSource(): Promise<boolean>; actOnOpenSource(action: Action): Promise<boolean> } };
+      ready: boolean;
+      panel: { visible: boolean; webview: { postMessage(value: { state: State }): Promise<boolean> }; dispose(): void };
+      state(): Promise<State>;
+      push(): Promise<void>;
+      handle(request: { type: 'home/open-source-action'; action: Action }): Promise<void>;
+    };
+    let claims = 0;
+    let opened = 0;
+    let ended = false;
+    let browserAccepted = false;
+    let missing: object | null = null;
+    const displayed: (string | undefined)[] = [];
+    internal.deps.guidance = {
+      presentOpenSource: async () => { claims++; return claimed; },
+      actOnOpenSource: async (action) => {
+        opened++;
+        ended = browserAccepted && action === 'star';
+        return browserAccepted;
+      },
+    };
+    internal.ready = true;
+    internal.panel.visible = false;
+    internal.panel.webview = { postMessage: async ({ state }) => { displayed.push(state.guidance?.card); return true; } };
+    internal.state = async () => ({ guidance: ended ? null : { card: 'open-source' }, missing });
+    await internal.push();
+    assert.equal(claims, 0, 'a hidden Home does not claim a presentation');
+    assert.equal(displayed.at(-1), undefined);
+    internal.panel.visible = true;
+    missing = {};
+    await internal.push();
+    assert.equal(claims, 0, 'a missing project does not claim a presentation');
+    missing = null;
+    await Promise.all([internal.push(), internal.push()]);
+    assert.equal(claims, 1);
+    assert.deepEqual(displayed.slice(-2), Array(2).fill(claimed ? 'open-source' : undefined));
+    const star = { type: 'home/open-source-action', action: 'star' } as const;
+    await internal.handle(star);
+    assert.equal(opened, claimed ? 1 : 0, 'only the Home that claimed the card can act on it');
+    if (claimed) {
+      await internal.push();
+      assert.equal(displayed.at(-1), 'open-source', 'a refused open leaves the card');
+      browserAccepted = true;
+      const pushesBeforeDiscussions = displayed.length;
+      await internal.handle({ ...star, action: 'discussions' });
+      assert.equal(opened, 2, 'Discussions opens from the current presentation');
+      assert.equal(displayed.length, pushesBeforeDiscussions, 'Discussions keeps the current slot');
+      await internal.handle(star);
+      assert.equal(opened, 3, 'Star still works after Discussions');
+      assert.equal(displayed.at(-1), undefined, 'accepted Star refreshes the slot');
+    }
     home.dispose();
   }
 

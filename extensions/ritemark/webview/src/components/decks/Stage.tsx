@@ -55,8 +55,9 @@ interface StageProps {
   onSplit?: (before: string, after: string) => void
   onFull?: (full: boolean) => void
   onNeedCaret?: () => void
-  /** The slide's right-click menu's Slide settings… (17 November): the popover at that point. */
-  onSlideSettings?: (at: { x: number; y: number }) => void
+  /** The slide's right-click menu's Slide settings… (17 November): the popover beside the slide. */
+  onSlideSettings?: () => void
+  settingsOpen?: boolean
   splitRequest?: number
   picture?: { path: string; url: string; serial: number } | null
 }
@@ -67,7 +68,7 @@ export function Stage(props: StageProps) {
   return <LayoutStage {...props} />
 }
 
-function BlockStage({ editor, slide, theme, borderless, assets, missing, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, splitRequest, picture }: StageProps) {
+function BlockStage({ editor, slide, theme, borderless, assets, missing, width, onWriting, commentCallouts, initialFocus, selectOnFocus, onFocusTaken, onPicture, commentOpen, onCommentOpened, onNewSlideBelow, onSplit, onFull, onNeedCaret, onSlideSettings, settingsOpen, splitRequest, picture }: StageProps) {
   // A request that comes after the stage is drawn (a deck New made, already shown) is taken once it changes.
   const focusTitle = useMemo(() => (initialFocus ? { select: !!selectOnFocus } : null), [initialFocus, selectOnFocus])
   return (
@@ -92,6 +93,7 @@ function BlockStage({ editor, slide, theme, borderless, assets, missing, width, 
         onFull={onFull}
         onNeedCaret={onNeedCaret}
         onSlideSettings={onSlideSettings}
+        settingsOpen={settingsOpen}
         splitRequest={splitRequest}
         picture={picture}
       />
@@ -223,7 +225,7 @@ function LayoutStage({ editor, slide, theme, borderless, assets, width, onWritin
           // Inside a box being typed in, the system's own menu (Cut, Copy, Paste) stays.
           if (!onSlideSettings || (event.target as Element | null)?.closest?.('[contenteditable="true"]')) return
           event.preventDefault()
-          onSlideSettings({ x: event.clientX, y: event.clientY })
+          onSlideSettings()
         }}
       >
         <SlideCanvas kind={slide.kind} data={slide.data} width={width} theme={theme} borderless={borderless} assets={assets} editing={editing} />

@@ -84,7 +84,7 @@ interface AIResponseBubbleProps {
 export function AIResponseBubble({ content, className }: AIResponseBubbleProps) {
   if (!content) return null;
   return (
-    <div style={chatFontStyle}>
+    <div style={chatFontStyle} data-ai-answer>
       <RenderedMarkdown content={content} className={className} />
     </div>
   );

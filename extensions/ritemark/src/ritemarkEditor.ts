@@ -35,7 +35,8 @@ import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap 
 import { canonicalMarkdownProjection } from './editorSync/state';
 import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
-import { isRelativeImagePath, pictureFileInside } from './utils/imagePaths';
+import { markdownImageFilePaths, pictureFileInside, sameMarkdownImageFile } from './utils/imagePaths';
+import { markdownImageDestinations } from './utils/markdownImages';
 import { ChatgptPictureHost } from './pictures/chatgptPictureHost';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
 import { resolveProjectScope } from './conversations/projectScope';
@@ -472,30 +473,13 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const imageMappings: Record<string, string> = {};
     const docDir = path.dirname(documentUri.fsPath);
 
-    // Match markdown images: ![alt](path)
-    const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    let match;
-
-    while ((match = imageRegex.exec(markdown)) !== null) {
-      const imagePath = match[2];
-
-      // Only local paths beside the document: ./a.png, ../a.png and the
-      // common bare form img/a.png. The webview restores exactly these on
-      // save (utils/imagePaths), so the two sides must use the same test.
-      if (!isRelativeImagePath(imagePath)) {
-        continue;
-      }
-
-      // Skip if already mapped
-      if (imageMappings[imagePath]) {
-        continue;
-      }
-
-      // Resolve relative path to absolute
-      const absolutePath = path.resolve(docDir, imagePath);
-
-      // Check if file exists
-      if (fs.existsSync(absolutePath)) {
+    for (const imagePath of markdownImageDestinations(markdown)) {
+      // Use the written destination as the mapping key, so the webview
+      // can match it and put the same path back on save.
+      const absolutePath = markdownImageFilePaths(imagePath)
+        .map(filePath => path.resolve(docDir, filePath))
+        .find(filePath => fs.existsSync(filePath));
+      if (absolutePath) {
         // Convert to webview URI. The mtime version param busts the webview's
         // cache when the file content changed since the last render (pairs
         // with the live 'imageRefreshed' watcher in resolveCustomTextEditor).
@@ -903,7 +887,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     imageWatcher.onDidChange((uri) => {
       if (isDisposed) { return; }
       const rel = toMarkdownRelativePath(path.dirname(document.uri.fsPath), uri.fsPath);
-      if (!document.getText().includes(rel.replace(/^\.\//, ''))) { return; }
+      if (![...markdownImageDestinations(document.getText())].some(written => sameMarkdownImageFile(written, rel))) { return; }
       void webview.postMessage({
         type: 'imageRefreshed',
         path: rel,

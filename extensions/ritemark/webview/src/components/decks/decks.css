@@ -13,11 +13,11 @@
 .deck-bar .deck-count { margin-left: 4px; font-size: 12.5px; line-height: 1; color: var(--r-ink-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .deck-bar .deck-saved { margin-right: 6px; font-size: 12px; line-height: 1; color: var(--r-ink-muted); white-space: nowrap; }
 /* Publish on the bar (Sprint 159 PR 4): the Published chip in the accent, as the browser bar's (frame 6) */
-.deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
+.deck-bar .deck-publish-chip,
+.deck-bar .deck-publish-chip[data-state="open"] { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
 /* In dark, Live, Updating and Offline sit on the bar's own ground with only their hairline, as the light chip does on the
-   white bar (the Experience lead, Experience 52); hover keeps the bar's usual hover ground. Paused keeps its amber and
-   Published · changed its accent. */
+   white bar (the Experience lead, Experience 52); hover keeps the bar's usual hover ground. Paused keeps its amber. */
 :is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-bar .deck-page-state-chip.is-plain:not(:hover) { background: transparent; }
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
@@ -29,7 +29,7 @@
 .deck-theme-swatch > i:last-child { top: 8px; width: 11px; }
 .deck-bar .deck-theme-button { gap: 7px; }
 .deck-bar .deck-theme-button[data-state="open"] { background: var(--r-surface-muted); color: var(--r-ink-strong); }
-.deck-theme-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck-theme-name { flex: none; white-space: nowrap; }
 .deck-theme-menu .deck-settings-k { margin: 6px 6px 6px; }
 .deck-theme-sep { height: 1px; margin: 10px -8px 4px; background: var(--r-hairline); }
 .deck-theme-menu .deck-theme-row { width: 100%; height: 32px; justify-content: flex-start; gap: 9px; padding: 0 6px; font-size: 13px; font-weight: 400; color: var(--r-ink-strong); }
@@ -74,11 +74,16 @@
 :where(:root:not([data-input-mode="pointer"])) .deck-strip:focus-visible .deck-thumb.is-current .deck-thumb-slide { box-shadow: 0 0 0 2px var(--r-surface), 0 0 0 4px var(--r-accent), 0 0 0 6px var(--r-accent-soft); }
 
 .deck-stage { position: absolute; top: 0; bottom: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; }
-.deck-stage .deck-stage-group { margin: auto 0; padding: 8px 0 48px; }
+.slide-formatting-bubble > .tippy-box[data-reference-hidden] {
+  visibility: hidden;
+  pointer-events: none;
+}
+.deck-stage .deck-stage-group { position: relative; margin: auto 0; padding: 36px 0 48px; }
 /* README item 19: the Theme menu's transition, played once over the stage's slide (TransitionPreview). */
 .deck-transition-preview { position: absolute; inset: 0; z-index: 6; overflow: hidden; pointer-events: none; }
 .deck-transition-layer { position: absolute; inset: 0; }
 .deck-transition-layer .deck-sl { background: transparent; }
+.deck-stage-gear { position: absolute; top: 0; left: 24px; display: flex; justify-content: flex-end; }
 .deck-stage .deck-big { position: relative; margin: 0 24px; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 1px var(--r-hairline), 0 8px 24px -10px rgba(30, 27, 75, 0.35); }
 .deck-source { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--r-ink-muted); }
 
@@ -90,16 +95,15 @@
 .deck-divider:hover::before, .deck-divider.is-dragging::before { border-left: 2px solid var(--r-accent); }
 
 /* Split along the long side (16 November; deckLayout.ts): with the slide above the handout, the slide is centred on top
-   at its pane's full height less 32 (16 above it and 16 under it; the Experience lead, 17 November), capped by the
+   with 36 px above for the gear and 16 px below, capped by the
    width; the line is level, runs edge to edge from the strip, and drags (the prototype's `.divider.h`,
    `.stage[data-stk]`). Since 17 November nothing sits on the line: the view switch on the bar shows or hides a pane.
    The deck view sets the top and the height of each. */
 .deck-stage.is-above { bottom: auto; align-items: center; }
-.deck-stage.is-above .deck-stage-group { max-width: 100%; padding: 16px 0; }
-/* Slide only: the slide fills the room and sits in its middle, both ways (Jarmo, 17 November). The 16 above and under
-   it are the 32 `fullSlideWidthFor` keeps, as above. */
+.deck-stage.is-above .deck-stage-group { max-width: 100%; padding-bottom: 16px; }
+/* Slide only fits the slide with the same room above and below as the stacked split. */
 .deck-stage.is-alone { align-items: center; }
-.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding: 16px 0; }
+.deck-stage.is-alone .deck-stage-group { max-width: 100%; padding-bottom: 16px; }
 /* #917: in Slide only the start card sits under the slide, in the stage's flow at the slide's width (DeckView sets it)
    and edges, 16 px under it. */
 .deck-stage .deck-start { position: relative; z-index: auto; margin: 16px 24px 0; }
@@ -220,10 +224,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-handout .wysiwyg-editor .ProseMirror > .deck-part-head.is-skip + :is(h1, h2) { color: var(--r-ink-muted) !important; }
 /* A wide table scrolls sideways inside its own frame, never cut at the handout's edge (Jarmo, 17 November). The frame
    is the table's own place with room around it for its handles (TableHandlesLayer): 24 px on the left for the row
-   grips (the Text editor's), 24 px on the right for the + column bar, and 8 px above and under for the column grip and
-   the + row bar, so a table that fits never scrolls and no handle is cut. What scrolls under the left room stops 6 px
+   grips (the Text editor's), 24 px on the right for the + column bar, 8 px above and below. The table's own vertical margins
+   also leave room inside the frame for the column grip and + row bar. What scrolls under the left room stops 6 px
    in, clear of the number's rail. */
-.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-right: -24px; padding-right: 24px; margin-top: -8px; margin-bottom: -8px; padding-top: 8px; padding-bottom: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); container-type: inline-size; }
+.deck-handout .wysiwyg-editor .ProseMirror > .rm-table { margin-inline: -24px; padding-inline: 24px; margin-block: -8px; padding-block: 8px; overflow-x: auto; overflow-y: hidden; clip-path: inset(0 0 0 6px); container-type: inline-size; }
 /* Now that a wide table scrolls, no column squeezes (the Experience lead on #780): each column keeps its widest word
    (the browser's own minimum), and a text column keeps about 200 px, or its stored share of the frame when larger, but
    never more than its longest note on one line, so a note wraps into two or three lines. The node view puts each
@@ -289,57 +293,86 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-menu-key { padding-left: 16px; font-size: 12px; letter-spacing: .5px; color: var(--r-ink-faint); }
 
 /* The bar's notice: a deleted slide's Undo, the line hint (quiet, as the prototype's toasts) */
-.deck-notice { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
-/* When the bar is short of room (a notice with the AI open), what gives way, in order (Sprint 162, step-3-themes.md):
-   1. the Theme button's name (its swatch and ▾ stay; the name is in its tooltip);
-   2. Publish's word (it folds to its icon, `iconWhenNarrow`);
-   3. the notice's words (an ellipsis; its actions keep their words);
-   4. Present's word, last: the bar's main action.
-   Flex weights far apart give that order; everything else on the bar keeps its size. */
-.deck-bar > :not(.deck-notice):not(.flex-1):not(.deck-present):not(.deck-theme-slot):not(.deck-publish-slot) { flex-shrink: 0; }
-.deck-bar > .deck-theme-slot { flex-shrink: 100000; min-width: 0; }
-.deck-bar > .deck-publish-slot { flex-shrink: 10000; min-width: 0; }
-.deck-bar > .deck-notice { flex-shrink: 100; }
-.deck-bar > .deck-present { flex-shrink: 1; }
-/* Sprint 170: each gives way only down to its folded size, so a long notice ("Saved as <deck> – slides and
-   handout.pdf" with Show in folder) shortens its own words instead of drawing the bar's controls over each other:
-   the Theme button to its swatch and ▾, Publish's split button to its globe and ▾ (both measured at the bar's 30). */
-.deck-bar > .deck-theme-slot { min-width: 65px; }
+.deck-notice { display: inline-flex; flex: 1 0 0; align-items: center; gap: 8px; min-width: var(--deck-notice-min, 0px); max-width: max-content; overflow: hidden; margin-left: 12px; font-size: 12.5px; color: var(--r-ink-body); }
+/* #931 and #950: the notice uses the room left by the controls. The spacer takes any surplus past the full notice. */
+.deck-bar > :not(.deck-notice) { flex-shrink: 0; }
+.deck-bar > .deck-bar-spacer { margin-inline-start: auto; }
+.deck-bar > :is(.deck-publish-slot, .deck-present) { max-width: none; }
+.deck-bar > .deck-publish-slot { min-width: 30px; }
 .deck-bar > .rm-split.deck-publish-split { min-width: 64px; }
-.deck-bar .deck-theme-slot > .deck-theme-button { min-width: 0; flex-shrink: 1; }
-.deck-bar .deck-theme-button > .deck-theme-swatch, .deck-bar .deck-theme-button > svg { flex: none; }
-.deck-bar .deck-theme-button > .deck-theme-name { flex: 0 1 auto; min-width: 0; }
+.deck-bar > .deck-present { min-width: 58px; }
+/* Keep hover and press transitions without animating the horizontal padding used by the fit check. */
+.deck-bar .deck-theme-button, .deck-bar .deck-publish-slot > button { transition-property: color, background-color, border-color, box-shadow, transform; }
+/* Reserve room for warning icons, whole actions and an ellipsis for passing notes. */
+.deck-notice[data-measure-min] { flex: none; width: max-content; min-width: 0; }
+.deck-notice[data-measure-min] > .deck-notice-words { flex: none; width: 1em; }
+.deck-notice[data-measure-min] > .deck-failure-words,
+.deck-notice[data-measure-min] .deck-notice-sizer > :first-child { display: none; }
+.deck-notice[data-measure-min] .deck-notice-room { width: calc(32px + 1em); }
+/* Compact the controls only when they and the minimum notice cannot fit. */
+.deck-bar[data-theme-compact] > .deck-notice { max-width: var(--deck-notice-min); }
+.deck-bar[data-theme-compact] .deck-theme-name,
+.deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }
+.deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
+.deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
+.deck-publish-feedback { flex: none; }
+.deck-notice[data-measure-min] > .deck-publish-feedback,
+.deck-bar[data-theme-compact] .deck-publish-feedback,
+.deck-notice > .deck-publish-feedback[data-link-clipped] { display: none; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
-.deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.deck-notice > .deck-notice-words { flex: 0 1 auto; min-width: 1em; overflow: hidden; }
+.deck-notice > .deck-failure-words { min-width: 0; }
+.deck-notice-warning { flex: none; color: var(--r-deck-warning); }
+.deck-notice-warning > span { display: inline-grid; place-items: center; padding: 4px; border-radius: 4px; }
+/* The keyboard ring (#635) in its own colour, drawn inside: the bar clips anything outside the note. */
+:where(:root:not([data-input-mode="pointer"])) .deck-notice-warning > span:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: -2px; }
 .deck-notice > .deck-notice-act { flex: none; }
-/* A join's line and the full slide's line side by side: a hairline between them. The pair gives way before the bar's
-   own controls (Present, which folds to its icon), its words first, its actions never. */
-.deck-notice:has(> .deck-notice-gap) { flex-shrink: 1000; }
+/* A hairline between a join's line and the full slide's line. */
 .deck-notice-gap { flex: none; width: 1px; height: 14px; margin: 0 4px; background: var(--r-hairline-strong); }
 /* #931: a notice ending with a file name ("Saved as Day one.pdf") takes the room the bar has. The whole words, hidden,
    keep its width; the words shown are fitted to it, the name cut in its middle only when it doesn't fit (DeckView,
    `NoticeWords`). Its action is an icon button right after the name (Show in folder, 14 px in 24). While it shows, the
-   bar's other controls keep their room: the note gives way first, down to nothing, before any of them folds (its
-   weight is far above theirs), and the deck's own Saved steps aside (DeckView). */
+   deck's own Saved steps aside (DeckView). */
 .deck-notice-cut { position: relative; display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; padding: 4px; margin: -4px 0 -4px -4px; white-space: nowrap; } /* 4 px of room for the icon's focus ring (2 px at 2 px) inside the note's clip */
 .deck-notice-sizer { display: block; visibility: hidden; line-height: 24px; } /* the icon's height, so its ring fits the padding */
 .deck-notice-room { display: inline-block; width: 32px; } /* the action's 24 and the gap's 8 */
 .deck-notice-line { position: absolute; inset: 4px; display: flex; align-items: center; gap: 8px; } /* the icon's focus ring (4 px out) clears the name by 4 px */
-.deck-notice-line > .deck-notice-words { flex: none; }
-.deck-notice-shown { display: block; white-space: nowrap; }
+.deck-notice-line > .deck-notice-words { flex: 0 1 auto; min-width: 0; }
+.deck-notice-shown { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Take hidden words out of the flex gap while keeping them in the live region. */
+.deck-notice:not([data-measure-words]) > .deck-notice-words:has(> .deck-notice-text[data-note-hidden]),
+.deck-notice-line > .deck-notice-words:has(> .deck-notice-shown[data-note-hidden]) {
+  position: absolute;
+  inline-size: 0;
+  min-inline-size: 0;
+  overflow: hidden;
+  opacity: 0;
+}
 .deck-notice-after { display: inline-flex; flex: none; }
-.deck-bar > .deck-notice:has(.deck-notice-cut) { flex-shrink: 1000000000; overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
+.deck-notice:has(.deck-notice-cut) { overflow: visible; } /* its words clip themselves (.deck-notice-cut) */
 .deck-notice .deck-notice-icon { width: 24px; height: 24px; min-width: 24px; padding: 0; }
 
 /* Slide settings (17 November, "Nothing around the slide"): the slide's own menu opens them, as a popover beside the
-   thumbnail, the part number or the point it came from (DeckView); the bar has no gear. */
+   thumbnail, the part number or the slide itself (DeckView); the bar has no gear. */
 /* The Settings material: the popup (its card from ui/popover.tsx) and Add to library's sheet beside the slide. */
 .deck-settings { width: 316px; box-sizing: border-box; font-size: 13px; line-height: 18px; color: var(--r-ink-strong); }
-/* The popup is never taller than the room it has: it scrolls, so its last section (the deck's Card | Borderless)
-   is always reachable in a short window (review, #764). Add to library's sheet isn't a popover and keeps its height. */
-.deck-settings:not(.deck-addlib) { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
+/* In Handout only, the popover scrolls within the viewport so its last section stays reachable. */
+.deck-settings.deck-settings-folded { max-height: var(--radix-popover-content-available-height); overflow-y: auto; }
+/* Keep the card within the viewport even when it is narrower than the settings width. */
+.deck-settings[role="dialog"] { max-width: calc(100vw - 16px); }
+/* Keep the bottom card in the stage's scroll flow while Radix handles dismissal and focus. */
+.deck-settings-below { position: relative; z-index: 4; align-self: center; text-align: left; scroll-margin-bottom: 16px; }
+.deck-stage:is(.is-alone, .is-above) .deck-settings-below { left: 50%; transform: translateX(-50%); }
+.deck-settings-below > [data-radix-popper-content-wrapper] {
+  position: relative !important;
+  transform: none !important;
+  min-width: 0 !important;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
 .deck-addlib { position: absolute; z-index: 40; padding: 12px; border-radius: 12px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline), 0 16px 34px -10px rgba(30,27,75,.28); }
 /* Its top: the lines that sat under the slide, which wrap in the popup's width. */
 .deck-settings-about { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 4px 0 0; container-type: inline-size; }
@@ -373,7 +406,6 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-search input::placeholder { color: var(--r-ink-muted); opacity: 1; }
 .deck-lib-search input::-webkit-search-cancel-button { display: none; }
 .deck-lib-row { display: flex; align-items: center; gap: 8px; width: 100%; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; font: 400 13.5px/30px var(--ritemark-ui-font-family); color: var(--r-ink-strong); text-align: left; white-space: nowrap; }
-.deck-lib-row:hover { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
 .deck-lib-row > svg { flex-shrink: 0; color: var(--r-ink-body); }
 .deck-lib-row > svg.deck-lib-caret { color: var(--r-ink-muted); }
 .deck-lib-name { overflow: hidden; text-overflow: ellipsis; }
@@ -390,6 +422,14 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-lib-group { margin: 14px 8px 4px; font: 600 11px/14px var(--ritemark-ui-font-family); letter-spacing: .6px; text-transform: uppercase; color: var(--r-ink-muted); }
 /* Sprint 165 PR 1: an other deck's row on two lines, the caret and icon on the name's first line. */
 .deck-lib-row.deck-lib-row-two { height: auto; min-height: 30px; align-items: flex-start; padding: 5px 8px; white-space: normal; }
+.deck-lib-row-actions { position: relative; }
+/* Keep the 24px action and its two 8px gaps clear even when the action is hidden. */
+.deck-lib-row-actions > .deck-lib-row { padding-right: 40px; }
+.deck-lib-row-actions:hover > .deck-lib-row,
+:where(:root:not([data-input-mode="pointer"])) .deck-lib-row-actions:has(> .deck-lib-open:focus-visible) > .deck-lib-row { background: var(--vscode-toolbar-hoverBackground, var(--r-surface-soft)); }
+.deck-lib-row-actions > .deck-lib-open { position: absolute; right: 8px; top: 50%; translate: 0 -50%; opacity: 0; pointer-events: none; }
+.deck-lib-row-actions:hover > .deck-lib-open,
+:where(:root:not([data-input-mode="pointer"])) .deck-lib-row-actions:has(> :focus-visible) > .deck-lib-open { opacity: 1; pointer-events: auto; }
 .deck-lib-row.deck-lib-row-two > svg { margin-top: 2px; }
 .deck-lib-row.deck-lib-row-two > svg.deck-lib-caret { margin-top: 4px; }
 .deck-lib-deck-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -481,10 +521,22 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host > .blk-agenda { margin: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow > .blk-agenda-host:last-child { margin-bottom: 0; }
 .deck-sl.is-blocks.is-editing .blk-flow .blk-agenda-host.ProseMirror-selectednode { outline: 3px solid var(--s-foc, rgba(242,181,68,.7)); outline-offset: 4px; }
+.deck-sl.is-blocks.is-editing .blk-flow .blk-edge-break { display: none; }
+.deck-sl.is-blocks.is-editing .blk-flow:focus .blk-edge-break.has-caret { display: revert; }
+/* Edge lines only take room while the caret is in them, so it stays visible while typing. */
+.deck-sl.is-blocks.is-editing .blk-flow > .blk-empty-line.is-edge { height: 0; min-height: 0; overflow: hidden; }
+.deck-sl.is-blocks.is-editing .blk-flow:focus > .blk-empty-line.is-edge.has-caret { height: auto; min-height: 1lh; overflow: visible; }
+.deck-sl.is-blocks.is-editing .blk-flow > :nth-last-child(1 of :not(ritemark-comment, .blk-empty-line.is-edge)) { margin-bottom: 0; }
 /* An empty line waits for its words: the title's, an empty column's heading and text. Only a line: an empty block (a new
    Columns block's, PR 3) is marked empty too, and a ::before on its grid would take a column of its own (the app run). */
 .deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: var(--s-ph, rgba(255,255,255,.35)); }
 .deck-slide.is-borderless .deck-sl.is-blocks.is-editing :is(p, h1, h2, h3, h4, h5, h6).is-empty[data-placeholder]::before { color: var(--s-ph, rgba(28,31,74,.3)); }
+/* Keep the title clickable at the top without taking room from the centred picture (#1116). */
+.deck-sl.is-blocks.is-editing.is-lone-pic .blk-flow > h1.is-empty[data-placeholder="Title"] { position: absolute; top: 0; left: 0; margin: 0; }
+.deck-sl.is-blocks.is-editing.is-lone-pic .blk-flow > h1.is-empty[data-placeholder="Title"]::before { float: none; }
+/* The stage's last-block rule above (margin-bottom 0) outranks the picture's centring in slide.css; with no Content
+   place chosen, the picture keeps both auto margins, so it sits in the middle as in Present (#1116 round 3). */
+.deck-slide .deck-sl.is-blocks.is-editing:is(.is-lone-pic, .is-titled-pic):not(.va-top, .va-middle, .va-bottom) .blk-flow > :is(.blk-pic, img):nth-last-child(1 of :not(ritemark-comment, .blk-empty-line.is-edge)) { margin-top: auto; margin-bottom: auto; }
 
 /* Sprint 161 (experience 46, "Comments on the slide, for Claude"; frames 27 and 28). A comment on a block or on the
    whole slide is a standalone note (`ritemark-comment`) in the slide editor: never drawn, and taking no place, so the
@@ -612,10 +664,12 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-slide.is-behind-chosen::after { content: ""; position: absolute; inset: 0; z-index: 6; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--r-accent); pointer-events: none; }
 .deck-slide.is-behind-chosen .deck-sl.pic-behind .photo.is-chosen::after { content: none; }
 @media (prefers-reduced-motion: reduce) { .deck-slide > .deck-behind-chip { transition: none; } }
-.deck-block-bar { position: fixed; z-index: 40; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
+.deck-block-bar { position: fixed; z-index: 40; width: max-content; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; background: var(--r-surface); box-shadow: 0 0 0 1px var(--r-hairline-strong), 0 10px 24px -8px rgba(30, 27, 75, .35); white-space: nowrap; }
 .deck-block-bar .deck-bar-seg { display: inline-flex; gap: 1px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
 .deck-block-bar .deck-bar-seg .deck-bar-choice { height: 24px; padding: 0 8px; }
 .deck-block-bar .deck-bar-seg .deck-bar-choice[data-state="active"] { background: var(--r-surface); color: var(--r-ink-strong); box-shadow: 0 1px 2px rgba(30, 27, 75, .15); }
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-block-bar .deck-bar-seg .deck-bar-choice { color: rgb(255 255 255 / 60%); }
+:is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-block-bar .deck-bar-choice[aria-pressed="true"] { background: color-mix(in srgb, var(--r-surface) 82%, white); color: white; box-shadow: 0 1px 3px rgb(0 0 0 / 30%); }
 .deck-block-bar .deck-bar-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--r-hairline-strong); }
 /* The Agenda's type (small details 14): a label, not a menu, since it turns into nothing; its tooltip says what it lists. */
 .deck-block-bar .deck-bar-type-fixed { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; font: 600 13px/28px 'Sofia Sans', sans-serif; color: var(--r-ink-strong); outline: none; }

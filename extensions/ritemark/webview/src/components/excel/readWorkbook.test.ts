@@ -20,6 +20,9 @@ const spike = path.join(repo, 'docs/development/releases/v2.3.0/sprint-158-excel
 const fixtures: Array<[string, string]> = [
   ...['training-budget.xlsx', 'estonian-timesheet.xlsx', 'project-plan.xlsx'].map((n) => [n, path.join(spike, n)] as [string, string]),
   ...chartsKeepFixtures.map(({ file }): [string, string] => [path.basename(file), file]),
+  ['charts-axis-zero.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/charts-axis-zero.xlsx', import.meta.url))],
+  ['charts-out-of-scope.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/charts-out-of-scope.xlsx', import.meta.url))],
+  ['rules-format-colour.xlsx', fileURLToPath(new URL('../../../../src/excel/fixtures/excel-174/rules-format-colour.xlsx', import.meta.url))],
   ['Excel for Mac', path.join(repo, 'docs/development/sprints/sprint-81-excel-editing/test-workbook.xlsx')],
 ]
 
@@ -38,7 +41,7 @@ async function main() {
       assert.equal(sha256(bytes), before, `${label}: ${name} changed input bytes`)
     }
   }
-  console.log(`  R21: input bytes preserved on ${fixtures.length} workbooks`)
+  console.log(`  R21: the reader does not mutate its input on ${fixtures.length} workbooks`)
 
   for (const [label, file] of fixtures) {
     const bytes = new Uint8Array(fs.readFileSync(file))

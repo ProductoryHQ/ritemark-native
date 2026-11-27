@@ -46,6 +46,8 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 // ── Now safe to import vscode-dependent modules ──────────────────────────────
 import * as assert from 'assert';
 import * as os from 'os';
+import * as fs from 'fs';
+import { snapshotTestKeys } from '../ai/providerKeys';
 import * as path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { CodexRuntime, CodexSession, buildCodexBaseInstructions, isCodexSignInFailure } = require('./CodexRuntime') as typeof import('./CodexRuntime');
@@ -447,6 +449,57 @@ async function run() {
     assert.strictEqual(a.getToolSetForThread(), '', "A's tools are its own");
     assert.notStrictEqual(b.getToolSetForThread(), '', "B's tools are its own");
     console.log('✓ Test 8: B1 — a conversation switching approval mode or tools cannot reset a sibling');
+  }
+
+  {
+    const { runtime, mock } = makeRuntime(['thread-docs']);
+    const events: AgentProgress[] = [];
+    await openTurn(runtime, 'conv-docs', {
+      ...dummyConfig,
+      onProgress: (progress) => events.push(progress),
+      codexDynamicTools: [{ ...TOOL_A, name: 'read_document' }],
+      onDynamicToolCall: async () => ({ text: 'The file is locked.', success: true, reason: 'password' }),
+    });
+    mock.emit('item/started', {
+      threadId: 'thread-docs', item: { type: 'commandExecution', id: 'shell', command: 'textutil "Ref.docx"' },
+    });
+    for (const [id, command, commandActions, kind, path] of [
+      ['list', 'rg --files', [{ type: 'listFiles', path: null }], 'folder', '.'],
+      ['search', 'rg pilot Reference', [{ type: 'search', path: 'Reference' }], 'folder', 'Reference'],
+      ['read-command', 'cat "01 Brief/Engagement brief.docx"', [{ type: 'read', path: '01 Brief/Engagement brief.docx' }], 'read', '01 Brief/Engagement brief.docx'],
+      ['find', 'find Reference -type f', [{ type: 'unknown' }], 'folder', 'Reference'],
+      ['write', 'rg --files > files.txt', [{ type: 'listFiles', path: null }], 'shell', undefined],
+      ['mixed', 'rg --files', [{ type: 'listFiles', path: null }, { type: 'unknown' }], 'shell', undefined],
+      // Outside the project, a listing keeps its command row: a step's label never shows a path.
+      ['outside', 'ls /etc', [{ type: 'listFiles', path: '/etc' }], 'shell', undefined],
+      ['up', 'find ../other -type f', [{ type: 'unknown' }], 'shell', undefined],
+    ] as const) {
+      const item = { type: 'commandExecution', id, command, commandActions };
+      mock.emit('item/started', { threadId: 'thread-docs', item });
+      mock.emit('item/completed', { threadId: 'thread-docs', item: { ...item, status: 'completed' } });
+      const steps = events.filter(({ step }) => step?.id === id).map(({ step }) => step);
+      assert.deepEqual(steps.map((step) => [step?.kind, step?.path, step?.status]),
+        [[kind, path, undefined], [kind, path, 'completed']]);
+    }
+    mock.emit('item/completed', {
+      threadId: 'thread-docs', item: {
+        type: 'commandExecution', id: 'legacy-list', command: 'rg --files', status: 'completed',
+        parsed_cmd: [{ type: 'list_files', path: null }],
+        aggregatedOutput: '01 Brief/Engagement brief.docx\nReference/Annual report.pdf',
+      },
+    });
+    assert.deepEqual(events.at(-1)?.step?.listing, ['01 Brief/Engagement brief.docx', 'Reference/Annual report.pdf']);
+    mock.emit('server-request', {
+      id: 81, method: 'item/tool/call', params: {
+        threadId: 'thread-docs', itemId: 'read', tool: 'read_document', arguments: { path: 'Reference/Locked.docx' },
+      },
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(events.find(({ step }) => step?.id === 'shell')?.step?.command, 'textutil "Ref.docx"');
+    const steps = events.flatMap(({ step }) => step?.id === 'read' ? [step] : []);
+    assert.equal(steps[0].path, 'Reference/Locked.docx');
+    assert.equal(steps[1].warning, 'it has a password');
+    runtime.dispose();
   }
 
   // ── Test 8b: Sprint 130 W5 — Ritemark's dynamic tools: given at thread
@@ -888,7 +941,119 @@ async function run() {
     console.log('✓ Test 21: a second sign-in joins the running one and gets its page; a new one starts after it ends');
   }
 
-  console.log('\nAll 21 CodexRuntime tests passed!');
+  // Run the no-key case before loading the synthetic vault key into the activation snapshot.
+  const tempRoot = fs.realpathSync(os.tmpdir());
+  const temp = fs.mkdtempSync(path.join(tempRoot, 'codex-test-'));
+  const run = path.join(temp, 'rm-reading-chatgpt.A1b2');
+  const home = path.join(run, 'codex');
+  const claudeHome = path.join(run, 'claude');
+  const realHome = path.join(temp, '.codex');
+  for (const dir of [home, claudeHome, realHome]) fs.mkdirSync(dir, { recursive: true });
+  const key = 'sk-synthetic-ritemark-test-0309';
+  const oldEnv = process.env;
+  const log = console.error;
+  const output: unknown[] = [];
+  try {
+    process.env = { ...oldEnv, TMPDIR: temp, CODEX_HOME: home, CLAUDE_CONFIG_DIR: claudeHome, RITEMARK_BUILD_CHANNEL: 'test' };
+    console.error = (...args: unknown[]) => { output.push(args); };
+    async function initialize(account: unknown = null, failLogin = false,
+      server = new CodexAppServer({ trace: (...args) => { output.push(args); } }),
+    ) {
+      const requests: Array<{ id?: number; method: string; params?: unknown }> = [];
+      server.on('progress', (event) => output.push(event));
+      server.on('notification', (event) => output.push(event));
+      const internals = server as any;
+      const manager = internals.manager;
+      manager.ensureRunning = async () => {};
+      manager.send = (line: string) => {
+        const request = JSON.parse(line);
+        requests.push(request);
+        if (request.id === undefined) return;
+        const login = request.method === 'account/login/start';
+        if (login && failLogin) {
+          internals.handleStderr('rejected ' + key.slice(0, 10));
+          internals.handleStderr(key.slice(10) + '\n');
+          internals.handleStdout(JSON.stringify({ method: 'progress', params: { message: key } }) + '\n');
+          const echoed = JSON.stringify({ id: request.id, error: { message: key } }) + '\n';
+          internals.handleStdout(echoed.slice(0, 45));
+          internals.handleStdout(echoed.slice(45));
+          return;
+        }
+        const result = login ? { type: 'apiKey' } : request.method === 'account/read' ? { account } : {};
+        internals.handleStdout(JSON.stringify({ id: request.id, result }) + '\n');
+      };
+      await Promise.all([server.ensureInitialized(), server.ensureInitialized()]);
+      return { requests, args: manager.buildAppServerArgs('codex-app-server') };
+    }
+    assert.ok(!(await initialize()).requests.some(({ method }) => method === 'account/login/start'));
+    process.env.RITEMARK_TEST_KEY_OPENAI = key;
+    snapshotTestKeys();
+    assert.strictEqual(process.env.RITEMARK_TEST_KEY_OPENAI, undefined);
+    process.env.RITEMARK_BUILD_CHANNEL = 'production';
+    assert.ok(!(await initialize()).requests.some(({ method }) => method === 'account/login/start'));
+    process.env.RITEMARK_BUILD_CHANNEL = 'test';
+    for (const profile of [path.join(os.homedir(), '.codex'), path.join(os.homedir(), '.codex-dev')]) {
+      process.env.CODEX_HOME = profile;
+      assert.ok(!(await initialize()).requests.some(({ method }) => method === 'account/login/start'));
+    }
+    process.env.CODEX_HOME = home;
+    fs.rmdirSync(home);
+    fs.symlinkSync(realHome, home, 'dir');
+    assert.ok(!(await initialize()).requests.some(({ method }) => method === 'account/login/start'));
+    fs.unlinkSync(home);
+    fs.mkdirSync(home);
+    assert.ok(!(await initialize({ type: 'chatgpt' })).requests.some(({ method }) => method === 'account/login/start'));
+    const runtime = new CodexRuntime();
+    const r = runtime as any;
+    r._ensureAppServer();
+    const server = r._appServer as InstanceType<typeof CodexAppServer>;
+    let disposals = 0;
+    (server as any).manager.dispose = () => { disposals++; };
+    const reasons: string[] = [];
+    const { onCodexStatusInvalidated } = require('./codexStatusEvents') as typeof import('./codexStatusEvents');
+    const unsubscribe = onCodexStatusInvalidated(({ reason }) => {
+      reasons.push(reason);
+      if (reason === 'login-finished') runtime.dispose();
+    });
+    const notify = async (loginId: string | null) => {
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/login/completed', params: { loginId, success: true, error: null },
+      }) + '\n');
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    };
+    try {
+      const { requests, args } = await initialize(null, false, server);
+      assert.deepStrictEqual(requests.map(({ method }) => method), [
+        'initialize', 'initialized', 'account/read', 'account/login/start',
+      ]);
+      assert.ok(JSON.stringify(requests.at(-1)?.params) === JSON.stringify({ type: 'apiKey', apiKey: key }));
+      assert.strictEqual(JSON.stringify(requests).split(key).length, 2);
+      assert.deepStrictEqual(args, ['-c', 'cli_auth_credentials_store="ephemeral"']);
+      await notify(null);
+      assert.strictEqual(disposals, 0);
+      assert.ok(!reasons.includes('login-finished'));
+
+      (server as any).handleStdout(JSON.stringify({
+        method: 'account/updated', params: { authMode: 'apikey' },
+      }) + '\n');
+      assert.deepStrictEqual(reasons, ['status-refresh']);
+
+      await notify('browser-login');
+      assert.strictEqual(reasons.filter((reason) => reason === 'login-finished').length, 1);
+      assert.strictEqual(disposals, 1);
+    } finally {
+      unsubscribe();
+    }
+    await initialize(null, true);
+    assert.ok(output.some((event) => JSON.stringify(event) === '{"message":"[test key]"}'));
+    assert.ok(!JSON.stringify(output).includes(key));
+  } finally {
+    process.env = oldEnv;
+    console.error = log;
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+  console.log('✓ Test 22: isolated vault sign-in guards, RPC and redaction');
+  console.log('\nAll 22 CodexRuntime tests passed!');
 }
 
 run().then(

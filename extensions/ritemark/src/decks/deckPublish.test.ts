@@ -17,8 +17,8 @@ import * as path from 'node:path';
 import Module from 'node:module';
 import { mock } from 'node:test';
 import { liveFileDisplay } from './deckLiveIssues';
-import type { LivePreference } from '../publish/publishRecords';
-import { gatherPage } from '../publish/gather';
+import type { LivePreference, PublishRecord } from '../publish/publishRecords';
+import { gatherPage, type HostedDeckPage } from '../publish/gather';
 import { liveIssue, type LiveIssue } from '../publish/liveUpdate';
 import type { GatheredPlan } from '../publish/types';
 import { makeTempDir } from '../testing/tempDir';
@@ -32,6 +32,7 @@ const savedListeners: Array<(document: unknown) => void> = [];
 const watchListeners: Array<(uri: { fsPath: string }) => void> = [];
 const changeListeners: Array<(event: { document: unknown }) => void> = [];
 let pageStateAsks = 0;
+const pageCommands: [string, string][] = [];
 let bar: { kind: 'unpublished' | 'published'; changed: boolean } = { kind: 'unpublished', changed: false };
 class EventEmitter<T> {
   private listeners: Array<(value: T) => void> = [];
@@ -62,8 +63,11 @@ const vscodeStub = {
   },
   window: {},
   commands: {
-    executeCommand: async (command: string) => {
-      if (command !== '_ritemark.publish.pageState') return undefined;
+    executeCommand: async (command: string, uri?: { fsPath: string }) => {
+      if (command !== '_ritemark.publish.pageState') {
+        if (uri) pageCommands.push([command, uri.fsPath]);
+        return undefined;
+      }
       pageStateAsks++;
       return { ...bar };
     },
@@ -83,7 +87,7 @@ const slideCss = fs.readFileSync(path.resolve(__dirname, '..', '..', 'webview', 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DeckPublisher } = require('./deckPublish') as typeof import('./deckPublish');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { foreignPageLine } = require('./page/pageFile') as typeof import('./page/pageFile');
+const { takenDeckPageLine } = require('./page/pageFile') as typeof import('./page/pageFile');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { splitFrontMatter } = require('../editorSync/frontMatter') as typeof import('../editorSync/frontMatter');
 
@@ -93,7 +97,7 @@ const fernPath = path.join(themes, 'Fern.theme.md');
 const paperPath = path.join(themes, 'Paper.theme.md');
 const logoPath = path.join(themes, 'Fern logo.svg');
 const deckPath = path.join(root, 'Training', 'Intro.deck.md');
-const pagePath = path.join(root, 'Training', 'Intro.html');
+const pagePath = path.join(root, 'Training', 'Intro.deck.md.files', 'Intro.html');
 
 const themeText = (fields: { name?: string; accent?: string; heading?: string; logo?: boolean } = {}) => `---
 name: ${fields.name ?? 'Fern'}
@@ -149,13 +153,22 @@ async function main(): Promise<void> {
   const document = { uri: vscodeStub.Uri.file(deckPath), getText: () => text };
 
   let published = 0;
+  let legacyRecord: string | undefined;
+  let cancel = false;
   const feature = {
     isReady: () => true,
     setPageRows: () => undefined,
+    setHostedDeckPage: () => undefined,
     onDidChangeReady: none,
     onDidChangePageState: none,
-    controller: { holdPage: () => () => undefined, recordFor: async () => (published > 0 ? { address: 'https://fern.example.test' } : undefined) },
+    controller: {
+      holdPage: () => () => undefined,
+      legacyDeckRecord: async (page: string) => page === legacyRecord ? { address: 'https://fern.example.test' } : undefined,
+      recordFor: async (page: string) => (page === legacyRecord || page === pagePath && published > 0)
+        ? { address: 'https://fern.example.test' } : undefined,
+    },
     publishPage: async () => {
+      if (cancel) return 'cancelled';
       published++;
       bar = { kind: 'published', changed: false };
       return 'published';
@@ -169,22 +182,70 @@ async function main(): Promise<void> {
     return true;
   });
   const notices: string[] = [];
-  const publish = () => publisher.publish(document as never, splitFrontMatter(text).content, 'card', [], line => notices.push(line));
+  const publish = () => publisher.publish(document as never, splitFrontMatter(text).content, 'card', [], (line, kind) => notices.push(`${kind}: ${line}`));
   const state = async () => {
     const read = await publisher.stateOf(document as never);
     return read.kind === 'published' ? (read.changed ? 'Published · changed' : 'Published') : read.kind;
   };
 
   try {
+    const deckFolder = path.dirname(pagePath);
+    fs.writeFileSync(deckFolder, 'a person’s file');
+    await publish();
+    assert.match(notices.shift() ?? '', /“Intro\.deck\.md\.files” beside this deck is a file, not a folder/);
+    assert.equal(fs.readFileSync(deckFolder, 'utf8'), 'a person’s file');
+    fs.unlinkSync(deckFolder);
+
+    legacyRecord = path.join(path.dirname(deckPath), 'Intro.html');
+    await publisher.pageAction(document as never, 'copy-link', () => {});
+    await publisher.pageAction(document as never, 'unpublish', () => {});
+    assert.deepEqual(pageCommands.splice(0), [
+      ['ritemark.page.copyLink', legacyRecord], ['ritemark.page.unpublish', legacyRecord],
+    ]);
+    cancel = true;
+    await publish();
+    assert.equal(fs.existsSync(deckFolder), false, 'cancel takes back the page, assets and newly created empty folder');
+    assert.equal(published, 0);
+    legacyRecord = undefined;
+    cancel = false;
+    fs.mkdirSync(deckFolder);
+    cancel = true;
+    await publish();
+    assert.deepEqual(fs.readdirSync(deckFolder), [], 'cancel keeps a preexisting empty folder');
+    cancel = false;
+
     // --- Publish: the page goes up with Fern, its font and its logo
     await publish();
-    assert.deepEqual(notices, []);
+    assert.deepEqual(notices.splice(0), ['success: ']);
     assert.equal(published, 1);
     assert.equal(await state(), 'Published');
     const live = pageFiles();
     assert.ok(live.has('Intro.html'));
     assert.ok([...live.keys()].some(name => name.startsWith(`fonts${path.sep}Inter-`)), 'the theme\'s font goes beside the page');
     assert.ok([...live.keys()].some(name => name.startsWith(`logos${path.sep}logo-`)), 'and its logo');
+    const logoAddress = [...live.keys()].find(name => name.startsWith(`logos${path.sep}logo-`))!;
+    const collidingPicture = path.join(path.dirname(deckPath), logoAddress);
+    fs.mkdirSync(path.dirname(collidingPicture), { recursive: true });
+    fs.copyFileSync(path.join(deckFolder, logoAddress), collidingPicture);
+    const picture = `![Picture](${logoAddress.split(path.sep).join('/')})`;
+    const original = text;
+    try {
+      text = original.replace('Welcome, everyone.', picture);
+      await publish();
+      assert.deepEqual(notices.splice(0), [
+        `failure: “${path.basename(logoAddress)}” on slide 1 and the theme's logo would go to the same address, so nothing was sent. Rename the picture and publish again.`,
+      ]);
+
+      text = original.replace('\n\n```slide', `\n\n${picture}\n\n` + '```slide');
+      await publish();
+      assert.deepEqual(notices.splice(0), [
+        `failure: “${path.basename(logoAddress)}” and the theme's logo would go to the same address, so nothing was sent. Rename the picture and publish again.`,
+      ]);
+      assert.equal(published, 1);
+    } finally {
+      text = original;
+      fs.unlinkSync(collidingPicture);
+    }
     const page = () => fs.readFileSync(pagePath, 'utf8');
     assert.match(page(), /#C2410C/i, 'the page wears Fern\'s accent');
 
@@ -257,7 +318,7 @@ async function main(): Promise<void> {
 
     // --- Update the page: the deck as it is now, with its theme as saved; Published again
     await publish();
-    assert.deepEqual(notices, []);
+    assert.deepEqual(notices.splice(0), ['success: ']);
     assert.equal(published, 2);
     assert.match(page(), /#7C3AED/i, 'the page wears the theme as saved');
     assert.doesNotMatch(page(), /#C2410C/i);
@@ -289,8 +350,11 @@ async function main(): Promise<void> {
   let unchangedSaves = 0;
   let diagnosis: LiveIssue | undefined;
   let nextResult: (() => void) | undefined;
+  let publishedFit: Pick<PublishRecord, 'files' | 'deckFit' | 'deckDigest' | 'deckFolder'> | undefined;
+  let hostedForBrowser: ((page: string) => Promise<HostedDeckPage | undefined>) | null;
   const liveFeature = {
     ...feature,
+    setHostedDeckPage: (provider: typeof hostedForBrowser) => { hostedForBrowser = provider; },
     publishPage: async () => {
       if (manualStarted) await new Promise<void>(resolve => {
         finishManual = resolve;
@@ -300,7 +364,7 @@ async function main(): Promise<void> {
     },
     controller: {
       ...feature.controller,
-      recordFor: async () => ({ files: [], live: preference }),
+      recordFor: async () => ({ files: [], ...publishedFit, live: preference }),
       setLive: async (_page: string, on: boolean) => {
         preference = on ? { on: true, id: 'test' } : undefined;
         return true;
@@ -310,20 +374,25 @@ async function main(): Promise<void> {
         preference = { ...preference!, pause };
         return { kind: 'paused', pause };
       },
-      updateLive: async (page: { realPath: string }, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
+      updateLive: async (page: { realPath: string; hostedDeck?: import('../publish/gather').HostedDeckPage }, input: { digest: string; describe: (plan: GatheredPlan, issue?: LiveIssue) => LiveIssue | undefined }) => {
         if (expectUnchanged && liveDigest === input.digest) {
           unchangedSaves++;
           return { kind: 'unchanged' };
         }
         liveDigest = input.digest;
         liveHtml = fs.readFileSync(page.realPath, 'utf8');
-        const plan = await gatherPage(page.realPath, root);
+        const plan = await gatherPage(page.realPath, root, { hostedDeck: page.hostedDeck });
+        if (!publishedFit) publishedFit = {
+          deckDigest: input.digest, deckFit: page.hostedDeck?.fit, deckFolder: true,
+          files: plan.files.map(file => ({ path: file.relPath, sha256: file.sha256! })),
+        };
         diagnosis = input.describe(plan, liveIssue(plan));
         return { kind: 'updated', pictures: [] };
       },
     },
   };
   const livePublisher = new DeckPublisher(extension);
+  const liveSaved = savedListeners.at(-1);
   const uri = document.uri;
   try {
     livePublisher.connect(liveFeature as never);
@@ -335,6 +404,8 @@ async function main(): Promise<void> {
     fs.writeFileSync(deckPath, text);
     const body = splitFrontMatter(text).content;
     livePublisher.rememberLiveInput(document as never, undefined, { text: body, look: 'card', steps: [2] });
+    assert.deepEqual((await livePublisher.savedPageInput(deckPath, text)).steps, [2]);
+    assert.equal((await livePublisher.savedPageInput(deckPath, text + '\nNew words')).measureFit, true);
     await livePublisher.liveAction(document as never, 'on');
     await ready;
     const fromLive = liveHtml;
@@ -344,6 +415,26 @@ async function main(): Promise<void> {
     await livePublisher.publish(document as never, body, 'card', [2], () => {});
     assert.equal(fromLive, fs.readFileSync(pagePath, 'utf8'), 'live and manual Update build the same page, including fit');
     seat.dispose();
+    assert.deepEqual(publishedFit?.deckFit, [2]);
+    const reopened = new DeckPublisher(extension);
+    try {
+      reopened.connect(liveFeature as never);
+      const hosted = await hostedForBrowser!(pagePath);
+      assert.ok(hosted);
+      const plan = await gatherPage(pagePath, root, { hostedDeck: hosted });
+      assert.equal(plan.files[0].sha256, publishedFit?.files[0].sha256);
+
+      fs.writeFileSync(pagePath, fromLive + '<!-- Edited in the browser preview -->');
+      try {
+        await assert.rejects(hostedForBrowser!(pagePath), {
+          message: 'This page is made from “Intro.deck.md”. Open the deck and choose Publish to update it.',
+        });
+      } finally {
+        fs.writeFileSync(pagePath, fromLive);
+      }
+    } finally {
+      reopened.dispose();
+    }
     preference = { on: true, id: 'already-on' };
     liveHtml = '';
     livePublisher.attach(document as never, async () => true);
@@ -354,9 +445,10 @@ async function main(): Promise<void> {
     expectUnchanged = true;
     text = text.replace('deck: 1', 'deck: 1\nritemark-length: 180').replace('id: a1', 'id: a1\ntime: 25');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     assert.deepEqual(await timetableTurn.finish([deckPath]), []);
     assert.equal(unchangedSaves, 1);
+    assert.equal(fs.readFileSync(pagePath, 'utf8'), fromLive, 'the unmeasured save leaves the fitted page intact');
     expectUnchanged = false;
     assert.equal(liveDigest, beforeTimetable, 'minutes and session changes have no public digest');
     const changed = new Promise<void>(resolve => { nextResult = resolve; });
@@ -371,14 +463,14 @@ async function main(): Promise<void> {
     const saved = new Promise<void>(resolve => { nextResult = resolve; });
     text = text.replace('An external save.', 'An editor save.');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await saved;
     assert.match(liveHtml, /An editor save/);
     const foundKey = new Promise<void>(resolve => { nextResult = resolve; });
     const fixtureKey = ['sk', 'ant', 'A1'.repeat(14)].join('-');
     text = text.replace('An editor save.', fixtureKey);
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await foundKey;
     assert.equal(diagnosis?.kind, 'key');
     assert.equal(diagnosis?.slide, 1);
@@ -390,7 +482,7 @@ async function main(): Promise<void> {
     const foundPicture = new Promise<void>(resolve => { nextResult = resolve; });
     text = text.replace(fixtureKey, '![Outside](/tmp/elsewhere.png)');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await foundPicture;
     assert.equal(diagnosis?.kind, 'outside');
     assert.equal(diagnosis?.slide, 1);
@@ -403,7 +495,7 @@ async function main(): Promise<void> {
     fs.truncateSync(logo, 26 * 1024 * 1024);
     text = deckText('Paper').replace('Welcome, everyone.', '![Logo](../Shared/logo.png)');
     fs.writeFileSync(deckPath, text);
-    savedListeners.at(-1)?.(document);
+    liveSaved?.(document);
     await limited;
     assert.equal(diagnosis?.kind, 'limits');
     assert.equal(diagnosis?.slide, 1);
@@ -438,7 +530,7 @@ async function main(): Promise<void> {
     for (const words of ['First save.', 'Latest save.']) {
       text = deckText('Paper').replace('Welcome, everyone.', words);
       fs.writeFileSync(deckPath, text);
-      savedListeners.at(-1)?.(document);
+      liveSaved?.(document);
       await new Promise(resolve => setTimeout(resolve, 35));
     }
     const beforeManualFinishes = liveHtml;
@@ -451,7 +543,7 @@ async function main(): Promise<void> {
     assert.deepEqual(usageForBoth, [event, event]);
     assert.equal(refusedState?.state, 'paused');
     assert.equal(refusedState?.pause?.kind, 'page');
-    assert.equal(refusedState?.pause?.detail, foreignPageLine(pagePath));
+    assert.equal(refusedState?.pause?.detail, takenDeckPageLine(pagePath));
     assert.equal(beforeManualFinishes.includes('Latest save.'), false);
     assert.equal(states.includes('offline'), false);
     assert.equal(sentPromptly, true, 'the pending save follows the manual publish immediately');
@@ -483,6 +575,62 @@ async function main(): Promise<void> {
 
   } finally {
     livePublisher.dispose();
+  }
+  const legacyPath = path.join(path.dirname(deckPath), 'Intro.html');
+  const legacyLive = { on: true as const, id: 'legacy' };
+  const legacyPublisher = new DeckPublisher(extension);
+  let moveOnWrite = false;
+  let migrated = false;
+  try {
+    legacyPublisher.connect({
+      ...feature,
+      controller: {
+        ...feature.controller,
+        legacyDeckRecord: async (page: string) => !migrated && page === legacyPath ? { live: legacyLive } : undefined,
+        recordFor: async (page: string) => page === (migrated ? pagePath : legacyPath) ? { files: [], live: legacyLive } : undefined,
+        setLive: async () => true,
+        writeLegacyDeckPage: async (_page: string, write: () => Promise<void>) => {
+          if (moveOnWrite) {
+            migrated = true;
+            return false;
+          }
+          await write();
+          return true;
+        },
+        updateLive: async (page: { realPath: string }, input: { sending: () => void }) => {
+          if (migrated) {
+            assert.equal(page.realPath, pagePath);
+            return { kind: 'updated', pictures: [] };
+          }
+          input.sending();
+          assert.equal((await legacyPublisher.stateOf(document as never)).live?.state, 'updating');
+          return { kind: 'offline', detail: 'Test connection failure.' };
+        },
+      },
+    } as never);
+    // User-requested live update, using the old record and the new activity key.
+    text = deckText('Paper');
+    fs.writeFileSync(deckPath, text);
+    legacyPublisher.attach(document as never, async () => true);
+    await legacyPublisher.liveAction(document as never, 'on');
+    const state = (await legacyPublisher.stateOf(document as never)).live;
+    assert.equal(state?.state, 'offline');
+    assert.match(state.tooltip, /Test connection failure/);
+    await legacyPublisher.liveAction(document as never, 'off');
+
+    moveOnWrite = true;
+    mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const retried = new Promise<void>(resolve => legacyPublisher.onDidUpdateLive(() => resolve()));
+      await legacyPublisher.liveAction(document as never, 'on');
+      assert.equal(migrated, true);
+      mock.timers.tick(2_000);
+      await retried;
+    } finally {
+      mock.timers.reset();
+    }
+  } finally {
+    legacyPublisher.dispose();
   }
   console.log('deckPublish: all passed');
 }

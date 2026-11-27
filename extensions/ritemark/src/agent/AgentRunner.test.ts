@@ -8,6 +8,8 @@ import {
   DEFAULT_SETTING_SOURCES,
   modelMatchesExpectedIdentity,
   normalizeClaudeSdkSuccessResult,
+  processAssistantMessage,
+  processToolResultMessage,
 } from './AgentRunner';
 
 // Sprint 127 R1: a declared model reaches the CLI as a modelPicker row plus its
@@ -81,7 +83,7 @@ async function testSynchronousPlanApprovalAnswer() {
   }
 }
 
-async function testSynchronousQuestionAnswer() {
+async function testSynchronousQuestionAnswer(splitFrames: boolean) {
   const session = new AgentSession({
     workspacePath: process.cwd(),
   }) as AgentSession & Record<string, unknown>;
@@ -99,18 +101,47 @@ async function testSynchronousQuestionAnswer() {
     ],
   };
 
+  const text = 'I will update the opening paragraph and keep the examples intact. '.repeat(3);
+  const emitted: Array<{ type: string; message: string; tool?: string }> = [];
+  session._turnResolve = () => {};
+  session._turnId = 1;
+  session._consumerTurnId = 1;
+  session._emitProgress = (type: string, message: string, tool?: string) => emitted.push({ type, message, tool });
+
   session._emitQuestion = (question: { toolUseId: string; questions: Array<{ question: string }> }) => {
+    assert.deepEqual(emitted.map(({ type, message }) => [type, message]), [
+      ['text', ''],
+      ['thinking', text.slice(0, 150) + '…'],
+      ['text', text],
+      ['tool_use', 'Using AskUserQuestion'],
+    ], 'tool result clears context, then both the snippet and full prose precede the question');
+    assert.equal(emitted[3].tool, 'AskUserQuestion');
     const answered = session.answerQuestion(question.toolUseId, {
       [question.questions[0].question]: 'A',
     });
     assert.equal(answered, true, 'synchronous question answer should be accepted');
   };
 
-  const result = await session._handleCanUseTool(
-    'AskUserQuestion',
-    questionInput,
-    { signal: new AbortController().signal, toolUseID: 'question-tool-1' }
-  );
+  let result: Awaited<ReturnType<AgentSession['_handleCanUseTool']>> | undefined;
+  session._queryStream = {
+    async *[Symbol.asyncIterator]() {
+      yield { type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'earlier-tool' }] } };
+      const textBlock = { type: 'text', text };
+      const questionBlock = { type: 'tool_use', id: 'question-tool-1', name: 'AskUserQuestion', input: questionInput };
+      if (splitFrames) {
+        yield { type: 'assistant', message: { content: [textBlock] } };
+      }
+      yield { type: 'assistant', message: { content: splitFrames ? [questionBlock] : [textBlock, questionBlock] } };
+      result = await session._handleCanUseTool(
+        'AskUserQuestion',
+        questionInput,
+        { signal: new AbortController().signal, toolUseID: 'question-tool-1' },
+      );
+      yield { type: 'result', subtype: 'success', result: 'Continuing.' };
+    },
+  };
+  await session._consumeLoop();
+  assert.ok(result);
 
   assert.equal(result.behavior, 'allow');
   if (result.behavior === 'allow') {
@@ -498,13 +529,44 @@ async function testSyntheticAuthSuccessEnvelopeFailsTheTurn(): Promise<void> {
   }, 'the SDK terminal is_error bit remains authoritative even with prior assistant activity');
 }
 
+function testDocumentStepEvents() {
+  const files: string[] = [];
+  const events: Array<Parameters<Parameters<typeof processAssistantMessage>[2]>> = [];
+  const capture: Parameters<typeof processAssistantMessage>[2] = (...event) => events.push(event);
+  processAssistantMessage({
+    type: 'assistant',
+    message: { content: [
+      { type: 'tool_use', id: 'doc', name: 'mcp__ritemark_documents__read_document', input: { path: 'Reference/Locked.docx' } },
+      { type: 'tool_use', id: 'ls', name: 'Glob', input: { path: 'Reference', pattern: '*.docx' } },
+      { type: 'tool_use', id: 'proposal', name: 'mcp__ritemark_documents__read_document', input: { path: '', filePath: '04 Drafts/Proposal phase 2 v3.docx' } },
+    ] },
+  } as Parameters<typeof processAssistantMessage>[0], files, capture);
+  processToolResultMessage({
+    type: 'user',
+    message: { content: [
+      { type: 'tool_result', tool_use_id: 'proposal', is_error: true, content: 'Tool input was rejected.' },
+      { type: 'tool_result', tool_use_id: 'ls', content: 'Reference/Locked.docx' },
+      { type: 'tool_result', tool_use_id: 'doc', content: 'The file is locked.', _meta: { documentReadReason: 'password' } },
+    ] },
+  } as Parameters<typeof processToolResultMessage>[0], files, capture);
+  assert.deepEqual(events.map((event) => event[5]?.id), ['doc', 'ls', 'proposal', 'proposal', 'ls', 'doc']);
+  assert.equal(events[0][5]?.path, 'Reference/Locked.docx');
+  assert.equal(events[3][3], '04 Drafts/Proposal phase 2 v3.docx');
+  assert.equal(events[3][5]?.status, 'failed');
+  assert.deepEqual(events[4][5]?.listing, ['Reference/Locked.docx']);
+  assert.equal(events[5][5]?.warning, 'it has a password');
+  assert.deepEqual(files, []);
+}
+
 async function main() {
+  testDocumentStepEvents();
   testCanonicalModelIdentityMatching();
   testDefaultSettingSources();
   testDefaultToolsIncludePlanAndQuestionLifecycle();
   testClaudeLifecycleInstructionsAreIncluded();
   await testSynchronousPlanApprovalAnswer();
-  await testSynchronousQuestionAnswer();
+  await testSynchronousQuestionAnswer(false);
+  await testSynchronousQuestionAnswer(true);
   await testConcurrentToolApprovalsBothResolve();
   testSprint103ModeMapping();
   await testSprint103PlanPhaseMutatingDenied();

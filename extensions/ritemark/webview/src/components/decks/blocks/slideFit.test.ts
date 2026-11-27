@@ -9,10 +9,12 @@
 import { strict as assert } from 'node:assert'
 import { readFileSync } from 'node:fs'
 import { EditorState, TextSelection } from '@tiptap/pm/state'
-import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, isCoverSlide } from '../../../../../src/decks/blocks/slideRenderer'
+import { BLOCK_FIT_STEPS, blockCanvasMarkup, blockSlideHtml, contentPlaceOf, isCoverSlide, lonePictureClass } from '../../../../../src/decks/blocks/slideRenderer'
 import { clearStageFit, fitFlow, fitKeyOf, fitLookOf, measureFlowAt, overflowsSideways, setStageFit, stageFitFor, subscribeStageFit } from './slideFit'
-import { loadSlide } from './slideEditorHarness'
-import { CARET_CLASS, caretBoxPos } from './slideDivView'
+import { loadSlide, saveSlide } from './slideEditorHarness'
+import { isTitlePlace, slidePlaceholderOf } from './slideEditorMarkdown'
+import { CARET_CLASS } from './slideDivView'
+import { caretBoxPos } from './blockBar'
 import { imagePathOf, missingDecorations } from './slidePictures'
 
 // ---- A flow laid out by a small model: words a given height and a word a given width, both scaled by `--fit`, as the
@@ -132,6 +134,32 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(!html.includes('is-cover'))
 }
 
+// The layout harness has no browser geometry. The stage shares the renderer's centring rule once
+// its editable placeholder is out of the flex flow.
+{
+  const markdown = '![](<Pictures.rtms.files/large.png>)'
+  const pictureDoc = loadSlide(markdown)
+  const title = pictureDoc.type.schema.nodes.heading.create({ level: 1 })
+  const doc = pictureDoc.copy(pictureDoc.content.addToStart(title))
+  assert.equal(title.textContent, '')
+  assert.equal(slidePlaceholderOf(title, doc, isTitlePlace(doc, title, 0)), 'Title')
+  assert.equal(lonePictureClass(saveSlide(doc), null), 'is-lone-pic')
+  assert.match(blockCanvasMarkup({ markdown }, { pictureUrl: () => 'large.png' }), /is-lone-pic/)
+  const css = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')
+  assert.match(css, /\.deck-sl\.is-blocks\.is-editing\.is-lone-pic \.blk-flow > h1\.is-empty\[data-placeholder="Title"\] \{[^}]*position: absolute;/,
+    'the stage title placeholder takes no room in the shared picture layout')
+  // The app run (round 3): the stage's last-block rule set margin-bottom 0 over the lone picture's auto margins, so the
+  // picture sat low. The stage's own rule must carry both auto margins on the last block, with no Content place chosen.
+  assert.match(css, /\.deck-slide \.deck-sl\.is-blocks\.is-editing:is\(\.is-lone-pic, \.is-titled-pic\):not\(\.va-top, \.va-middle, \.va-bottom\) \.blk-flow > :is\(\.blk-pic, img\):nth-last-child\(1 of :not\(ritemark-comment, \.blk-empty-line\.is-edge\)\) \{ margin-top: auto; margin-bottom: auto; \}/,
+    'on the stage both picture layouts keep both auto margins over the last-block rule')
+
+  const state = EditorState.create({ doc })
+  const titled = saveSlide(state.tr.insertText('A title', 1).doc)
+  assert.equal(lonePictureClass(titled, null), 'is-titled-pic')
+  assert.equal(contentPlaceOf(titled, undefined, null), 'top')
+  assert.match(blockCanvasMarkup({ markdown: titled }, { pictureUrl: () => 'large.png' }), /<h1>A title<\/h1>\s*<img/)
+}
+
 // A picture whose file is gone says so, with its name, in the deck view; the page never says so (no `missing`).
 {
   const missing = (path: string) => path === 'images/gone<1>.png'
@@ -194,7 +222,7 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
   assert.ok(/\.blk-link(?:, [^{]*)? \{[^}]*overflow-wrap: anywhere;/.test(css), 'a link (a web address) may break (#938: the slide editor\'s live link shares the rule)')
   assert.ok(!/\.deck-sl\.is-blocks[^{]*\{[^}]*(?:word-break: break-all|overflow-wrap: anywhere)[^}]*\}/.test(css.replace(/\.deck-sl\.is-blocks \.blk-link[^{]*\{[^}]*\}/, '').replace(/\.deck-sl \.blk-missing-name \{[^}]*\}/, '')), 'nothing else splits words')
   assert.ok(/\.is-cover \.blk-flow \{[^}]*justify-content: safe flex-end;/.test(css), "a cover's title is never pushed past the top")
-  assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/.test(css) && /\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{ flex: 0 1 auto; min-height: 96px;/.test(css), 'the picture shrinks first, down to 96 px')
+  assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) \{ display: flex; flex-direction: column; \}/.test(css) && /\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{ flex: 0 1 auto; min-height: 0;/.test(css), 'the picture shrinks first to fit the remaining room')
   assert.ok(/\.blk-flow:has\(> \.blk-pic, > img\) > \* \{ flex: none; \}/.test(css), 'the title and the words never shrink')
   // The stage's editor (ProseMirror) breaks long words by default: the slide's rule wins over it.
   const decks = readFileSync(new URL('../decks.css', import.meta.url), 'utf8')

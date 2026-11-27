@@ -11,15 +11,21 @@ import { strict as assert } from 'node:assert'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createDocument } from '@mixmark-io/domino'
+import domino, { createDocument } from '@mixmark-io/domino'
+import { EditorState, NodeSelection, TextSelection, type Plugin } from '@tiptap/pm/state'
+import { DecorationSet, EditorView, type NodeView } from '@tiptap/pm/view'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { isBlockSlide, isSlideKind, parseDeck, slideDataOf } from '../../../../../src/decks/deckFormat'
 import { legacyToBlocks } from '../../../../../src/decks/blocks/legacyToBlocks'
 import { blockSlideHtml } from '../../../../../src/decks/blocks/slideRenderer'
 import { withStepsLabels } from '../../../../../src/decks/blocks/labelBlock'
-import { SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
-import { loadSlide } from './slideEditorHarness'
+import { BOXES_MARKS, SLIDE_BLOCK_CLASSES } from '../../../../../src/decks/blocks/fencedDiv'
+import { caretBoxIcon, chosenBlockAt, setBoxesMark } from './blockBar'
+import * as itemHandle from './itemHandle'
+import { loadSlide, saveSlide } from './slideEditorHarness'
 import { slideDivWithView, unknownIconWords, type SlideDivHandlers } from './slideDivView'
+import { setBlockValue } from './slideCommands'
+import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { quoteBy } from './slideQuote'
 import { PAGE_ICON_PATHS } from '../slide/pageIcons'
 
@@ -170,16 +176,22 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
 // the stage drew the box's empty place (hidden) and the renderer nothing.
 {
   const calls: string[] = []
+  const picks: { pos: number; current: string | null }[] = []
   const handlers: SlideDivHandlers = {
-    pickIcon: (_pos, _anchor, current) => { calls.push(`pick ${current}`) },
+    pickIcon: (pos, _anchor, current) => {
+      calls.push(`pick ${current}`)
+      picks.push({ pos, current })
+    },
     hintIcon: (_pos, _anchor, name) => { calls.push(`hint ${name}`) },
   }
-  const makeView = (slideDivWithView(handlers).config.addNodeView as () => (props: unknown) => { dom: HTMLElement })()
+  const extension = slideDivWithView(handlers)
+  const makeView = (extension.config.addNodeView as () => (props: unknown) => { dom: HTMLElement })()
   // domino has no `append`, which the node view uses (a browser does): for this check only.
   const elementProto = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div'))) as { append?: unknown; appendChild: (node: unknown) => unknown }
   if (typeof (document.createElement('div') as { append?: unknown }).append !== 'function') {
     Object.defineProperty(elementProto, 'append', { configurable: true, value(this: typeof elementProto, ...nodes: unknown[]) { for (const node of nodes) this.appendChild(node) } })
   }
+  const plugins = extension.config.addProseMirrorPlugins as () => Plugin[]
   const stageBadge = (markdown: string) => {
     const doc = loadSlide(markdown)
     let boxPos = -1
@@ -187,7 +199,10 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
       if (boxPos < 0 && node.type.name === 'slideDiv' && String(node.attrs.class).split(' ').includes('box')) boxPos = pos
     })
     assert.ok(boxPos >= 0, `a box in ${markdown}`)
-    const view = makeView({ node: doc.nodeAt(boxPos), getPos: () => boxPos, editor: { state: { doc } } })
+    const state = EditorState.create({ doc, plugins: plugins() })
+    const [boxLooks] = state.plugins
+    const decorations = (boxLooks.props.decorations!.call(boxLooks, state) as DecorationSet).find(boxPos, boxPos + 1)
+    const view = makeView({ node: doc.nodeAt(boxPos), getPos: () => boxPos, decorations })
     return view.dom.firstElementChild as HTMLElement
   }
   const slide = (icon: string) => `:::: boxes\n::: {.box icon="${icon}"}\n### Idea\n:::\n::::`
@@ -230,8 +245,7 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
   assert.ok(/setIconPick\(\{ pos, rect[^\n]*\n\s*setIconHint\(null\)/.test(stage), 'the icon menu ends it')
   assert.ok(hint.includes('HINT_WAIT_MS') && hint.includes("classList.contains('is-unknown')") && hint.includes('requestAnimationFrame(follow)'), 'the place waits, checks and follows')
   // Sprint 169 PR 2 (#867): an icon outside the 24 (the Experience lead's `truck` and `folder`), and an alias, draw on
-  // the stage the renderer's own drawing from the full set: its path, not the chrome's. Under a look with its own mark
-  // (Mark: Number, Dot, Arrow; Sprint 167 PR 2) the box's icon is never drawn, on either.
+  // the stage the renderer's own drawing from the full set. Number keeps the icon below the count.
   const pathOf = (phosphor: keyof typeof PAGE_ICON_PATHS) => /d="([^"]*)"/.exec(PAGE_ICON_PATHS[phosphor])![1]
   for (const [icon, phosphor] of [['truck', 'truck'], ['folder', 'folder'], ['mail', 'envelope-simple'], ['list-checks', 'list-checks']] as const) {
     const badge = stageBadge(slide(icon))
@@ -244,10 +258,86 @@ console.log(`slideRenderer.parity: ${same}/${slides.length} slides draw the same
   }
   for (const look of ['steps', 'line', 'arrows']) {
     const marked = `:::: {.boxes look="${look}"}\n::: {.box icon="truck"}\n### Idea\n:::\n::::`
-    assert.ok(!draw(marked).includes(pathOf('truck')), `${look}: the renderer draws no icon`)
+    const showsIcon = look === 'steps'
+    assert.equal(draw(marked).includes(pathOf('truck')), showsIcon, `${look}: renderer icon`)
     const mark = stageBadge(marked)
-    assert.ok(!mark.innerHTML.includes(pathOf('truck')) && !mark.className.includes('blk-icon'), `${look}: the stage draws no icon`)
-    assert.equal(mark.className, look === 'arrows' ? 'blk-mark' : '', `${look}: the look's own mark`)
+    assert.equal(mark.innerHTML.includes(pathOf('truck')), showsIcon, `${look}: stage icon`)
+    assert.equal(mark.className, showsIcon ? 'blk-icon is-pickable' : look === 'arrows' ? 'blk-mark' : '', look)
   }
+  // Drive the Mark command through ProseMirror's real view update, keeping the same boxes and their caret.
+  const doc = loadSlide(':::: boxes\n::: {.box icon="truck"}\nKnown\n:::\n::: {.box icon="xyz-unknown"}\nUnknown\n:::\n::: box\nEmpty\n:::\n::::')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: (domino as unknown as { createWindow(): Window }).createWindow() })
+
+  const liveView = new EditorView(document.createElement('div'), {
+    state: EditorState.create({ doc, plugins: plugins() }),
+    nodeViews: { slideDiv: (node, _view, getPos, decorations) => makeView({ node, getPos, decorations }) as NodeView },
+  })
+  for (const mark of [...BOXES_MARKS, 'icon', 'dot', 'icon'] as const) {
+    const tr = setBoxesMark(liveView.state, 0, mark)
+    if (tr) liveView.dispatch(tr)
+    const showsIcons = mark === 'icon' || mark === 'number'
+    liveView.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'slideDiv' || node.attrs.class !== 'box') return
+      const state = liveView.state.apply(liveView.state.tr.setSelection(TextSelection.create(liveView.state.doc, pos + 2)))
+      const badge = (liveView.nodeDOM(pos) as HTMLElement).firstElementChild as HTMLElement
+      assert.equal(chosenBlockAt(state)?.kind, 'boxes')
+      assert.equal(!!caretBoxIcon(state), badge.classList.contains('is-pickable'), `${mark}: icon control matches the stage slot`)
+      assert.equal(badge.classList.contains('blk-icon'), showsIcons, `${mark}: ${node.textContent} icon or placeholder`)
+      assert.equal(badge.classList.contains('blk-mark'), mark === 'arrow', `${mark}: arrow`)
+    })
+  }
+  // Domino has no layout engine. Both views put the shared badge box before the title in the flex layout.
+  const mixed = ':::: boxes\n::: {.box icon="truck"}\n### Truck\n:::\n::: box\n### Empty\n:::\n::: {.box icon="rocket-launch"}\n### Rocket\n:::\n::::'
+  liveView.updateState(EditorState.create({ doc: loadSlide(mixed), plugins: plugins() }))
+  const page = createDocument(draw(mixed))
+  const stageBoxes = Array.from(liveView.dom.querySelectorAll('.blk-box'))
+  const pageBoxes = Array.from(page.querySelectorAll('.blk-box'))
+  assert.equal(stageBoxes.length, 3)
+  assert.equal(pageBoxes.length, 3)
+  for (const [index, box] of stageBoxes.entries()) {
+    const stageIcon = box.firstElementChild!
+    const pageIcon = pageBoxes[index].firstElementChild!
+    assert.ok(stageIcon.classList.contains('blk-icon') && pageIcon.classList.contains('blk-icon'))
+    assert.equal(stageIcon.nextElementSibling?.firstElementChild?.textContent, pageIcon.nextElementSibling?.textContent)
+    if (index === 1) {
+      assert.ok(stageIcon.classList.contains('is-unknown') && stageIcon.innerHTML.includes(pathOf('circle-dashed')))
+      assert.equal(pageIcon.className, 'blk-icon is-empty')
+      assert.equal(pageIcon.innerHTML, '')
+    } else {
+      assert.equal(pageIcon.innerHTML, stageIcon.innerHTML)
+    }
+  }
+  // #1103: the empty block keeps the page's geometry, even when the caret moves.
+  const numbered = ':::: {.boxes look="steps"}\n::: box\nFirst\n:::\n::: box\nSecond\n:::\n::::'
+  const plain = numbered.replace(':::: {.boxes look="steps"}', ':::: boxes')
+  const stageBadges = () => liveView.dom.querySelectorAll('.blk-box > .blk-icon:not(.is-place)')
+  for (const index of [1, null]) {
+    const doc = loadSlide(numbered)
+    liveView.updateState(EditorState.create({ doc, plugins: plugins() }))
+    const block = doc.firstChild!
+    const first = 1
+    const second = first + block.firstChild!.nodeSize
+    const selection = index === null ? NodeSelection.create(doc, 0) : TextSelection.create(doc, second + 2)
+    liveView.dispatch(liveView.state.tr.setSelection(selection))
+    const target = itemHandle.boxForEmptyIconMenu(liveView.state, chosenBlockAt(liveView.state)!)
+    assert.equal(target, index === null ? first : second)
+    liveView.dispatch(setBoxesMark(liveView.state, 0, 'icon')!)
+    assert.equal(stageBadges().length, 0, 'an all-plain Icon block has no stage badges, with or without a caret')
+    assert.equal(createDocument(draw(plain)).querySelectorAll('.blk-icon').length, 0)
+    assert.equal(saveSlide(liveView.state.doc), plain, 'opening the chooser writes no icon')
+    // Dismissing the picker leaves only the Mark change. Choosing writes only the targeted box.
+    assert.equal(saveSlide(liveView.state.doc), plain, 'Escape leaves the block plain')
+    const [choice] = iconMenuChoices(iconMenuStartQuery(null), []).icons
+    liveView.dispatch(setBlockValue(liveView.state, target!, 'icon', choice.name)!)
+    const word = index === null ? 'First' : 'Second'
+    assert.equal(saveSlide(liveView.state.doc), plain.replace(`::: box\n${word}`, `::: {.box icon="${choice.name}"}\n${word}`))
+    assert.equal(stageBadges().length, 2)
+    const emptyBadge = stageBadges()[index === null ? 1 : 0]
+    assert.ok(emptyBadge.classList.contains('is-unknown') && emptyBadge.innerHTML.includes(pathOf('circle-dashed')))
+    assert.equal(itemHandle.boxForEmptyIconMenu(liveView.state, chosenBlockAt(liveView.state)!), null, 'a mixed block already has an icon')
+    liveView.dispatch(setBlockValue(liveView.state, target!, 'icon', null)!)
+    assert.equal(stageBadges().length, 0, 'removing the last icon also clears the sibling badge')
+  }
+  liveView.destroy()
   console.log('slideRenderer.parity: an unknown icon draws the same dashed badge on the stage, and asks for its tooltip')
 }

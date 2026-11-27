@@ -1,6 +1,6 @@
 # Sprint 174 technical plan
 
-Release tier: **extension**. Nothing here touches a shell-tier path (`CLAUDE.md`): no patch, no `vscode`, no `product.json`, no binaries, no workflow, no build script. All new code is webview code under `extensions/ritemark/webview/src/components/excel/` that `media/webview.js` carries, which an extension release ships. No esbuild external is added (the host bundle is not touched). If a PR finds it must touch the host, `ExcelDocument`, `excelEditorProvider.ts` or `src/excel/applyCellEdits.ts`, it stops and the plan is revised: those paths write a person's file, which `REVIEW.md` rates High.
+Release tier: **extension**. Nothing here touches a shell-tier path (`CLAUDE.md`): no patch, no `vscode`, no `product.json`, no binaries, no workflow, no build script. The chart Copy implementation is webview code under `extensions/ritemark/webview/src/components/excel/` that `media/webview.js` carries, which an extension release ships. PR 4b adds `img-src blob:` to the Excel viewer CSP and gets High and security review. The workbook write path stays outside the sprint scope.
 
 ## What step 1 already gives (reused as it is)
 
@@ -75,4 +75,4 @@ As in Sprint 158: the Experience lead captures each fixture in Excel for Mac at 
 
 ## Review tier per PR
 
-Every PR is Standard or Light by path: `webview/src/` (not `App.tsx`, not `documentSyncReducer.ts`, not `editorValueReconciliation.ts`, not `src/editorSync/`, not `src/ritemarkEditor.ts`). A PR that changes how the sheet looks also goes to the Experience lead with its one screenshot (`REVIEW.md`). The save-keeps proof (PR 0) is tests only, so Light; if it needs a change in `src/excel/` code, that PR is re-rated High and gets `/security-review`.
+Apart from PR 4b, the PRs are Standard or Light by path: `webview/src/` (not `App.tsx`, not `documentSyncReducer.ts`, not `editorValueReconciliation.ts`, not `src/editorSync/`, not `src/ritemarkEditor.ts`). A PR that changes how the sheet looks also goes to the Experience lead with its one screenshot (`REVIEW.md`). The save-keeps proof (PR 0) is tests only, so Light; if it needs a change in `src/excel/` code, that PR is re-rated High and gets `/security-review`.

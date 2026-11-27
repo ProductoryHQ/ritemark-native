@@ -75,6 +75,7 @@ export type HomeKeyName = 'google-ai-key' | 'openai-api-key' | 'anthropic-api-ke
 /** Sprint 140 (R2, R3, R14): the one guidance card under Waiting for you, or none. */
 export type HomeGuidance =
   | { card: 'what-moved' }
+  | { card: 'quick-look'; body: string; button: string }
   | {
       card: 'ready-request';
       kind: ReadyCardKind;
@@ -108,16 +109,9 @@ export type HomeGuidance =
       /** The sample's hand-over while the board starts it: the button's words, with a spinner, and the note. */
       busy: { button: string; note: string } | null;
     }
-  | {
-      card: 'feedback';
-      heading: string;
-      lede: string;
-      placeholder: string;
-      /** The send is on its way. */
-      sending: boolean;
-      /** The send did not go (R13, D5); what was typed stays in the field. */
-      problem: string | null;
-    };
+  | { card: 'open-source' };
+
+export type OpenSourceAction = 'star' | 'discussions' | 'dismiss';
 
 export interface HomeState {
   platform: HomePlatform;
@@ -133,10 +127,7 @@ export interface HomeState {
   boardEnabled: boolean;
   /** Sprint 159: the `decks` flag is on, so Start something has a Deck card (Jarmo, 17 November). */
   decksEnabled: boolean;
-  /**
-   * Sprint 140 (R2): at most one guidance card, under Waiting for you: What moved (experience 32, frame 5: once
-   * on a profile updated from Ritemark 1), the ready request, or the feedback card.
-   */
+  /** One card under Waiting for you: What moved, ready request, Quick Look, or open source. */
   guidance: HomeGuidance | null;
   /** Copilot Chat is installed and enabled, so What moved can say it is in More (Sprint 136). */
   copilotChat: boolean;
@@ -150,7 +141,9 @@ export interface HomeState {
 }
 
 /** Host → Home. */
-export type HomeMessage = { type: 'home/state'; state: HomeState } | HomeKeysSaved;
+export type HomeMessage =
+  | { type: 'home/state'; state: HomeState }
+  | HomeKeysSaved;
 
 export type StartKind = 'text' | 'table' | 'deck' | 'web';
 
@@ -182,9 +175,9 @@ export type HomeRequest =
   | { type: 'home/reopen-sign-in' }
   // Sprint 156 (PR B): `from` is where the key sheet was opened, the card's main part or Ask with, for the sign-in's counts
   | { type: 'home/save-keys'; keys: Partial<Record<HomeKeyName, string>>; from: SignInFrom }
-  | { type: 'home/feedback-send'; text: string }
-  | { type: 'home/feedback-mail'; text: string }
-  | { type: 'home/feedback-not-now' };
+  | { type: 'home/open-source-action'; action: OpenSourceAction }
+  | { type: 'home/quick-look-open' }
+  | { type: 'home/quick-look-dismiss' };
 
 /** Host → Home: OpenCode's keys were saved, or why not (the welcome's sheet, shared). */
 export type HomeKeysSaved = { type: 'home/keys-saved'; ok: boolean; message: string | null };
@@ -261,7 +254,8 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
     case 'home/ready-request-hide':
     case 'home/cancel-sign-in':
     case 'home/reopen-sign-in':
-    case 'home/feedback-not-now':
+    case 'home/quick-look-open':
+    case 'home/quick-look-dismiss':
       problem = check([]);
       return problem ? fail(problem) : { ok: true, request: { type: raw.type } };
     case 'home/ready-request-ai':
@@ -283,12 +277,11 @@ export function decodeHomeRequest(raw: unknown): Decoded<HomeRequest> {
       }
       return { ok: true, request: { type: 'home/save-keys', keys, from: raw.from as SignInFrom } };
     }
-    case 'home/feedback-send':
-    case 'home/feedback-mail':
-      problem = check(['text']);
+    case 'home/open-source-action':
+      problem = check(['action']);
       if (problem) return fail(problem);
-      if (!isText(raw.text) || !raw.text.trim()) return fail('text must be written');
-      return { ok: true, request: { type: raw.type, text: raw.text } };
+      if (raw.action !== 'star' && raw.action !== 'discussions' && raw.action !== 'dismiss') return fail('unknown open-source action');
+      return { ok: true, request: { type: raw.type, action: raw.action } };
     case 'home/set-line':
       problem = check(['line']);
       if (problem) return fail(problem);

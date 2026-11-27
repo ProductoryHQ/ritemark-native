@@ -10,6 +10,8 @@
  * With the flag off nothing here applies: a `.rtms` or `.deck.md` opens as an ordinary document, its slide blocks as code.
  */
 
+import { FEEDBACK_OPEN_COMMAND } from '../feedback/feedbackSheet';
+import { DECK_FAILURE_FEEDBACK_MESSAGE, decodeFailureFeedbackOpen, PUBLISH_FAILURE_TITLE } from '../feedback/feedbackQuoteSafety';
 import { openInBrowser } from './openInLink';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -19,11 +21,11 @@ import { timetableStatus } from './timetableDisplay';
 import { isEnabled } from '../features';
 import { isRelativeImagePath } from '../utils/imagePaths';
 import { parseImageDataUrl, writeImageRelativeTo } from '../utils/imageWriter';
-import { ensureProjectSubfolder } from '../projects/projectFolderGuard';
+import { DeckPictureFolderTaken, ensureDeckPictureFolder } from './deckPictureFolder';
 import { deckModeOf } from './deckMode';
 import { BUILT_IN_THEME_PATH, isThemePath, MAX_THEMES, parseTheme, pathKey, themeEntries, themePathOf, THEMES_FOLDER, type DeckTheme, type ThemeEntry } from './deckTheme';
 import { LOGO_TOO_LARGE, logoAspectOf, logoKindOfName, logoProblem, MAX_LOGO_BYTES, type LogoKind } from './themeLogo';
-import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest } from './deckProtocol';
+import { decodeDeckRequest, DeckProtocolError, type DeckCurrentSlide, type DeckHostMessage, type DeckRequest, type DeckNoticeReporter } from './deckProtocol';
 import { slideTitleLine, type CurrentSlide } from './currentSlide';
 import { decodeDeckPresentMenuRequest, decodeDeckPresentRequest, sessionTimeEdit, type DeckPresentOptions, type DeckPresentRequest } from './present/presentProtocol';
 import { frontMatterField, parseFrom } from './deckFormat';
@@ -65,6 +67,7 @@ const KEPT_WRITES = 20;
 const VIEW_ANSWER_MS = 5000;
 
 export class DeckPages implements vscode.Disposable {
+  private readonly publishFailures = new WeakMap<vscode.Webview, string>();
   private readonly views = new Set<DeckView>();
   private active: DeckView | null = null;
   private readonly changed = new vscode.EventEmitter<void>();
@@ -99,8 +102,8 @@ export class DeckPages implements vscode.Disposable {
     state: (document: vscode.TextDocument) => Promise<StartCardState>;
     gone: (document: vscode.TextDocument) => Promise<void>;
     /** Draft and the copy: true when the card is gone (the row was used), false when it stays (nothing was done). */
-    draft: (document: vscode.TextDocument, text: string, notice: (text: string) => void) => Promise<boolean>;
-    copy: (document: vscode.TextDocument, source: string, notice: (text: string) => void) => Promise<boolean>;
+    draft: (document: vscode.TextDocument, text: string, notice: DeckNoticeReporter) => Promise<boolean>;
+    copy: (document: vscode.TextDocument, source: string, notice: DeckNoticeReporter) => Promise<boolean>;
   } | null = null;
   /** Sprint 170 (#881): Save as PDF from Publish's menu (`deckPdf.ts`), set once at activation. */
   pdf: Pick<DeckPdfSaver, 'save' | 'show'> | null = null;
@@ -398,6 +401,13 @@ export class DeckPages implements vscode.Disposable {
     if (!connected || !this.deckModeFor(document, true)) return;
     // Present (Sprint 159) has its own decoders, beside the presenter's other messages.
     const type = (message as { type?: unknown } | null)?.type;
+    if (type === DECK_FAILURE_FEEDBACK_MESSAGE) {
+      const line = this.publishFailures.get(webview);
+      const options = decodeFailureFeedbackOpen((message as { options?: unknown }).options,
+        line === undefined ? undefined : { title: PUBLISH_FAILURE_TITLE, line });
+      if (options) await vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
+      return;
+    }
     if (type === 'deck/present') {
       const present = decodeDeckPresentRequest(message);
       if (present && this.presenter) await this.presenter.start({ document, panel: connected.panel }, present);
@@ -433,12 +443,14 @@ export class DeckPages implements vscode.Disposable {
         const pending = (this.sessionEdits.get(document) ?? Promise.resolve()).then(async () => {
           if (document.isClosed) return;
           const change = sessionTimeEdit(document.getText(), field, value);
-          if (!change) return;
-          const edit = new vscode.WorkspaceEdit();
-          edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
-          if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+          if (change) {
+            const edit = new vscode.WorkspaceEdit();
+            edit.replace(document.uri, new vscode.Range(document.positionAt(change.start), document.positionAt(change.end)), change.text);
+            if (!await vscode.workspace.applyEdit(edit)) throw new Error('Session edit was declined');
+          }
+          await this.post(webview, { type: 'deck/notice', text: '', kind: 'success', operation: `session-${field}` });
         }).catch(async () => {
-          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.` });
+          await this.post(webview, { type: 'deck/notice', text: `The session ${field} could not be saved. Try again.`, kind: 'failure', operation: `session-${field}` });
         });
         this.sessionEdits.set(document, pending);
         await pending;
@@ -503,7 +515,11 @@ export class DeckPages implements vscode.Disposable {
         await this.publisher?.liveAction(document, request.action, webview);
         return;
       case 'deck/publish':
-        await this.publisher?.publish(document, request.text, request.look, request.steps, text => void this.post(webview, { type: 'deck/page-notice', text }));
+        await this.publisher?.publish(document, request.text, request.look, request.steps, (text, kind) => {
+          if (kind === 'failure') this.publishFailures.set(webview, text);
+          if (kind === 'success') this.publishFailures.delete(webview);
+          void this.post(webview, { type: 'deck/page-notice', text, kind, operation: 'publish' });
+        });
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));
@@ -554,7 +570,7 @@ export class DeckPages implements vscode.Disposable {
       case 'deck/start-copy': {
         // The card waits for the answer: gone once the row was used, or as it is now when nothing was done
         const card = this.startCard;
-        const notice = (text: string) => void this.post(webview, { type: 'deck/notice', text });
+        const notice: DeckNoticeReporter = (text, kind) => void this.post(webview, { type: 'deck/notice', text, kind, operation: 'start-card' });
         const gone = !card || !isEnabled('decks') || (request.type === 'deck/start-draft'
           ? await card.draft(document, request.text, notice)
           : await card.copy(document, request.source, notice));
@@ -593,7 +609,7 @@ export class DeckPages implements vscode.Disposable {
     const library = this.library();
     const root = projectRoot();
     const deckPath = root ? projectRelative(root, document.uri.fsPath) : null;
-    const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message });
+    const failed = (id: string | null, message: string) => this.post(webview, { type: 'deck/library-failed', id, message, operation: request.type });
     if (!isEnabled('decks')) {
       // Sprint 159 (PR 2): the deck keeps working with the flag turned off since it opened, but the library is off
       if (request.type === 'deck/source-states') await this.post(webview, { type: 'deck/source-states', states: [] });
@@ -648,6 +664,7 @@ export class DeckPages implements vscode.Disposable {
           const source = parseFrom(request.from);
           if (!source) return;
           await vscode.commands.executeCommand(`${SLIDE_LIBRARY_VIEW}.focus`);
+          await this.post(webview, { type: 'deck/notice', text: '', kind: 'success', operation: request.type });
           this.revealed.fire({ path: source.path, id: source.id });
           return;
         }
@@ -655,7 +672,7 @@ export class DeckPages implements vscode.Disposable {
           const write = this.writes.get(request.token);
           this.writes.delete(request.token);
           if (!write || !(await library.undoWrite(write))) {
-            await failed(null, 'The library was changed since, so it is left as it is.');
+            await this.post(webview, { type: 'deck/notice', text: 'The library was changed since, so it is left as it is.', kind: 'success', operation: request.type });
             return;
           }
           await this.post(webview, { type: 'deck/library-undone', token: request.token });
@@ -767,11 +784,11 @@ export async function readThemeOrEvening(root: string, themePath: string | null 
 }
 
 /** `readThemeOrEvening`, with the project path of the file it read (its logo is beside it, Sprint 162 PR 4). */
-export async function readThemeFileOrEvening(root: string, themePath: string | null | undefined): Promise<{ path: string; text: string } | null> {
-  const named = themePath && isThemePath(themePath) ? await readProjectTheme(root, themePath) : null;
-  if (named !== null) return { path: themePath!.trim(), text: named };
-  const evening = await readProjectTheme(root, BUILT_IN_THEME_PATH);
-  return evening === null ? null : { path: BUILT_IN_THEME_PATH, text: evening };
+export async function readThemeFileOrEvening(root: string, themePath: string | null | undefined): Promise<{ path: string; text: string; bytes: Buffer } | null> {
+  const named = themePath && isThemePath(themePath) ? await readProjectThemeBytes(root, themePath) : null;
+  if (named !== null) return { path: themePath!.trim(), text: named.toString('utf8'), bytes: named };
+  const evening = await readProjectThemeBytes(root, BUILT_IN_THEME_PATH);
+  return evening === null ? null : { path: BUILT_IN_THEME_PATH, text: evening.toString('utf8'), bytes: evening };
 }
 
 /**
@@ -789,7 +806,7 @@ export type ThemeLogoFile =
 /** The logo files read lately, by their real path and name, with the time and size they were read at. */
 const logoFileCache = new Map<string, { modified: number; size: number; answer: ThemeLogoFile }>();
 
-export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>, second = false): Promise<ThemeLogoFile> {
+export async function themeLogoFile(root: string, themePath: string, theme: Pick<DeckTheme, 'logo'>, second = false, fresh = false): Promise<ThemeLogoFile> {
   // `second`: the logo's second version (18 November), found, checked and refused by the same rules.
   const file = second ? theme.logo?.second?.file : theme.logo?.file;
   if (!file) return { state: 'none' };
@@ -813,7 +830,7 @@ export async function themeLogoFile(root: string, themePath: string, theme: Pick
     // Read and checked once for each version of the file (the review of #785: the tab asks at every change of the draft).
     const key = `${realFile}\u0000${file}`;
     const seen = logoFileCache.get(key);
-    if (seen && seen.modified === stat.mtimeMs && seen.size === stat.size) return seen.answer;
+    if (!fresh && seen && seen.modified === stat.mtimeMs && seen.size === stat.size) return seen.answer;
     const bytes = await fs.promises.readFile(realFile);
     const problem = logoProblem(file, bytes);
     const answer: ThemeLogoFile = problem ? refused(problem) : { state: 'found', absolute, file, kind, bytes, modified: Math.round(stat.mtimeMs), aspect: logoAspectOf(bytes, kind) };
@@ -860,13 +877,21 @@ export interface DeckThemeAddresses {
 }
 
 /** The theme a deck at `deckPath` draws, and its logo file and its second version's (Sprint 162 PR 4: the page carries one). */
-export async function deckThemeAndLogo(deckPath: string, themePath: string): Promise<{ text: string | null; logo: ThemeLogoFile; secondLogo: ThemeLogoFile }> {
+export async function deckThemeAndLogo(deckPath: string, themePath: string, fresh = false) {
   const root = themeRootOf(deckPath);
+  const files = [themePath, BUILT_IN_THEME_PATH].filter(isThemePath).map(file => path.resolve(root, file.trim()));
   const read = await readThemeFileOrEvening(root, themePath);
-  if (!read) return { text: null, logo: { state: 'none' }, secondLogo: { state: 'none' } };
+  if (!read) {
+    return { text: null, bytes: null, files, logo: { state: 'none' } as const, secondLogo: { state: 'none' } as const };
+  }
   const theme = parseTheme(read.text);
-  const [logo, secondLogo] = await Promise.all([themeLogoFile(root, read.path, theme), themeLogoFile(root, read.path, theme, true)]);
-  return { text: read.text, logo, secondLogo };
+  for (const file of [theme.logo?.file, theme.logo?.second?.file]) {
+    if (!file) continue;
+    const absolute = path.resolve(root, path.dirname(read.path), ...file.split(/[\\/]/));
+    if (projectRelative(root, absolute)) files.push(absolute);
+  }
+  const [logo, secondLogo] = await Promise.all([themeLogoFile(root, read.path, theme, false, fresh), themeLogoFile(root, read.path, theme, true, fresh)]);
+  return { text: read.text, bytes: read.bytes, files, logo, secondLogo };
 }
 
 /** The folder a deck at `deckPath` reads its theme from: its project folder, or its own folder when it has none. */
@@ -895,6 +920,10 @@ export async function projectThemeFiles(root: string): Promise<Array<{ path: str
 
 /** The text of a theme file in the project at `root`, or null (the same limits as a deck's own theme). */
 export async function readProjectTheme(root: string, themePath: string): Promise<string | null> {
+  return (await readProjectThemeBytes(root, themePath))?.toString('utf8') ?? null;
+}
+
+async function readProjectThemeBytes(root: string, themePath: string): Promise<Buffer | null> {
   if (!isThemePath(themePath)) return null;
   const absolute = path.resolve(root, themePath);
   const relative = path.relative(root, absolute);
@@ -906,28 +935,26 @@ export async function readProjectTheme(root: string, themePath: string): Promise
     if (!realRelative || realRelative.startsWith('..') || path.isAbsolute(realRelative)) return null;
     const stat = await fs.promises.stat(realFile);
     if (!stat.isFile() || stat.size > MAX_THEME_BYTES) return null;
-    return await fs.promises.readFile(realFile, 'utf8');
+    return await fs.promises.readFile(realFile);
   } catch {
     return null;
   }
 }
 
 /**
- * A picture pasted or dropped on a slide, saved as the editor saves a pasted picture: in `images/` beside the deck
+ * A picture pasted or dropped on a slide, saved in the deck's own folder
  * (only while the deck's folder is there), under a cleaned name that never overwrites another file.
  */
 async function savePicture(document: vscode.TextDocument, webview: vscode.Webview, slideId: string, dataUrl: string, filename: string): Promise<DeckHostMessage> {
   try {
     const parsed = parseImageDataUrl(dataUrl);
     if (!parsed) throw new Error('That is not a picture.');
-    const folder = path.dirname(document.uri.fsPath);
-    const imagesDir = path.join(folder, 'images');
-    await ensureProjectSubfolder(folder, imagesDir);
+    const imagesDir = await ensureDeckPictureFolder(document.uri.fsPath);
     const written = writeImageRelativeTo(imagesDir, `${path.basename(filename, path.extname(filename))}.${parsed.extension}`, parsed.base64);
     const url = webview.asWebviewUri(vscode.Uri.file(path.join(imagesDir, written))).toString();
-    return { type: 'deck/image-saved', slideId, path: `images/${written}`, url };
+    return { type: 'deck/image-saved', slideId, path: `${path.basename(imagesDir)}/${written}`, url };
   } catch (error) {
     console.warn('[Decks] Could not save a picture:', error);
-    return { type: 'deck/image-failed', slideId, message: 'The picture could not be saved beside the deck.' };
+    return { type: 'deck/image-failed', slideId, message: error instanceof DeckPictureFolderTaken ? error.message : 'The picture could not be saved beside the deck.' };
   }
 }

@@ -14,7 +14,8 @@ import type { DeckTheme } from '../../../../src/decks/deckTheme'
 import { SlideCanvas } from './slide/SlideCanvas'
 import { AgendaContext } from './slide/agendaContext'
 import type { AgendaDrawing } from '../../../../src/decks/blocks/agenda'
-import { PICTURE_HEIGHT, PICTURE_WIDTH, customProperties, familiesOf, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+import { PICTURE_HEIGHT, PICTURE_WIDTH, customProperties, matchableSelector, slidePictureSvg } from './slidePictureSvg'
+import { familiesOf, matchingFontFace, readableStyleSheets } from '../../lib/svgFontFaces'
 import { readFileAsBase64 } from '../../lib/pastedImage'
 
 export { COPY_FAILED_NOTE, PICTURE_HEIGHT, PICTURE_WIDTH, copiedNote } from './slidePictureSvg'
@@ -68,9 +69,9 @@ async function cssFor(host: HTMLElement, families: Set<string>): Promise<string>
       if (rule instanceof CSSStyleRule) {
         if (reaches(rule.selectorText)) out += rule.cssText
       } else if (rule instanceof CSSFontFaceRule) {
-        const family = familiesOf(rule.style.getPropertyValue('font-family'))[0]
-        if (!family || !families.has(family)) continue
-        const text = rule.cssText
+        const face = matchingFontFace(rule, families)
+        if (!face) continue
+        const text = face.cssText
         faces.push((async () => {
           let inlined = text
           for (const { raw, url } of urlsIn(text, base)) {
@@ -94,9 +95,7 @@ async function cssFor(host: HTMLElement, families: Set<string>): Promise<string>
     return out
   }
   let css = ''
-  for (const sheet of Array.from(document.styleSheets)) {
-    let rules: CSSRuleList
-    try { rules = sheet.cssRules } catch { continue }
+  for (const { sheet, rules } of readableStyleSheets(document)) {
     css += walk(rules, sheet.href ?? document.baseURI)
   }
   return (await Promise.all(faces)).join('') + css

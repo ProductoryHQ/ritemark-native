@@ -17,8 +17,8 @@
  * Comments on the slide (`<!-- … -->`, `<mark data-comment>`) load and save as the handout's do, with the comment flag.
  * Sprint 164 PR 3: the Label (`[words]{.label}`, `slideLabel.ts`) loads and saves here only, never in a Text document.
  */
-import { Node, mergeAttributes } from '@tiptap/core'
-import { Marked } from 'marked'
+import { Extension, Node, mergeAttributes } from '@tiptap/core'
+import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
 import { fencedDivStart, scanFencedDiv, type FenceScan } from '../../../../../src/decks/blocks/fencedDiv'
 import { AGENDA_CLOSE, AGENDA_OPEN, isAgendaClasses } from '../../../../../src/decks/blocks/agenda'
@@ -27,13 +27,18 @@ import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtensio
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
 import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
 import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
+import { usePictureReferences } from '../../../extensions/pictures/pictureReferences'
 import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
-import { LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
+import { isEmptyLabel, LABEL_PLACEHOLDER } from '../../../../../src/decks/blocks/labelBlock'
 import { splitQuoteByLine } from '../../../../../src/decks/blocks/slideRenderer'
 import { SLIDE_LABEL_NODE, addLabelTurndownRules, labelMarkedExtension } from './slideLabel'
-import type { Node as PMNode } from '@tiptap/pm/model'
+import { DOMParser as PMDOMParser, Fragment, type Node as PMNode } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { markSlideEmptyLines, SLIDE_EMPTY_LINE, slideEmptyLineExtension } from '../../../../../src/decks/blocks/slideEmptyLines'
+import { isLineBreakTag } from '../../../../../src/decks/blocks/lineBreakTag'
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -76,13 +81,43 @@ export const slideDivMarkedExtension = {
   ],
 }
 
+/** Keep inline HTML breaks at textblock edges separate from editable spacer paragraphs. */
+function markEdgeInlineBreaks(token: Token): void {
+  if (token.type !== 'paragraph' && token.type !== 'heading' && token.type !== 'text') return
+  const tokens = (token as { tokens?: Token[] }).tokens
+  const markBreak = (inline: Token): boolean => {
+    if (inline.type === 'html' && isLineBreakTag(inline.raw)) inline.type = 'slideInlineBreak'
+    return inline.type === 'slideInlineBreak'
+  }
+  const markLeading = (inline: Token): boolean => {
+    const children = (inline as { tokens?: Token[] }).tokens
+    return children?.length ? children.every(markLeading) : markBreak(inline)
+  }
+  tokens?.every(markLeading)
+  let tail = tokens?.[tokens.length - 1]
+  while (tail && 'tokens' in tail) {
+    const children = tail.tokens as Token[] | undefined
+    tail = children?.[children.length - 1]
+  }
+  if (tail) markBreak(tail)
+}
+
 /** The slide editor's own `marked`: the document editor's configuration, and the `:::` blocks. */
 export const slideEditorMarked = new Marked({ breaks: true, gfm: true })
 slideEditorMarked.use(asWrittenMarkedExtension)
+slideEditorMarked.use({
+  extensions: [
+    slideEmptyLineExtension(true),
+    { name: 'slideInlineBreak', renderer: () => '<br data-md-break="html">' },
+  ],
+  walkTokens: markEdgeInlineBreaks,
+})
 slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
 slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// #1129: a reference picture (`![a][ref]`) and its definition stay as written, as in a Text document since #1115.
+usePictureReferences(slideEditorMarked)
 // Sprint 163: the Tabs block, as the Text editor reads it.
 slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Sprint 163 PR 3: the Button block, read as the Text editor reads it.
@@ -107,7 +142,82 @@ export function ensureSlideCommentPipeline(): void {
 
 /** A block slide's Markdown as the HTML the slide editor parses; `imageMappings` gives its pictures' webview addresses. */
 export function markdownToSlideEditorHTML(markdown: string, imageMappings?: Record<string, string>): string {
-  return withoutCodeEndBreak(withColumnPlaces(markdownToEditorHTML(markdown, imageMappings, slideEditorMarked)))
+  const html = markdownToEditorHTML(markdown, imageMappings, slideEditorMarked, markSlideEmptyLines)
+  return withoutCodeEndBreak(withColumnPlaces(markPictureBoundaries(html)))
+}
+
+const PICTURE_PARAGRAPH = 'data-slide-picture-paragraph'
+const PICTURE_BREAK = 'slide-picture-boundary'
+
+/** Record the source boundaries before ProseMirror lifts inline pictures out as blocks. */
+function markPictureBoundaries(html: string): string {
+  if (!html.includes('<img')) return html
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const inlineLeaves = (node: DomNode): DomNode[] => {
+    if (node.nodeType === 3) return node.textContent?.trim() ? [node] : []
+    if (node.nodeType !== 1) return []
+    // These wrappers can share a textblock with a picture. Other elements stop the boundary search.
+    if (/^(A|STRONG|B|EM|I|S|DEL|MARK|SPAN|U|SUB|SUP)$/.test(node.nodeName)) {
+      return Array.from(node.childNodes).flatMap(inlineLeaves)
+    }
+    return [node]
+  }
+
+  for (const block of Array.from(root.querySelectorAll('p, li'))) {
+    if (block.closest('table')) continue
+    const leaves = Array.from(block.childNodes).flatMap(inlineLeaves)
+    if (block.nodeName === 'P' && leaves.find(leaf => leaf.nodeName !== 'BR')?.nodeName === 'IMG') {
+      block.setAttribute(PICTURE_PARAGRAPH, '')
+    }
+    leaves.forEach((leaf, index) => {
+      if (leaf.nodeName !== 'IMG') return
+      for (const neighbor of [leaves[index - 1], leaves[index + 1]]) {
+        if (neighbor?.nodeName === 'BR') (neighbor as Element).setAttribute('data-md-break', PICTURE_BREAK)
+      }
+      // The picture replaces one break. Further breaks still belong to the caption.
+      for (let next = index + 2; leaves[index + 1]?.nodeName === 'BR' && leaves[next]?.nodeName === 'BR'; next++) {
+        const br = leaves[next] as Element
+        if (br.getAttribute('data-md-break') !== PICTURE_BREAK) br.setAttribute('data-md-break', 'html')
+      }
+    })
+  }
+  return root.innerHTML
+}
+
+/** Drop the paragraph and boundary break left when ProseMirror lifts a picture out of a textblock. */
+export function withoutPictureSplitArtifacts(doc: PMNode): PMNode {
+  function clean(node: PMNode): PMNode {
+    if (node.isLeaf) return node
+    const children: PMNode[] = []
+    node.forEach(child => {
+      if (child.type.name === 'hardBreak' && child.attrs.mdBreak === PICTURE_BREAK) return
+      children.push(clean(child))
+    })
+    const generatedParagraph = (child: PMNode) => child.attrs.slidePictureParagraph && child.childCount === 0
+    const kept = children.flatMap((child, index) => {
+      if (generatedParagraph(child)) return []
+      const previous = children[index - 1]
+      if (child.type.name === 'image' && previous && generatedParagraph(previous) && previous.attrs.mdTight) {
+        return [child.type.create({ ...child.attrs, mdTight: previous.attrs.mdTight }, child.content, child.marks)]
+      }
+      // A caption parsed in the picture's original paragraph can retain its inter-word space.
+      const text = child.firstChild?.text
+      if (previous?.type.name === 'image' && child.type.name === 'paragraph' && text?.startsWith(' ')) {
+        const start = /^ +/.exec(text)![0].length
+        return [child.copy(child.content.cut(start))]
+      }
+      return [child]
+    })
+    const content = Fragment.fromArray(kept)
+    // A list item can require its initial paragraph even when the picture was lifted out.
+    const validContent = node.type.validContent(content) ? content : Fragment.fromArray(children)
+    if (node.attrs.slidePictureParagraph && validContent.size > 0) {
+      return node.type.create({ ...node.attrs, slidePictureParagraph: false }, validContent, node.marks)
+    }
+    return node.content.eq(validContent) ? node : node.copy(validContent)
+  }
+  return clean(doc)
 }
 
 /**
@@ -275,6 +385,9 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
   const blank = rules.blankRule.replacement
   rules.blankRule = {
     replacement: (content, node, options) => {
+      if (node.nodeName === 'P' && (node as HTMLElement).hasAttribute('data-slide-empty-line')) {
+        return `\n\n${SLIDE_EMPTY_LINE}\n\n`
+      }
       if (isSlideDiv(node)) return slideDivMarkdown(content, node as HTMLElement)
       // The Agenda holds no words of its own: Turndown's blank rule would drop it.
       if (isAgenda(node)) return agendaMarkdown(node as HTMLElement)
@@ -291,7 +404,7 @@ export function addSlideDivTurndownRule(service: TurndownService): void {
 
 /** The slide editor's Turndown: the document editor's rules on a service of its own, and the div's rule. */
 export function createSlideTurndownService(): TurndownService {
-  const service = createEditorTurndownService()
+  const service = createEditorTurndownService(slideEditorMarked)
   addSlideDivTurndownRule(service)
   addLabelTurndownRules(service)
   return service
@@ -327,16 +440,146 @@ function createEscapingTurndownService(): TurndownService {
   return service
 }
 
-/** The slide editor's save: its HTML as Markdown. */
-export function slideEditorHTMLToMarkdown(html: string): string {
-  slideTurndown ??= createSlideTurndownService()
-  return slideTurndown.turndown(preprocessTableHTML(html))
+/** Empty lines on the stage are regular paragraphs, so typing replaces the space with text. */
+export const SlideEmptyLines = Extension.create({
+  name: 'slideEmptyLines',
+  addGlobalAttributes() {
+    return [{
+      types: ['paragraph'],
+      attributes: {
+        slidePictureParagraph: {
+          default: false,
+          keepOnSplit: false,
+          parseHTML: (element: HTMLElement) => element.hasAttribute(PICTURE_PARAGRAPH),
+          renderHTML: (attrs: Record<string, unknown>) => attrs.slidePictureParagraph ? { [PICTURE_PARAGRAPH]: '' } : {},
+        },
+        slideEmptyLine: {
+          default: false,
+          keepOnSplit: false,
+          parseHTML: (element: HTMLElement) => element.hasAttribute('data-slide-empty-line'),
+          renderHTML: (attrs: Record<string, unknown>) => attrs.slideEmptyLine ? { 'data-slide-empty-line': '' } : {},
+        },
+      },
+    }]
+  },
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        decorations({ doc, selection }) {
+          const decorations: Decoration[] = []
+          const isEmpty = (block: PMNode) => block.type.name === 'paragraph' &&
+            block.content.content.every(child => child.type.name === 'hardBreak')
+          let firstDrawn = Infinity
+          let lastDrawn = -1
+          doc.forEach((block, from) => {
+            if (isEmpty(block) || block.type.name === 'commentNode' ||
+              (block.type.name === SLIDE_LABEL_NODE && isEmptyLabel(block.textContent))) return
+            firstDrawn = Math.min(firstDrawn, from)
+            lastDrawn = from
+          })
+
+          doc.descendants((block, from, parent) => {
+            if (block.type.name === 'table') return false
+            const to = from + block.nodeSize
+            const hasCaret = selection.from > from && selection.from < to
+            if (isEmpty(block)) {
+              const edge = parent === doc && (from < firstDrawn || from > lastDrawn)
+              const className = edge ? `blk-empty-line is-edge${hasCaret ? ' has-caret' : ''}` : 'blk-empty-line'
+              decorations.push(Decoration.node(from, to, { class: className }))
+              return false
+            }
+            if (!/^(paragraph|heading)$/.test(block.type.name)) return
+            const first = parent === doc && from === firstDrawn
+            const last = parent === doc && from === lastDrawn
+            let leading = 0
+            let trailing = block.childCount
+            while (first && block.maybeChild(leading)?.type.name === 'hardBreak' &&
+              block.child(leading).attrs.mdBreak !== 'html') leading++
+            while (last && trailing > leading && block.child(trailing - 1).type.name === 'hardBreak' &&
+              block.child(trailing - 1).attrs.mdBreak !== 'html') trailing--
+            const trailingHtmlBreak = trailing === block.childCount &&
+              block.lastChild?.type.name === 'hardBreak' && block.lastChild.attrs.mdBreak === 'html'
+            block.forEach((child, offset, index) => {
+              if (index >= leading && index < trailing && !(trailingHtmlBreak && index === trailing - 1)) return
+              const start = from + 1 + offset
+              const caret = selection.from === start || selection.from === start + child.nodeSize
+              decorations.push(Decoration.node(start, start + child.nodeSize, {
+                class: caret ? 'blk-edge-break has-caret' : 'blk-edge-break',
+              }))
+            })
+          })
+          return DecorationSet.create(doc, decorations)
+        },
+      },
+    })]
+  },
+})
+
+/** Move boundary breaks into editable paragraphs before CommonMark's writer can drop them. */
+function withSlideEmptyLines(html: string): HTMLElement {
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const emptyLine = () => {
+    const line = document.createElement('p')
+    line.setAttribute('data-slide-empty-line', '')
+    return line
+  }
+
+  for (const block of Array.from(root.querySelectorAll('p, h1, h2, h3, h4, h5, h6'))) {
+    if (block.closest('table')) continue
+    const parent = block.parentElement!
+    if (block.hasChildNodes()) block.removeAttribute('data-slide-empty-line')
+    const takeBreak = (side: 'firstChild' | 'lastChild') => {
+      let edge: globalThis.Node = block
+      while (edge[side]) edge = edge[side]!
+      if (edge.nodeName !== 'BR' ||
+        (edge as Element).getAttribute('data-md-break') === 'html') return false
+      // A break can carry marks. Remove wrappers emptied by taking it out.
+      do {
+        const parent = edge.parentNode!
+        parent.removeChild(edge)
+        edge = parent
+      } while (edge !== block && !edge.hasChildNodes())
+      return true
+    }
+    // Empty container placeholders and bare list markers have no line in the file.
+    if (block.nodeName === 'P' && parent !== root && !block.hasChildNodes() &&
+      !block.hasAttribute('data-slide-empty-line') &&
+      Array.from(parent.children).every(sibling =>
+        sibling === block || (/^H[1-6]$/.test(sibling.nodeName) && !sibling.hasChildNodes()))) {
+      continue
+    }
+    while (takeBreak('firstChild')) parent.insertBefore(emptyLine(), block)
+    if (block.nodeName === 'P' && !block.hasChildNodes()) {
+      block.setAttribute('data-slide-empty-line', '')
+      continue
+    }
+    const next = block.nextSibling
+    while (takeBreak('lastChild')) parent.insertBefore(emptyLine(), next)
+  }
+
+  const children = Array.from(root.children).filter(block => block.nodeName !== 'RITEMARK-COMMENT' &&
+    !(block.hasAttribute('data-slide-label') && isEmptyLabel(block.textContent ?? '')))
+  const isEmptyLine = (block: Element) => block.hasAttribute('data-slide-empty-line')
+  const first = children.findIndex(block => !isEmptyLine(block))
+  let last = children.length - 1
+  while (last > first && isEmptyLine(children[last])) last--
+  children.forEach((block, index) => {
+    if (isEmptyLine(block) && (first < 0 || index < first || index > last)) block.remove()
+  })
+  return root
 }
 
-/** The slide editor's save with every text line that reads as a `:::` line escaped. */
-export function slideEditorHTMLToEscapedMarkdown(html: string): string {
-  escapingTurndown ??= createEscapingTurndownService()
-  return escapingTurndown.turndown(preprocessTableHTML(html))
+function writeSlide(root: HTMLElement, escapeFences = false): string {
+  const service = escapeFences
+    ? (escapingTurndown ??= createEscapingTurndownService())
+    : (slideTurndown ??= createSlideTurndownService())
+  return service.turndown(preprocessTableHTML(root.innerHTML))
+}
+
+/** The slide editor's save: its HTML as Markdown. */
+export function slideEditorHTMLToMarkdown(html: string): string {
+  return writeSlide(withSlideEmptyLines(html))
 }
 
 /** Do two documents hold the same blocks and words (their as-written attributes aside)? */
@@ -352,7 +595,9 @@ export function sameShape(a: PMNode, b: PMNode): boolean {
  * document's HTML, `load` the slide editor's own load of a Markdown.
  */
 export function saveSlideMarkdown(doc: PMNode, html: string, load: (markdown: string) => PMNode): string {
-  const markdown = slideEditorHTMLToMarkdown(html)
-  if (!markdown.includes(':::') || sameShape(load(markdown), doc)) return markdown
-  return slideEditorHTMLToEscapedMarkdown(html)
+  const root = withSlideEmptyLines(html)
+  const markdown = writeSlide(root)
+  if (!markdown.includes(':::')) return markdown
+  const expected = root.innerHTML === html ? doc : PMDOMParser.fromSchema(doc.type.schema).parse(root)
+  return sameShape(load(markdown), expected) ? markdown : writeSlide(root, true)
 }

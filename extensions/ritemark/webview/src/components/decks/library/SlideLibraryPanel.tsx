@@ -131,31 +131,44 @@ export function insertLabel(active: ActiveDeck | null): string | null {
   return `Insert after slide ${Math.min(active.current, active.count - 1) + 1}`
 }
 
-/**
- * Sprint 165 PR 1 (the Experience lead): an other deck's row, on two lines. The name takes up to two lines before an
- * ellipsis, and only a name cut there gets its full text in a tooltip; under it, "18 Nov · 9 slides", muted.
- */
-function DeckRow({ name, meta, expanded, onToggle }: { name: string; meta: string; expanded: boolean; onToggle: () => void }) {
+type DeckRowProps = {
+  name: string
+  expanded: boolean
+  onToggle: () => void
+} & ({ meta: string; count?: never } | { count: number; meta?: never })
+
+/** Topic names use a single line. Deck names can wrap to two lines above their metadata. */
+function DeckRow({ name, meta, count, expanded, onToggle }: DeckRowProps) {
+  const singleLine = count !== undefined
   const nameRef = useRef<HTMLSpanElement>(null)
   const [cut, setCut] = useState(false)
   useLayoutEffect(() => {
     const element = nameRef.current
     if (!element) return
-    const measure = () => setCut(element.scrollHeight > element.clientHeight + 1)
+    const measure = () => setCut(singleLine
+      ? element.scrollWidth > element.clientWidth
+      : element.scrollHeight > element.clientHeight + 1)
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
-  }, [name])
+  }, [name, singleLine])
   return (
-    <Tooltip label={name} side="bottom" hoverOnly suppressed={!cut} className="flex w-full">
-      <button type="button" className="deck-lib-row deck-lib-row-two" aria-expanded={expanded} aria-label={`${name}, ${meta}`} onClick={onToggle}>
+    <Tooltip label={name} side="bottom" hoverOnly suppressed={!cut} asChild>
+      <button type="button" className={singleLine ? 'deck-lib-row' : 'deck-lib-row deck-lib-row-two'} aria-expanded={expanded} aria-label={singleLine ? undefined : `${name}, ${meta}`} onClick={onToggle}>
         <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
         <Icon name="presentation" size={16} tone="inherit" />
-        <span className="deck-lib-deck-text">
-          <span ref={nameRef} className="deck-lib-deck-name">{name}</span>
-          <span className="deck-lib-deck-meta">{meta}</span>
-        </span>
+        {singleLine ? (
+          <>
+            <span ref={nameRef} className="deck-lib-name">{name}</span>
+            <span className="deck-lib-count">{count}</span>
+          </>
+        ) : (
+          <span className="deck-lib-deck-text">
+            <span ref={nameRef} className="deck-lib-deck-name">{name}</span>
+            <span className="deck-lib-deck-meta">{meta}</span>
+          </span>
+        )}
       </button>
     </Tooltip>
   )
@@ -475,26 +488,30 @@ export function SlideLibraryPanel() {
     }
     return (
       <div key={deck.path}>
-        {deck.topic && !named ? (
-        <button
-          type="button"
-          className="deck-lib-row"
-          aria-expanded={expanded}
-          onClick={toggle}
-        >
-          <Icon name={expanded ? 'caret-down' : 'caret-right'} size={12} tone="inherit" className="deck-lib-caret" />
-          <Icon name="presentation" size={16} tone="inherit" />
-          <span className="deck-lib-name">{deck.name}</span>
-          <span className="deck-lib-count">{deck.slides.length}</span>
-        </button>
-        ) : (
-          <DeckRow
-            name={deck.name}
-            meta={deckMeta(deck.modified, deck.slides.length)}
-            expanded={expanded}
-            onToggle={toggle}
-          />
-        )}
+        <div className="deck-lib-row-actions">
+          {deck.topic && !named ? (
+            <DeckRow name={deck.name} count={deck.slides.length} expanded={expanded} onToggle={toggle} />
+          ) : (
+            <DeckRow
+              name={deck.name}
+              meta={deckMeta(deck.modified, deck.slides.length)}
+              expanded={expanded}
+              onToggle={toggle}
+            />
+          )}
+          <Tooltip label={deck.topic ? 'Open topic' : 'Open deck'} asChild>
+            <Button
+              type="button"
+              variant="toolbar"
+              size="icon-2xs"
+              className="deck-lib-open"
+              aria-label={`${deck.topic ? 'Open topic' : 'Open deck'} ${deck.name}`}
+              onClick={() => sendToExtension('library/open', { path: deck.path })}
+            >
+              <Icon name="arrow-square-out" size={14} tone="inherit" />
+            </Button>
+          </Tooltip>
+        </div>
         {expanded ? (
           sectioned(deck)
         ) : null}

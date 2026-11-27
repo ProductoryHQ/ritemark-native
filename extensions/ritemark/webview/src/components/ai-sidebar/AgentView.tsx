@@ -6,13 +6,14 @@ import { useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../ui/Icon';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { StartingPoints } from './StartingPoints';
+import { ActivityDetails } from './ActivityDetails';
 import { LiveDeckSteps } from './LiveDeckSteps';
 import { AgentResponse } from './AgentResponse';
 import { AgentQuestion } from './AgentQuestion';
 import { AgentPlanApproval } from './AgentPlanApproval';
 import { ApprovalCard } from './CodexView';
 import { SubagentCard } from './SubagentCard';
-import { UserPromptBubble } from './ChatBubbles';
+import { AIResponseBubble, UserPromptBubble } from './ChatBubbles';
 import type { AgentConversationTurn, AgentProgress } from './types';
 import { RUNTIME_TURN_HEADER } from './backgroundWork';
 
@@ -96,6 +97,8 @@ export function AgentTurnBlock({
         </div>
       )}
 
+      {turn.pendingQuestion && turn.assistantText && <AIResponseBubble content={turn.assistantText} />}
+
       {/* Pending question */}
       {turn.pendingQuestion && (
         <AgentQuestion turnId={turn.id} question={turn.pendingQuestion} onAnswer={answerAgentQuestion} />
@@ -134,6 +137,8 @@ export function AgentTurnBlock({
           conversation-level ActivityStatusLine (Sprint 103 R7's single status
           point) — removed; its subagent badge lives there now. */}
 
+      {turn.isRunning && <ActivityDetails activities={turn.activities} running />}
+
       {/* Result */}
       {turn.result && <AgentResponse turn={turn} />}
       <LiveDeckSteps steps={turn.result?.liveDeckSteps} />
@@ -162,9 +167,10 @@ export function AgentView() {
   }, []);
 
   const lastTurn = agentConversation[agentConversation.length - 1];
+  const questionContext = lastTurn?.pendingQuestion ? lastTurn.assistantText : undefined;
   useEffect(() => {
     scrollToBottom();
-  }, [agentConversation.length, lastTurn?.activities.length, lastTurn?.pendingQuestion, lastTurn?.pendingPlanApproval, lastTurn?.result, scrollToBottom]);
+  }, [agentConversation.length, lastTurn?.activities.length, questionContext, lastTurn?.pendingQuestion, lastTurn?.pendingPlanApproval, lastTurn?.result, scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -174,7 +180,7 @@ export function AgentView() {
   }, []);
 
   if (agentConversation.length === 0) {
-    // Sprint 140 (R8): the starting points, the same for every AI, which fill the box rather than send at once.
+    // Sprint 140 (R8): the chosen AI's starting points, which fill the box rather than send at once.
     return <StartingPoints aiName={selectedAgent === 'opencode' ? 'OpenCode' : 'Claude'} />;
   }
 

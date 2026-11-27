@@ -82,13 +82,14 @@ function looksBuilt(value: string): boolean {
  * The URLs in a `srcset` value, as the HTML standard splits it: a URL is a run of non-space characters (a `data:` URL
  * keeps its commas), trailing commas end it, and its descriptors run to the next comma.
  */
-export function srcsetUrls(srcset: string): string[] {
+export function srcsetUrls(srcset: string, visit?: (url: string, start: number) => void): string[] {
   const urls: string[] = [];
   let i = 0;
   const n = srcset.length;
   while (i < n) {
     while (i < n && (/\s/.test(srcset[i]) || srcset[i] === ',')) i++;
     if (i >= n) break;
+    const start = i;
     let j = i;
     while (j < n && !/\s/.test(srcset[j])) j++;
     let url = srcset.slice(i, j);
@@ -103,7 +104,10 @@ export function srcsetUrls(srcset: string): string[] {
         i++;
       }
     }
-    if (url) urls.push(url);
+    if (url) {
+      urls.push(url);
+      visit?.(url, start);
+    }
   }
   return urls;
 }
@@ -168,13 +172,73 @@ export function pageReferences(html: string): PageReferences {
   return out;
 }
 
+/** Rewrite URL-bearing parts of a generated deck page without reserializing its HTML. */
+export function rewritePageAssets(html: string, address: (value: string) => string | undefined): string {
+  const edits: { start: number; end: number; value: string }[] = [];
+  const edit = (start: number, before: string, value: string) => {
+    if (value !== before) edits.push({ start, end: start + before.length, value });
+  };
+  for (const el of parsed(html).querySelectorAll('*')) {
+    const tag = el.rawTagName?.toLowerCase();
+    if (tag === 'style') {
+      const text = el.firstChild;
+      if (text) edit(text.range[0], text.rawText, rewriteCssAssets(text.rawText, address));
+      continue;
+    }
+    if (!tag || tag === 'base') continue;
+    const attrsStart = el.range[0] + tag.length + 2;
+    const attrs = el.attributes;
+    for (const match of el.rawAttrs.matchAll(/([^\s=]+)(?:\s*=\s*("[^"]*"|'[^']*'|[^\s]+))?/g)) {
+      const [, name, raw] = match;
+      if (raw === undefined) continue;
+      const value = attrs[name];
+      if (value === undefined) continue;
+      let next: string | undefined;
+      if (name === 'style') {
+        next = rewriteCssAssets(value, address);
+      } else if (name === 'srcset' || name === 'imagesrcset') {
+        const urls: typeof edits = [];
+        srcsetUrls(value, (url, start) => {
+          const replaced = address(url);
+          if (replaced !== undefined) urls.push({ start, end: start + url.length, value: replaced });
+        });
+        next = applyEdits(value, urls);
+      } else if (SINGLE_URL_ATTRIBUTES.includes(name) && (name !== 'data' || DATA_URL_TAGS.has(tag))
+        && !((name === 'href' || name === 'xlink:href') && LINK_TAGS.has(tag))) {
+        const trimmed = value.trim();
+        const replaced = address(trimmed);
+        if (replaced !== undefined) next = value.replace(trimmed, () => replaced);
+      }
+      if (next !== undefined && next !== value) {
+        edit(attrsStart + match.index + match[0].length - raw.length, raw,
+          `"${next.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`);
+      }
+    }
+  }
+  return applyEdits(html, edits);
+}
+
+function applyEdits(text: string, edits: { start: number; end: number; value: string }[]): string {
+  const parts: string[] = [];
+  let start = 0;
+  for (const edit of edits.sort((a, b) => a.start - b.start)) {
+    parts.push(text.slice(start, edit.start), edit.value);
+    start = edit.end;
+  }
+  parts.push(text.slice(start));
+  return parts.join('');
+}
+
 /**
  * CSS with its comments gone and its strings set aside (round 4 of #669): `code` holds each string as `"N"`, its
  * text in `strings[N]`, so `url(` or `@import` inside a comment or inside `content: "…"` names nothing, while
  * `url("a.png")` and `@import "b.css"` keep theirs. An unquoted `url(…)` is kept whole, as CSS reads it: a `/*` inside
  * it opens no comment. An unclosed comment runs to the end and an unclosed string to the end of its line, as in CSS.
  */
-export function maskCss(css: string): { code: string; strings: string[] } {
+export function maskCss(css: string, positions?: {
+  strings: number[];
+  offsets: { at: number; delta: number }[];
+}): { code: string; strings: string[] } {
   const strings: string[] = [];
   let code = '';
   let i = 0;
@@ -185,14 +249,17 @@ export function maskCss(css: string): { code: string; strings: string[] } {
       const close = css.indexOf('*/', i + 2);
       i = close < 0 ? n : close + 2;
       code += ' ';
+      positions?.offsets.push({ at: code.length, delta: i - code.length });
       continue;
     }
     if (c === '"' || c === "'") {
       let j = i + 1;
       while (j < n && css[j] !== c && css[j] !== '\n') j += css[j] === '\\' ? 2 : 1;
+      positions?.strings.push(i + 1);
       strings.push(css.slice(i + 1, Math.min(j, n)));
       code += `"${strings.length - 1}"`;
       i = j < n && css[j] === c ? j + 1 : j;
+      positions?.offsets.push({ at: code.length, delta: i - code.length });
       continue;
     }
     if ((c === 'u' || c === 'U') && !/[\w-]/.test(css[i - 1] ?? '')) {
@@ -220,8 +287,7 @@ export function cssReferences(css: string): Reference[] {
     const value = (m[1] !== undefined ? strings[Number(m[1])] : m[2] ?? '').trim();
     if (value) refs.push({ value, as: 'style' });
   }
-  const urlRe = /url\(\s*(?:"(\d+)"|([^)\s"]*))\s*\)/gi;
-  for (const m of code.matchAll(urlRe)) {
+  for (const m of cssUrls(code)) {
     // `@import url(x.css)` was taken above as a stylesheet; the same text here would be taken twice
     const before = code.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0);
     if (/@import\s*$/i.test(before)) continue;
@@ -229,6 +295,31 @@ export function cssReferences(css: string): Reference[] {
     if (value) refs.push({ value, as: 'any' });
   }
   return refs;
+}
+
+function cssUrls(code: string) {
+  return code.matchAll(/url\(\s*(?:"(\d+)"|([^)\s"]*))\s*\)/gi);
+}
+
+function rewriteCssAssets(css: string, address: (value: string) => string | undefined): string {
+  const positions = { strings: [] as number[], offsets: [] as { at: number; delta: number }[] };
+  const { code, strings } = maskCss(css, positions);
+  const edits: { start: number; end: number; value: string }[] = [];
+  let offset = 0;
+  let delta = 0;
+  for (const match of cssUrls(code)) {
+    const stringId = match[1] === undefined ? undefined : Number(match[1]);
+    const raw = stringId === undefined ? match[2] : strings[stringId];
+    const value = address(raw.trim());
+    if (value === undefined) continue;
+    const at = match.index + (stringId === undefined ? match[0].indexOf(raw, 4) : 0);
+    while (offset < positions.offsets.length && positions.offsets[offset].at <= at) {
+      delta = positions.offsets[offset++].delta;
+    }
+    const start = stringId === undefined ? at + delta : positions.strings[stringId];
+    edits.push({ start, end: start + raw.length, value });
+  }
+  return applyEdits(css, edits);
 }
 
 /** Words after which a `/` starts a regular expression, not a division. */

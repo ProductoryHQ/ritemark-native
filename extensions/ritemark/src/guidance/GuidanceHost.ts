@@ -1,8 +1,8 @@
 /**
  * The first day's guidance in one window (Sprint 140; experience 35, 29 and
- * 34): Home's one guidance card (What moved, the ready request or the feedback
- * card), the ready request's Ask with, its sign-ins and its press, the empty
- * sheet's starting place, the saved days, and the day-one counts.
+ * 34): Home's guidance card (the ready request, Quick Look, What moved or open source),
+ * the ready request's Ask with, its sign-ins and its press, the empty sheet's
+ * starting place, and the day-one counts.
  *
  * Sprint 156 (experience 35, "With no AI ready"): with no AI ready the card's
  * press signs in, through the welcome's own flows, and the card waits while it
@@ -27,11 +27,8 @@ import { onCodexStatusInvalidated, waitForCodexSignIn, type CodexSignInWait, typ
 import { trackEvent } from '../analytics/posthog';
 import type { SignInFrom, WelcomeProvider } from '../analytics/events';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
-import { FEEDBACK_COPY } from '../feedback/feedbackCopy';
-import { sendWeekLine, showBriefToast } from '../feedback/feedbackSheet';
-import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject } from '../reporting/composeReport';
-import { openReportMail } from '../reporting/reportTransport';
-import type { HomeAi, HomeGuidance, HomeKeyName } from '../projects/protocol';
+import { HELP_DISCUSSIONS_COMMAND, HELP_GITHUB_COMMAND } from '../feedback/feedbackSheet';
+import type { HomeAi, HomeGuidance, HomeKeyName, OpenSourceAction } from '../projects/protocol';
 import type { ChatIndexEntry } from '../projects/waiting';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
@@ -41,11 +38,12 @@ import { saveAiForNewChats } from '../welcome/welcomeHost';
 import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
 import { isEnabled } from '../features/featureGate';
-import { feedbackDue, guidanceCard, localDay } from './guidanceState';
-import { GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
+import { guidanceCard, localDay, type GuidanceCard } from './guidanceState';
+import { openSettingsLabel, settingsNote } from '../decks/quickLook/guidance';
+import { type GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
 import { AI_NAMES, AI_ORDER, canSignInHere, cardAi, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords, SAMPLE_CARD_ID, type AiState, type ReadyKind, type ReadyRecord } from './readyRequest';
-import { startingPlaceOf, wordCount, type FrontEditor } from './startingPlace';
+import { startingPlacesForAgents, wordCount, type FrontEditor, type StartingPlacesByAgent } from './startingPlace';
 
 const PROVIDER: Record<AgentId, WelcomeProvider> = { 'claude-code': 'claude', codex: 'chatgpt', opencode: 'opencode' };
 const KEY_NAMES: readonly HomeKeyName[] = ['google-ai-key', 'openai-api-key', 'anthropic-api-key', 'openrouter-api-key'];
@@ -93,6 +91,8 @@ const CLAUDE_SIGN_IN: ClaudeSignIn = {
 
 export interface GuidanceDependencies {
   context: vscode.ExtensionContext;
+  store: GuidanceStore;
+  appRun?: string;
   folder: vscode.WorkspaceFolder | undefined;
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
   startChat(request: ChatStartRequest): Promise<void>;
@@ -101,7 +101,7 @@ export interface GuidanceDependencies {
   /** The board's Give, for the sample's card; null without a board. */
   give(cardId: string, runtimeId: AgentId): Promise<{ ok: boolean; message?: string } | null>;
   hasWorkingTurn(): boolean;
-  setStartingPlace(place: string, hasAbout: boolean): void;
+  setStartingPlace(places: StartingPlacesByAgent, hasAbout: boolean): void;
   onTurnAccepted(listener: (turn: AcceptedTurn) => void): vscode.Disposable;
   onChatOrigin(listener: (origin: ChatOrigin) => void): vscode.Disposable;
   /** Sprint 142 (R5b): open a chat on the AI's sheet by its id. */
@@ -153,15 +153,14 @@ export class GuidanceHost implements vscode.Disposable {
   private readonly shownPending = new Map<string, HomeGuidance & { card: 'ready-request' }>();
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
-  private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
+  private openingSourceLink = false;
   private placeTimer: ReturnType<typeof setTimeout> | undefined;
   /** The counts line per folder, listed once and listed again only after a file is created or deleted there (QA). */
   /** The folder's file names, listed once per folder and skip set (the line is made from them on each read). */
   private readonly counts = new Map<string, Promise<{ names: string[]; more: boolean }>>();
 
   constructor(private readonly deps: GuidanceDependencies) {
-    const version = String(deps.context.extension.packageJSON.version ?? '0.0.0');
-    this.store = new GuidanceStore(deps.context.globalState, version);
+    this.store = deps.store;
     // Sprint 156: a test launch can stage a lapsed sign-in (test channel only; no effect anywhere else)
     void seedLastReadyAiForTest(deps.context.globalState);
     // Sprint 156: a sign-in or sign-out anywhere (the AI's sheet, Settings, a terminal) or an AI's key saved: Home's
@@ -186,12 +185,6 @@ export class GuidanceHost implements vscode.Disposable {
     this.disposables.push(
       deps.onTurnAccepted((turn) => void this.turnAccepted(turn)),
       deps.onChatOrigin((origin) => this.origins.set(origin.conversationId, origin)),
-      // R14: a day with a saved document; R15: a new document's first save
-      vscode.workspace.onDidSaveTextDocument((document) => {
-        if (document.uri.scheme !== 'file') return;
-        void this.store.noteSavedDay(localDay(new Date()));
-        madeSomething.noteSaved(document.uri.fsPath);
-      }),
       vscode.window.tabGroups.onDidChangeTabs(() => this.schedulePlace()),
       vscode.window.tabGroups.onDidChangeTabGroups(() => this.schedulePlace()),
       vscode.workspace.onDidChangeTextDocument((event) => {
@@ -220,7 +213,10 @@ export class GuidanceHost implements vscode.Disposable {
 
   // ── Home's card (R2–R6, R14) ─────────────────────────────────────────────
 
-  async homeGuidance(input: HomeGuidanceInput): Promise<HomeGuidance | null> {
+  async homeGuidance(
+    input: HomeGuidanceInput,
+    { quickLook = false, selected }: { quickLook?: boolean; selected?: GuidanceCard } = {},
+  ): Promise<HomeGuidance | null> {
     // Home redraws on board changes too: the sample's starting points follow its card (experience 35, The build checked)
     this.schedulePlace();
     const key = normalizeProjectUri(input.folderUri);
@@ -240,21 +236,23 @@ export class GuidanceHost implements vscode.Disposable {
       });
       if (gone) record = await this.store.updateProject(key, (current) => ({ ...current, gone }));
     }
-    const today = localDay(new Date());
-    const release = this.store.release();
-    const card = guidanceCard({
+    let card = selected ?? guidanceCard({
       whatMoved: input.whatMoved,
       readyRequest: readyRequestDue({ foundBy: input.foundBy, record, ownChats }),
-      feedback: feedbackDue({ savedDays: release.savedDays, answered: release.feedback !== undefined }) || this.feedback.sending || this.feedback.problem !== null,
-      today,
-      readyShownOn: this.store.read().readyShownOn,
+      openSource: true,
+      quickLook,
     });
-    if (card === 'what-moved') return { card };
-    if (card === 'feedback') {
-      return { card, heading: FEEDBACK_COPY.card.heading, lede: FEEDBACK_COPY.card.lede, placeholder: FEEDBACK_COPY.card.placeholder, sending: this.feedback.sending, problem: this.feedback.problem };
+    if (card === 'open-source' && !selected) {
+      const day = localDay(new Date());
+      const appRun = this.deps.appRun ?? '';
+      if (this.store.read().readyShownOn === day
+        || (!await this.store.homeEligible({ day, appRun }) && !await this.store.openHomePresentation(appRun).catch(() => undefined))) {
+        card = null;
+      }
     }
+    if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
+    if (card === 'what-moved' || card === 'open-source') return { card };
     if (card !== 'ready-request') return null;
-    await this.store.noteReadyShown(today);
     const states = await this.aiStates();
     const chosen = this.cardAiOf(record, states);
     // The card waits only for a sign-in to the AI it names, with no AI ready (answer 1); with one ready it stays usable
@@ -293,6 +291,7 @@ export class GuidanceHost implements vscode.Disposable {
    */
   async readyCardShown(folderUri: string, guidance: HomeGuidance | null): Promise<void> {
     if (guidance?.card !== 'ready-request') return;
+    await this.store.noteReadyShown(localDay(new Date()));
     const key = normalizeProjectUri(folderUri);
     if (this.shownCounting.has(key) || readyCardCounted(this.deps.context.globalState, key)) return;
     // The show is the impression, so it is always counted. While an AI's check still runs, `ai_ready` and the AI named
@@ -646,45 +645,28 @@ export class GuidanceHost implements vscode.Disposable {
     return { ok: true, message: null };
   }
 
-  // ── The feedback card (R14) ──────────────────────────────────────────────
-
-  async sendFeedbackLine(text: string): Promise<void> {
-    this.feedback = { sending: true, problem: null };
-    this.changed.fire();
-    const sent = await sendWeekLine(text).catch(() => false);
-    if (sent) {
-      await this.store.answerFeedback('sent');
-      this.feedback = { sending: false, problem: null };
-      void showBriefToast(FEEDBACK_COPY.toast.accepted);
-    } else {
-      this.feedback = { sending: false, problem: FEEDBACK_COPY.card.failed };
-    }
-    this.changed.fire();
+  /** Claim or restore the release presentation immediately before posting to a visible Home. */
+  async presentOpenSource(): Promise<boolean> {
+    const day = localDay(new Date());
+    if (this.store.read().readyShownOn === day) return false;
+    const appRun = this.deps.appRun ?? '';
+    // A failing read of the markers fails closed, as reserveHomePresentation does (review round 2): no card, Home still draws.
+    return await this.store.reserveHomePresentation({ day, appRun }) || Boolean(await this.store.openHomePresentation(appRun).catch(() => undefined));
   }
 
-  /** The card's line, after a send that did not go, handed to the person's own e-mail app (R13's e-mail route). */
-  async mailFeedbackLine(text: string): Promise<void> {
-    const context = narrowReportContext({ appVersion: this.store.version, platform: process.platform, occurredAt: new Date().toISOString() });
-    const outcome = await openReportMail(
-      { recipient: REPORT_RECIPIENT, subject: reportSubject(context, 'feedback'), body: composeReport(context, text) },
-      { openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)) },
-    );
-    if (outcome !== 'opened') {
-      this.feedback = { sending: false, problem: outcome === 'too-long' ? FEEDBACK_COPY.handoff.tooLong.lede : FEEDBACK_COPY.handoff.noHandler.lede };
-      this.changed.fire();
-      return;
+  async actOnOpenSource(action: OpenSourceAction): Promise<boolean> {
+    if (this.openingSourceLink) return false;
+    this.openingSourceLink = true;
+    try {
+      if (action !== 'dismiss') {
+        const command = action === 'star' ? HELP_GITHUB_COMMAND : HELP_DISCUSSIONS_COMMAND;
+        if (!await vscode.commands.executeCommand<boolean>(command)) return false;
+      }
+      if (action !== 'discussions') await this.store.endHomePresentation(action);
+      return true;
+    } finally {
+      this.openingSourceLink = false;
     }
-    // Handed over: the question has its answer for this release; the mail is the person's to send.
-    await this.store.answerFeedback('sent');
-    this.feedback = { sending: false, problem: null };
-    void showBriefToast(`${FEEDBACK_COPY.handoff.opened.title}. ${FEEDBACK_COPY.handoff.opened.message}`);
-    this.changed.fire();
-  }
-
-  async feedbackNotNow(): Promise<void> {
-    await this.store.answerFeedback('not-now');
-    this.feedback = { sending: false, problem: null };
-    this.changed.fire();
   }
 
   // ── Turns and origins (R6, R15) ──────────────────────────────────────────
@@ -757,7 +739,7 @@ export class GuidanceHost implements vscode.Disposable {
       fsp.access(path.join(root, 'AGENTS.md')).then(() => true, () => false),
     ]);
     const kind = readyKindOf({ empty: listed.names.length === 0, sample });
-    this.deps.setStartingPlace(startingPlaceOf(this.frontEditor(), kind), hasAbout);
+    this.deps.setStartingPlace(startingPlacesForAgents(this.frontEditor(), kind, process.platform), hasAbout);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────

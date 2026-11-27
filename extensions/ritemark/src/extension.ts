@@ -14,17 +14,21 @@ import { initConnectivity } from './ai/connectivity';
 import { initAiStatusItem } from './ai/aiStatusItem';
 import * as modelCatalog from './ai/modelCatalog';
 import { discoverAnthropic, discoverOpenAI, discoverGemini, discoverCodex } from './ai/modelCatalog/providerDiscovery';
+import type { AgentId } from './agent/types';
 import { anthropicKeyChanged, getSetupStatus, registerAnthropicKeyReader } from './agent/setup';
 import { CodexManager } from './codex/codexManager';
 import { UnifiedViewProvider } from './views/UnifiedViewProvider';
 import { registerFeedback } from './feedback/feedbackSheet';
 import { registerFeedbackStatusBar } from './feedback/feedbackStatusBar';
 import { GuidanceHost } from './guidance/GuidanceHost';
+import { GuidanceStore } from './guidance/guidanceStore';
 import { madeSomething } from './guidance/madeSomething';
 import { CommentTaskStore, commentTaskStoreDir } from './commentTasks/CommentTaskStore';
 import { CommentTaskController } from './commentTasks/CommentTaskController';
 import { registerTaskBoard, type TaskBoardHost } from './taskBoard/taskBoardHost';
 import { registerDecks, type DecksHost } from './decks/decksHost';
+import { registerQuickLookGuidance } from './decks/quickLook/registerGuidance';
+import { startQuickLook } from './decks/quickLookService';
 import { registerProjects, type ProjectsHost } from './projects/projectsHost';
 import { registerProjectSearch } from './search/SearchHost';
 import { buildCommentTaskPrompt } from './commentTasks/commentTaskPrompt';
@@ -49,7 +53,8 @@ import {
   RELAUNCH_COMMAND_ID,
   ActivationIntegrityTracker,
   quarantineVersion,
-  confirmActivationAndCleanup
+  confirmActivationAndCleanup,
+  getCurrentAppVersion,
 } from './update';
 import { initAnalytics, shutdownAnalytics } from './analytics/posthog';
 import { registerReactionCommand } from './analytics/reactions';
@@ -309,6 +314,18 @@ export function activate(context: vscode.ExtensionContext) {
   // dedup (confirmed in tasks.md W3.4). See activationIntegrity.ts for the
   // documented limitation on load-time (syntax error) failures.
   const activationIntegrity = new ActivationIntegrityTracker(context.globalState);
+  const guidanceStore = new GuidanceStore(context.globalState, currentVersion, getCurrentAppVersion(), context.globalStorageUri.fsPath);
+  // The Electron main PID is inherited by each local extension host and survives window reloads.
+  void guidanceStore.initializeAppRun(process.env.VSCODE_PID, Boolean(activationIntegrity.getLastConfirmedVersion()))
+    .catch((error) => console.warn('Ritemark: Could not initialize local guidance', error));
+  const guidanceFolder = vscode.workspace.workspaceFolders?.[0];
+  const hasProjectGuidance = guidanceFolder?.uri.scheme === 'file' && !vscode.workspace.workspaceFile;
+  context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((document) => {
+    void guidanceStore.noteDocumentSaved(document.uri.scheme, new Date(), hasProjectGuidance)
+      .catch((error) => console.warn('Ritemark: Could not record a local saved day', error));
+    if (hasProjectGuidance && document.uri.scheme === 'file') madeSomething.noteSaved(document.uri.fsPath);
+  }));
+
   const versionQuarantinedThisLaunch = activationIntegrity.didPreviousAttemptFail(currentVersion);
   if (versionQuarantinedThisLaunch) {
     console.warn(`Ritemark: ${currentVersion} failed to activate on the previous attempt — quarantining and requesting reload.`);
@@ -446,7 +463,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri, context.globalState);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri, guidanceStore, context.globalState);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
@@ -470,6 +487,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerFeedback(context, {
     appVersion: String(context.extension.packageJSON.version ?? 'unknown'),
     lastAnswer: () => unifiedViewProvider.lastAnswerOfOpenChat(),
+    answerOfTurn: ref => unifiedViewProvider.answerOfTurn(ref),
     openReportWindow: () => unifiedViewProvider.openReportWindow(),
   });
   registerFeedbackStatusBar(context);
@@ -622,9 +640,10 @@ export function activate(context: vscode.ExtensionContext) {
   // (in 1.x's Home launcher's slot, `ritemark.homeView`), Home is the project's own first tab, Home and
   // Tasks are the first two tabs, and switching projects asks first while a chat works.
   // Sprint 140: the first day's guidance: Home's one card, the empty sheet's starting place, the day-one counts.
-  const guidanceFolder = vscode.workspace.workspaceFolders?.[0];
-  const guidance = guidanceFolder?.uri.scheme === 'file' && !vscode.workspace.workspaceFile ? new GuidanceHost({
+  const guidance = hasProjectGuidance ? new GuidanceHost({
     context,
+    store: guidanceStore,
+    appRun: process.env.VSCODE_PID,
     folder: guidanceFolder,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startChat: (request) => unifiedViewProvider.startChat(request),
@@ -637,14 +656,16 @@ export function activate(context: vscode.ExtensionContext) {
       return answer.ok ? { ok: true } : { ok: false, message: answer.message };
     },
     hasWorkingTurn: () => unifiedViewProvider.hasWorkingTurn(),
-    setStartingPlace: (place, hasAbout) => unifiedViewProvider.setStartingPlace(place, hasAbout),
+    setStartingPlace: (places, hasAbout) => unifiedViewProvider.setStartingPlace(places, hasAbout),
     onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(listener),
     onChatOrigin: (listener) => unifiedViewProvider.onChatOrigin(listener),
     openConversation: (conversationId) => unifiedViewProvider.openConversation(conversationId),
   }) : null;
   if (guidance) context.subscriptions.push(guidance);
 
+  const quickLookGuidance = registerQuickLookGuidance(context);
   projectsHost = registerProjects({
+    quickLookGuidance,
     context,
     taskBoard,
     boardEnabled: () => isEnabled('task-board'),
@@ -653,6 +674,10 @@ export function activate(context: vscode.ExtensionContext) {
     stopWorkingChats: () => unifiedViewProvider.stopWorkingChats(),
     guidance,
     onTurnAccepted: (listener) => unifiedViewProvider.onTurnAccepted(() => listener()),
+  });
+
+  void startQuickLook(context, decks.publisher, projectsHost.projectList, projectsHost.ready).catch(() => {
+    // The optional background cache must never interfere with opening or saving a deck.
   });
 
   // Sprint 108: Transcribe. Flag-gated (D4 ships it on Windows too). Where the
@@ -791,9 +816,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register show AI panel command
   context.subscriptions.push(
-    vscode.commands.registerCommand('ritemark.showAIPanel', () => {
-      vscode.commands.executeCommand('ritemark.unifiedView.focus');
-    })
+    vscode.commands.registerCommand('ritemark.showAIPanel', (agentId?: AgentId) =>
+      agentId ? unifiedViewProvider.openLandingChat(agentId) : vscode.commands.executeCommand('ritemark.unifiedView.focus')
+    )
   );
 
   // Register search command (opens VS Code search)

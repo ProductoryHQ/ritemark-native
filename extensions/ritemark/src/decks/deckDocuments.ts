@@ -3,10 +3,12 @@
  * document (the person's unsaved changes included) and written with a `WorkspaceEdit`, saved when it was clean, as
  * the task board's `CardDocuments` does; a closed one is read and written on disk, a new file only by exclusive create.
  */
+import { deckFolderCheck } from './deckFolderListing';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { DeckFiles } from './DeckLibrary';
+import { workspaceDeckPictures } from './workspaceDeckPictures';
 import { DECK_GLOB } from './deckFileName';
 
 /** Folders a deck is never looked for in. */
@@ -55,12 +57,15 @@ export function workspaceDeckFiles(root: string): DeckFiles {
     return target;
   };
   return {
+    pictures: workspaceDeckPictures(root),
     async list() {
       const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, DECK_GLOB), SKIPPED, MAX_DECKS);
+      const inDeckFolder = deckFolderCheck(root, async dir =>
+        (await fs.promises.readdir(dir, { withFileTypes: true })).filter(entry => entry.isFile()).map(entry => entry.name));
       const found: Array<{ path: string; modified: number }> = [];
       for (const uri of uris) {
         const relative = projectRelative(root, uri.fsPath);
-        if (!relative) continue;
+        if (!relative || await inDeckFolder(relative)) continue;
         let modified = 0;
         try {
           modified = (await fs.promises.stat(uri.fsPath)).mtimeMs;

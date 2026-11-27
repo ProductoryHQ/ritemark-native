@@ -52,8 +52,8 @@ Standard-tier PRs get `/code-review` at medium, one round. Proof is one screensh
 - Proof: the first complete set of runs for one AI
 
 ## PR 8, 9, 10: the gate, one AI at a time (G2)
-- [ ] `startingPlace.ts` per-AI shape with every entry still `false`; tests S39, S40 (a PR of its own, merged with PR 5 or before the runs)
-- [ ] Then one tiny PR per AI that has 3 of 3 on the Mac: its entry becomes `true`, the run record linked in the PR
+- [x] `startingPlace.ts` per-AI, per-platform shape with every entry still `false`; tests S39, S40 (a PR of its own, merged with PR 5 or before the runs)
+- [ ] (Claude on Mac: done, #1087; ChatGPT on Mac: done, this PR) Then one tiny PR per AI that has 3 of 3 on the Mac: its entry becomes `true`, the run record linked in the PR
 - [ ] Windows: three runs per AI at Gate 2; an AI that fails there has its entry false for Windows (open question 1)
 
 ## Sprint end

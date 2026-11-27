@@ -12,45 +12,140 @@ const template = path.join(repo, 'docs/development/releases/v2.4.0/sprint-173-wo
 const runtimes = {
   claude: { label: 'Claude', key: 'ANTHROPIC' },
   chatgpt: { label: 'ChatGPT', key: 'OPENAI' },
-  opencode: { label: 'OpenCode', key: 'OPENROUTER' },
+  opencode: { label: 'OpenCode', key: 'GOOGLE', modelPrefix: 'opencode:google/' },
 };
 
-const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/[’‘]/g, "'").replace(/[\p{Pd}−]/gu, '-').replace(/\s+/g, ' ').trim();
 const title = (file) => path.posix.basename(file, path.posix.extname(file));
-const mentions = (text, file) => normalize(text).includes(normalize(title(file)));
-const containsFact = (text, words) => words.some((word) => {
-  const escaped = normalize(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(normalize(text));
-});
+const titleWords = (text) => normalize(text).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const titleAliases = (name) => {
+  const stripped = name.replace(/ (?:v ?\d+|draft \d+)$/, '');
+  return stripped !== name && stripped.includes(' ') ? [name, stripped] : [name];
+};
+const entryEndingNames = (name) => {
+  const role = name.replace(/^interview /, '');
+  return role !== name && role.includes(' ') ? [name, role] : [name];
+};
+const normalizeFact = (text) => normalize(text.replace(/["“”'‘’]/g, ''));
+const containsFact = (text, words) => {
+  const normalized = normalizeFact(text);
+  return words.some((word) => {
+    const escaped = normalizeFact(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return Boolean(escaped) && new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(normalized);
+  });
+};
 const pathText = /(?:\bfile:\/\/|\b[A-Z]:[\\/]|(?:^|[\s`"'(])(?:~|\.{1,2})?[\\/]\S|(?:[\w.-]+[\\/])+[\w.-]+\.(?:docx|pdf|pptx)\b)/im;
 const passwordReason = /\b(?:has a password|password[- ]protected|encrypted with a password|requires a password)\b/i;
-const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted)\s+copy\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
+const wayForward = /\b(?:provide|supply|enter|share|ask for|request)\b[^.!?\n]{0,55}\bpassword\b|\b(?:unlocked|unencrypted|decrypted|unprotected|password-free)\s+copy\b|\bcopy\s+without\s+(?:(?:the|a)\s+password|password\s+protection)\b|\bopen\b[^.!?\n]{0,55}\bwith\s+the\s+password\b|\bremove\s+the\s+password\b|\b(?:save|export|send|share|provide|supply)\b[^.!?\n]{0,40}\bcopy\s+without\s+its\s+password\b|\b(?:unlock|decrypt)\b[^.!?\n]{0,55}\b(?:file|document|appendix|copy)\b/i;
 const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can't) (?:open|read|extract)\b[^\n]*\b(?:corrupt(?:ed)?|damaged|unsupported|permission denied|access denied|missing|not found|timed out)\b/i;
-const scanReason = /\b(?:no (?:searchable |selectable |extractable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
+const scanReason = /\b(?:no (?:searchable |selectable |extractable |readable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
+const slideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*)?\[?slide\s+(\d+)\b/i;
+const linkedSlideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(\*\*)?\[[^\]\n]+\]\(([^\n]*?)\)\1\s*[:\p{Pd}−]\s*(?:\*\*)?slide\s+(\d+)\b/iu;
+const entryName = (line) => titleWords(line.replace(/^(?:[-*+] |\d+[.)] )?/, ''));
+// The text a Markdown row shows: link labels, without emphasis or code marks.
+const inlineText = (text) => text.replace(/!?\[([^\]\n]*)\]\([^\n]*?\)/g, '$1')
+  .replace(/\*+|`+|~~/g, '').replace(/(^|[^\p{L}\p{N}])_+|_+(?=[^\p{L}\p{N}]|$)/gu, '$1');
 
-export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [] }, facts) {
-  const lines = visibleAnswer.split('\n').map((line) => line.trim()).filter(Boolean);
-  const passwordLine = lines.find((line) => mentions(line, facts.passwordDocument) && passwordReason.test(line)) ?? null;
-  const coverage = facts.documents.map(({ file, words, unreadReason }) => {
-    const rows = lines.filter((line) => mentions(line, file));
-    if (rows.some((line) => containsFact(line, words))) return { file, result: 'read' };
-    if (rows.some((line) => otherUnreadReason.test(line) || (unreadReason === 'scan' && scanReason.test(line)))) return { file, result: 'unread' };
-    return { file, result: 'missing' };
+export function evidenceRedactor(env = process.env) {
+  const keys = Object.entries(env)
+    .filter(([name, value]) => name.startsWith('RITEMARK_TEST_KEY_') && value)
+    .map(([, value]) => value)
+    .sort((a, b) => b.length - a.length)
+    .map((value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const secrets = new RegExp([...keys, 'AIza[0-9A-Za-z_-]{20,}', 'sk-[A-Za-z0-9_-]{20,}'].join('|'), 'g');
+  return (value) => typeof value === 'string' ? value.replace(secrets, '[redacted]') : value;
+}
+
+export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [], customQuestion = false }, facts) {
+  const lines = visibleAnswer.split(/\r?\n/).map((line) => line.trim());
+  const markdownLines = answer.split(/\r?\n/).map((line) => line.trim());
+  const files = [...facts.documents.map(({ file }) => file), facts.passwordDocument, facts.deck.file];
+  const entries = new Map(files.map((file) => [file, []]));
+  const rawNamesByFile = new Map(files.map((file) => {
+    const heading = facts.documents.find((document) => document.file === file)?.heading;
+    return [file, [title(file), heading].filter(Boolean)];
+  }));
+  const namesByFile = new Map([...rawNamesByFile].map(([file, names]) => [file, names.map(titleWords)]));
+  const candidates = [...rawNamesByFile].flatMap(([file, names]) => names.flatMap((raw) => {
+    const name = titleWords(raw);
+    const prefix = titleWords(raw.split(/[,\(]/, 1)[0]);
+    return [...new Set([...titleAliases(name), ...(prefix.includes(' ') ? [prefix] : [])])]
+      .filter(Boolean).map((alias) => ({ file, name: alias, full: alias === name }));
+  }));
+  const titles = candidates.filter(({ file, name, full }) => full || !candidates.some((other) =>
+    other.file !== file && (other.name === name || other.name.startsWith(name + ' '))))
+    .sort((a, b) => b.name.length - a.name.length);
+  const startsEntry = (heading) => {
+    const matchTitle = (text) => titles.find(({ name }) => text === name || text.startsWith(name + ' '));
+    return matchTitle(heading) ?? (heading.startsWith('the ') ? matchTitle(heading.slice(4)) : undefined);
+  };
+  const mentionsOther = (heading, file) => files.some((other) => other !== file
+    && containsFact(heading, namesByFile.get(other).flatMap(entryEndingNames)));
+  let entryFile;
+  let entry;
+  for (const line of lines) {
+    const heading = entryName(line);
+    const file = startsEntry(heading)?.file;
+    if (file) {
+      entryFile = file;
+      entry = [line];
+      entries.get(file).push(entry);
+    } else if (!line || /^(?:[-*+] |\d+[.)] )/.test(line) || slideStart.test(line)
+      || (entry && mentionsOther(heading, entryFile))) {
+      entry = undefined;
+    } else {
+      entry?.push(line);
+    }
+  }
+  const rowsFor = (file) => entries.get(file).map((row) => row.join(' '));
+  // Rendered Markdown can insert a blank line between a paragraph and its list.
+  // Use source line boundaries for reasons following a standalone title.
+  const unreadRows = new Map(files.map((file) => [file, []]));
+  let unreadEntry;
+  for (const line of markdownLines) {
+    const visible = line.replace(/\[([^\]\n]+)\]\([^\n]*?\)/g, '$1');
+    const heading = entryName(visible);
+    const match = startsEntry(heading);
+    if (match && (heading === match.name || heading === 'the ' + match.name)) {
+      entryFile = match.file;
+      unreadEntry = [visible];
+      unreadRows.get(entryFile).push(unreadEntry);
+    } else if (!line || match || /^#{1,6}\s/.test(line) || slideStart.test(line) || linkedSlideStart.test(line)
+      || (unreadEntry && mentionsOther(heading, entryFile))) {
+      unreadEntry = undefined;
+    } else {
+      unreadEntry?.push(visible);
+    }
+  }
+  const unreadRowsFor = (file) => [...rowsFor(file), ...unreadRows.get(file).map((row) => row.join(' '))];
+  const passwordRows = customQuestion ? [] : unreadRowsFor(facts.passwordDocument).filter((row) => passwordReason.test(row));
+  const passwordLine = passwordRows.find((row) => wayForward.test(row)) ?? passwordRows[0] ?? null;
+  const coverage = customQuestion ? [] : facts.documents.map(({ file, words, unreadReason }) => {
+    const rows = rowsFor(file);
+    if (rows.some((row) => containsFact(row, words))) return { file, result: 'read' };
+    if (unreadRowsFor(file).some((row) => otherUnreadReason.test(row) || (unreadReason === 'scan' && scanReason.test(row)))) return { file, result: 'unread' };
+    return { file, result: rows.length ? 'to check' : 'missing' };
   });
-  coverage.push({ file: facts.passwordDocument, result: passwordLine ? 'unread' : 'missing' });
+  if (!customQuestion) coverage.push({ file: facts.passwordDocument, result: passwordLine ? 'unread' : rowsFor(facts.passwordDocument).length ? 'to check' : 'missing' });
 
   // Each slide entry starts with its own number. The prompt asks for notes on the same line.
   const slideRows = new Map();
   let duplicateSlide = false;
-  for (const line of lines) {
-    const match = /^(?:[-*+]\s+)?(?:\*\*)?slide\s+(\d+)\b/i.exec(line);
+  // Link destinations are only present in the Markdown. Use one representation
+  // for the whole deck so a row seen in both forms is counted only once.
+  const slideLines = markdownLines.some((line) => linkedSlideStart.test(line)) ? markdownLines : lines;
+  for (const line of slideLines) {
+    const linked = linkedSlideStart.exec(line);
+    const match = linked ?? slideStart.exec(line);
     if (!match) continue;
-    const number = Number(match[1]);
+    const number = Number(linked ? linked[3] : match[1]);
     if (slideRows.has(number)) duplicateSlide = true;
-    slideRows.set(number, line);
+    // Score what the row shows, so `quiet **room**` still reads as `quiet room`.
+    const row = linked ? line.slice(linked[0].length) : line;
+    slideRows.set(number, slideLines === markdownLines ? inlineText(row) : row);
   }
-  const slides = facts.deck.slides.map(({ number, words, noteWords }) => {
+  const slides = customQuestion ? [] : facts.deck.slides.map(({ number, words, noteWords }) => {
     const row = slideRows.get(number) ?? '';
     const marker = /\b(?:speaker )?notes?\s*[:–—-]/i.exec(row);
     const slideText = marker ? row.slice(0, marker.index) : row;
@@ -62,36 +157,65 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
         && (noteWords.length ? containsFact(noteText, noteWords) && !noNotes.test(noteText) : noNotes.test(row)),
     };
   });
-  const deckRows = lines.filter((line) => mentions(line, facts.deck.file));
-  const deckRead = deckRows.length > 0 && slides.every((slide) => slide.content);
-  coverage.push({
+  const deckRows = rowsFor(facts.deck.file);
+  const linkedSlides = new Set();
+  for (const line of markdownLines) {
+    const linked = linkedSlideStart.exec(line);
+    const match = linked ?? slideStart.exec(line);
+    if (!match) continue;
+    const number = Number(linked ? linked[3] : match[1]);
+    if (links.some(({ href, targetFile, hasPassage }) => {
+      if (targetFile !== facts.deck.file) return false;
+      if (linked ? href !== linked[2] : !hasPassage || !line.includes(`](${href})`)) return false;
+      const fragment = new URLSearchParams(href.split('#')[1]);
+      const page = fragment.get('p') ?? (linked ? fragment.get('slide') : null);
+      return page === null || page === String(number);
+    })) linkedSlides.add(number);
+  }
+  const deckRead = slides.every(({ content }) => content) && (deckRows.length > 0
+    || slides.every(({ number }) => linkedSlides.has(number)));
+  if (!customQuestion) coverage.push({
     file: facts.deck.file,
-    result: deckRead ? 'read' : deckRows.some((line) => otherUnreadReason.test(line)) ? 'unread' : 'missing',
+    result: deckRead ? 'read' : unreadRowsFor(facts.deck.file).some((line) => otherUnreadReason.test(line)) ? 'unread'
+      : deckRows.length ? 'to check' : 'missing',
   });
 
-  const names = [facts.folder, ...coverage.flatMap(({ file }) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
+  const names = ['the project folder', facts.folder, ...files.flatMap((file) => [path.posix.basename(file), title(file), ...path.posix.dirname(file).split('/')])]
     .filter((name) => name && name !== '.');
   const badSteps = stepLabels.filter((label) => {
-    const match = /^(?:Read|Looked in|Couldn't open|Could not open)\s+(.+?)(?:\s+·\s+|:\s+|$)/i.exec(label.trim());
+    if (/^Reading documents$/i.test(label.trim())) return false;
+    const match = /^(?:Read|Reading|Looked in|Looking in|Couldn't look in|Couldn't open|Could not open)\s+(.+?)(?:\s+·\s+|:\s+|$)/i.exec(label.trim());
     return !match || pathText.test(label) || !names.some((name) => normalize(match[1]) === normalize(name));
   });
 
   const numberedSources = /\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]|\(\s*(?:sources?|refs?)\s*:?\s*\d+|\b(?:sources?|refs?|citations?)\s*[:#]?\s*\d+|^(?:\s*\d+[.)]\s*)[^\n]*\.(?:docx|pdf|pptx)\b/im;
   // Markdown link destinations are hidden. Only inspect the displayed answer and link labels.
+  const knownRelativePath = files.some((file) => file.includes('/') && normalize(visibleAnswer).includes(normalize(file)));
   const badSourceStyle = numberedSources.test(visibleAnswer) || /\[[^\]\n]+\.(?:docx|pdf|pptx)\s*\]/i.test(visibleAnswer)
-    || pathText.test(visibleAnswer) || links.some(({ label }) => /^\s*\[?\d+\]?\s*$/.test(label));
+    || pathText.test(visibleAnswer) || knownRelativePath || links.some(({ label }) => /^\s*\[?\d+\]?\s*$/.test(label));
   const readSourcesLinked = coverage.filter(({ result }) => result === 'read')
     .every(({ file }) => links.some((link) => link.expectedFile === file));
-  const documentsOpen = links.length > 0 && links.every((link) => link.opensRightDocument && link.hasPassage);
+  const passageLinks = links.filter((link) => link.hasPassage);
+  const linkCounts = {
+    total: links.length,
+    rightDocument: links.filter((link) => link.opensRightDocument).length,
+    withPassage: passageLinks.length,
+    onClaim: passageLinks.filter((link) => link.landsOnClaim === 'yes').length,
+  };
+  const pendingClaims = passageLinks.filter((link) => !['yes', 'no'].includes(link.landsOnClaim)).length;
+  const requiredPassages = Math.ceil(linkCounts.total * 0.9);
+  const passageLinksPass = readSourcesLinked && linkCounts.total > 0 && linkCounts.rightDocument === linkCounts.total
+    && linkCounts.onClaim + pendingClaims >= requiredPassages;
   const result = (ok) => ok ? 'pass' : 'fail';
   return {
-    coverage, slides, badSteps, passwordLine,
+    coverage, slides, badSteps, passwordLine, linkCounts,
     criteria: {
-      1: result(coverage.every(({ result: coverageResult }) => coverageResult !== 'missing')),
-      2: result(!duplicateSlide && slideRows.size === slides.length && slides.every((slide) => slide.notes)),
+      1: customQuestion ? 'n/a' : coverage.some((row) => row.result === 'missing') ? 'fail'
+        : coverage.some((row) => row.result === 'to check') ? 'to check' : 'pass',
+      2: customQuestion ? 'n/a' : result(!duplicateSlide && slideRows.size === slides.length && slides.every((slide) => slide.notes)),
       3: result(stepLabels.length > 0 && badSteps.length === 0),
-      4: readSourcesLinked && documentsOpen ? 'to check' : 'fail',
-      5: result(Boolean(passwordLine && wayForward.test(passwordLine))),
+      4: customQuestion ? 'n/a' : passageLinksPass ? pendingClaims ? 'to check' : 'pass' : 'fail',
+      5: customQuestion ? 'n/a' : result(Boolean(passwordLine && wayForward.test(passwordLine))),
       6: result(Boolean(answer.trim()) && !badSourceStyle),
     },
   };
@@ -109,6 +233,15 @@ function sourceDestination(href, folder) {
     return { relative, passage: /^(?:p|q)=/.test(fragment) && (/^[1-9]\d*$/.test(params.get('p') ?? '') || Boolean(params.get('q')?.trim())) };
   } catch {
     return null;
+  }
+}
+
+export async function retryDestroyedContext(evaluate, refreshTarget, target, expression) {
+  try {
+    return await evaluate(target, expression);
+  } catch (error) {
+    if (!/execution context (?:was destroyed|is not available)|cannot find (?:default )?context|inspected target navigated/i.test(error.message)) throw error;
+    return evaluate(await refreshTarget(target), expression);
   }
 }
 
@@ -135,8 +268,11 @@ function browser(port, signal) {
         socket.onmessage = ({ data }) => {
           const reply = JSON.parse(data);
           if (reply.id !== 1) return;
-          if (reply.error || reply.result?.exceptionDetails) finish(reject, new Error(`CDP ${method} failed.`));
-          else finish(resolve, reply.result);
+          const exception = reply.result?.exceptionDetails;
+          if (reply.error || exception) {
+            const detail = reply.error?.message ?? exception.exception?.description ?? exception.text;
+            finish(reject, new Error(`CDP ${method} failed: ${detail}`));
+          } else finish(resolve, reply.result);
         };
       });
     } finally {
@@ -144,9 +280,15 @@ function browser(port, signal) {
     }
   }
 
-  const evaluate = async (target, expression) => (await request(target, 'Runtime.evaluate', {
+  const evaluateOnce = async (target, expression) => (await request(target, 'Runtime.evaluate', {
     expression, returnByValue: true, awaitPromise: true,
   })).result.value;
+  const evaluate = (target, expression) => retryDestroyedContext(evaluateOnce, async (old) => {
+    const current = await targets();
+    return current.find(({ id }) => id === old.id)
+      ?? current.find(({ type, url }) => type === old.type && url === old.url)
+      ?? old;
+  }, target, expression);
   async function page() {
     const workbench = (await targets()).find(({ type, url }) => type === 'page' && url.startsWith('vscode-file://'));
     if (!workbench) throw new Error('Ritemark workbench CDP target is missing.');
@@ -218,13 +360,13 @@ const modelSelector = 'button[role="combobox"][title*=" · "]';
 const criteriaLabels = ['Document coverage', 'Speaker notes', 'Step labels', 'Passage links', 'Password notice and way forward', 'Source style'];
 const activeTab = '.part.editor .editor-group-container.active .tabs-container > .tab.active';
 const lastTurn = `
-  const anchor = [...d.querySelectorAll('[data-turn-anchor]')].at(-1);
-  let turn = anchor?.nextElementSibling;
+  const turnAnchor = [...d.querySelectorAll('[data-turn-anchor]')].at(-1);
+  let turn = turnAnchor?.nextElementSibling;
   while (turn && !turn.matches('.space-y-2') && !turn.hasAttribute('data-turn-anchor')) turn = turn.nextElementSibling;
   if (turn?.hasAttribute('data-turn-anchor')) turn = null;
 `;
 
-async function ask(ui, ai, runtime, question) {
+async function ask(ui, ai, runtime, question, report) {
   if (!(await ui.frame())) {
     await ui.press('F1', 'F1', 112);
     await ui.waitFor(async () => ui.evaluate(await ui.page(), '!!document.querySelector(".quick-input-widget input:focus")'),
@@ -236,29 +378,50 @@ async function ask(ui, ai, runtime, question) {
   }
   await ui.waitFor(ui.frame, 60, 'The AI composer did not open.');
   const modelButton = `d.querySelector(${JSON.stringify(modelSelector)})`;
-  const selected = () => ui.chat(`return ${modelButton}?.title;`);
-  if (!(await selected())?.startsWith(`${runtime.label} · `)) {
+  const selected = () => ui.chat(`return {title: ${modelButton}?.title, value: ${modelButton}?.dataset.modelValue};`);
+  const matchesRuntime = (model) => model?.title?.startsWith(`${runtime.label} · `)
+    && (!runtime.modelPrefix || model.value?.startsWith(runtime.modelPrefix));
+  if (!matchesRuntime(await selected())) {
     await ui.waitFor(() => ui.clickChat(modelButton), 20, 'The AI model picker is unavailable.');
+    const selector = '[role="option"]:not([aria-disabled="true"])'
+      + (runtime.modelPrefix ? `[data-model-value^="${runtime.modelPrefix}"]` : '');
     const option = `[...d.querySelectorAll('[role="group"]')].find(el =>
       d.getElementById(el.getAttribute('aria-labelledby'))?.textContent.trim() === ${JSON.stringify(runtime.label)}
-    )?.querySelector('[role="option"]:not([aria-disabled="true"])')`;
-    await ui.waitFor(() => ui.clickChat(option), 30, 'The requested AI has no selectable model. Check the test build and vault setup.');
+    )?.querySelector(${JSON.stringify(selector)})`;
+    await ui.waitFor(() => ui.clickChat(option), 30, runtime.modelPrefix
+      ? 'OpenCode has no selectable Google model. Check Google key readiness and the model catalog.'
+      : 'The requested AI has no selectable model. Check the test build and vault setup.');
   }
-  const model = await ui.waitFor(async () => {
+  report.model = await ui.waitFor(async () => {
     const current = await selected();
-    return current?.startsWith(`${runtime.label} · `) && current;
-  }, 15, 'The composer switched to a different AI.');
+    return matchesRuntime(current) && current.title;
+  }, 15, 'The composer did not select the requested AI and provider.');
   const textarea = 'd.querySelector(\'textarea[aria-label="Message"]\')';
   if (!(await ui.clickChat(textarea))) throw new Error('The message box could not be focused.');
   await ui.insert(question);
   await ui.waitFor(() => ui.chat(`return ${textarea}?.value === ${JSON.stringify(question)};`),
-    10, 'The fixed question did not reach the message box.');
-  if (!(await ui.clickChat('d.querySelector(\'button[aria-label="Send"]:not(:disabled)\')'))) throw new Error('Send is unavailable.');
+    10, 'The question did not reach the message box.');
+  const send = 'd.querySelector(\'button[aria-label="Send"]:not(:disabled)\')';
+  if (!(await ui.waitFor(() => ui.chat(`return !!${send};`), 30))) {
+    const status = await ui.chat(`
+      const notice = d.querySelector('[data-composer] [role="status"][aria-label], [data-composer] [role="alert"][aria-label]');
+      if (notice?.innerText.trim()) return notice.innerText.trim().replace(/\\s+/g, ' ');
+      return navigator.onLine ? ${textarea}?.placeholder : 'You are offline';
+    `);
+    throw new Error(`Send stayed disabled: ${status || 'composer status unavailable'}`);
+  }
+  if (!(await ui.clickChat(send))) throw new Error('Send is unavailable.');
 
   const answer = await ui.waitFor(() => ui.chat(`
     ${lastTurn}
     if (!turn?.textContent.includes(${JSON.stringify(question)}) || d.querySelector('button[aria-label="Stop"]')) return null;
-    if (turn.querySelector('[data-turn-failure]') || d.querySelector('[data-activity-state="error"]')) return {failed:true};
+    const failure = turn.querySelector('[data-turn-failure]');
+    const errors = [...d.querySelectorAll('[data-turn-failure], [data-activity-state="error"], [data-activity-state="failed"], [role="alert"]')]
+      .filter(el => el.getClientRects().length).map(el => el.innerText.trim()).filter(Boolean);
+    if (failure || d.querySelector('[data-activity-state="error"], [data-activity-state="failed"]')) return { failure: {
+      turnFailure: failure?.textContent.trim() ?? null,
+      sidebarError: [...new Set(errors)].join('\\n'),
+    } };
     const markdown = [...turn.querySelectorAll('.rendered-markdown')].at(-1);
     if (!markdown) return null;
     // Read the same raw Markdown prop the renderer consumed, without clipboard or DOM-to-Markdown conversion.
@@ -267,10 +430,17 @@ async function ask(ui, ai, runtime, question) {
     return fiber ? {
       answer:fiber.memoizedProps.content,
       visibleAnswer:markdown.innerText,
-      links:[...markdown.querySelectorAll('a[href]')].map(a=>({label:a.innerText, href:a.getAttribute('href')})),
+      readFold:[...turn.querySelectorAll('details:not([open]) > summary, button[aria-expanded="false"]')]
+        .find(el => /^Read /.test(el.innerText))?.innerText ?? null,
+      links:[...markdown.querySelectorAll('a[href]')].map(a => ({
+        label: a.innerText, href: a.getAttribute('href'), sourceLinkId: a.dataset.sourceLink ?? null,
+      })),
     } : null;
   `), 240, 'The turn did not produce a completed answer within 240 seconds.');
-  if (answer.failed) throw new Error('The selected AI returned a turn failure. Check API-key readiness in the test build.');
+  if (answer.failure) {
+    report.failure = answer.failure;
+    throw new Error('The selected model returned a turn failure.');
+  }
 
   await ui.chat(`
     ${lastTurn}
@@ -283,7 +453,7 @@ async function ask(ui, ai, runtime, question) {
     }
     return true;
   `);
-  const stepLabels = await ui.chat(`
+  const stepRows = await ui.chat(`
     ${lastTurn}
     const rows = turn.querySelectorAll(${JSON.stringify(ai === 'claude'
       ? 'details[open] > summary + div > div'
@@ -291,59 +461,97 @@ async function ask(ui, ai, runtime, question) {
     return [...rows].flatMap(row => {
       const fiber = row[Object.keys(row).find(key => key.startsWith('__reactFiber$'))];
       const activity = fiber?.return?.memoizedProps?.activity;
-      return activity && /^(init|thinking|text|done|error)$/.test(activity.type) ? [] : [row.innerText.trim()];
+      return activity && /^(init|thinking|text|done|error)$/.test(activity.type) ? [] : [{ label: row.innerText.trim(), commandId: activity?.tool === 'commandExecution' ? activity.step?.id : undefined }];
     });
   `);
-  return { ...answer, stepLabels, model };
+  return { ...answer, stepLabels: stepRows.map(({ label }) => label), stepRows };
 }
 
-async function tryLinks(ui, folder, facts, links, results) {
+export async function tryLinks(ui, folder, facts, links, results) {
   const files = [...facts.documents.map(({ file }) => file), facts.deck.file, facts.passwordDocument];
   const front = async () => ui.evaluate(await ui.page(), `(() => {
     const tab = document.querySelector(${JSON.stringify(activeTab)});
     return tab?.getAttribute('data-resource-name') ?? '';
   })()`);
-  for (const [index, link] of links.entries()) {
-    const expectedFile = files.find((file) => mentions(link.label, file)) ?? null;
+  const entries = links.map((link) => {
     const destination = sourceDestination(link.href, folder);
-    const entry = {
-      ...link, expectedFile, hasPassage: destination?.passage ?? false, openedDocument: null,
-      opensRightDocument: false, findMarkedPassage: false, landsOnClaim: 'to check',
+    const targetFile = files.find((file) => file.normalize('NFC') === destination?.relative) ?? null;
+    return {
+      ...link, targetFile, expectedFile: targetFile,
+      hasPassage: destination?.passage ?? false, openedDocument: null,
+      opensRightDocument: false, findMarkedPassage: false, landsOnClaim: destination?.passage ? 'to check' : 'no',
     };
-    results.push(entry);
-    // Click only links whose destination is a known fixture. A realpath check also excludes symlinks out of the folder.
-    const targetFile = files.find((file) => file.normalize('NFC') === destination?.relative);
-    if (!targetFile) continue;
-    const filePath = path.join(folder, targetFile);
-    if (!fs.existsSync(filePath) || fs.realpathSync(filePath).normalize('NFC') !== filePath.normalize('NFC')) continue;
+  });
+  results.push(...entries);
+  for (const [index, entry] of entries.entries()) {
+    const { targetFile, expectedFile, href } = entry;
+    let step = 'validate destination';
+    try {
+      // Click only links whose destination is a known fixture. A realpath check also excludes symlinks out of the folder.
+      if (!targetFile) continue;
+      const filePath = path.join(folder, targetFile);
+      if (!fs.existsSync(filePath) || fs.realpathSync(filePath).normalize('NFC') !== filePath.normalize('NFC')) continue;
 
-    // Close the last fixture before the next click so a stale tab or highlight cannot count.
-    const isFixtureActive = async () => {
-      const open = await front();
-      return files.some((file) => path.posix.basename(file).normalize('NFC') === open.normalize('NFC'));
-    };
-    if (await isFixtureActive()) {
-      await ui.evaluate(await ui.page(), `document.querySelector(${JSON.stringify(activeTab + ' .action-label.codicon-close')})?.click()`);
-      await ui.waitFor(async () => !(await isFixtureActive()), 5,
-        'Could not close the last fixture tab.');
-    }
-    const anchor = `(() => {${lastTurn} return [...(turn?.querySelectorAll('.rendered-markdown') ?? [])].at(-1)?.querySelectorAll('a[href]')[${index}];})()`;
-    if (!(await ui.clickChat(anchor))) continue;
-    entry.openedDocument = await ui.waitFor(async () => {
-      const open = await front();
-      return files.find((file) => path.posix.basename(file).normalize('NFC') === open.normalize('NFC'));
-    }, 10);
-    entry.opensRightDocument = Boolean(expectedFile && entry.openedDocument === expectedFile);
-    if (!entry.openedDocument) continue;
-    entry.findMarkedPassage = Boolean(await ui.waitFor(async () => {
-      for (const target of (await ui.targets()).filter(({ type, url }) => type === 'iframe' && url.startsWith('vscode-webview://'))) {
-        const found = await ui.evaluate(target, ui.frameCode(`
-          return /^[1-9]\\d* of \\d+$/.test(d?.querySelector('[data-find-bar] .find-bar-count')?.innerText || '');
-        `)).catch(() => false);
-        if (found) return true;
+      // Close the destination even if it is inactive, so a previous open or find mark
+      // cannot satisfy the next check (including repeated links to the same deck).
+      const fileName = path.posix.basename(targetFile).normalize('NFC');
+      const fixtureTabs = `[...document.querySelectorAll('.part.editor .tab[data-resource-name]')]
+        .filter(tab => tab.getAttribute('data-resource-name').normalize('NFC') === ${JSON.stringify(fileName)})`;
+      step = 'close destination tab';
+      await ui.evaluate(await ui.page(), `(${fixtureTabs}).forEach(tab =>
+        tab.dispatchEvent(new MouseEvent('auxclick', {button: 1, bubbles: true, cancelable: true})))`);
+      if (!(await ui.waitFor(async () => ui.evaluate(await ui.page(), `(${fixtureTabs}).length === 0`), 5))) {
+        throw new Error('Could not close the existing destination tab.');
       }
-      return false;
-    }, new URLSearchParams(link.href.split('#')[1]).has('q') ? 5 : 1));
+      // Invoke the rendered anchor itself. Coordinate clicks can land on the
+      // hover preview or the composer when the sidebar scrolls to a wrapped link.
+      step = 'read active tab before click';
+      const previous = await front();
+      step = 'click answer link';
+      const clicked = await ui.chat(`
+        ${lastTurn}
+        const markdown = [...(turn?.querySelectorAll('.rendered-markdown') ?? [])].at(-1);
+        const anchors = [...(markdown?.querySelectorAll('a[href]') ?? [])];
+        const matches = (anchor) => anchor?.getAttribute('href') === ${JSON.stringify(href)};
+        const sourceLinkId = ${JSON.stringify(entry.sourceLinkId ?? null)};
+        const anchor = (sourceLinkId && anchors.find(a => a.dataset.sourceLink === sourceLinkId && matches(a)))
+          || (matches(anchors[${index}]) ? anchors[${index}] : anchors.find(matches));
+        if (!anchor) return false;
+        anchor.click();
+        return true;
+      `);
+      if (!clicked) {
+        throw new Error('The rendered link was unavailable.');
+      }
+      step = 'wait for destination tab';
+      entry.openedDocument = await ui.waitFor(async () => {
+        const open = await front();
+        if (open === previous) return null;
+        return files.find((file) => path.posix.basename(file).normalize('NFC') === open.normalize('NFC'));
+      }, 10);
+      entry.opensRightDocument = Boolean(expectedFile && entry.openedDocument === expectedFile);
+      if (!entry.openedDocument) {
+        throw new Error('No fixture tab opened after the rendered link click.');
+      }
+      step = 'check find mark';
+      let findProbeError;
+      entry.findMarkedPassage = Boolean(await ui.waitFor(async () => {
+        for (const target of (await ui.targets()).filter(({ type, url }) => type === 'iframe' && url.startsWith('vscode-webview://'))) {
+          const found = await ui.evaluate(target, ui.frameCode(`
+            return /^[1-9]\\d* of \\d+$/.test(d?.querySelector('[data-find-bar] .find-bar-count')?.innerText || '');
+          `)).catch((error) => {
+            findProbeError = error;
+            return false;
+          });
+          if (found) return true;
+        }
+        return false;
+      }, new URLSearchParams(href.split('#')[1]).has('q') ? 5 : 1));
+      if (!entry.findMarkedPassage && findProbeError) throw findProbeError;
+    } catch (error) {
+      entry.error = error.message;
+      entry.errorStep = step;
+    }
   }
 }
 
@@ -356,15 +564,31 @@ function launch(args) {
   return spawnSync(path.join(here, 'dev-launch-isolated.sh'), args, { encoding: 'utf8' });
 }
 
+export function badCommandsFromTrace(trace, commandIds) {
+  const commands = new Set();
+  for (const [, payload] of trace.matchAll(/^\[[^\]\n]+\] \[rpc:event\] item\/(?:started|completed) (.+)$/gm)) {
+    let item;
+    try { ({ item } = JSON.parse(payload)); } catch { continue; }
+    if (item?.type === 'commandExecution' && commandIds.has(item.id) && typeof item.command === 'string' && item.command) {
+      commands.add(item.command);
+    }
+  }
+  return [...commands];
+}
+
 function formatRun(run) {
   const fence = '`'.repeat(Math.max(3, ...(run.answer.match(/`+/g) ?? []).map((s) => s.length + 1)));
   const bullets = (items) => items.length ? items.map((line) => `- ${line}`).join('\n') : 'None recorded.';
+  const { total, rightDocument, withPassage, onClaim } = run.linkCounts;
+  const pendingCoverage = run.coverage.filter(({ result }) => result === 'to check').map(({ file }) => title(file));
+  const share = (count) => total ? `${count}/${total} (${(100 * count / total).toFixed(1)}%)` : '0/0';
   return `#### Run ${run.number}
 
 - Date — ${run.date}
 - Build — ${run.build ?? 'unavailable'}
 - Model — ${run.model ?? 'unavailable'}
 - Question — ${run.question}
+- Completed read fold — ${run.readFold ?? 'None recorded.'}
 - Password document's line — ${run.passwordLine ?? 'None recorded.'}
 ${run.error ? `- Run error — ${run.error}\n` : ''}
 **Answer (verbatim)**
@@ -376,10 +600,25 @@ ${fence}
 **Step labels**
 
 ${bullets(run.stepLabels)}
+${run.badCommands.length ? `
+**Commands behind failing step labels**
 
+${run.badCommands.map((command) => {
+  const fence = '`'.repeat(Math.max(3, ...(command.match(/`+/g) ?? []).map((s) => s.length + 1)));
+  return `${fence}sh\n${command}\n${fence}`;
+}).join('\n\n')}
+` : ''}${pendingCoverage.length ? `
+**Document findings to check**
+
+${bullets(pendingCoverage)}
+` : ''}
 **Links tried**
 
-${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim to check`))}
+- Opened the right document — ${share(rightDocument)}
+- Include a passage target — ${share(withPassage)}
+- Confirmed to land on the claim — ${share(onClaim)}
+
+${bullets(run.links.map((link) => `${link.label} — \`${link.href}\` — opened ${link.openedDocument ?? 'none'} — opens the right document ${link.opensRightDocument ? 'yes' : 'no'} — find marked a passage ${link.findMarkedPassage ? 'yes' : 'no'} — lands on the claim ${link.landsOnClaim}${link.error ? ` — ${link.errorStep}: ${link.error}` : ''}`))}
 
 **Criteria**
 
@@ -389,7 +628,7 @@ ${Object.entries(run.criteria).map(([n, status]) => `${n}. ${criteriaLabels[Numb
 
 async function main() {
   const { values } = parseArgs({ options: { ai: { type: 'string' }, folder: { type: 'string' }, out: { type: 'string' },
-    'user-data-dir': { type: 'string' } } });
+    question: { type: 'string' }, 'user-data-dir': { type: 'string' } } });
   const runtime = Object.hasOwn(runtimes, values.ai) && runtimes[values.ai];
   if (!runtime || !values.folder || !values.out) throw new Error('Use --ai claude|chatgpt|opencode --folder <dir> --out <dir>.');
   const profile = values['user-data-dir'];
@@ -401,8 +640,8 @@ async function main() {
   const folder = fs.realpathSync(values.folder);
   const facts = JSON.parse(fs.readFileSync(path.join(folder, '..', 'facts.json'), 'utf8'));
   facts.folder = path.basename(folder);
-  const question = fs.readFileSync(template, 'utf8').match(/^> (Review the whole folder[^\r\n]*)/m)?.[1];
-  if (!question) throw new Error('The fixed question is missing from reading-test.md.');
+  const question = values.question?.trim() ?? fs.readFileSync(template, 'utf8').match(/^> (Review the whole folder[^\r\n]*)/m)?.[1];
+  if (!question) throw new Error('Pass a nonempty --question or restore the fixed question in reading-test.md.');
   const output = path.resolve(values.out);
   const insideFolder = (dir) => dir === folder || dir.startsWith(folder + path.sep);
   if (insideFolder(output)) throw new Error('Keep evidence outside the workspace.');
@@ -417,21 +656,23 @@ async function main() {
     stem = path.join(output, `run-${values.ai}-${number}`);
     if (fs.existsSync(stem + '.md')) continue;
     try {
-      fs.closeSync(fs.openSync(stem + '.json', 'wx'));
+      fs.closeSync(fs.openSync(stem + '.json', 'wx', 0o600));
       break;
     } catch (error) {
       if (error.code !== 'EEXIST') throw error;
     }
   }
 
-  const report = { number, ai: values.ai, platform: 'Mac', date: new Date().toISOString(), question, answer: '', stepLabels: [], links: [] };
+  const report = { number, ai: values.ai, platform: 'Mac', date: new Date().toISOString(), question, customQuestion: values.question !== undefined, answer: '', stepLabels: [], links: [] };
   let runDir;
+  let stepRows = [];
   const abort = new AbortController();
   const interrupt = () => abort.abort(new Error('Run interrupted.'));
   process.once('SIGINT', interrupt);
   process.once('SIGTERM', interrupt);
   try {
-    const started = launch(['start', '--name', `reading-${values.ai}`, '--folder', folder, `--user-data-dir=${profile}`]);
+    const started = launch(['start', '--name', `reading-${values.ai}`, '--folder', folder, `--user-data-dir=${profile}`,
+      '--runtime-trace']);
     runDir = field(started.stdout ?? '', 'RUN_DIR');
     const port = Number(field(started.stdout ?? '', 'PORT'));
     if (started.status !== 0 || !runDir || !port) throw new Error('dev-launch-isolated.sh start failed. Check the dev build, launch window and empty test profile.');
@@ -440,14 +681,63 @@ async function main() {
     const revision = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: buildRoot, encoding: 'utf8' });
     report.build = `${version} dev (${revision.stdout?.trim() || 'revision unavailable'})`;
     const ui = browser(port, abort.signal);
-    Object.assign(report, await ask(ui, values.ai, runtime, question));
+    const { stepRows: rows, ...result } = await ask(ui, values.ai, runtime, question, report);
+    stepRows = rows;
+    Object.assign(report, result);
     const anchors = report.links;
     report.links = [];
     await tryLinks(ui, folder, facts, anchors, report.links);
+    if (report.links.some((link) => link.error)) process.exitCode = 1;
   } catch (error) {
     report.error = error.message;
     process.exitCode = 1;
   } finally {
+    const redact = evidenceRedactor();
+    const writeReport = () => fs.writeFileSync(stem + '.json',
+      JSON.stringify(report, (_key, value) => redact(value), 2) + '\n');
+    if (report.failure && values.ai === 'opencode' && runDir) {
+      report.failure.runtimeStderr = null;
+      try {
+        const trace = fs.readFileSync(path.join(runDir, 'trace', 'ritemark-acp-trace.log'), 'utf8');
+        const stderr = [...trace.matchAll(/^\[[^\]\n]+\] \[stdio:stderr\] message (.+)$/gm)]
+          .map(([, value]) => {
+            try { return JSON.parse(value); } catch { return value; }
+          });
+        if (stderr.length) report.failure.runtimeStderr = stderr.join('\n');
+      } catch (error) {
+        if (error.code !== 'ENOENT') report.failure.runtimeStderrError = error.message;
+      }
+    }
+    if (report.failure && values.ai === 'opencode') {
+      try {
+        const failureDir = stem + '-failure';
+        fs.mkdirSync(failureDir, { recursive: true, mode: 0o700 });
+        fs.writeFileSync(path.join(failureDir, 'failure.txt'), redact([
+          report.error,
+          ...Object.entries(report.failure).map(([name, value]) => `${name}\n${value ?? 'Unavailable'}`),
+        ].join('\n\n') + '\n'), { mode: 0o600 });
+        writeReport();
+      } catch (error) {
+        report.error += ` Could not save failure evidence: ${error.message}`;
+      }
+    }
+    Object.assign(report, scoreRun(report, facts));
+    report.badCommands = [];
+    if (values.ai === 'chatgpt' && runDir && report.badSteps.length) {
+      const ids = new Set(stepRows.filter(({ label, commandId }) => commandId && report.badSteps.includes(label))
+        .map(({ commandId }) => commandId));
+      if (ids.size) {
+        try {
+          const trace = fs.readFileSync(path.join(runDir, 'trace', 'ritemark-codex-trace.log'), 'utf8');
+          report.badCommands = badCommandsFromTrace(trace, ids);
+        } catch (error) {
+          if (error.code !== 'ENOENT') {
+            report.error = [report.error, `Could not read command trace (${error.code ?? 'unknown error'}).`].filter(Boolean).join(' ');
+            process.exitCode = 1;
+          }
+        }
+      }
+    }
     if (runDir) {
       const stopped = launch(['stop', runDir]);
       if (stopped.status === 0 && /^LEFT=0\r?$/m.test(stopped.stdout ?? '')) {
@@ -457,10 +747,9 @@ async function main() {
         process.exitCode = 1;
       }
     }
-    Object.assign(report, scoreRun(report, facts));
-    fs.writeFileSync(stem + '.json', JSON.stringify(report, null, 2) + '\n');
-    fs.writeFileSync(stem + '.md', formatRun(report));
-    if (report.error) console.error(report.error);
+    writeReport();
+    fs.writeFileSync(stem + '.md', redact(formatRun(report)));
+    if (report.error) console.error(redact(report.error));
     if (Object.values(report.criteria).includes('fail')) process.exitCode = 1;
     console.log(`Evidence written to ${stem}.json and ${stem}.md`);
     process.removeListener('SIGINT', interrupt);

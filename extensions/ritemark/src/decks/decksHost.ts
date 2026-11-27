@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
+import { classifyWorkspaceFileKind } from '../workspaceFileLinks';
 import { DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
@@ -16,9 +17,10 @@ import { DeckPdfSaver, PRINT_COMMAND } from './deckPdf';
 import { loadPageAssets } from './page/pageAssets';
 import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
+import { workspaceDeckPictures } from './workspaceDeckPictures';
 import { copyEarlierDeck, earlierDecks, makeEmptyDeck } from './newDeck';
 import { freshDeckMarks, sendDraft, type StartCardState } from './startCard';
-import { movedTarget, placeAfterMoves, rewriteDeckPictures, slidesOfText } from './deckLibraryFormat';
+import { folderOf, movedTarget, placeAfterMoves, rewriteDeckPictures, slidesOfText } from './deckLibraryFormat';
 import { AI_NAMES, AI_ORDER } from '../guidance/readyRequest';
 import { sheetAi } from '../guidance/GuidanceHost';
 import type { AgentId } from '../agent/types';
@@ -26,6 +28,8 @@ import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
 import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
 import { DECK_GLOB, isDeckPath } from './deckFileName';
+import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles, type DeletedDeck } from './deckFolderFollow';
+import { copyDeckFolder } from './copyDeckFolder';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -121,6 +125,13 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     if (!isEnabled('decks')) view.forgetSearch();
     setFieldKey();
   }));
+  // Serialize the filesystem events so copy and delete see the previous event's completed folder changes.
+  let following = Promise.resolve();
+  const deletingDecks = new Map<string, DeletedDeck>();
+  const follow = (operation: () => Promise<void>) => {
+    if (isEnabled('decks')) following = following.then(operation)
+      .catch(error => console.warn('[Decks] Could not follow a file change:', error));
+  };
   context.subscriptions.push(
     publisher,
     pages,
@@ -135,13 +146,53 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     vscode.commands.registerCommand(LIBRARY_SEARCH_COMMAND, (arg?: unknown) => (isEnabled('decks') ? view.searchRow(arg) : undefined)),
     // Sprint 159 (PR 7; since 16 November it opens the deck at once): New → Deck, only with the flag on
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options, fresh) : undefined)),
-    // A deck deleted or renamed in Ritemark takes its card's mark with it
-    vscode.workspace.onDidDeleteFiles(event => { for (const file of event.files) void fresh.remove(markOf(file.fsPath)); }),
+    vscode.workspace.onWillDeleteFiles(event => {
+      // Capture the deck's links before its file and open document can disappear.
+      const paths = event.files.filter(file => file.scheme === 'file' && isDeckPath(file.fsPath)).map(file => rootless(file.fsPath));
+      if (!paths.length) return;
+      event.waitUntil(Promise.all(paths.map(async file => {
+        deletingDecks.delete(file);
+        if (!isEnabled('decks') || await deckFolderFiles.kind(file) !== 'file') return;
+        const text = await deckFolderFiles.readDeck(file).catch(() => undefined);
+        if (!event.token.isCancellationRequested) deletingDecks.set(file, { file, text });
+      })));
+    }),
+    vscode.workspace.onDidDeleteFiles(event => {
+      for (const file of event.files) void fresh.remove(markOf(file.fsPath));
+      const deleted = event.files.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath));
+      const decks: DeletedDeck[] = [];
+      for (const file of deleted) {
+        const deck = deletingDecks.get(file);
+        deletingDecks.delete(file);
+        if (deck) decks.push(deck);
+      }
+      if (decks.length) follow(() => trashDeckFolders(decks, deleted, deckFolderFiles));
+    }),
     vscode.workspace.onDidRenameFiles(event => {
       for (const file of event.files) void fresh.remove(markOf(file.oldUri.fsPath));
-      // 17 November: a deck moved or renamed in Ritemark keeps its pictures: its paths to them are written for its new
-      // place. The picture files are never touched.
-      if (isEnabled('decks')) void rebaseMovedDecks(event.files).catch(error => console.warn('[Decks] Could not follow a move:', error));
+      follow(() => rebaseMovedDecks(event.files.filter(file => file.oldUri.scheme === 'file' && file.newUri.scheme === 'file')));
+    }),
+    vscode.workspace.onDidCreateFiles(event => {
+      if (!isEnabled('decks')) return;
+      // Start reading the saved copies as soon as the event arrives, before earlier folder operations finish.
+      const created = Promise.all(event.files.filter(uri => uri.scheme === 'file' && isDeckPath(uri.fsPath))
+        .map(async uri => {
+          const deck = rootless(uri.fsPath);
+          if (await deckFolderFiles.kind(deck) !== 'file') return null;
+          const bytes = await deckFolderFiles.readBytes(deck).catch(() => null);
+          return bytes && { uri, deck, bytes };
+        }));
+      follow(async () => {
+        for (const file of await created) {
+          if (!file) continue;
+          const { uri, deck, bytes } = file;
+          const document = await vscode.workspace.openTextDocument(uri);
+          const text = document.getText();
+          if (text !== bytes.toString('utf8').replace(/^\uFEFF/, '')) continue;
+          const next = await copyCreatedDeckPictures(deck, text, deckFolderFiles, bytes);
+          await replaceDeckText(document, text, next);
+        }
+      });
     }),
   );
   return { pages, themes, publisher, library, themeAi };
@@ -154,7 +205,8 @@ function dayOf(modified: number): string {
 
 /** A path from the file system's root, posix and without its leading slash (`Users/me/Project/a.png`, `C:/a.png`). */
 function rootless(fsPath: string): string {
-  return path.resolve(fsPath).replace(/\\/g, '/').replace(/^\/+/, '');
+  const absolute = path.resolve(fsPath).split(path.sep).join('/');
+  return absolute.startsWith('//') ? 'UNC/' + absolute.slice(2) : absolute.replace(/^\/+/, '');
 }
 
 /**
@@ -182,47 +234,132 @@ async function movedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vsc
   return decks;
 }
 
-/**
- * 17 November (Jarmo's deck lost its pictures after a move): each deck a rename moved has its pictures' paths (the
- * slides' `image:` lines and Markdown pictures, and the handout's) written for its new place, the way the Slide library
- * rebases a copied slide. One edit per deck, saved unless the deck already had unsaved changes. A move back writes them
- * back. Only the deck's text changes: no picture file is ever moved, copied or deleted.
- */
+/** Convert the common rootless paths back to file URIs (a drive is already absolute). */
+function fileUri(file: string): vscode.Uri {
+  if (process.platform !== 'win32') return vscode.Uri.file('/' + file);
+  if (file.startsWith('UNC/')) return vscode.Uri.file('//' + file.slice(4));
+  return vscode.Uri.file(/^[a-z]:$/i.test(file) ? file + '/' : file);
+}
+
+const deckFolderFiles: CreatedDeckFiles = {
+  async kind(file) {
+    try {
+      const stat = await fs.promises.lstat(fileUri(file).fsPath);
+      return stat.isDirectory() ? 'folder' : stat.isFile() ? 'file' : 'other';
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'ENOENT' ? undefined : 'other';
+    }
+  },
+  async listMarkdown(deck, limit) {
+    const uri = fileUri(deck);
+    const root = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
+    const pattern = new vscode.RelativePattern(root, '**/*.{[mM][dD],[mM][aA][rR][kK][dD][oO][wW][nN],[rR][tT][mM][sS]}');
+    const found = await vscode.workspace.findFiles(pattern, undefined, limit);
+    const files = new Set(found.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath)));
+    for (const { uri } of vscode.workspace.textDocuments) {
+      if (uri.scheme === 'file' && projectRelative(root.fsPath, uri.fsPath) !== null &&
+          classifyWorkspaceFileKind(uri.fsPath) === 'markdown') {
+        files.add(rootless(uri.fsPath));
+      }
+    }
+    return [...files];
+  },
+  async readDeck(file) {
+    const uri = fileUri(file);
+    const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
+    return open?.getText() ?? fs.promises.readFile(uri.fsPath, 'utf8');
+  },
+  async *listFolder(folder) {
+    if (await deckFolderFiles.kind(folder) !== 'folder') throw new Error('Expected a plain deck folder');
+    const dir = await fs.promises.opendir(fileUri(folder).fsPath);
+    for await (const { name } of dir) {
+      const file = folder + '/' + name;
+      const kind = await deckFolderFiles.kind(file);
+      if (kind === 'file') await fs.promises.access(fileUri(file).fsPath, fs.constants.R_OK);
+      yield { name, kind: kind ?? 'other' };
+    }
+  },
+  async readPage(file) {
+    const page = await fs.promises.open(fileUri(file).fsPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    try {
+      return await page.readFile('utf8');
+    } finally {
+      await page.close();
+    }
+  },
+  async findFiles(glob, limit) {
+    const files = await vscode.workspace.findFiles(glob, null, limit);
+    return files.filter(uri => uri.scheme === 'file').map(uri => rootless(uri.fsPath));
+  },
+  readBytes(file) {
+    return fs.promises.readFile(fileUri(file).fsPath);
+  },
+  async resolves(file) {
+    return fs.promises.stat(fileUri(file).fsPath).then(() => true, error => {
+      const code = (error as NodeJS.ErrnoException).code;
+      return code !== 'ENOENT' && code !== 'ENOTDIR' && code !== 'ELOOP';
+    });
+  },
+  log(message) { console.warn('[Decks]', message); },
+  async sameFolder(from, to) {
+    if (from.toLowerCase() !== to.toLowerCase()) return false;
+    try {
+      const [old, next] = await Promise.all([fs.promises.lstat(fileUri(from).fsPath), fs.promises.lstat(fileUri(to).fsPath)]);
+      return old.isDirectory() && next.isDirectory() && old.dev === next.dev && old.ino === next.ino;
+    } catch {
+      return false;
+    }
+  },
+  async rename(from, to) {
+    await vscode.workspace.fs.rename(fileUri(from), fileUri(to), { overwrite: false });
+  },
+  async trash(folder) {
+    await vscode.workspace.fs.delete(fileUri(folder), { recursive: true, useTrash: true });
+  },
+  async copy(from, to) {
+    if (await deckFolderFiles.kind(from) !== 'folder') return false;
+    // Create-only, entry by entry into the reserved name (copyDeckFolder: Electron's fs.cp refuses an existing target).
+    return copyDeckFolder(fileUri(from).fsPath, fileUri(to).fsPath);
+  },
+  notice(message, level) {
+    if (level === 'information') void vscode.window.showInformationMessage(message);
+    else void vscode.window.showWarningMessage(message);
+  },
+};
+
+/** Rebase the moved decks after the folders have followed, including moves named by Documents itself. */
 async function rebaseMovedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUri: vscode.Uri }>): Promise<void> {
   const moves = files.map(file => ({ from: rootless(file.oldUri.fsPath), to: rootless(file.newUri.fsPath) }));
-  const after = placeAfterMoves(moves);
-  for (const deck of await movedDecks(files)) {
-    const oldFolder = path.posix.dirname(rootless(deck.before));
-    const newFolder = path.posix.dirname(rootless(deck.uri.fsPath));
-    const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
-    // A deck inside a moved folder that isn't open is read from disk first, and opened only when its text changes
-    // (review of #771): a folder of decks moved never opens the ones that need nothing. A deck moved itself is always
-    // read as a document, so unsaved words carried to its new place are rebased too (round two).
+  const decks = await movedDecks(files);
+  const direct = decks.filter(deck => !deck.inFolder).map(deck => ({ from: rootless(deck.before), to: rootless(deck.uri.fsPath) }));
+  const after = placeAfterMoves(await followDeckMoves(moves, direct, deckFolderFiles));
+  for (const deck of decks) {
+    const oldFolder = folderOf(rootless(deck.before));
+    const newFolder = folderOf(rootless(deck.uri.fsPath));
+    const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after), true);
+    // A moved folder's decks stay closed unless their links need an edit.
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === deck.uri.toString());
     if (!open && deck.inFolder) {
-      let onDisk: string;
-      try {
-        onDisk = await fs.promises.readFile(deck.uri.fsPath, 'utf8');
-      } catch {
-        continue;
-      }
-      if (rebase(onDisk) === onDisk) continue;
+      const onDisk = await fs.promises.readFile(deck.uri.fsPath, 'utf8').catch(() => undefined);
+      if (onDisk === undefined || rebase(onDisk) === onDisk) continue;
     }
     const document = open ?? await vscode.workspace.openTextDocument(deck.uri);
     const text = document.getText();
-    const next = rebase(text);
-    if (next === text) continue;
-    // Only the changed stretch is replaced, so the deck's editor keeps everything around it as it was.
-    let start = 0;
-    while (start < text.length && start < next.length && text[start] === next[start]) start++;
-    let end = 0;
-    while (end < text.length - start && end < next.length - start && text[text.length - 1 - end] === next[next.length - 1 - end]) end++;
-    const wasDirty = document.isDirty;
-    const edit = new vscode.WorkspaceEdit();
-    edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(text.length - end)), next.slice(start, next.length - end));
-    if (!(await vscode.workspace.applyEdit(edit))) continue;
-    if (!wasDirty) await document.save();
+    await replaceDeckText(document, text, rebase(text));
   }
+}
+
+async function replaceDeckText(document: vscode.TextDocument, text: string, next: string): Promise<void> {
+  if (next === text || document.getText() !== text) return;
+  // Replace only the changed stretch, preserving the editor's state around it.
+  let start = 0;
+  while (start < text.length && start < next.length && text[start] === next[start]) start++;
+  let end = 0;
+  while (end < text.length - start && end < next.length - start && text[text.length - 1 - end] === next[next.length - 1 - end]) end++;
+  const wasDirty = document.isDirty;
+  const edit = new vscode.WorkspaceEdit();
+  edit.replace(document.uri, new vscode.Range(document.positionAt(start), document.positionAt(text.length - end)), next.slice(start, next.length - end));
+  if (await vscode.workspace.applyEdit(edit) && !wasDirty) await document.save();
 }
 
 /** A deck's key among the fresh marks: its file path, as this host compares paths. */
@@ -339,6 +476,17 @@ function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: Fresh
       const result = await copyEarlierDeck(source, {
         deck,
         read: relative => files.read(relative),
+        pictures: workspaceDeckPictures(root),
+        updateCopy: async (relative, before, after) => {
+          const uri = vscode.Uri.file(path.join(root, relative));
+          const copy = await vscode.workspace.openTextDocument(uri);
+          const current = copy.getText();
+          const normalize = (text: string) => text.replace(/\r\n/g, '\n');
+          if (normalize(current) === normalize(before)) {
+            const next = normalize(after);
+            await replaceDeckText(copy, current, copy.eol === vscode.EndOfLine.CRLF ? next.replace(/\n/g, '\r\n') : next);
+          }
+        },
         taken: fileName => takenIn(folder, fileName),
         replace: async text => {
           const edit = new vscode.WorkspaceEdit();

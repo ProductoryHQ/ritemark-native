@@ -168,6 +168,7 @@ const SECTIONS: CapabilitySection[] = [
     render: () => [
       'SOURCES IN ANSWERS: Use `read_document` first when reading Word, PDF, or PowerPoint files.',
       '- Name the source in the sentence as you would in a report. Never use a number, a bracketed file name, or a path as the source label.',
+      '- Refer to folders and documents in plain prose, for example “the Reference folder” or “the annual report”.',
       '- Link the source name to the passage. Use a project-relative path, `p` for the viewer page or slide when known, and `q` for the passage’s own words (up to 200 characters before percent-encoding). If the page is unknown, use `#q=…`. Write a space in the path as `%20` (or put the whole target in `<…>`): a link with a bare space is not a link.',
       '- Example: [the head of operations](Interviews/Operations.docx#p=4&q=start%20with%20the%20handover) would start with the handover.',
     ].join('\n'),
@@ -222,7 +223,8 @@ const SECTIONS: CapabilitySection[] = [
             // Sprint 165 PR 4 (#834): the library's offer, the same slides the Slide library place offers
             `- The slides that are in most of the decks (the Slide library's offer): list_repeated_slides. Only when the user asks, add_repeated_slides copies them into the library's topic "Every training"; it never changes a deck.`,
             // Sprint 161 (PR 2): block slides, written like text (the Pandoc and Quarto `:::` blocks for columns, boxes and steps)
-            '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `), a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: images/x.png`) and where its content sits (`valign: middle` or `bottom`; a title or section slide sits low by itself, so for it `valign: top` or `middle`; leave the line out for the slide\'s own place); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](images/x.png)`). Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
+            '- To change a deck\'s own slides, edit the file. Each slide is a fenced block ```` ```slide ```` (the word `slide` alone) holding Markdown: first a short header between `---` lines with `id:` and, when the slide has them, `from:`, `skip: true`, `kept: true`, `section: true` (a section slide: its `# ` title alone, perhaps a short number line over it, and its handout part opening with `# `, not `## `), a picture beside or behind its words (`picture: left`, `right` or `behind` with `image: Kickoff.rtms.files/x.png`) and where its content sits (`valign: middle` or `bottom`; a title or section slide sits low by itself, so for it `valign: top` or `middle`; leave the line out for the slide\'s own place); then the slide itself: `# ` its title, a `## ` line under it, text, `-` and `1.` lists, tables and pictures (`![](<Kickoff.rtms.files/x.png>)`). Keep the angle brackets around picture paths so names with spaces work. Save new deck pictures at the top of the sibling folder named after the deck, for example `Kickoff.rtms.files/` beside `Kickoff.rtms`. Write a slide\'s words as you would a short document; never put a list number in front of a heading.',
+            '- On a slide, write an empty line as `<br>` alone on its line, with a blank line before and after.',
             '- A slide\'s blocks are Pandoc\'s fenced divs, each closed by a line of as many colons as opened it: `:::: columns` holding two or three `::: column` (each with a `### ` heading and its lines); `:::: boxes` (or `:::: {.boxes look="steps"}`, `"arrows"`, `"line"`) holding `::: box` or `::: {.box icon="lightbulb"}`; and `::: steps` around a numbered list.',
             // Sprint 166 PR 9 (#850): the icon names a box may carry
             iconLine(),
@@ -272,6 +274,7 @@ const SECTIONS: CapabilitySection[] = [
         'HONESTY: if the user asks for something Ritemark genuinely does not expose to you, say so plainly rather than inventing or claiming a capability that does not exist.',
         // Sprint 140 (R1, #497): every AI, whatever the spike decided
         'When you are asked to read a file and cannot open it (a scanned PDF, a password-protected or unreadable document), say which files you could not open rather than leaving them out silently.',
+        'If a scanned PDF has no readable text, offer only to open it in the PDF viewer. Do not ask for a text-searchable copy.',
       ].join('\n'),
   },
 ];

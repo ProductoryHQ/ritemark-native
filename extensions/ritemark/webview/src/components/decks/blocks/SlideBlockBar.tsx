@@ -2,10 +2,10 @@
  * The block's bar on the stage (experience 46, 17 November; frames 23, 29 and 30; `blockBar.ts` does the work).
  *
  *  - **The bar** sits under the chosen block (the caret's Boxes, Steps, Columns or list): the type as a menu
- *    ("Boxes ▾"), the block's own group (Boxes: Style, Mark, Width, alignment; Columns: the count, the vertical alignment and
+ *    ("Boxes ▾"), the block's own group (Boxes: Style, Mark, Size, alignment; Columns: the count, the vertical alignment and
  *    frame 23's ⋯ with Add a column, Remove a column and Delete block), then Add and Delete. It is the page's own size at
- *    any stage size, so it goes in `document.body` (the slide's frame clips, and frame 29's bar runs past the slide), and
- *    follows its block as the stage moves and scales. A press outside it or Esc closes it; a press in the block opens it.
+ *    any stage size, so it goes in `document.body`. It stays inside the slide and follows its block as the stage moves
+ *    and scales. A press outside it or Esc closes it; a press in the block opens it.
  *  - **The handles** go in the slide's frame, over the slide, at the block's place on the screen, so they move and scale
  *    with the slide and stay a pointer's size: the accent ring, the ⋮ at the block's top left that drags it within the
  *    slide (a line shows where it lands), the round + at its right or bottom edge, and on Columns the line between two
@@ -17,24 +17,29 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import type { Editor as TipTapEditor } from '@tiptap/react'
 import type { Transaction } from '@tiptap/pm/state'
-import { BOXES_MARKS, BOX_WIDTH_PX, boxesLookOf, boxesMarkOf, columnsAlignOf, type BoxWidth, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
+import { BOXES_MARKS, boxesLookOf, boxesMarkOf, columnsAlignOf, type BoxWidth, type BoxesMark } from '../../../../../src/decks/blocks/fencedDiv'
 import type { DeckTheme } from '../../../../../src/decks/deckTheme'
 import { Button } from '../../ui/button'
 import { Tooltip } from '../../ui/tooltip'
 import { Icon, type PhosphorIconName } from '../../ui/Icon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../ui/dropdown-menu'
+import { isMac } from '../../../hooks/usePlatform'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
-  dropGaps, gripSpot, iconSpot, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
-  type ChosenBlock,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, barLeftPastPane, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
+  type BoxIconMenuCloseReason, type ChosenBlock,
 } from './blockBar'
-import { caretBoxPos, markableBox } from './slideDivView'
-import { blockItems, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
+import { markableBox } from './slideDivView'
+import { blockItems, boxForEmptyIconMenu, caretItemIndex, itemAtPoint, itemKindOf, type DropLine, type PlacedItem } from './itemHandle'
+import { SlideIconPickerContent } from './SlideBlockTools'
+import { SlideIconGlyph } from '../slide/SlideIconGlyph'
 import { SlideItemHandle } from './SlideItemHandle'
 import { addTab, setPendingRename } from '../../../extensions/tabs/tabsCommands'
 import { buttonAt } from '../../../extensions/buttonBlock/buttonCommands'
+
+const BOX_SIZE_LABEL: Record<BoxWidth, string> = { s: 'Small', m: 'Medium', l: 'Large' }
 
 const KIND_ICON: Record<BarKind, PhosphorIconName> = { boxes: 'squares-four', steps: 'list-checks', columns: 'columns', list: 'list', numbered: 'list-numbers', agenda: 'calendar', tabs: 'tabs' }
 /** Sprint 167 PR 2: the Mark menu's icons (README item C, `block-details.html`). */
@@ -42,6 +47,7 @@ const MARK_ICON: Record<BoxesMark, PhosphorIconName> = { icon: 'smiley', number:
 const ADD_LABEL: Record<BarKind, string> = { boxes: 'Add a box', steps: 'Add a step', columns: 'Add a column', list: 'Add an item', numbered: 'Add an item', agenda: '', tabs: 'Add a tab' }
 
 export interface SlideBlockBarProps {
+  settingsOpen?: boolean
   editor: TipTapEditor | null
   /** The slide's frame (unscaled; the slide is scaled inside it): the handles are drawn in it. */
   frame: HTMLDivElement | null
@@ -66,6 +72,7 @@ interface Placed {
   markerX: number | null
   /** The slide's pane on the screen: the bar stays inside it. */
   pane: { left: number; right: number }
+  caretBox: ReturnType<typeof caretBoxIcon>
   /** The icon handle: on the caret's box while it has no icon (its empty place is drawn), at its spot in the frame. */
   icon: { pos: number; left: number; top: number } | null
   /** Sprint 167 PR 5 (README item B): the block's boxes, columns, steps or list items in the frame, and the caret's. */
@@ -77,6 +84,7 @@ function samePlace(a: Placed, b: Placed): boolean {
   const same = (x: Box, y: Box) => x.left === y.left && x.top === y.top && x.width === y.width && x.height === y.height
   return same(a.block, b.block) && a.screen.left === b.screen.left && a.screen.top === b.screen.top && a.screen.bottom === b.screen.bottom
     && a.markerX === b.markerX && a.pane.left === b.pane.left && a.pane.right === b.pane.right && JSON.stringify(a.lines) === JSON.stringify(b.lines)
+    && a.caretBox?.pos === b.caretBox?.pos && a.caretBox?.current === b.caretBox?.current && a.caretBox?.glyph === b.caretBox?.glyph
     && JSON.stringify(a.icon) === JSON.stringify(b.icon) && a.caretItem === b.caretItem && JSON.stringify(a.items) === JSON.stringify(b.items)
 }
 
@@ -85,13 +93,14 @@ function boxIn(rect: DOMRect, origin: DOMRect): Box {
 }
 
 /** A choice in one of the bar's segments: on or not, with its tooltip. */
-function Choice({ on, label, tip, icon, onPick }: { on: boolean; label?: string; tip: string; icon?: PhosphorIconName; onPick: () => void }) {
+/** A choice in a segment's track; `plain` draws a lone toggle (One by one) as a toolbar button with no track. */
+function Choice({ on, label, tip, icon, onPick, plain }: { on: boolean; label?: string; tip: string; icon?: PhosphorIconName; onPick: () => void; plain?: boolean }) {
   return (
     <Tooltip label={tip}>
       <Button
         variant="toolbar"
         size="compact"
-        className="deck-bar-choice"
+        className={plain ? undefined : 'deck-bar-choice'}
         data-state={on ? 'active' : undefined}
         aria-pressed={on}
         aria-label={label ? undefined : tip}
@@ -121,19 +130,22 @@ interface Option {
 /**
  * A group of the bar: its choices side by side, or, when the bar is wider than the slide's pane, one menu that shows
  * the value it has ("Auto ▾", "Filled ▾", the alignment's icon ▾) and lists the choices (the lead on #773). Its
- * trigger says the value to a screen reader too ("Width: Auto"). `bare` shows the value as its icon only, the word in the
- * tooltip ("Mark: Number"); `tip` is the tooltip otherwise (else the group's name).
+ * trigger says the value to a screen reader too ("Size: Auto"). `bare` shows the value as its icon only, the word in the
+ * tooltip ("Mark: Number"); `tip` overrides the tooltip. `icon` is the control's own icon on the trigger, kept whatever
+ * is chosen, for a group whose choices have no icons of their own (Size: "▯▯ Small ▾"; the Experience lead on #910).
  */
-function Group({ label, options, folded, tip, bare = false }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean }) {
+function Group({ label, options, folded, tip, bare = false, icon }: { label: string; options: Option[]; folded: boolean; tip?: string; bare?: boolean; icon?: PhosphorIconName }) {
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
+  const hasIcons = options.some(option => option.icon)
+  const triggerIcon = icon ?? current.icon
   return (
     <DropdownMenu modal={false}>
-      <Tooltip label={bare ? `${label}: ${current.label ?? current.tip}` : tip ?? label}>
+      <Tooltip label={tip ?? (bare ? `${label}: ${current.label ?? current.tip}` : label)}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
-            {current.icon ? <Icon name={current.icon} size={16} tone="inherit" /> : null}
-            {bare && current.icon ? null : current.label}
+            {triggerIcon ? <Icon name={triggerIcon} size={16} tone="inherit" /> : null}
+            {bare && triggerIcon ? null : current.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
         </DropdownMenuTrigger>
@@ -141,7 +153,7 @@ function Group({ label, options, folded, tip, bare = false }: { label: string; o
       <DropdownMenuContent align="start" onCloseAutoFocus={event => event.preventDefault()}>
         {options.map(option => (
           <DropdownMenuItem key={option.key} className="gap-2" onSelect={option.pick}>
-            {option.icon ? <Icon name={option.icon} size={16} tone="inherit" /> : null}
+            {option.icon ? <Icon name={option.icon} size={16} tone="inherit" /> : hasIcons ? <span className="size-4 shrink-0" aria-hidden="true" /> : null}
             <span className="flex-1">{option.label ?? option.tip}</span>
             {option.on ? <Icon name="check" size={14} tone="inherit" /> : null}
           </DropdownMenuItem>
@@ -183,11 +195,77 @@ function SmilePlusGlyph() {
   )
 }
 
-export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBlockBarProps) {
+function BoxIconButton({ box, trigger, onPick, focusEditor }: {
+  box: NonNullable<ReturnType<typeof caretBoxIcon>>
+  trigger: { current: HTMLButtonElement | null }
+  onPick: (name: string | null) => void
+  focusEditor: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const openedByKeyboard = useRef(false)
+  const pickedByKeyboard = useRef(false)
+  const closeReason = useRef<BoxIconMenuCloseReason>('outside')
+  useEffect(() => {
+    if (!open) return
+    // An icon's tooltip can close the picker on Escape before the menu sees the key.
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
+        closeReason.current = 'escape'
+      }
+    }
+    window.addEventListener('keydown', onEscape, true)
+    return () => window.removeEventListener('keydown', onEscape, true)
+  }, [open])
+  return (
+    <DropdownMenu modal={false} open={open} onOpenChange={next => {
+      if (next) {
+        pickedByKeyboard.current = false
+        closeReason.current = 'outside'
+      }
+      setOpen(next)
+    }}>
+      <Tooltip label={`This box's icon (${isMac ? '⌥F10' : 'Alt+F10'})`} suppressed={open}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
+            onMouseDown={event => event.preventDefault()}
+            onPointerDownCapture={() => { if (open) closeReason.current = 'trigger'; else openedByKeyboard.current = false }}
+            onKeyDownCapture={event => {
+              if (!open && ['Enter', ' ', 'ArrowDown'].includes(event.key)) openedByKeyboard.current = true
+            }}
+          >
+            <SlideIconGlyph name={box.glyph} size={16} />
+          </Button>
+        </DropdownMenuTrigger>
+      </Tooltip>
+      <SlideIconPickerContent
+        current={box.current}
+        onKeyDownCapture={event => { pickedByKeyboard.current = event.key === 'Enter' || event.key === ' ' }}
+        onPointerUpCapture={() => { pickedByKeyboard.current = false }}
+        onInteractOutside={event => {
+          closeReason.current = trigger.current?.contains(event.target as Node) ? 'trigger' : 'outside'
+        }}
+        onPick={name => {
+          closeReason.current = pickedByKeyboard.current ? 'keyboard-pick' : 'mouse-pick'
+          onPick(name)
+        }}
+        onCloseAutoFocus={event => {
+          event.preventDefault()
+          const returnFocus = boxIconMenuReturnFocus(openedByKeyboard.current, closeReason.current)
+          if (returnFocus === 'trigger') trigger.current?.focus({ preventScroll: true })
+          if (returnFocus === 'editor') focusEditor()
+        }}
+      />
+    </DropdownMenu>
+  )
+}
+
+export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsOpen }: SlideBlockBarProps) {
   const [chosen, setChosen] = useState<ChosenBlock | null>(null)
   const [open, setOpen] = useState(false)
   const [placed, setPlaced] = useState<Placed | null>(null)
   const [barAt, setBarAt] = useState<{ left: number; top: number } | null>(null)
+  const [pendingIcon, setPendingIcon] = useState<{ blockPos: number; pos: number } | null>(null)
   const [drag, setDrag] = useState<{ kind: 'move'; y: number; width: number; left: number } | { kind: 'split'; x: number; top: number; height: number } | { kind: 'item'; from: number; line: DropLine | null } | null>(null)
   // Sprint 167 PR 5: the item the pointer is at (the handle follows it), and the item whose menu is open.
   const [hoverItem, setHoverItem] = useState<number | null>(null)
@@ -195,6 +273,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const placedRef = useRef<Placed | null>(null)
   const dragRef = useRef(false)
   const barRef = useRef<HTMLDivElement | null>(null)
+  const iconTrigger = useRef<HTMLButtonElement | null>(null)
+  const focusIcon = useRef(false)
   const chosenKey = useRef<string | null>(null)
   // The handles' layer, the frame's last child while the frame is there.
   const [layer, setLayer] = useState<HTMLDivElement | null>(null)
@@ -242,12 +322,12 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       const item = dom.querySelector('li')?.getBoundingClientRect()
       if (words && item) markerX = (block.kind === 'steps' ? item.left + (words.left - item.left) * 0.3 : item.left - (item.left - screen.left) / 2) - origin.left
     }
-    const paneRect = (frame.closest('.deck-stage') as HTMLElement | null)?.getBoundingClientRect()
-    const pane = paneRect ? { left: paneRect.left, right: paneRect.right } : { left: 0, right: window.innerWidth }
+    const pane = { left: origin.left, right: origin.right }
     // The caret's box shows the icon handle while it has no icon: its view draws the empty place (hidden on the stage)
     // only then, and only under the looks that draw icons.
     let icon: Placed['icon'] = null
-    const boxPos = block.kind === 'boxes' ? caretBoxPos(editor.state) : null
+    const caretBox = caretBoxIcon(editor.state)
+    const boxPos = block.kind === 'boxes' ? caretBox?.pos ?? null : null
     const box = boxPos === null ? null : markableBox(editor.view.nodeDOM(boxPos) as HTMLElement | null)
     if (boxPos !== null && box && dom.contains(box) && box.querySelector(':scope > .blk-icon.is-place')) {
       const rect = box.getBoundingClientRect()
@@ -270,7 +350,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       }
     }
     const caretItem = caretItemIndex(editor.state, block)
-    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, icon, items, caretItem }
+    const next: Placed = { block: boxIn(screen, origin), screen, lines, markerX, pane, caretBox, icon, items, caretItem }
     // The same place draws nothing again (a transaction that moves nothing, a scroll elsewhere).
     setPlaced(current => (current && samePlace(current, next) ? current : next))
   }, [editor, frame])
@@ -286,6 +366,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
     const dom = editor.view.dom
     // A press the stage took for the picture Behind (between the words, cancelled on its way down) opens nothing here.
     const press = (event: PointerEvent) => { if (event.defaultPrevented) return; setOpen(true); later() }
+    // Tab moves between boxes. Alt+F10 moves from the text to its Icon control.
+    const focusToolbar = (event: KeyboardEvent) => {
+      if (!isBoxIconShortcut(event)) return
+      if (!frame || !caretBoxIcon(editor.state) || !chosenBlockAt(editor.state) || buttonAt(editor.state)) return
+      event.preventDefault()
+      if (iconTrigger.current) {
+        iconTrigger.current.focus({ preventScroll: true })
+      } else {
+        focusIcon.current = true
+        setOpen(true)
+        measure()
+      }
+    }
+    dom.addEventListener('keydown', focusToolbar)
     dom.addEventListener('pointerdown', press)
     window.addEventListener('resize', later)
     // The stage scrolls, so the bar in `document.body` follows its block.
@@ -296,6 +390,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
       cancelAnimationFrame(frameId)
       editor.off('transaction', later)
       editor.off('focus', later)
+      dom.removeEventListener('keydown', focusToolbar)
       dom.removeEventListener('pointerdown', press)
       window.removeEventListener('resize', later)
       document.removeEventListener('scroll', later, true)
@@ -304,6 +399,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [editor, frame, measure])
 
   const showing = open && !!chosen && !!placed
+  const barShowing = showing && !settingsOpen
   placedRef.current = placed
   dragRef.current = !!drag
   // Another block (or none) chosen: no item of the last one is pointed at or has its menu open.
@@ -330,29 +426,53 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   }, [frame])
   // Esc or a press outside the bar and the slide closes it (the slide's frame is its trigger: a press there is the
   // block's own, and opens it again).
-  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, enabled: showing })
+  useDismissOnOutside(barRef, () => setOpen(false), { trigger: () => frame, returnFocus: () => null, enabled: barShowing })
 
   // Under the block, the page's own size; above it when there is no room under it; never off the window.
   // Inside the slide's pane (the Experience lead on #773): when the bar is wider than the pane, its own group folds
-  // into menus that show their value, from the right: alignment, then Width (or the count), then Style. A new block or
+  // into menus that show their value, from the right: alignment, then the count, then Style. A new block or
   // a new pane width starts again unfolded.
   const [fold, setFold] = useState(0)
+  const iconOnly = fold >= FOLD_AT.words
   const foldKey = `${chosen?.pos}:${chosen?.kind}:${placed ? Math.round(placed.pane.right - placed.pane.left) : 0}`
   useEffect(() => { setFold(0) }, [foldKey])
   useLayoutEffect(() => {
     const bar = barRef.current
-    if (!showing || !placed || !bar || !chosen) { setBarAt(null); return }
-    const width = bar.offsetWidth
+    if (!barShowing || !placed || !bar || !chosen) { setBarAt(null); return }
+    if (focusIcon.current && iconTrigger.current) {
+      focusIcon.current = false
+      iconTrigger.current.focus({ preventScroll: true })
+    }
+    // The max-content row includes every control, separator, gap and the bar padding.
+    const width = bar.getBoundingClientRect().width
     const height = bar.offsetHeight
     const room = window.innerHeight
     let top = placed.screen.bottom + barGap(chosen.kind)
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
     const inPane = barLeft(placed.screen.left, width, placed.pane, window.innerWidth)
     if (inPane === null && fold < MAX_FOLD) { setFold(fold + 1); return }
-    const left = inPane ?? Math.max(8, placed.pane.left + 8)
+    // At the last fold, keep the row intact: past the pane if it must be, never past the window (Add and Delete stay).
+    const left = inPane ?? barLeftPastPane(width, placed.pane, window.innerWidth)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
-  }, [showing, placed, chosen, drag, fold])
+  }, [barShowing, placed, chosen, drag, fold])
+
+  useLayoutEffect(() => {
+    if (!pendingIcon) return
+    setPendingIcon(null)
+    if (!editor || editor.isDestroyed || chosen?.pos !== pendingIcon.blockPos || chosen.kind !== 'boxes'
+      || boxesMarkOf(divAttributesOf(chosen.node)) !== 'icon') return
+    const trigger = placed?.caretBox?.pos === pendingIcon.pos ? iconTrigger.current : null
+    if (trigger) {
+      // Radix opens from pointerdown on its trigger and anchors the menu to that same button.
+      if (trigger.getAttribute('aria-expanded') !== 'true') {
+        trigger.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, pointerType: 'mouse' }))
+      }
+    } else {
+      const anchor = editor.view.nodeDOM(pendingIcon.pos)
+      if (anchor instanceof HTMLElement) pickIcon?.(pendingIcon.pos, anchor, null)
+    }
+  }, [pendingIcon, editor, chosen, placed, pickIcon])
 
   if (!editor || !chosen || !placed || !layer) return null
 
@@ -370,6 +490,18 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   const act = (make: (pos: number) => Transaction | null): Transaction | null => {
     const now = chosenBlockAt(editor.state)
     return now && now.kind === chosen.kind ? make(now.pos) : null
+  }
+  const pickMark = (choice: BoxesMark) => {
+    const state = editor.state
+    const block = chosenBlockAt(state)
+    if (block?.kind !== 'boxes') return
+    const pos = choice === 'icon' ? boxForEmptyIconMenu(state, block) : null
+    const tr = setBoxesMark(state, block.pos, choice)
+    const changed = apply(tr)
+    editor.view.focus()
+    if (pos === null || (tr && !changed)) return
+    measure()
+    setPendingIcon({ blockPos: block.pos, pos })
   }
   const setValue = (key: string, value: string | null) => run(act(pos => setBlockValue(editor.state, pos, key, value)))
   const add = () => {
@@ -493,6 +625,20 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
   // The ring keeps 8 px from the words: a box has its own padding, so a Boxes block's ring sits closer.
   const ring = ringGap(chosen.kind)
 
+  const boxIconButton = placed.caretBox ? (
+    <BoxIconButton
+      box={placed.caretBox}
+      trigger={iconTrigger}
+      focusEditor={() => editor.view.focus()}
+      onPick={name => {
+        const box = caretBoxIcon(editor.state)
+        if (box && box.pos === placed.caretBox?.pos) {
+          apply(setBlockValue(editor.state, box.pos, 'icon', name))
+        }
+      }}
+    />
+  ) : null
+
   return (
     <>
       {/* The handles go in a layer of their own, put in the frame by this component (a portal): the frame's other
@@ -579,14 +725,25 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
         </>
       ) : null, layer)}
       {/* Hidden while a handle drags, so it never covers where the block lands (the app run's drag shot). */}
-      {showing && !drag
+      {barShowing && !drag
         ? createPortal(
             <div
               ref={barRef}
               className="deck-block-bar"
+              onKeyDown={event => {
+                // Radix may consume Escape to dismiss a tooltip over a toolbar button.
+                if (event.key !== 'Escape' || event.nativeEvent.isComposing
+                  || !event.currentTarget.contains(event.target as Node)) return
+                event.preventDefault()
+                editor.view.focus()
+                setOpen(false)
+              }}
               role="toolbar"
               aria-label={`${BAR_KIND_LABEL[chosen.kind]} block`}
-              style={{ left: barAt?.left ?? -9999, top: barAt?.top ?? -9999 }}
+              style={{
+                left: barAt?.left ?? -9999,
+                top: barAt?.top ?? -9999,
+              }}
             >
               {agenda ? (
                 <Tooltip label={AGENDA_TIP}>
@@ -599,9 +756,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
               <DropdownMenu modal={false}>
                 <Tooltip label="Turn this block into another kind">
                   <DropdownMenuTrigger asChild>
-                    <Button variant="toolbar" size="compact" className="deck-bar-type" onMouseDown={event => event.preventDefault()}>
+                    <Button variant="toolbar" size="compact" className="deck-bar-type" aria-label={BAR_KIND_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()}>
                       <Icon name={KIND_ICON[chosen.kind]} size={16} tone="inherit" />
-                      {BAR_KIND_LABEL[chosen.kind]}
+                      {!iconOnly && BAR_KIND_LABEL[chosen.kind]}
                       <Icon name="caret-down" size={12} tone="inherit" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -621,29 +778,31 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                 </DropdownMenuContent>
               </DropdownMenu>
               )}
+              {!look && boxIconButton ? <><Sep />{boxIconButton}</> : null}
               {look ? (
                 <>
                   <Sep />
                   {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
-                  <Group label="Style" folded={fold >= FOLD_AT.style} options={[
+                  <Group label="Style" folded={fold >= FOLD_AT.style} bare={iconOnly} icon={iconOnly ? (fill === 'filled' ? 'square-half' : 'square') : undefined} options={[
                     { key: 'filled', on: fill === 'filled', label: 'Filled', tip: "Boxes filled with the theme's colour", pick: () => setValue('fill', theme.boxes === 'filled' ? null : 'filled') },
                     { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
                   ]} />
                   <Sep />
                   {/* Sprint 167 PR 2 (README item C): Mark, a menu that shows its value; Icon, the default, writes nothing. On
-                      the narrowest pane it folds last, to its value's icon (the word stays in its tooltip). */}
+                      the narrowest pane it folds last, to its value's icon. */}
                   <Group label="Mark" tip={MARK_MENU_TIP} folded bare={fold >= FOLD_AT.mark} options={BOXES_MARKS.map(choice => ({
                     key: choice,
                     on: mark === choice,
                     icon: MARK_ICON[choice],
                     label: MARK_LABEL[choice],
                     tip: MARK_TIP[choice],
-                    pick: () => run(act(pos => setBoxesMark(editor.state, pos, choice))),
+                    pick: () => pickMark(choice),
                   }))} />
+                  {boxIconButton}
                   <Sep />
-                  <Group label="Width" folded={fold >= FOLD_AT.size} options={[
-                    { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'One row while every box is at least S wide, else two rows', pick: () => setValue('width', null) },
-                    ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: width.toUpperCase(), tip: `Every box ${{ s: 'small', m: 'medium', l: 'large' }[width]} (about ${BOX_WIDTH_PX[width]} px on the slide), wrapping to rows`, pick: () => setValue('width', width) })),
+                  <Group label="Size" folded bare={iconOnly} icon="columns" tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
+                    { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'Auto', pick: () => setValue('width', null) },
+                    ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: BOX_SIZE_LABEL[width], tip: BOX_SIZE_LABEL[width], pick: () => setValue('width', width) })),
                   ]} />
                   <Sep />
                   <Group label="Text alignment" folded={fold >= FOLD_AT.alignment} options={[
@@ -676,23 +835,24 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon }: SlideBl
                   <Sep />
                   {/* README item 18: one toggle, pressed when on; off (All at once, the default) writes nothing. Folded,
                       it keeps its toggle as an icon with the same tooltip. */}
-                  <Segment label="Reveal">
-                    <Choice
-                      on={reveal}
-                      icon="cards-three"
-                      label={fold >= FOLD_AT.reveal ? undefined : REVEAL_LABEL}
-                      tip={REVEAL_TIP}
-                      onPick={() => run(act(pos => setReveal(editor.state, pos, !reveal)))}
-                    />
-                  </Segment>
+                  {/* One by one is a lone toggle: no segment track, so off has no ground and on takes the toolbar's
+                      active chip, never mistaken for an open menu's chip beside it (the Experience lead, 27 November). */}
+                  <Choice
+                    plain
+                    on={reveal}
+                    icon="cards-three"
+                    label={fold >= FOLD_AT.reveal ? undefined : REVEAL_LABEL}
+                    tip={REVEAL_TIP}
+                    onPick={() => run(act(pos => setReveal(editor.state, pos, !reveal)))}
+                  />
                 </>
               )}
               <Sep />
               {agenda ? null : (
                 <Tooltip label={canAdd ? ADD_LABEL[chosen.kind] : `A Columns block holds ${MAX_COLUMNS} columns at most`}>
-                  <Button variant="toolbar" size="compact" disabled={!canAdd} onMouseDown={event => event.preventDefault()} onClick={add}>
+                  <Button variant="toolbar" size="compact" disabled={!canAdd} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
                     <Icon name="plus" size={16} tone="inherit" />
-                    Add
+                    {!iconOnly && 'Add'}
                   </Button>
                 </Tooltip>
               )}

@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useCallback, useState, useId, useLayoutEffect, useRef } from 'react';
+import { consumeLinkClick } from '../../lib/consumeLinkClick';
 import { marked } from 'marked';
 import { cn } from '../../lib/utils';
 import { vscode } from '../../lib/vscode';
@@ -60,7 +61,9 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
   useLayoutEffect(() => {
     markdownRef.current?.querySelectorAll('a').forEach((anchor, index) => {
       const link = classifyChatHref(anchor.getAttribute('href'));
-      if (link.kind !== 'file' || !link.passage) return;
+      if (link.kind !== 'file') return;
+      anchor.dataset.fileLink = '';
+      if (!link.passage) return;
       anchor.dataset.sourceLink = `${id}-${index}`;
       if (anchor.dataset.sourceLink === currentSourceId) anchor.setAttribute('aria-current', 'true');
       else anchor.removeAttribute('aria-current');
@@ -90,7 +93,7 @@ export function RenderedMarkdown({ content, className }: RenderedMarkdownProps) 
     const anchor = target.closest('a');
     if (anchor) {
       const link = classifyChatHref(anchor.getAttribute('href'));
-      e.preventDefault();
+      consumeLinkClick(e);
       if (link.kind === 'external') {
         vscode.postMessage({ type: 'openExternal', url: link.url });
       } else if (link.kind === 'file') {
@@ -226,14 +229,14 @@ export const markdownStyles = `
   text-decoration: underline;
 }
 
-.rendered-markdown a[data-source-link] {
+.rendered-markdown a[data-file-link] {
   color: inherit;
   text-decoration: underline;
   text-decoration-color: color-mix(in srgb, var(--r-accent) 45%, transparent);
   text-underline-offset: 2px;
 }
-.rendered-markdown a[data-source-link]:is(:hover, [aria-current="true"]),
-:where(:root:not([data-input-mode="pointer"])) .rendered-markdown a[data-source-link]:focus-visible {
+.rendered-markdown a[data-file-link]:is(:hover, [aria-current="true"]),
+:where(:root:not([data-input-mode="pointer"])) .rendered-markdown a[data-file-link]:focus-visible {
   color: var(--r-accent);
   text-decoration-color: currentColor;
 }

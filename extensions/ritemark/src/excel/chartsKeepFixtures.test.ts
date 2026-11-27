@@ -14,6 +14,6 @@ export const chartsKeepFixtures = [
   { file: resolve(here, 'fixtures/excel-174/charts-3d.xlsx'), sheet: '3-D column', ref: 'B2', rows: 7, cols: 4, edits: 200 },
   { file: resolve(here, 'fixtures/excel-174/rules-all-kinds.xlsx'), sheet: 'Cell value', ref: 'B2', rows: 9, cols: 6, edits: 200 },
   { file: resolve(here, 'fixtures/excel-174/rules-icons-unreadable.xlsx'), sheet: 'Icon sets', ref: 'B2', rows: 11, cols: 4, edits: 200 },
-  { file: resolve(here, 'fixtures/excel-174/charts-all-kinds.xlsx'), sheet: 'Clustered column', ref: 'B2', rows: 7, cols: 4, edits: 200 },
+  { file: resolve(here, 'fixtures/excel-174/charts-all-kinds.xlsx'), sheet: 'Scatter', ref: 'B2', rows: 13, cols: 2, edits: 200 },
   { file: resolve(here, 'fixtures/excel-174/chart-sheet.xlsx'), sheet: 'Data', ref: 'B2', rows: 7, cols: 4, edits: 200 },
 ];

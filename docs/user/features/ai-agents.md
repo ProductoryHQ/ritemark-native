@@ -30,6 +30,28 @@ Agent selection is per turn inside a conversation. You can keep one thread open 
 
 ---
 
+## Ask AI about your project documents
+
+Claude, ChatGPT and OpenCode can read Word (.docx), PDF and PowerPoint (.pptx)
+files in your project. You can ask for specific pages, for example, “Summarise
+pages 3 to 4 of the PDF.” When the AI reads PowerPoint, each slide keeps its own
+speaker notes.
+
+The AI is asked to name its sources in the sentence and link those names to the
+passages it used. Hover over a source link to see the document name and matching
+passage. Click the link to open Word or PDF at the matching words, or PowerPoint
+at the cited slide.
+
+If the words are missing, the card offers to open the cited page or slide, or
+the document if the link gives no location. Clicking the source link itself with
+missing words opens a Word document or PDF at the top.
+
+Word equations come through as math when the AI reads the file or when you
+[make a Markdown copy](previews.md#make-a-markdown-copy-of-a-word-document).
+Some equations are kept as an approximation using their original text.
+
+---
+
 ## Parallel agent chats
 
 > New in v1.8.5.
@@ -193,7 +215,7 @@ in Settings and OpenCode runs against that provider's models.
 
 **Capabilities:**
 - Chat against any provider you have an API key for (OpenAI, Google AI, Anthropic, OpenRouter)
-- Streaming responses, with reasoning summarized as a few "Thinking" entries and tool calls shown as activities
+- Streaming responses, with reasoning summarized as a few "Thinking" entries and actions shown as activities
 - File edits gated behind a per-edit File Change Approval card (out-of-workspace writes are always blocked)
 
 **Choosing a model:** the model picker in the message box shows an **OpenCode** group after ChatGPT. Only providers whose
@@ -203,7 +225,7 @@ the moment a key is saved or removed.
 
 **File-edit approval:** when OpenCode wants to edit an open file, you get a single **File Change
 Approval** card showing the target path. The file on disk is untouched until you Approve. For
-hands-free runs, Settings → OpenCode has an **Auto-approve edits & tool calls** toggle — out-of-workspace
+hands-free runs, Settings → OpenCode has an toggle for automatic approval of edits and other actions — out-of-workspace
 writes stay blocked even then.
 
 For full setup, see [Set Up AI → OpenCode (bring your own key)](../setup-ai.md#opencode-bring-your-own-key).

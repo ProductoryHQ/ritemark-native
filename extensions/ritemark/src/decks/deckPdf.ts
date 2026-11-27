@@ -54,6 +54,7 @@ export interface PrintInput {
   text: string;
   theme: DeckTheme;
   steps: readonly number[];
+  measureFit?: boolean;
   fonts: PageFontFile[];
   logo: PageFile | null;
 }
@@ -92,7 +93,7 @@ async function writePrintFolder(folder: string, html: string, files: readonly Pa
     if (path.relative(folder, target).startsWith('..') || path.isAbsolute(path.relative(folder, target))) throw new Error('An address outside the print folder');
     return target;
   };
-  await Promise.all([
+  const written = await Promise.allSettled([
     ...files.map(async file => {
       const target = placed(file.address);
       await fs.promises.mkdir(path.dirname(target), { recursive: true });
@@ -104,9 +105,38 @@ async function writePrintFolder(folder: string, html: string, files: readonly Pa
       await fs.promises.copyFile(picture.file, target, fs.constants.COPYFILE_EXCL);
     }),
   ]);
+  for (const result of written) if (result.status === 'rejected') throw result.reason;
   const page = path.join(folder, 'page.html');
   await fs.promises.writeFile(page, html, { encoding: 'utf8', flag: 'wx' });
   return page;
+}
+
+export async function prepareDeckPdf(input: PrintInput, kind: DeckPdfKind, deps: Pick<PdfDeps, 'assets'>) {
+  return buildPrintPage(
+    { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, measureFit: input.measureFit, print: kind === 'slides-and-handout' ? undefined : kind },
+    { ...await deps.assets(), themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
+  );
+}
+
+/** Offline print shared by export and background drawing. The consumer uses the PDF before the folder goes away. */
+export async function drawDeckPdf<T>(
+  input: PrintInput,
+  built: Awaited<ReturnType<typeof prepareDeckPdf>>,
+  deps: Pick<PdfDeps, 'print' | 'tempRoot'>,
+  use: (pdf: string) => Promise<T>,
+): Promise<T> {
+  const folder = await fs.promises.mkdtemp(path.join(deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));
+  try {
+    const page = await writePrintFolder(folder, built.html, [...input.fonts, ...(input.logo ? [input.logo] : [])], built.pictures);
+    const pdf = await deps.print(page);
+    const there = typeof pdf === 'string' && path.extname(pdf) === '.pdf' && await fs.promises.realpath(path.dirname(pdf)).catch(() => null);
+    if (!there || there !== await fs.promises.realpath(folder) || !(await fs.promises.lstat(pdf)).isFile()) {
+      throw new Error('The print answered another file');
+    }
+    return await use(pdf);
+  } finally {
+    await fs.promises.rm(folder, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 export class DeckPdfSaver {
@@ -138,7 +168,6 @@ export class DeckPdfSaver {
     const key = normalizeForCompare(deckPath);
     if (this.running.has(key)) return; // a second press while the first is going: its dialog is open
     this.running.add(key);
-    let folder: string | null = null;
     try {
       const target = await this.deps.askTarget(path.join(path.dirname(deckPath), pdfFileName(deckNameOf(deckPath), kind)));
       if (!target) return; // cancelled: nothing written, nothing said
@@ -146,38 +175,25 @@ export class DeckPdfSaver {
       post({ type: 'deck/page-notice', text: `Saving ${name}…` });
       try {
         const input = await this.source.pageInput(document, body, look, steps);
-        const assets = await this.deps.assets();
-        const built = await buildPrintPage(
-          { deckPath: input.deckPath, text: input.text, theme: input.theme, steps: input.steps, print: kind === 'slides-and-handout' ? undefined : kind },
-          { ...assets, themeFonts: input.fonts, logo: input.logo ? { address: input.logo.address, aspect: input.logo.aspect } : null },
-        );
-        // A deck whose slides are all skipped has nothing to print as slides: say so rather than save a blank page.
+        const built = await prepareDeckPdf(input, kind, this.deps);
         if (kind === 'slides' && built.deck.slides.length === 0) {
-          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES });
+          post({ type: 'deck/page-notice', text: PDF_NO_SLIDES, kind: 'failure', operation: 'save-pdf' });
           return;
         }
-        // Likewise a handout with no text: nothing to print but its footer.
         if (kind === 'handout' && !handoutHasText(built.deck)) {
-          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT });
+          post({ type: 'deck/page-notice', text: PDF_NO_HANDOUT, kind: 'failure', operation: 'save-pdf' });
           return;
         }
-        folder = await fs.promises.mkdtemp(path.join(this.deps.tempRoot ?? os.tmpdir(), 'ritemark-pdf-'));
-        const page = await writePrintFolder(folder, built.html, [...input.fonts, ...(input.logo ? [input.logo] : [])], built.pictures);
-        const pdf = await this.deps.print(page);
-        // The print answers a PDF in its own folder; anything else is never copied.
-        const there = typeof pdf === 'string' && path.extname(pdf) === '.pdf' && await fs.promises.realpath(path.dirname(pdf)).catch(() => null);
-        if (!there || there !== await fs.promises.realpath(folder)) throw new Error('The print answered another file');
-        await writeOver(pdf, target);
+        await drawDeckPdf(input, built, this.deps, pdf => writeOver(pdf, target));
       } catch (error) {
         console.warn('[Decks] Save as PDF failed:', error);
-        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED });
+        post({ type: 'deck/page-notice', text: PDF_NOT_SAVED, kind: 'failure', operation: 'save-pdf' });
         return;
       }
       this.saved.set(key, target);
       post({ type: 'deck/pdf-saved', name });
     } finally {
       this.running.delete(key);
-      if (folder) await fs.promises.rm(folder, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 

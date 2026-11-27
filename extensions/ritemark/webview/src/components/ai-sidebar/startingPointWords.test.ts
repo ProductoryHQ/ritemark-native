@@ -7,9 +7,14 @@
 import assert from 'node:assert/strict'
 import { fillOf, startingPointsFor, startingSentence } from './startingPointWords'
 
+import { READ_KINDS_PASSED, startingPlacesForAgents } from '../../../../src/guidance/startingPlace'
+import { createConversationState } from './conversationState'
+import { hydrateConversations, selectStartingPlace, useAISidebarStore } from './store'
+import { vscode } from '../../lib/vscode'
+
 const labels = (place: Parameters<typeof startingPointsFor>[0], hasAbout = false) => startingPointsFor(place, { hasAbout }).map((point) => point.label)
 
-assert.deepEqual(labels('project'), ['What is here?', 'Find what I wrote about…', 'Write About this project'], 'S33')
+assert.deepEqual(labels('project'), ['What is here?', 'Find what I wrote about…', 'Write “About this project”'], 'S33')
 assert.deepEqual(labels('project', true), ['What is here?', 'Find what I wrote about…'], 'S41: About this project exists')
 assert.deepEqual(labels('empty_project'), ['This project is for…', 'Plan a first document with me'], 'S34')
 assert.deepEqual(labels('word_or_pdf'), ['Summarise this in five points', 'Turn this into a one-page brief', 'What does this say about…?'], 'S35')
@@ -30,5 +35,47 @@ assert.equal(fillOf('What does this say about…?').text.slice(0, 25), 'What doe
 assert.deepEqual(fillOf('This project is for…'), { text: 'This project is for ', cursor: 20 }, 'the same words as the empty project\'s ready request')
 
 assert.equal(startingSentence('ChatGPT'), 'ChatGPT can work across your open documents and the whole project.', 'D2')
+
+// Sprint 173, S39 and S40: deliver the host's places once per platform, then switch AIs in the column.
+// Its own gate, independent of which AIs have passed since: Claude passed on the Mac only, the others not yet.
+const passed = {
+  'claude-code': { darwin: true, win32: false },
+  codex: { darwin: false, win32: false },
+  opencode: { darwin: false, win32: false },
+} satisfies typeof READ_KINDS_PASSED
+const word = { viewType: 'ritemark.docxViewer', fileName: 'Tender.docx' }
+const pdf = { viewType: 'ritemark.pdfViewer', fileName: 'Tender.pdf' }
+const conversation = createConversationState('starting-points', { selectedAgent: 'claude-code' })
+hydrateConversations([conversation], conversation.id)
+const store = useAISidebarStore.getState
+const originalPostMessage = vscode.postMessage
+vscode.postMessage = () => undefined
+
+try {
+  const receivePlaces = (platform: NodeJS.Platform) => {
+    store().handleExtensionMessage({ type: 'starting-place', places: startingPlacesForAgents(word, 'files', platform, passed), hasAbout: false })
+  }
+  const offeredLabels = () => {
+    const place = selectStartingPlace(store())
+    return place ? labels(place, store().startingPlace?.hasAbout) : []
+  }
+
+  receivePlaces('darwin')
+  assert.deepEqual(offeredLabels(), labels('word_or_pdf'), 'S39: Claude offers all three Word points')
+  store().selectAgent('codex')
+  assert.deepEqual(offeredLabels(), labels('project'), 'S39: switching to ChatGPT immediately offers the project points')
+  store().selectAgent('opencode')
+  assert.deepEqual(offeredLabels(), labels('project'), 'OpenCode also needs its own pass')
+  store().selectAgent('claude-code')
+  assert.deepEqual(offeredLabels(), labels('word_or_pdf'), 'S40: Claude passed on Mac')
+  receivePlaces('win32')
+  assert.deepEqual(offeredLabels(), labels('project'), 'S40: Claude failed on Windows')
+  receivePlaces('linux')
+  assert.deepEqual(offeredLabels(), labels('project'), 'Linux always follows the project')
+  assert.equal(startingPlacesForAgents(pdf, 'files', 'darwin', passed)['claude-code'], 'word_or_pdf')
+  assert.equal(startingPlacesForAgents(pdf, 'files', 'win32', passed)['claude-code'], 'project')
+} finally {
+  vscode.postMessage = originalPostMessage
+}
 
 console.log('startingPointWords: all assertions passed')

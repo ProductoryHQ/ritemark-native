@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # dev-launch-isolated.sh — start one Ritemark dev instance for a test run, isolated, and stop it again.
 #
-#   scripts/qa/dev-launch-isolated.sh start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]...
+#   scripts/qa/dev-launch-isolated.sh start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]... [--runtime-trace]
 #                                           [--user-data-dir=<new empty dir>] [--dry-run] [-- <extra Ritemark args>]
 #   scripts/qa/dev-launch-isolated.sh stop <run-dir>
 #
@@ -228,7 +228,7 @@ remove_pending_run_dir() {
 trap remove_pending_run_dir EXIT
 
 start_run() {
-	local name="" folder="" port="" dry_run=0 profile_arg=""
+	local name="" folder="" port="" dry_run=0 profile_arg="" runtime_trace=0
 	local -a envs=() extra=()
 	while [[ $# -gt 0 ]]; do
 		case $1 in
@@ -238,6 +238,7 @@ start_run() {
 			--env) envs+=("${2:-}"); shift 2 ;;
 			--user-data-dir=*) profile_arg=${1#--user-data-dir=}; shift ;;
 			--user-data-dir) profile_arg=${2:-}; shift 2 ;;
+			--runtime-trace) runtime_trace=1; shift ;;
 			--dry-run) dry_run=1; shift ;;
 			--) shift; extra=("$@"); break ;;
 			*) die "unknown option '$1'" ;;
@@ -338,13 +339,19 @@ start_run() {
 		profile_dir=$(cd "$profile_arg" && pwd -P)
 	fi
 	mkdir -p "$run_dir"/{extensions,shared,claude,codex,xdg/config,xdg/data,xdg/state,xdg/cache} "$profile_dir/User"
-	cat > "$profile_dir/User/settings.json" <<-'JSON'
 	{
+		printf '{\n'
+		if (( runtime_trace )); then
+			mkdir -p "$run_dir/trace"
+			printf '\t"ritemark.ai.debugTrace": true,\n'
+		fi
+		cat <<-'JSON'
 		"files.simpleDialog.enable": true,
 		"security.workspace.trust.enabled": false,
 		"window.confirmBeforeClose": "never"
-	}
-	JSON
+		}
+		JSON
+	} > "$profile_dir/User/settings.json"
 
 	if [[ -z $folder ]]; then
 		folder="$run_dir/project"
@@ -364,6 +371,8 @@ start_run() {
 		die "port $port already answers: another instance is listening there"
 	fi
 
+	local -a trace_env=()
+	if (( runtime_trace )); then trace_env=("RITEMARK_RUNTIME_TRACE_DIR=$run_dir/trace"); fi
 	local -a cmd=(
 		env -u ELECTRON_RUN_AS_NODE
 		NODE_ENV=development VSCODE_DEV=1 VSCODE_CLI=1 ELECTRON_ENABLE_STACK_DUMPING=1 ELECTRON_ENABLE_LOGGING=1
@@ -371,6 +380,7 @@ start_run() {
 		XDG_CONFIG_HOME="$run_dir/xdg/config" XDG_DATA_HOME="$run_dir/xdg/data"
 		XDG_STATE_HOME="$run_dir/xdg/state" XDG_CACHE_HOME="$run_dir/xdg/cache"
 		"${envs[@]+"${envs[@]}"}"
+		"${trace_env[@]+"${trace_env[@]}"}"
 		arch -arm64 "$app" .
 		--disable-extension=vscode.vscode-api-tests
 		--user-data-dir="$profile_dir"
@@ -452,5 +462,5 @@ sys.exit(0 if any(ready(x) for x in targets) else 1)' "$(basename "$folder")" <<
 case ${1:-} in
 	start) shift; start_run "$@" ;;
 	stop) shift; stop_run "${1:-}" ;;
-	*) die "usage: $0 start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]... [--dry-run] [-- args] | stop <run-dir>" ;;
+	*) die "usage: $0 start --name <run> [--folder <dir>] [--port <n>] [--env KEY=VALUE]... [--runtime-trace] [--dry-run] [-- args] | stop <run-dir>" ;;
 esac

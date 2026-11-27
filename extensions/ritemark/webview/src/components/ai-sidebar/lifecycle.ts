@@ -105,12 +105,15 @@ export function finalizeCodexTurnResult(
       : {}),
     isRunning: false,
     pendingQuestion: undefined,
+    approval: undefined,
     // Sprint 143 (#544): a wait to try again ends with the turn.
     retry: undefined,
     planText: fallbackPlanText,
     requiresPlanReview: turn.requiresPlanReview || shouldRequirePlanReview,
     result: {
       status: result.status || 'success',
+      ...(turn.activities.some((activity) => activity.step?.kind === 'read')
+        ? { activityDurationMs: Math.max(0, Date.now() - turn.timestamp) } : {}),
       ...(result.liveDeckSteps?.length ? { liveDeckSteps: result.liveDeckSteps } : {}),
       error: result.error,
       ...(result.error && result.errorKind ? { errorKind: result.errorKind } : {}),

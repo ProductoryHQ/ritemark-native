@@ -24,7 +24,8 @@
  * Nothing here changes what the editor shows or how it reads Markdown (spec R7):
  * the HTML `marked` makes is the same apart from the added attributes.
  */
-import { tableHasWidths } from '../../../src/markdown/tableWidths'
+import { delimiterUnits, tableHasWidths } from '../../../src/markdown/tableWidths'
+import { definitionAllowsTight, pictureDefinitionAttribute } from '../extensions/pictures/pictureReferences'
 import type TurndownService from 'turndown'
 import type { MarkedExtension, Token, Tokens } from 'marked'
 
@@ -93,13 +94,15 @@ export function annotateAsWritten(tokens: Token[], source: string): void {
 }
 
 function walkBlocks(tokens: Token[], tabs: boolean): void {
-  tokens.forEach((token, index) => {
+  let previous: Token | undefined
+  for (const token of tokens) {
+    if (token.type === 'pictureDefinition' && !token.keep) continue
     const block = token as Token & AsWrittenToken
-    const previous = tokens[index - 1]
     // The block comes straight after the one before it: no `space` token
     // between, and no blank line at the end of the earlier block's raw text
     // (a heading or a rule keeps its trailing blank line in its raw).
     block.rmTight = !!previous && previous.type !== 'space' && !ENDS_WITH_BLANK_LINE.test(previous.raw)
+    previous = token
     if (token.type === 'list') {
       block.rmTabs = tabs
       for (const item of (token as Tokens.List).items) walkBlocks(item.tokens, tabs)
@@ -112,7 +115,7 @@ function walkBlocks(tokens: Token[], tabs: boolean): void {
       // Sprint 163: each tab's pane holds blocks, read on their own (the pane's first block follows its heading).
       for (const pane of (token as unknown as { tabs: Array<{ tokens: Token[] }> }).tabs) walkBlocks(pane.tokens, tabs)
     }
-  })
+  }
 }
 
 function escapeAttribute(value: string): string {
@@ -372,6 +375,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
   hardBreak: ['data-md-break'],
   horizontalRule: ['data-md-hr'],
   link: ['data-md-link'],
+  image: ['data-md-image-label', 'data-md-image-target', 'data-md-image-src', 'data-md-image-alt', 'data-md-image-title'],
   table: ['data-md-delims', 'data-md-spacing', 'data-md-widths'],
   codeBlock: ['data-md-info'],
   /** No blank line between a block and the one before it. */
@@ -379,7 +383,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
 } as const
 
 /** The blocks that can follow the block before them with no blank line, as written. */
-export const TIGHT_BLOCKS = ['paragraph', 'heading', 'codeBlock', 'blockquote', 'table', 'horizontalRule', 'image', 'bulletList', 'orderedList', 'taskList']
+export const TIGHT_BLOCKS = ['paragraph', 'heading', 'codeBlock', 'blockquote', 'table', 'horizontalRule', 'image', 'bulletList', 'orderedList', 'taskList', 'pictureDefinition']
 
 // ---------------------------------------------------------------------------
 // 3. The save: escapes
@@ -546,7 +550,7 @@ function hasListItemAncestor(node: Node): boolean {
   return false
 }
 
-type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv'
+type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv' | 'definition'
 
 function blockKind(node: Element): BlockKind {
   // Sprint 161: a block slide's `:::` block, which only the slide editor's own pipeline makes (never a Text document's).
@@ -563,10 +567,15 @@ function blockKind(node: Element): BlockKind {
     case 'PRE': return 'code'
     case 'BLOCKQUOTE': return 'quote'
     case 'TABLE': return 'table'
-    case 'HR': return 'rule'
+    case 'HR': return node.hasAttribute(pictureDefinitionAttribute) ? 'definition' : 'rule'
     case 'UL': case 'OL': return 'list'
     default: return 'other'
   }
+}
+
+function writtenRule(node: Element): string | null {
+  const marker = node.getAttribute('data-md-hr')
+  return marker && /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*(?![\s\S])/.test(marker) ? marker : null
 }
 
 /**
@@ -577,16 +586,21 @@ function blockKind(node: Element): BlockKind {
  * list, a quote or a table goes on taking lines until a blank line or a
  * block that can interrupt it (CommonMark §4.8, §5.1, §5.2; GFM tables).
  */
-function writtenTight(previous: Element | null, next: Element): boolean {
+function writtenTight(previous: Element | null, next: Element, content?: string): boolean {
   if (!previous || next.getAttribute('data-md-tight') !== 'true') return false
   const before = blockKind(previous)
   const after = blockKind(next)
   if (before === 'other' || after === 'other') return false
   // A fence line (`:::`) never merges with the block beside it, so written tight it stays tight.
   if (before === 'fdiv' || after === 'fdiv') return true
+  if (before === 'definition') {
+    // Turndown joins at the larger gap. The paragraph's leading side has its
+    // rendered Markdown and can detect a title crossing the block boundary.
+    return content === undefined || definitionAllowsTight(previous.getAttribute(pictureDefinitionAttribute)!, content)
+  }
   if (before === 'heading' || before === 'code' || before === 'rule') return true
   if (after === 'heading' || after === 'code') return true
-  if (after === 'rule') return before !== 'paragraph' || !(next.getAttribute('data-md-hr') ?? '-').startsWith('-')
+  if (after === 'rule') return before !== 'paragraph' || !(writtenRule(next) ?? '-').trimStart().startsWith('-')
   if (before === 'paragraph') {
     if (after === 'quote' || after === 'table') return true
     // A list interrupts a paragraph only with a first item, and an ordered one only from 1.
@@ -596,9 +610,9 @@ function writtenTight(previous: Element | null, next: Element): boolean {
 }
 
 /** The newlines before a top-level block. */
-export function blockLeading(node: Element): string {
+export function blockLeading(node: Element, content?: string): string {
   if (isList(node) && node.getAttribute('data-md-continues') === 'true' && isList(node.previousElementSibling)) return '\n'
-  return writtenTight(node.previousElementSibling, node) ? '\n' : '\n\n'
+  return writtenTight(node.previousElementSibling, node, content) ? '\n' : '\n\n'
 }
 
 /** The newlines after a top-level block. */
@@ -773,8 +787,9 @@ function holdsTwoParagraphs(blocks: ItemBlock[]): boolean {
  */
 export function serializeList(service: TurndownService, list: HTMLElement): string {
   const ordered = list.nodeName === 'OL'
-  const marker = list.getAttribute('data-md-marker') || '-'
-  const delimiter = list.getAttribute('data-md-delim') || '.'
+  const writtenMarker = list.getAttribute('data-md-marker')
+  const marker = writtenMarker === '*' || writtenMarker === '+' ? writtenMarker : '-'
+  const delimiter = list.getAttribute('data-md-delim') === ')' ? ')' : '.'
   const padAttribute = Number(list.getAttribute('data-md-pad'))
   const pad = padAttribute >= 1 && padAttribute <= 4 ? padAttribute : 1
   const start = ordered ? Number(list.getAttribute('start') || 1) : 0
@@ -809,7 +824,8 @@ export function serializeList(service: TurndownService, list: HTMLElement): stri
       markdown += gap ? '\n\n' : '\n'
     }
   })
-  const extraIndent = Number(list.getAttribute('data-md-indent'))
+  // A list starts at most 3 spaces in (4 would make it code); a pasted value is never trusted past that.
+  const extraIndent = Math.min(3, Math.floor(Number(list.getAttribute('data-md-indent'))) || 0)
   return extraIndent > 0 && !tabs ? indentAll(markdown, ' '.repeat(extraIndent)) : markdown
 }
 
@@ -842,9 +858,22 @@ function isHeadingRow(row: Element): boolean {
   return firstRow && firstSection && childElements(row).every(cell => cell.nodeName === 'TH')
 }
 
+const INLINE_BLOCK_BOUNDARY = /^(P|H[1-6]|TD|TH|LI|BLOCKQUOTE|DIV|X-TURNDOWN|BODY)$/
+
+/** Find the previous inline leaf, crossing mark wrappers within the same block. */
+function previousInline(node: Node): Node | null {
+  for (let current: Node | null = node; current && !INLINE_BLOCK_BOUNDARY.test(current.nodeName); current = current.parentNode) {
+    let previous = current.previousSibling
+    if (!previous) continue
+    while (previous.lastChild) previous = previous.lastChild
+    return previous
+  }
+  return null
+}
+
 /** Is there text or an element after `node` inside its block (paragraph, heading or cell)? */
 function hasContentAfter(node: Element): boolean {
-  for (let current: Node | null = node; current && !/^(P|H[1-6]|TD|TH|LI|BLOCKQUOTE|DIV|X-TURNDOWN|BODY)$/.test(current.nodeName); current = current.parentNode) {
+  for (let current: Node | null = node; current && !INLINE_BLOCK_BOUNDARY.test(current.nodeName); current = current.parentNode) {
     for (let next = current.nextSibling; next; next = next.nextSibling) {
       if (next.nodeType === 1 || (next.nodeType === 3 && next.nodeValue?.trim())) return true
     }
@@ -887,7 +916,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
   service.addRule('asWrittenParagraph', {
     filter: 'p',
     replacement(content, node) {
-      return blockLeading(node as Element) + escapeLineStarts(content) + blockTrailing(node as Element)
+      const paragraph = escapeLineStarts(content)
+      return blockLeading(node as Element, paragraph) + paragraph + blockTrailing(node as Element)
     },
   })
 
@@ -923,18 +953,21 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
     filter: 'br',
     replacement(_content, node) {
       const element = node as Element
-      // A break with nothing after it in its block has no Markdown form; it
-      // would be a literal backslash or trailing spaces.
+      const form = element.getAttribute('data-md-break')
+      if (form === 'html') return '<br>'
+      // A terminal Markdown break would be a literal backslash or trailing spaces.
       if (!hasContentAfter(element)) return ''
       // A line break inside a table cell would end the row, and one inside a
       // heading would end the heading: an ATX heading is one line, so `\\` and a
       // newline there read back as a literal `\\` and a paragraph (#923).
       // `<br>` keeps both one line; Pandoc, GitHub and the slide renderer draw it.
       if (insideOneLineBlock(element)) return '<br>'
-      const form = element.getAttribute('data-md-break')
+      // A spaces-only line after another break would end the paragraph.
+      if (previousInline(element)?.nodeName === 'BR') return '\\\n'
       if (form === 'soft') return '\n'
       const spaces = /^spaces-(\d+)$/.exec(form ?? '')
-      if (spaces) return ' '.repeat(Number(spaces[1])) + '\n'
+      // A hard break is 2 or more spaces; bounded so a crafted value can never make the save throw.
+      if (spaces) return ' '.repeat(Math.min(64, Math.max(2, Number(spaces[1])))) + '\n'
       // `backslash`, and every break typed in Ritemark (R2, decision 3).
       return '\\\n'
     },
@@ -944,7 +977,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
     filter: 'hr',
     replacement(_content, node) {
       const element = node as Element
-      const written = element.getAttribute('data-md-hr')
+      const written = writtenRule(element)
       // A new break at the very top: `---` there can read as front matter.
       const marker = written || (isFirstBlock(element) ? '***' : '---')
       return blockLeading(element) + marker + blockTrailing(element)
@@ -953,7 +986,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
 
   service.addRule('asWrittenAddress', {
     filter(node) {
-      return node.nodeName === 'A' && !!node.getAttribute('data-md-link') && !!node.getAttribute('href')
+      const form = node.nodeName === 'A' ? node.getAttribute('data-md-link') : null
+      return (form === 'bare' || form === 'angle') && !!node.getAttribute('href')
     },
     replacement(content, node) {
       const link = node as HTMLAnchorElement
@@ -1019,11 +1053,11 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
       const language = ((code.getAttribute('class') || '').match(/language-(\S+)/) || [null, ''])[1]
       const written = pre.getAttribute('data-md-info')
       let info: string
-      if (written !== null && (written === 'none' ? language === '' || language === 'plaintext' : written.split(/\s+/)[0] === language)) {
+      if (written !== null && !/[`\r\n]/.test(written) && (written === 'none' ? language === '' || language === 'plaintext' : written.split(/\s+/)[0] === language)) {
         info = written === 'none' ? '' : written
       } else {
         // The editor's default language is no language in the file.
-        info = language === 'plaintext' ? '' : language
+        info = language === 'plaintext' || language.includes('`') ? '' : language
       }
       const text = code.textContent ?? ''
       let fenceSize = 3
@@ -1063,7 +1097,7 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
         // The delimiter row as written, while the table has as many columns;
         // otherwise one cell per column from its alignment (S22).
         const written = table?.getAttribute('data-md-delims') ?? null
-        const writtenColumns = written ? written.slice(1, -1).split('|').length : 0
+        const writtenColumns = written && !/[^|:\- \t]/.test(written) ? delimiterUnits(written)?.length : undefined
         markdown += '\n' + (written && writtenColumns === cellElements.length
           ? written
           : line(cellElements.map(cell => alignDelimiter(cell.getAttribute('data-md-align') ?? cell.getAttribute('align')))))

@@ -1,3 +1,4 @@
+
 /**
  * Markdown image paths that point at a file beside the document.
  *
@@ -9,6 +10,11 @@
  * Pure module — no `vscode` import — so the webview bundle can use it.
  */
 
+/** Remove CommonMark backslash escapes before resolving an image destination. */
+export function unescapeMarkdownImagePath(value: string): string {
+  return value.replace(/\\([\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e])/g, '$1');
+}
+
 /** `./a.png`, `../a.png` and the common bare form `img/a.png`. */
 export function isRelativeImagePath(value: string): boolean {
   const path = value.trim();
@@ -16,6 +22,41 @@ export function isRelativeImagePath(value: string): boolean {
   // Any scheme (http:, data:, file:, vscode-resource:) or a Windows drive (C:).
   if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return false;
   return !path.startsWith('/') && !path.startsWith('\\') && !path.startsWith('#');
+}
+
+const NAMED_ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0' };
+
+/**
+ * Decode the character references a picture path realistically carries: `&amp;` (written by tools that escape) and
+ * numeric ones. Other named references stay as written (#1115 round 2; no dependency for the full HTML table).
+ */
+function decodeHTMLAttribute(text: string): string {
+  return text.replace(/&(?:#(\d{1,7})|#[xX]([0-9a-fA-F]{1,6})|(amp|lt|gt|quot|apos|nbsp));/g,
+    (_match, decimal?: string, hex?: string, name?: string) => {
+      if (name) return NAMED_ENTITIES[name];
+      const code = decimal ? parseInt(decimal, 10) : parseInt(hex!, 16);
+      return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : '\uFFFD';
+    });
+}
+
+/** Match marked's URL encoding and the subsequent HTML attribute decode. */
+export function markdownImageSource(href: string): string {
+  return decodeHTMLAttribute(encodeURI(href).replace(/%25/g, '%'));
+}
+
+/** The preferred filesystem spelling, followed by the literal percent-encoded spelling. */
+export function markdownImageFilePaths(written: string): string[] {
+  if (!isRelativeImagePath(written)) return [];
+  const raw = decodeHTMLAttribute(unescapeMarkdownImagePath(written));
+  let decoded = raw;
+  try { decoded = decodeURI(raw); } catch { /* Use the literal spelling. */ }
+  return (decoded === raw ? [raw] : [decoded, raw])
+    .filter(candidate => isRelativeImagePath(candidate) && !candidate.includes('\0'));
+}
+
+/** Compare a Markdown destination to a filesystem path from an image change event. */
+export function sameMarkdownImageFile(written: string, changed: string): boolean {
+  return markdownImageFilePaths(written).some(candidate => sameRelativeImagePath(candidate, changed));
 }
 
 /** A URI the webview can load only because the host mapped a local file to it. */

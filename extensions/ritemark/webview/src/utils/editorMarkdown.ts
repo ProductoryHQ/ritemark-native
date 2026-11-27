@@ -18,9 +18,12 @@
  * extensions in through `EditorExtensionSlots`, at the positions they always
  * had, so the editor's extension order is unchanged.
  */
-import { Marked } from 'marked'
+import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
-import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
+import { Extension, Node, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
+import { DOMSerializer, type Schema } from '@tiptap/pm/model'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorProps } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import BulletList from '@tiptap/extension-bullet-list'
 import ListItem from '@tiptap/extension-list-item'
@@ -41,8 +44,10 @@ import { addDeckTurndownRules } from '../components/decks/handout/deckSchema'
 import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
 import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
+import { markdownImageSource, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
+import { annotatePictureReferences, keepsPictureReferences, pictureDefinitionAttribute, usePictureReferences } from '../extensions/pictures/pictureReferences'
 import { TabPane, TabsBlock, addTabsTurndownRules, tabsMarkedExtension } from '../extensions/tabs/tabsMarkdown'
 import { buttonBlockExtensions } from '../extensions/buttonBlock/ButtonBlock'
 import { addButtonTurndownRules, buttonMarkedExtension } from '../extensions/buttonBlock/buttonMarkdown'
@@ -76,6 +81,7 @@ editorMarked.use(asWrittenMarkedExtension)
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 // Experience 49: a picture's size, crop and caption, kept in the block after its image line.
 editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
+usePictureReferences(editorMarked)
 // Sprint 163: the Tabs block (`::: {.panel-tabset}`), one block in a slide, a handout and a Text document. Only that
 // `:::` block: any other `:::` line in a Text document stays text.
 editorMarked.use(tabsMarkedExtension as Parameters<typeof editorMarked.use>[0])
@@ -96,6 +102,69 @@ export function ensureCommentMarkedPipeline(): void {
   editorMarked.use(commentMarkedExtension as Parameters<typeof editorMarked.use>[0])
 }
 
+const clipboardSessionAttribute = 'data-ritemark-clipboard'
+const clipboardSession = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+  byte.toString(16).padStart(2, '0')).join('')
+
+/** ProseMirror serializes both copy and cut through this prop before writing text/html. */
+export function markdownClipboardProps(schema: Schema): EditorProps {
+  const serializer = DOMSerializer.fromSchema(schema)
+  const clipboardSerializer = new DOMSerializer(serializer.nodes, serializer.marks)
+  clipboardSerializer.serializeFragment = (fragment, options, target) => {
+    const dom = serializer.serializeFragment(fragment, options, target)
+    const firstElement = Array.from(dom.childNodes).find((node): node is Element => node.nodeType === 1)
+    firstElement?.setAttribute(clipboardSessionAttribute, clipboardSession)
+    return dom
+  }
+  return { clipboardSerializer, transformPastedHTML: stripPastedMarkdownAttributes }
+}
+
+/** Preserve ProseMirror's slice depths and node context across editors. */
+function stripSliceMarkdownAttributes(slice: string): string {
+  // Read the context as ProseMirror does (`(.*)`: up to the first line break), so nothing it reads escapes the strip.
+  const match = /^(\d+ \d+(?: -\d+)? )(.*)/.exec(slice)
+  if (!match) return slice
+  let context: unknown
+  try {
+    context = JSON.parse(match[2])
+  } catch {
+    return slice
+  }
+  // ProseMirror also reads an array-like object; anything but a real array loses its context here (2nd High review).
+  if (!Array.isArray(context)) return match[1] + '[]'
+
+  let changed = false
+  for (let index = 1; index < context.length; index += 2) {
+    const attrs = context[index]
+    if (!attrs || typeof attrs !== 'object' || Array.isArray(attrs)) continue
+    for (const key of Object.keys(attrs)) {
+      if (!key.startsWith('md')) continue
+      delete attrs[key]
+      changed = true
+    }
+  }
+  return changed ? match[1] + JSON.stringify(context) : slice
+}
+
+/** Strip Markdown spelling metadata before ProseMirror parses external paste or drop HTML. */
+function stripPastedMarkdownAttributes(html: string): string {
+  if (!/data-md-|data-pm-slice/i.test(html)) return html
+
+  const template = document.createElement('template')
+  template.innerHTML = html
+  const elements = Array.from(template.content.querySelectorAll('*'))
+  if (elements.some(element => element.getAttribute(clipboardSessionAttribute) === clipboardSession)) return html
+
+  for (const element of elements) {
+    const slice = element.getAttribute('data-pm-slice')
+    if (slice !== null) element.setAttribute('data-pm-slice', stripSliceMarkdownAttributes(slice))
+    for (const attribute of Array.from(element.attributes)) {
+      if (attribute.name.startsWith('data-md-')) element.removeAttribute(attribute.name)
+    }
+  }
+  return template.innerHTML
+}
+
 /**
  * Unwrap standalone images from paragraph tags.
  *
@@ -105,28 +174,28 @@ export function ensureCommentMarkedPipeline(): void {
  * Without this, TipTap creates both an empty paragraph AND an image node,
  * causing extra spacing above images when reopening files.
  */
-export function preprocessImageHTML(html: string): string {
+export function preprocessImageHTML(html: string, imageMappings?: Record<string, string>): string {
   const temp = document.createElement('div')
   temp.innerHTML = html
 
-  // Find all paragraphs that contain only an image (and maybe whitespace)
-  temp.querySelectorAll('p').forEach(p => {
-    const img = p.querySelector('img')
-    if (img) {
-      // Check if paragraph only contains the image (no text content besides whitespace)
-      const textContent = p.textContent?.trim() || ''
-      const imgAlt = img.getAttribute('alt') || ''
+  mapImages(temp, imageMappings)
 
-      // If the only text content is the img alt text (or empty), unwrap the image
-      if (textContent === '' || textContent === imgAlt) {
-        // Sprint 137: the paragraph's place as written (no blank line before
-        // it) moves to the image that replaces it.
-        const tight = p.getAttribute('data-md-tight')
-        if (tight !== null) img.setAttribute('data-md-tight', tight)
-        // Replace paragraph with just the image
-        p.replaceWith(img)
-      }
-    }
+  // Find all paragraphs that hold only pictures (and maybe whitespace)
+  temp.querySelectorAll('p').forEach(p => {
+    const imgs = Array.from(p.querySelectorAll('img'))
+    if (imgs.length === 0) return
+    // Check the paragraph holds only its pictures (no text content besides whitespace)
+    const textContent = p.textContent?.trim() || ''
+    const onlyAlt = imgs.length === 1 && textContent === (imgs[0].getAttribute('alt') || '')
+    if (textContent !== '' && !onlyAlt) return
+    // Sprint 137: the paragraph's place as written (no blank line before
+    // it) moves to the first image that replaces it.
+    const tight = p.getAttribute('data-md-tight')
+    if (tight !== null) imgs[0].setAttribute('data-md-tight', tight)
+    // #1075: replace the paragraph with every picture it holds, in order. Keeping
+    // only the first deleted the others (`![a](a.png) ![b](b.png)` saved as
+    // `![a](a.png)`). A link around a picture is still dropped, as before (#554).
+    p.replaceWith(...imgs)
   })
 
   return temp.innerHTML
@@ -138,22 +207,36 @@ export function preprocessImageHTML(html: string): string {
  * original relative path in the title attribute for Turndown.
  */
 export function applyImageMappings(html: string, imageMappings: Record<string, string>): string {
-  if (!imageMappings || Object.keys(imageMappings).length === 0) {
-    return html
+  const container = document.createElement('div')
+  container.innerHTML = html
+  mapImages(container, imageMappings)
+  return container.innerHTML
+}
+
+function mapImages(container: HTMLElement, imageMappings?: Record<string, string>): void {
+  const entries = Object.entries(imageMappings ?? {})
+  const mappings = new Map(entries.map(([path, uri]) => [path, { path, uri }]))
+  // Match marked's URL encoding, including its preservation of existing percent escapes.
+  for (const [path, uri] of entries) {
+    const encoded = markdownImageSource(unescapeMarkdownImagePath(path))
+    if (!mappings.has(encoded)) mappings.set(encoded, { path, uri })
   }
 
-  // Process each mapping
-  let result = html
-  for (const [relativePath, webviewUri] of Object.entries(imageMappings)) {
-    // Escape special regex characters in the path
-    const escapedPath = relativePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    // Replace src="relativePath" with src="webviewUri" title="relativePath"
-    // This preserves the relative path for turndown to use when saving
-    const srcRegex = new RegExp(`src="${escapedPath}"`, 'g')
-    result = result.replace(srcRegex, `src="${webviewUri}" title="${relativePath}"`)
+  for (const image of Array.from(container.querySelectorAll('img'))) {
+    const src = image.getAttribute('src')
+    if (src === null) continue
+    const mapping = mappings.get(src)
+    if (mapping) {
+      const caption = image.getAttribute('title')
+      if (caption && image.hasAttribute('data-md-image-target')) image.setAttribute('data-md-image-title', caption)
+      image.setAttribute('src', mapping.uri)
+      image.setAttribute('title', mapping.path)
+    }
+    if (image.hasAttribute('data-md-image-target')) {
+      if (mapping && mapping.path !== mapping.uri) image.setAttribute('data-md-image-src', mapping.path)
+      image.setAttribute('data-md-image-alt', image.getAttribute('alt') ?? '')
+    }
   }
-
-  return result
 }
 
 /**
@@ -164,13 +247,15 @@ export function applyImageMappings(html: string, imageMappings: Record<string, s
  * another) or the whole source (tab-indented lists). The rest is what `parse`
  * does: hooks, `walkTokens` and the parser, with the same options.
  */
-function parseAsWritten(markdown: string, instance: Marked = editorMarked): string {
+function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tokens: Token[]) => void): string {
   // The editor's instance is synchronous: no extension sets `async`.
   const options = instance.defaults
   const preprocessed = options.hooks ? options.hooks.preprocess(markdown) as string : markdown
   const source = protectFenceTabs(preprocessed)
   const tokens = instance.lexer(source)
+  if (keepsPictureReferences(instance)) annotatePictureReferences(instance, tokens)
   annotateAsWritten(tokens, source)
+  prepareTokens?.(tokens)
   if (options.walkTokens) instance.walkTokens(tokens, options.walkTokens)
   const html = instance.parser(tokens)
   return options.hooks ? options.hooks.postprocess(html) as string : html
@@ -184,12 +269,10 @@ function parseAsWritten(markdown: string, instance: Marked = editorMarked): stri
  * Throws what `marked` throws; the editor catches it and falls back to plain
  * paragraphs.
  */
-export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked): string {
+export function markdownToEditorHTML(markdown: string, imageMappings?: Record<string, string>, instance: Marked = editorMarked, prepareTokens?: (tokens: Token[]) => void): string {
   // Sprint 161: the slide editor passes its own scoped instance (`slideEditorMarkdown.ts`), never this one.
-  const html = parseAsWritten(markdown, instance)
-  let processed = preprocessTaskListHTML(html)
-  processed = preprocessImageHTML(processed)
-  return imageMappings ? applyImageMappings(processed, imageMappings) : processed
+  const html = parseAsWritten(markdown, instance, prepareTokens)
+  return preprocessImageHTML(preprocessTaskListHTML(html), imageMappings)
 }
 
 // ---------------------------------------------------------------------------
@@ -227,6 +310,10 @@ function dataAttributes(names: readonly string[], keepOnSplit = true) {
 export const MarkdownAsWritten = Extension.create({
   name: 'markdownAsWritten',
 
+  addProseMirrorPlugins() {
+    return [new Plugin({ props: markdownClipboardProps(this.editor.schema) })]
+  },
+
   addGlobalAttributes() {
     return [
       { types: ['bulletList', 'orderedList', 'taskList'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.list) },
@@ -238,7 +325,7 @@ export const MarkdownAsWritten = Extension.create({
       { types: ['table'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.table) },
       { types: ['codeBlock'], attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.codeBlock, false) },
       // Experience 49: a picture's attribute block as written (`{width=50%}`), written back after its image line.
-      { types: ['image'], attributes: { picture: dataAttribute('data-picture', false) } },
+      { types: ['image'], attributes: { ...dataAttributes(AS_WRITTEN_ATTRIBUTES.image, false), picture: dataAttribute('data-picture', false) } },
       // A block split off with Enter is new writing: a blank line before it.
       { types: TIGHT_BLOCKS, attributes: dataAttributes(AS_WRITTEN_ATTRIBUTES.tight, false) },
       {
@@ -253,6 +340,29 @@ export const MarkdownAsWritten = Extension.create({
         },
       },
     ]
+  },
+})
+
+/** Keep definitions in document order without adding a visible block. */
+export const PictureDefinitionNode = Node.create({
+  name: 'pictureDefinition',
+  group: 'block',
+  atom: true,
+  selectable: false,
+  addAttributes() {
+    return {
+      definition: {
+        default: null,
+        parseHTML: element => element.getAttribute(pictureDefinitionAttribute),
+        renderHTML: attrs => ({ [pictureDefinitionAttribute]: attrs.definition }),
+      },
+    }
+  },
+  parseHTML() {
+    return [{ tag: `hr[${pictureDefinitionAttribute}]`, priority: 100 }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['hr', { ...HTMLAttributes, hidden: '' }]
   },
 })
 
@@ -409,6 +519,7 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     // Sprint 163 PR 3: the Button block, the same in a Text document and on a slide.
     ...buttonBlockExtensions,
     slots.image ?? Image.configure(editorImageOptions),
+    PictureDefinitionNode,
     ...(slots.afterImage ?? []),
     // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
     // Registered at the highest level — when off, the extensions don't exist,
@@ -476,8 +587,8 @@ export function preprocessTableHTML(html: string): string {
  * comment-callout rules. Comment rules register unconditionally: they are
  * harmless when no comment nodes exist.
  */
-export function createEditorTurndownService(): TurndownService {
-  const service = createTurndownService()
+export function createEditorTurndownService(instance = editorMarked): TurndownService {
+  const service = createTurndownService(instance)
   addCommentTurndownRules(service)
   // Sprint 157: a deck's slide nodes. Harmless without them, like the comment rules.
   addDeckTurndownRules(service)

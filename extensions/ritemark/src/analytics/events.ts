@@ -18,6 +18,7 @@ export type EventName =
   | 'starting_point_used'
   | 'made_something'
   | 'feedback_opened'
+  | 'ai_answer_reacted'
   | 'first_reply'
   | 'voice_captured'
   | 'voice_note_edited'
@@ -102,7 +103,11 @@ export interface EventPayloads {
     after_ready_request: boolean;
   };
   feedback_opened: {
-    from: 'status_bar' | 'help' | 'ai_info' | 'command';
+    from: 'status_bar' | 'help' | 'ai_info' | 'command' | 'thumb' | 'failure_card';
+  };
+  ai_answer_reacted: {
+    reaction: 'up' | 'down' | 'none';
+    ai: 'claude-code' | 'codex' | 'opencode';
   };
   app_session_start: {
     version: string;
@@ -142,8 +147,7 @@ export interface EventPayloads {
   };
   feedback_sent: {
     message: string;
-    /** Sprint 140 (D11): which question the message answers; only the first-week card's send carries it. */
-    asked?: 'made_this_week';
+    from?: 'sheet' | 'thumb' | 'failure_card';
   };
   /**
    * Sprint 156 (PR B; experience 35, "With no AI ready"): the no-AI card's three counts. Each field is a fixed choice
@@ -194,6 +198,11 @@ export type SignInCountsAreClosed = Closed<
 >;
 /** #926: the same allow-list for `ready_card_shown`: a boolean, a `ReadyCardKind` or a `WelcomeProvider`, nothing open. */
 export type ReadyCardCountIsClosed = Closed<OpenFields<EventPayloads['ready_card_shown']> extends never ? true : false>;
+
+/** Explicit feedback carries the message and its optional source. */
+export type FeedbackFieldsAreClosed = Closed<
+  Exclude<keyof EventPayloads['feedback_sent'], 'message' | 'from'> extends never ? true : false
+>;
 
 /**
  * Type-safe event helper — ensures payload matches event name.

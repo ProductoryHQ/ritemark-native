@@ -17,6 +17,16 @@
    file's rules, can't hide it (the Select's trigger did). */
 :where(:root:not([data-input-mode="pointer"])) .rm-focus-ring.rm-focus-ring:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
 
+/* Leave older answer actions in the tab order. Reveal them for the answer itself,
+   its controls, or a draft that still has the person's attention. */
+[data-older-answer] > [data-answer-actions] { opacity: 0; }
+[data-older-answer]:has([data-ai-answer]:hover) > [data-answer-actions],
+[data-older-answer] > [data-answer-actions]:is(:hover, [data-draft-open]),
+:where(:root:not([data-input-mode="pointer"])) [data-older-answer]:has([data-ai-answer]:focus-within) > [data-answer-actions],
+:where(:root:not([data-input-mode="pointer"])) [data-older-answer] > [data-answer-actions]:focus-within {
+  opacity: 1;
+}
+
 /* Everything clickable shows the pointing hand — Tailwind's preflight leaves
    buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
    any class (`cursor-not-allowed` on a refused action, `cursor-text`, …) and
@@ -74,6 +84,7 @@
   --ritemark-hairline-strong: #cbd5e1;
   --ritemark-ink-strong: #1e1b4b;
   --ritemark-ink-body: #475569;
+  --ritemark-deck-warning: #B45309;
   --ritemark-ink-muted: #617187; /* the kit's muted, 4.5:1 on the ground (Sprint 132) */
   --ritemark-ink-faint: #94a3b8;
   --ritemark-ink-disabled: #cbd5e1;
@@ -104,6 +115,7 @@
   --ritemark-dark-hairline-strong: rgba(199, 210, 254, 0.22);
   --ritemark-dark-ink-strong: #f8fafc;
   --ritemark-dark-ink-body: #C7D2FE;
+  --ritemark-dark-deck-warning: #EAB308;
   --ritemark-dark-ink-muted: #94a3b8;
   --ritemark-dark-ink-faint: #7C86A2;
   --ritemark-dark-ink-disabled: #475569;
@@ -145,6 +157,7 @@
   --r-hairline-strong: var(--ritemark-hairline-strong);
   --r-ink-strong: var(--ritemark-ink-strong);
   --r-ink-body: var(--ritemark-ink-body);
+  --r-deck-warning: var(--ritemark-deck-warning);
   --r-ink-muted: var(--ritemark-ink-muted);
   --r-ink-faint: var(--ritemark-ink-faint);
   --r-ink-disabled: var(--ritemark-ink-disabled);
@@ -238,6 +251,7 @@ body[data-vscode-theme-kind='vscode-dark'],
   --r-hairline-strong: var(--ritemark-dark-hairline-strong);
   --r-ink-strong: var(--ritemark-dark-ink-strong);
   --r-ink-body: var(--ritemark-dark-ink-body);
+  --r-deck-warning: var(--ritemark-dark-deck-warning);
   --r-ink-muted: var(--ritemark-dark-ink-muted);
   --r-ink-faint: var(--ritemark-dark-ink-faint);
   --r-ink-disabled: var(--ritemark-dark-ink-disabled);
@@ -463,6 +477,17 @@ html.rm-ground [data-scrolling] { scrollbar-color: var(--vscode-scrollbarSlider-
 .deck-sl .rm-table :is(td, th).selectedCell { box-shadow: inset 0 0 0 999px var(--rm-table-tint); }
 /* The menu opens under its grip or at the pointer: its anchor is a fixed, empty box there. */
 .rm-table-menu-anchor { position: fixed; pointer-events: none; }
+/* Let Radix flip the full menu. If neither side fits, shift it inside the padded viewport. */
+.rm-table-menu[data-side] {
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+}
+.rm-table-menu[data-side="bottom"] {
+  translate: 0 min(0px, calc(var(--radix-dropdown-menu-content-available-height) - 100%));
+}
+.rm-table-menu[data-side="top"] {
+  translate: 0 max(0px, calc(100% - var(--radix-dropdown-menu-content-available-height)));
+}
 .rm-table-align { display: flex; gap: 2px; margin: 2px 4px 4px; padding: 2px; border-radius: 8px; background: var(--r-surface-muted); }
 .rm-table-align > span { flex: 1; }
 .rm-table-align [role="menuitem"].rm-table-align-choice { width: 100%; justify-content: center; height: 26px; padding: 0; border-radius: 6px; color: var(--r-ink-muted); }
@@ -607,6 +632,7 @@ body {
 .ProseMirror .pic-block {
   position: relative;
   margin: 0.5em 0;
+  padding-bottom: var(--picture-bar-room, 0px);
 }
 .ProseMirror .pic-block img {
   margin: 0;

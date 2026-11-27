@@ -53,7 +53,7 @@ function rotateIfNeeded(logPath: string): void {
 
 export function createRuntimeTrace(outputChannelName: string, logFileName: string) {
   let channel: OutputChannelLike | null = null;
-  const traceLogPath = path.join(os.tmpdir(), logFileName);
+  const traceLogPath = path.join(process.env.RITEMARK_RUNTIME_TRACE_DIR || os.tmpdir(), logFileName);
   let enabled: boolean | null = null;
   let writesSinceRotationCheck = 0;
 

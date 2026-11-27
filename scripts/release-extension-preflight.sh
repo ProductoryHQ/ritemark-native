@@ -99,6 +99,8 @@ SHELL_TIER_PATHS=(
   "scripts/update-vscode.sh"
   "scripts/create-patch.sh"
   "scripts/stamp-deck-document-type.sh"
+  "macos/quicklook/"
+  "scripts/build-quicklook.sh"
   "branding/icons/deck-badge.car"
   "installer/windows/ritemark.iss"
   "scripts/codesign-windows.sh"

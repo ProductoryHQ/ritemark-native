@@ -5,11 +5,12 @@
  * time, red failure, faint stopped. Never says "Done" while a card is pending
  * — that gating lives in deriveActivityState, not here.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { useActiveConversation, useAISidebarStore } from './store';
+import { activityHeadline } from './stepLabel';
 import { deriveActivityState, presentActivityState } from './activityState';
 import { activeDurationMs } from './types';
 import { useReadyAlternative } from './TurnFailureCard';
@@ -40,7 +41,7 @@ const TONE_CLASS: Record<string, string> = {
   faint: 'text-[var(--r-ink-faint)]',
 };
 
-export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?: boolean } = {}) {
+export function ActivityStatusLine({ closesLiveStep = false, doneActions }: { closesLiveStep?: boolean; doneActions?: ReactNode } = {}) {
   const conversation = useActiveConversation();
   const state = deriveActivityState(conversation);
 
@@ -52,10 +53,13 @@ export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?
     : (lastAgent.timestamp >= lastCodex.timestamp ? lastAgent : lastCodex);
 
   const metrics = last && 'result' in last ? (last.result as { metrics?: { durationMs: number; waitedMs?: number; costUsd: number | null; model: string | null } } | undefined)?.metrics : undefined;
-  const activeSeconds = metrics ? activeDurationMs(metrics) / 1000 : undefined;
+  const activeMs = last?.result && 'activityDurationMs' in last.result
+    ? last.result.activityDurationMs
+    : metrics ? activeDurationMs(metrics) : undefined;
+  const activeSeconds = activeMs === undefined ? undefined : activeMs / 1000;
   const waitedSeconds = metrics?.waitedMs ? metrics.waitedMs / 1000 : undefined;
   const liveActivity = last?.isRunning
-    ? last.activities[last.activities.length - 1]?.message?.slice(0, 80)
+    ? activityHeadline(last.activities[last.activities.length - 1]).slice(0, 80)
     : undefined;
   const runningSubagents = last?.isRunning && 'subagents' in last
     ? ((last as { subagents?: Array<{ status: string }> }).subagents?.filter((x) => x.status === 'running').length ?? 0)
@@ -121,6 +125,7 @@ export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?
       />
       {/* Sprint 128: "Done — 1 task still running in the background" may take two lines in a narrow side bar. */}
       <span className="min-w-0 line-clamp-2" data-retry-line={retry ? 'true' : undefined}>{presentation.label}</span>
+      {state === 'done' && doneActions}
       {offerAlternative && alternative && last && (
         <Tooltip label={continueWithAction(alternative.runtimeId, 'waiting').tooltip}>
           <Button

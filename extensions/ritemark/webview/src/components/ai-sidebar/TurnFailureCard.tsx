@@ -10,12 +10,13 @@
  */
 
 import { Icon, type PhosphorIconName } from '../ui/Icon';
+import { FailureFeedbackLink } from './FailureFeedbackLink';
 import { RuntimeNotice } from './RuntimeNotice';
 import { useActiveConversation, useAISidebarStore } from './store';
 import { defaultCodexModelId } from './modelPresentation';
 import { anotherOpenCodeModel, deriveRuntimeAvailabilities, listReadyAlternatives, openCodeLabel, resolveAvailableRuntimeModel, stillLimitedOpenCodeModels } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
-import { turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
+import { aiName, turnFailureCard, type ModelNames } from '../../../../src/runtime/turnFailureCopy';
 import type { AgentId, ModelOption, RuntimeErrorDetail, RuntimeErrorKind } from './types';
 
 function findModel(models: ModelOption[], id: string): ModelOption | undefined {
@@ -142,10 +143,14 @@ export function TurnFailureCard({
   });
 
   if (!card) {
+    const title = `${aiName(runtimeId)} couldn’t answer.`;
     return (
       <div className="flex items-start gap-2 text-[var(--r-error)]" data-turn-failure={errorKind ?? 'unclassified'}>
         <Icon name="warning-circle" size={14} className="mt-0.5 shrink-0" />
-        <span>{error}</span>
+        <span>
+          {error}{' '}
+          <FailureFeedbackLink title={title} line={error} />
+        </span>
       </div>
     );
   }
@@ -154,6 +159,7 @@ export function TurnFailureCard({
   return (
     <div data-turn-failure={errorKind}>
       <RuntimeNotice
+        feedback={!card.done}
         title={card.title}
         message={card.message}
         tone={card.done ? 'success' : 'warning'}

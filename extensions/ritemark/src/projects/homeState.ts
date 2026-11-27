@@ -4,6 +4,7 @@
  * what name, what waits and with which AI, and the other projects' line.
  */
 
+import { ritemarkFileInDeckFolder, listedDeckFolders } from '../decks/deckFolderListing';
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
@@ -77,7 +78,10 @@ export function recentItems(
   pointerPaths: ReadonlySet<string>,
   limit = RECENT_LIMIT,
 ): { item: HomeRecentItem; path: string }[] {
+  const relative = (file: ChangedFile) => path.relative(folder, file.path).split(path.sep).join('/');
+  const owned = listedDeckFolders(files.map(relative));
   return [...files]
+    .filter(file => !ritemarkFileInDeckFolder(relative(file), owned))
     .filter((file) => !(isRootClaudeFile(folder, file.path) && pointerPaths.has(file.path)))
     .sort((a, b) => b.changedAt - a.changedAt || (a.path < b.path ? -1 : 1))
     .slice(0, limit)
@@ -120,7 +124,7 @@ export function othersOf(projects: readonly { name: string; waiting: ProjectWait
 /**
  * What moved shows on Home once for a profile that came from Ritemark 1 (R11):
  * the welcome records `ritemark.updatedFrom1x` as `{ at }` when an update
- * welcome finishes, and Got it records it seen.
+ * welcome finishes, and the first visible delivery records it seen.
  */
 export function showWhatMoved(updatedFrom1x: unknown, seen: unknown): boolean {
   const updated = updatedFrom1x === true || (typeof updatedFrom1x === 'object' && updatedFrom1x !== null);

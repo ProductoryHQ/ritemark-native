@@ -180,6 +180,29 @@ for (const set of ['kept', 'known', 'cleanup']) {
   assert.equal(reopened.textContent.includes('[x]: not a definition'), true, 'escapes: `\\[x]: …` stays text, not a definition')
 }
 
+// ---- #1075: a paragraph of pictures keeps every picture ----
+// Opening one used to keep only its first picture, so a save deleted the rest.
+// Each picture now becomes a block of its own; a link around one is still
+// dropped (#554, known/image-in-link.md), but never the picture.
+for (const [source, expected] of [
+  ['![a](a.png) ![b](b.png)\n', '![a](a.png)\n\n![b](b.png)\n'],
+  ['[![x](a.svg)](u) [![y](b.svg)](v)\n', '![x](a.svg)\n\n![y](b.svg)\n'],
+] as const) {
+  const once = saveDocument(openDocument(source))
+  assert.equal(once, expected, `#1075: ${JSON.stringify(source)} saves every picture`)
+  assert.equal(saveDocument(openDocument(once)), once, `#1075: ${JSON.stringify(source)}: a second save changes nothing`)
+  assert.deepEqual(inventory(openDocument(once).doc).images, sourceInventory(source).images, `#1075: ${JSON.stringify(source)}: every picture survives`)
+}
+
+// ---- picture destinations and labels after an edit elsewhere ----
+{
+  const source = readFileSync(corpus('picture-destinations.md'), 'utf8')
+  const opened = openDocument(source)
+  const edited = typeAtEndOfLastParagraph(opened.doc, ' EDITED')
+  assert.ok(edited)
+  assert.equal(saveDocument(opened, edited), source.replace('Edit this paragraph.', 'Edit this paragraph. EDITED'))
+}
+
 // ---- the look: the same document as on main, apart from these ----
 /**
  * Where the editor now shows what the file holds and `main` did not (R6, R3),

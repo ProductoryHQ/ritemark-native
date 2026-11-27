@@ -172,14 +172,18 @@ export const MARK_LOOK: Readonly<Record<BoxesMark, string | null>> = { icon: nul
 const LOOK_MARK: ReadonlyMap<string, BoxesMark> = new Map(BOXES_MARKS.flatMap(mark => (MARK_LOOK[mark] === null ? [] : [[MARK_LOOK[mark]!, mark] as const])));
 
 /**
- * The Boxes looks that draw their own mark (a number, a dot, an arrow) where a box's icon would go: Mark's looks, so a
- * look the slide draws and the bar's Mark never part (review of #878).
+ * The Boxes looks that draw their own mark (a number, a dot, an arrow).
  */
 export const OWN_MARK_LOOKS: ReadonlySet<string> = new Set(LOOK_MARK.keys());
 
+/** Number can sit above the box's icon. Dot and Arrow replace it. */
+export function boxesShowIcons(look: string): boolean {
+  return look !== MARK_LOOK.dot && look !== MARK_LOOK.arrow;
+}
+
 /**
  * A Boxes block's Mark, read as it is drawn: the renderer and the stage draw a look by its exact word, and any look
- * other than the three own-mark ones (`boxes`, none, or one this reader doesn't know) draws icons, so it is Icon.
+ * other than the three own-mark ones (`boxes`, none, or one this reader doesn't know) reads as Icon.
  */
 export function boxesMarkOf(attrs: FenceAttributes): BoxesMark {
   const look = attrs.values.look;

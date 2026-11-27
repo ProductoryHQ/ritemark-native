@@ -29,34 +29,41 @@ Sprints are to be numbered when planned.
 
 | Sprint | Issues | Scope | Status |
 |---|---|---|---|
-| 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov; [plan](sprint-173-word-folder/sprint-plan.md) |
-| 174 · Excel charts and colour rules | #971 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Approved 24 Nov; [plan](sprint-174-excel-charts/sprint-plan.md) |
-| 175 · The live deck | to file | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Approved in the roadmap 24 Nov; plan after the Cloudflare measurements and the drawings |
+| 173 · Word folder, ready for any AI | #497, #547 | ChatGPT, Claude and OpenCode read the folder’s Word documents, PDFs and decks through one Ritemark tool; steps name documents; answers name sources in the sentence and link them to the passage (way C); Word equations as math. Each AI gets its own starting points once it passes the reading test (3 of 3). Experience 50. | Approved 24 Nov. PRs 1–7 merged (PR 3, #1000, on 26 Nov); the gate per AI and platform (#1083); the runner measures what G1 says (#1085, #1086). **Claude on the Mac passed G1, 3 of 3 on 11819457 (26 Nov); its Word and PDF starting points open (#1087).** ChatGPT waits for the OpenAI test key; OpenCode on Gemini is blocked by #1078; Windows runs at Gate 2. [plan](sprint-173-word-folder/sprint-plan.md) |
+| 174 · Excel charts and colour rules | #971 (open until 2.4 publishes); PRs #990 (plan), #1026, #1029–#1032, #1034–#1036, #1038, #1039 | Charts appear where they sit and colour rules colour the cells as in Excel. Experience 47, step 2. | Done 25 Nov (code and docs); four follow-ups wait on the Experience lead's Excel renders; closing proof: [research/closing-proof.md](sprint-174-excel-charts/research/closing-proof.md) |
+| 175 · The live deck | no issue (roadmap item); PRs #995 (plan), #1003, #1006, #1012, #1014–#1016, #1020, #1022, #1024, #1027, #1028 | A published deck updates on save while its page’s switch is on (layer 1) and open pages follow on the same slide (layer 2); an AI’s edit publishes too when the switch is on; each slide gets its minutes and the deck its total (Experience 51). | Done 25 Nov; S18 and the Windows checks wait for Gate 2; closing proof: [research/closing-proof.md](sprint-175-live-deck/research/closing-proof.md) |
+| 176 · Hear from people | #1045; PRs #1068, #1135, #1136, #1137, #1139, #1140 | Thumbs on AI answers, feedback on failures, a window picture in feedback, one open-source card on Home in place of the week’s question, GitHub and Discussions in Help, and saved days across releases. | Done 27 Nov. Closing proof and Gate 2 checks in [research/closing-proof.md](sprint-176-feedback/research/closing-proof.md). |
+| 177 · Quick Look for decks | #953 | Finder shows the first shown slide and Space shows the slides when this Mac has a current picture. Otherwise Finder shows the deck icon and Space shows the deck text. | Code done 26 Nov: #1073 (cache), #1074 (native extensions), #1079 (build, sign, ship), #1082 (Home note and Help; proof and docs). Runner proof green on macOS 15, 26 and 26 Intel; Intel CI green on main. Gate 1 rows: the signed app in a real Finder, and the Home note against a disabled extension (#953 open until then). [plan](sprint-177-quick-look/sprint-plan.md) |
+| 178 · A deck's own folder | none (Jarmo's testing note, 26 Nov); PRs #1102 (plan), #1110, #1113, #1119, #1122, #1124 | Everything a deck makes goes into one folder beside it, named after the deck file (`Kickoff.rtms.files`; Jarmo, 27 Nov). Rename, move and delete take the folder along only when it holds nothing but the deck's pictures and its published page. A copy in Documents brings the whole folder, and a slide from another deck brings its pictures (#1118). Search and Home show a person's own note there. Old decks keep their pictures; their page, fonts and logo move at the next Publish, with the same link. In 2.4 the folder sits beside the deck: patch 023 was dropped (#1105), and folding comes after 2.4 (#1108). Spec: Decks README, "A deck's own folder". | Done 27 Nov. A deck published with 2.3, then updated, and Windows paths wait for Gate 2. Other documents that use the folder's pictures: #1123. Closing proof: [research/closing-proof.md](sprint-178-deck-folder/research/closing-proof.md) |
+
+Release notes: each sprint's `release-notes-lines.md`, joined in `docs/releases/v2.4.0/release-notes.md` with the `release-notes` skill.
 
 ## Work outside sprints
 
 | Issue | What it does | PR or status |
 |---|---|---|
-| #947 | Place the start card right under the handout’s first part. | PR #958 |
-| #948 | Correct what the start card says. | PR #957 |
-| #950 | Keep a long bar note from squeezing the bar. | PR #977 (draft) |
-| #946 | Put the text bubble above the chosen words. | No PR yet |
-| #927, #983 | Count a deck’s words in the status bar. #983 (RC4 smoke test) is the same fault. | PR #962 |
-| #910 | Make a box’s icon accessible from the keyboard. | No PR yet |
-| #920 | Open a deck from its row in the Slide library. | No PR yet |
-| #919 | Keep the theme on the printed page and in the PDF. | No PR yet |
-| #953 | Show a deck’s first slide in Finder. | No PR yet |
-| #966 | Make runtime checks fail when they can’t check. | PR #973 |
-| #968 | Give the published page’s buttons names on a phone. | PR #970 |
-| #980 | Keep a picture’s bar at size S off the paragraph below it. | No PR yet |
-| #981 | Keep the Slide settings popup off the slide’s title. | No PR yet |
-| #982 | Keep a table cell’s right-click menu inside the window. | No PR yet |
-| #984 | Show Claude’s own mark on its tile in Settings ▸ AI accounts. | No PR yet |
-| #934 | Get the frame screenshots through the Slide library. | No PR yet |
-| #954 | Leave another app’s defaults alone when uninstalling on Windows. | No PR yet |
-| #924 | Apply a place’s default in a fresh frame. | No PR yet |
-| #582 | Address a noisy log line. | No PR yet |
-| #501 | Address the first start after an update on Windows. | No PR yet |
+| #947 | Place the start card right under the handout’s first part. | PR #958 (merged) |
+| #948 | Correct what the start card says. | PR #957 (merged) |
+| #950 | Keep a long bar note from squeezing the bar. | PR #977 (merged) |
+| #946 | Put the text bubble above the chosen words. | PR #1059 (merged) |
+| #927, #983 | Count a deck’s words in the status bar. #983 (RC4 smoke test) is the same fault. | PR #962 (merged) |
+| #910 | Make a box’s icon accessible from the keyboard. | PR #1069 (merged) |
+| #920 | Open a deck from its row in the Slide library. | PR #1064 (merged) |
+| #919 | Keep the theme on the printed page and in the PDF. | PR #1065 (merged) |
+| #966 | Make runtime checks fail when they can’t check. | PR #973 (merged) |
+| #968 | Give the published page’s buttons names on a phone. | PR #970 (merged) |
+| #980 | Keep a picture’s bar at size S off the paragraph below it. | PR #1063 (merged) |
+| #981 | Keep the Slide settings popup off the slide’s title. | PR #1061 (merged) |
+| #982 | Keep a table cell’s right-click menu inside the window. | PR #1057 (merged) |
+| #984 | Show Claude’s own mark on its tile in Settings ▸ AI accounts. | Closed: the letter C stays (Jarmo) |
+| #934 | Get the frame screenshots through the Slide library. | PR #1066 (merged); frame run on the release candidate, baseline retaken |
+| #954 | Leave another app’s defaults alone when uninstalling on Windows. | PR #1071 (merged); fix proven on Windows CI (run 45723811419) |
+| #924 | Apply a place’s default in a fresh frame. | PR #1070 (merged) |
+| #582 | Address a noisy log line. | No code change needed; checked again on the release candidate |
+| #1051 | Put a table's + bars on its real edges, shown only when the edge is in view. | PR #1058 (merged) |
+| #1056 | Keep an empty line on a slide after leaving the slide. | PR #1060 (merged) |
+| #1062 | Put Gemini 4 Neon in place of Gemini 4 Argon in the model lists. | PR #1067 (merged) |
+| #501 | Address the first start after an update on Windows. | No PR yet; retest at Gate 2 |
 
 ## Cut line
 
@@ -75,6 +82,9 @@ The meaning layer (#591) moves to a later release with its own sprint plan. Jarm
 
 - **Gate 1** on the arm64 candidate.
 - **Gate 2** on x64 and Windows.
+  - Gate 2 also checks Sprint 176 on Windows. Paste the window picture into Windows Mail, Thunderbird and Outlook (the clipboard writes only the registered `PNG` format). Check the window picture at 150% scaling and the two native Help items and their mnemonics.
+  - Gate 2 also checks Sprint 176 in the app. Open **Tell us about this** from the Publish failure notification with a Cloudflare token (`vscodePublish.test.ts` covers it) and from OpenCode’s quota failure card (the dev build had no bundled OpenCode). Check ChatGPT plan approval with thumbs using Jarmo’s sign-in (covered by lifecycle, store and runtime-switching tests).
+  - Gate 2 also checks Sprint 178: a deck published with 2.3, then updated with 2.4, keeps its link and loses its old page, fonts and logo from beside it. Proposed, pending Jarmo's answer: a deck folder whose path has spaces or is on another drive letter, on Windows.
 - **Notarization** for each macOS candidate after its gate clears and the 60-minute hardening window elapses.
 - **Publication** on Jarmo’s word.
 
@@ -90,3 +100,6 @@ The meaning layer (#591) moves to a later release with its own sprint plan. Jarm
 | 2026-11-23 | File the RC4 smoke test’s findings as 2.4 issues (#980–#984). | Jarmo (“jah”) |
 | 2026-11-24 | Put live publishing in 2.4: five measurements first; layer 1 behind a switch per page. | Jarmo, relayed in his words by the Chief of Staff (“jah, mõõtmised koos viiendaga, alusta kohe ja läheb 2.4”; “Layer 1 is in.”) |
 | 2026-11-24 | Approve the 2.4 roadmap (four streams in order; sprint plans and their questions are the Development manager’s), the cut line, and an AI’s edit publishing a live deck when its switch is on. | Jarmo (“roadmap kinnitatud, lõikejoon ja AI-avaldamine soovituse järgi”) |
+| 2026-11-25 | Put Quick Look for decks (#953) in 2.4. | Jarmo (“teeme ära selle quicklooki!”) |
+| 2026-11-25 | Choose file access A for both Quick Look extensions: read-only access to the home folder and no network. | Jarmo (“2. a”) |
+| 2026-11-25 | Draw deck pictures in Ritemark on save, on disk changes in an open project and when a project opens with missing or stale pictures. Keep the pictures on this Mac and remove them with the project. Finder shows the deck icon and Space shows current text until the picture is current. | Experience lead and Jarmo (“1 jah”) |

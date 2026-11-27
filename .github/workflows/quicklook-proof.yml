@@ -1,0 +1,68 @@
+# Sprint 177 Quick Look proof on disposable runners.
+name: Quick Look runner proof (macOS)
+
+'on':
+  push:
+    branches: ['ql-proof/**']
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26, macos-26-intel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record runner
+        run: |
+          mkdir -p "$RUNNER_TEMP/quicklook-proof"
+          { sw_vers; uname -m; sysctl -n machdep.cpu.brand_string; } \
+            | tee "$RUNNER_TEMP/quicklook-proof/runner.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build both universal Quick Look extensions
+        run: scripts/build-quicklook.sh "$RUNNER_TEMP/quicklook-build"
+
+      - name: Run Quick Look proof and collect the independent Settings verdict
+        run: |
+          bash macos/quicklook/Proof/run.sh "$RUNNER_TEMP/quicklook-build" \
+            "$RUNNER_TEMP/quicklook-proof" "$RUNNER_TEMP/quicklook-work"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quicklook-${{ matrix.runner }}
+          path: ${{ runner.temp }}/quicklook-proof
+          retention-days: 30
+
+  settings-version-gate:
+    if: ${{ !cancelled() }}
+    needs: proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: quicklook-macos-*
+          path: ${{ runner.temp }}/quicklook-artifacts
+      - name: Compare confirmed Settings versions against the app gate
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 macos/quicklook/Proof/settings-versions.py "$RUNNER_TEMP/quicklook-artifacts" \
+            extensions/ritemark/src/decks/quickLook/confirmedSettingsVersions.json \
+            "$RUNNER_TEMP/results.md" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quicklook-settings-versions
+          path: ${{ runner.temp }}/results.md
+          retention-days: 30

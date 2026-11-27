@@ -117,3 +117,9 @@ assert.deepEqual(classifyChatHref('https://example.test/a#p=4&q=quote'), {
 })
 const codex = rewriteCodexCitations(':codex-file-citation{path="docs/report#p=4.pdf" purpose="source"}')
 assert.deepEqual(classifyChatHref(codex.match(/\(([^)]*)\)/)?.[1]), { kind: 'file', path: 'docs/report#p=4.pdf' })
+
+assert.deepEqual(classifyChatHref('02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%20Riverside.docx#q=about%20140%20visits%20a%20day'), {
+  kind: 'file',
+  path: '02 Interviews/Interview – branch manager, Riverside.docx',
+  passage: { text: 'about 140 visits a day' },
+})

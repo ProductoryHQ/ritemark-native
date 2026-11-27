@@ -8,7 +8,7 @@
  *    page is drawn: the sprint plan's "same place as a Picture with a link").
  *  - `UnknownIconHint` (#850): pointing at a box's unknown icon shows No icon named “xyz” with Choose an icon.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from '../../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../../ui/dropdown-menu'
@@ -37,11 +37,18 @@ export function SlideIconPicker({ pick, onPick, onClose }: { pick: IconPick | nu
           style={{ position: 'fixed', left: pick.rect.left, top: pick.rect.top, width: pick.rect.width, height: pick.rect.height, pointerEvents: 'none' }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-auto max-w-none" onCloseAutoFocus={event => event.preventDefault()}>
-        <IconGridItems current={pick.current} onPick={name => onPick(pick.pos, name)} />
-      </DropdownMenuContent>
+      <SlideIconPickerContent current={pick.current} onPick={name => onPick(pick.pos, name)} onCloseAutoFocus={event => event.preventDefault()} />
     </DropdownMenu>,
     document.body,
+  )
+}
+
+export function SlideIconPickerContent({ current, onPick, ...contentProps }: ComponentProps<typeof IconGridItems> &
+  Pick<ComponentProps<typeof DropdownMenuContent>, 'onCloseAutoFocus' | 'onInteractOutside' | 'onKeyDownCapture' | 'onPointerUpCapture'>) {
+  return (
+    <DropdownMenuContent align="start" className="w-auto max-w-none" {...contentProps}>
+      <IconGridItems current={current} onPick={onPick} />
+    </DropdownMenuContent>
   )
 }
 
@@ -49,7 +56,7 @@ export function SlideIconPicker({ pick, onPick, onClose }: { pick: IconPick | nu
 export interface IconHint {
   pos: number
   anchor: HTMLElement
-  name: string
+  name: string | null
 }
 
 /**
@@ -120,7 +127,7 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
       cancelAnimationFrame(frameId)
     }
   }, [hint.anchor, measure, onDone])
-  const words = unknownIconWords(hint.name)
+  const words = hint.name === null ? null : unknownIconWords(hint.name)
   const choose = () => onChoose(hint, hint.anchor.getBoundingClientRect())
   return (
     <div className="deck-block-at" style={{ ...place, zIndex: 5 }}>
@@ -141,7 +148,7 @@ function UnknownIconPlace({ frame, hint, onChoose, onDone }: { frame: HTMLElemen
       >
         <span
           role="button"
-          aria-label={`${words}: choose an icon`}
+          aria-label={words ? `${words}: choose an icon` : 'Choose an icon'}
           className="deck-icon-hint"
           // A press keeps the caret where it is, as on every handle over the slide.
           onMouseDown={event => event.preventDefault()}

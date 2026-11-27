@@ -10,6 +10,9 @@ import { pictureBlockTokenizer, type ImageTokenWithLook } from '../../../../src/
 
 const escapeAttribute = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+// Match the label of an already parsed inline image, including escaped or nested brackets.
+const inlineImageLabel = /^!\[(?:\[(?:\\.|[^\[\]\\])*\]|\\.|`[^`]*`|[^\[\]\\`])*?\](?=\()/
+
 interface ImageRendererContext {
   parser: { renderer: { image: (href: string, title: string | null, text: string) => string } }
 }
@@ -20,11 +23,14 @@ export const pictureMarkedExtension = {
     pictureBlockTokenizer,
     {
       name: 'image',
-      renderer(this: ImageRendererContext, token: ImageTokenWithLook): string | false {
-        // A picture without a block is drawn as marked draws it.
-        if (!token.picture) return false
+      renderer(this: ImageRendererContext, token: ImageTokenWithLook & { referenceLabel?: string }): string | false {
+        const label = token.referenceLabel ?? inlineImageLabel.exec(token.raw)?.[0]
         const html = this.parser.renderer.image(token.href, token.title, token.text)
-        return html.replace(/^<img\s/, `<img data-picture="${escapeAttribute(token.picture)}" `)
+        const written = label
+          ? ` data-md-image-label="${escapeAttribute(label)}" data-md-image-target="${escapeAttribute(token.raw.slice(label.length))}"`
+          : ''
+        const look = token.picture ? ` data-picture="${escapeAttribute(token.picture)}"` : ''
+        return html.replace(/^<img\s/, () => `<img${written}${look} `)
       },
     },
   ],

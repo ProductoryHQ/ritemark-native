@@ -1,7 +1,11 @@
 /** Sprint 174 R22. Run with npm run test:excel. */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { utils } from 'xlsx';
 import { basename } from 'node:path';
+import { compareCells } from '../../webview/src/components/sheetSort';
+import { cellKey, readWorkbook } from '../../webview/src/components/excel/readWorkbook';
+import { buildLayout, sortedRows, sheetRowAt } from '../../webview/src/components/excel/sheetLayout';
 import { applyCellEdits, indexWorkbook } from './applyCellEdits';
 import { chartsKeepFixtures } from './chartsKeepFixtures.test';
 import { attr, locateCell, parseCellRef, rootPrefix } from './sheetXml';
@@ -72,6 +76,23 @@ async function main() {
     const saved = openPackage(bytes);
     await assertKeepsWorkbook(index.pkg, saved, sheetPath, ref);
     console.log(`  ${basename(file)}: package and worksheet bytes preserved`);
+
+    if (basename(file) === 'sales-report.xlsx') {
+      const model = await readWorkbook(original);
+      const worksheet = model.sheets.find((item) => item.name === sheet)!;
+      const col = 5;
+      const displayIndex = 1;
+      const expectedRef = 'F10';
+      const rowOrder = sortedRows(worksheet, col, -1, compareCells);
+      const view = buildLayout(worksheet, model.styles, { minWidth: 0, minHeight: 0, rowOrder });
+      const sortedRef = utils.encode_cell({ r: sheetRowAt(view.rowOf, displayIndex), c: col });
+      const sortedSave = await applyCellEdits(original, [{ sheet, ref: sortedRef, value: 4321 }], index);
+      const savedModel = await readWorkbook(sortedSave.bytes);
+      const savedSheet = savedModel.sheets.find((item) => item.name === sheet)!;
+      assert.equal(savedSheet.cells.get(cellKey(9, col))?.value, 4321, 'saved the cell shown at display index 1');
+      await assertKeepsWorkbook(index.pkg, openPackage(sortedSave.bytes), sheetPath, expectedRef);
+      console.log('  sales-report.xlsx: a save from the sorted view preserves package and worksheet bytes');
+    }
 
     // Corrupt independent copies of the saved rich workbook, one XML payload byte at a time.
     if (basename(file) !== 'rich-excelish.xlsx') continue;

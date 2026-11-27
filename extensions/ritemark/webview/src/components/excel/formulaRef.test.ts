@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { parseFormulaRef, refArea, referenceBounds } from './formulaRef'
+import { joinAdjacentRefs, parseFormulaRef, refArea, referenceBounds } from './formulaRef'
 
 assert.deepEqual(parseFormulaRef('A1')?.start, { row: 0, col: 0, absoluteRow: false, absoluteCol: false })
 assert.deepEqual(parseFormulaRef('=Sheet1!$C7')?.start, { row: 6, col: 2, absoluteRow: false, absoluteCol: true })
@@ -22,3 +22,9 @@ const anchored = parseFormulaRef("'Other sheet'!$B2:C$5")!
 assert.deepEqual(refArea(anchored, 2, 3), { top: 3, bottom: 4, left: 1, right: 5 })
 assert.equal(refArea(anchored, -2), undefined)
 assert.deepEqual(refArea(parseFormulaRef('$B:$C')!, 20, 20), { top: 0, bottom: 1048575, left: 1, right: 2 })
+
+const upper = parseFormulaRef('Sheet1!B2:C7')!
+const lower = parseFormulaRef('sheet1!C10:B8')!
+assert.deepEqual(referenceBounds(joinAdjacentRefs(lower, upper)!), { top: 1, bottom: 9, left: 1, right: 2 })
+assert.equal(joinAdjacentRefs(upper, parseFormulaRef('Sheet2!D2:D7')!), undefined)
+assert.equal(joinAdjacentRefs(upper, parseFormulaRef('Sheet1!D3:D7')!), undefined)

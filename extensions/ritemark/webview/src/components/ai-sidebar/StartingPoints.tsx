@@ -2,7 +2,7 @@
  * StartingPoints — the AI's empty sheet (Sprint 140, R8; experience 35, frames
  * 1, 3, 4 and 5): "What shall we work on?", the sentence about what the AI can
  * work across (D2), and at most three starting points chosen by what is open.
- * The same for Claude, ChatGPT and OpenCode; a click puts the words in the
+ * Word and PDF points depend on the chosen AI. A click puts the words in the
  * message box and the person presses Send. While the box holds the person's
  * own words the points step aside, keeping their room so the box does not move
  * (D4). Replaces 2.0's three examples, which sent at once.
@@ -11,14 +11,15 @@
 import type { ReactNode } from 'react'
 import { Button } from '../ui/button'
 import { Tooltip } from '../ui/tooltip'
-import { useAISidebarStore } from './store'
+import { selectStartingPlace, useAISidebarStore } from './store'
 import { startingPointsFor, startingSentence } from './startingPointWords'
 
 export function StartingPoints({ aiName, notice, onPicked, sentence = true }: { aiName: string; notice?: ReactNode; onPicked?: () => void; sentence?: boolean }) {
-  const startingPlace = useAISidebarStore((s) => s.startingPlace)
+  const place = useAISidebarStore(selectStartingPlace)
+  const hasAbout = useAISidebarStore((s) => s.startingPlace?.hasAbout ?? false)
   const composerEmpty = useAISidebarStore((s) => s.composerEmpty)
   const fillComposer = useAISidebarStore((s) => s.fillComposer)
-  const points = startingPlace ? startingPointsFor(startingPlace.place, { hasAbout: startingPlace.hasAbout }) : []
+  const points = place ? startingPointsFor(place, { hasAbout }) : []
   return (
     <div className="flex flex-1 flex-col justify-center overflow-y-auto px-4 py-6">
       {notice && <div className="mb-4 text-left">{notice}</div>}
@@ -42,7 +43,7 @@ export function StartingPoints({ aiName, notice, onPicked, sentence = true }: { 
                   className="h-auto w-full justify-start whitespace-nowrap rounded-lg bg-[var(--r-surface)] px-3 py-2 text-left text-[13px] font-normal leading-5 text-[var(--r-ink-strong)] shadow-[0_0_0_1px_var(--r-hairline)] hover:bg-[var(--r-surface-soft)]"
                   onClick={() => {
                     onPicked?.()
-                    fillComposer(point.text, point.cursor, { startingPoint: startingPlace!.place })
+                    fillComposer(point.text, point.cursor, { startingPoint: place })
                   }}
                 >
                   <span className="truncate">{point.label}</span>

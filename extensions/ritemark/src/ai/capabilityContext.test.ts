@@ -360,15 +360,21 @@ test('every runtime shares every capability section (edit-tool aside)', () => {
 });
 
 test('Sprint 173 S21: Claude, ChatGPT and OpenCode get the same source instructions', () => {
-  const sources = (['claude-code', 'codex', 'opencode'] as const).map((runtime) =>
+  const contexts = (['claude-code', 'codex', 'opencode'] as const).map((runtime) =>
     renderCapabilityContext(capabilityDescriptorFor(runtime, { browser: true, board: true, deck: true }))
-      .split('\n\n').find((section) => section.startsWith('SOURCES IN ANSWERS:')));
+  );
+  for (const context of contexts) {
+    assert.ok(context.includes('If a scanned PDF has no readable text, offer only to open it in the PDF viewer. Do not ask for a text-searchable copy.'));
+  }
+  const sources = contexts.map((context) =>
+    context.split('\n\n').find((section) => section.startsWith('SOURCES IN ANSWERS:')));
   const [instructions] = sources;
   assert.ok(instructions);
   assert.ok(sources.every((source) => source === instructions));
   assert.match(instructions, /Use `read_document` first when reading Word, PDF, or PowerPoint/);
   assert.match(instructions, /Name the source in the sentence as you would in a report/);
   assert.match(instructions, /Never use a number, a bracketed file name, or a path as the source label/);
+  assert.ok(instructions.includes('Refer to folders and documents in plain prose, for example “the Reference folder” or “the annual report”.'));
   assert.match(instructions, /the passage’s own words/);
   assert.match(instructions, /\[the head of operations\]\(Interviews\/Operations\.docx#p=4&q=start%20with%20the%20handover\)/);
 });

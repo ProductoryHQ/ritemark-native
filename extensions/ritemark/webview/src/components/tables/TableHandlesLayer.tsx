@@ -11,10 +11,10 @@
  *
  * The handles are drawn inside the table's element, positioned in its own coordinates: on a slide (drawn with
  * `transform: scale`) every measured rect is divided by the scale, so the handles scale with the slide and a click
- * lands where they are drawn, and a drag's pointer positions are divided by it too. Where the table's container clips
- * (a slide's text area), the handles stay inside it.
+ * lands where they are drawn, and a drag's pointer positions are divided by it too. Grips and the row bar can clamp
+ * to a slide's non-scrolling text area.
  */
-import { useCallback, useEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/core'
 import type { Transaction } from '@tiptap/pm/state'
@@ -29,6 +29,7 @@ import { minPercent, resizePair } from './columnResize'
 import { MAX_WIDTH_COLUMNS, snapPercents } from '../../../../src/markdown/tableWidths'
 import { TableMenuItems, type MenuKit } from './TableMenuItems'
 import { dropTarget } from './dropTarget'
+import { watchTableAddBars } from './tableAddBars'
 
 const GRIP_GAP = 4
 const COL_GRIP = { width: 28, height: 14 }
@@ -82,7 +83,7 @@ interface Geometry {
   rows: Rect[]
   cols: Rect[]
   /** The container that clips the table (a slide's text area), in the table's coordinates; null when nothing does. */
-  clip: { x: Rect | null; y: Rect | null }
+  clip: { x: Rect | null; y: Rect | null; slideY: boolean }
 }
 
 interface DragState {
@@ -150,7 +151,11 @@ export function measureTable(view: TableHandlesView): Geometry | null {
     table: local(view.table.getBoundingClientRect()),
     rows: rows.map(row => local(row.getBoundingClientRect())),
     cols: Array.from(rows[0]?.cells ?? []).map(cell => local(cell.getBoundingClientRect())),
-    clip: { x: clip.x ? local(clip.x.getBoundingClientRect()) : null, y: clip.y ? local(clip.y.getBoundingClientRect()) : null },
+    clip: {
+      x: clip.x ? local(clip.x.getBoundingClientRect()) : null,
+      y: clip.y ? local(clip.y.getBoundingClientRect()) : null,
+      slideY: !!clip.y?.matches('.deck-sl.is-blocks.is-editing .blk-flow'),
+    },
   }
 }
 
@@ -270,15 +275,47 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
     }
   }, [view])
 
+  const addRow = useRef<HTMLDivElement>(null)
+  const addColumn = useRef<HTMLDivElement>(null)
+  const rowGripSpot = useRef<HTMLDivElement>(null)
+  const columnGripSpot = useRef<HTMLDivElement>(null)
+  const pendingReveal = useRef<'row' | 'column' | null>(null)
+  const visibility = useRef<ReturnType<typeof watchTableAddBars> | null>(null)
+
   const tablePos = view.getPos()
   const table = tablePos === undefined ? null : tableAt(editor.state.doc, tablePos)
-  if (tablePos === undefined || !table) return null
   const caretCell = cellAtSelection(editor.state)
   const caret = caretCell && caretCell.pos === tablePos && editor.isFocused && !(editor.state.selection instanceof CellSelection) ? caretCell : null
   const menuHere = menu && menu.tablePos === tablePos ? menu : null
-  if (!inside && !caret && !menuHere && !drag && !resize) return null
-  const geometry = measureTable(view)
-  if (!geometry || !geometry.cols.length) return null
+  const geometry = table && (inside || caret || menuHere || drag || resize) ? measureTable(view) : null
+  const rendered = !!geometry?.cols.length
+
+  useLayoutEffect(() => {
+    if (!rendered) return
+    const watcher = watchTableAddBars(view.table, view.dom, () => [
+      { element: addRow.current, axis: 'y' },
+      { element: addColumn.current, axis: 'x' },
+      { element: rowGripSpot.current },
+      { element: columnGripSpot.current },
+    ])
+    visibility.current = watcher
+    return () => {
+      watcher.stop()
+      visibility.current = null
+    }
+  }, [view, rendered])
+
+  useLayoutEffect(() => {
+    if (pendingReveal.current) {
+      const isRow = pendingReveal.current === 'row'
+      const spot = isRow ? addRow.current : addColumn.current
+      pendingReveal.current = null
+      if (spot) visibility.current?.reveal(spot, isRow ? 'y' : 'x')
+    }
+    visibility.current?.update()
+  })
+
+  if (tablePos === undefined || !geometry || !rendered) return null
   const { table: box, rows, cols, clip } = geometry
   // The handles' sizes in the table's coordinates: on a slide drawn small, larger, so they stay big enough to point at.
   const k = Math.max(1, MIN_SCREEN / geometry.scale)
@@ -292,8 +329,9 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const activeCol = drag?.kind === 'column' ? drag.from : active && active.col < width ? active.col : null
   const activeRow = drag?.kind === 'row' ? drag.from : active && active.row < height ? active.row : null
 
-  const run = (tr: Transaction | null) => {
+  const run = (tr: Transaction | null, reveal?: 'row' | 'column') => {
     if (!tr || editor.isDestroyed) return
+    if (reveal) pendingReveal.current = reveal
     editor.view.dispatch(tr)
     editor.view.focus()
   }
@@ -430,6 +468,10 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
   const clipBottom = clip.y ? clip.y.top + clip.y.height : undefined
   const tableRight = box.left + box.width
   const tableBottom = box.top + box.height
+  const gripLeft = (at: number, size: number) => clip.slideY ? clamp(at, size, clipLeft, clipRight) : at
+  const slideTop = (at: number, size: number) => clip.slideY ? clamp(at, size, clipTop, clipBottom) : at
+  // Shorten the gap at a tight sideways clip while keeping the bar outside the cells.
+  const columnBarLeft = clamp(tableRight + gap, bar, tableRight + 1, clipRight)
   const col = activeCol !== null ? cols[activeCol] : null
   const row = activeRow !== null ? rows[activeRow] : null
   const columnOpen = menuHere?.kind === 'column' && menuHere.col === activeCol
@@ -440,9 +482,10 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
       {col && activeCol !== null && !resize && (!drag || drag.kind === 'column') ? (
         <div
           className="rm-table-grip-spot"
+          ref={columnGripSpot}
           style={{
-            left: clamp(col.left + col.width / 2 - colGrip.width / 2, colGrip.width, clipLeft, clipRight),
-            top: clamp(box.top - gap - colGrip.height, colGrip.height, clipTop, clipBottom),
+            left: gripLeft(col.left + col.width / 2 - colGrip.width / 2, colGrip.width),
+            top: slideTop(box.top - gap - colGrip.height, colGrip.height),
             width: colGrip.width,
             height: colGrip.height,
             ['--rm-k' as string]: k,
@@ -475,9 +518,10 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
       {row && activeRow !== null && !resize && (!drag || drag.kind === 'row') ? (
         <div
           className="rm-table-grip-spot"
+          ref={rowGripSpot}
           style={{
-            left: clamp(box.left - gap - rowGrip.width, rowGrip.width, clipLeft, clipRight),
-            top: clamp(row.top + row.height / 2 - rowGrip.height / 2, rowGrip.height, clipTop, clipBottom),
+            left: gripLeft(box.left - gap - rowGrip.width, rowGrip.width),
+            top: slideTop(row.top + row.height / 2 - rowGrip.height / 2, rowGrip.height),
             width: rowGrip.width,
             height: rowGrip.height,
             ['--rm-k' as string]: k,
@@ -542,7 +586,8 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
         <>
           <div
             className="rm-table-add-spot"
-            style={{ left: clamp(tableRight + gap, bar, clipLeft, clipRight), top: box.top, width: bar, height: box.height, ['--rm-k' as string]: k }}
+            ref={addColumn}
+            style={{ left: columnBarLeft, top: box.top, width: bar, height: box.height, ['--rm-k' as string]: k }}
           >
             <Tooltip label="Add a column" className="size-full" side="right">
               <Button
@@ -551,7 +596,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
                 className="rm-table-add"
                 aria-label="Add a column"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => run(insertColumn(editor.state, tablePos, width, activeRow ?? 0))}
+                onClick={() => run(insertColumn(editor.state, tablePos, width, activeRow ?? 0, false), 'column')}
               >
                 <Icon name="plus" size={12} tone="inherit" />
               </Button>
@@ -559,7 +604,8 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
           </div>
           <div
             className="rm-table-add-spot"
-            style={{ left: box.left, top: clamp(tableBottom + gap, bar, clipTop, clipBottom), width: box.width, height: bar, ['--rm-k' as string]: k }}
+            ref={addRow}
+            style={{ left: box.left, top: slideTop(tableBottom + gap, bar), width: box.width, height: bar, ['--rm-k' as string]: k }}
           >
             <Tooltip label="Add a row" className="size-full" side="bottom">
               <Button
@@ -568,7 +614,7 @@ function TableHandleSet({ view, editor, menu, onMenu }: { view: TableHandlesView
                 className="rm-table-add"
                 aria-label="Add a row"
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0))}
+                onClick={() => run(insertRow(editor.state, tablePos, height, activeCol ?? 0, false), 'row')}
               >
                 <Icon name="plus" size={12} tone="inherit" />
               </Button>
@@ -638,7 +684,12 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
           <span
             aria-hidden="true"
             className="rm-table-menu-anchor"
-            style={{ left: anchor.left, top: anchor.top, width: anchor.width, height: anchor.height }}
+            style={{
+              left: anchor.left,
+              width: anchor.width,
+              top: `clamp(8px, ${anchor.top}px, 100dvh - 8px)`,
+              bottom: `clamp(8px, 100dvh - ${anchor.top + anchor.height}px, 100dvh - 8px)`,
+            }}
           />
         </DropdownMenuTrigger>,
         document.body,
@@ -646,8 +697,9 @@ function TableMenu({ editor, menu, onClose }: { editor: Editor; menu: OpenMenu; 
       <DropdownMenuContent
         align="start"
         side="bottom"
-        // A long menu (a cell's, with Cut, Copy and Paste) scrolls inside the room the window has (the app run on #772).
-        className="rm-table-menu w-[236px] max-w-none max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
+        avoidCollisions
+        collisionPadding={8}
+        className="rm-table-menu w-[236px] max-w-none"
         onInteractOutside={() => { outside.current = true }}
         onCloseAutoFocus={event => event.preventDefault()}
       >

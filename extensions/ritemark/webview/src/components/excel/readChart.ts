@@ -1,6 +1,6 @@
 import { attr, decodeXmlEntities } from '../../../../src/excel/sheetXml'
 import {
-  colorOf, readTheme, section, type ColorContext, type ColorTransform,
+  chartColorVariation, colorOf, readTheme, type ColorContext, type ColorTransform,
 } from './excelStyles'
 import { drawingPresets } from './drawingColorNames'
 import type {
@@ -221,9 +221,16 @@ function data(el?: Element): ChartData | undefined {
   }
 }
 
-/** Preserve the rich-text title used by the existing drawing card. */
+/** Read the drawing card title from the chart itself, preferring rich text to ChartEx text data. */
 export function chartTitle(xml: string): string | undefined {
-  return richTitleText(section(xml, 'title'))
+  const root = children(xml).next().value
+  if (root?.name !== 'chartSpace') return undefined
+  const title = fields(fields(root.body).get('chart')?.body).get('title')?.body ?? ''
+  const rich = richTitleText(title)
+  if (rich) return rich
+  const tx = fields(title).get('tx')
+  const txData = fields(tx?.body).get('txData')
+  return fields(txData?.body).text('v')?.trim() || undefined
 }
 
 function richTitleText(body: string): string | undefined {
@@ -418,24 +425,23 @@ function plot(kind: ChartPlot['kind'], props: Fields, ctx: ColorContext): ChartP
   }
 }
 
-// Excel style 201's colour variations, as recorded in the fixtures' chart colour parts.
-const style201Variations = [
-  [1, 0], [0.6, 0], [0.8, 0.2], [0.8, 0], [0.6, 0.4],
-  [0.5, 0], [0.7, 0.3], [0.7, 0], [0.5, 0.5],
-]
-
 function automaticSeriesColor(index: number, ctx: ColorContext): string | undefined {
-  const [mod, off] = style201Variations[Math.floor(index / 6) % style201Variations.length]
-  return colorOf(`theme="${4 + index % 6}"`, ctx, [{ kind: 'lumMod', value: mod }, { kind: 'lumOff', value: off }])
+  return colorOf(`theme="${4 + index % 6}"`, ctx, chartColorVariation(Math.floor(index / 6)))
 }
 
-export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }): ChartModel {
+export function readChart(xml: string, ctx: ColorContext = { theme: readTheme(''), indexed: [] }, extended = false): ChartModel {
   const root = children(xml).next().value
-  if (root?.name !== 'chartSpace') return { supported: false, kind: 'unknown' }
+  if (root?.name !== 'chartSpace') return { supported: false, kind: extended ? 'chartex' : 'unknown' }
   const prefix = /^<([\w.-]+):/.exec(root.tag)?.[1]
   const namespace = attr(root.tag, prefix ? `xmlns:${prefix}` : 'xmlns')
-  if (namespace && /\b(?:drawingml|drawing)\/(?:\d+\/)+chartex$/i.test(namespace)) {
-    return { supported: false, kind: 'chartex' }
+  if (extended || namespace && /\b(?:drawingml|drawing)\/(?:\d+\/)+chartex$/i.test(namespace)) {
+    const chart = fields(fields(root.body).get('chart')?.body)
+    const regions = fields(chart.get('plotArea')?.body).all('plotAreaRegion')
+    const extendedKinds = [...new Set(regions.flatMap((region) => fields(region.body).all('series').flatMap((series) => {
+      const kind = attr(series.tag, 'layoutId')
+      return kind ? [kind] : []
+    })))]
+    return { supported: false, kind: 'chartex', ...(extendedKinds.length ? { extendedKinds } : {}) }
   }
   const space = fields(root.body)
   const chart = fields(space.get('chart')?.body)

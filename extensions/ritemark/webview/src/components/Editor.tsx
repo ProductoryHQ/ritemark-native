@@ -33,7 +33,7 @@ import { MarginCommentRail } from './MarginCommentRail'
 import { TableHandlesLayer } from './tables/TableHandlesLayer'
 import { PictureTools } from './pictures/PictureTools'
 import { PictureMakerView, usePictureMaker, type PictureMode, type PicturePlaceRef } from './pictures/ChatgptPicture'
-import { imagePathOf } from '../extensions/pictures/PictureNode'
+import { imagePathOf, refreshPictureSources } from '../extensions/pictures/PictureNode'
 import { caretBeforePicture, chosenPicture, chosenPictureUnder, replacePicture, replacePictureKeepingCaret } from '../extensions/pictures/pictureCommands'
 import { startComment } from '../extensions/comment/CommentNode'
 import { TableHandles, tableHandlesEnabled } from '../extensions/tables/TableHandles'
@@ -510,25 +510,8 @@ export function Editor({
         // doesn't have the image yet) would wipe the fresh insert.
         sendToExtension('imageInserted', { path: message.path })
       } else if (message.type === 'imageRefreshed' && message.displaySrc && message.path) {
-        // The image file changed on disk (e.g. a .drawio.svg saved from the
-        // diagram editor) — surgically swap the src of matching image nodes.
-        // title holds the markdown-relative path; the new displaySrc carries a
-        // cache-buster so the webview actually refetches.
-        const { state, view } = editor
-        const tr = state.tr
-        const changedPath = message.path
-        let changed = false
-        state.doc.descendants((node, pos) => {
-          if (node.type.name === 'image' && typeof node.attrs.title === 'string'
-            && sameRelativeImagePath(node.attrs.title, changedPath)) {
-            tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: message.displaySrc })
-            changed = true
-          }
-        })
-        if (changed) {
-          tr.setMeta('addToHistory', false)
-          view.dispatch(tr)
-        }
+        const tr = refreshPictureSources(editor.state, message.path, message.displaySrc)
+        if (tr) editor.view.dispatch(tr)
       } else if (message.type === 'imageSelectionCancelled') {
         // Replace picture… cancelled: the picture stays, and a later paste goes where the caret is.
         replaceImagePosRef.current = null

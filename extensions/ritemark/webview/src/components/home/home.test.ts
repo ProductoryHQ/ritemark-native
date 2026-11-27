@@ -7,6 +7,7 @@
  * Run: npx tsx webview/src/components/home/home.test.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
 import type { HomeState, ProjectRow, ProjectsState } from '../../../../src/projects/protocol'
 
@@ -126,7 +127,6 @@ assert.deepEqual(posted, [], 'drawing Home sends nothing')
 // ── The four-card grid (the Experience lead, 17 November): four across while each card can be 150 wide, two by two, one across ──
 
 {
-  const { readFileSync } = await import('node:fs')
   const css = readFileSync(new URL('./home.css', import.meta.url), 'utf8')
   const gap = Number(/\.rh-tiles \{[^}]*gap: (\d+)px/.exec(css)?.[1])
   assert.equal(gap, 12, 'the tiles’ gap')
@@ -469,17 +469,18 @@ assert.deepEqual(failedSignIn.querySelectorAll('button').map((button) => button.
 // A press that did not start says so on the card
 assert.match(render(home({ guidance: ready({ problem: 'That card is no longer on the board.' }) })), /role="status">That card is no longer on the board\./)
 
-// S61: the first-week question (experience 34, frame 1), with Send off until something is typed
-const asking = parse(render(home({ guidance: { card: 'feedback', heading: 'What did you make with Ritemark this week?', lede: 'One line is plenty. It goes to the people who make Ritemark, and we read every one.', placeholder: 'A proposal, notes, a module…', sending: false, problem: null } })))
-const ask = asking.querySelector('.rh-ask')!
-assert.equal(words(ask.querySelector('.rh-guide-hd')!), 'What did you make with Ritemark this week?')
-assert.equal(ask.querySelector('input')?.getAttribute('placeholder'), 'A proposal, notes, a module…')
-assert.deepEqual(ask.querySelectorAll('button').map(words), ['Send', 'Not now'], 'no ×: Send and Not now')
-assert.ok(ask.querySelector('button')!.hasAttribute('disabled'), 'Send is off while the field is empty')
-// S64: a send that did not go says so in one line, and offers the e-mail route
-const failed = parse(render(home({ guidance: { card: 'feedback', heading: 'What did you make with Ritemark this week?', lede: '…', placeholder: '…', sending: false, problem: "It didn't go. Your message is still here: try again, or open it in e-mail." } })))
-assert.deepEqual(failed.querySelector('.rh-ask')!.querySelectorAll('button').map(words), ['Try again', 'Open in e-mail', 'Not now'])
-assert.match(failed.toString(), /role="alert">It didn(&#x27;|')t go\./)
+// Experience 53, frame 6: the open-source card in the guidance slot.
+const openSource = parse(render(home({ guidance: { card: 'open-source' } }))).querySelector('.rh-guide')!
+assert.equal(words(openSource.querySelector('.rh-guide-hd')!), 'Ritemark is open source')
+assert.equal(words(openSource.querySelector('.rh-guide-body')!), 'Ritemark is free and open source. A star on GitHub helps other people find it, and in Discussions you can ask us and others anything.')
+assert.equal(words(openSource.querySelector('.rh-guide-note')!), 'Both open in your browser.')
+assert.deepEqual(openSource.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Not now', 'Star on GitHub', 'Discussions'])
+assert.equal(openSource.querySelectorAll('.rh-guide-go button.h-7').length, 2)
+assert.equal(openSource.querySelector('input'), null)
+const guidanceSource = readFileSync(new URL('./GuidanceCards.tsx', import.meta.url), 'utf8')
+assert.match(guidanceSource, /<Tooltip label="Opens Ritemark on GitHub" asChild>\s*<Button[^\n]*action: 'star'/)
+assert.match(guidanceSource, /<Tooltip label="Opens Ritemark's Discussions on GitHub" asChild>\s*<Button[^\n]*action: 'discussions'/)
+assert.deepEqual(openSource.querySelectorAll('.rh-guide-go button[data-state="closed"]').map(words), ['Star on GitHub', 'Discussions'])
 
 assert.deepEqual(posted, [], 'drawing sends nothing to the host')
 
@@ -491,4 +492,14 @@ assert.deepEqual(posted, [], 'drawing sends nothing to the host')
   assert.equal(recentIcon({ ...row, kind: 'markdown' }), 'file-text', 'a document')
   assert.equal(recentIcon({ ...row, name: 'Pitch', extension: '.pptx', kind: 'slides' }), 'file-ppt', 'PowerPoint keeps its own page, as in Documents')
 }
+const quickLook = parse(render(home({ guidance: {
+  card: 'quick-look',
+  body: 'Finder can show your decks’ first slides.',
+  button: 'Open System Settings',
+} })))
+const note = quickLook.querySelector('section[aria-labelledby="rh-quick-look-note"]')!
+assert.equal(note.querySelector('#rh-quick-look-note')?.text, 'Finder can show your decks’ first slides.')
+assert.deepEqual(note.querySelectorAll('button').map(words), ['Open System Settings', 'Not now'])
+assert.equal(note.querySelectorAll('.rh-guide-go > span[data-state="closed"] > button').length, 2, 'both note actions use Tooltip triggers')
+
 console.log('home: all assertions passed')

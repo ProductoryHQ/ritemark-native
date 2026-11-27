@@ -72,11 +72,11 @@ export function reportContextLines(context: ReportContextV1): string[] {
  * `body` is whatever the user typed or pasted. It is clipped rather than
  * rejected, because losing a long paste at the moment someone is trying to
  * complain is the worst possible time to be strict — and the clip is visible
- * in the field before anything is sent.
+ * in the field before anything is sent. The feedback sheet may append its separately bounded card words.
  */
-export function composeReport(context: ReportContextV1, body: string, lastAnswer?: string): string {
+export function composeReport(context: ReportContextV1, body: string, lastAnswer?: string, boundedCardSuffix = ''): string {
   const clipped = body.slice(0, MAX_REPORT_BODY_CHARS).trimEnd();
-  const lines = [...reportContextLines(context), '', clipped];
+  const lines = [...reportContextLines(context), '', clipped + boundedCardSuffix];
   // Sprint 140 (R12; Jarmo, 15 September): the AI's last answer, only when the person ticked it and saw it in the
   // sheet, quoted as shown there. Nothing else from the chat: not its title, not the other turns.
   if (lastAnswer && lastAnswer.trim()) {

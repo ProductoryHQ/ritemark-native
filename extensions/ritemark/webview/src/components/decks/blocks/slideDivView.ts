@@ -4,11 +4,9 @@
  * look, `blk-box` with its icon, `blk-steps`. The block's words are the editor's own content.
  *
  * PR 3 (README frame 4 and "The 'Exercise' pill is the person's own word"; the plan's "Added to PR 3"):
- *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). A box with none gets a place
- *    for one, on the stage only, under the looks that draw icons. Since the follow-up to #773 the place is never drawn
- *    (`display: none`): it tells the block bar that the caret's box has room for an icon, and the bar draws the icon
- *    handle there (`SlideBlockBar`, the `smile-plus` handle over the box's top edge). `slideCaretBox` still marks the
- *    caret's box `is-caret`; no rule draws it now.
+ *  - **A box's icon** is clicked to choose another from the grid (`handlers.pickIcon`). Under Icon, an empty box
+ *    shows a dashed badge when another box in the block has an icon. Under Number, the hidden icon slot anchors the block bar's
+ *    icon handle when the caret is in the box.
  *  - **Steps** has no pill of its own since Sprint 164 PR 3: its old pill is a Label before it (`slideLabel.ts`), and the
  *    stage opens a slide with its pills as Labels already (`SlideEditor.stageMarkdownOf`).
  *
@@ -17,22 +15,22 @@
  * No icon named “xyz” with Choose an icon. The name stays in the file as written until another icon is chosen.
  */
 import type { Node as PMNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
-import type { EditorView } from '@tiptap/pm/view'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Decoration, DecorationSet, type EditorView } from '@tiptap/pm/view'
 import type { NodeView, ViewMutationRecord } from '@tiptap/pm/view'
-import { OWN_MARK_LOOKS, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
+import { boxesShowIcons, boxesDrawnAttributes, columnsDrawnAttributes, revealsOne, slideBlockClassOf, type FenceAttributes } from '../../../../../src/decks/blocks/fencedDiv'
 import { boxIconBadge } from '../../../../../src/decks/blocks/slideRenderer'
 import { iconSvg } from '../slide/pageIcons'
 import { boxIconOf } from '../slide/iconSet'
 import { SlideDiv } from './slideEditorMarkdown'
-import { divAttributesOf, revealWrappedList } from './blockBar'
+import { boxLookAt, caretBoxPos, divAttributesOf, revealWrappedList } from './blockBar'
 
 /** What the stage does when a box's icon is used (SlideEditor gives it; it reads its latest state). */
 export interface SlideDivHandlers {
   /** A box's icon (or its empty place) was clicked: choose one for the box at `pos`, under `anchor`. */
   pickIcon: (pos: number, anchor: HTMLElement, current: string | null) => void
   /** #850: the pointer came onto the badge of a box at `pos` whose icon `name` Ritemark doesn't know (its tooltip). */
-  hintIcon?: (pos: number, anchor: HTMLElement, name: string) => void
+  hintIcon?: (pos: number, anchor: HTMLElement, name: string | null) => void
 }
 
 /** #850: the words a box's unknown icon says, in the stage's tooltip and to a screen reader. */
@@ -42,15 +40,6 @@ export function unknownIconWords(name: string): string {
 
 /** The block's attributes, read from its opening line as written. */
 const attributesOf: (node: PMNode) => FenceAttributes = divAttributesOf
-
-/** The Boxes look a box is drawn under: its parent's, or Boxes. */
-function lookAround(getPos: () => number | undefined, doc: () => PMNode): string {
-  const pos = getPos()
-  if (pos === undefined) return 'boxes'
-  const parent = doc().resolve(pos).parent
-  if (parent.type.name !== 'slideDiv') return 'boxes'
-  return attributesOf(parent).values.look ?? 'boxes'
-}
 
 /** The attributes the block bar's values are drawn with (`boxesDrawnAttributes`, `columnsDrawnAttributes`). */
 const DRAWN = ['data-count', 'data-many', 'data-width', 'data-fill', 'data-align', 'data-valign', 'style'] as const
@@ -91,7 +80,7 @@ class SlideDivView implements NodeView {
   constructor(
     private node: PMNode,
     private readonly getPos: () => number | undefined,
-    private readonly doc: () => PMNode,
+    private decorations: readonly Decoration[],
     private readonly handlers: SlideDivHandlers | null,
   ) {
     this.kind = slideBlockClassOf(attributesOf(node))
@@ -125,9 +114,8 @@ class SlideDivView implements NodeView {
   /** #850: the pointer on an unknown icon's badge: the stage's tooltip says so, with Choose an icon. */
   private onIconEnter = () => {
     const pos = this.getPos()
-    const name = this.deco?.classList.contains('is-unknown') ? this.deco.getAttribute('data-icon') : null
-    if (pos === undefined || !this.deco || this.deco.hidden || !name) return
-    this.handlers?.hintIcon?.(pos, this.deco, name)
+    if (pos === undefined || !this.deco || this.deco.hidden || !this.deco.classList.contains('is-unknown')) return
+    this.handlers?.hintIcon?.(pos, this.deco, this.deco.getAttribute('data-icon'))
   }
 
   private render() {
@@ -152,25 +140,29 @@ class SlideDivView implements NodeView {
         : {})
     const deco = this.deco
     if (!deco) return
-    // A box: its icon, an arrow under the Arrows look, nothing under Steps and Line (they draw their own mark).
-    const look = lookAround(this.getPos, this.doc)
+    // Number is drawn by CSS. The decoration holds the icon under Icon or Number, or the arrow under Arrow.
+    const { boxLook: look = 'boxes', reserveIconSpace = false } = this.decorations.find(deco => deco.spec.boxLook !== undefined)?.spec ?? {}
     // The renderer's badge: the box's icon, or the dashed circle for a name Ritemark doesn't know (#850).
-    const badge = boxIconBadge(attrs.values.icon)
+    const showsIcons = boxesShowIcons(look)
+    const badge = showsIcons ? boxIconBadge(attrs.values.icon, reserveIconSpace ? 'placeholder' : undefined) : null
     deco.removeAttribute('data-icon')
     if (look === 'arrows') {
       deco.className = 'blk-mark'
       deco.innerHTML = iconSvg('arrow-right', 20)
       deco.hidden = false
       deco.removeAttribute('role')
-    } else if (!OWN_MARK_LOOKS.has(look) && badge) {
+    } else if (badge) {
       deco.className = `${badge.className}${this.handlers ? ' is-pickable' : ''}`
       deco.innerHTML = badge.svg
       deco.hidden = false
       // The unknown name, as written, for the stage's tooltip (`onIconEnter`).
       if (badge.unknown !== null) deco.setAttribute('data-icon', badge.unknown)
-      this.pickable(deco, badge.unknown === null ? 'Change the icon' : `${unknownIconWords(badge.unknown)}: choose an icon`)
-    } else if (!OWN_MARK_LOOKS.has(look) && this.handlers) {
-      // A box with no icon shows a place for one, on the stage only (README frame 4).
+      const label = badge.unknown !== null
+        ? `${unknownIconWords(badge.unknown)}: choose an icon`
+        : attrs.values.icon?.trim() ? 'Change the icon' : 'Choose an icon'
+      this.pickable(deco, label)
+    } else if (look === 'steps' && this.handlers) {
+      // Under Number, the hidden slot anchors the caret’s icon handle.
       deco.className = 'blk-icon is-pickable is-place'
       deco.innerHTML = PLUS_SVG
       deco.hidden = false
@@ -198,12 +190,10 @@ class SlideDivView implements NodeView {
     deco.setAttribute('aria-label', label)
   }
 
-  update(node: PMNode): boolean {
+  update(node: PMNode, decorations: readonly Decoration[]): boolean {
     if (node.type !== this.node.type || slideBlockClassOf(attributesOf(node)) !== this.kind) return false
-    // A Boxes block's look draws its boxes' marks: another look draws the block and its boxes again (ProseMirror
-    // doesn't update unchanged children; review of #765).
-    if (this.kind === 'boxes' && (attributesOf(node).values.look ?? 'boxes') !== (attributesOf(this.node).values.look ?? 'boxes')) return false
     this.node = node
+    this.decorations = decorations
     this.render()
     return true
   }
@@ -223,18 +213,8 @@ class SlideDivView implements NodeView {
   }
 }
 
-/** The box the caret is in: its empty icon place shows, and only there (17 November). */
+/** Marks the box holding the caret without changing its drawing. */
 export const CARET_CLASS = 'is-caret'
-
-/** The position of the innermost box (`::: box`) holding the selection's head, or null. */
-export function caretBoxPos(state: EditorState): number | null {
-  const $head = state.selection.$head
-  for (let depth = $head.depth; depth > 0; depth--) {
-    const node = $head.node(depth)
-    if (node.type.name === 'slideDiv' && slideBlockClassOf(attributesOf(node)) === 'box') return $head.before(depth)
-  }
-  return null
-}
 
 /**
  * The element the caret's mark may go on: a box this view draws, in the page. Anything else (another node's element
@@ -270,15 +250,39 @@ function slideCaretBox(): Plugin {
   })
 }
 
+// A box's drawing depends on its parent and siblings. Send both values as decorations so ProseMirror
+// redraws unchanged boxes when the first icon is added or the last is removed.
+function slideBoxLooks(): Plugin {
+  return new Plugin({
+    props: {
+      decorations(state) {
+        const { doc } = state
+        const boxes: Decoration[] = []
+        doc.descendants((node, pos, parent) => {
+          if (node.type.name === 'slideDiv' && decorated(slideBlockClassOf(attributesOf(node)))) {
+            const boxLook = boxLookAt(doc, pos)
+            const reserveIconSpace = boxLook !== 'steps' && boxesShowIcons(boxLook) && !!parent &&
+              slideBlockClassOf(attributesOf(parent)) === 'boxes' &&
+              childDivs(parent, 'box').some(box => attributesOf(box).values.icon?.trim())
+            if (boxLook !== 'boxes' || reserveIconSpace) {
+              boxes.push(Decoration.node(pos, pos + node.nodeSize, {}, { boxLook, reserveIconSpace }))
+            }
+          }
+        })
+        return DecorationSet.create(doc, boxes)
+      },
+    },
+  })
+}
+
 /** The `:::` node with the renderer's drawing, as the stage's slide editor uses it; with the stage's handlers in PR 3. */
 export function slideDivWithView(handlers: SlideDivHandlers | null) {
   return SlideDiv.extend({
     addNodeView() {
-      return ({ node, getPos, editor }) => new SlideDivView(node, getPos as () => number | undefined, () => editor.state.doc, handlers)
+      return ({ node, getPos, decorations }) => new SlideDivView(node, getPos as () => number | undefined, decorations, handlers)
     },
-    // The box being edited shows its empty icon place (17 November): the stage's editor, which has the handlers.
     addProseMirrorPlugins() {
-      return handlers ? [slideCaretBox()] : []
+      return handlers ? [slideBoxLooks(), slideCaretBox()] : [slideBoxLooks()]
     },
   })
 }

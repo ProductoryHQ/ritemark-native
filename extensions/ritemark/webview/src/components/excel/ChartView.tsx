@@ -1,7 +1,8 @@
 import { Component, memo, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { layoutChart, type ChartLayout } from './chartLayout'
+import { layoutChart, slicePath, type ChartLayout } from './chartLayout'
 import type { ChartMarker, ChartShape, ChartTextStyle } from './chartModel'
 import { resolveSeries } from './chartSeries'
+import { chartFormulaText, type ChartSelectionTarget } from './chartSelection'
 import { measure, forgetMeasures } from './gridTextMeasure'
 import type { WorkbookModel } from './readWorkbook'
 import { fontCss, fontShorthand, GRID_SANS } from './sheetLayout'
@@ -27,7 +28,7 @@ function stroke(shape: ChartShape | undefined, color: string, width = 1) {
 }
 
 function Marker({ x, y, marker, color }: { x: number; y: number; marker: ChartMarker; color: string }) {
-  const r = (marker.size ?? 5) * 2 / 3
+  const r = Math.min(marker.size ?? 5, 72) * 2 / 3
   const shape = { fill: marker.shape?.noFill ? 'none' : marker.shape?.fill ?? color, ...stroke(marker.shape, color) }
   switch (marker.symbol) {
     case 'square': return <rect x={x - r} y={y - r} width={2 * r} height={2 * r} {...shape} />
@@ -65,13 +66,51 @@ function smoothPath(points: ChartLayout['lines'][number]['segments'][number]): s
     const after = points[i + 1] ?? p
     const c1 = { x: start.x + (p.x - before.x) / 6, y: start.y + (p.y - before.y) / 6 }
     const c2 = { x: p.x - (after.x - start.x) / 6, y: p.y - (after.y - start.y) / 6 }
+    if (![c1.x, c1.y, c2.x, c2.y].every(Number.isFinite)) return `L ${p.x} ${p.y}`
     return `C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${p.x} ${p.y}`
   }).join(' ')
+}
+
+function finiteGeometry(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (Array.isArray(value)) return value.every(finiteGeometry)
+  if (value && typeof value === 'object') return Object.values(value).every(finiteGeometry)
+  return true
+}
+
+function PlotSlices({ layout }: { layout: Pick<ChartLayout, 'slices'> }) {
+  return layout.slices && <g data-chart="slices">{layout.slices.map((slice, i) =>
+    <path key={i} d={slicePath(slice)} fill={slice.shape?.noFill ? 'none' : slice.color} {...stroke(slice.shape, 'none')} />)}
+  </g>
+}
+
+function PlotPaths({ layout, clip }: { layout: Pick<ChartLayout, 'areas' | 'bars' | 'lines'>; clip: string }) {
+  return (
+    <g clipPath={`url(#${clip})`}>
+      {layout.areas && <g data-chart="areas">{layout.areas.flatMap(({ segments, color, shape }, i) =>
+        segments.map(({ top, base }, j) => {
+          const points = [...top, ...[...base].reverse()].map(({ x, y }) => `${x} ${y}`).join(' L ')
+          return <path key={`${i}:${j}`} d={`M ${points} Z`} fill={shape?.noFill ? 'none' : color} {...stroke(shape, 'none')} />
+        }))}
+      </g>}
+      <g data-chart="bars">{layout.bars.map(({ x, y, width, height, color, shape, index, series }) =>
+        <rect key={`${series}:${index}`} {...{ x, y, width, height }} fill={shape?.noFill ? 'none' : color} {...stroke(shape, 'none')} />)}</g>
+      <g data-chart="lines">{layout.lines.flatMap(({ segments, shape, color, smooth }, i) => segments.map((points, j) =>
+        smooth ? <path key={`${i}:${j}`} d={smoothPath(points)} fill="none" {...stroke(shape, color, 2.25)} />
+          : <polyline key={`${i}:${j}`} points={points.map(({ x, y }) => `${x},${y}`).join(' ')} fill="none" {...stroke(shape, color, 2.25)} />,
+      ))}</g>
+    </g>
+  )
+}
+
+function PlotMarkers({ markers }: { markers: ChartLayout['markers'] }) {
+  return <g data-chart="markers">{markers.map((marker, i) => <Marker key={i} {...marker} />)}</g>
 }
 
 export const ChartView = memo(function ChartView({ layout }: { layout: ChartLayout }) {
   const clip = useId()
   const { width, height, plot, legend, plotShape, chartShape } = layout
+  if (layout.emptyReason || !finiteGeometry(layout)) return null
   const borderInset = Math.min((chartShape?.lineWidth ?? 1) / 2, width / 2, height / 2)
   return (
     <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={layout.name}
@@ -82,21 +121,23 @@ export const ChartView = memo(function ChartView({ layout }: { layout: ChartLayo
         fill={chartShape?.noFill ? 'none' : chartShape?.fill ?? 'none'} {...stroke(chartShape, '#898989')} />
       {plotShape && !plotShape.noFill && plotShape.fill && <rect {...plot} fill={plotShape.fill} />}
       <g data-chart="gridlines"><Rules rules={layout.gridlines} color="#d9d9d9" /></g>
-      <g clipPath={`url(#${clip})`}>
-        <g data-chart="bars">{layout.bars.map(({ x, y, width, height, color, shape, index, series }) =>
-          <rect key={`${series}:${index}`} {...{ x, y, width, height }} fill={shape?.noFill ? 'none' : color} {...stroke(shape, 'none')} />)}</g>
-        <g data-chart="lines">{layout.lines.flatMap(({ segments, shape, color, smooth }, i) => segments.map((points, j) =>
-          smooth ? <path key={`${i}:${j}`} d={smoothPath(points)} fill="none" {...stroke(shape, color, 2.25)} />
-            : <polyline key={`${i}:${j}`} points={points.map(({ x, y }) => `${x},${y}`).join(' ')} fill="none" {...stroke(shape, color, 2.25)} />,
-        ))}</g>
-      </g>
+      {layout.plotLayers ? layout.plotLayers.map((layer, i) => <g key={i} data-chart-plot={layer.kind}>
+        <PlotSlices layout={layer} />
+        <PlotPaths layout={layer} clip={clip} />
+        <PlotMarkers markers={layer.markers} />
+      </g>) : <>
+        <PlotSlices layout={layout} />
+        <PlotPaths layout={layout} clip={clip} />
+      </>}
       {plotShape && <rect data-chart="plot-area" {...plot} fill="none" {...stroke(plotShape, plotShape.hasLine ? '#898989' : 'none')} />}
       <g data-chart="axes"><Rules rules={layout.axes} color="#898989" /></g>
-      <g data-chart="markers">{layout.markers.map((marker, i) => <Marker key={i} {...marker} />)}</g>
+      {!layout.plotLayers && <PlotMarkers markers={layout.markers} />}
       <g data-chart="axis-labels">{layout.axisLabels.map((label, i) => <Text key={i} {...label} />)}</g>
       <g data-chart="titles">{layout.titles.map((label, i) => <Text key={i} {...label} />)}</g>
-      <g data-chart="data-labels">{layout.dataLabels.map(({ shape, width, height, keyColor, ...label }, i) => (
-        <g key={i}>
+      {layout.leaders && <g data-chart="leader-lines"><Rules rules={layout.leaders} color="#898989" /></g>}
+      <g data-chart="data-labels">{layout.dataLabels.map(({ shape, width, height, keyColor, fitScale, ...label }, i) => (
+        <g key={i} transform={fitScale === undefined ? undefined
+          : `translate(${label.x} ${label.y}) scale(${fitScale}) translate(${-label.x} ${-label.y})`}>
           {shape && <rect x={label.x - width / 2 - 2} y={label.y - height / 2 - 1} width={width + 4} height={height + 2}
             fill={shape.noFill ? 'none' : shape.fill ?? 'none'} {...stroke(shape, 'none')} />}
           {keyColor && <rect x={label.x - width / 2 - 9} y={label.y - 3} width={6} height={6} fill={keyColor} />}
@@ -105,12 +146,12 @@ export const ChartView = memo(function ChartView({ layout }: { layout: ChartLayo
       ))}</g>
       {legend && <g data-chart="legend">
         {legend.shape && <rect {...legend.bounds} fill={legend.shape.noFill ? 'none' : legend.shape.fill ?? 'none'} {...stroke(legend.shape, 'none')} />}
-        {legend.entries.map(({ key, label, color, shape, marker }, i) => {
+        {legend.entries.map(({ key, label, color, shape, marker, lineKey }, i) => {
           const middle = key.y + key.height / 2
           return <g key={i}>
             {key.width > 7
               ? <line x1={key.x} y1={middle} x2={key.x + key.width} y2={middle} {...stroke(shape, color, 2.25)} />
-              : <rect {...key} fill={shape?.noFill ? 'none' : color} {...stroke(shape, 'none')} />}
+              : lineKey !== false && <rect {...key} fill={shape?.noFill ? 'none' : color} {...stroke(shape, 'none')} />}
             {marker && <Marker x={key.x + key.width / 2} y={middle} marker={marker} color={color} />}
             <Text {...label} />
           </g>
@@ -126,6 +167,9 @@ interface ChartProps {
   version: number
 }
 interface PositionedChartProps extends ChartProps {
+  emptyFallback: (reason: string) => ReactNode
+  selection?: ChartSelectionTarget
+  sheetName?: string
   width?: number
   height?: number
 }
@@ -149,7 +193,7 @@ export class ChartErrorBoundary extends Component<ChartProps & { children: React
   }
 }
 
-export const PositionedChart = memo(function PositionedChart({ chart, workbook, version, width, height }: PositionedChartProps) {
+export const PositionedChart = memo(function PositionedChart({ chart, workbook, version, width, height, emptyFallback, selection, sheetName = '' }: PositionedChartProps) {
   const container = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [fontVersion, setFontVersion] = useState(0)
@@ -175,11 +219,41 @@ export const PositionedChart = memo(function PositionedChart({ chart, workbook, 
     fonts.addEventListener('loadingdone', refresh)
     return () => { mounted = false; fonts.removeEventListener('loadingdone', refresh) }
   }, [])
-  const series = useMemo(() => resolveSeries(chart, workbook.sheets, workbook)[0], [chart, workbook, version])
+  const series = useMemo(() => resolveSeries(chart, workbook.sheets, workbook), [chart, workbook, version])
   const w = width ?? size.width
   const h = height ?? size.height
-  const layout = useMemo(() => w > 0 && h > 0 ? layoutChart(chart, series, w, h, measureChartText, workbook.date1904) : undefined,
+  const layout = useMemo(() => {
+    if (!(w > 0 && h > 0)) return undefined
+    const geometry = layoutChart(chart, series, w, h, measureChartText, workbook.date1904)
+    if (!finiteGeometry(geometry)) geometry.emptyReason = 'This chart contains values outside the preview range.'
+    return geometry
+  },
     [chart, series, w, h, workbook.date1904, fontVersion])
-  const style: CSSProperties = { width: '100%', height: '100%', background: '#fff', overflow: 'hidden' }
-  return <div ref={container} style={style}>{layout && <ChartView layout={layout} />}</div>
+  const style: CSSProperties = { width: '100%', height: '100%', background: '#fff' }
+  const target = layout && !layout.emptyReason ? selection : undefined
+  const choose = (element: HTMLDivElement) => {
+    if (!target || !layout) return
+    target.choose(element, chartFormulaText(chart, layout.chartTitle, sheetName))
+  }
+  return (
+    <div ref={container} style={style} className={target ? 'sg-chart' : undefined}
+      id={target?.focusable ? target.id : undefined} data-sheet-chart={target?.id} role={target ? 'button' : undefined}
+      tabIndex={target ? target.focusable ? 0 : -1 : undefined}
+      aria-hidden={target && !target.focusable ? true : undefined}
+      aria-label={target ? layout?.name : undefined} aria-pressed={target?.chosen}
+      onMouseDown={target && !target.focusable ? (event) => {
+        if (event.button === 0) event.preventDefault()
+      } : undefined}
+      onClick={target && ((event) => choose(event.currentTarget))}
+      onKeyDown={target && ((event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        choose(event.currentTarget)
+      })}>
+      <div className="h-full w-full overflow-hidden">
+        {layout && (layout.emptyReason ? emptyFallback(layout.emptyReason) : <ChartView layout={layout} />)}
+      </div>
+    </div>
+  )
 })

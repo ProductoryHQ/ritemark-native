@@ -36,6 +36,7 @@ export const BUNDLED_CODEX_REPAIR_MESSAGE =
   'ChatGPT ships with Ritemark and cannot be repaired on its own. If it does not work, reinstall Ritemark to restore it.';
 
 export interface CodexManagerConfig {
+  isolatedTestHome?: string;
   onStdout?: (data: string) => void;
   onStderr?: (data: string) => void;
   onExit?: (code: number | null) => void;
@@ -461,7 +462,9 @@ export class CodexManager {
         stdio: ['pipe', 'pipe', 'pipe'],
         // Sprint 143 (#544, R3a): Codex's own log line naming its wait before it tries again reaches stderr.
         // A log filter for this process only; the person's configuration and ~/.codex are untouched.
-        env: codexAppServerEnv(process.env),
+        env: codexAppServerEnv(this.config.isolatedTestHome
+          ? { ...process.env, CODEX_HOME: this.config.isolatedTestHome }
+          : process.env),
       });
 
       // Set up stdout handler
@@ -846,7 +849,11 @@ export class CodexManager {
   }
 
   private buildAppServerArgs(launchMode: CodexLaunchMode | null): string[] {
-    return launchMode === 'codex-app-server' ? [] : ['app-server'];
+    const args = launchMode === 'codex-app-server' ? [] : ['app-server'];
+    if (this.config.isolatedTestHome) {
+      args.push('-c', 'cli_auth_credentials_store="ephemeral"');
+    }
+    return args;
   }
 
   private buildGenerateTypesArgs(launchMode: CodexLaunchMode, outputDir: string): string[] {

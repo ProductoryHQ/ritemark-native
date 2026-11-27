@@ -60,6 +60,14 @@ function withOlderAppFields(
   gates: Partial<Record<Provider, Record<string, string>>>,
 ): JsonObject {
   const out: JsonObject = { ...row };
+  // Older apps need a plain row to resolve a saved selection. This build
+  // reapplies the hidden flag from its bundled catalog.
+  if (row.hidden) {
+    delete out.hidden;
+    out.description = 'Retained for saved selections';
+    out.deprecated = false;
+    out.order = 100;
+  }
   // Only a curated feed row carries fields on: an automated row's belong to the
   // withdrawn publisher, and the curated bundled row replaces it whole.
   const carried = current && current.provenance !== 'auto' ? current : undefined;

@@ -2,10 +2,14 @@
  * Sprint 157: the Slide library, with an in-memory project. Run with `npx tsx src/decks/DeckLibrary.test.ts`.
  */
 import { strict as assert } from 'node:assert';
+import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { isTextHandout, parseFrom, slideDataOf } from './deckFormat';
 import { slideStamps, slidesOfText } from './deckLibraryFormat';
 import { DeckLibrary, isTopicPath, type DeckFiles } from './DeckLibrary';
 import { isDeckPath } from './deckFileName';
+import { workspaceDeckPictures } from './workspaceDeckPictures';
 
 function project(files: Record<string, string>): DeckFiles & { files: Record<string, string> } {
   return {
@@ -90,6 +94,13 @@ async function run() {
   assert.ok(topic.includes('# Our own'), 'the library gets it as a block slide');
   // Sprint 172: a topic named as one made before (`AI assistants.deck.md`) is that file, never a new `.rtms` beside it
   {
+    const withAssets = new DeckLibrary(project({
+      'Kickoff.rtms': DECK,
+      'Kickoff.rtms.files/Kickoff.html': DECK,
+      'Kickoff.rtms.files/Internal.rtms': DECK,
+      'Notes.rtms.files/x.rtms': DECK,
+    }));
+    assert.deepEqual((await withAssets.listDecks()).map(deck => deck.path).sort(), ['Kickoff.rtms', 'Notes.rtms.files/x.rtms']);
     const legacy = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Talks/Day one.rtms': DECK });
     const legacyLibrary = new DeckLibrary(legacy);
     const write = await legacyLibrary.addToLibrary('Talks/Day one.rtms', 'AI assistants', { kind: 'statement', body: 'id: t8\ntitle: One more', handout: '' });
@@ -203,7 +214,118 @@ async function run() {
   console.log('DeckLibrary: passed');
 }
 
-void run().catch(error => {
+async function pictureTransfers() {
+  const temp = await mkdtemp(join(tmpdir(), 'deck-picture-transfer-'));
+  try {
+    const root = join(temp, 'project');
+    const selling = 'Sales/Sales.rtms';
+    const sourceFolder = selling + '.files';
+    const receiving = 'Kickoff.rtms';
+    const own = receiving + '.files';
+    const sourceText = [
+      '---', 'deck: 2', '---', '', '```slide', '---', 'id: map1', 'image: Sales.rtms.files/map.png', 'picture: right',
+      '---', '# Sales map', '', '![Map](Sales.rtms.files/map.png) [Same file](Sales.rtms.files/map.png)',
+      '![Already here](../Kickoff.rtms.files/own.png)',
+      '![Missing](Sales.rtms.files/gone.png) ![Remote](https://example.com/pic.png)',
+      '![Outside](Sales.rtms.files/outside.png) ![Document](Sales.rtms.files/brief.md) [Brief](Sales.rtms.files/brief.md)',
+      '```', '', '![Handout][detail]', '', '[detail]: Sales.rtms.files/detail.png', '',
+    ].join('\n');
+    const sources = {
+      'map.png': Buffer.from([0, 10, 255]),
+      'detail.png': Buffer.from('detail'),
+      'brief.md': Buffer.from('# Brief'),
+    };
+    const put = async (file: string, bytes: Buffer | string) => writeFile(join(root, file), bytes);
+    const read = (file: string) => readFile(join(root, file));
+    await mkdir(join(root, sourceFolder), { recursive: true });
+    await mkdir(join(root, own));
+    await put(selling, sourceText);
+    for (const [name, bytes] of Object.entries(sources)) await put(sourceFolder + '/' + name, bytes);
+    await writeFile(join(temp, 'outside.png'), 'outside');
+    await symlink(join(temp, 'outside.png'), join(root, sourceFolder, 'outside.png'));
+    await put(own + '/own.png', 'receiving picture');
+    const topic = 'Slide library/Maps.rtms';
+    const projectFiles = project({ [selling]: sourceText, [receiving]: DECK, [topic]: DECK, 'Failure.rtms': DECK });
+    const library = new DeckLibrary({ ...projectFiles, pictures: workspaceDeckPictures(root) });
+
+    await library.insertCopies(selling, ['map1'], receiving, undefined, async ([part]) => {
+      assert.deepEqual(await read(own + '/map.png'), sources['map.png'], 'bytes exist before the view receives the slide');
+      assert.equal(slideDataOf(part.kind, part.body).image, own + '/map.png');
+      assert.match(part.body, /!\[Map\]\(Kickoff\.rtms\.files\/map\.png\)/);
+      assert.match(part.body, /\[Same file\]\(Sales\/Sales\.rtms\.files\/map\.png\)/);
+      assert.match(part.body, /!\[Already here\]\(Kickoff\.rtms\.files\/own\.png\)/);
+      assert.match(part.body, /!\[Missing\]\(Sales\/Sales\.rtms\.files\/gone\.png\)/);
+      assert.match(part.body, /!\[Remote\]\(https:\/\/example\.com\/pic\.png\)/);
+      assert.match(part.body, /!\[Outside\]\(Sales\/Sales\.rtms\.files\/outside\.png\)/);
+      assert.match(part.body, /!\[Document\]\(Sales\/Sales\.rtms\.files\/brief\.md\)/);
+      assert.match(part.body, /\[Brief\]\(Sales\/Sales\.rtms\.files\/brief\.md\)/);
+      assert.match(part.handout, /\[detail\]: Kickoff\.rtms\.files\/detail\.png/);
+      return true;
+    });
+    await library.insertCopies(selling, ['map1'], receiving, undefined);
+    assert.deepEqual((await readdir(join(root, own))).sort(), ['detail.png', 'map.png', 'own.png']);
+    assert.deepEqual(await read(own + '/detail.png'), sources['detail.png']);
+
+    const inserted = slidesOfText(projectFiles.files[receiving]).find(slide => slide.data.from)!;
+    const state = async () => (await library.sourceStates(receiving, [{ ...inserted, id: inserted.data.id!, from: inserted.data.from! }]))[0];
+    assert.equal((await state()).changed, false);
+    assert.equal((await state()).newer, false);
+
+    const collisionDeck = 'Collision.rtms';
+    await mkdir(join(root, collisionDeck + '.files'));
+    await put(collisionDeck + '.files/map.png', 'different picture');
+    const [collided] = await library.copies(selling, ['map1'], collisionDeck, []);
+    assert.equal(slideDataOf(collided.kind, collided.body).image, collisionDeck + '.files/map-2.png');
+    assert.deepEqual(await read(collisionDeck + '.files/map-2.png'), sources['map.png']);
+    assert.equal((await read(collisionDeck + '.files/map.png')).toString(), 'different picture');
+    const [repeated] = await library.copies(selling, ['map1'], collisionDeck, []);
+    assert.equal(slideDataOf(repeated.kind, repeated.body).image, collisionDeck + '.files/map-2.png');
+
+    // The same bytes under Publish's own logos/ aren't reused: only the folder's top counts.
+    const logoDeck = 'Logo.rtms';
+    await mkdir(join(root, logoDeck + '.files', 'logos'), { recursive: true });
+    await put(logoDeck + '.files/logos/map.png', sources['map.png']);
+    const [logoCopy] = await library.copies(selling, ['map1'], logoDeck, []);
+    assert.equal(slideDataOf(logoCopy.kind, logoCopy.body).image, logoDeck + '.files/map.png');
+    assert.deepEqual(await read(logoDeck + '.files/map.png'), sources['map.png']);
+    assert.deepEqual((await readdir(join(root, logoDeck + '.files'))).sort(), ['detail.png', 'logos', 'map.png', 'own.png'], 'no temporary folder left behind');
+
+    await put('Failure.rtms.files', 'blocks creation');
+    const [failed] = await library.copies(selling, ['map1'], 'Failure.rtms', []);
+    assert.equal(slideDataOf(failed.kind, failed.body).image, sourceFolder + '/map.png');
+    assert.equal((await read('Failure.rtms.files')).toString(), 'blocks creation');
+
+    const refreshed = await library.useSource('Refresh.rtms', inserted.body, inserted.kind);
+    assert.equal(slideDataOf(refreshed.kind, refreshed.body).image, 'Refresh.rtms.files/map.png');
+    assert.deepEqual(await read('Refresh.rtms.files/map.png'), sources['map.png']);
+
+    const added = await library.addToLibrary(receiving, topic, inserted);
+    assert.match(added.written, /image: Maps\.rtms\.files\/map\.png/);
+    assert.deepEqual(await read(topic + '.files/map.png'), sources['map.png']);
+    await put(own + '/new-map.png', 'new map');
+    const edited = {
+      ...inserted,
+      body: inserted.body.replace(/^from: .*$/m, `from: ${added.from}`).split(own + '/map.png').join(own + '/new-map.png'),
+    };
+    const updated = await library.updateLibrarySlide(receiving, edited);
+    assert.match(updated.written, /image: Maps\.rtms\.files\/new-map\.png/);
+    assert.equal((await read(topic + '.files/new-map.png')).toString(), 'new map');
+    assert.equal(await library.undoWrite(updated), true);
+    assert.equal((await read(topic + '.files/new-map.png')).toString(), 'new map');
+    assert.equal(await library.undoWrite(added), true);
+    assert.equal(projectFiles.files[topic], DECK);
+    assert.deepEqual(await read(topic + '.files/map.png'), sources['map.png']);
+
+    assert.equal(projectFiles.files[selling], sourceText);
+    assert.equal((await read(selling)).toString(), sourceText);
+    assert.deepEqual((await readdir(join(root, sourceFolder))).sort(), ['brief.md', 'detail.png', 'map.png', 'outside.png']);
+    for (const [name, bytes] of Object.entries(sources)) assert.deepEqual(await read(sourceFolder + '/' + name), bytes);
+  } finally {
+    await rm(temp, { force: true, recursive: true });
+  }
+}
+
+void run().then(pictureTransfers).catch(error => {
   console.error(error);
   process.exit(1);
 });

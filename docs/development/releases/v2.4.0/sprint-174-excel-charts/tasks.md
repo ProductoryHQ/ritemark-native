@@ -4,6 +4,8 @@ Nothing starts until Jarmo approves the plan. The branch is made first: `sprint-
 
 Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side by side after PR 1; PR 6 waits for PR 5; PR 7 last. PR 2, 3, 4 and 6 all touch `SheetGrid.tsx`, so they merge one at a time.
 
+The per-PR boxes are recorded in each PR's **Review record** comment on GitHub, which is authoritative; they are not ticked here.
+
 ## PR 0: fixtures, references and the byte guards (Light: docs and tests)
 - [ ] Issue in milestone v2.4.0 (#971 is the sprint's; one issue per PR as Sprint 170 did)
 - [ ] The fixture set, made in Excel for Mac by the Experience lead, synthetic, creator scrubbed with `scrub-metadata.py`: `charts-all-kinds.xlsx` (one sheet per kind in scope, scenario 1), `charts-colours.xlsx` (theme tints, automatic colours, scenarios 3 and 4), `charts-3d.xlsx`, `charts-out-of-scope.xlsx`, `chart-sheet.xlsx`, `rules-all-kinds.xlsx` (every rule kind in scope, formula rules for scenarios 23 to 25, stacking and stop-if-true), `rules-icons-unreadable.xlsx` (scenarios 26 and 31). Beside them the existing sales report, `rich.xlsx` and `rich-excelish.xlsx`
@@ -33,13 +35,19 @@ Order: PR 0, then PR 1. PRs 2 to 4 (charts) and PR 5 (rules reader) can run side
 - [ ] 3-D pie drawn flat
 - [ ] Proof: scenarios 1 (these kinds), 5, each beside Excel's render; the lead's look
 
-## PR 4: combo, the second axis, chosen charts, copy, the 5,000-point thinning (Standard, look change)
+## PR 4: combo, the second axis, chosen charts, the 5,000-point thinning (Standard, look change)
 - [ ] Combo (columns with a line, a second value axis on the right)
 - [ ] The accent ring on a click; the formula bar's text (R8, frame 10); Esc and a click elsewhere let go
+- [ ] Ctrl+Alt+5 (Cmd+Option+5 on Mac, since Ctrl+Option is VoiceOver's) cycles through the grid and charts in sheet order. Hold Shift to reverse direction. Tab steps cells from the grid and moves focus between charts and the grid from a chart. Escape returns focus to the grid.
 - [ ] Copy as a picture (`chartCopy.ts`); a tooltip on nothing new (no new elements)
 - [ ] Series over more than 5,000 points thinned, keeping each bucket's lowest and highest (R25)
 - [ ] Out-of-scope kinds keep the card; the line names them (scenario 13)
 - [ ] Proof: scenarios 1 (combo), 10, 11, 13, 14, each beside Excel's render; the lead's look; the copy checked by pasting the picture into a Ritemark document
+
+## PR 4b — Copy a chosen chart as a picture (High)
+
+- [x] Copy the chosen chart as a PNG with Cmd/Ctrl+C (R8)
+- [ ] High review, security review, and paste into a Ritemark document
 
 ## PR 5: the rules reader and engine (Standard, no visible change)
 - [x] `readStyles` reads `dxfs`; `readRules.ts`; `ruleFormula.ts` and `ruleEngine.ts` with the subset in the technical plan
@@ -60,8 +68,10 @@ PR 5 only reads and evaluates rules, so there is no user-facing release note.
 - [ ] The 50,000-row workbook: first paint, scroll to the end and one typed edit measured against Sprint 158's numbers (`proof/perf-50k.ts`); range facts cached per sheet version (R24, scenario 35)
 - [ ] Proof: the measurements in `research/`, before and after; scenarios 31, 32, 35 and the full set of byte checks on the final head (scenarios 15, 16, 36, 37, 38)
 
-## Sprint end
-- [ ] `docs/development/architecture.md` Excel contract updated
+## Closing
+
+- [x] `docs/development/architecture.md` Excel contract updated (#1039)
 - [ ] Jarmo's gate: the saved files in Excel with no repair prompt; the preview beside Excel's screenshots; the 50,000-row sheet in a dev instance
-- [ ] `qa-validator` sign-off
-- [ ] Release notes line for the sprint, written with the `release-notes` skill
+- [x] `qa-validator` (25 Nov, on 7eefb46c: signed off with open items)
+- [ ] Windows test-window and clipboard checks
+- [x] Release notes line for the sprint, written with the `release-notes` skill (`release-notes-lines.md`, #1039)

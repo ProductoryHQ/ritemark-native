@@ -52,6 +52,14 @@ Case doesn't matter, and a match can't run from one paragraph into the next. In 
 presentation, search covers every slide and its speaker notes, and the count
 includes slides you have not scrolled to yet.
 
+## Make a Markdown copy of a Word document
+
+Open the menu beside **Open in Word** and choose **Make an editable copy**.
+Equations come through as math in the Markdown copy. Some equations are kept as
+an approximation using their original text. You can also
+[ask the AI to read the Word file](ai-agents.md#ask-ai-about-your-project-documents)
+with its equations.
+
 ## When the file changes
 
 If the document or presentation is changed and saved in another app, the preview

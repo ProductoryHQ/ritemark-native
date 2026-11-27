@@ -1,9 +1,12 @@
+import type { AnswerFeedbackResult, AnswerReactionResult, AnswerReactionsMessage, OpenAnswerFeedbackResult } from '../../../../src/feedback/answerFeedbackProtocol';
 /**
  * AI Sidebar Types
  *
  * Mirrors the message protocol used between UnifiedViewProvider and the webview.
  */
 
+import type { StartingPlacesByAgent } from '../../../../src/guidance/startingPlace';
+import type { ToolStep } from '../../../../src/runtime/toolStep';
 import type { AgentSidebarProtocolMessage, SheetSignInAttentionMessage, SheetSignInMessage } from '../../../../src/views/agentSidebarProtocol';
 import type { LiveDeckStep } from '../../../../src/conversations/types';
 import type { ChatDocumentView } from '../../../../src/views/chatDocuments';
@@ -60,13 +63,14 @@ export interface ModelOption {
   aliases?: string[];
   isDefault?: boolean;
   thinkingEffort?: ModelThinkingEffort;
-  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  /** Bundled or resolver-hidden row kept for saved selections and omitted from model menus. */
   hidden?: boolean;
 }
 
-export type AgentProgressType = 'init' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
+export type AgentProgressType = 'init' | 'notice' | 'thinking' | 'tool_use' | 'text' | 'plan_text' | 'plan_ready' | 'plan_autonomous' | 'session_reset' | 'done' | 'error' | 'context_overflow' | 'subagent_start' | 'subagent_progress' | 'subagent_done' | 'subagent_update' | 'compacting' | 'compacted';
 
 export interface AgentProgress {
+  step?: ToolStep;
   type: AgentProgressType;
   message: string;
   tool?: string;
@@ -296,6 +300,7 @@ export interface AgentConversationTurn {
   activeFileLabel?: string;
   attachments?: FileAttachment[];
   activities: AgentProgress[];
+  assistantText?: string;
   /** Subagents spawned during this turn */
   subagents?: SubagentProgress[];
   result?: {
@@ -437,6 +442,7 @@ export interface CodexConversationTurn {
   result?: {
     liveDeckSteps?: LiveDeckStep[];
     status: string;
+    activityDurationMs?: number;
     error?: string;
     /** Sprint 139 (#376): the failure's kind and its card's data, from the host's one classifier. */
     errorKind?: RuntimeErrorKind;
@@ -478,7 +484,7 @@ export interface ByokModelOption {
   id: string;
   label: string;
   description: string;
-  /** Kept for a saved selection; never offered in the model menu (Claude below 5). */
+  /** Bundled or resolver-hidden row kept for saved selections and omitted from model menus. */
   hidden?: boolean;
 }
 
@@ -495,6 +501,10 @@ export interface ConversationScopedMessage {
 
 export type ExtensionMessage =
   | AgentSidebarProtocolMessage
+  | AnswerFeedbackResult
+  | OpenAnswerFeedbackResult
+  | AnswerReactionResult
+  | AnswerReactionsMessage
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 117 (#292, R4/D5): the host names the destination conversation for
@@ -509,10 +519,12 @@ export type ExtensionMessage =
   // Sprint 148 (R8): search passes the matching message's turn, shown in view.
   | { type: 'conversation/select'; conversationId: string; turnId?: string }
   // Sprint 133 (R6): the welcome's landing opens a new chat with the AI the person signed in with.
-  | { type: 'landing:new-chat'; runtimeId: AgentId; placeholder: string }
+  | { type: 'landing:new-chat'; runtimeId: AgentId } & (
+    { placeholder: string; fromStatus?: never } | { placeholder?: never; fromStatus: true }
+  )
   // Sprint 140 (R5, R8): the host's visible chat with a request, and the empty sheet's starting place
   | { type: 'chat/start'; runtimeId: AgentId; text: string; send: boolean; cursor?: number; origin?: 'what_is_here' | 'what_for'; conversationId?: string; fill?: 'if-empty' }
-  | { type: 'starting-place'; place: string; hasAbout: boolean }
+  | { type: 'starting-place'; places: StartingPlacesByAgent; hasAbout: boolean }
   // Sprint 162 PR 5: an AI's theme change under its reply, and what Undo did
   | { type: 'theme-change/add'; conversationId: string; change: ThemeChangeChipView }
   | { type: 'theme-change/undone'; id: string; words: string }
@@ -577,7 +589,7 @@ export type ExtensionMessage =
   | ({ type: 'codex-question'; requestId: string | number; questions: Array<AgentQuestionItem & { id: string }> } & ConversationScopedMessage)
   | ({ type: 'codex-plan-text-delta'; delta: string } & ConversationScopedMessage)
   | ({ type: 'codex-plan-update'; explanation?: string | null; plan: CodexPlanStep[] } & ConversationScopedMessage)
-  | ({ type: 'codex-result'; liveDeckSteps?: LiveDeckStep[]; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; rawError?: string } & ConversationScopedMessage)
+  | ({ type: 'codex-result'; turnId?: string; liveDeckSteps?: LiveDeckStep[]; status?: string; error?: string; errorKind?: RuntimeErrorKind; errorDetail?: RuntimeErrorDetail; rawError?: string } & ConversationScopedMessage)
   | ({ type: 'codex-approval'; approvalType: 'command' | 'fileChange'; requestId: string | number; command?: string; workingDir?: string; fileChanges?: Record<string, unknown> } & ConversationScopedMessage)
   // Onboarding messages
   | { type: 'onboarding:status'; status: OnboardingStatus }
