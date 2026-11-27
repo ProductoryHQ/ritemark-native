@@ -11,7 +11,7 @@ If you run training or share slides with clients, you can update the page they a
 - **Update your page on every save.** After you publish, turn on **Update on every save** for that page. On older pages, choose **Update the page** once so open pages can follow your changes.
 - **Let readers stay on their slide.** When readers pause, their page catches up and keeps them on the same slide if it's still there.
 - **See what happens after an AI edit.** When the AI saves your live deck, chat tells you whether the page updated or why it paused.
-- **Keep a deck's files together.** A deck's pictures and its published page go into one folder beside it, such as `Kickoff.rtms.files`. Rename, move, copy or delete the deck in Ritemark, and its folder follows. If you add your own files to that folder, Ritemark leaves the folder as it is.
+- **Keep a deck's files together.** A deck's pictures and its published page go into one folder beside it, such as `Kickoff.rtms.files`. Rename, move, copy or delete the deck in Ritemark, and its folder follows. If you add your own files to that folder, Ritemark leaves the folder as it is. A slide you add from another deck brings its pictures along.
 - **See if your slides fit the session.** In **Timed slide list**, set each slide’s minutes and compare the total with your session length. Your timings stay private when you publish.
 
 ## See Excel charts and cell colours
@@ -61,6 +61,8 @@ If you run training or share slides with clients, you can update the page they a
 - **See when OpenCode can't answer.** If its AI service is busy or goes quiet, chat says so, and you can send your message again.
 - **Choose icons for boxes that had numbers.** Switch a Boxes block from numbers to icons, and the icon menu opens for the box you're in.
 - **Keep your other apps' file links on Windows.** If another app opens your .md files, removing Ritemark leaves that in place.
+- **Find notes you keep beside a deck.** Search and Home now show a note you put in a deck's folder.
+- **See the whole update notice.** It now has two buttons. To skip a version, use **Settings**.
 
 ## Updating from 2.3
 
