@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { kindOf } from '../publish/gather';
 import { cssReferences, pageReferences } from '../publish/references';
+import { readScalar } from './deckFormat';
 import { deckNameOf, deckPictureFolderName, isDeckPath, DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
 import { folderOf, isRelativeTarget, movedTarget, normalizePath, placeAfterMoves, projectPath, rewriteDeckPictures, rewritePictureTargets } from './deckLibraryFormat';
 import { PAGE_FONT_FOLDER, readPageMeta } from './page/pageFile';
@@ -11,8 +12,8 @@ export type CopyDeckFolder = (from: string, to: string) => Promise<boolean>;
 
 export interface DeckFolderFiles {
   kind(file: string): Promise<'file' | 'folder' | 'other' | undefined>;
-  listMarkdown(deck: string, limit: number): Promise<string[]>;
-  readDeck(file: string): Promise<string>;
+  listMarkdown(deck: string, signal: AbortSignal): Promise<string[]>;
+  readDeck(file: string, signal?: AbortSignal): Promise<string>;
   listFolder(folder: string): AsyncIterable<{ name: string; kind: 'file' | 'folder' | 'other' }>;
   readPage(file: string): Promise<string>;
   sameFolder?(from: string, to: string): Promise<boolean>;
@@ -46,7 +47,8 @@ function linksInto(files: Iterable<string>, folder: string): boolean {
 }
 
 const FOLDER_ENTRY_LIMIT = 500;
-const MARKDOWN_FILE_LIMIT = 500;
+const FOLDER_USERS_TIMEOUT_MS = 3000;
+const FOLDER_USERS_READ_CONCURRENCY = 8;
 const CHECK_INCOMPLETE = "Ritemark couldn't check whether other files use it.";
 const PICTURES_STAY = ' The deck still finds its pictures there.';
 
@@ -64,34 +66,82 @@ function compareTreePaths(a: string, b: string): number {
   return fileNameOrder.compare(left[index], right[index]) || left[index].length - right[index].length;
 }
 
+function containsFolderName(text: string, basename: string): boolean {
+  return text.includes(basename) || (text.includes('%') && text.replace(/(?:%[0-9a-f]{2})+/gi, encoded => {
+    try {
+      return decodeURI(encoded);
+    } catch {
+      return encoded;
+    }
+  }).includes(basename));
+}
+
+function mayLinkIntoFolder(text: string, file: string, folder: string, basename: string): boolean {
+  // A link written inside the folder can reach its contents without naming it.
+  if (inside(file, folder) || containsFolderName(text, basename)) return true;
+  if (!isDeckPath(file)) return false;
+
+  // Quoted slide image scalars can spell the name with YAML escapes or doubled apostrophes.
+  for (const [, scalar] of text.matchAll(/^image:[^\S\r\n]+(["'][^\r\n]*)/gm)) {
+    if (containsFolderName(readScalar(scalar), basename)) return true;
+  }
+  return false;
+}
+
 async function sharedFolderReason(
   deck: string, folder: string, fs: DeckFolderFiles, skip: (file: string) => boolean,
 ): Promise<string | undefined> {
-  try {
-    const files = await fs.listMarkdown(deck, MARKDOWN_FILE_LIMIT + 1);
-    if (files.length > MARKDOWN_FILE_LIMIT) return CHECK_INCOMPLETE;
+  const controller = new AbortController();
+  const { signal } = controller;
+  const deadline = performance.now() + FOLDER_USERS_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<string>(resolve => {
+    timer = setTimeout(() => resolve(CHECK_INCOMPLETE), FOLDER_USERS_TIMEOUT_MS);
+  });
+  function checkBudget() {
+    if (signal.aborted || performance.now() >= deadline) throw new Error(CHECK_INCOMPLETE);
+  }
 
-    const users: string[] = [];
-    for (const file of new Set(files)) {
-      if (skip(file)) continue;
-      const text = await fs.readDeck(file);
-      let usesFolder = false;
-      const visit = (target: string) => {
-        const resolved = projectPath(target, folderOf(file));
-        if (resolved !== null && (resolved === folder || inside(resolved, folder))) usesFolder = true;
-        return target;
-      };
-      if (isDeckPath(file)) rewriteDeckPictures(text, visit, true);
-      else rewritePictureTargets(text, visit, undefined, true);
-      if (usesFolder) users.push(file);
+  async function scan() {
+    const files = [...new Set(await fs.listMarkdown(deck, signal))].filter(file => !skip(file));
+    const basename = path.posix.basename(folder);
+    const users = new Set<string>();
+    let next = 0;
+
+    async function readCandidates() {
+      while (next < files.length) {
+        checkBudget();
+        const file = files[next++];
+        const text = await fs.readDeck(file, signal);
+        checkBudget();
+        if (!mayLinkIntoFolder(text, file, folder, basename)) continue;
+        const visit = (target: string) => {
+          const resolved = projectPath(target, folderOf(file));
+          if (resolved !== null && (resolved === folder || inside(resolved, folder))) users.add(file);
+          return target;
+        };
+        if (isDeckPath(file)) rewriteDeckPictures(text, visit, true);
+        else rewritePictureTargets(text, visit, undefined, true);
+      }
     }
 
-    if (!users.length) return;
-    const first = `“${path.posix.basename(users.sort(compareTreePaths)[0])}”`;
-    const more = users.length - 1;
+    await Promise.all(Array.from({ length: Math.min(files.length, FOLDER_USERS_READ_CONCURRENCY) }, readCandidates));
+    checkBudget();
+    if (!users.size) return;
+    const first = `“${path.posix.basename(files.filter(file => users.has(file)).sort(compareTreePaths)[0])}”`;
+    const more = users.size - 1;
     return more ? `${first} and ${more} more ${more === 1 ? 'file' : 'files'} use it.` : `${first} uses it.`;
+  }
+
+  try {
+    const reason = await Promise.race([scan(), timeout]);
+    checkBudget();
+    return reason;
   } catch {
     return CHECK_INCOMPLETE;
+  } finally {
+    clearTimeout(timer);
+    controller.abort();
   }
 }
 const OS_CLUTTER = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
