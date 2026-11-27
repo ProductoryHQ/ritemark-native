@@ -10,6 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
+import { DeckPublishFeedbackLink } from './DeckPublishFeedbackLink'
 import { Fragment as ReactFragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
 import { updateDeckFailures } from './deckFailures'
 import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
@@ -2301,6 +2302,7 @@ export function DeckView({
               <span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">
                 <span className="deck-notice-text">{text}</span>
               </span>
+              <DeckPublishFeedbackLink operation={operation} line={text} />
             </ReactFragment>
           ))}
           {notice ? (

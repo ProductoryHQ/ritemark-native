@@ -9,6 +9,8 @@ import { trackEvent } from '../analytics/posthog';
 import { isEnabled } from '../features';
 import { saveAsMarkdownHandler, type SaveAsMarkdownPayload } from '../export/saveAsMarkdown';
 import { findRequests } from '../search/findAtPassage';
+import { FEEDBACK_OPEN_COMMAND } from '../feedback/feedbackSheet';
+import { decodeFailureFeedbackOpen, OFFICE_FAILURE_FEEDBACK_MESSAGE } from '../feedback/feedbackQuoteSafety';
 
 /** One app "Open externally" may send the file to. */
 interface ExternalAppChoice {
@@ -95,6 +97,7 @@ export const POWERPOINT_FORMAT: OfficeFormat = {
 export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvider<OfficeDocument> {
   private fileWatchers = new Map<string, vscode.FileSystemWatcher>();
   private fileChangeDebounceTimers = new Map<string, NodeJS.Timeout>();
+  private readonly shownFailures = new WeakMap<vscode.Webview, { title: string; line: string }>();
   private externalApp: Promise<ExternalApp> | null = null;
 
   public static register(context: vscode.ExtensionContext, format: OfficeFormat): vscode.Disposable {
@@ -154,7 +157,13 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
 
     // Handle messages from webview
     webviewPanel.webview.onDidReceiveMessage(async (message) => {
-      switch (message.type) {
+      switch (message?.type) {
+        case OFFICE_FAILURE_FEEDBACK_MESSAGE: {
+          const shown = this.shownFailures.get(webviewPanel.webview);
+          const options = shown && decodeFailureFeedbackOpen(message.options, shown);
+          if (options) await vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
+          break;
+        }
         case 'ready': {
           await this.postOpenStatus(webviewPanel.webview);
           await this.sendDocument(document, webviewPanel.webview);
@@ -225,6 +234,7 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
 
     // The kill switch: the editor stays registered, so say the preview is off and offer the app.
     if (!this.format.enabled()) {
+      this.shownFailures.delete(webview);
       webview.postMessage({
         type: 'loadError',
         fileType: this.format.fileType,
@@ -241,10 +251,12 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
       : await checkOfficePackage(document.buffer, this.format.partPrefix);
     if (!verdict.ok) {
       const { title, detail } = describeProblem(verdict, this.format.kind, appName);
-      webview.postMessage({ type: 'loadError', fileType: this.format.fileType, filename, title, detail });
+      this.shownFailures.set(webview, { title, line: detail });
+      webview.postMessage({ type: 'loadError', fileType: this.format.fileType, filename, title, detail, feedback: true });
       return;
     }
 
+    this.shownFailures.delete(webview);
     webview.postMessage({
       type: 'load',
       fileType: this.format.fileType,

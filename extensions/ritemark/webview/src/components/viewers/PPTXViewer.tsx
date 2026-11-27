@@ -23,12 +23,15 @@ import { fitPageZoom, fitWidthZoom, pageAtScroll, stepZoom, type FitMode } from 
 import { deckMatches, firstMatchFrom } from './pptx/deckSearch'
 import { loadDeck, type LoadedDeck } from './pptx/loadDeck'
 import { notesRanges, slideRanges } from './pptx/renderedDeck'
+import { FailureFeedbackLink } from '../ai-sidebar/FailureFeedbackLink'
+import { OFFICE_FAILURE_FEEDBACK_MESSAGE } from '../../../../src/feedback/feedbackQuoteSafety'
 import './documentSearch.css'
 import './pptx/pptxPreview.css'
 
 export interface PptxLoadError {
   title: string
   detail: string
+  feedback?: boolean
 }
 
 interface PPTXViewerProps {
@@ -514,7 +517,12 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
             <Icon name="warning-circle" size={20} tone="active" />
             <div className="font-ui text-[15px] font-medium text-ink-strong">{failure.title}</div>
             <div className="font-ui text-[13px] text-ink-muted">{failure.detail}</div>
-            <div className="mt-1 flex gap-2">
+            <div className={failure.feedback ? "mt-1 flex w-full flex-wrap items-center gap-2" : "mt-1 flex gap-2"}>
+              {failure.feedback && (
+                <span className="mr-auto">
+                  <FailureFeedbackLink title={failure.title} line={failure.detail} messageType={OFFICE_FAILURE_FEEDBACK_MESSAGE} />
+                </span>
+              )}
               <Tooltip label="Read the file from disk again">
                 <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
                   <Icon name="arrow-clockwise" size={14} />

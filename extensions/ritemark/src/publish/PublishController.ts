@@ -39,6 +39,7 @@ import { recordFor, sheetNeeded, type LivePreference, type PublishRecord, type P
 import { decodeSettingsRequest, type WebPageRow, type WebPagesSettingsProjection } from './settingsProtocol';
 import { isValidPagePart } from './sheetProtocol';
 import { plainLine, plainPart } from './plainText';
+import { isSafeFailureFeedbackPart } from '../feedback/feedbackQuoteSafety';
 import type { SheetConfirm, SheetConfirmReply, SheetOptions, SheetSetupResult } from './sheetModel';
 import type { GatheredPlan, PublishPlan } from './types';
 
@@ -124,10 +125,10 @@ export function plainUi(ui: PublishUi): PublishUi {
     openExternal: (url) => ui.openExternal(url),
     askToken: (options) => ui.askToken(options),
     showSheet: (request) => ui.showSheet(request),
-    showFailure: (line, retry) => ui.showFailure(plainLine(line), retry),
+    showFailure: (line, retry) => ui.showFailure(plainLine(line), retry, isSafeFailureFeedbackPart(line)),
     showWaiting: (line) => ui.showWaiting(plainLine(line)),
     showBrief: (line) => ui.showBrief(plainLine(line)),
-    showConnect: (line) => ui.showConnect(plainLine(line)),
+    showConnect: (line) => ui.showConnect(plainLine(line), isSafeFailureFeedbackPart(line)),
   };
 }
 
@@ -191,13 +192,13 @@ export interface PublishUi {
     onConfirm: (confirm: SheetConfirm) => Promise<SheetConfirmReply>;
   }): Promise<{ kind: 'cancel' } | { kind: 'publish' | 'publishAnyway'; pagePart?: string; plan: PublishPlan }>;
   /** A failure line for the page, with Try again (R7). */
-  showFailure(line: string, retry: () => void): void;
+  showFailure(line: string, retry: () => void, quoteSafe?: boolean): void;
   /** A line that stays while something waits: the bar's Unpublish past 10 s. The returned function closes it. */
   showWaiting(line: string): () => void;
   /** A toast that goes by itself (patch 018's brief toast): a new address's wait (M6), and its end. */
   showBrief(line: string): void;
   /** A line whose way on is connecting (again) in Settings ▸ Sharing: the bar's Unpublish signed out or on another account. */
-  showConnect(line: string): void;
+  showConnect(line: string, quoteSafe?: boolean): void;
 }
 
 /** The page's bar, as patch 010 draws it (spec R7, frame 4), through `_ritemark.publish.pageState`. */
