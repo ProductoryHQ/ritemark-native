@@ -4,11 +4,11 @@ Use a deck to put slides and a handout together. Choose **New → Deck** to star
 
 ## A page that follows its deck
 
-Choose **Publish** on the deck's bar to share a page. Once it's published, open the **Published** menu and turn on **Update on every save**. The switch starts off for each new page. With it off, **Published · changed** means you have changes to share. Choose **Update the page** when you're ready.
+Choose **Publish** on the deck's bar to share a page. Once it's published, open the **Published** menu and turn on **Update on every save**. The switch starts off for each new page. With it off, the bar shows **Publish changes** when you have changes to share. Press it when you're ready.
 
 With the switch on, the chip says **Live** with a green dot. While the page is updating, a spinner takes the dot's place. If Ritemark can't reach the page, the chip says **Offline** in grey. Your saves stay on your computer, and Ritemark tries the latest one again while the deck is open.
 
-Open pages usually catch up in about 15 seconds, once the reader stops moving or finishes selecting text. Readers stay on their slide and keep their ticks. If their slide changes, the changed text is briefly highlighted and **Updated just now** appears in the page's top bar. If their slide is taken out, they can finish reading it and choose **Go on to** the slide named there. For a page published before 2.4, use **Update the page** once to give it this behaviour.
+Open pages usually catch up in about 15 seconds, once the reader stops moving or finishes selecting text. Readers stay on their slide and keep their ticks. If their slide changes, the changed text is briefly highlighted and **Updated just now** appears in the page's top bar. If their slide is taken out, they can finish reading it and choose **Go on to** the slide named there. For a page published before 2.4, use **Publish changes** once to give it this behaviour.
 
 ### When an update pauses
 

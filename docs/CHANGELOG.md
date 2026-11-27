@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Excel column, bar, line, pie, doughnut, area and scatter charts appear in their original positions and on chart sheets. Column, bar and line charts update when you change a number they use and follow the workbook’s text formatting and chart layout (#1031, #1034).
 - Excel previews explain when a chart sheet contains a chart they can’t draw (#1035).
 - Excel previews show cell colour rules, colour scales, and data bars, and update them as you edit values. Today rules follow the local date, and the notice identifies Excel icon sets kept in the file (#1032, #1035).
+- When a published deck has changes, its bar shows a **Publish changes** button. Press it to update the page.
 - After the AI saves a live deck, chat shows whether the page updated or why it paused.
 - When you open a deck, the status bar shows its slide count in place of the word count.
 - Claude, ChatGPT, and OpenCode name their sources in the answer. Hover over a source or focus it with the keyboard to see the passage. If the quoted words are missing, the card says so and offers to open the cited page or the document.
