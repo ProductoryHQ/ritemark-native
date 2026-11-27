@@ -27,6 +27,7 @@ import { mathMarkedExtension } from '../../../extensions/math/mathMarkedExtensio
 import { createEditorTurndownService, markdownToEditorHTML, preprocessTableHTML } from '../../../utils/editorMarkdown'
 import { commentMarkedExtension } from '../../../extensions/comment/commentMarkedExtension'
 import { pictureMarkedExtension } from '../../../extensions/pictures/pictureMarked'
+import { usePictureReferences } from '../../../extensions/pictures/pictureReferences'
 import { tabsMarkedExtension } from '../../../extensions/tabs/tabsMarkdown'
 import { PANE_PLACEHOLDER, tabsetOf } from '../../../../../src/decks/blocks/tabset'
 import { buttonMarkedExtension } from '../../../extensions/buttonBlock/buttonMarkdown'
@@ -115,6 +116,8 @@ slideEditorMarked.use(mathMarkedExtension as Parameters<typeof slideEditorMarked
 slideEditorMarked.use(slideDivMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Experience 49: a picture's look, as the document editor reads it.
 slideEditorMarked.use(pictureMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
+// #1129: a reference picture (`![a][ref]`) and its definition stay as written, as in a Text document since #1115.
+usePictureReferences(slideEditorMarked)
 // Sprint 163: the Tabs block, as the Text editor reads it.
 slideEditorMarked.use(tabsMarkedExtension as Parameters<typeof slideEditorMarked.use>[0])
 // Sprint 163 PR 3: the Button block, read as the Text editor reads it.

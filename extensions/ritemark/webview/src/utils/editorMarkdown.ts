@@ -47,7 +47,7 @@ import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
 import { markdownImageSource, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
-import { annotatePictureReferences, pictureDefinitionAttribute, pictureReferencesExtension } from '../extensions/pictures/pictureReferences'
+import { annotatePictureReferences, keepsPictureReferences, pictureDefinitionAttribute, usePictureReferences } from '../extensions/pictures/pictureReferences'
 import { TabPane, TabsBlock, addTabsTurndownRules, tabsMarkedExtension } from '../extensions/tabs/tabsMarkdown'
 import { buttonBlockExtensions } from '../extensions/buttonBlock/ButtonBlock'
 import { addButtonTurndownRules, buttonMarkedExtension } from '../extensions/buttonBlock/buttonMarkdown'
@@ -80,7 +80,8 @@ editorMarked.use(asWrittenMarkedExtension)
 // text whose backslashes and underscores a save would rewrite.
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 // Experience 49: a picture's size, crop and caption, kept in the block after its image line.
-editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0], pictureReferencesExtension)
+editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
+usePictureReferences(editorMarked)
 // Sprint 163: the Tabs block (`::: {.panel-tabset}`), one block in a slide, a handout and a Text document. Only that
 // `:::` block: any other `:::` line in a Text document stays text.
 editorMarked.use(tabsMarkedExtension as Parameters<typeof editorMarked.use>[0])
@@ -252,7 +253,7 @@ function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tok
   const preprocessed = options.hooks ? options.hooks.preprocess(markdown) as string : markdown
   const source = protectFenceTabs(preprocessed)
   const tokens = instance.lexer(source)
-  if (instance === editorMarked) annotatePictureReferences(instance, tokens)
+  if (keepsPictureReferences(instance)) annotatePictureReferences(instance, tokens)
   annotateAsWritten(tokens, source)
   prepareTokens?.(tokens)
   if (options.walkTokens) instance.walkTokens(tokens, options.walkTokens)
