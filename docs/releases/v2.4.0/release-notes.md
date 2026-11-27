@@ -8,7 +8,8 @@ If you run training or share slides with clients, you can update the page they a
 
 ## Keep a published deck up to date
 
-- **Update your page on every save.** After you publish, turn on **Update on every save** for that page. On older pages, choose **Update the page** once so open pages can follow your changes.
+- **Update your page on every save.** After you publish, turn on **Update on every save** for that page. On older pages, choose **Publish changes** once so open pages can follow your changes.
+- **See when your page is behind.** If you change a published deck, its bar shows **Publish changes**. Press it to update the page.
 - **Let readers stay on their slide.** When readers pause, their page catches up and keeps them on the same slide if it's still there.
 - **See what happens after an AI edit.** When the AI saves your live deck, chat tells you whether the page updated or why it paused.
 - **Keep a deck's files together.** A deck's pictures and its published page go into one folder beside it, such as `Kickoff.rtms.files`. Rename, move, copy or delete the deck in Ritemark, and its folder follows. If you add your own files to that folder, Ritemark leaves the folder as it is. A slide you add from another deck brings its pictures along.
@@ -34,6 +35,10 @@ If you run training or share slides with clients, you can update the page they a
 
 ## Smaller changes
 
+- **Say whether an answer helped.** Under a finished AI answer, choose **Good answer** or **Not right**. With **Not right**, you can tell us what was wrong.
+- **Tell us when something goes wrong.** When the AI, Publish or a Word or PowerPoint preview can't finish, choose **Tell us about this**. **Send feedback** opens with the notice's words, and you can leave them out.
+- **Show us what you see.** When you send feedback by e-mail, you can add a picture of the Ritemark window.
+- **Find Ritemark on GitHub.** Ritemark is open source. Home and the Help menu link to its code and its discussions.
 - **Keep Word formulas as math.** They carry over when AI reads the document or you make a Markdown copy. Some formulas look different.
 - **Share pictures without private details.** Ritemark removes location, camera and author details from the pictures it publishes.
 - **See your decks in Finder on a Mac.** Finder shows a saved deck's first slide, and pressing Space lets you look through its slides. Ritemark keeps these previews on your Mac. On some Macs, first turn on Ritemark's Quick Look extension in your Mac's settings, under Extensions.
