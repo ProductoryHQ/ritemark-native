@@ -1,6 +1,7 @@
 name: Daily test chain
 
-# The extension's full `npm test` chain runs here once a day on main, and on demand
+# The extension's full `npm test` chain runs here once a day on main (macOS arm64, as the tests
+# assume: dictation and Quick Look are Mac-only; standard runners are free on this public repo), and on demand
 # (for example before an RC), instead of on every PR. A PR's proof is tsc, the tests it
 # touches and the pre-commit hook; a failure here is fixed forward from that day's merges.
 
@@ -23,7 +24,7 @@ concurrency:
 jobs:
   test-chain:
     name: npm test (extension)
-    runs-on: ubuntu-latest
+    runs-on: macos-15
     timeout-minutes: 60
     steps:
       - name: Checkout Ritemark
