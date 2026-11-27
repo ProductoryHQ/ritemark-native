@@ -211,9 +211,11 @@ export class AcpManager {
    * Sprint 99: the old "ACP session is already running" throw is gone — opening
    * a second session on the same connection is exactly the supported case now.
    */
-  async start(): Promise<string> {
+  async start(signal?: AbortSignal): Promise<string> {
     const client = await this.ensureClient();
+    signal?.throwIfAborted();
     const session = await client.newSession(this.config.workspaceRoot, this.config.mcpServers);
+    signal?.throwIfAborted();
     this.sessions.set(session.sessionId, {
       sessionId: session.sessionId,
       sawContentThisTurn: false,
@@ -378,18 +380,25 @@ export class AcpManager {
 
   /** Drain trailing updates before reusing a session, or replace it if the agent never settles. */
   async preparePrompt(sessionId: string, signal?: AbortSignal): Promise<string> {
+    signal?.throwIfAborted();
     const { state } = this.requireSession(sessionId);
     const previous = state.turn;
     if (!previous?.cancelled) return sessionId;
 
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopDrain: (() => void) | undefined;
     try {
       await Promise.race([
         previous.response.catch(() => undefined),
-        new Promise<void>((resolve) => { timer = setTimeout(resolve, this.cancelledPromptDrainMs); }),
+        new Promise<void>((resolve) => {
+          stopDrain = resolve;
+          timer = setTimeout(resolve, this.cancelledPromptDrainMs);
+          signal?.addEventListener('abort', stopDrain, { once: true });
+        }),
       ]);
     } finally {
       clearTimeout(timer);
+      if (stopDrain) signal?.removeEventListener('abort', stopDrain);
     }
     signal?.throwIfAborted();
     if (this.sessions.get(sessionId) !== state) throw new Error(`ACP session is not running: ${sessionId}`);
@@ -398,12 +407,7 @@ export class AcpManager {
     // Notifications carry only a session ID. A new session isolates late updates
     // and permission requests from the abandoned one without stopping siblings.
     this.closeSession(sessionId);
-    const replacement = await this.start();
-    if (signal?.aborted) {
-      this.closeSession(replacement);
-      signal.throwIfAborted();
-    }
-    return replacement;
+    return this.start(signal);
   }
 
   async prompt(sessionId: string, text: string, observer?: AcpTurnObserver, signal?: AbortSignal): Promise<PromptResponse> {

@@ -42,7 +42,7 @@ Module._resolveFilename = function (request: string, ...rest: [unknown, boolean]
 import * as assert from 'assert';
 import { setTimeout as delay } from 'node:timers/promises';
 import { AcpManager } from './acpManager';
-import { presentRuntimeError } from '../runtime/runtimeErrorPresentation';
+import { ACP_QUIET_STREAM_ERROR, presentRuntimeError } from '../runtime/runtimeErrorPresentation';
 import { turnFailureCard } from '../runtime/turnFailureCopy';
 import * as os from 'os';
 import * as path from 'path';
@@ -200,7 +200,7 @@ async function testHungTurnTimesOut(): Promise<void> {
 
 const GEMINI_BUSY = 'Internal error: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.';
 
-async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progress' | 'permission' | 'permission-ceiling' | 'tool' | 'tool-ceiling'): Promise<void> {
+async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progress' | 'permission' | 'permission-ceiling' | 'tool' | 'tool-ceiling' | 'prepare-drain' | 'prepare-hang' | 'prepare-late' | 'stop-prepare' | 'stop-model'): Promise<void> {
   const script = `
     const send = (message) => console.log(JSON.stringify({ jsonrpc: '2.0', ...message }));
     const reply = (id, result) => send({ id, result });
@@ -209,22 +209,40 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
     } });
     const mode = process.argv[1];
     let sessionCount = 0;
+    const stuckCancel = mode === 'stuck-cancel' || mode.startsWith('prepare-') || mode === 'stop-prepare';
     let promptId;
     let cancelled = false;
     let permissionCancelled = false;
     require('node:readline').createInterface({ input: process.stdin }).on('line', (line) => {
       const { id, method, params, result } = JSON.parse(line);
       if (method === 'initialize') reply(id, { protocolVersion: 1, agentCapabilities: {} });
-      if (method === 'session/new') reply(id, { sessionId: ++sessionCount === 1 ? 'fake' : 'replacement', configOptions: [] });
+      if (method === 'session/new') {
+        const count = ++sessionCount;
+        if (count === 2 && (mode === 'prepare-drain' || mode === 'prepare-hang')) return;
+        if (count === 2 && mode === 'prepare-late') {
+          setTimeout(() => {
+            reply(id, { sessionId: 'abandoned', configOptions: [] });
+            chunk('agent_message_chunk', 'late replacement update', 'abandoned');
+          }, 120);
+          return;
+        }
+        reply(id, { sessionId: count === 1 ? 'fake' : 'replacement', configOptions: [] });
+      }
+      if (method === 'session/set_config_option' && mode === 'stop-model') return;
       if (method === 'session/prompt') {
         if (params.prompt[0].text === 'follow-up') {
-          if (!cancelled && params.sessionId !== 'replacement') return send({ id, error: { code: -32603, message: 'Previous prompt still running' } });
+          if (!cancelled && mode !== 'busy' && params.sessionId !== 'replacement') return send({ id, error: { code: -32603, message: 'Previous prompt still running' } });
           if (mode === 'permission-ceiling' && !permissionCancelled) {
             return send({ id, error: { code: -32603, message: 'Permission still pending' } });
           }
           if (mode === 'stuck-cancel') chunk('agent_message_chunk', 'late reply');
-          chunk('agent_message_chunk', 'second reply', params.sessionId);
-          return reply(id, { stopReason: 'end_turn' });
+          const finish = () => {
+            chunk('agent_message_chunk', 'second reply', params.sessionId);
+            reply(id, { stopReason: 'end_turn' });
+          };
+          if (mode === 'prepare-late') setTimeout(finish, 70);
+          else finish();
+          return;
         }
         promptId = id;
         if (mode === 'busy') send({ id, error: { code: -32603,
@@ -265,7 +283,7 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
         if (mode === 'permission') reply(promptId, { stopReason: 'end_turn' });
         permissionCancelled = result?.outcome?.outcome === 'cancelled';
       }
-      if (method === 'session/cancel' && mode !== 'stuck-cancel') {
+      if (method === 'session/cancel' && !stuckCancel) {
         const cancelledId = promptId;
         setTimeout(() => {
           chunk('agent_thought_chunk', 'late thought');
@@ -283,6 +301,7 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
   let reported: Parameters<NonNullable<RuntimeSessionConfig['onCodexComplete']>>[0] | undefined;
   const config: RuntimeSessionConfig = {
     ...dummyConfig,
+    ...(mode === 'stop-model' ? { model: 'opencode:some/model' } : {}),
     onApprovalRequest: (request) => { requestId = request.requestId; },
     onCodexComplete: (result) => { reported = result; },
   };
@@ -297,16 +316,30 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
     },
     approveWrite: async () => true,
     onProgress: (event) => { progress.push(event.message); },
-  }, 150);
+  }, mode === 'prepare-drain' || mode === 'stop-prepare' ? 200
+    : mode === 'stuck-cancel' || mode.startsWith('prepare-') ? 15 : 75);
   try {
     const sessionId = await manager.start();
     const ceilingMs = mode.endsWith('-ceiling') ? 900 : undefined;
-    const silent = mode === 'silent' || mode === 'stuck-cancel';
+    const prepareTimeout = mode.startsWith('prepare-');
+    const silent = mode === 'silent' || mode === 'stuck-cancel' || prepareTimeout || mode === 'stop-prepare';
     const quietMs = silent ? 100 : 300;
     const session = new AcpSession('conv-quiet', sessionId, config, runtime, undefined, quietMs, ceilingMs);
     (runtime as any)._manager = manager;
     (runtime as any)._sessions.set(session.conversationId, session);
     (runtime as any)._sessionsByAcpId.set(sessionId, session);
+    let modelRequested: Promise<void> | undefined;
+    if (mode === 'stop-model') {
+      const setModel = manager.setModel.bind(manager);
+      modelRequested = new Promise<void>((resolve) => {
+        manager.setModel = (...args) => {
+          const request = setModel(...args);
+          resolve();
+          return request;
+        };
+      });
+    }
+    const getReported = () => reported;
     const startedAt = performance.now();
     const finished = session.prompt({
       prompt: 'hi',
@@ -322,6 +355,13 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
         deadline.abort();
       }
     };
+    if (modelRequested) {
+      await within(modelRequested);
+      runtime.disposeSession(session.conversationId);
+      await within(finished);
+      assert.deepEqual(reported, { status: 'interrupted' });
+      return;
+    }
     if (mode === 'permission' || mode === 'permission-ceiling') {
       await delay(500);
       assert.ok(requestId, 'agent requested permission');
@@ -373,7 +413,30 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
         session.respondToApproval(requestId!, true, false);
         assert.deepEqual(permissionResult, { outcome: { outcome: 'cancelled' } });
       }
-      if (silent || mode === 'permission-ceiling') {
+      if (prepareTimeout || mode === 'stop-prepare') {
+        reported = undefined;
+        const started = performance.now();
+        const pending = session.prompt({ prompt: 'follow-up' });
+        if (mode === 'stop-prepare') {
+          await session.cancel();
+          await within(pending);
+          assert.deepEqual(reported, { status: 'interrupted' });
+          return;
+        }
+        await within(pending);
+        assert.ok(performance.now() - started < 500, 'preparation is bounded by the quiet window');
+        assert.equal(getReported()?.errorCode, ACP_QUIET_STREAM_ERROR);
+        if (mode !== 'prepare-late') return;
+
+        await within(session.prompt({ prompt: 'follow-up' }));
+        assert.equal(getReported()?.status, 'completed');
+        assert.equal(getReported()?.lastAgentMessage, 'second reply');
+        assert.equal(progress.filter((message) => message === 'second reply').length, 1);
+        assert.equal(manager.hasSession('abandoned'), false);
+        assert.ok(!progress.some((line) => line.startsWith('late ')), 'late preparation posts no updates');
+        return;
+      }
+      if (silent || mode === 'permission-ceiling' || mode === 'busy') {
         const followUpStartedAt = performance.now();
         await within(session.prompt({ prompt: 'follow-up' }));
         assert.equal(reported?.status, 'completed', reported?.error);
@@ -392,7 +455,7 @@ async function testQuietStream(mode: 'silent' | 'stuck-cancel' | 'busy' | 'progr
 }
 
 async function run() {
-  for (const mode of ['silent', 'stuck-cancel', 'busy', 'progress', 'permission', 'permission-ceiling', 'tool', 'tool-ceiling'] as const) {
+  for (const mode of ['silent', 'stuck-cancel', 'busy', 'progress', 'permission', 'permission-ceiling', 'tool', 'tool-ceiling', 'prepare-drain', 'prepare-hang', 'prepare-late', 'stop-prepare', 'stop-model'] as const) {
     await testQuietStream(mode);
     console.log(`✓ ACP quiet-stream fixture: ${mode}`);
   }
