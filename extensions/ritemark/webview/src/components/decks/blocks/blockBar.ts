@@ -71,8 +71,9 @@ export const REVEAL_TIP = 'In Present, show the items one by one: the slide open
  * Style, and last Boxes' Mark (Sprint 167 PR 2), a menu already, which keeps its value as its icon only, the word in its
  * tooltip. `fold` counts the folds; a group is folded from its number on.
  */
-export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4, mark: 5 } as const
-export const MAX_FOLD = FOLD_AT.mark
+// `words`, last (27 November): the type, Style, Size and Add drop their words for their icons, so the bar never wraps.
+export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4, mark: 5, words: 6 } as const
+export const MAX_FOLD = FOLD_AT.words
 
 /** A Columns block holds two to four columns from the bar (more can be written, and are kept). */
 export const MIN_COLUMNS = 2

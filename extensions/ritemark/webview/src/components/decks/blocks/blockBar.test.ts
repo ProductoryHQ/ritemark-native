@@ -652,6 +652,18 @@ stable(COLUMNS, 'three columns')
   assert.equal(barLeft(500, 300, pane, 1440), 392, 'moved left to keep 8 px from the divider')
   assert.equal(barLeft(150, 300, pane, 1440), 208, 'never past the pane\'s left edge')
   assert.equal(barLeft(300, 490, pane, 1440), null, 'wider than the pane: the group folds')
+  const widthBeforeDelete = 460
+  const deleteWidth = 32
+  const deleteGap = 2
+  const rowWidth = widthBeforeDelete + deleteWidth + deleteGap
+  assert.equal(barLeft(300, widthBeforeDelete, pane, 1440), 232, 'without Delete the row fits at this fold')
+  assert.equal(barLeft(300, rowWidth, pane, 1440), null, 'the complete row needs another fold')
+  const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(barSource, /maxWidth:|flexWrap:/, 'measure the complete intrinsic row even at MAX_FOLD')
+  assert.match(barSource, /\{!iconOnly && BAR_KIND_LABEL\[chosen.kind\]\}/, 'the type keeps only its icons at the last fold')
+  assert.match(barSource, /\{!iconOnly && 'Add'\}/, 'Add keeps only its icon at the last fold')
+  assert.match(barSource, /<Group label="Style" folded=\{fold >= FOLD_AT.style\} bare=\{iconOnly\}/)
+  assert.match(barSource, /<Group label="Size" folded bare=\{iconOnly\}/)
   const list = { left: 100, top: 50, width: 400, height: 90 }
   const plus = plusSpot(list, 'list', 112)
   assert.equal(plus.left + HANDLE_SIZE / 2, 112, 'a list\'s + under its bullets')
@@ -832,7 +844,8 @@ stable(COLUMNS, 'three columns')
   // Sprint 167 PR 2: Boxes' Mark, a menu already, folds last, to its value's icon (review of #878: else the Boxes bar at
   // its last fold was a menu wider than before, and ran past a narrow pane).
   assert.ok(FOLD_AT.style < FOLD_AT.mark, 'Style, then Mark')
-  assert.equal(MAX_FOLD, FOLD_AT.mark, 'every group can fold')
+  assert.ok(FOLD_AT.mark < FOLD_AT.words, 'Mark, then the words')
+  assert.equal(MAX_FOLD, FOLD_AT.words, 'every group can fold, then the words go')
   {
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
     // One by one is a lone toggle with no segment track (the Experience lead, 27 November): off has no ground.
@@ -840,7 +853,7 @@ stable(COLUMNS, 'three columns')
     assert.match(barSource, /<Choice\s+plain\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
     assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
     for (const group of ['Style', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
-    assert.match(barSource, /<Group label="Size" folded icon="columns" tip=/)
+    assert.match(barSource, /<Group label="Size" folded bare=\{iconOnly\} icon="columns" tip=/)
     assert.match(barSource, /fold < MAX_FOLD/)
   }
   // A wrapper that carries more than Reveal keeps it at All at once: only Reveal goes (review of #799).
@@ -1066,7 +1079,7 @@ stable(COLUMNS, 'three columns')
   // A menu's trigger says its value to a screen reader too ("Mark: Number"), as it shows it; folded to its icon, the
   // accessible name keeps the value.
   assert.match(barSource, /aria-label=\{`\$\{label\}: \$\{current\.label \?\? current\.tip\}`\}/)
-  assert.match(barSource, /\{bare && current\.icon \? null : current\.label\}/)
+  assert.match(barSource, /\{bare && triggerIcon \? null : current\.label\}/)
   assert.match(barSource, /<Tooltip label=\{tip \?\? \(bare \? `\$\{label\}: \$\{current\.label \?\? current\.tip\}` : label\)\}>/)
 }
 
