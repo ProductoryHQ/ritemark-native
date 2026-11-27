@@ -6,18 +6,18 @@
  *  - New → Deck makes "Untitled.rtms" ("Untitled 2.rtms" and on; Sprint 172), a title slide reading "The deck's title" in
  *    the built-in theme, in the folder New was opened from, and opens it at once, as New → Text and Table do.
  *  - The deck's start card offers a copy of an earlier deck: this deck becomes that deck as written, notes included (it
- *    is the person's own deck), named "<deck name> (copy)" ("(copy 2)" and on when that is taken). Its own picture
- *    folder is copied when linked, and its other relative paths are written for the copy's folder.
+ *    is the person's own deck), named "<deck name> (copy)" ("(copy 2)" and on when that is taken). Its pictures go into
+ *    the copy's own folder, and its other relative paths are written for the copy's folder.
  *  - The card lists the project's decks, newest first, each with its folder and date. The Slide library's topics are the
  *    library, not earlier decks, so they are left out (as the library's Other decks leaves them out).
  */
 
 import type { DeckNoticeReporter } from './deckProtocol';
-import { EMPTY_DECK_TITLE, newId, parseDeck, writeScalar } from './deckFormat';
-import { folderOf, newTopicText, partText, rebasePath, rebaseSlide, rewriteMarkdownTargets } from './deckLibraryFormat';
+import { EMPTY_DECK_TITLE, newId, parseDeck, parseFrom, slideDataOf, writeFrom, writeScalar, writeSlideData } from './deckFormat';
+import { folderOf, newTopicText, pairedStamp, partText, rebasePath, rebaseSlide, rewriteDeckPictures, rewriteMarkdownTargets, slideStamp, stampBaselines } from './deckLibraryFormat';
 import { isTopicPath } from './DeckLibrary';
 import { BUILT_IN_THEME_PATH } from './deckTheme';
-import { copyDeckPictures, type CopyDeckFolder } from './deckFolderFollow';
+import { copyPictureTargets, type DeckPictureFiles } from './deckPictureCopy';
 import { deckFileName, deckNameOf, deckPictureFolderName, LEGACY_DECK_EXTENSION } from './deckFileName';
 
 /** The words an empty deck's title slide starts with, selected so they are typed over (its part shows no heading of them). */
@@ -157,7 +157,7 @@ export interface CopyDeckSteps {
    * when that was refused.
    */
   rename: (fileName: string, line: string) => Promise<boolean>;
-  copyFolder: CopyDeckFolder;
+  pictures: DeckPictureFiles;
   /** Rewrite the copy at its actual path, if it still holds the text written by this operation. */
   updateCopy: (relative: string, before: string, after: string) => Promise<void>;
   /** A line for the deck's bar, in the tab it is in now. */
@@ -190,7 +190,19 @@ export async function copyEarlierDeck(source: string, steps: CopyDeckSteps): Pro
   const fileName = copyFileName(sourceName, steps.taken);
   const renamed = await steps.rename(fileName, copiedNotice(sourceName));
   const target = renamed ? (folder ? folder + '/' : '') + fileName : steps.deck;
-  const next = await copyDeckPictures(text, source, target, steps.copyFolder);
+  const picture = await copyPictureTargets(source, target, steps.pictures, visit => { rewriteDeckPictures(written, visit); });
+  const from = folderOf(source);
+  const rebaseLink = (value: string) => from === folder ? value : rebasePath(value, from, folder);
+  const next = rewriteDeckPictures(written, picture, true, rebaseLink, (slide, body, beforeHandout, afterHandout) => {
+    const before = slideDataOf(slide.kind, slide.body);
+    const origin = parseFrom(before.from);
+    if (!origin?.stamp) return body;
+    const { sourceStamp, copyStamp } = stampBaselines(origin.stamp);
+    if (!sourceStamp || copyStamp !== slideStamp(slide.kind, before, beforeHandout, from)) return body;
+    const after = slideDataOf(slide.kind, body);
+    const nextStamp = slideStamp(slide.kind, after, afterHandout, folder);
+    return nextStamp === copyStamp ? body : writeSlideData(slide.kind, body, { ...after, from: writeFrom({ ...origin, stamp: pairedStamp(sourceStamp, nextStamp) }) });
+  });
   if (next !== text) await steps.updateCopy(target, text, next);
   if (!renamed) steps.notice(copiedNotice(sourceName), 'success');
   return renamed ? fileName : steps.deck.slice(steps.deck.lastIndexOf('/') + 1);
