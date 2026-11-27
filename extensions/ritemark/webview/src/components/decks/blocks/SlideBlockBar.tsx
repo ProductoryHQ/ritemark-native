@@ -226,9 +226,6 @@ function BoxIconButton({ box, trigger, onPick, focusEditor }: {
         <DropdownMenuTrigger asChild>
           <Button
             ref={trigger} variant="toolbar" size="compact" aria-label="Icon" aria-keyshortcuts="Alt+F10"
-            // While its menu is open, the button shows the open chip, as Auto ⌄ and the Mark menu do (#1107): Radix
-            // sets `data-state="open"` on a menu's trigger, and `ui/dropdown-menu.tsx` styles it the same way.
-            className="data-[state=open]:bg-surface-soft data-[state=open]:text-ink-strong"
             onMouseDown={event => event.preventDefault()}
             onPointerDownCapture={() => { if (open) closeReason.current = 'trigger'; else openedByKeyboard.current = false }}
             onKeyDownCapture={event => {
