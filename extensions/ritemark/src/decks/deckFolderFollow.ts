@@ -175,16 +175,6 @@ export async function trashDeckFolders(decks: readonly DeletedDeck[], deleted: r
   }
 }
 
-/** Text already written for the copy's directory, using the source's folder until the copy succeeds. */
-export async function copyDeckPictures(text: string, source: string, deck: string, copy: CopyDeckFolder): Promise<string> {
-  const from = ownDeckFolder(source);
-  const to = ownDeckFolder(deck);
-  const dir = folderOf(deck);
-  if (from === to || !linksInto(linkedFiles(text, dir), from) || !(await copy(from, to))) return text;
-  const after = placeAfterMoves([{ from, to }]);
-  return rewriteDeckPictures(text, target => movedTarget(target, dir, dir, after));
-}
-
 export interface CreatedDeckFiles extends DeckFolderFiles {
   findFiles(glob: string, limit: number): Promise<string[]>;
   readBytes(file: string): Promise<Buffer>;

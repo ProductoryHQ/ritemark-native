@@ -77,28 +77,29 @@ export function writeImageRelativeTo(
     }
     finalFilename = rawFilename;
   } else {
-    const ext = path.extname(rawFilename);
-    const rawBaseName = path.basename(rawFilename, ext);
-    const sanitizedBaseName = sanitizeImageBaseName(rawBaseName) || 'image';
-    // A pasted or dropped picture never replaces another one of the same name: other documents and slides may show
-    // it (Codex on Sprint 157 PR 3). The next free name, `name-2.png`, `name-3.png`, … is used instead.
-    // The write itself claims the name ('wx'), so two saves at the same moment can't both take it.
     const bytes = Buffer.from(base64, 'base64');
-    for (let n = 1; ; n++) {
-      // The name stays within the 255-byte limit of one path component, suffix included (Codex on #716).
-      const suffix = n === 1 ? '' : `-${n}`;
-      const room = 255 - Buffer.byteLength(ext) - suffix.length;
-      finalFilename = `${sanitizedBaseName.slice(0, room)}${suffix}${ext}`;
-      try {
-        fs.writeFileSync(path.join(targetDir, finalFilename), bytes, { flag: 'wx' });
-        return finalFilename;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      }
-    }
+    return claimImageName(rawFilename, name => fs.writeFileSync(path.join(targetDir, name), bytes, { flag: 'wx' }));
   }
   const imagePath = path.join(targetDir, finalFilename);
 
   fs.writeFileSync(imagePath, Buffer.from(base64, 'base64'));
   return finalFilename;
+}
+
+/** Try the same create-only names for pasted pictures and pictures copied between decks. */
+export function claimImageName(rawFilename: string, create: (name: string) => void): string {
+  const ext = path.extname(rawFilename);
+  const base = sanitizeImageBaseName(path.basename(rawFilename, ext)) || 'image';
+  for (let n = 1; ; n++) {
+    const suffix = n === 1 ? '' : `-${n}`;
+    // Keep the complete filename within the filesystem's 255-byte component limit.
+    const room = 255 - Buffer.byteLength(ext) - suffix.length;
+    const name = `${base.slice(0, room)}${suffix}${ext}`;
+    try {
+      create(name);
+      return name;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
 }

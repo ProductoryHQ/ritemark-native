@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import type { DeckFiles } from './DeckLibrary';
+import { workspaceDeckPictures } from './workspaceDeckPictures';
 import { DECK_GLOB } from './deckFileName';
 
 /** Folders a deck is never looked for in. */
@@ -56,6 +57,7 @@ export function workspaceDeckFiles(root: string): DeckFiles {
     return target;
   };
   return {
+    pictures: workspaceDeckPictures(root),
     async list() {
       const uris = await vscode.workspace.findFiles(new vscode.RelativePattern(root, DECK_GLOB), SKIPPED, MAX_DECKS);
       const inDeckFolder = deckFolderCheck(root, async dir =>

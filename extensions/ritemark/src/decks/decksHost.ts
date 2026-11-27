@@ -16,6 +16,7 @@ import { DeckPdfSaver, PRINT_COMMAND } from './deckPdf';
 import { loadPageAssets } from './page/pageAssets';
 import { DeckPresenter } from './present/DeckPresenter';
 import { setDeckToolHost } from '../runtime/ritemarkTools';
+import { workspaceDeckPictures } from './workspaceDeckPictures';
 import { copyEarlierDeck, earlierDecks, makeEmptyDeck } from './newDeck';
 import { freshDeckMarks, sendDraft, type StartCardState } from './startCard';
 import { folderOf, movedTarget, placeAfterMoves, rewriteDeckPictures, slidesOfText } from './deckLibraryFormat';
@@ -465,7 +466,7 @@ function startCardHost(pages: DeckPages, options: DecksHostOptions, fresh: Fresh
       const result = await copyEarlierDeck(source, {
         deck,
         read: relative => files.read(relative),
-        copyFolder: (from, to) => deckFolderFiles.copy(rootless(path.join(root, from)), rootless(path.join(root, to))),
+        pictures: workspaceDeckPictures(root),
         updateCopy: async (relative, before, after) => {
           const uri = vscode.Uri.file(path.join(root, relative));
           const copy = await vscode.workspace.openTextDocument(uri);

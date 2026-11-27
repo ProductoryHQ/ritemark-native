@@ -193,20 +193,31 @@ async function main(): Promise<void> {
     '',
   ].join('\n');
   const steps: string[] = [];
-  const folders = new Map<string, string[]>([['Clients/Harbour/AI assistants.deck.md.files', ['side.png']]]);
-  const copyFolder = async (from: string, to: string) => {
-    const pictures = folders.get(from);
-    if (!pictures || folders.has(to)) return false;
-    folders.set(to, [...pictures]);
-    return true;
+  const pictures = new Map<string, Buffer>([
+    ['Clients/Harbour/AI assistants.deck.md.files/side.png', Buffer.from('side')],
+    ['Clients/Harbour/images/handout.png', Buffer.from('handout')],
+  ]);
+  const before = new Map(pictures);
+  const pictureFiles = {
+    async copyPicture(from: string, folder: string) {
+      const bytes = pictures.get(from);
+      if (!bytes) throw new Error('missing');
+      const to = folder + '/' + from.split('/').pop();
+      pictures.set(to, Buffer.from(bytes));
+      return to;
+    },
   };
   let deckText = emptyDeckText(() => 0.5);
   const result = await copyEarlierDeck('Clients/Harbour/AI assistants.deck.md', {
     deck: 'Courses/Untitled.rtms',
-    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source.replace('images/cover.png', 'AI assistants.deck.md.files/side.png') : null),
+    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source.replace('images/cover.png', 'AI assistants.deck.md.files/side.png').replace('Welcome.', 'Welcome. ![Handout](images/handout.png).') : null),
     taken: fileName => fileName === 'AI assistants (copy).rtms',
-    copyFolder,
-    updateCopy: async (_relative, before, after) => { assert.equal(deckText, before); deckText = after; },
+    pictures: pictureFiles,
+    updateCopy: async (relative, before, after) => {
+      assert.equal(deckText, before);
+      assert.ok(pictures.has(relative + '.files/side.png'), 'the picture exists before the new link is saved');
+      deckText = after;
+    },
     replace: async text => { deckText = text; steps.push('replace and save'); return true; },
     rename: async (fileName, line) => { steps.push(`rename ${fileName}, then: ${line}`); return true; },
     notice: text => { steps.push(`notice ${text}`); },
@@ -217,13 +228,17 @@ async function main(): Promise<void> {
   const copied = parseDeck(deckText);
   assert.deepEqual({ theme: copied.theme, look: /^look: borderless$/m.test(deckText), slides: copied.slides.length }, { theme: 'Slide library/Themes/Evening.theme.md', look: true, slides: 2 });
   assert.equal(parseSlideBody(copied.slides[0].body).image, 'AI assistants (copy 2).rtms.files/side.png');
-  assert.deepEqual(folders.get('Courses/AI assistants (copy 2).rtms.files'), ['side.png']);
+  const own = 'Courses/AI assistants (copy 2).rtms.files';
+  assert.deepEqual(pictures.get(own + '/side.png'), Buffer.from('side'));
+  assert.deepEqual(pictures.get(own + '/handout.png'), Buffer.from('handout'));
+  assert.match(deckText, /!\[Handout\]\(<AI assistants \(copy 2\)\.rtms\.files\/handout\.png>\)/);
+  for (const [path, bytes] of before) assert.deepEqual(pictures.get(path), bytes);
   assert.match(deckText, /\[the brief\]\(\.\.\/Clients\/Harbour\/Brief\.md\)/);
   // Gone meanwhile: nothing changes, and the bar says why
   const gone: string[] = [];
   assert.equal(await copyEarlierDeck('Old.deck.md', {
     deck: 'Untitled.rtms',
-    copyFolder: async () => false,
+    pictures: { async copyPicture() { throw new Error('missing'); } },
     updateCopy: async () => assert.fail('no pictures copied'),
     read: async () => null,
     taken: () => false,
@@ -234,10 +249,15 @@ async function main(): Promise<void> {
   assert.deepEqual(gone, ['notice Old is no longer there.']);
   // A rename refused: the deck is the copy under its own name, and the bar says so in this tab
   const kept: string[] = [];
+  pictures.set('images/cover.png', Buffer.from('cover'));
   assert.equal(await copyEarlierDeck('Kickoff.deck.md', {
     deck: 'Untitled.rtms',
-    copyFolder: async () => false,
-    updateCopy: async () => assert.fail('no pictures copied'),
+    pictures: pictureFiles,
+    updateCopy: async (relative, _before, after) => {
+      assert.equal(relative, 'Untitled.rtms');
+      assert.match(after, /image: Untitled\.rtms\.files\/cover\.png/);
+      assert.deepEqual(pictures.get('Untitled.rtms.files/cover.png'), Buffer.from('cover'));
+    },
     read: async () => source,
     taken: () => false,
     replace: async () => true,
