@@ -82,6 +82,65 @@ test('each read source needs a link and duplicate slide rows fail the notes chec
   assert.equal(result.criteria[4], 'fail');
 });
 
+test('scores all six OpenCode link-first slide rows from Markdown and counts their deck links', () => {
+  const file = '04 Drafts/Decision briefing.pptx';
+  const href = '04%20Drafts/Decision%20briefing.pptx';
+  const rows = [
+    [href, ': Slide 1 — Start with three branch types.', 'three branch types', 'amber ledger', 'Use the amber ledger for the pilot register.'],
+    [href, ': Slide 2 — Reserve the quiet room on Tuesdays.', 'quiet room', 'queue buzzer', 'Test the queue buzzer before opening.'],
+    [href + '#p=3', ': Slide 3: Access keeps the west entrance open.', 'west entrance', 'folding ramp', 'Place the folding ramp by the side door.'],
+    [href, ': Slide 4 — Train eight advisers first.', 'eight advisers', 'mock till', 'Use the mock till during rehearsal.'],
+    [href + '#p=5', ': Slide 5: Budget keeps €6,200 in reserve.', '€6,200', '', 'none'],
+    [href, ': Slide 6 — Review the pilot after 17 days.', '17 days', 'blue tally sheet', 'Bring the blue tally sheet to the review.'],
+  ];
+  const markdown = rows.map(([target, slide, , , notes]) =>
+    `- [Decision briefing](${target})${slide} Speaker notes: ${notes}`);
+  const visibleAnswer = rows.map(([, slide, , , notes]) =>
+    `Decision briefing${slide} Speaker notes: ${notes}`).join('\n');
+  // With no separate deck entry, each slide needs a matching deck link.
+  const fixture = {
+    ...facts, documents: [],
+    deck: { file, slides: rows.map(([, , content, note], index) =>
+      ({ number: index + 1, words: [content], noteWords: note ? [note] : [] })) },
+  };
+  const links = rows.map(([target]) => ({ href: target, targetFile: file, hasPassage: target.includes('#') }));
+  const score = (lines = markdown, linkEvidence = links) =>
+    scoreRun({ ...sample, answer: lines.join('\n'), visibleAnswer: '', links: linkEvidence }, fixture);
+  const result = scoreRun({ ...sample, answer: markdown.join('\n'), visibleAnswer, links }, fixture);
+  assert.deepEqual(result.slides, fixture.deck.slides.map(({ number }) => ({ number, content: true, notes: true })));
+  assert.equal(result.criteria[2], 'pass');
+  assert.equal(score().coverage.at(-1).result, 'read');
+  assert.equal(score(markdown, links.filter((link) => link.href !== href + '#p=5')).coverage.at(-1).result, 'missing');
+  assert.equal(score([...markdown, markdown[2]]).criteria[2], 'fail');
+  assert.equal(score(markdown.map((line) => line.replace('Speaker notes: none', 'Speaker notes: mock till'))).criteria[2], 'fail');
+
+  for (const fragment of ['p=5', 'slide=5']) {
+    const mismatched = [...markdown];
+    mismatched[2] = markdown[2].replace(`[Decision briefing](${href}#p=3):`, `**[Slide 5](${href}#${fragment})** —`);
+    const rescored = score(mismatched);
+    assert.equal(rescored.criteria[2], 'pass');
+    assert.deepEqual(rescored.slides[2], { number: 3, content: true, notes: true });
+  }
+});
+
+test('a link-first slide row does not make the deck’s other rows fail on their Markdown marks', () => {
+  // Codex's review of #1132: slide 2 shows "quiet room" but is written "quiet **room**".
+  const href = 'Pilot%20deck.pptx#p=1';
+  const markdown = answer
+    .replace('Slide 1 — quiet room.', `- [Pilot deck](${href}): Slide 1 — quiet room.`)
+    .replace('Slide 2 — side entrance. Speaker notes: folding ramp.',
+      'Slide 2 — side **entrance**. Speaker notes: folding _ramp_.')
+    .replace('Slide 3 — next Tuesday.', 'Slide 3 — next `Tuesday`.');
+  const links = [...sample.links, { href, targetFile: 'Pilot deck.pptx', hasPassage: true }];
+  const result = scoreRun({ ...sample, answer: markdown, links }, facts);
+  assert.deepEqual(result.slides.slice(0, 3), [
+    { number: 1, content: true, notes: true },
+    { number: 2, content: true, notes: true },
+    { number: 3, content: true, notes: true },
+  ]);
+  assert.equal(result.criteria[2], 'pass');
+});
+
 test('accepts a password-free copy and the project folder label from the Claude run', () => {
   const result = scoreRun({
     ...sample,
