@@ -51,6 +51,7 @@ If you run training or share slides with clients, you can update the page they a
 - **Hear button names on a phone.** Screen readers now announce the More and Contents buttons by name on published deck pages.
 - **Print slides with their theme.** On paper and in a PDF, each slide spans the column and keeps its theme's colours.
 - **Keep every picture in a row.** Pictures written side by side no longer disappear when you save. Each one now gets its own line.
+- **See every picture in your document.** Pictures with a space, brackets or a caption in their link now show while you edit. Saving keeps them as you wrote them.
 - **Keep empty lines on a slide.** A blank line you add between blocks no longer disappears when you leave the slide.
 - **See the text toolbar where you work.** On a slide, it appears above the words you chose.
 - **Keep the slide's title in view.** **Slide settings** opens beside the slide, not over its title.
