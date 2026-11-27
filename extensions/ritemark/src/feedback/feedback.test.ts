@@ -291,6 +291,18 @@ test('feedback command validates the open and binds submissions to its card and 
     assert.equal(mailBody, email.copyText);
     assert.ok(email.copyText.endsWith(`${message}\n\n${LAST_ANSWER_LABEL}\n> Chosen answer.`));
   }
+  const withPicture = { ...base, withPicture: true };
+  const withoutPicture = { ...base, withPicture: false };
+  const eventCount = events.length;
+  const plainMail = await submit({ ...withoutPicture, route: 'email', includeQuote: true });
+  const plainBody = mailBody;
+  const pictureMail = await submit({ ...withPicture, route: 'straight', includeQuote: true });
+  assert.deepEqual(pictureMail, plainMail, 'a picture selects e-mail and leaves the text report unchanged');
+  assert.equal(mailBody, plainBody);
+  assert.equal(events.length, eventCount, 'picture feedback must not go to analytics');
+  assert.equal(routeOf(withPicture), 'email');
+  assert.equal(mailKindOf(withPicture), 'feedback');
+  assert.equal(await submit({ ...withPicture, route: 'straight', withPicture: 'true' }), null);
   const fullField = 'x'.repeat(8000);
   const longMail = await submit({ ...base, route: 'email', text: fullField, includeQuote: true });
   assert.equal(longMail.outcome, 'too-long');
