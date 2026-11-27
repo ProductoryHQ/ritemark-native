@@ -41,6 +41,7 @@ const otherUnreadReason = /\b(?:could not|couldn't|unable to|cannot|can’t|can'
 const scanReason = /\b(?:no (?:searchable |selectable |extractable |readable )?text|image[- ]only|needs ocr|without (?:a )?text layer)\b/i;
 const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?:none|absent|n\/a))\b/i;
 const slideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*)?\[?slide\s+(\d+)\b/i;
+const linkedSlideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(\*\*)?\[[^\]\n]+\]\(([^\n]*?)\)\1\s*[:\p{Pd}−]\s*(?:\*\*)?slide\s+(\d+)\b/iu;
 const entryName = (line) => titleWords(line.replace(/^(?:[-*+] |\d+[.)] )?/, ''));
 
 export function evidenceRedactor(env = process.env) {
@@ -107,7 +108,7 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
       entryFile = match.file;
       unreadEntry = [visible];
       unreadRows.get(entryFile).push(unreadEntry);
-    } else if (!line || match || /^#{1,6}\s/.test(line) || slideStart.test(line)
+    } else if (!line || match || /^#{1,6}\s/.test(line) || slideStart.test(line) || linkedSlideStart.test(line)
       || (unreadEntry && mentionsOther(heading, entryFile))) {
       unreadEntry = undefined;
     } else {
@@ -128,12 +129,16 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   // Each slide entry starts with its own number. The prompt asks for notes on the same line.
   const slideRows = new Map();
   let duplicateSlide = false;
-  for (const line of lines) {
-    const match = slideStart.exec(line);
+  // Link destinations are only present in the Markdown. Use one representation
+  // for the whole deck so a row seen in both forms is counted only once.
+  const slideLines = markdownLines.some((line) => linkedSlideStart.test(line)) ? markdownLines : lines;
+  for (const line of slideLines) {
+    const linked = linkedSlideStart.exec(line);
+    const match = linked ?? slideStart.exec(line);
     if (!match) continue;
-    const number = Number(match[1]);
+    const number = Number(linked ? linked[3] : match[1]);
     if (slideRows.has(number)) duplicateSlide = true;
-    slideRows.set(number, line);
+    slideRows.set(number, linked ? line.slice(linked[0].length) : line);
   }
   const slides = customQuestion ? [] : facts.deck.slides.map(({ number, words, noteWords }) => {
     const row = slideRows.get(number) ?? '';
@@ -150,12 +155,15 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
   const deckRows = rowsFor(facts.deck.file);
   const linkedSlides = new Set();
   for (const line of markdownLines) {
-    const match = slideStart.exec(line);
+    const linked = linkedSlideStart.exec(line);
+    const match = linked ?? slideStart.exec(line);
     if (!match) continue;
-    const number = Number(match[1]);
+    const number = Number(linked ? linked[3] : match[1]);
     if (links.some(({ href, targetFile, hasPassage }) => {
-      if (targetFile !== facts.deck.file || !hasPassage || !line.includes(`](${href})`)) return false;
-      const page = new URLSearchParams(href.split('#')[1]).get('p');
+      if (targetFile !== facts.deck.file) return false;
+      if (linked ? href !== linked[2] : !hasPassage || !line.includes(`](${href})`)) return false;
+      const fragment = new URLSearchParams(href.split('#')[1]);
+      const page = fragment.get('p') ?? (linked ? fragment.get('slide') : null);
       return page === null || page === String(number);
     })) linkedSlides.add(number);
   }
