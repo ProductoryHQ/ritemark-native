@@ -893,10 +893,10 @@ test('title injection: every way to a notification makes its line plain, and eve
     showConnect: (line) => { said.push(line); },
   };
   const ui = plainUi(raw);
-  ui.showFailure(COMMAND_LINK, () => undefined);
+  ui.showFailure(COMMAND_LINK, () => undefined, "Publish didn't go");
   ui.showWaiting(COMMAND_LINK)();
   ui.showBrief(COMMAND_LINK);
-  ui.showConnect(COMMAND_LINK);
+  ui.showConnect(COMMAND_LINK, "Unpublish didn't go");
   assert.deepEqual(said, [COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN, COMMAND_LINK_PLAIN], 'failure, wait, toast and connect');
   assert.equal(hasLinkSyntax(FILE_CHANGED(`${COMMAND_LINK}.png`)), false, 'a changed file');
   assert.throws(

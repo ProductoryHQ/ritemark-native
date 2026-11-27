@@ -10,6 +10,8 @@
  * With the flag off nothing here applies: a `.rtms` or `.deck.md` opens as an ordinary document, its slide blocks as code.
  */
 
+import { FEEDBACK_OPEN_COMMAND } from '../feedback/feedbackSheet';
+import { DECK_FAILURE_FEEDBACK_MESSAGE, decodeFailureFeedbackOpen, PUBLISH_FAILURE_TITLE } from '../feedback/feedbackQuoteSafety';
 import { openInBrowser } from './openInLink';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -65,6 +67,7 @@ const KEPT_WRITES = 20;
 const VIEW_ANSWER_MS = 5000;
 
 export class DeckPages implements vscode.Disposable {
+  private readonly publishFailures = new WeakMap<vscode.Webview, string>();
   private readonly views = new Set<DeckView>();
   private active: DeckView | null = null;
   private readonly changed = new vscode.EventEmitter<void>();
@@ -398,6 +401,13 @@ export class DeckPages implements vscode.Disposable {
     if (!connected || !this.deckModeFor(document, true)) return;
     // Present (Sprint 159) has its own decoders, beside the presenter's other messages.
     const type = (message as { type?: unknown } | null)?.type;
+    if (type === DECK_FAILURE_FEEDBACK_MESSAGE) {
+      const line = this.publishFailures.get(webview);
+      const options = decodeFailureFeedbackOpen((message as { options?: unknown }).options,
+        line === undefined ? undefined : { title: PUBLISH_FAILURE_TITLE, line });
+      if (options) await vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
+      return;
+    }
     if (type === 'deck/present') {
       const present = decodeDeckPresentRequest(message);
       if (present && this.presenter) await this.presenter.start({ document, panel: connected.panel }, present);
@@ -505,7 +515,11 @@ export class DeckPages implements vscode.Disposable {
         await this.publisher?.liveAction(document, request.action, webview);
         return;
       case 'deck/publish':
-        await this.publisher?.publish(document, request.text, request.look, request.steps, (text, kind) => void this.post(webview, { type: 'deck/page-notice', text, kind, operation: 'publish' }));
+        await this.publisher?.publish(document, request.text, request.look, request.steps, (text, kind) => {
+          if (kind === 'failure') this.publishFailures.set(webview, text);
+          if (kind === 'success') this.publishFailures.delete(webview);
+          void this.post(webview, { type: 'deck/page-notice', text, kind, operation: 'publish' });
+        });
         return;
       case 'deck/page-action':
         await this.publisher?.pageAction(document, request.action, text => void this.post(webview, { type: 'deck/page-notice', text }));

@@ -1,6 +1,6 @@
 # Sprint 176 · Hear from people
 
-**Draft for the manager's approval** · SDD · Phase 2, planning · Planning branch and worktree `plan/sprint-176-feedback`, based on `ba93ceba`. Implementation branch after approval `sprint-176-feedback`.
+**Status:** Done 27 Nov 2026; Gate 2 items in closing-proof.md
 
 Parent release v2.4.0. App half of #1045. Jarmo put the app half in 2.4 on 25 November (“3. Jah rakenduse pool 2.4.”). Approved by the Development manager on 25 November under the 2.4 roadmap, which Jarmo approved (sprint plans are the manager's); the scope is Jarmo's decision of the same day. The design is the Experience lead's experience 53, in words, kept in the private design repository (ritemark-dev `8b13e5e`, `product/design/experience/experiences/voice/README.md`). The frames follow by 27 November.
 
@@ -10,6 +10,7 @@ Parent release v2.4.0. App half of #1045. Jarmo put the app half in 2.4 on 25 No
 - [Scenarios](scenarios.md) gives the proof for S1–S12.
 - [Technical plan](technical-plan.md) records the audit, changes and events.
 - [Tasks](tasks.md) gives the PR order, tiers and proof.
+- [Closing proof](research/closing-proof.md) records S1–S12 and the Gate 2 checks.
 
 ## Scope
 
@@ -25,13 +26,15 @@ People can react while they read an AI answer and open feedback from a failure. 
 
 ## Success criteria
 
-- [ ] Every AI’s finished answer gives the person the correct thumb and a way to add words (R1).
-- [ ] Supported failure cards open a removable quote, and Send sends only the reviewed content (R2).
-- [ ] The Home invitation appears after the first session and an earned action, respects both caps and stays away after Star (R3).
-- [ ] A window picture can be inspected and handed to e-mail on each platform with explicit action (R4).
-- [ ] Both Help links remain available alongside Send feedback (R5).
-- [ ] Distinct saved days survive an update with usage data off and while offline (R6).
-- [ ] Experience accepts the visible states, the privacy wording has Jarmo’s yes and final QA records S1–S12.
+- [x] Finished answers give the person the correct thumb and a way to add words (R1).
+- [x] Supported failure cards open a removable quote, and Send sends only the reviewed content (R2).
+- [x] The Home invitation appears after the first session and an earned action, respects both caps and stays away after Star (R3).
+- [x] A window picture can be inspected and handed to e-mail with explicit action (R4).
+- [x] Both Help links remain available alongside Send feedback (R5).
+- [x] Distinct saved days survive an update with usage data off and while offline (R6).
+- [x] Experience accepts the visible states.
+- [ ] Privacy wording has Jarmo’s yes. Growth’s privacy page awaits his approval before publication.
+- [ ] Final QA completes the remaining app and platform checks at Gate 2. See [closing proof](research/closing-proof.md).
 
 ## Release notes
 
@@ -58,3 +61,6 @@ Growth owns the website and community half of #1045, including Discussions setup
 
 - [x] Approved by the Development manager, 25 November, with decisions 2 and the window-capture fallback settled.
 - Implementation starts on `sprint-176-feedback` branches; the visible PRs wait for the Experience lead's frames (27 November), and PR 1 (saved days) can start before them.
+
+
+The implementation PRs recorded the visible changes in the unreleased changelog. The v2.4.0 release notes are drafted with the release.

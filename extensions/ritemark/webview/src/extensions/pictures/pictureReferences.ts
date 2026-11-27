@@ -37,6 +37,24 @@ function reference(token: Tokens.Image): { tag: string; label: string } | undefi
   }
 }
 
+/** The `marked` instances that keep reference pictures: those registered with `usePictureReferences`. */
+const keepsReferences = new WeakSet<Marked>()
+
+/**
+ * Register reference pictures on an editor's `marked` (the document editor's and the slide editor's, #1129): the
+ * definitions as tokens, and the instance marked for `annotatePictureReferences`. An instance without this keeps
+ * marked's own reading (a reference picture written inline), never a reference whose definition was dropped.
+ */
+export function usePictureReferences(instance: Marked): void {
+  instance.use(pictureReferencesExtension)
+  keepsReferences.add(instance)
+}
+
+/** Whether `usePictureReferences` registered this instance. */
+export function keepsPictureReferences(instance: Marked): boolean {
+  return keepsReferences.has(instance)
+}
+
 /** The lexer normally discards definitions after registering them for inline parsing. */
 export const pictureReferencesExtension: MarkedExtension = {
   extensions: [{

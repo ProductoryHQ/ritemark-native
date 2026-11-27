@@ -158,7 +158,7 @@ async function main(): Promise<void> {
   {
     const feedback = [
       { name: 'feedback_sent' as const, properties: { message: 'Nice' } },
-      { name: 'feedback_sent' as const, properties: { message: 'And one more thing', asked: 'made_this_week' as const } },
+      { name: 'feedback_sent' as const, properties: { message: 'And one more thing' } },
     ];
     // Usage data off (a no)
     const off = harness({ setting: false });
@@ -203,17 +203,36 @@ async function main(): Promise<void> {
     assert.equal(await noKey.gate.sendFeedback(feedback), false);
   }
 
-  // ── Sprint 140 (R13, R14, R15; S51, S64, S68): sent only when accepted; the card's question; the new counts ──
+  for (const setting of [true, false, undefined]) {
+    const h = harness({ setting });
+    const feedback = { name: 'feedback_sent' as const, properties: { message: 'Explicit words', from: 'failure_card' as const } };
+    assert.equal(await h.gate.sendFeedback([feedback]), true);
+    assert.deepEqual(h.sent.find(event => event.event === 'feedback_sent'), {
+      event: 'feedback_sent',
+      distinctId: setting ? 'anon-1' : 'one-off-1',
+      properties: {
+        message: 'Explicit words',
+        ...(setting ? { from: 'failure_card', product_area: 'app', app_version: '2.0.0-0', build_channel: 'prod' } : {}),
+        $process_person_profile: false,
+        $geoip_disable: true,
+      },
+    });
+    assert.equal(await h.gate.track('feedback_opened', { from: 'thumb' }), Boolean(setting));
+    assert.equal(await h.gate.track('ai_answer_reacted', { reaction: 'none', ai: 'codex' }), Boolean(setting));
+    if (!setting) assert.equal(h.sent.length, 1);
+  }
+
+  // ── Sprint 140 (R13, R14, R15; S51, S64, S68): sent only when accepted; the new counts ──
   {
-    const week = [{ name: 'feedback_sent' as const, properties: { message: 'A proposal for Harbour', asked: 'made_this_week' as const } }];
+    const feedback = [{ name: 'feedback_sent' as const, properties: { message: 'A proposal for Harbour' } }];
     const off = harness({ setting: false });
-    assert.equal(await off.gate.sendFeedback(week), true, 'the first-week line goes with usage data off');
-    assert.deepEqual(off.sent[0].properties, { message: 'A proposal for Harbour', asked: 'made_this_week', $process_person_profile: false, $geoip_disable: true }, 'the line and the question it answers, nothing else');
+    assert.equal(await off.gate.sendFeedback(feedback), true, 'the message goes with usage data off');
+    assert.deepEqual(off.sent[0].properties, { message: 'A proposal for Harbour', $process_person_profile: false, $geoip_disable: true }, 'only the message and privacy controls');
     const offline = harness({ setting: false, offline: true });
-    assert.equal(await offline.gate.sendFeedback(week), false, 'S64: a send that did not go says so');
+    assert.equal(await offline.gate.sendFeedback(feedback), false, 'S64: a send that did not go says so');
     const offlineOn = harness({ setting: true, offline: true });
     await offlineOn.gate.refresh();
-    assert.equal(await offlineOn.gate.sendFeedback(week), false, 'S60: with usage data on, too');
+    assert.equal(await offlineOn.gate.sendFeedback(feedback), false, 'S60: with usage data on, too');
     const before = harness();
     await before.gate.refresh();
     assert.equal(await before.gate.track('ready_request_used', { kind: 'what_is_here', provider: 'chatgpt' }), false);

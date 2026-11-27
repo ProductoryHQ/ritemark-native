@@ -4,7 +4,7 @@
  * - the project's mark and name, the folder it works in (opens Documents), its line;
  * - Waiting for you, with what waits in the other projects;
  * - at most one guidance card under it, chosen by the host: the ready request,
- *   Quick Look, What moved, or the first-week question;
+ *   Quick Look, What moved, or the open-source card;
  * - Start something in <project>: Text, Table, Deck (flag `decks`), Web page;
  * - Last changed in <project>; an empty project's drop target (experience 29, frame 1);
  * - a project of the list whose folder is not found (experience 33, frame 2).

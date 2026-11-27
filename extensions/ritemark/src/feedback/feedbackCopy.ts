@@ -28,9 +28,11 @@ export const FEEDBACK_COPY = {
       lede: 'Tell us what the AI said or did that was wrong, unsafe or not what you asked for.',
       placeholder: 'What happened?',
     },
+    fromCard: 'From the card',
     aiBox: 'This is about something the AI said or did',
     answerBox: "I'd like an answer",
     answerNote: 'This opens your e-mail app instead, so we can write back to you. Ritemark never asks for your address.',
+    selectedAnswerBox: "Add this answer",
     lastAnswerBox: "Add the AI's last answer in this chat",
     /** Followed by the chat's title in quotes. */
     lastAnswerNoteBefore: 'Only that answer, from "',
@@ -70,8 +72,22 @@ export const FEEDBACK_COPY = {
     kindReport: 'Report an AI issue',
     kindMessage: 'Send feedback',
   },
+  picture: {
+    box: 'Add a picture of this window',
+    preview: "It shows what's on your screen, your document too.",
+    note: 'The picture goes on your clipboard, to paste into the e-mail ({key}).',
+    paste: 'Paste the picture into the e-mail ({key}).',
+    failed: "The picture couldn't be copied, so the e-mail has your words only.",
+    copyHandoff: {
+      wordsButton: 'Copy words',
+      pictureButton: 'Copy picture',
+      pictureHint: 'Puts the picture back on your clipboard',
+      wordsCopied: 'Your words are on the clipboard now, in place of the picture. Paste them, then press Copy picture.',
+    },
+  },
   /** Each sheet button's hover hint, and why Send waits (QA, 26 October). */
   hints: {
+    leaveThisOut: 'Leave this out',
     cancel: 'Closes this without sending anything',
     send: 'Sends your words to the people who make Ritemark',
     openInEmail: 'Opens your e-mail app with this message, to send it yourself',
@@ -84,21 +100,19 @@ export const FEEDBACK_COPY = {
   toast: {
     accepted: "Thank you. It's with the people who make Ritemark.",
   },
-  card: {
-    heading: 'What did you make with Ritemark this week?',
-    lede: 'One line is plenty. It goes to the people who make Ritemark, and we read every one.',
-    placeholder: 'A proposal, notes, a module…',
-    send: 'Send',
-    notNow: 'Not now',
-    /** The card's send that did not go: Try again (primary), Open in e-mail and Not now (the Experience lead, 26 October). */
+  answer: {
     failed: "It didn't go. Your words are still here: try again, or open it in e-mail.",
   },
 } as const;
 
 /** The e-mail route's words: none may claim a delivery Ritemark cannot see. */
 export function emailRouteStrings(): string[] {
-  const { sheet, handoff } = FEEDBACK_COPY;
+  const { sheet, handoff, picture } = FEEDBACK_COPY;
   return [
+    picture.note,
+    picture.paste,
+    picture.failed,
+    ...Object.values(picture.copyHandoff),
     sheet.email.button,
     sheet.email.foot,
     sheet.email.via,

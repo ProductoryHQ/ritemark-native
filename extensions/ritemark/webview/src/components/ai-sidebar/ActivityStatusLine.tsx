@@ -5,7 +5,7 @@
  * time, red failure, faint stopped. Never says "Done" while a card is pending
  * — that gating lives in deriveActivityState, not here.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Icon } from '../ui/Icon';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
@@ -41,7 +41,7 @@ const TONE_CLASS: Record<string, string> = {
   faint: 'text-[var(--r-ink-faint)]',
 };
 
-export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?: boolean } = {}) {
+export function ActivityStatusLine({ closesLiveStep = false, doneActions }: { closesLiveStep?: boolean; doneActions?: ReactNode } = {}) {
   const conversation = useActiveConversation();
   const state = deriveActivityState(conversation);
 
@@ -125,6 +125,7 @@ export function ActivityStatusLine({ closesLiveStep = false }: { closesLiveStep?
       />
       {/* Sprint 128: "Done — 1 task still running in the background" may take two lines in a narrow side bar. */}
       <span className="min-w-0 line-clamp-2" data-retry-line={retry ? 'true' : undefined}>{presentation.label}</span>
+      {state === 'done' && doneActions}
       {offerAlternative && alternative && last && (
         <Tooltip label={continueWithAction(alternative.runtimeId, 'waiting').tooltip}>
           <Button

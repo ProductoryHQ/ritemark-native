@@ -9,6 +9,8 @@ Sprint 133: Getting started joins Support in Help, where 1.x's first page linked
 Sprint 135: rebased onto VS Code 1.142.0. The main menu's registrations moved upstream to
 menubar.contribution.ts; the Help allowlist stays in menubarControl.ts, which now imports MenuRegistry itself.
 Upstream added its own menubarControl.test.ts (Open Recent's labels); this patch's suite is appended to it.
+Sprint 176 (R5): Help ▸ Ritemark on GitHub and Discussions follow Send feedback.
+
 Sprint 140 (R10, D7): Help ▸ Send feedback after Support (ritemark.help.sendFeedback, in the allowlist), opening the
 extension's feedback sheet through ritemark.feedback.open; off the palette, where the extension's own Send Feedback is.
 Sprint 177: Help offers Quick Look guidance on macOS.
@@ -26,10 +28,10 @@ index 0df05b689ce..3400905b234 100644
  	static readonly MenubarNewBreakpointMenu = new MenuId('MenubarNewBreakpointMenu');
  	static readonly PanelAlignmentMenu = new MenuId('PanelAlignmentMenu');
 diff --git a/src/vs/workbench/browser/actions/helpActions.ts b/src/vs/workbench/browser/actions/helpActions.ts
-index 8251c4a4292..7633b7f5897 100644
+index 8251c4a4292..e20f857af24 100644
 --- a/src/vs/workbench/browser/actions/helpActions.ts
 +++ b/src/vs/workbench/browser/actions/helpActions.ts
-@@ -127,11 +127,14 @@ class OpenDocumentationUrlAction extends Action2 {
+@@ -127,18 +127,21 @@ class OpenDocumentationUrlAction extends Action2 {
  	static readonly AVAILABLE = !!(isWeb ? product.serverDocumentationUrl : product.documentationUrl);
  
  	constructor() {
@@ -46,7 +48,15 @@ index 8251c4a4292..7633b7f5897 100644
  			},
  			category: Categories.Help,
  			f1: true,
-@@ -154,6 +157,84 @@ class OpenDocumentationUrlAction extends Action2 {
+ 			menu: {
+ 				id: MenuId.MenubarHelpMenu,
+ 				group: '1_welcome',
+-				order: 3
++				order: isRitemark ? 1 : 3
+ 			}
+ 		});
+ 	}
+@@ -154,6 +157,122 @@ class OpenDocumentationUrlAction extends Action2 {
  	}
  }
  
@@ -105,6 +115,44 @@ index 8251c4a4292..7633b7f5897 100644
 +	}
 +}
 +
++class OpenRitemarkGitHubAction extends Action2 {
++
++	constructor() {
++		super({
++			id: 'ritemark.help.openGitHub',
++			title: {
++				...localize2('ritemarkGitHub', "Ritemark on GitHub"),
++				mnemonicTitle: localize({ key: 'miRitemarkGitHub', comment: ['&& denotes a mnemonic'] }, "Ritemark on Git&&Hub"),
++			},
++			category: Categories.Help,
++			menu: { id: MenuId.MenubarHelpMenu, group: '1_welcome', order: 5 }
++		});
++	}
++
++	run(accessor: ServicesAccessor): Promise<unknown> {
++		return accessor.get(ICommandService).executeCommand('ritemark.help.github');
++	}
++}
++
++class OpenRitemarkDiscussionsAction extends Action2 {
++
++	constructor() {
++		super({
++			id: 'ritemark.help.openDiscussions',
++			title: {
++				...localize2('ritemarkDiscussions', "Discussions"),
++				mnemonicTitle: localize({ key: 'miRitemarkDiscussions', comment: ['&& denotes a mnemonic'] }, "&&Discussions"),
++			},
++			category: Categories.Help,
++			menu: { id: MenuId.MenubarHelpMenu, group: '1_welcome', order: 6 }
++		});
++	}
++
++	run(accessor: ServicesAccessor): Promise<unknown> {
++		return accessor.get(ICommandService).executeCommand('ritemark.help.discussions');
++	}
++}
++
 +class OpenRitemarkDeckQuickLookAction extends Action2 {
 +
 +	static readonly ID = 'ritemark.help.deckQuickLook';
@@ -118,7 +166,7 @@ index 8251c4a4292..7633b7f5897 100644
 +			menu: {
 +				id: MenuId.MenubarHelpMenu,
 +				group: '1_welcome',
-+				order: 5
++				order: 7
 +			}
 +		});
 +	}
@@ -131,13 +179,15 @@ index 8251c4a4292..7633b7f5897 100644
  class OpenNewsletterSignupUrlAction extends Action2 {
  
  	static readonly ID = 'workbench.action.openNewsletterSignupUrl';
-@@ -379,6 +460,14 @@ if (OpenTipsAndTricksUrlAction.AVAILABLE) {
+@@ -379,6 +492,16 @@ if (OpenTipsAndTricksUrlAction.AVAILABLE) {
  	registerAction2(OpenTipsAndTricksUrlAction);
  }
  
 +if (product.applicationName === 'ritemark') {
 +	registerAction2(OpenRitemarkGettingStartedAction);
 +	registerAction2(OpenRitemarkSendFeedbackAction);
++	registerAction2(OpenRitemarkGitHubAction);
++	registerAction2(OpenRitemarkDiscussionsAction);
 +	if (isMacintosh) {
 +		registerAction2(OpenRitemarkDeckQuickLookAction);
 +	}
@@ -147,7 +197,7 @@ index 8251c4a4292..7633b7f5897 100644
  	registerAction2(OpenDocumentationUrlAction);
  }
 diff --git a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
-index 9d3f6af4e6b..0378eeff47e 100644
+index 9d3f6af4e6b..7fd71fa084e 100644
 --- a/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 +++ b/src/vs/workbench/browser/parts/titlebar/menubarControl.ts
 @@ -5,7 +5,7 @@
@@ -159,7 +209,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  import { MenuBarVisibility, IWindowOpenable, getMenuBarVisibility, MenuSettings, hasNativeMenu } from '../../../../platform/window/common/window.js';
  import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
  import { IAction, Action, SubmenuAction, Separator, IActionRunner, ActionRunner, WorkbenchActionExecutedEvent, WorkbenchActionExecutedClassification, toAction } from '../../../../base/common/actions.js';
-@@ -43,9 +43,64 @@ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultSty
+@@ -43,9 +43,66 @@ import { defaultMenuStyles } from '../../../../platform/theme/browser/defaultSty
  import { mainWindow } from '../../../../base/browser/window.js';
  import { ActivityBarPosition } from '../../../services/layout/browser/layoutService.js';
  import { truncateMiddle } from '../../../../base/common/strings.js';
@@ -170,7 +220,9 @@ index 9d3f6af4e6b..0378eeff47e 100644
 +const RITEMARK_HELP_MENU_ACTION_IDS = new Set([
 +	'ritemark.help.openGettingStarted',
 +	'workbench.action.openDocumentationUrl',
-+	'ritemark.help.sendFeedback', // Sprint 140 (R10, D7): Getting started, Support, Send feedback
++	'ritemark.help.sendFeedback',
++	'ritemark.help.openGitHub',
++	'ritemark.help.openDiscussions',
 +	'ritemark.help.deckQuickLook',
 +	'workbench.action.openLicenseUrl',
 +	'workbench.action.showAboutDialog',
@@ -224,7 +276,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  export abstract class MenubarControl extends Disposable {
  
  	protected keys = [
-@@ -144,6 +199,11 @@ export abstract class MenubarControl extends Disposable {
+@@ -144,6 +201,11 @@ export abstract class MenubarControl extends Disposable {
  		this.menuUpdater.schedule();
  	}
  
@@ -236,7 +288,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  	protected calculateActionLabel(action: { id: string; label: string }): string {
  		const label = action.label;
  		switch (action.id) {
-@@ -493,10 +553,6 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -493,10 +555,6 @@ export class CustomMenubarControl extends MenubarControl {
  		this._onVisibilityChange.fire(visible);
  	}
  
@@ -247,7 +299,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  	private readonly reinstallDisposables = this._register(new DisposableStore());
  	private readonly updateActionsDisposables = this._register(new DisposableStore());
  	private setupCustomMenubar(firstTime: boolean): void {
-@@ -606,7 +662,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -606,7 +664,7 @@ export class CustomMenubarControl extends MenubarControl {
  					if (!this.focusInsideMenubar) {
  						const actions: IAction[] = [];
  						menuChangedDisposable.clear();
@@ -256,7 +308,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  						this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  					}
  				}));
-@@ -618,7 +674,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -618,7 +676,7 @@ export class CustomMenubarControl extends MenubarControl {
  						if (!this.focusInsideMenubar) {
  							const actions: IAction[] = [];
  							webMenuChangedDisposable.clear();
@@ -265,7 +317,7 @@ index 9d3f6af4e6b..0378eeff47e 100644
  							this.menubar?.updateMenu({ actions, label: mnemonicMenuLabel(this.topLevelTitles[title]) });
  						}
  					}));
-@@ -628,7 +684,7 @@ export class CustomMenubarControl extends MenubarControl {
+@@ -628,7 +686,7 @@ export class CustomMenubarControl extends MenubarControl {
  			const actions: IAction[] = [];
  			if (menu) {
  				this.updateActionsDisposables.clear();
@@ -317,7 +369,7 @@ index 716f2280413..ea9ea240939 100644
  				if (menubarMenu.items.length === 0) {
  					return false; // Menus are incomplete
 diff --git a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
-index 36c109a8fc6..a7c1cdc5f11 100644
+index 36c109a8fc6..060d0b91b4c 100644
 --- a/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
 +++ b/src/vs/workbench/test/browser/parts/titlebar/menubarControl.test.ts
 @@ -4,13 +4,13 @@
@@ -345,7 +397,7 @@ index 36c109a8fc6..a7c1cdc5f11 100644
  import { IWorkbenchEnvironmentService } from '../../../../services/environment/common/environmentService.js';
  import { IHostService } from '../../../../services/host/browser/host.js';
  import { IPreferencesService } from '../../../../services/preferences/common/preferences.js';
-@@ -106,3 +106,75 @@ suite('MenubarControl', () => {
+@@ -106,3 +106,83 @@ suite('MenubarControl', () => {
  		]);
  	});
  });
@@ -358,6 +410,8 @@ index 36c109a8fc6..a7c1cdc5f11 100644
 +		const gettingStarted = new Action('ritemark.help.openGettingStarted', 'Getting started');
 +		const support = new Action('workbench.action.openDocumentationUrl', 'Support');
 +		const sendFeedback = new Action('ritemark.help.sendFeedback', 'Send feedback');
++		const github = new Action('ritemark.help.openGitHub', 'Ritemark on GitHub');
++		const discussions = new Action('ritemark.help.openDiscussions', 'Discussions');
 +		const quickLook = new Action('ritemark.help.deckQuickLook', "Show decks' first slides in Finder…");
 +		const license = new Action('workbench.action.openLicenseUrl', 'View License');
 +		const about = new Action('workbench.action.showAboutDialog', 'About Ritemark');
@@ -370,9 +424,11 @@ index 36c109a8fc6..a7c1cdc5f11 100644
 +			new Separator(),
 +			new Action('workbench.action.openWalkthrough', 'Welcome'),
 +			new Separator(),
-+			gettingStarted,
 +			support,
++			gettingStarted,
 +			sendFeedback,
++			github,
++			discussions,
 +			quickLook,
 +			new Separator(),
 +			new Action('workbench.action.askVScode', 'Ask @vscode'),
@@ -387,9 +443,11 @@ index 36c109a8fc6..a7c1cdc5f11 100644
 +		]);
 +
 +		assert.deepStrictEqual(ids(result), [
-+			gettingStarted.id,
 +			support.id,
++			gettingStarted.id,
 +			sendFeedback.id,
++			github.id,
++			discussions.id,
 +			quickLook.id,
 +			Separator.ID,
 +			license.id,
@@ -405,6 +463,8 @@ index 36c109a8fc6..a7c1cdc5f11 100644
 +			new Action('workbench.action.openProcessExplorer', 'Open Process Explorer'),
 +			new Action('workbench.action.toggleDevTools', 'Toggle Developer Tools'),
 +			new Action('future.upstream.help.command', 'Future upstream command'),
++			new Action('ritemark.help.github', 'Extension GitHub command'),
++			new Action('ritemark.help.discussions', 'Extension Discussions command'),
 +		]);
 +
 +		assert.deepStrictEqual(result, []);

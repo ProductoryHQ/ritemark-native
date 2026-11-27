@@ -2,7 +2,7 @@
 
 The behaviour contract is Experience 52 (`product/design/experience/experiences/live/README.md`, frames 1 to 6) and Experience 51 (`.../timing/README.md`, frames 8 and 9, "Jarmo's focus: one job"). This file numbers them for tests. If they differ, the drawings win and this file is corrected. The engineering decisions are the Development manager's of 24 November, in [research/2026-11-24-cloudflare-live-measurements.md](research/2026-11-24-cloudflare-live-measurements.md).
 
-**Amends Sprint 149's R1 principle** ("Nothing leaves the computer until the person presses Publish or Update the page"). New wording: nothing leaves until the person presses Publish or Update the page, **or has turned on that one page's switch, Update on every save**. Jarmo's reading of "Publishing is explicit: nothing local is uploaded on its own" (24 November): the switch is the person's word for this one page. Every other line of Sprint 149's principle stands: no AI tool, Flow, schedule or start-up path publishes, updates or unpublishes.
+**Amends Sprint 149's R1 principle** ("Nothing leaves the computer until the person presses Publish or Update the page"; that button is Publish changes since #1142). New wording: nothing leaves until the person presses Publish or Publish changes, **or has turned on that one page's switch, Update on every save**. Jarmo's reading of "Publishing is explicit: nothing local is uploaded on its own" (24 November): the switch is the person's word for this one page. Every other line of Sprint 149's principle stands: no AI tool, Flow, schedule or start-up path publishes, updates or unpublishes.
 
 "A deck's page" is the handout page Ritemark writes beside the deck (`page/pageFile.ts`) and publishes through 2.2's Publish. "The digest" is `publicDeck`'s: what the page shows.
 
@@ -19,7 +19,7 @@ The behaviour contract is Experience 52 (`product/design/experience/experiences/
 - **R6. A save sends.** With the switch on, a save of the deck's file whose digest differs from the page's sends the page. The save may be the editor's or another program's or an AI's, seen by the open window. Typing without saving sends nothing.
 - **R7. The timetable and the session never send.** A change to only a slide's minutes or the session (and notes, skipped slides, comments: what `publicDeck` already leaves out) changes no digest, sends nothing, shows no "changed" and refreshes no open page.
 - **R8. One in flight, the latest wins.** At most one deploy runs per page. Saves during it leave one waiting update that is built from the latest saved state when the first ends; earlier waiting states are dropped. The chip reads Updating… for the whole of it (about one update per 6 s at most).
-- **R9. The first-publish and manual paths are unchanged.** Publish, Update the page (shown while the switch is off) and the sheet work as in 2.3. A save with the switch off sends nothing and the chip reads "Published · changed" as in 2.3.
+- **R9. The first-publish and manual paths are unchanged.** Publish, Publish changes (shown while the switch is off) and the sheet work as in 2.3. A save with the switch off sends nothing and the bar shows **Publish changes** (#1142, 27 November; it was the chip "Published · changed" as in 2.3).
 
 ## Pauses
 
@@ -30,9 +30,9 @@ The behaviour contract is Experience 52 (`product/design/experience/experiences/
 
 ## The chip
 
-- **R14. States.** "Published · changed" (switch off, as 2.3), **Live** (green dot), **Updating…**, **Paused** (amber), **Offline** (grey). Green only for Live, amber only for Paused. Each state has a tooltip that says what it means; Live's and the switch's help promise "about 15 seconds", never "seconds".
+- **R14. States.** **Publish changes**, a button and not a chip (switch off; #1142, 27 November, replaced 2.3's "Published · changed"), **Live** (green dot), **Updating…**, **Paused** (amber), **Offline** (grey). Green only for Live, amber only for Paused. Each state has a tooltip that says what it means; Live's and the switch's help promise "about 15 seconds", never "seconds".
 - **R15. Offline.** When Cloudflare can't be reached, the chip is grey Offline and asks nothing. Saves stay on the computer. The latest saved state is tried again when the connection is back (at most every 30 s while the window is open) and goes through the same checks. Other failures are Offline too, with the redacted reason in the tooltip.
-- **R16. The menu.** The switch; then Copy link, See online (the address), Save slides as PDF, Unpublish. Update the page is there only while the switch is off. Copy link leaves the deck's bar for the menu; the publish page's own bar (patch 010) keeps its Copy link.
+- **R16. The menu.** The switch; then Copy link, See online (the address), Save slides as PDF, Unpublish. Publish changes is there only while the switch is off. Copy link leaves the deck's bar for the menu; the publish page's own bar (patch 010) keeps its Copy link.
 
 ## Pictures
 
@@ -51,7 +51,7 @@ The behaviour contract is Experience 52 (`product/design/experience/experiences/
 - **R26. A slide added before theirs** changes only the count (6 / 17 becomes 7 / 18) on the same slide. Changes on other slides show nothing but the count.
 - **R27. A removed slide stays.** If the reader's slide isn't in the new version's list, the page keeps it, a little dimmed, with "This slide was taken out of the deck. You can finish reading it." and **Go on to <title>**, the slide that took its place (the first slide after it in the old order that the new version has; the last one when none follows). The count reads "– / 16". The reader is never moved off a slide they are reading. Go on to loads the new version at that slide.
 - **R28. The page's policy.** `PAGE_CSP` gains `connect-src 'self'` and a hash for its own script and nothing else; no `unsafe-inline`, no remote origin.
-- **R29. Pages published before 2.4** have no version file and don't follow; they do from their next Update the page.
+- **R29. Pages published before 2.4** have no version file and don't follow; they do from their next Publish changes.
 
 ## An AI's edit
 

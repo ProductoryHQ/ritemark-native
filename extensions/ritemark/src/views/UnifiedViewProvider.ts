@@ -93,7 +93,7 @@ import { createRuntime } from '../runtime/runtimeFactory';
 import { RitemarkToolsInjector } from '../runtime/RitemarkToolsInjector';
 import { BOARD_TOOL_GROUP, DECK_TOOL_GROUP, toolGroupsFor, toolSetKey } from '../runtime/ritemarkTools';
 import { CodexRuntime, type CodexSidebarStatus } from '../codex/CodexRuntime';
-import { countTurnAccepted, countTurnEnded } from '../analytics/posthog';
+import { countTurnAccepted, countTurnEnded, sendFeedback, trackAnswerReaction } from '../analytics/posthog';
 import * as modelCatalog from '../ai/modelCatalog';
 import { CAPABILITY_CONTEXT_VERSION, renderCapabilityContext, capabilityDescriptorFor } from '../ai/capabilityContext';
 import { UnifiedApprovalGate } from '../runtime/UnifiedApprovalGate';
@@ -112,7 +112,9 @@ import type {
   CommentTaskRoutingFacts,
   CommentTaskRuntimeSettings,
 } from '../commentTasks/CommentTaskController';
-import { showBriefToast } from '../feedback/feedbackSheet';
+import { FEEDBACK_OPEN_COMMAND, showBriefToast, type FeedbackTurnRef } from '../feedback/feedbackSheet';
+import { AnswerFeedbackHost, decodeSidebarFeedbackOpen, findCompletedAnswer } from '../feedback/answerFeedback';
+import type { OpenAnswerFeedbackResult } from '../feedback/answerFeedbackProtocol';
 import {
   bringDocumentForward,
   chatDocumentsFor,
@@ -183,7 +185,7 @@ import {
   type ChatLocalTarget,
 } from './chatLinkTargets';
 import { aiColumnShownSince, aiStartingMarkBody, aiStartingMarkHead, shellLookSince } from './aiStartingMark';
-import { clearLastReadyAi, type MementoLike } from '../guidance/guidanceStore';
+import { clearLastReadyAi, type GuidanceStore, type MementoLike } from '../guidance/guidanceStore';
 
 const _toolsInjector = new RitemarkToolsInjector();
 
@@ -420,6 +422,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
   private _runtimeRegistry: RuntimeRegistry;
   private _approvalGate: UnifiedApprovalGate;
   private readonly _conversationController: ConversationController;
+  private readonly _answerFeedback: AnswerFeedbackHost;
+  private _answerReactionSnapshotGeneration = 0;
   /** Startup: turns a crash left running are recorded as interrupted (W13). */
   private readonly _turnsLeftByRestart: Promise<void>;
   /** The conversations this window runs turns in, for other windows' sweeps. */
@@ -438,6 +442,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
     private readonly _workspacePath: string | undefined,
     private readonly _secrets: vscode.SecretStorage | undefined,
     globalStorageUri: vscode.Uri,
+    private readonly guidanceStore: GuidanceStore,
     /** Sprint 156: the profile's global state, where a sign-out from the sheet forgets the AI last seen ready. */
     private readonly _globalState?: MementoLike,
   ) {
@@ -488,10 +493,21 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // gone file again without a workspace event, so the gone ones are asked again.
         this._chatRealPaths.forgetMissing();
         this._scheduleChatDocuments();
+        const target = this._currentSidebarContext();
+        if (target && event.type === 'conversation/changed' && this._activeConversationId === event.conversationId) {
+          void this._sendAnswerReactions(event.conversationId, target);
+        }
       },
       rolloutMode: () => conversationCutover.resolve(isEnabled('durableAgentConversations')),
       markHostAuthority: () => conversationCutover.establishHostAuthority(),
       migrator: new LegacyConversationMigrator(conversationStore),
+    });
+    this._answerFeedback = new AnswerFeedbackHost({
+      guidance: guidanceStore,
+      activeConversation: () => this._activeConversationId,
+      readConversation: (conversationId) => this._readConversationForFeedback(conversationId),
+      sendFeedback,
+      trackAnswerReaction,
     });
     // Sprint 130 (W13): turns a crash or forced quit left running. Conversation
     // requests and new turns wait for it, so none reads such a turn as live.
@@ -566,6 +582,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             && 'undoToken' in response.data
             && 'title' in response.data) {
             const deletion = response.data;
+            if (this._activeConversationId === deletion.conversationId) this._noteActiveConversation(null);
             void showConversationDeleteNotification({
               undoToken: deletion.undoToken,
               title: deletion.title,
@@ -757,6 +774,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
 
         case 'conversation:selected':
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           if (typeof message.conversationId === 'string') {
             this._selectedConversationId = message.conversationId;
             this._runtimeSessionLastUsed.set(message.conversationId, Date.now());
@@ -770,13 +788,13 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
         // from this, so a bounded wait on it replaces the old blind 400 ms
         // setTimeout dispatch that simply lost the message (audit F25).
         case 'sidebar/ready':
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           if (typeof message.conversationId === 'string') {
             this._noteActiveConversation(message.conversationId);
             this._markInFrontRead();
           }
           // A replaced webview's late ready signal says nothing about the current
           // one: it must neither mark it ready nor use up a held report request.
-          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._sidebarReady = true;
           if (this._pendingOpenReport) {
             this._pendingOpenReport = false;
@@ -818,7 +836,8 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           break;
         }
 
-        case 'conversation/active':
+        case 'conversation/active': {
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
           this._noteActiveConversation(
             typeof message.conversationId === 'string' ? message.conversationId : null,
           );
@@ -826,7 +845,48 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           if (message.agentId === 'claude-code' || message.agentId === 'codex' || message.agentId === 'opencode') {
             this._setOpenChatReport({ agentId: message.agentId, signInEnded: message.signInEnded === true });
           }
+          if (typeof message.conversationId === 'string') {
+            await this._sendAnswerReactions(message.conversationId, { webview: webviewView.webview, generation: viewGeneration });
+          }
           break;
+        }
+
+        case 'agent:answerReaction':
+        case 'agent:sendAnswerFeedback': {
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
+          const result = await (message.type === 'agent:answerReaction'
+            ? this._answerFeedback.react(message)
+            : this._answerFeedback.send(message));
+          if (result && this._isCurrentSidebarView(webviewView.webview, viewGeneration)) {
+            void webviewView.webview.postMessage(result);
+          }
+          break;
+        }
+
+        case 'agent:openFeedback': {
+          if (!this._isCurrentSidebarView(webviewView.webview, viewGeneration)) break;
+          const options = decodeSidebarFeedbackOpen(message.options);
+          const requestId = message.requestId;
+          const eligible = options && (options.from !== 'thumb' || await this._answerFeedback.activeAnswer(options.turn));
+          const target = { webview: webviewView.webview, generation: viewGeneration };
+          if (!this._isCurrentSidebarView(target.webview, target.generation)) break;
+          let outcome: OpenAnswerFeedbackResult['outcome'] = 'failed';
+          if (eligible) {
+            try {
+              outcome = await vscode.commands.executeCommand<OpenAnswerFeedbackResult['outcome']>(
+                FEEDBACK_OPEN_COMMAND, options,
+              ) ?? 'failed';
+            } catch {
+              // The reply leaves the inline words available for another attempt.
+            }
+          }
+          if (Number.isSafeInteger(requestId)) {
+            await this._postCurrentSidebarMessage(target, {
+              type: 'agent:openFeedbackResult', requestId, outcome,
+            } satisfies OpenAnswerFeedbackResult, 'feedback');
+          }
+          break;
+        }
 
         case 'report/request-open':
           // Sprint 140 (R10, R12): AI information's "Report an AI issue" opens the feedback sheet ready for an AI
@@ -961,6 +1021,11 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               message: `${thinkingEffortLabel(requestedThinkingEffort)} isn’t available for this model. Using Auto.`,
             });
           }
+          const startsPlanExecution = message.conversationContinuation === true
+            && typeof message.approvedPlanTurnId === 'string'
+            && typeof message.conversationTurnId === 'string'
+            && message.approvedPlanTurnId !== message.conversationTurnId;
+          const reuseTurn = message.conversationContinuation === true && !startsPlanExecution;
           let acceptedConversation: import('../conversations/types').ConversationRecordV1 | null = null;
           let hostConversationEnabled = false;
           // Sprint 139 (R6): the chat's own saved model for this AI, read before this turn saves its own.
@@ -970,7 +1035,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             hostConversationEnabled = await this._conversationController.currentRolloutMode() !== 'legacy';
             if (hostConversationEnabled) {
               chatSavedModel = await this._conversationController.savedComposerModel(clientConversationId, agentId as AgentId);
-              if (message.conversationContinuation === true) {
+              if (reuseTurn) {
                 const current = await this._conversationController.runtimeConversation(clientConversationId);
                 const continuedTurnId = typeof message.conversationTurnId === 'string'
                   ? message.conversationTurnId
@@ -986,6 +1051,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                     })
                   : current;
               } else {
+                // Plan execution has its own display turn and feedback target. Keep the
+                // existing chat and provider session, and persist a separate answer.
+                if (startsPlanExecution) {
+                  await this._conversationCheckpointQueues.get(clientConversationId)?.catch(() => undefined);
+                  const current = await this._conversationController.runtimeConversation(clientConversationId);
+                  if (!current.events.some((event) => event.kind === 'user-message'
+                    && event.turnId === message.approvedPlanTurnId && event.runtimeId === agentId)) {
+                    throw new Error('Approved plan has no matching conversation turn');
+                  }
+                }
                 acceptedConversation = await this._conversationController.acceptRuntimeTurn({
                     conversationId: clientConversationId,
                     turnId: typeof message.conversationTurnId === 'string' && message.conversationTurnId.length <= 128
@@ -1042,7 +1117,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           this._activeRuntimeTurnTokens.set(conversationId, runtimeTurnToken);
           // Sprint 139 (R7, R8): the turn, counted with no text. Its first message is counted only now that it is
           // saved (it was counted before the save in 2.0); a continuation is the same turn.
-          const countedTurnKey = `${conversationId}:${conversationTurnId ?? randomUUID()}`;
+          const countedTurnKey = `${conversationId}:${(startsPlanExecution ? message.approvedPlanTurnId : conversationTurnId) ?? randomUUID()}`;
           void countTurnAccepted(countedTurnKey, String(agentId), message.conversationContinuation === true);
           // Sprint 117: a cancel arrives without a turn id, so remember which
           // turn is live in this conversation before anything can be cancelled.
@@ -1303,7 +1378,7 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
                 },
               ),
             };
-            const currentUserEvent = message.conversationContinuation === true
+            const currentUserEvent = reuseTurn
               ? undefined
               : [...acceptedConversation.events].reverse().find(
                   (event) => event.kind === 'user-message' && event.turnId === conversationTurnId,
@@ -2216,7 +2291,35 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   public async lastAnswerOfOpenChat(): Promise<{ title: string; text: string } | null> {
     const conversationId = this._activeConversationId;
-    if (!conversationId) return null;
+    return conversationId ? this.answerOfConversation(conversationId) : null;
+  }
+
+  public async answerOfTurn({ conversationId, turnId }: FeedbackTurnRef): Promise<{ title: string; text: string } | null> {
+    try {
+      const record = await this._readConversationForFeedback(conversationId);
+      const answer = findCompletedAnswer(record, turnId);
+      return answer ? { title: record.title, text: answer.content } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async _sendAnswerReactions(conversationId: string, target: { webview: vscode.Webview; generation: number }): Promise<void> {
+    const generation = ++this._answerReactionSnapshotGeneration;
+    const snapshot = await this._answerFeedback.snapshot(conversationId);
+    if (snapshot && generation === this._answerReactionSnapshotGeneration) {
+      await this._postCurrentSidebarMessage(target, snapshot, 'feedback');
+    }
+  }
+
+  private async _readConversationForFeedback(conversationId: string): Promise<ConversationRecordV1> {
+    await this._turnsLeftByRestart;
+    // The Done row can reach the webview while the turn's checkpoint is still writing.
+    await this._conversationCheckpointQueues.get(conversationId)?.catch(() => undefined);
+    return this._conversationController.runtimeConversation(conversationId);
+  }
+
+  private async answerOfConversation(conversationId: string): Promise<{ title: string; text: string } | null> {
     try {
       const record = await this._conversationController.runtimeConversation(conversationId);
       for (let index = record.events.length - 1; index >= 0; index -= 1) {
