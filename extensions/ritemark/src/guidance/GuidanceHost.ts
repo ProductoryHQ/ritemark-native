@@ -1,6 +1,6 @@
 /**
  * The first day's guidance in one window (Sprint 140; experience 35, 29 and
- * 34): Home's guidance card (the ready request, Quick Look, What moved or feedback),
+ * 34): Home's guidance card (the ready request, Quick Look, What moved or open source),
  * the ready request's Ask with, its sign-ins and its press, the empty sheet's
  * starting place, and the day-one counts.
  *
@@ -27,11 +27,8 @@ import { onCodexStatusInvalidated, waitForCodexSignIn, type CodexSignInWait, typ
 import { trackEvent } from '../analytics/posthog';
 import type { SignInFrom, WelcomeProvider } from '../analytics/events';
 import { normalizeProjectUri, resolveProjectScope } from '../conversations/projectScope';
-import { FEEDBACK_COPY } from '../feedback/feedbackCopy';
-import { sendWeekLine, showBriefToast } from '../feedback/feedbackSheet';
-import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject } from '../reporting/composeReport';
-import { openReportMail } from '../reporting/reportTransport';
-import type { HomeAi, HomeGuidance, HomeKeyName } from '../projects/protocol';
+import { HELP_DISCUSSIONS_COMMAND, HELP_GITHUB_COMMAND } from '../feedback/feedbackSheet';
+import type { HomeAi, HomeGuidance, HomeKeyName, OpenSourceAction } from '../projects/protocol';
 import type { ChatIndexEntry } from '../projects/waiting';
 import type { RuntimeAvailability } from '../runtime/availability';
 import type { CardHandoffRecordV1 } from '../taskBoard/CardTaskStore';
@@ -41,7 +38,7 @@ import { saveAiForNewChats } from '../welcome/welcomeHost';
 import { homeReopenNotOpened, signInProblem, type SignInProblem } from '../welcome/words';
 import { countsLine, listFileNames } from './folderCounts';
 import { isEnabled } from '../features/featureGate';
-import { feedbackDue, guidanceCard, localDay, type GuidanceCard } from './guidanceState';
+import { guidanceCard, localDay, type GuidanceCard } from './guidanceState';
 import { openSettingsLabel, settingsNote } from '../decks/quickLook/guidance';
 import { type GuidanceStore, noteLastReadyAi, noteReadyCardCounted, readLastReadyAi, readyCardCounted, seedLastReadyAiForTest } from './guidanceStore';
 import { madeSomething } from './madeSomething';
@@ -95,6 +92,7 @@ const CLAUDE_SIGN_IN: ClaudeSignIn = {
 export interface GuidanceDependencies {
   context: vscode.ExtensionContext;
   store: GuidanceStore;
+  appRun?: string;
   folder: vscode.WorkspaceFolder | undefined;
   runtimeAvailability(runtimeId: AgentId): Promise<RuntimeAvailability>;
   startChat(request: ChatStartRequest): Promise<void>;
@@ -155,7 +153,7 @@ export class GuidanceHost implements vscode.Disposable {
   private readonly shownPending = new Map<string, HomeGuidance & { card: 'ready-request' }>();
   /** Sprint 142 (R5b): when the folder's request was last sent from Home. */
   private filesPressedAt: number | null = null;
-  private feedback: { sending: boolean; problem: string | null } = { sending: false, problem: null };
+  private openingSourceLink = false;
   private placeTimer: ReturnType<typeof setTimeout> | undefined;
   /** The counts line per folder, listed once and listed again only after a file is created or deleted there (QA). */
   /** The folder's file names, listed once per folder and skip set (the line is made from them on each read). */
@@ -238,19 +236,22 @@ export class GuidanceHost implements vscode.Disposable {
       });
       if (gone) record = await this.store.updateProject(key, (current) => ({ ...current, gone }));
     }
-    const release = this.store.release();
-    const card = selected ?? guidanceCard({
+    let card = selected ?? guidanceCard({
       whatMoved: input.whatMoved,
       readyRequest: readyRequestDue({ foundBy: input.foundBy, record, ownChats }),
-      feedback: this.store.read().readyShownOn !== localDay(new Date())
-        && feedbackDue({ savedDays: release.savedDays, answered: release.feedback !== undefined }),
+      openSource: true,
       quickLook,
     });
-    if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
-    if (card === 'what-moved') return { card };
-    if (card === 'feedback') {
-      return { card, heading: FEEDBACK_COPY.card.heading, lede: FEEDBACK_COPY.card.lede, placeholder: FEEDBACK_COPY.card.placeholder, sending: this.feedback.sending, problem: this.feedback.problem };
+    if (card === 'open-source' && !selected) {
+      const day = localDay(new Date());
+      const appRun = this.deps.appRun ?? '';
+      if (this.store.read().readyShownOn === day
+        || (!await this.store.homeEligible({ day, appRun }) && !await this.store.openHomePresentation(appRun).catch(() => undefined))) {
+        card = null;
+      }
     }
+    if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
+    if (card === 'what-moved' || card === 'open-source') return { card };
     if (card !== 'ready-request') return null;
     const states = await this.aiStates();
     const chosen = this.cardAiOf(record, states);
@@ -644,47 +645,28 @@ export class GuidanceHost implements vscode.Disposable {
     return { ok: true, message: null };
   }
 
-  // ── The feedback card (R14) ──────────────────────────────────────────────
-
-  async sendFeedbackLine(text: string): Promise<boolean> {
-    this.feedback = { sending: true, problem: null };
-    this.changed.fire();
-    const sent = await sendWeekLine(text).catch(() => false);
-    if (sent) {
-      await this.store.answerFeedback('sent');
-      this.feedback = { sending: false, problem: null };
-      void showBriefToast(FEEDBACK_COPY.toast.accepted);
-    } else {
-      this.feedback = { sending: false, problem: FEEDBACK_COPY.card.failed };
-    }
-    this.changed.fire();
-    return sent;
+  /** Claim or restore the release presentation immediately before posting to a visible Home. */
+  async presentOpenSource(): Promise<boolean> {
+    const day = localDay(new Date());
+    if (this.store.read().readyShownOn === day) return false;
+    const appRun = this.deps.appRun ?? '';
+    // A failing read of the markers fails closed, as reserveHomePresentation does (review round 2): no card, Home still draws.
+    return await this.store.reserveHomePresentation({ day, appRun }) || Boolean(await this.store.openHomePresentation(appRun).catch(() => undefined));
   }
 
-  /** The card's line, after a send that did not go, handed to the person's own e-mail app (R13's e-mail route). */
-  async mailFeedbackLine(text: string): Promise<boolean> {
-    const context = narrowReportContext({ appVersion: this.store.version, platform: process.platform, occurredAt: new Date().toISOString() });
-    const outcome = await openReportMail(
-      { recipient: REPORT_RECIPIENT, subject: reportSubject(context, 'feedback'), body: composeReport(context, text) },
-      { openExternal: (url) => vscode.env.openExternal(vscode.Uri.parse(url, true)) },
-    );
-    if (outcome !== 'opened') {
-      this.feedback = { sending: false, problem: outcome === 'too-long' ? FEEDBACK_COPY.handoff.tooLong.lede : FEEDBACK_COPY.handoff.noHandler.lede };
-      this.changed.fire();
-      return false;
+  async actOnOpenSource(action: OpenSourceAction): Promise<boolean> {
+    if (this.openingSourceLink) return false;
+    this.openingSourceLink = true;
+    try {
+      if (action !== 'dismiss') {
+        const command = action === 'star' ? HELP_GITHUB_COMMAND : HELP_DISCUSSIONS_COMMAND;
+        if (!await vscode.commands.executeCommand<boolean>(command)) return false;
+      }
+      if (action !== 'discussions') await this.store.endHomePresentation(action);
+      return true;
+    } finally {
+      this.openingSourceLink = false;
     }
-    // Handed over: the question has its answer for this release; the mail is the person's to send.
-    await this.store.answerFeedback('sent');
-    this.feedback = { sending: false, problem: null };
-    void showBriefToast(`${FEEDBACK_COPY.handoff.opened.title}. ${FEEDBACK_COPY.handoff.opened.message}`);
-    this.changed.fire();
-    return true;
-  }
-
-  async feedbackNotNow(): Promise<void> {
-    await this.store.answerFeedback('not-now');
-    this.feedback = { sending: false, problem: null };
-    this.changed.fire();
   }
 
   // ── Turns and origins (R6, R15) ──────────────────────────────────────────

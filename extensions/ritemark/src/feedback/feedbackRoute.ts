@@ -7,15 +7,15 @@
 import { buildMailtoUrl, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
 import { composeReport, REPORT_RECIPIENT, reportSubject, type ReportContextV1, type ReportKind } from '../reporting/composeReport';
 
-/** Straight from Ritemark (neither box ticked), or through the person's own e-mail app (either box). */
+/** Straight from Ritemark (no box ticked), or through the person's own e-mail app (any routing box). */
 export type FeedbackRoute = 'straight' | 'email';
 
-export function routeOf(boxes: { aiIssue: boolean; wantAnswer: boolean }): FeedbackRoute {
-  return boxes.aiIssue || boxes.wantAnswer ? 'email' : 'straight';
+export function routeOf(boxes: { aiIssue: boolean; wantAnswer: boolean; withPicture?: boolean }): FeedbackRoute {
+  return boxes.aiIssue || boxes.wantAnswer || boxes.withPicture ? 'email' : 'straight';
 }
 
 /** What the e-mail is about, for its subject and the hand-off's words. */
-export function mailKindOf(boxes: { aiIssue: boolean }): ReportKind {
+export function mailKindOf(boxes: { aiIssue: boolean; withPicture?: boolean }): ReportKind {
   return boxes.aiIssue ? 'ai-issue' : 'feedback';
 }
 

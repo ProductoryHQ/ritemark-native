@@ -6,7 +6,7 @@
  *  - On the bar after Saved, before Present (frame 2), at the bar's 30 px (`size="bar"`).
  *  - Unpublished: Publish, outlined, with the globe. Published: the chip opens the page actions, including Update on
  *    every save. While that is on, the chip shows the live state and any pause can be reviewed from the same menu.
- *  - Publish and Update the page send the deck's text and look as this view holds them (the document may not have its
+ *  - Publish and Publish changes send the deck's text and look as this view holds them (the document may not have its
  *    newest words or look yet) and each slide's fit, numbers only, so the page's slides fit as the deck view's do. The
  *    fit is measured on the slides drawn once out of sight (`MeasureSlides`) in that look, the way the strip draws
  *    them, so it is there with the strip hidden or the desk narrow too.
@@ -15,7 +15,7 @@
  *
  * Sprint 170 (#881, the decks README "Save as PDF, from Publish"): where this app can save a PDF (`state.pdf`), Publish
  * is a split button: Publish stays its main part, and the ▾, a part of its own with its own hover and focus, opens
- * Publish… and one item that names what it saves from the view at the press (`pdfKindFor`). The Published chip's menu
+ * Publish and one item that names what it saves from the view at the press (`pdfKindFor`). The Published chip's menu
  * holds the same item. The PDF takes the slides' fit the way Publish does; the host asks for the file and prints it.
  * The split button's hover is the whole button's (ui/split-button.tsx; Jarmo, 26 October); the ▾ keeps its own click
  * and focus. With Publish not reachable (off, or not ready yet), a plain Save as PDF button keeps the PDF's place: it
@@ -283,7 +283,7 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
             <>
               <PublishMenuItem tip="Publish the slides and their handout as a web page" onSelect={publish}>
                 <Icon name="globe" size={14} tone="inherit" />
-                Publish…
+                Publish
               </PublishMenuItem>
               {pdfItem}
             </>
@@ -305,15 +305,42 @@ export function DeckPublishControl({ state, view = 'both', onPublish: publish, o
     )
   }
 
+  const publishingChanges = state.kind === 'publishing' && !!state.address && !state.live?.on
+  if (publishingChanges || (state.kind === 'published' && state.changed && !state.live?.on)) {
+    const menuTip = 'See it online, copy its link or take it down'
+    return (
+      <SplitButton
+        tone="outline"
+        size="bar"
+        className="deck-publish-slot deck-publish-split"
+        busy={publishingChanges}
+        main={{
+          label: publishingChanges ? 'Publishing…' : 'Publish changes',
+          icon: publishingChanges
+            ? <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin" />
+            : <Icon name="globe" size={14} tone="inherit" />,
+          tooltip: publishingChanges ? 'Your changes are going online' : "Your changes aren't on the page yet",
+          onClick: publish,
+          className: 'deck-publish',
+        }}
+        menu={{
+          label: menuTip,
+          tooltip: menuTip,
+          content: publishedMenu(state, pdfItem, publish, act, onLiveAction),
+          contentClassName: 'w-[330px] max-w-[calc(100vw_-_16px)] p-2',
+        }}
+      />
+    )
+  }
+
   // The publisher's own bar is busy during a live deploy too. The deck keeps its live chip and switch.
   if ((state.kind === 'publishing' && state.live?.state !== 'updating') || state.kind === 'unpublishing') {
     const publishing = state.kind === 'publishing'
-    const updating = publishing && !state.live?.on && !!state.address
     return (
-      <Tooltip label={updating ? LIVE_CHIPS.updating.tip : publishing ? 'The page is going online' : 'The page is being taken down'}>
+      <Tooltip label={publishing ? 'The page is going online' : 'The page is being taken down'}>
         <Button variant="toolbar" size="bar" className="deck-publish-chip" disabled>
           <Icon name="circle-notch" size={14} tone="inherit" className="animate-spin" />
-          {updating ? 'Updating…' : publishing ? 'Publishing…' : 'Unpublishing…'}
+          {publishing ? 'Publishing…' : 'Unpublishing…'}
         </Button>
       </Tooltip>
     )
@@ -361,6 +388,7 @@ export function publishedMenu(
   onLiveAction?: (action: LiveAction) => void,
   onShowPause?: (target: PauseTarget) => void,
 ) {
+  const publishing = state.kind === 'publishing'
   const pause = state.live?.state === 'paused' ? state.live.pause : undefined
   return (
     <>
@@ -409,11 +437,10 @@ export function publishedMenu(
         </span>
       </PublishMenuItem>
       {pdfItem}
-      {!state.live?.on && (
-        <PublishMenuItem tip={state.changed ? 'Review and publish the changes' : 'No changes to publish'} disabled={!state.changed} onSelect={publish}>
-          <Icon name="arrows-clockwise" size={14} tone="inherit" />
-          Update the page
-          {state.changed ? null : <span className="ml-auto pl-3 text-xs text-ink-muted">No changes</span>}
+      {!state.live?.on && (state.changed || publishing) && (
+        <PublishMenuItem tip={publishing ? undefined : 'Review and publish the changes'} disabled={publishing} onSelect={publish}>
+          <Icon name="globe" size={14} tone="inherit" />
+          {publishing ? 'Publishing…' : 'Publish changes'}
         </PublishMenuItem>
       )}
       <DropdownMenuSeparator />
@@ -453,12 +480,12 @@ export function publishedChip(state: DeckPageState) {
     }
   }
   return {
-    label: state.changed ? 'Published · changed' : 'Published',
+    label: 'Published',
     icon: 'globe' as const,
     className: 'deck-publish-chip',
     dot: false,
     spinning: false,
-    tip: state.changed ? 'The deck or its theme changed since it was published: update the page from here' : 'The page is online: see it, copy its link or take it down',
+    tip: 'The page is online: see it, copy its link or take it down',
   }
 }
 

@@ -67,12 +67,15 @@ import {
   type HostPlatform,
 } from './viewerShare'
 import { bodyLandingIndex, decodeFindOpen, isRequestQuery, type FindRequest } from '../../utils/findRequest'
+import { FailureFeedbackLink } from '../ai-sidebar/FailureFeedbackLink'
+import { OFFICE_FAILURE_FEEDBACK_MESSAGE } from '../../../../src/feedback/feedbackQuoteSafety'
 import './documentSearch.css'
 import './docx/docxPreview.css'
 
 export interface DocxLoadError {
   title: string
   detail: string
+  feedback?: boolean
 }
 
 interface DOCXViewerProps {
@@ -110,15 +113,16 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
 }
 
 /** What to tell the user when drawing fails, instead of the library's own words. */
-function renderFailure(error: unknown): DocxLoadError {
+export function renderFailure(error: unknown): DocxLoadError {
   const message = error instanceof Error ? error.message : String(error)
   if (/central directory|is this a zip|Corrupted zip|no Word document/i.test(message)) {
     return {
       title: 'This file can’t be read as a Word document',
+      feedback: true,
       detail: 'It may be damaged, or saved in another format. Try opening it in a word processor.',
     }
   }
-  return { title: 'Ritemark couldn’t draw this document', detail: message }
+  return { title: 'Ritemark couldn’t draw this document', detail: message, feedback: true }
 }
 
 /**
@@ -668,21 +672,28 @@ export function DOCXViewer({ content, filename, canSaveAsMarkdown, loadError }: 
             <Icon name="warning-circle" size={20} tone="active" />
             <div className="font-ui text-[15px] font-medium text-ink-strong">{failure.title}</div>
             <div className="font-ui text-[13px] text-ink-muted">{failure.detail}</div>
-            <div className="mt-1 flex gap-2">
-              {!isDocFormat && (
-                <Tooltip label="Read the file from disk again">
-                  <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
-                    <Icon name="arrow-clockwise" size={14} />
-                    Try again
+            <div className="mt-1">
+              <div className="flex justify-center gap-2">
+                {!isDocFormat && (
+                  <Tooltip label="Read the file from disk again">
+                    <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
+                      <Icon name="arrow-clockwise" size={14} />
+                      Try again
+                    </Button>
+                  </Tooltip>
+                )}
+                <Tooltip label="See the document in a word processor">
+                  <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
+                    <Icon name="arrow-square-out" size={14} />
+                    {openLabel}
                   </Button>
                 </Tooltip>
+              </div>
+              {failure.feedback && (
+                <div className="mt-2 flex justify-center">
+                  <FailureFeedbackLink title={failure.title} line={failure.detail} messageType={OFFICE_FAILURE_FEEDBACK_MESSAGE} />
+                </div>
               )}
-              <Tooltip label="See the document in a word processor">
-                <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
-                  <Icon name="arrow-square-out" size={14} />
-                  {openLabel}
-                </Button>
-              </Tooltip>
             </div>
           </div>
         </div>

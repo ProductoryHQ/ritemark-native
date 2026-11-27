@@ -23,12 +23,15 @@ import { fitPageZoom, fitWidthZoom, pageAtScroll, stepZoom, type FitMode } from 
 import { deckMatches, firstMatchFrom } from './pptx/deckSearch'
 import { loadDeck, type LoadedDeck } from './pptx/loadDeck'
 import { notesRanges, slideRanges } from './pptx/renderedDeck'
+import { FailureFeedbackLink } from '../ai-sidebar/FailureFeedbackLink'
+import { OFFICE_FAILURE_FEEDBACK_MESSAGE } from '../../../../src/feedback/feedbackQuoteSafety'
 import './documentSearch.css'
 import './pptx/pptxPreview.css'
 
 export interface PptxLoadError {
   title: string
   detail: string
+  feedback?: boolean
 }
 
 interface PPTXViewerProps {
@@ -55,15 +58,16 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
 }
 
 /** What to tell the user when reading fails, instead of the library's own words. */
-function loadFailure(error: unknown): PptxLoadError {
+export function loadFailure(error: unknown): PptxLoadError {
   const message = error instanceof Error ? error.message : String(error)
   if (/central directory|is this a zip|Corrupted zip|zip limit|size mismatch|presentation\.xml/i.test(message)) {
     return {
       title: 'This file can’t be read as a presentation',
+      feedback: true,
       detail: 'It may be damaged, or saved in another format. Try opening it in PowerPoint.',
     }
   }
-  return { title: 'Ritemark couldn’t draw this presentation', detail: message }
+  return { title: 'Ritemark couldn’t draw this presentation', detail: message, feedback: true }
 }
 
 function highlightsSupported(): boolean {
@@ -514,19 +518,26 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
             <Icon name="warning-circle" size={20} tone="active" />
             <div className="font-ui text-[15px] font-medium text-ink-strong">{failure.title}</div>
             <div className="font-ui text-[13px] text-ink-muted">{failure.detail}</div>
-            <div className="mt-1 flex gap-2">
-              <Tooltip label="Read the file from disk again">
-                <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
-                  <Icon name="arrow-clockwise" size={14} />
-                  Try again
-                </Button>
-              </Tooltip>
-              <Tooltip label="See the presentation in PowerPoint or another app">
-                <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
-                  <Icon name="arrow-square-out" size={14} />
-                  {openLabel}
-                </Button>
-              </Tooltip>
+            <div className="mt-1">
+              <div className="flex justify-center gap-2">
+                <Tooltip label="Read the file from disk again">
+                  <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
+                    <Icon name="arrow-clockwise" size={14} />
+                    Try again
+                  </Button>
+                </Tooltip>
+                <Tooltip label="See the presentation in PowerPoint or another app">
+                  <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
+                    <Icon name="arrow-square-out" size={14} />
+                    {openLabel}
+                  </Button>
+                </Tooltip>
+              </div>
+              {failure.feedback && (
+                <div className="mt-2 flex justify-center">
+                  <FailureFeedbackLink title={failure.title} line={failure.detail} messageType={OFFICE_FAILURE_FEEDBACK_MESSAGE} />
+                </div>
+              )}
             </div>
           </div>
         </div>

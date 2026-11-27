@@ -463,7 +463,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Register Unified View Provider (Primary Sidebar / left)
   const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri, context.globalState);
+  unifiedViewProvider = new UnifiedViewProvider(context.extensionUri, workspacePath, context.secrets, context.globalStorageUri, guidanceStore, context.globalState);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(UnifiedViewProvider.viewType, unifiedViewProvider, {
       webviewOptions: { retainContextWhenHidden: true }
@@ -487,6 +487,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerFeedback(context, {
     appVersion: String(context.extension.packageJSON.version ?? 'unknown'),
     lastAnswer: () => unifiedViewProvider.lastAnswerOfOpenChat(),
+    answerOfTurn: ref => unifiedViewProvider.answerOfTurn(ref),
     openReportWindow: () => unifiedViewProvider.openReportWindow(),
   });
   registerFeedbackStatusBar(context);
@@ -642,6 +643,7 @@ export function activate(context: vscode.ExtensionContext) {
   const guidance = hasProjectGuidance ? new GuidanceHost({
     context,
     store: guidanceStore,
+    appRun: process.env.VSCODE_PID,
     folder: guidanceFolder,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startChat: (request) => unifiedViewProvider.startChat(request),

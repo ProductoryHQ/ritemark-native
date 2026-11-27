@@ -16,8 +16,7 @@
 .deck-bar .deck-publish-chip { background: var(--r-accent-soft); color: var(--r-accent); }
 .deck-bar .deck-publish-chip:hover { background: var(--r-accent-soft); color: var(--r-accent); filter: brightness(.97); }
 /* In dark, Live, Updating and Offline sit on the bar's own ground with only their hairline, as the light chip does on the
-   white bar (the Experience lead, Experience 52); hover keeps the bar's usual hover ground. Paused keeps its amber and
-   Published · changed its accent. */
+   white bar (the Experience lead, Experience 52); hover keeps the bar's usual hover ground. Paused keeps its amber. */
 :is(body.vscode-dark, body.ritemark-dark, body[data-vscode-theme-kind='vscode-dark'], .dark) .deck-bar .deck-page-state-chip.is-plain:not(:hover) { background: transparent; }
 /* The Theme button and its menu (Sprint 162, frame 12): the theme's colours as a small swatch, then its name ▾. The
    swatch is the theme's ground with a bar in its accent and one in its headings' colour. */
@@ -315,6 +314,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }
 .deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
 .deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
+.deck-publish-feedback { flex: none; }
+.deck-notice[data-measure-min] > .deck-publish-feedback,
+.deck-bar[data-theme-compact] .deck-publish-feedback,
+.deck-notice > .deck-publish-feedback[data-link-clipped] { display: none; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */

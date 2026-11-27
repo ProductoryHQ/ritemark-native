@@ -930,97 +930,288 @@ Verdict — pending (3 of 3 required).
 
 ### OpenCode on Mac
 
-Verdict — pending (3 of 3 required).
+Set 1 (26 November 2026) on main at `849aa667` — **0 of 3 pass** after re-scoring the saved answers with the corrected slide-row matcher. OpenCode used Gemini 3.5 Flash Lite because the test key’s prepaid Gemini balance was exhausted. OpenCode reported “You exceeded your current quota” for Gemini 3.1 Pro. Gemini 3.8 Flash stays silent through OpenCode (#1114). The 2.4 known issue “Ask OpenCode in chat” remains until a rerun on Gemini 3.8 Flash with a funded key.
 
 #### Run 1
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T18:52:46.529Z
+- Build — 2.3.0 dev (849aa6677255d522907342424d94449fb1aa3fcc)
+- Model — OpenCode · Gemini 3.5 Flash Lite
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix.docx: Couldn't read Confidential appendix.docx: it has a password. Open it in Word, or save a copy without the password.
 
 **Answer (verbatim)**
 
 ```markdown
+Here is an overview of the findings from the review of the steering group folder, along with recommended decisions.
+
+### Overview and Recommendations
+The review shows a branch network facing declining transactions (visits fell 31% over three years as reported in [Engagement brief](01%20Brief/Engagement%20brief.docx)), high branch visit costs (€18.40 per visit vs. €3.10 for a call according to [Interview – head of operations](02%20Interviews/Interview%20–%20head%20of%20operations.docx)), and increasing app-related customer service calls. Key priorities include finalizing findings for the board on 18 November (noted in [Steering group minutes 21 October](Steering%20group%20minutes%2021%20October.docx)), deciding on Phase 2 proposals, and piloting new concepts such as app desks and shared branch managers.
+
+### Document Findings
+- [Steering group minutes 21 October](Steering%20group%20minutes%2021%20October.docx): Findings go to the board on 18 November.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025,%20branch%20section.pdf): At year end the bank ran 42 branches and 118 cash machines.
+- [Engagement brief](01%20Brief/Engagement%20brief.docx): Visits fell 31% in three years while call volumes rose.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20–%20two%20tellers,%20Harbour%20Street.docx): Both tellers say the busiest hour is lunchtime.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20–%20branch%20manager,%20Riverside.docx): Riverside sees about 140 visits a day, half of them older customers paying bills.
+- [Interview – head of operations](02%20Interviews/Interview%20–%20head%20of%20operations.docx): Operations counts cost per visit at €18.40, against €3.10 for a call.
+- [Interview – customer service lead](02%20Interviews/Interview%20–%20customer%20service%20lead.docx): Calls about card disputes doubled since the app change in May.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 1 — Start with three branch types. Speaker notes: Use the amber ledger for the pilot register.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 2 — Reserve the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 3 — Keep the west entrance open. Speaker notes: Place the folding ramp by the side door.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 4 — Train eight advisers first. Speaker notes: Use the mock till during rehearsal.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 5 — Keep €6,200 in reserve. Speaker notes: none
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx): Slide 6 — Review the pilot after 17 days. Speaker notes: Bring the blue tally sheet to the review.
+- [Findings draft v2](04%20Drafts/Findings%20draft%20v2.docx): Cost per visit is six times the cost per call.
+- [Proposal phase 2 v3](04%20Drafts/Proposal%20phase%202%20v3.docx): A twelve-week phase to design the three branch sizes with staff, test an app desk in two branches, and plan the first moves.
+- [Workshop notes 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx): Advice, not transactions, is why people still come.
+
+### Unreadable Documents
+- Confidential appendix.docx: Couldn't read Confidential appendix.docx: it has a password. Open it in Word, or save a copy without the password.
+- Branch visit form, Riverside (scan).pdf: Branch visit form, Riverside (scan).pdf is a scan with no text (1 page). Open it in the PDF viewer.
 ```
 
 **Step labels**
 
+- Looked in the project folder: 10 Word documents, 2 PDFs, 1 PowerPoint deck
+- Read Steering group minutes 21 October
+- Read Annual report 2025, branch section · 1 page
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Engagement brief
+- Read Interview – two tellers, Harbour Street
+- Read Interview – branch manager, Riverside
+- Read Interview – head of operations
+- Read Interview – customer service lead
+- Read Decision briefing · 6 slides
+- Read Findings draft v2
+- Read Proposal phase 2 v3
+- Couldn't open Confidential appendix · it has a password
+- Read Workshop notes 14 October
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+All 19 links opened the intended document, and none included a `#q` passage link.
+
+- Opened the right document — 19/19 (100.0%)
+- Include a passage target — 0/19 (0.0%)
+- Confirmed to land on the claim — 0/19 (0.0%)
+
+- Engagement brief — `01%20Brief/Engagement%20brief.docx` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Steering group minutes 21 October — `Steering%20group%20minutes%2021%20October.docx` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Steering group minutes 21 October — `Steering%20group%20minutes%2021%20October.docx` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Annual report 2025, branch section — `Reference/Annual%20report%202025,%20branch%20section.pdf` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage no — lands on the claim no
+- Engagement brief — `01%20Brief/Engagement%20brief.docx` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers,%20Harbour%20Street.docx` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%20Riverside.docx` — opened 02 Interviews/Interview – branch manager, Riverside.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage no — lands on the claim no
+- Findings draft v2 — `04%20Drafts/Findings%20draft%20v2.docx` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Proposal phase 2 v3 — `04%20Drafts/Proposal%20phase%202%20v3.docx` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage no — lands on the claim no
+- Workshop notes 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage no — lands on the claim no
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — pass
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — fail
+5. Password notice and way forward — pass
+6. Source style — pass
 
 #### Run 2
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T18:53:41.219Z
+- Build — 2.3.0 dev (849aa6677255d522907342424d94449fb1aa3fcc)
+- Model — OpenCode · Gemini 3.5 Flash Lite
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix.docx: Could not be read because it has a password. Open it in Word or save a copy without the password.
 
 **Answer (verbatim)**
 
 ```markdown
+Here is an overview of the findings from the Fernhollow Bank review documents, along with recommendations for the steering group:
+
+### Overview of Findings
+
+The review highlights that branch visits fell 31% over three years while digital share reached 87%, yet remaining visits are longer and focused on advice rather than simple transactions. Key challenges include high branch visit costs (€18.40 vs €3.10 for calls), aging infrastructure, and disconnected communication systems between branches and the call centre. Phase 2 of the project proposes a 12-week design and pilot programme costing €79,000.
+
+### Document Findings and Recommendations
+
+- [Steering group minutes 21 October](Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board%27s%20decision): Phase 2 waits for the board's decision on 18 November.
+- [Workshop notes 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door): Participants voted strongly in favour of an app desk at the door and sharing managers for small branches.
+- [Findings draft v2](04%20Drafts/Findings%20draft%20v2.docx#q=Cost%20per%20visit%20is%20six%20times%20the%20cost%20per%20call): Cost per visit is six times the cost per call.
+- [Proposal phase 2 v3](04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%80%a879%2C000): The proposed Phase 2 fee is €79,000 plus VAT, valid until 31 December 2026.
+- Confidential appendix.docx: Could not be read because it has a password. Open it in Word or save a copy without the password.
+- [Engagement brief](01%20Brief/Engagement%20brief.docx#q=Fernhollow%20Bank%20runs%2042%20branches): Fernhollow Bank currently runs 42 branches.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025,%20branch%20section.pdf#p=1&q=Branch%20visits%3A%202.1%20million): Branch visits dropped to 2.1 million in 2025.
+- Branch visit form, Riverside (scan).pdf: A scanned PDF with no text. Open it in the PDF viewer.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers,%20Harbour%20Street.docx#q=busiest%20hour%20is%20lunchtime): The busiest hour at Harbour Street branch is lunchtime.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day): Riverside sees about 140 visits a day, half of them older customers paying bills.
+- [Interview – head of operations](02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit%20at%20%E2%82%AC18.40): Operations counts cost per visit at €18.40 against €3.10 for a call.
+- [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled): Calls about card disputes doubled since the app change in May.
+
+### Presentation Breakdown
+
+- [Slide 1](04%20Drafts/Decision%20briefing.pptx#p=1&q=Pilot%20scope): Start with three branch types. Speaker notes: Use the amber ledger for the pilot register.
+- [Slide 2](04%20Drafts/Decision%20briefing.pptx#p=2&q=Advice): Reserve the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+- [Slide 3](04%20Drafts/Decision%20briefing.pptx#p=3&q=Access): Keep the west entrance open. Speaker notes: Place the folding ramp by the side door.
+- [Slide 4](04%20Drafts/Decision%20briefing.pptx#p=4&q=Staffing): Train eight advisers first. Speaker notes: Use the mock till during rehearsal.
+- [Slide 5](04%20Drafts/Decision%20briefing.pptx#p=5&q=Budget): Keep €6,200 in reserve. Speaker notes: none
+- [Slide 6](04%20Drafts/Decision%20briefing.pptx#p=6&q=Follow-up): Review the pilot after 17 days. Speaker notes: Bring the blue tally sheet to the review.
+
+### Recommended Next Decisions
+1. Proceed with the board review on 18 November to approve Phase 2.
+2. Request a password-free copy of the confidential appendix for complete visibility.
 ```
 
 **Step labels**
 
+- Looked in the project folder: 10 Word documents, 1 PowerPoint deck, 2 PDFs
+- Read Steering group minutes 21 October
+- Read Workshop notes 14 October
+- Read Findings draft v2
+- Read Proposal phase 2 v3
+- Couldn't open Confidential appendix · it has a password
+- Read Engagement brief
+- Read Annual report 2025, branch section · 1 page
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Interview – two tellers, Harbour Street
+- Read Interview – branch manager, Riverside
+- Read Interview – head of operations
+- Read Interview – customer service lead
+- Read Decision briefing · 6 slides
+
+**Document findings to check**
+
+- Engagement brief
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+The link for Interview – branch manager, Riverside targeted the wrong document path. An extra comma in the filename prevented it from opening.
+
+- Opened the right document — 15/16 (93.8%)
+- Include a passage target — 16/16 (100.0%)
+- Confirmed to land on the claim — 0/16 (0.0%)
+
+- Steering group minutes 21 October — `Steering%20group%20minutes%2021%20October.docx#q=Phase%202%20waits%20for%20the%20board%27s%20decision` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Workshop notes 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx#q=App%20desk%20at%20the%20door` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings draft v2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Cost%20per%20visit%20is%20six%20times%20the%20cost%20per%20call` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal phase 2 v3 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%80%a879%2C000` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief — `01%20Brief/Engagement%20brief.docx#q=Fernhollow%20Bank%20runs%2042%20branches` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025,%20branch%20section.pdf#p=1&q=Branch%20visits%3A%202.1%20million` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers,%20Harbour%20Street.docx#q=busiest%20hour%20is%20lunchtime` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day` — opened none — opens the right document no — find marked a passage no — lands on the claim to check
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Operations%20counts%20cost%20per%20visit%20at%20%E2%82%AC18.40` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 1 — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Pilot%20scope` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 2 — `04%20Drafts/Decision%20briefing.pptx#p=2&q=Advice` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 3 — `04%20Drafts/Decision%20briefing.pptx#p=3&q=Access` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 4 — `04%20Drafts/Decision%20briefing.pptx#p=4&q=Staffing` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 5 — `04%20Drafts/Decision%20briefing.pptx#p=5&q=Budget` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Slide 6 — `04%20Drafts/Decision%20briefing.pptx#p=6&q=Follow-up` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — to check
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — fail
+5. Password notice and way forward — pass
+6. Source style — pass
 
 #### Run 3
 
-- Date —
-- Build —
-- Model —
-- Question — Fixed question above
-- Password document's line —
+- Date — 2026-11-26T18:54:12.810Z
+- Build — 2.3.0 dev (849aa6677255d522907342424d94449fb1aa3fcc)
+- Model — OpenCode · Gemini 3.5 Flash Lite
+- Question — Review the whole folder, including its subfolders, for the steering group. Keep the files as they are. Give a short overview of the findings and recommend the next decisions. Include one bullet per document, using its title without the path or file extension, and give a concrete finding from each document. If you could not read a document, name it on its own line, explain why, and say how I can make it readable. For the presentation, add one bullet per slide beginning with “Slide” and its number. Give a fact from the slide, then write “Speaker notes:” followed by a fact from its notes on the same line, or say “Speaker notes: none” if it has none. In the answer, name each source in the sentence and link that name to the passage or slide supporting the claim. Use document titles in the link text and keep source numbers, bracketed filenames and visible file paths out of the answer.
+- Completed read fold — None recorded.
+- Password document's line — Confidential appendix.docx couldn't be read because it has a password. Open it in Word, or save a copy without the password.
 
 **Answer (verbatim)**
 
 ```markdown
+Here is a short overview of the findings from the review folder, along with recommended next decisions for the steering group.
+
+### Overview and Recommendations
+The review shows that while branch visits have declined significantly and digital payments have reached 87%, remaining branch visits are longer and focused on advice and help with digital services. However, operational silos—such as disconnected case notes between branches and call centers—and aging infrastructure create friction. We recommend approving the phase 2 proposal to design the new branch formats and test an app desk, while finalizing the board findings by 11 November.
+
+### Document Findings
+- [Steering group minutes 21 October](Steering%20group%20minutes%2021%20October.docx#q=final%20findings%20by%2011%20November) notes that Kestrel will deliver the final findings by 11 November.
+- [Annual report 2025, branch section](Reference/Annual%20report%202025,%20branch%20section.pdf#p=1&q=Digital%20share%20of%20payments%3A%2087%25) states that the digital share of payments is 87%.
+- Branch visit form, Riverside (scan).pdf is a scanned PDF with no readable text. Open it in the PDF viewer.
+- [Engagement brief](01%20Brief/Engagement%20brief.docx#q=Visits%20fell%2031%25%20in%20three%20years) notes that visits fell 31% in three years while call volumes rose.
+- [Interview – two tellers, Harbour Street](02%20Interviews/Interview%20%E2%80%93%20two%20tellers,%20Harbour%20Street.docx#q=busiest%20hour%20is%20lunchtime) states that the busiest hour for tellers is lunchtime.
+- [Interview – branch manager, Riverside](02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day) notes that Riverside sees about 140 visits a day, half of them older customers paying bills.
+- [Interview – head of operations](02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Cost%20per%20visit%20is%20%E2%82%AC18.40) states that operations counts the cost per visit at €18.40 against €3.10 for a call.
+- [Interview – customer service lead](02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled) notes that calls about card disputes doubled since the app change in May.
+- Confidential appendix.docx couldn't be read because it has a password. Open it in Word, or save a copy without the password.
+- [Workshop notes 14 October](03%20Workshop/Workshop%20notes%2014%20October.docx#q=Advice%2C%20not%20transactions) notes that advice, not transactions, is why people still come.
+- [Findings draft v2](04%20Drafts/Findings%20draft%20v2.docx#q=Cost%20per%20visit%20is%20six%20times%20the%20cost%20per%20call) states that the cost per visit is six times the cost per call.
+- [Proposal phase 2 v3](04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT) outlines a total fee of €79,000 plus VAT for the phase 2 proposal.
+- [Decision briefing](04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types)
+  - Slide 1: Start with three branch types. Speaker notes: Use the amber ledger for the pilot register.
+  - Slide 2: Reserve the quiet room on Tuesdays. Speaker notes: Test the queue buzzer before opening.
+  - Slide 3: Keep the west entrance open. Speaker notes: Place the folding ramp by the side door.
+  - Slide 4: Train eight advisers first. Speaker notes: Use the mock till during rehearsal.
+  - Slide 5: Keep €6,200 in reserve. Speaker notes: none
+  - Slide 6: Review the pilot after 17 days. Speaker notes: Bring the blue tally sheet to the review.
 ```
 
 **Step labels**
 
+- Looked in the project folder: 10 Word documents, 2 PDFs, 1 PowerPoint deck
+- Read Steering group minutes 21 October
+- Read Annual report 2025, branch section · 1 page
+- Couldn't open Branch visit form, Riverside (scan) · a scan with no text
+- Read Engagement brief
+- Read Interview – two tellers, Harbour Street
+- Read Interview – branch manager, Riverside
+- Read Interview – head of operations
+- Read Interview – customer service lead
+- Read Decision briefing · 6 slides
+- Read Findings draft v2
+- Read Proposal phase 2 v3
+- Couldn't open Confidential appendix · it has a password
+- Read Workshop notes 14 October
+
 **Links tried**
 
-| Source | href | Opened document | Opens the right document | Find marked a passage | Lands on the claim |
-| --- | --- | --- | --- | --- | --- |
-| | | | | | To check |
+The link for Interview – branch manager, Riverside targeted the wrong document path. An extra comma in the filename prevented it from opening.
+
+- Opened the right document — 10/11 (90.9%)
+- Include a passage target — 11/11 (100.0%)
+- Confirmed to land on the claim — 0/11 (0.0%)
+
+- Steering group minutes 21 October — `Steering%20group%20minutes%2021%20October.docx#q=final%20findings%20by%2011%20November` — opened Steering group minutes 21 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Annual report 2025, branch section — `Reference/Annual%20report%202025,%20branch%20section.pdf#p=1&q=Digital%20share%20of%20payments%3A%2087%25` — opened Reference/Annual report 2025, branch section.pdf — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Engagement brief — `01%20Brief/Engagement%20brief.docx#q=Visits%20fell%2031%25%20in%20three%20years` — opened 01 Brief/Engagement brief.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – two tellers, Harbour Street — `02%20Interviews/Interview%20%E2%80%93%20two%20tellers,%20Harbour%20Street.docx#q=busiest%20hour%20is%20lunchtime` — opened 02 Interviews/Interview – two tellers, Harbour Street.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – branch manager, Riverside — `02%20Interviews/Interview%20%E2%80%93%20branch%20manager,%2C%20Riverside.docx#q=Riverside%20sees%20about%20140%20visits%20a%20day` — opened none — opens the right document no — find marked a passage no — lands on the claim to check
+- Interview – head of operations — `02%20Interviews/Interview%20%E2%80%93%20head%20of%20operations.docx#q=Cost%20per%20visit%20is%20%E2%82%AC18.40` — opened 02 Interviews/Interview – head of operations.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Interview – customer service lead — `02%20Interviews/Interview%20%E2%80%93%20customer%20service%20lead.docx#q=Calls%20about%20card%20disputes%20doubled` — opened 02 Interviews/Interview – customer service lead.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Workshop notes 14 October — `03%20Workshop/Workshop%20notes%2014%20October.docx#q=Advice%2C%20not%20transactions` — opened 03 Workshop/Workshop notes 14 October.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Findings draft v2 — `04%20Drafts/Findings%20draft%20v2.docx#q=Cost%20per%20visit%20is%20six%20times%20the%20cost%20per%20call` — opened 04 Drafts/Findings draft v2.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Proposal phase 2 v3 — `04%20Drafts/Proposal%20phase%202%20v3.docx#q=Total%3A%20%E2%82%AC79%2C000%20plus%20VAT` — opened 04 Drafts/Proposal phase 2 v3.docx — opens the right document yes — find marked a passage yes — lands on the claim to check
+- Decision briefing — `04%20Drafts/Decision%20briefing.pptx#p=1&q=Start%20with%20three%20branch%20types` — opened 04 Drafts/Decision briefing.pptx — opens the right document yes — find marked a passage yes — lands on the claim to check
 
 **Criteria**
 
-1. Document coverage — pass / fail
-2. Speaker notes — pass / fail
-3. Step labels — pass / fail
-4. Passage links — pass / fail
-5. Password notice and way forward — pass / fail
-6. Source style — pass / fail
+1. Document coverage — pass
+2. Speaker notes — pass
+3. Step labels — pass
+4. Passage links — fail
+5. Password notice and way forward — pass
+6. Source style — pass
 
 ### OpenCode on Windows
 

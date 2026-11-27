@@ -33,12 +33,15 @@ for (const from of ['home', 'settings', 'Home_card', '', 1, null]) {
   assert.equal(decodeHomeRequest({ type: 'home/save-keys', keys: {}, from }).ok, false, `from ${JSON.stringify(from)} is refused: only the two places`);
 }
 assert.equal(decodeHomeRequest({ type: 'home/save-keys', keys: { 'not-a-key': 'k' }, from: 'home_card' }).ok, false, 'the keys are still checked');
-for (const hasDraft of [true, false]) {
-  const request = { type: 'home/feedback-draft-changed', hasDraft };
+for (const action of ['star', 'discussions', 'dismiss']) {
+  const request = { type: 'home/open-source-action', action };
   assert.deepEqual(decodeHomeRequest(request), { ok: true, request });
+  assert.equal(decodeHomeRequest({ ...request, url: 'https://example.com' }).ok, false);
 }
-assert.equal(decodeHomeRequest({ type: 'home/feedback-draft-changed', hasDraft: 'true' }).ok, false);
-assert.equal(decodeHomeRequest({ type: 'home/feedback-draft-changed', hasDraft: true, text: 'draft' }).ok, false);
+assert.equal(decodeHomeRequest({ type: 'home/open-source-action', action: 'open' }).ok, false);
+for (const type of ['home/feedback-send', 'home/feedback-mail', 'home/feedback-not-now', 'home/feedback-draft-changed']) {
+  assert.equal(decodeHomeRequest({ type, text: 'old week question' }).ok, false);
+}
 assert.equal(decodeHomeRequest({ type: 'home/nope' }).ok, false);
 assert.equal(decodeHomeRequest(null).ok, false);
 assert.equal(decodeHomeRequest(['home/ready']).ok, false);

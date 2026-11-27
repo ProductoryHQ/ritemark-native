@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'fs';
 import * as path from 'path';
 import { COUNT_LIMIT, countsLine, fileKindOf, listFileNames } from './folderCounts';
-import { feedbackDue, guidanceCard, localDay, releaseOf, withSavedDay } from './guidanceState';
+import { guidanceCard, localDay, withSavedDay } from './guidanceState';
 import { decodeGuidanceState, GUIDANCE_KEY, GuidanceStore, type MementoLike } from './guidanceStore';
 import { AI_NAMES, cardAi, EVENT_KIND, FILES_PRESS_SETTLE_MS, FIRST_LOOK_READS_DOCUMENTS, READY_REQUEST_CURSOR_EMPTY, READY_REQUEST_TEXT, readyGoneNow, readyKindOf, readyPressAction, readyRequestDue, readyRequestWords } from './readyRequest';
 import { READ_KINDS_PASSED, startingPlaceOf, wordCount, STARTING_PLACES, startingPlaceFrom } from './startingPlace';
@@ -172,25 +172,21 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
 
   // ── Home's one card (R2, R14, D1; S7, S8, S61–S63) ──
 
-  const base = { whatMoved: false, readyRequest: false, quickLook: false, feedback: false };
+  const base = { whatMoved: false, readyRequest: false, quickLook: false, openSource: false };
   assert.equal(guidanceCard(base), null);
   assert.equal(guidanceCard({ ...base, readyRequest: true, quickLook: true }), 'ready-request');
   assert.equal(guidanceCard({ ...base, readyRequest: true, whatMoved: true }), 'what-moved');
-  assert.equal(guidanceCard({ ...base, readyRequest: true, feedback: true }), 'ready-request');
+  assert.equal(guidanceCard({ ...base, readyRequest: true, openSource: true }), 'ready-request');
   assert.equal(guidanceCard({ ...base, quickLook: true, whatMoved: true }), 'what-moved');
-  assert.equal(guidanceCard({ ...base, quickLook: true, feedback: true }), 'quick-look');
-  assert.equal(guidanceCard({ ...base, whatMoved: true, feedback: true }), 'what-moved');
+  assert.equal(guidanceCard({ ...base, quickLook: true, openSource: true }), 'quick-look');
+  assert.equal(guidanceCard({ ...base, whatMoved: true, openSource: true }), 'what-moved');
 
   // ── Saved days and releases (R14, S61, S63) ──
 
   assert.equal(localDay(new Date(2026, 10, 3, 23, 59)), '2026-11-03', 'a local calendar day');
   assert.deepEqual(withSavedDay(['2026-11-01'], '2026-11-01'), ['2026-11-01'], 'one day counts once');
   assert.deepEqual(withSavedDay(['2026-11-02', '2026-11-01', '2026-11-03'], '2026-11-04'), ['2026-11-02', '2026-11-03', '2026-11-04'], 'kept short');
-  assert.equal(feedbackDue({ savedDays: ['a', 'b'], answered: false }), false);
-  assert.equal(feedbackDue({ savedDays: ['a', 'b', 'c'], answered: false }), true, 'S61: the third day');
-  assert.equal(feedbackDue({ savedDays: ['a', 'b', 'c'], answered: true }), false, 'S63: once per release');
-  assert.equal(releaseOf('2.1.0'), '2.1');
-  assert.equal(releaseOf('2.1.3-ext.2'), '2.1', 'S63: an extension update within 2.1 is the same release');
+  assert.equal(guidanceCard({ ...base, openSource: true }), 'open-source');
 
   // ── The store: one global key, defensive reads (E2) ──
 
@@ -204,11 +200,8 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   await store.noteReadyShown('2026-11-02');
   assert.deepEqual([...bag.keys()], [GUIDANCE_KEY], 'one key');
   assert.deepEqual(store.project('file:///p'), { chatId: 'c1', ai: 'codex' });
-  assert.deepEqual(store.release(), { id: '2.1', savedDays: ['2026-11-01', '2026-11-02'] });
-  await store.answerFeedback('not-now');
-  assert.equal(store.release().feedback, 'not-now');
-  const next = new GuidanceStore(memento, '2.2.0');
-  assert.deepEqual(next.release(), { id: '2.2', savedDays: [] }, 'a new release asks again');
+  assert.deepEqual(store.read().savedDays, ['2026-11-01', '2026-11-02']);
+  assert.equal(store.read().release, undefined, 'saves do not write week-question data');
   assert.deepEqual(decodeGuidanceState({ v: 1, projects: { a: { gone: 'nope', ai: 'gpt', chatId: 7 }, b: 'x' }, readyShownOn: 'yesterday', release: { id: '2.1', savedDays: ['2026-1-1', '2026-11-01'], feedback: 'maybe' } }),
     { v: 1, projects: { a: {} }, savedDays: ['2026-11-01'], release: { id: '2.1', savedDays: ['2026-11-01'] } }, 'anything malformed is dropped');
   assert.deepEqual(decodeGuidanceState(undefined), { v: 1, projects: {}, savedDays: [] });

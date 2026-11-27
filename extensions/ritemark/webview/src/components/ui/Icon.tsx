@@ -61,6 +61,7 @@ import {
   CellSignalMedium,
   Chat,
   ChatCircle,
+  ChatsCircle,
   ChatText,
   Check,
   CheckCircle,
@@ -98,6 +99,7 @@ import {
   FolderPlus,
   Gear,
   GitBranch,
+  GithubLogo,
   Globe,
   GlobeSimple,
   Graph,
@@ -148,6 +150,7 @@ import {
   Sparkle,
   SquaresFour,
   Square,
+  Star,
   StarFour,
   Table,
   Terminal,
@@ -156,6 +159,8 @@ import {
   TextHThree,
   TextHTwo,
   TextT,
+  ThumbsDown,
+  ThumbsUp,
   Timer,
   Trash,
   Warning,
@@ -197,7 +202,7 @@ import {
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
-export type IconWeight = 'regular' | 'duotone'
+export type IconWeight = 'regular' | 'duotone' | 'fill'
 /**
  * `inherit` takes the colour from the wrapping element instead of a role token.
  * It exists for conversation identity bubbles and controls whose semantic
@@ -259,6 +264,7 @@ const iconMap = {
   'cell-signal-medium': CellSignalMedium,
   'chat': Chat,
   'chat-circle': ChatCircle,
+  'chats-circle': ChatsCircle,
   'chat-text': ChatText,
   'check': Check,
   'check-circle': CheckCircle,
@@ -298,6 +304,7 @@ const iconMap = {
   'folder-plus': FolderPlus,
   'gear': Gear,
   'git-branch': GitBranch,
+  'github-logo': GithubLogo,
   'globe': Globe,
   'globe-simple': GlobeSimple,
   'graph': Graph,
@@ -354,6 +361,7 @@ const iconMap = {
   'sparkle': Sparkle,
   'square': Square,
   'squares-four': SquaresFour,
+  'star': Star,
   'star-four': StarFour,
   'table': Table,
   'terminal': Terminal,
@@ -362,6 +370,8 @@ const iconMap = {
   'text-h-three': TextHThree,
   'text-h-two': TextHTwo,
   'text-t': TextT,
+  'thumbs-down': ThumbsDown,
+  'thumbs-up': ThumbsUp,
   'timer': Timer,
   'trash': Trash,
   'warning': Warning,
