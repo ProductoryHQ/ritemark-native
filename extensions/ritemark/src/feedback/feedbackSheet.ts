@@ -113,9 +113,12 @@ function decodeQuote(raw: unknown): { quote: FeedbackCardQuote; key: string } | 
   if (typeof title !== 'string' || typeof line !== 'string') return;
   const parts = [title, line].map(part => part.trim());
   // Scan the original words, including URL paths and query strings, before truncation.
-  const localPath = /\/(?:users|home|volumes|private|tmp|var\/folders|mnt|media|root)\/|…\/documents\/|~\/|\b[a-z]:[\\/]|\\\\[^\s\\/]+\\|\b(?:file|smb):/i;
+  const localPath = /\/(?:users|home|volumes|private|tmp|var|mnt|media|root|etc|opt|srv|usr|workspaces?)\/|…\/documents\/|~\/|\b[a-z]:[\\/]|\\\\[^\s\\/]+\\|\b(?:file|smb):/i;
   const credentials = /\/\/[^/\s?#@]+@|[?&](?:key|api_key|apikey|token|access_token|sig|signature|password|secret)=/i;
-  if (parts.some(part => !part || localPath.test(part) || credentials.test(part))) return;
+  // Any other absolute path that names a file (`/a/b/c.docx`), outside web addresses (Codex's review of #1135).
+  const webAddress = /\b[a-z][a-z\d+.-]*:\/\/[^\s"'“”‘’«»<>()[\]{},;]+/giu;
+  const filePath = /(?:^|[^\p{L}\p{N}_.-])\/(?:[^\s/\\"'“”‘’«»<>()[\]{},;]+\/)+[^\s/\\"'“”‘’«»<>()[\]{},;]*[^\s/\\"'“”‘’«»<>()[\]{},;.]\.[a-z][a-z\d]{0,7}(?![\p{L}\p{N}])/iu;
+  if (parts.some(part => !part || localPath.test(part) || credentials.test(part) || filePath.test(part.replace(webAddress, ' ')))) return;
   return {
     quote: {
       title: boundQuotePart(parts[0].replace(/[\r\n\u2028\u2029]+/g, ' '), 120),

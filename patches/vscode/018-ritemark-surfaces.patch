@@ -4003,10 +4003,10 @@ index 252bcf8..718e4a1 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..8523c998e7c
+index 00000000000..12783d136ac
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,489 @@
+@@ -0,0 +1,490 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4210,7 +4210,8 @@ index 00000000000..8523c998e7c
 +				return;
 +			}
 +			closed = true;
-+			if (!went && (sendingRoute || area.value !== initialText)) {
++			// Unsent words, typed or prefilled, stay as this context's draft (Codex's review of #1135).
++			if (!went) {
 +				if (area.value) {
 +					draft.set(draftKey, area.value);
 +				} else {
@@ -7983,7 +7984,7 @@ index 6851c3b584c..686f8932c2d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..09aa179d69d
+index 00000000000..9bf9650fff6
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 @@ -0,0 +1,520 @@
@@ -8396,7 +8397,7 @@ index 00000000000..09aa179d69d
 +		});
 +	}
 +
-+	test('an unedited prefill keeps the previous draft, an empty prefill restores it, and an edited prefill replaces it', async () => {
++	test('an unedited prefill becomes the draft, an empty prefill restores it, and an edited prefill replaces it', async () => {
 +		const container = mainWindow.document.createElement('div');
 +		async function check(text: string | undefined, expected: string, edit?: string) {
 +			const sheet = open({ text }, async () => null, container);
@@ -8412,7 +8413,7 @@ index 00000000000..09aa179d69d
 +		}
 +		await check(undefined, '', 'Draft words');
 +		await check('Prefilled', 'Prefilled');
-+		await check('', 'Draft words');
++		await check('', 'Prefilled');
 +		await check('Prefilled', 'Prefilled', 'New draft');
 +		await check(undefined, 'New draft');
 +	});

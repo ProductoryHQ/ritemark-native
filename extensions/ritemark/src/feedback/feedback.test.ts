@@ -212,6 +212,7 @@ test('feedback command validates the open and binds submissions to its card and 
     'Error 404: /v1/Users/x', 'HTTP 500: /v2/home/x/secret', '?api_key=sk-…',
     '/Volumes/drive/file', '/private/path', '/var/folders/x', '/mnt/share', '/media/drive', '/root/file',
     'C:/Example', String.raw`\\server\share`, 'file:relative', 'smb:share',
+    '/etc/passwd', '/opt/acme/customer.csv', '/workspace/project/private.docx', 'Could not read /data/2025/report.pdf.',
     ...['key', 'api_key', 'apikey', 'token', 'access_token', 'sig', 'signature', 'password', 'secret']
       .map(key => `https://x.com/path?version=1&${key}=example`),
   ]) {
@@ -222,6 +223,7 @@ test('feedback command validates the open and binds submissions to its card and 
   for (const line of [
     'Please run /login', 'Error 404: /v1/messages', 'POST /v1/messages failed',
     String.raw`{"error":"Use \"quotes\""}`, 'See https://example.com/help',
+    'See https://ritemark.app/docs/guide.html', 'Version 2.4.0 failed', 'and/or 3/4 of the slides',
   ]) {
     const opened = await open({ quote: { title: 'Card', line } });
     await t.test(`allows quote ${line}`, () => assert.equal(opened.spec.quote?.line, line));
