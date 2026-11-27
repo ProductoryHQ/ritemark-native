@@ -137,11 +137,17 @@ export function markdownImageDestinations(source: string): Set<string> {
   if (references.size) {
     // Use marked's block rules for container indentation, fences, and
     // definition titles. The linear scan above handles inline candidates.
-    const lexer = new Lexer({ ...marked.defaults });
-    lexer.blockTokens(source.replace(/\r\n?/g, '\n'), lexer.tokens);
-    for (const label of references) {
-      const definition = lexer.tokens.links[label];
-      if (definition) destinations.add(definition.href);
+    // A crafted document (thousands of nested `>`) can overflow marked's stack. The document must still open, so the
+    // reference pictures then stay unmapped, as before #1115 (High review round 2).
+    try {
+      const lexer = new Lexer({ ...marked.defaults });
+      lexer.blockTokens(source.replace(/\r\n?/g, '\n'), lexer.tokens);
+      for (const label of references) {
+        const definition = lexer.tokens.links[label];
+        if (definition) destinations.add(definition.href);
+      }
+    } catch {
+      // Inline pictures found by the linear scan are kept.
     }
   }
   return destinations;

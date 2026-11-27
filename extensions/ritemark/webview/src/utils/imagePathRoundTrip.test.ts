@@ -242,6 +242,18 @@ for (const [definition, text] of [
   })
 }
 
+test('a button block after a picture definition keeps its words on reopen', () => {
+  const opened = openDocument('![a][r]\n\n[r]: x.png\nWords\n[Go](https://x.test){.button}\n')
+  let pos = -1
+  opened.doc.descendants((node, offset) => {
+    if (node.type.name === 'buttonWords' && node.textContent === 'Words') pos = offset
+  })
+  assert.ok(pos >= 0)
+  const tr = EditorState.create({ doc: opened.doc }).tr.insertText('"Buy now"', pos + 1, pos + 6)
+  const saved = saveDocument(opened, tr.doc)
+  assert.ok(openDocument(saved).doc.textContent.includes('"Buy now"'), saved)
+})
+
 test('deleting a heading does not turn the next paragraph into a picture title', () => {
   const opened = openDocument('![a][r]\n\n[r]: x.png\n# H\n"Quote"\n')
   const state = EditorState.create({ doc: opened.doc })

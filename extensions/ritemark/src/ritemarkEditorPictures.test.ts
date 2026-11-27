@@ -76,6 +76,11 @@ test('200 KB of unterminated angle destinations takes under 50 ms', () => {
   console.log(`200 KB scan: ${elapsed.toFixed(2)} ms`);
 });
 
+test('a document marked cannot lex (deeply nested quotes) still opens', () => {
+  const markdown = '![r]\n\n[r]: x.png\n\n' + '>'.repeat(2500) + ' x\n';
+  assert.doesNotThrow(() => editor.transformImagePaths(markdown, uri('/dev/null/doc.md'), { asWebviewUri: uri }));
+});
+
 test('file changes match the written spelling of a picture path', () => {
   assert.ok(sameMarkdownImageFile('images/my%20pic.png', './images/my pic.png'));
   assert.ok(sameMarkdownImageFile('Screen%20Shot.png', './Screen%20Shot.png'));

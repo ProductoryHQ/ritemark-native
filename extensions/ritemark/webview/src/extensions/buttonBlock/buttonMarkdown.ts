@@ -63,7 +63,9 @@ function buttonMarkdown(content: string, element: Element): string {
   const dest = element.getAttribute('data-dest') ?? ''
   const attrs = element.getAttribute('data-attrs') || BUTTON_ATTRIBUTES
   const link = `[${label}](${dest})${attrs}`
-  return blockLeading(element) + (words ? escapeLineStarts(words) + sep : '') + link + blockTrailing(element)
+  const body = (words ? escapeLineStarts(words) + sep : '') + link
+  // Its first line decides whether it may sit tight under a picture definition without becoming its title (#1115).
+  return blockLeading(element, body) + body + blockTrailing(element)
 }
 
 /** The Button block's save rules, on the editor's Turndown (and so the slide editor's). */
