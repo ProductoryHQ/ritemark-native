@@ -985,10 +985,10 @@ index 72cb1c1..a8b8807 100644
  
 diff --git a/src/vs/workbench/browser/media/ritemarkSurfaces.css b/src/vs/workbench/browser/media/ritemarkSurfaces.css
 new file mode 100644
-index 00000000000..4f7619faf68
+index 00000000000..29d3878275e
 --- /dev/null
 +++ b/src/vs/workbench/browser/media/ritemarkSurfaces.css
-@@ -0,0 +1,2138 @@
+@@ -0,0 +1,2147 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -2917,6 +2917,15 @@ index 00000000000..4f7619faf68
 +	height: 20px;
 +}
 +
++.monaco-workbench > .notifications-toasts .notifications-list-container .notification-list-item .notification-list-item-message,
++.monaco-workbench > .notifications-toasts .notifications-list-container .notification-offset-helper {
++	text-wrap: pretty;
++}
++
++.monaco-workbench > .notifications-toasts .notifications-list-container .notification-list-item > .notification-list-item-details-row:not(:has(.notification-list-item-source:not(:empty), .notification-list-item-buttons-container:not(:empty))) {
++	display: none;
++}
++
 +/* A toast's message wraps to 3 lines, then ends in an ellipsis; the row grows with it (notificationsViewer.ts). The
 +   centre keeps one line, its full text behind the expand toggle (the Experience lead, Windows round 2) */
 +.monaco-workbench > .notifications-toasts .notifications-list-container .notification-list-item:not(.expanded) .notification-list-item-message {
@@ -3935,10 +3944,29 @@ index 38e722820da..f9fbe8c1a61 100644
  
  				availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts b/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
-index 0b62b5801da..239089e9ac3 100644
+index 0b62b5801da..971623ae30f 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsToasts.ts
-@@ -642,11 +642,11 @@ export class NotificationsToasts extends Themable implements INotificationsToast
+@@ -319,16 +319,14 @@ export class NotificationsToasts extends Themable implements INotificationsToast
+ 
+ 		// Handle content changes
+ 		// - actions: re-draw to properly show them
+-		// - message: update notification height unless collapsed
++		// - message: recalculate the wrapped toast height
+ 		itemDisposables.add(item.onDidChangeContent(e => {
+ 			switch (e.kind) {
+ 				case NotificationViewItemContentChangeKind.ACTIONS:
+ 					notificationList.updateNotificationsList(0, 1, [item]);
+ 					break;
+ 				case NotificationViewItemContentChangeKind.MESSAGE:
+-					if (item.expanded) {
+-						notificationList.updateNotificationHeight(item);
+-					}
++					notificationList.updateNotificationHeight(item);
+ 					break;
+ 				case NotificationViewItemContentChangeKind.PROGRESS:
+ 					if (e.activeProgressChanged) {
+@@ -642,11 +640,11 @@ export class NotificationsToasts extends Themable implements INotificationsToast
  			// Make sure notifications are not exceeding available height
  			availableHeight = this.workbenchDimensions.height;
  			if (this.layoutService.isVisible(Parts.STATUSBAR_PART, mainWindow)) {
@@ -3953,10 +3981,10 @@ index 0b62b5801da..239089e9ac3 100644
  
  			availableHeight -= (2 * 12); // adjust for paddings top and bottom
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
-index ebb6b6f90c3..9e42d3ffb9f 100644
+index ebb6b6f90c3..b93752781db 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
 +++ b/src/vs/workbench/browser/parts/notifications/notificationsViewer.ts
-@@ -62,7 +62,7 @@ export function setNotificationRowHeight(height: number): void {
+@@ -62,11 +62,11 @@ export function setNotificationRowHeight(height: number): void {
  export class NotificationsListDelegate implements IListVirtualDelegate<INotificationViewItem> {
  
  	private static get ROW_HEIGHT(): number { return notificationRowHeight; }
@@ -3965,25 +3993,50 @@ index ebb6b6f90c3..9e42d3ffb9f 100644
  
  	private offsetHelper: HTMLElement;
  
-@@ -76,6 +76,12 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+-	constructor(container: HTMLElement) {
++	constructor(private readonly container: HTMLElement) {
+ 		this.offsetHelper = this.createOffsetHelper(container);
+ 	}
+ 
+@@ -75,7 +75,23 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+ 	}
  
  	getHeight(notification: INotificationViewItem): number {
++		const hasDetails = !!notification.source || isNonEmptyArray(notification.actions?.primary);
  		if (!notification.expanded) {
 +			// Ritemark 2.0: a toast's message wraps to 3 lines, then ends in an ellipsis (ritemarkSurfaces.css; the Experience
 +			// lead, Windows round 2). The notification centre keeps one line, its full text behind the expand toggle.
 +			if (this.offsetHelper.closest('.notification-toast')) {
++				// With no details or secondary actions, the idle toast has the full message width.
++				// Check that width first so a hidden toolbar cannot add a blank line.
++				if (!hasDetails && !isNonEmptyArray(notification.actions?.secondary)) {
++					const listWidth = this.container.clientWidth;
++					const messageWidth = listWidth - 10 /* padding */ - 24 /* severity icon and margins */;
++					if (messageWidth > 0 && this.computePreferredHeight(notification, true, messageWidth) <= NotificationsListDelegate.LINE_HEIGHT) {
++						return NotificationsListDelegate.ROW_HEIGHT;
++					}
++				}
 +				const lines = Math.ceil(this.computePreferredHeight(notification, true) / NotificationsListDelegate.LINE_HEIGHT);
 +				return NotificationsListDelegate.ROW_HEIGHT + (Math.min(Math.max(lines, 1), 3) - 1) * NotificationsListDelegate.LINE_HEIGHT;
 +			}
  			return NotificationsListDelegate.ROW_HEIGHT; // return early if there are no more rows to show
  		}
  
-@@ -104,15 +110,15 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+@@ -91,7 +107,7 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
+ 		}
+ 
+ 		// Last row: source and buttons if we have any
+-		if (notification.source || isNonEmptyArray(notification.actions?.primary)) {
++		if (hasDetails) {
+ 			expandedHeight += NotificationsListDelegate.ROW_HEIGHT;
+ 		}
+ 
+@@ -104,20 +120,20 @@ export class NotificationsListDelegate implements IListVirtualDelegate<INotifica
  		return expandedHeight;
  	}
  
 -	private computePreferredHeight(notification: INotificationViewItem): number {
-+	private computePreferredHeight(notification: INotificationViewItem, ritemarkWrappedToast = false): number {
++	private computePreferredHeight(notification: INotificationViewItem, ritemarkWrappedToast = false, messageWidth?: number): number {
  
  		// Prepare offset helper depending on toolbar actions count
  		let actions = 0;
@@ -3997,6 +4050,12 @@ index ebb6b6f90c3..9e42d3ffb9f 100644
  		}
  		if (isNonEmptyArray(notification.actions?.secondary)) {
  			actions++; // secondary actions
+ 		}
+-		this.offsetHelper.style.width = `${450 /* notifications container width */ - (10 /* padding */ + 30 /* severity icon */ + (actions * 30) /* actions */ - (Math.max(actions - 1, 0) * 4) /* less padding for actions > 1 */)}px`;
++		this.offsetHelper.style.width = `${messageWidth ?? (450 /* notifications container width */ - (10 /* padding */ + 30 /* severity icon */ + (actions * 30) /* actions */ - (Math.max(actions - 1, 0) * 4) /* less padding for actions > 1 */))}px`;
+ 
+ 		// Render message into offset helper
+ 		const renderedMessage = NotificationMessageRenderer.render(notification.message);
 diff --git a/src/vs/workbench/browser/parts/paneCompositeBar.ts b/src/vs/workbench/browser/parts/paneCompositeBar.ts
 index 29725b7..10bf358 100644
 --- a/src/vs/workbench/browser/parts/paneCompositeBar.ts
@@ -8292,6 +8351,55 @@ index 6851c3b584c..686f8932c2d 100644
  	if (!hasCustomTitlebar(configurationService)) {
  		return false;
  	}
+diff --git a/src/vs/workbench/test/browser/notificationsToasts.test.ts b/src/vs/workbench/test/browser/notificationsToasts.test.ts
+index f428a723a58..f229a1e5a1a 100644
+--- a/src/vs/workbench/test/browser/notificationsToasts.test.ts
++++ b/src/vs/workbench/test/browser/notificationsToasts.test.ts
+@@ -4,6 +4,7 @@
+  *--------------------------------------------------------------------------------------------*/
+ 
+ import assert from 'assert';
++import { Action } from '../../../base/common/actions.js';
+ import { Dimension, getWindow } from '../../../base/browser/dom.js';
+ import { Event } from '../../../base/common/event.js';
+ import { DisposableStore, toDisposable } from '../../../base/common/lifecycle.js';
+@@ -13,6 +14,7 @@ import { NotificationsToasts } from '../../browser/parts/notifications/notificat
+ import { NotificationsModel } from '../../common/notifications.js';
+ import { workbenchInstantiationService } from './workbenchTestServices.js';
+ import { DEFAULT_NOTIFICATION_ROW_HEIGHT, setNotificationRowHeight } from '../../browser/parts/notifications/notificationsViewer.js';
++import '../../browser/media/ritemarkSurfaces.css';
+ 
+ suite('NotificationsToasts', () => {
+ 
+@@ -135,6 +137,28 @@ suite('NotificationsToasts', () => {
+ 		});
+ 	});
+ 
++	test('uses one row for a one-line toast and keeps the row for action buttons', async () => {
++		const { container, model, flushAnimationFrame } = await createToasts();
++		// A roughly 397px message fits the idle toast's 416px message area, but would wrap in
++		// the old 380px measurement, which reserved space for the hidden toolbar.
++		container.style.font = '20px/20px monospace';
++		const message = 'A notice with a one-line message.';
++		const textWidth = document.createElement('canvas').getContext('2d')!;
++		textWidth.font = '20px monospace';
++		const width = textWidth.measureText(message).width;
++		assert.ok(width > 380 && width <= 416);
++		model.addNotification({ severity: Severity.Info, message, sticky: true });
++		const action = disposables.add(new Action('notice.ok', 'OK'));
++		model.addNotification({ severity: Severity.Info, message: 'With a button', sticky: true, actions: { primary: [action] } });
++		await flushAnimationFrame();
++
++		const rows = [...container.querySelectorAll<HTMLElement>('.notification-toast .monaco-list-row')];
++		assert.deepStrictEqual(rows.map(row => row.style.height), [
++			`${2 * DEFAULT_NOTIFICATION_ROW_HEIGHT}px`,
++			`${DEFAULT_NOTIFICATION_ROW_HEIGHT}px`
++		]);
++	});
++
+ 	test('recalculates visible toasts when row height changes', async () => {
+ 		setNotificationRowHeight(34);
+ 		const { container, model, toasts, flushAnimationFrame } = await createToasts();
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
 index 00000000000..b1d6efed39c
