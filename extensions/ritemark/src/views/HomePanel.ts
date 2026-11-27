@@ -67,8 +67,7 @@ export class HomeHost implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private redrawTimer: ReturnType<typeof setTimeout> | undefined;
   private ready = false;
-  private guidanceHasDraft = false;
-  private guidanceSlot: { decision?: Promise<HomeGuidance | null> } = {};
+  private guidanceSlot: { decision?: Promise<HomeGuidance | null>; openSourcePresentation?: Promise<boolean>; openSourceShown?: boolean } = {};
   private homeVisible = false;
   private recentPaths = new Map<string, string>();
   private waitingIds = new Map<string, { source: 'card' | 'chat'; id: string }>();
@@ -213,7 +212,6 @@ export class HomeHost implements vscode.Disposable {
   private attach(panel: vscode.WebviewPanel): void {
     this.panel = panel;
     this.ready = false;
-    this.guidanceHasDraft = false;
     this.guidanceSlot = {};
     this.homeVisible = panel.visible;
     panel.iconPath = {
@@ -246,7 +244,7 @@ export class HomeHost implements vscode.Disposable {
       this.endSwitchedNote('home-hidden');
       return;
     }
-    if (reopened && !this.guidanceHasDraft) this.guidanceSlot = {};
+    if (reopened && !this.guidanceSlot.openSourceShown) this.guidanceSlot = {};
     this.deps.waiting.invalidate();
     this.scheduleRedraw(0);
     // The list beside Home counts from the same fresh read (R3, S9).
@@ -266,7 +264,6 @@ export class HomeHost implements vscode.Disposable {
     const folder = this.deps.folder;
     switch (request.type) {
       case 'home/ready':
-        this.guidanceHasDraft = false;
         this.ready = true;
         await this.push();
         return;
@@ -392,31 +389,21 @@ export class HomeHost implements vscode.Disposable {
         await this.panel?.webview.postMessage({ type: 'home/keys-saved', ...result });
         return;
       }
-      case 'home/feedback-draft-changed':
-        this.guidanceHasDraft = request.hasDraft;
-        return;
-      case 'home/feedback-send':
-        if (await this.deps.guidance?.sendFeedbackLine(request.text)) await this.feedbackAnswered();
-        return;
       case 'home/quick-look-open':
       case 'home/quick-look-dismiss':
         await this.deps.quickLookGuidance?.retire(request.type === 'home/quick-look-open');
         await this.guidanceEnded();
         return;
-      case 'home/feedback-not-now':
-        await this.deps.guidance?.feedbackNotNow();
-        await this.feedbackAnswered();
+      case 'home/open-source-action': {
+        const slot = this.guidanceSlot;
+        if (await slot.openSourcePresentation && this.guidanceSlot === slot
+          && await this.deps.guidance?.actOnOpenSource(request.action)
+          && request.action !== 'discussions' && this.guidanceSlot === slot) {
+          await this.guidanceEnded();
+        }
         return;
-      case 'home/feedback-mail':
-        if (await this.deps.guidance?.mailFeedbackLine(request.text)) await this.feedbackAnswered();
-        return;
+      }
     }
-  }
-
-  private async feedbackAnswered(): Promise<void> {
-    this.guidanceHasDraft = false;
-    await this.panel?.webview.postMessage({ type: 'home/feedback-answered' });
-    await this.guidanceEnded();
   }
 
   private async guidanceEnded(): Promise<void> {
@@ -573,7 +560,7 @@ export class HomeHost implements vscode.Disposable {
       return slot.decision;
     }
     const selected = await slot.decision;
-    if (selected?.card === 'ready-request' || selected?.card === 'feedback') {
+    if (selected?.card === 'ready-request') {
       return await this.readGuidance(recent, selected.card) ?? selected;
     }
     return selected;
@@ -594,7 +581,7 @@ export class HomeHost implements vscode.Disposable {
         console.warn('[Home] The guidance card could not be read:', error);
       }
     }
-    const card = selected ?? guidanceCard({ whatMoved, quickLook, readyRequest: false, feedback: false });
+    const card = selected ?? guidanceCard({ whatMoved, quickLook, readyRequest: false, openSource: false });
     if (card === 'quick-look') return { card, body: settingsNote, button: openSettingsLabel };
     return card === 'what-moved' ? { card } : null;
   }
@@ -640,7 +627,21 @@ export class HomeHost implements vscode.Disposable {
     const slot = this.guidanceSlot;
     const state = await this.state(slot);
     if (this.panel !== panel || this.guidanceSlot !== slot) return;
+    if (state.guidance?.card === 'open-source') {
+      // Claim or restore the release presentation before posting.
+      if (panel.visible && !state.missing && this.deps.guidance) {
+        slot.openSourcePresentation ??= this.deps.guidance.presentOpenSource();
+        if (!await slot.openSourcePresentation) state.guidance = null;
+      } else {
+        state.guidance = null;
+      }
+      if (this.panel !== panel || this.guidanceSlot !== slot) return;
+      if (!panel.visible) state.guidance = null;
+    }
     const delivered = await panel.webview.postMessage({ type: 'home/state', state });
+    if (delivered && state.guidance?.card === 'open-source' && this.guidanceSlot === slot) {
+      slot.openSourceShown = true;
+    }
     if (delivered && this.panel === panel && panel.visible && !state.missing && state.guidance?.card === 'what-moved'
         && !this.deps.context.globalState.get(WHAT_MOVED_SEEN_KEY)) {
       // This note belongs to the first landing after the upgrade.

@@ -100,13 +100,7 @@ export const FEEDBACK_COPY = {
   toast: {
     accepted: "Thank you. It's with the people who make Ritemark.",
   },
-  card: {
-    heading: 'What did you make with Ritemark this week?',
-    lede: 'One line is plenty. It goes to the people who make Ritemark, and we read every one.',
-    placeholder: 'A proposal, notes, a module…',
-    send: 'Send',
-    notNow: 'Not now',
-    /** The card's send that did not go: Try again (primary), Open in e-mail and Not now (the Experience lead, 26 October). */
+  answer: {
     failed: "It didn't go. Your words are still here: try again, or open it in e-mail.",
   },
 } as const;
