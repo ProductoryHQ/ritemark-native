@@ -596,6 +596,16 @@ async function main(): Promise<void> {
   assert.equal((await host.homeGuidance(noReadyRequest, { quickLook: true }))?.card, 'quick-look');
   assert.equal((await host.homeGuidance(noReadyRequest))?.card, 'open-source');
   assert.equal(await store.openHomePresentation('second'), undefined, 'selection alone does not record a presentation');
+  {
+    // Review round 2 (#1139): a failing marker read fails closed, so Home still draws without the card.
+    const realOpen = store.openHomePresentation.bind(store);
+    const realReserve = store.reserveHomePresentation.bind(store);
+    store.openHomePresentation = async () => { throw Object.assign(new Error('too many open files'), { code: 'EMFILE' }); };
+    store.reserveHomePresentation = async () => false;
+    assert.equal(await host.presentOpenSource(), false, 'a failing marker read fails closed');
+    store.openHomePresentation = realOpen;
+    store.reserveHomePresentation = realReserve;
+  }
   const { registerFeedback } = await import('../feedback/feedbackSheet');
   registerFeedback({ subscriptions: [] } as never, {} as never);
   counts.length = 0;

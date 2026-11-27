@@ -246,7 +246,7 @@ export class GuidanceHost implements vscode.Disposable {
       const day = localDay(new Date());
       const appRun = this.deps.appRun ?? '';
       if (this.store.read().readyShownOn === day
-        || (!await this.store.homeEligible({ day, appRun }) && !await this.store.openHomePresentation(appRun))) {
+        || (!await this.store.homeEligible({ day, appRun }) && !await this.store.openHomePresentation(appRun).catch(() => undefined))) {
         card = null;
       }
     }
@@ -650,7 +650,8 @@ export class GuidanceHost implements vscode.Disposable {
     const day = localDay(new Date());
     if (this.store.read().readyShownOn === day) return false;
     const appRun = this.deps.appRun ?? '';
-    return await this.store.reserveHomePresentation({ day, appRun }) || Boolean(await this.store.openHomePresentation(appRun));
+    // A failing read of the markers fails closed, as reserveHomePresentation does (review round 2): no card, Home still draws.
+    return await this.store.reserveHomePresentation({ day, appRun }) || Boolean(await this.store.openHomePresentation(appRun).catch(() => undefined));
   }
 
   async actOnOpenSource(action: OpenSourceAction): Promise<boolean> {
