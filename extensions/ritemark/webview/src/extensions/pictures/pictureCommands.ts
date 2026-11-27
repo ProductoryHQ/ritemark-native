@@ -141,7 +141,10 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
   if (!node) return null
   const written = (node.attrs.picture as string | null) ?? ''
   const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined, caption: undefined }))
-  const tr = state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...newPictureSpelling, src: picture.src, title: picture.title, alt: '', picture: block || null })
+  const tr = state.tr.setNodeMarkup(pos, undefined, {
+    ...node.attrs, ...newPictureSpelling,
+    src: picture.src, title: picture.title, alt: '', picture: block || null,
+  })
   tr.setSelection(NodeSelection.create(tr.doc, pos))
   return ownStep(tr)
 }

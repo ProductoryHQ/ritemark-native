@@ -131,7 +131,7 @@ function labelMarkdown(element: Element): string {
   const words = element.textContent ?? ''
   const raw = element.getAttribute('data-raw')
   const line = raw !== null && element.getAttribute('data-words') === words ? raw.trim() : labelLine(words, element.getAttribute('data-attrs') ?? LABEL_ATTRIBUTES)
-  return blockLeading(element) + line + blockTrailing(element)
+  return blockLeading(element, line) + line + blockTrailing(element)
 }
 
 /** The Label's save rule, on the slide editor's Turndown (never the Text editor's). */

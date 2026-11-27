@@ -23,8 +23,8 @@ export const pictureMarkedExtension = {
     pictureBlockTokenizer,
     {
       name: 'image',
-      renderer(this: ImageRendererContext, token: ImageTokenWithLook): string | false {
-        const label = inlineImageLabel.exec(token.raw)?.[0]
+      renderer(this: ImageRendererContext, token: ImageTokenWithLook & { referenceLabel?: string }): string | false {
+        const label = token.referenceLabel ?? inlineImageLabel.exec(token.raw)?.[0]
         const html = this.parser.renderer.image(token.href, token.title, token.text)
         const written = label
           ? ` data-md-image-label="${escapeAttribute(label)}" data-md-image-target="${escapeAttribute(token.raw.slice(label.length))}"`
