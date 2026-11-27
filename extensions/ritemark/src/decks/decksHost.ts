@@ -26,7 +26,7 @@ import type { RuntimeAvailability } from '../runtime/availability';
 import type { ChatStartRequest } from '../views/UnifiedViewProvider';
 import { LIBRARY_FIELD_CONTEXT_KEY, LIBRARY_SEARCH_COMMAND } from './librarySearchRow';
 import { DECK_GLOB, isDeckPath } from './deckFileName';
-import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles } from './deckFolderFollow';
+import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles, type DeletedDeck } from './deckFolderFollow';
 import { copyDeckFolder } from './copyDeckFolder';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -125,7 +125,7 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
   }));
   // Serialize the filesystem events so copy and delete see the previous event's completed folder changes.
   let following = Promise.resolve();
-  const deletingDecks = new Set<string>();
+  const deletingDecks = new Map<string, DeletedDeck>();
   const follow = (operation: () => Promise<void>) => {
     if (isEnabled('decks')) following = following.then(operation)
       .catch(error => console.warn('[Decks] Could not follow a file change:', error));
@@ -145,18 +145,25 @@ export function registerDecks(context: vscode.ExtensionContext, options: DecksHo
     // Sprint 159 (PR 7; since 16 November it opens the deck at once): New → Deck, only with the flag on
     vscode.commands.registerCommand('ritemark.decks.new', () => (isEnabled('decks') ? newDeck(pages, options, fresh) : undefined)),
     vscode.workspace.onWillDeleteFiles(event => {
-      // After deletion there is no way to tell a deck from a directory with the same extension.
+      // Capture the deck's links before its file and open document can disappear.
       const paths = event.files.filter(file => file.scheme === 'file' && isDeckPath(file.fsPath)).map(file => rootless(file.fsPath));
       if (!paths.length) return;
       event.waitUntil(Promise.all(paths.map(async file => {
         deletingDecks.delete(file);
-        if (isEnabled('decks') && await deckFolderFiles.kind(file) === 'file' && !event.token.isCancellationRequested) deletingDecks.add(file);
+        if (!isEnabled('decks') || await deckFolderFiles.kind(file) !== 'file') return;
+        const text = await deckFolderFiles.readDeck(file).catch(() => undefined);
+        if (!event.token.isCancellationRequested) deletingDecks.set(file, { file, text });
       })));
     }),
     vscode.workspace.onDidDeleteFiles(event => {
       for (const file of event.files) void fresh.remove(markOf(file.fsPath));
       const deleted = event.files.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath));
-      const decks = deleted.filter(file => deletingDecks.delete(file));
+      const decks: DeletedDeck[] = [];
+      for (const file of deleted) {
+        const deck = deletingDecks.get(file);
+        deletingDecks.delete(file);
+        if (deck) decks.push(deck);
+      }
       if (decks.length) follow(() => trashDeckFolders(decks, deleted, deckFolderFiles));
     }),
     vscode.workspace.onDidRenameFiles(event => {
@@ -251,6 +258,24 @@ const deckFolderFiles: CreatedDeckFiles = {
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
     return open?.getText() ?? fs.promises.readFile(uri.fsPath, 'utf8');
   },
+  async *listFolder(folder) {
+    if (await deckFolderFiles.kind(folder) !== 'folder') throw new Error('Expected a plain deck folder');
+    const dir = await fs.promises.opendir(fileUri(folder).fsPath);
+    for await (const { name } of dir) {
+      const file = folder + '/' + name;
+      const kind = await deckFolderFiles.kind(file);
+      if (kind === 'file') await fs.promises.access(fileUri(file).fsPath, fs.constants.R_OK);
+      yield { name, kind: kind ?? 'other' };
+    }
+  },
+  async readPage(file) {
+    const page = await fs.promises.open(fileUri(file).fsPath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    try {
+      return await page.readFile('utf8');
+    } finally {
+      await page.close();
+    }
+  },
   async findFiles(glob, limit) {
     const files = await vscode.workspace.findFiles(glob, null, limit);
     return files.filter(uri => uri.scheme === 'file').map(uri => rootless(uri.fsPath));
@@ -297,7 +322,7 @@ async function rebaseMovedDecks(files: ReadonlyArray<{ oldUri: vscode.Uri; newUr
   for (const deck of decks) {
     const oldFolder = folderOf(rootless(deck.before));
     const newFolder = folderOf(rootless(deck.uri.fsPath));
-    const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after));
+    const rebase = (text: string) => rewriteDeckPictures(text, target => movedTarget(target, oldFolder, newFolder, after), true);
     // A moved folder's decks stay closed unless their links need an edit.
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === deck.uri.toString());
     if (!open && deck.inFolder) {

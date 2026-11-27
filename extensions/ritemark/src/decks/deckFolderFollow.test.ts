@@ -4,10 +4,13 @@ import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type Create
 import { folderOf, movedTarget, placeAfterMoves, rewriteDeckPictures } from './deckLibraryFormat';
 import { deckFolderCheck, insideDeckFolder, listedDeckFolders } from './deckFolderListing';
 import { emptyDeckText } from './newDeck';
+import { DIGEST_META, GENERATOR_META } from './page/pageHtml';
 
 const original = 'work/Kickoff.rtms';
 const assets = 'work/Kickoff files';
 const text = '---\ndeck: 1\n---\n\n```slide title\nid: a1\ntitle: Kickoff\nimage: Kickoff files/x.png\n```\n\n![](<Kickoff files/y.png>)\n\n![](other.png)\n';
+const trashed = '“Kickoff files” went to the Trash with the deck.';
+const kept = "“Kickoff files” stayed where it was, because it holds files the deck doesn't use.";
 
 function fixture() {
   const content = new Map([[original, text], [assets + '/x.png', 'x'], [assets + '/y.png', 'y']]);
@@ -19,7 +22,20 @@ function fixture() {
   const fs: CreatedDeckFiles = {
     kind: async file => folders.has(file) ? 'folder' : content.has(file) ? 'file' : undefined,
     siblingDecks: async dir => [...content.keys()].filter(file => folderOf(file) === dir && /\.(?:rtms|deck\.md)$/.test(file)),
-    readDeck: async file => content.get(file)!,
+    readDeck: async file => {
+      const value = content.get(file);
+      if (value === undefined) throw new Error('Deck unavailable');
+      return value;
+    },
+    async *listFolder(folder) {
+      for (const file of folders) {
+        if (folderOf(file) === folder) yield { name: file.slice(folder.length + 1), kind: 'folder' };
+      }
+      for (const file of content.keys()) {
+        if (folderOf(file) === folder) yield { name: file.slice(folder.length + 1), kind: 'file' };
+      }
+    },
+    readPage: async file => content.get(file)!,
     readBytes: async file => Buffer.from(content.get(file)!),
     resolves: async file => folders.has(file) || content.has(file),
     findFiles: async (glob, limit) => {
@@ -53,6 +69,8 @@ function fixture() {
 }
 
 async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, direct = true) {
+  const readDeck = fs.readDeck;
+  fs.readDeck = async file => file === deck.to ? text : readDeck(file);
   const after = placeAfterMoves(await followDeckMoves(moves, direct ? [deck] : [], fs));
   return rewriteDeckPictures(text, target => movedTarget(target, folderOf(deck.from), folderOf(deck.to), after));
 }
@@ -105,17 +123,79 @@ test('the folder stays when the deck moves into it', async () => {
   assert.deepEqual(notices, ['“Kickoff files” stayed where it was, because the deck was moved into it.']);
 });
 
+test('renaming an empty deck leaves a folder of notes silently', async () => {
+  const { fs, content, changes, notices } = fixture();
+  const move = { from: original, to: 'work/New.rtms' };
+  content.set(move.to, emptyDeckText());
+  content.set(assets + '/notes.md', 'notes');
+  assert.deepEqual(await followDeckMoves([move], [move], fs), [move]);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, []);
+});
+
+test('moving a deck leaves a mixed folder in place and reports once', async () => {
+  const { fs, content, changes, notices } = fixture();
+  const move = { from: original, to: 'work/archive/Kickoff.rtms' };
+  content.set(assets + '/notes.md', 'notes');
+  assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff files/', '../Kickoff files/').replace('other.png', '../other.png'));
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [kept]);
+});
+
+for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'marked page', 'unmarked page', 'symlink', 'unreadable deck', 'unreadable folder', 'too many entries', 'Markdown link'] as const) {
+  test(`delete checks folder ownership with ${scenario}`, async () => {
+    const { fs, content, folders, changes, notices } = fixture();
+    content.delete(original);
+    content.delete(assets + '/y.png');
+    content.set(assets + '/.DS_Store', 'clutter');
+    let saved: string | undefined = '![](<Kickoff files/x.png>)';
+    if (scenario === 'empty deck') saved = emptyDeckText();
+    if (scenario === 'unreadable deck') saved = undefined;
+    if (scenario === 'empty deck' || scenario === 'extra notes') content.set(assets + '/notes.md', 'notes');
+    if (scenario === 'Markdown link') saved = '[Picture](<Kickoff files/x.png>)';
+    if (scenario === 'marked page' || scenario === 'unmarked page') {
+      const mark = `<meta name="generator" content="${GENERATOR_META}"><meta name="${DIGEST_META}" content="${'a'.repeat(64)}">`;
+      content.set(assets + '/Kickoff.html', (scenario === 'marked page' ? mark : '') +
+        '<style>@font-face{src:url(fonts/X.woff2)}</style><img src="logos/l.svg"><img src="page%20picture%23.png">');
+      folders.add(assets + '/fonts');
+      folders.add(assets + '/logos');
+      content.set(assets + '/fonts/X.woff2', 'font');
+      content.set(assets + '/logos/l.svg', 'logo');
+      content.set(assets + '/page picture#.png', 'picture');
+      saved += '\n[Published page](<Kickoff files/Kickoff.html>)';
+    }
+    if (scenario === 'symlink') {
+      const list = fs.listFolder;
+      fs.listFolder = async function* (folder) {
+        yield* list(folder);
+        yield { name: 'outside.png', kind: 'other' };
+      };
+      saved += '\n![](<Kickoff files/outside.png>)';
+    }
+    if (scenario === 'unreadable folder') fs.listFolder = async function* () { throw new Error('EACCES'); };
+    if (scenario === 'too many entries') {
+      for (let index = 0; index < 499; index++) folders.add(assets + '/extra-' + index);
+    }
+    await trashDeckFolders([{ file: original, text: saved }], [original], fs);
+    const owned = scenario === 'picture and clutter' || scenario === 'marked page' || scenario === 'Markdown link';
+    const silent = scenario === 'empty deck' || scenario === 'unreadable deck';
+    assert.deepEqual(changes, owned ? ['trash work/Kickoff files'] : []);
+    assert.deepEqual(notices, owned ? [trashed] : silent ? [] : [kept]);
+    assert.equal(folders.has(assets), !owned);
+  });
+}
+
 test('delete uses the Trash, except when a sibling links in or the folder is already in the event', async () => {
   const { fs, content, changes } = fixture();
   content.delete(original);
   content.set('work/Shared.deck.md', text);
-  await trashDeckFolders([original], [original], fs);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
   content.set('work/Shared.deck.md', '[Handout](<Kickoff files/Kickoff.html>)');
-  await trashDeckFolders([original], [original], fs);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
   content.delete('work/Shared.deck.md');
-  await trashDeckFolders([original], [original, assets], fs);
+  await trashDeckFolders([{ file: original, text }], [original, assets], fs);
   assert.deepEqual(changes, []);
-  await trashDeckFolders([original], [original], fs);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
   assert.deepEqual(changes, ['trash work/Kickoff files']);
 });
 
@@ -123,7 +203,7 @@ test('unavailable Trash leaves the folder and reports once', async () => {
   const { fs, content, notices, folders } = fixture();
   content.delete(original);
   fs.trash = async () => { throw new Error('unavailable'); };
-  await trashDeckFolders([original, original], [original, original], fs);
+  await trashDeckFolders([{ file: original, text }, { file: original, text }], [original, original], fs);
   assert.ok(folders.has(assets));
   assert.deepEqual(notices, ["“Kickoff files” stayed where it was, because it couldn't be moved to the Trash."]);
 });

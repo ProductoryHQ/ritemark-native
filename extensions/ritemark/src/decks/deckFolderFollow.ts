@@ -1,14 +1,20 @@
 import * as path from 'path';
+import { kindOf } from '../publish/gather';
+import { cssReferences, pageReferences } from '../publish/references';
 import { deckNameOf, deckPictureFolderName, isDeckPath, DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
-import { folderOf, movedTarget, placeAfterMoves, projectPath, rewriteDeckPictures, rewriteMarkdownTargets } from './deckLibraryFormat';
+import { folderOf, isRelativeTarget, movedTarget, normalizePath, placeAfterMoves, projectPath, rewriteDeckPictures } from './deckLibraryFormat';
+import { PAGE_FONT_FOLDER, readPageMeta } from './page/pageFile';
 
 export type DeckMove = { from: string; to: string };
+export type DeletedDeck = { file: string; text: string | undefined };
 export type CopyDeckFolder = (from: string, to: string) => Promise<boolean>;
 
 export interface DeckFolderFiles {
   kind(file: string): Promise<'file' | 'folder' | 'other' | undefined>;
   siblingDecks(dir: string): Promise<string[]>;
   readDeck(file: string): Promise<string>;
+  listFolder(folder: string): AsyncIterable<{ name: string; kind: 'file' | 'folder' | 'other' }>;
+  readPage(file: string): Promise<string>;
   sameFolder?(from: string, to: string): Promise<boolean>;
   rename(from: string, to: string): Promise<void>;
   trash(folder: string): Promise<void>;
@@ -30,14 +36,60 @@ function linkedFiles(text: string, dir: string, includeLinks = false): Set<strin
     if (file !== null) files.add(file);
     return target;
   };
-  rewriteDeckPictures(text, visit);
-  if (includeLinks) rewriteMarkdownTargets(text, visit);
+  rewriteDeckPictures(text, visit, includeLinks);
   return files;
 }
 
 function linksInto(files: Iterable<string>, folder: string): boolean {
   for (const file of files) if (inside(file, folder)) return true;
   return false;
+}
+
+const FOLDER_ENTRY_LIMIT = 500;
+const OS_CLUTTER = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
+const UNUSED_FILES = "it holds files the deck doesn't use.";
+
+async function deckFolderOwnership(
+  deck: string, text: string, folder: string, fs: DeckFolderFiles,
+): Promise<'unlinked' | 'foreign' | 'owned'> {
+  const linked = linkedFiles(text, folderOf(deck), true);
+  if (!linksInto(linked, folder)) return 'unlinked';
+
+  const page = folder + '/' + deckNameOf(deck) + '.html';
+  const files = new Set<string>();
+  const pending = [folder];
+  let count = 0;
+  try {
+    while (pending.length) {
+      const dir = pending.pop()!;
+      for await (const entry of fs.listFolder(dir)) {
+        if (++count > FOLDER_ENTRY_LIMIT || entry.kind === 'other') return 'foreign';
+        const file = dir + '/' + entry.name;
+        if (entry.kind === 'folder') pending.push(file);
+        else files.add(file);
+      }
+    }
+
+    if (files.has(page)) {
+      const html = await fs.readPage(page);
+      if (!readPageMeta(html).ritemark) return 'foreign';
+      linked.add(page);
+      const { refs, inlineCss } = pageReferences(html);
+      for (const ref of [...refs, ...inlineCss.flatMap(cssReferences)]) {
+        if (ref.as !== 'picture' && ref.as !== 'any') continue;
+        if (!isRelativeTarget(ref.value)) continue;
+        const address = ref.value.split(/[?#]/, 1)[0];
+        if (/%(?:2f|5c)/i.test(address)) continue;
+        const file = normalizePath(folder + '/' + decodeURIComponent(address));
+        if (file === null || !inside(file, folder)) continue;
+        const kind = kindOf(file);
+        if (kind === 'picture' || (kind === 'font' && inside(file, folder + '/' + PAGE_FONT_FOLDER))) linked.add(file);
+      }
+    }
+    return [...files].every(file => linked.has(file) || OS_CLUTTER.has(path.posix.basename(file))) ? 'owned' : 'foreign';
+  } catch {
+    return 'foreign';
+  }
 }
 
 export async function followDeckMoves(
@@ -58,8 +110,14 @@ export async function followDeckMoves(
     const to = ownDeckFolder(deck.to);
     if (from === to || result.some(move => move.from === from || inside(from, move.from))) continue;
     if (await fs.kind(from) !== 'folder') continue;
+    const text = await fs.readDeck(deck.to).catch(() => undefined);
+    if (text === undefined) continue;
+    const ownership = await deckFolderOwnership(deck.from, text, from, fs);
+    if (ownership === 'unlinked') continue;
     if (inside(deck.to, from)) {
       stayed(from, 'the deck was moved into it.');
+    } else if (ownership === 'foreign') {
+      stayed(from, UNUSED_FILES);
     } else if (await fs.kind(to) && !(await fs.sameFolder?.(from, to))) {
       stayed(from, `“${path.posix.basename(to)}” is already there. The deck's pictures still show.`);
     } else {
@@ -74,13 +132,22 @@ export async function followDeckMoves(
   return result;
 }
 
-export async function trashDeckFolders(decks: readonly string[], deleted: readonly string[], fs: DeckFolderFiles): Promise<void> {
+export async function trashDeckFolders(decks: readonly DeletedDeck[], deleted: readonly string[], fs: DeckFolderFiles): Promise<void> {
   const handled = new Set<string>();
-  for (const deck of decks) {
+  const unreadableFolders = new Set(decks.filter(deck => deck.text === undefined).map(deck => ownDeckFolder(deck.file)));
+  for (const { file: deck, text } of decks) {
     const folder = ownDeckFolder(deck);
-    if (handled.has(folder) || deleted.some(file => file === folder || inside(folder, file))) continue;
-    handled.add(folder);
+    if (text === undefined || unreadableFolders.has(folder) || handled.has(folder) ||
+        deleted.some(file => file === folder || inside(folder, file))) continue;
     if (await fs.kind(folder) !== 'folder') continue;
+    const ownership = await deckFolderOwnership(deck, text, folder, fs);
+    if (ownership === 'unlinked') continue;
+    handled.add(folder);
+    const name = path.posix.basename(folder);
+    if (ownership === 'foreign') {
+      fs.notice(`“${name}” stayed where it was, because ${UNUSED_FILES}`);
+      continue;
+    }
     const dir = folderOf(deck);
     let shared = false;
     for (const sibling of await fs.siblingDecks(dir)) {
@@ -95,8 +162,10 @@ export async function trashDeckFolders(decks: readonly string[], deleted: readon
     try {
       await fs.trash(folder);
     } catch {
-      fs.notice(`“${path.posix.basename(folder)}” stayed where it was, because it couldn't be moved to the Trash.`);
+      fs.notice(`“${name}” stayed where it was, because it couldn't be moved to the Trash.`);
+      continue;
     }
+    fs.notice(`“${name}” went to the Trash with the deck.`);
   }
 }
 

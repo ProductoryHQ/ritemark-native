@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deleting or renaming a deck now leaves a folder of the same name alone unless it holds only that deck's pictures.
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).
