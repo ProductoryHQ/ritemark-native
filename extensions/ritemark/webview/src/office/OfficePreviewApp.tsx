@@ -43,7 +43,11 @@ export function OfficePreviewApp() {
           kind: 'error',
           fileType: message.fileType === 'pptx' ? 'pptx' : 'docx',
           filename,
-          error: { title: message.title as string, detail: message.detail as string },
+          error: {
+            title: message.title as string,
+            detail: message.detail as string,
+            feedback: message.feedback === true,
+          },
         })
       }
     })

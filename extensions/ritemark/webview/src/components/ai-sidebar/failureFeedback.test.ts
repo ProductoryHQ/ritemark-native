@@ -76,13 +76,27 @@ test('fallback failure links after the line and sends its visible words', () => 
   assert.deepEqual(messages, expected({ title: 'ChatGPT couldn’t answer.', line: 'Send your message again.' }));
 });
 
+test('ordinary slash wording stays in the feedback quote', () => {
+  const title = 'Claude limit';
+  for (const message of [
+    "You've used Claude's limit for now. It resets at 3pm (Europe/Tallinn).",
+    'A/B', 'and/or', '/login', 'Error 404: /v1/messages', 'Open Notes.docx.',
+  ]) {
+    render(React.createElement(RuntimeNotice, { title, message, feedback: true }));
+    openFeedback();
+    assert.deepEqual(messages, expected({ title, line: message }), message);
+  }
+});
+
 test('unsafe visible diagnostics never enter the feedback payload', () => {
   for (const error of [
-    'Could not read /Users/example/file.txt',
-    'Could not read ./private/file.txt',
-    'Could not read project/private.txt',
-    'Request failed at https://example.test/?token=example',
-    '{"error":"raw provider payload"}',
+    'Could not read /Users/example/file.txt', 'Could not read ./private/file.txt',
+    'Could not read /a/b', 'Could not read /report.docx', 'Could not read ~/Notes',
+    'Could not read ../Notes', 'Could not read a/b/c', 'Could not read dir/file.docx',
+    'Could not read project/Private notes.docx',
+    String.raw`Could not read C:\Notes`, String.raw`Could not read \\server\share`,
+    'Request failed at https://example.test/?token=example', '{"error":"raw provider payload"}',
+    'TypeError: raw renderer diagnostics',
   ]) {
     render(React.createElement(TurnFailureCard, {
       runtimeId: 'codex', error, isLatest: true,

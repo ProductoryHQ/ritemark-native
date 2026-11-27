@@ -315,6 +315,10 @@ body:has(.deck-view) .block-plus-btn { display: none !important; }
 .deck-bar[data-theme-compact] .deck-theme-button > svg { display: none; }
 .deck-bar[data-theme-compact] > .deck-publish-slot { flex-shrink: 10000; }
 .deck-bar[data-theme-compact] > .deck-present { flex-shrink: 1; }
+.deck-publish-feedback { flex: none; }
+.deck-notice[data-measure-min] > .deck-publish-feedback,
+.deck-bar[data-theme-compact] .deck-publish-feedback,
+.deck-notice > .deck-publish-feedback[data-link-clipped] { display: none; }
 .deck-notice-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* The bar's words give way before its actions (Undo, Split at the cursor): the words' tooltip span shrinks and its
    text ends in an ellipsis; an action keeps its whole word. */
