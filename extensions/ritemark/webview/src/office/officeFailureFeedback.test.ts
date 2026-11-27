@@ -21,6 +21,8 @@ register('data:text/javascript,' + encodeURIComponent(cssLoader), import.meta.ur
 const { createRoot } = await import('react-dom/client');
 const { flushSync } = await import('react-dom');
 const { OfficePreviewApp } = await import('./OfficePreviewApp');
+const { renderFailure } = await import('../components/viewers/DOCXViewer');
+const { loadFailure } = await import('../components/viewers/PPTXViewer');
 
 const container = document.getElementById('root')!;
 const root = createRoot(container);
@@ -78,3 +80,12 @@ test('turned-off notice has no feedback link', () => {
 });
 
 test.after(() => root.unmount());
+
+test('read failures found while drawing offer feedback too (Codex review of #1140)', () => {
+  for (const failure of [
+    renderFailure(new Error('Corrupted zip')), renderFailure(new Error('word/document.xml: unexpected end')),
+    loadFailure(new Error('size mismatch')), loadFailure(new Error('slide1.xml: bad tag')),
+  ]) {
+    assert.equal(failure.feedback, true, failure.title);
+  }
+});

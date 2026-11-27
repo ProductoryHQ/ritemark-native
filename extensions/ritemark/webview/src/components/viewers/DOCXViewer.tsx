@@ -113,15 +113,16 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
 }
 
 /** What to tell the user when drawing fails, instead of the library's own words. */
-function renderFailure(error: unknown): DocxLoadError {
+export function renderFailure(error: unknown): DocxLoadError {
   const message = error instanceof Error ? error.message : String(error)
   if (/central directory|is this a zip|Corrupted zip|no Word document/i.test(message)) {
     return {
       title: 'This file can’t be read as a Word document',
+      feedback: true,
       detail: 'It may be damaged, or saved in another format. Try opening it in a word processor.',
     }
   }
-  return { title: 'Ritemark couldn’t draw this document', detail: message }
+  return { title: 'Ritemark couldn’t draw this document', detail: message, feedback: true }
 }
 
 /**

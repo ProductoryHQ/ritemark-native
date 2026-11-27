@@ -58,15 +58,16 @@ function decodeBase64ToBytes(base64: string): Uint8Array {
 }
 
 /** What to tell the user when reading fails, instead of the library's own words. */
-function loadFailure(error: unknown): PptxLoadError {
+export function loadFailure(error: unknown): PptxLoadError {
   const message = error instanceof Error ? error.message : String(error)
   if (/central directory|is this a zip|Corrupted zip|zip limit|size mismatch|presentation\.xml/i.test(message)) {
     return {
       title: 'This file can’t be read as a presentation',
+      feedback: true,
       detail: 'It may be damaged, or saved in another format. Try opening it in PowerPoint.',
     }
   }
-  return { title: 'Ritemark couldn’t draw this presentation', detail: message }
+  return { title: 'Ritemark couldn’t draw this presentation', detail: message, feedback: true }
 }
 
 function highlightsSupported(): boolean {
