@@ -2,7 +2,7 @@ import * as path from 'path';
 import { kindOf } from '../publish/gather';
 import { cssReferences, pageReferences } from '../publish/references';
 import { deckNameOf, deckPictureFolderName, isDeckPath, DECK_EXTENSION, LEGACY_DECK_EXTENSION } from './deckFileName';
-import { folderOf, isRelativeTarget, movedTarget, normalizePath, placeAfterMoves, projectPath, rewriteDeckPictures } from './deckLibraryFormat';
+import { folderOf, isRelativeTarget, movedTarget, normalizePath, placeAfterMoves, projectPath, rewriteDeckPictures, rewritePictureTargets } from './deckLibraryFormat';
 import { PAGE_FONT_FOLDER, readPageMeta } from './page/pageFile';
 
 export type DeckMove = { from: string; to: string };
@@ -11,7 +11,7 @@ export type CopyDeckFolder = (from: string, to: string) => Promise<boolean>;
 
 export interface DeckFolderFiles {
   kind(file: string): Promise<'file' | 'folder' | 'other' | undefined>;
-  siblingDecks(dir: string): Promise<string[]>;
+  listMarkdown(deck: string, limit: number): Promise<string[]>;
   readDeck(file: string): Promise<string>;
   listFolder(folder: string): AsyncIterable<{ name: string; kind: 'file' | 'folder' | 'other' }>;
   readPage(file: string): Promise<string>;
@@ -46,6 +46,54 @@ function linksInto(files: Iterable<string>, folder: string): boolean {
 }
 
 const FOLDER_ENTRY_LIMIT = 500;
+const MARKDOWN_FILE_LIMIT = 500;
+const CHECK_INCOMPLETE = "Ritemark couldn't check whether other files use it.";
+const PICTURES_STAY = ' The deck still finds its pictures there.';
+
+const fileNameOrder = new Intl.Collator(undefined, { numeric: true });
+
+/** The default Documents tree visits folders first, then files, in natural name order. */
+function compareTreePaths(a: string, b: string): number {
+  const left = a.split('/');
+  const right = b.split('/');
+  let index = 0;
+  while (left[index] === right[index] && index < left.length - 1 && index < right.length - 1) index++;
+  const leftFolder = index < left.length - 1;
+  const rightFolder = index < right.length - 1;
+  if (leftFolder !== rightFolder) return leftFolder ? -1 : 1;
+  return fileNameOrder.compare(left[index], right[index]) || left[index].length - right[index].length;
+}
+
+async function sharedFolderReason(
+  deck: string, folder: string, fs: DeckFolderFiles, skip: (file: string) => boolean,
+): Promise<string | undefined> {
+  try {
+    const files = await fs.listMarkdown(deck, MARKDOWN_FILE_LIMIT + 1);
+    if (files.length > MARKDOWN_FILE_LIMIT) return CHECK_INCOMPLETE;
+
+    const users: string[] = [];
+    for (const file of new Set(files)) {
+      if (skip(file)) continue;
+      const text = await fs.readDeck(file);
+      let usesFolder = false;
+      const visit = (target: string) => {
+        const resolved = projectPath(target, folderOf(file));
+        if (resolved !== null && (resolved === folder || inside(resolved, folder))) usesFolder = true;
+        return target;
+      };
+      if (isDeckPath(file)) rewriteDeckPictures(text, visit, true);
+      else rewritePictureTargets(text, visit, undefined, true);
+      if (usesFolder) users.push(file);
+    }
+
+    if (!users.length) return;
+    const first = `“${path.posix.basename(users.sort(compareTreePaths)[0])}”`;
+    const more = users.length - 1;
+    return more ? `${first} and ${more} more ${more === 1 ? 'file' : 'files'} use it.` : `${first} uses it.`;
+  } catch {
+    return CHECK_INCOMPLETE;
+  }
+}
 const OS_CLUTTER = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
 const OTHER_FILES = "it holds more than the deck's pictures and published page.";
 
@@ -122,8 +170,15 @@ export async function followDeckMoves(
     if (ownership === 'unlinked') continue;
     if (inside(deck.to, from)) {
       stayed(from, 'the deck was moved into it.');
-    } else if (ownership === 'foreign') {
-      stayed(from, OTHER_FILES, 'information');
+      continue;
+    }
+    if (ownership === 'foreign') {
+      stayed(from, OTHER_FILES);
+      continue;
+    }
+    const shared = await sharedFolderReason(deck.from, from, fs, file => file === deck.from || file === deck.to);
+    if (shared) {
+      stayed(from, shared + PICTURES_STAY);
     } else if (await fs.kind(to) && !(await fs.sameFolder?.(from, to))) {
       stayed(from, `“${path.posix.basename(to)}” is already there. The deck's pictures still show.`);
     } else {
@@ -154,17 +209,12 @@ export async function trashDeckFolders(decks: readonly DeletedDeck[], deleted: r
       fs.notice(`“${name}” stayed where it was, because ${OTHER_FILES}`, 'information');
       continue;
     }
-    const dir = folderOf(deck);
-    let shared = false;
-    for (const sibling of await fs.siblingDecks(dir)) {
-      // A sibling that cannot be read might still use these files.
-      const text = await fs.readDeck(sibling).catch(() => null);
-      if (text === null || linksInto(linkedFiles(text, dir, true), folder)) {
-        shared = true;
-        break;
-      }
+    const shared = await sharedFolderReason(deck, folder, fs, file =>
+      file === deck || deleted.some(removed => file === removed || inside(file, removed)));
+    if (shared) {
+      fs.notice(`“${name}” stayed where it was, because ${shared}`, 'information');
+      continue;
     }
-    if (shared) continue;
     try {
       await fs.trash(folder);
     } catch {

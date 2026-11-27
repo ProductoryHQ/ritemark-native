@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { isEnabled } from '../features';
+import { classifyWorkspaceFileKind } from '../workspaceFileLinks';
 import { DeckLibrary } from './DeckLibrary';
 import { projectRelative, projectRoot, workspaceDeckFiles } from './deckDocuments';
 import { DeckPages, SLIDE_LIBRARY_VIEW } from './deckPages';
@@ -249,10 +250,19 @@ const deckFolderFiles: CreatedDeckFiles = {
       return (error as NodeJS.ErrnoException).code === 'ENOENT' ? undefined : 'other';
     }
   },
-  async siblingDecks(dir) {
-    const entries = await fs.promises.readdir(fileUri(dir).fsPath, { withFileTypes: true });
-    return entries.filter(entry => entry.isFile() && isDeckPath(entry.name))
-      .map(entry => dir ? dir + '/' + entry.name : entry.name);
+  async listMarkdown(deck, limit) {
+    const uri = fileUri(deck);
+    const root = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
+    const pattern = new vscode.RelativePattern(root, '**/*.{[mM][dD],[mM][aA][rR][kK][dD][oO][wW][nN],[rR][tT][mM][sS]}');
+    const found = await vscode.workspace.findFiles(pattern, undefined, limit);
+    const files = new Set(found.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath)));
+    for (const { uri } of vscode.workspace.textDocuments) {
+      if (uri.scheme === 'file' && projectRelative(root.fsPath, uri.fsPath) !== null &&
+          classifyWorkspaceFileKind(uri.fsPath) === 'markdown') {
+        files.add(rootless(uri.fsPath));
+      }
+    }
+    return [...files];
   },
   async readDeck(file) {
     const uri = fileUri(file);

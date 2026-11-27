@@ -9,6 +9,7 @@ import { makeTempDir } from '../testing/tempDir';
 import { copyCreatedDeckPictures, followDeckMoves, trashDeckFolders, type CreatedDeckFiles, type DeckFolderFiles, type DeckMove } from './deckFolderFollow';
 import { folderOf, movedTarget, placeAfterMoves, rewriteDeckPictures } from './deckLibraryFormat';
 import { deckFolderCheck, insideDeckFolder, listedDeckFolders } from './deckFolderListing';
+import { ensureDeckPictureFolder } from './deckPictureFolder';
 import { emptyDeckText } from './newDeck';
 import { DIGEST_META, GENERATOR_META } from './page/pageHtml';
 
@@ -17,6 +18,11 @@ const assets = 'work/Kickoff.rtms.files';
 const text = '---\ndeck: 1\n---\n\n```slide title\nid: a1\ntitle: Kickoff\nimage: Kickoff.rtms.files/x.png\n```\n\n![](<Kickoff.rtms.files/y.png>)\n\n![](other.png)\n';
 const trashed = '“Kickoff.rtms.files” went to the Trash with the deck.';
 const kept = "“Kickoff.rtms.files” stayed where it was, because it holds more than the deck's pictures and published page.";
+const shared = '“Kickoff.rtms.files” stayed where it was, because “Q3 review.md” uses it.';
+const incomplete = "“Kickoff.rtms.files” stayed where it was, because Ritemark couldn't check whether other files use it.";
+const stillFindsPictures = ' The deck still finds its pictures there.';
+const review = 'notes/Q3 review.md';
+const reviewText = '![](<../work/Kickoff.rtms.files/x.png>)';
 const pageMark = `<meta name="generator" content="${GENERATOR_META}"><meta name="${DIGEST_META}" content="${'a'.repeat(64)}">`;
 const handout = [
   '[^1]: Smith 2020, p. 4',
@@ -29,16 +35,18 @@ const handout = [
 
 function fixture() {
   const content = new Map([[original, text], [assets + '/x.png', 'x'], [assets + '/y.png', 'y']]);
+  const openText = new Map<string, string>();
   const folders = new Set([assets]);
   const changes: string[] = [];
   const notices: Array<[string, 'information' | 'warning']> = [];
   const logs: string[] = [];
   const searches: Array<{ glob: string; limit: number }> = [];
   const fs: CreatedDeckFiles = {
+    listMarkdown: async (_deck, limit) => [...new Set([...content.keys(), ...openText.keys()])]
+      .filter(file => /\.(md|rtms)$/i.test(file)).slice(0, limit),
     kind: async file => folders.has(file) ? 'folder' : content.has(file) ? 'file' : undefined,
-    siblingDecks: async dir => [...content.keys()].filter(file => folderOf(file) === dir && /\.(?:rtms|deck\.md)$/.test(file)),
     readDeck: async file => {
-      const value = content.get(file);
+      const value = openText.get(file) ?? content.get(file);
       if (value === undefined) throw new Error('Deck unavailable');
       return value;
     },
@@ -88,7 +96,7 @@ function fixture() {
     },
     notice: (message, level) => { notices.push([message, level]); },
   };
-  return { fs, content, folders, changes, notices, searches, logs };
+  return { fs, content, openText, folders, changes, notices, searches, logs };
 }
 
 async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, direct = true, saved = text) {
@@ -97,6 +105,90 @@ async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, di
   const after = placeAfterMoves(await followDeckMoves(moves, direct ? [deck] : [], fs));
   return rewriteDeckPictures(saved, target => movedTarget(target, folderOf(deck.from), folderOf(deck.to), after), true);
 }
+
+test('delete keeps a folder used by Markdown elsewhere in the project', async () => {
+  const { fs, content, folders, changes, notices } = fixture();
+  content.delete(original);
+  content.set(review, reviewText);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
+  assert.ok(folders.has(assets));
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [[shared, 'information']]);
+});
+
+for (const [to, prefix] of [['work/archive/Review.rtms', '../'], ['work/Review.rtms', '']]) {
+  test(`a shared folder stays when the deck goes to ${to}`, async () => {
+    const { fs, content, folders, changes, notices } = fixture();
+    const move = { from: original, to };
+    content.delete(original);
+    content.set(review, reviewText);
+    const expected = prefix ? text.replaceAll('Kickoff.rtms.files/', prefix + 'Kickoff.rtms.files/')
+      .replace('other.png', prefix + 'other.png') : text;
+    assert.equal(await rebase(fs, [move], move), expected);
+    assert.equal(content.get(review), reviewText);
+    assert.ok(folders.has(assets));
+    assert.deepEqual(changes, []);
+    assert.deepEqual(notices, [[shared + stillFindsPictures, 'information']]);
+    const root = makeTempDir('rm-deck-folder-');
+    await disk.mkdir(path.join(root, folderOf(to)), { recursive: true });
+    assert.equal(await ensureDeckPictureFolder(path.join(root, to)), path.join(root, to + '.files'));
+  });
+}
+
+for (const extra of [1, 2]) {
+  test(`shared folder notice names the first user in tree order and counts ${extra} more`, async () => {
+    const { fs, content, notices } = fixture();
+    content.delete(original);
+    content.set('A note.md', '![](work/Kickoff.rtms.files/x.png)');
+    if (extra === 2) content.set('notes/Z deck.rtms', text.replaceAll('Kickoff.rtms.files/', '../work/Kickoff.rtms.files/'));
+    content.set(review, reviewText + '\n' + reviewText);
+    await trashDeckFolders([{ file: original, text }], [original], fs);
+    assert.deepEqual(notices, [[`“Kickoff.rtms.files” stayed where it was, because “Q3 review.md” and ${extra} more ${extra === 1 ? 'file' : 'files'} use it.`, 'information']]);
+  });
+}
+
+test('unsaved open Markdown text counts', async () => {
+  const { fs, content, openText, changes, notices } = fixture();
+  content.delete(original);
+  content.set(review, 'No pictures on disk');
+  openText.set(review, reviewText);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [[shared, 'information']]);
+});
+
+for (const failure of ['too many files', 'unreadable file', 'failed listing']) {
+  test(`an incomplete check keeps the folder on delete and move with ${failure}`, async () => {
+    const { fs, content, changes, notices } = fixture();
+    content.delete(original);
+    if (failure === 'too many files') {
+      for (let i = 0; i < 501; i++) content.set(`notes/${i}.md`, 'No links');
+    } else if (failure === 'unreadable file') {
+      fs.listMarkdown = async () => [review];
+    } else {
+      fs.listMarkdown = async () => { throw new Error('EACCES'); };
+    }
+    await trashDeckFolders([{ file: original, text }], [original], fs);
+    const move = { from: original, to: 'work/archive/Kickoff.rtms' };
+    assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff.rtms.files/', '../Kickoff.rtms.files/')
+      .replace('other.png', '../other.png'));
+    assert.deepEqual(changes, []);
+    assert.deepEqual(notices, [[incomplete, 'information'], [incomplete + stillFindsPictures, 'information']]);
+  });
+}
+
+test('extra folder contents take precedence over a shared-folder notice', async () => {
+  const { fs, content, changes, notices } = fixture();
+  content.delete(original);
+  content.set(review, reviewText);
+  await trashDeckFolders([{ file: original, text }], [original], fs);
+  content.set(assets + '/notes.md', 'Other contents');
+  await trashDeckFolders([{ file: original, text }], [original], fs);
+  const move = { from: original, to: 'work/archive/Kickoff.rtms' };
+  await rebase(fs, [move], move);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [[shared, 'information'], [kept, 'information'], [kept, 'information']]);
+});
 
 test('rename in place follows the deck and rebases both picture forms', async () => {
   const { fs, changes } = fixture();
