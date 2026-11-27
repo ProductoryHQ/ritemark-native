@@ -163,6 +163,8 @@ export class AcpSession implements RuntimeSession {
   private _capabilityContextInjected = false;
   private _dispatchAccepted = false;
   private _manualThinkingEffortApplied = false;
+  private _stopPreparation?: () => void;
+  private _restartSession = false;
 
   constructor(
     readonly conversationId: string,
@@ -199,9 +201,53 @@ export class AcpSession implements RuntimeSession {
 
     config.onProgress({ type: 'init', message: 'Starting OpenCode…', timestamp: Date.now() });
 
+    const ceilingMinutes = turn.timeoutMinutes ?? this._turnCeilingMs / 60_000;
+    const ceilingMs = turn.timeoutMinutes === undefined ? this._turnCeilingMs : ceilingMinutes * 60_000;
+    let quietTimer: ReturnType<typeof setTimeout> | undefined;
+    let approvals = 0;
+    let toolsRunning = false;
+    let finished = false;
+    const abort = new AbortController();
+    let fail!: (error: Error) => void;
+    const failed = new Promise<never>((_, reject) => { fail = reject; });
+    const stop = (error: Error) => {
+      if (finished || abort.signal.aborted) return;
+      fail(error);
+      abort.abort(error);
+      clearTimeout(quietTimer);
+      clearTimeout(ceilingTimer);
+    };
+    const onActivity = () => {
+      clearTimeout(quietTimer);
+      if (finished || abort.signal.aborted || approvals > 0 || toolsRunning) return;
+      quietTimer = setTimeout(() => {
+        stop(Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
+      }, this._quietStreamMs);
+    };
+
+    const ceilingTimer = setTimeout(() => {
+      stop(new Error(`OpenCode did not respond within ${ceilingMinutes} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
+    }, ceilingMs);
+    onActivity();
+    let stoppedByUser = false;
+    let browserTurn = false;
+    let cancelWriteTimer: ReturnType<typeof setTimeout> | undefined;
+    this._stopPreparation = () => {
+      stoppedByUser = true;
+      stop(new Error('OpenCode preparation stopped'));
+    };
+    const prepare = async <T>(step: Promise<T>): Promise<T> => {
+      const result = await Promise.race([step, failed]);
+      abort.signal.throwIfAborted();
+      return result;
+    };
+
     try {
       const previousSessionId = this.acpSessionId;
-      const readySessionId = await manager.preparePrompt(previousSessionId);
+      const readySessionId = await prepare(this._restartSession
+        ? manager.start(abort.signal)
+        : manager.preparePrompt(previousSessionId, abort.signal));
+      this._restartSession = false;
       if (readySessionId !== previousSessionId) {
         this._runtime._replaceSessionId(this, previousSessionId, readySessionId, manager);
         this._acpSessionId = readySessionId;
@@ -237,7 +283,7 @@ export class AcpSession implements RuntimeSession {
         const providerModel = config.model.startsWith('opencode:')
           ? config.model.slice('opencode:'.length)
           : config.model;
-        await manager.setModel(this.acpSessionId, providerModel);
+        await prepare(manager.setModel(this.acpSessionId, providerModel));
         config.onThinkingEffortCapability?.(manager.getThinkingEffortCapability(this.acpSessionId));
       }
 
@@ -246,14 +292,14 @@ export class AcpSession implements RuntimeSession {
       let effortFallback = false;
       if (requestedThinkingEffort !== 'auto' || this._manualThinkingEffortApplied) {
         try {
-          appliedThinkingEffort = await manager.setThinkingEffort(
+          appliedThinkingEffort = await prepare(manager.setThinkingEffort(
             this.acpSessionId,
             requestedThinkingEffort,
-          );
+          ));
         } catch (error) {
-          if (requestedThinkingEffort === 'auto') throw error;
+          if (abort.signal.aborted || requestedThinkingEffort === 'auto') throw error;
           effortFallback = true;
-          appliedThinkingEffort = await manager.setThinkingEffort(this.acpSessionId, 'auto').catch(() => undefined);
+          appliedThinkingEffort = await prepare(manager.setThinkingEffort(this.acpSessionId, 'auto').catch(() => undefined));
           this._manualThinkingEffortApplied = false;
           config.onThinkingEffortApplied?.({
             requested: requestedThinkingEffort,
@@ -276,37 +322,11 @@ export class AcpSession implements RuntimeSession {
         });
       }
 
-      const ceilingMinutes = turn.timeoutMinutes ?? this._turnCeilingMs / 60_000;
-      const ceilingMs = turn.timeoutMinutes === undefined ? this._turnCeilingMs : ceilingMinutes * 60_000;
-      let quietTimer: ReturnType<typeof setTimeout> | undefined;
-      let cancelWriteTimer: ReturnType<typeof setTimeout> | undefined;
-      let approvals = 0;
-      let toolsRunning = false;
-      let finished = false;
-      const abort = new AbortController();
-      let fail!: (error: Error) => void;
-      const failed = new Promise<never>((_, reject) => { fail = reject; });
-      const stop = (error: Error) => {
-        if (finished || abort.signal.aborted) return;
-        fail(error);
-        abort.abort(error);
-        clearTimeout(quietTimer);
-        clearTimeout(ceilingTimer);
-      };
-      const onActivity = () => {
-        clearTimeout(quietTimer);
-        if (finished || abort.signal.aborted || approvals > 0 || toolsRunning) return;
-        quietTimer = setTimeout(() => {
-          stop(Object.assign(new Error('OpenCode did not respond'), { code: ACP_QUIET_STREAM_ERROR }));
-        }, this._quietStreamMs);
-      };
-
+      abort.signal.throwIfAborted();
+      this._stopPreparation = undefined;
       // #658: hold this conversation's browser page only while its prompt is active.
       this._runtime.beginBrowserTurn(this, config.browserPage);
-      const ceilingTimer = setTimeout(() => {
-        stop(new Error(`OpenCode did not respond within ${ceilingMinutes} minutes. The selected model or provider may be unavailable or rate-limited — try again, or pick a different model.`));
-      }, ceilingMs);
-      onActivity();
+      browserTurn = true;
       const prompted = manager.prompt(this.acpSessionId, promptText, {
         onActivity,
         onApproval: (waiting) => {
@@ -351,24 +371,35 @@ export class AcpSession implements RuntimeSession {
           ]);
         }
         throw err;
-      } finally {
-        finished = true;
-        clearTimeout(quietTimer);
-        clearTimeout(cancelWriteTimer);
-        clearTimeout(ceilingTimer);
-        this._runtime.endBrowserTurn(this);
       }
     } catch (err) {
+      if (stoppedByUser) {
+        config.onCodexComplete?.({ status: 'interrupted' });
+        return;
+      }
+      if (abort.signal.aborted && !browserTurn) {
+        // A pending configuration reply or update belongs to the old session.
+        manager.closeSession(this.acpSessionId);
+        this._restartSession = true;
+      }
       const raw = err instanceof Error ? err.message : String(err);
       const errorCode = acpTurnErrorCode(err);
       config.onCodexComplete?.({
         status: 'error', error: describeAcpTurnError(raw),
         ...(errorCode ? { errorCode } : {}),
       });
+    } finally {
+      finished = true;
+      this._stopPreparation = undefined;
+      clearTimeout(quietTimer);
+      clearTimeout(cancelWriteTimer);
+      clearTimeout(ceilingTimer);
+      if (browserTurn) this._runtime.endBrowserTurn(this);
     }
   }
 
   async cancel(): Promise<void> {
+    this._stopPreparation?.();
     this.rejectPendingApprovals();
     try {
       await this._runtime.getManager()?.cancel(this.acpSessionId);
@@ -393,6 +424,7 @@ export class AcpSession implements RuntimeSession {
   }
 
   dispose(): void {
+    this._stopPreparation?.();
     this.rejectPendingApprovals();
     this.recentlyPermissionedWrites.clear();
 
