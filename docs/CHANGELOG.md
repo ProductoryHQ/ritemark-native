@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Close Send feedback with Escape or a click outside the sheet. Your unsent message comes back when you reopen it in the same window.
+- Close Send feedback with Escape or a click outside the sheet. Your unsent words come back when you reopen it for the same thing in the same window.
 - Publishing a deck writes its local page and any theme fonts or logo it uses into `<deck file>.files/`. Updating an existing published deck keeps its public link when the files fit its current hosted layout.
 - Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
 

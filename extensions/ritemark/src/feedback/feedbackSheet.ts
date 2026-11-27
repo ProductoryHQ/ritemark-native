@@ -51,6 +51,8 @@ export interface FeedbackOpenOptions {
   text?: string;
   /** A particular completed answer to offer, independent of the chat currently open. */
   turn?: FeedbackTurnRef;
+  /** Preselect the referenced answer and open as an AI issue if the answer is found. */
+  withAnswer?: boolean;
 }
 
 /** What the workbench's sheet is given. */
@@ -110,12 +112,10 @@ function decodeQuote(raw: unknown): { quote: FeedbackCardQuote; key: string } | 
   const { title, line } = recordOf(raw);
   if (typeof title !== 'string' || typeof line !== 'string') return;
   const parts = [title, line].map(part => part.trim());
-  // Reject paths and credential-bearing URLs anywhere in the supplied words, before truncation.
-  const credentials = /\/\/[^/\s?#@]+@/;
-  const absolutePath = /(?:^|[^\p{L}\p{N}])(?:[a-z]:[\\/]|file:\/|~[\\/]|\\+[^\s\\/]|\/[^\s/\\]+\/[^\s/\\])/iu;
-  // URLs without userinfo and versioned endpoints cited in HTTP errors are not local paths.
-  const nonPaths = /\b(?!file:)[a-z][a-z\d+.-]+:\/\/[^\s"\x27“”‘’«»<>{}]+|\b(?:error|http)\s+[1-5]\d{2}:\s+\/v\d+(?:\/[\w-]+)+(?=$|[\s“”‘’«»<>{}])/giu;
-  if (parts.some(part => !part || credentials.test(part) || absolutePath.test(part.replace(nonPaths, ' ')))) return;
+  // Scan the original words, including URL paths and query strings, before truncation.
+  const localPath = /\/(?:users|home|volumes|private|tmp|var\/folders|mnt|media|root)\/|…\/documents\/|~\/|\b[a-z]:[\\/]|\\\\[^\s\\/]+\\|\b(?:file|smb):/i;
+  const credentials = /\/\/[^/\s?#@]+@|[?&](?:key|api_key|apikey|token|access_token|sig|signature|password|secret)=/i;
+  if (parts.some(part => !part || localPath.test(part) || credentials.test(part))) return;
   return {
     quote: {
       title: boundQuotePart(parts[0].replace(/[\r\n\u2028\u2029]+/g, ' '), 120),
@@ -144,6 +144,7 @@ function decodeOpen(raw: unknown): FeedbackOpenOptions & { hasTurn: boolean; dra
     quote: card?.quote,
     text: typeof value.text === 'string' ? value.text.slice(0, 2_000).replace(/[\uD800-\uDBFF]$/, '') : undefined,
     turn,
+    withAnswer: value.withAnswer === true,
   };
 }
 
@@ -187,7 +188,7 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       const answer = last ? answerForSheet(reportContext, last.text) : null;
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
-      const includeAnswer = Boolean(options.turn && answer);
+      const includeAnswer = Boolean(options.withAnswer && options.turn && answer);
       const aiIssue = options.kind === 'ai-issue' || includeAnswer;
       const spec: FeedbackSheetSpec = {
         token,
@@ -237,6 +238,10 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
     if (request.route === 'straight' && routeOf(request) === 'straight') {
       // The message and nothing else: no address, no document, no chat, no path (R11).
       const accepted = await sendFeedback([{ name: 'feedback_sent', properties: { message: text, from: sentFrom(sheet.from) } }]);
+      if (open !== sheet) {
+        if (accepted) void showBriefToast(FEEDBACK_COPY.toast.accepted);
+        else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
+      }
       return { route: 'straight', outcome: accepted ? 'accepted' : 'failed' };
     }
     const kind = mailKindOf(request);

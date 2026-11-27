@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import { test } from 'node:test';
-import type { FeedbackSheetSpec } from './feedbackSheet';
+import type { FeedbackSheetOutcome, FeedbackSheetSpec } from './feedbackSheet';
 import { composeReport, LAST_ANSWER_LABEL, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { DELIVERY_CLAIM_WORDS } from '../reporting/reportCopy';
 import { buildMailtoUrl, fitsInMailto, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
@@ -96,7 +96,13 @@ test('feedback command validates the open and binds submissions to its card and 
   let spec: FeedbackSheetSpec;
   let shows = 0;
   let lastReads = 0;
-  let dismiss: () => void;
+  let dismiss: (result: FeedbackSheetOutcome) => void;
+  let rejectSheet = false;
+  let inputBoxes = 0;
+  let deliver: ((accepted: boolean) => void) | undefined;
+  let deferSend = false;
+  const toasts: string[] = [];
+  const warnings: string[] = [];
   let mailBody: string | null = null;
   const loader = Module as unknown as { _load(id: string, ...args: unknown[]): unknown };
   const load = loader._load;
@@ -104,18 +110,30 @@ test('feedback command validates the open and binds submissions to its card and 
     if (id === 'vscode') return {
       commands: {
         registerCommand: (name: string, handler: (...args: any[]) => any) => handlers.set(name, handler),
-        executeCommand: (_name: string, opened: FeedbackSheetSpec) => {
+        executeCommand: (name: string, opened: FeedbackSheetSpec | string) => {
+          if (name === '_ritemark.briefToast') {
+            toasts.push(opened as string);
+            return Promise.resolve(true);
+          }
+          if (rejectSheet) return Promise.reject(new Error('Sheet command rejected'));
           shows++;
-          spec = opened;
-          return new Promise<void>(resolve => { dismiss = resolve; });
+          spec = opened as FeedbackSheetSpec;
+          return new Promise<FeedbackSheetOutcome>(resolve => { dismiss = resolve; });
         },
+      },
+      window: {
+        showInputBox: async () => { inputBoxes++; },
+        showWarningMessage: (message: string) => warnings.push(message),
       },
       env: { openExternal: async (uri: string) => { mailBody = new URL(uri).searchParams.get('body'); return true; } },
       Uri: { parse: (uri: string) => uri },
     };
     if (id === '../analytics/posthog') return {
       trackEvent: (name: string, properties: unknown) => events.push({ name, properties }),
-      sendFeedback: async (batch: unknown[]) => { events.push(...batch); return true; },
+      sendFeedback: async (batch: unknown[]) => {
+        events.push(...batch);
+        return deferSend ? new Promise<boolean>(resolve => { deliver = resolve; }) : true;
+      },
     };
     return load.call(this, id, ...args);
   };
@@ -137,7 +155,7 @@ test('feedback command validates the open and binds submissions to its card and 
     const closed = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!(options);
     await Promise.resolve();
     await Promise.resolve();
-    return { spec, close: async () => { dismiss(); await closed; } };
+    return { spec, close: async (result: FeedbackSheetOutcome = 'cancelled') => { dismiss(result); await closed; } };
   }
   const bad = await open({ from: 'unknown', quote: { title: 1, line: 'words' }, text: {}, turn: { conversationId: 'chat', turnId: ' ' } });
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'command' } });
@@ -170,16 +188,41 @@ test('feedback command validates the open and binds submissions to its card and 
     await Promise.resolve();
     await Promise.resolve();
     const seen = shows - before;
-    dismiss();
+    dismiss('cancelled');
     assert.equal(seen, 1);
     await Promise.all([first, pending, shown]);
   });
-  for (const line of ['', '  ', 'https://user:pass@example.com', '/Users/example', 'C:\\Example', '~/file', '~/', '/tmp/file', '“/Users/x/a.docx”', '‘/Users/…’', '«/home/x»', '</Users/x>', '{/Users/x}', '…/Documents/a.docx', 'https://ghp_token@github.com/…']) {
+  await t.test('a rejected sheet command releases the opening guard after the fallback', async () => {
+    const before = shows;
+    rejectSheet = true;
+    await start({ from: 'help' });
+    rejectSheet = false;
+    assert.equal(inputBoxes, 1);
+    const reopened = await open({ from: 'help' });
+    await reopened.close();
+    assert.equal(shows, before + 1);
+  });
+
+  for (const line of [
+    '', '  ', 'https://user:pass@example.com', '/Users/example', 'C:\\Example', '~/file', '~/', '/tmp/file',
+    '“/Users/x/a.docx”', '‘/Users/…’', '«/home/x»', '</Users/x>', '{/Users/x}', '…/Documents/a.docx',
+    'https://ghp_token@github.com/…',
+    'https://file+.vscode-resource.vscode-cdn.net/Users/x/…', 'vscode-file://vscode-app/Users/…',
+    'smb://server/share/…', 'https://x.com,/Users/x/a.docx', 'https://x.com/(/Users/…)',
+    'Error 404: /v1/Users/x', 'HTTP 500: /v2/home/x/secret', '?api_key=sk-…',
+    '/Volumes/drive/file', '/private/path', '/var/folders/x', '/mnt/share', '/media/drive', '/root/file',
+    'C:/Example', String.raw`\\server\share`, 'file:relative', 'smb:share',
+    ...['key', 'api_key', 'apikey', 'token', 'access_token', 'sig', 'signature', 'password', 'secret']
+      .map(key => `https://x.com/path?version=1&${key}=example`),
+  ]) {
     const badQuote = await open({ quote: { title: 'Card', line } });
     await t.test(`rejects quote ${line}`, () => assert.equal(badQuote.spec.quote, undefined));
     await badQuote.close();
   }
-  for (const line of ['Please run /login', 'Error 404: /v1/messages', 'See https://example.com/help']) {
+  for (const line of [
+    'Please run /login', 'Error 404: /v1/messages', 'POST /v1/messages failed',
+    String.raw`{"error":"Use \"quotes\""}`, 'See https://example.com/help',
+  ]) {
     const opened = await open({ quote: { title: 'Card', line } });
     await t.test(`allows quote ${line}`, () => assert.equal(opened.spec.quote?.line, line));
     await opened.close();
@@ -215,12 +258,23 @@ test('feedback command validates the open and binds submissions to its card and 
   const missing = await open({ kind: 'ai-issue', turn: { ...turn, turnId: 'missing' } });
   assert.equal(missing.spec.lastAnswer, null);
   await missing.close();
-  const selected = await open({ from: 'failure_card', turn, quote: { title: ' Card ', line: ' Details ' } });
-  await t.test('a found turn opens as an AI issue with its answer selected', () => {
+  for (const options of [{}, { withAnswer: false }, { withAnswer: 'true' }, { kind: 'ai-issue' }]) {
+    const offered = await open({ from: 'failure_card', turn, ...options });
+    const kind = options.kind ?? 'feedback';
+    await t.test(`a found turn offers an unticked answer for ${JSON.stringify(options)}`, () => {
+      assert.equal(offered.spec.lastAnswer?.quote, 'Chosen answer.');
+      assert.equal(offered.spec.kind, kind);
+      assert.equal(offered.spec.aiIssue, kind === 'ai-issue');
+      assert.equal(offered.spec.includeAnswer, false);
+    });
+    await offered.close();
+  }
+  const selected = await open({ from: 'failure_card', turn, withAnswer: true, quote: { title: ' Card ', line: ' Details ' } });
+  await t.test('withAnswer true opens a found turn as an AI issue with its answer selected', () => {
     assert.equal(selected.spec.lastAnswer?.quote, 'Chosen answer.');
     assert.equal(selected.spec.kind, 'ai-issue');
     assert.equal(selected.spec.aiIssue, true);
-    assert.equal(Reflect.get(selected.spec, 'includeAnswer'), true);
+    assert.equal(selected.spec.includeAnswer, true);
   });
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'failure_card' } });
   const submit = handlers.get(feedback.FEEDBACK_SUBMIT_COMMAND)!;
@@ -246,4 +300,30 @@ test('feedback command validates the open and binds submissions to its card and 
   await submit({ ...base, token: oldDoor.spec.token, route: 'straight', includeQuote: true });
   assert.deepEqual(events.pop(), { name: 'feedback_sent', properties: { message: 'My words.', from: 'sheet' } });
   await oldDoor.close();
+
+  for (const accepted of [true, false]) {
+    await t.test(`the host reports a pending straight send after dismissal (${accepted ? 'accepted' : 'failed'})`, async () => {
+      const sheet = await open({ from: 'help' });
+      deferSend = true;
+      const sending = submit({ ...base, token: sheet.spec.token, route: 'straight' });
+      await sheet.close();
+      const reopened = await open({ from: 'help' });
+      toasts.length = 0;
+      warnings.length = 0;
+      deliver!(accepted);
+      deferSend = false;
+      assert.deepEqual(await sending, { route: 'straight', outcome: accepted ? 'accepted' : 'failed' });
+      await reopened.close();
+      assert.deepEqual(toasts, accepted ? [FEEDBACK_COPY.toast.accepted] : []);
+      assert.deepEqual(warnings, accepted ? [] : [FEEDBACK_COPY.sheet.failed]);
+    });
+  }
+  await t.test('an accepted straight send with its sheet still open gets one toast on close', async () => {
+    const sheet = await open({ from: 'help' });
+    toasts.length = 0;
+    assert.deepEqual(await submit({ ...base, token: sheet.spec.token, route: 'straight' }), { route: 'straight', outcome: 'accepted' });
+    assert.deepEqual(toasts, []);
+    await sheet.close('sent');
+    assert.deepEqual(toasts, [FEEDBACK_COPY.toast.accepted]);
+  });
 });
