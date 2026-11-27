@@ -1,24 +1,29 @@
-name: Daily test chain
+name: Extension tests
 
-# The extension's full `npm test` chain runs here once a day on main (macOS arm64, as the tests
-# assume: dictation and Quick Look are Mac-only; standard runners are free on this public repo), and on demand
-# (for example before an RC), instead of on every PR. A PR's proof is tsc, the tests it
-# touches and the pre-commit hook; a failure here is fixed forward from that day's merges.
+# The extension's automatic tests: 469 test files, one or more per feature (decks, AI chat,
+# dictation, Flows, publishing, search, Excel and the other viewers, ...). Each checks that a
+# feature still does what it should, so a change in one place can't quietly break another.
+# They run here on every PR that touches the extension and on every merge to main, on a
+# macOS arm64 runner (dictation and Quick Look are Mac-only; standard runners are free on this
+# public repo), not on a developer's machine. A PR merges only when this check is green.
 
 on:
-  schedule:
-    - cron: '0 3 * * *'
-  workflow_dispatch:
   pull_request:
     paths:
-      - '.github/workflows/daily-test-chain.yml'
+      - 'extensions/ritemark/**'
+      - '.github/workflows/extension-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'extensions/ritemark/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
 
 concurrency:
-  group: daily-test-chain
+  group: extension-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -60,23 +65,22 @@ jobs:
           cat "$RUNNER_TEMP/failing.txt"
 
       # Red main is never silent: one open issue labelled test-chain-red carries the failing
-      # lines and the merges of the last day. The Development manager fixes it forward first,
+      # lines and the merge that turned it red. The Development manager fixes it forward first,
       # and no RC is cut while it is open. A green run closes it.
       - name: Open or update the red-chain issue
         if: failure() && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh label create test-chain-red --color B60205 --description "Daily test chain failed on main" 2>/dev/null || true
+          gh label create test-chain-red --color B60205 --description "Extension tests failed on main" 2>/dev/null || true
           {
-            echo "The daily test chain failed on \`main\` at \`${GITHUB_SHA::8}\` ([run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))."
-            echo; echo "**Merges in the last 25 hours:**"; echo
-            git log --since="25 hours ago" --format='- %h %s' origin/main
+            echo "The extension tests failed on \`main\` at \`${GITHUB_SHA::8}\` ([run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))."
+            echo; echo "**The merge:** $(git log -1 --format='%h %s')"
             echo; echo "**Failing lines:**"; echo; echo '```'; head -c 60000 "$RUNNER_TEMP/failing.txt"; echo '```'
           } > "$RUNNER_TEMP/body.md"
           n=$(gh issue list --label test-chain-red --state open --json number -q '.[0].number')
           if [ -n "$n" ]; then gh issue comment "$n" --body-file "$RUNNER_TEMP/body.md"
-          else gh issue create --title "Daily test chain is red on main" --label test-chain-red --body-file "$RUNNER_TEMP/body.md"; fi
+          else gh issue create --title "Extension tests are red on main" --label test-chain-red --body-file "$RUNNER_TEMP/body.md"; fi
 
       - name: Close the red-chain issue
         if: success() && github.ref == 'refs/heads/main'
