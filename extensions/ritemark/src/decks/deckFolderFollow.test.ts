@@ -176,14 +176,14 @@ test('moving a deck leaves a mixed folder in place and reports once', async () =
   assert.deepEqual(notices, [[kept, 'information']]);
 });
 
-for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'marked page', 'unmarked page', 'nested page', 'symlink', 'unreadable deck', 'unreadable folder', 'too many entries', 'Markdown link', 'linked document'] as const) {
+for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'marked page', 'unmarked page', 'nested page', 'symlink', 'unreadable deck', 'unreadable folder', 'too many entries', 'too many entries without a link', 'unreadable folder without a link', 'Markdown link', 'linked document'] as const) {
   test(`delete checks folder ownership with ${scenario}`, async () => {
     const { fs, content, folders, changes, notices } = fixture();
     content.delete(original);
     content.delete(assets + '/y.png');
     content.set(assets + '/.DS_Store', 'clutter');
     let saved: string | undefined = '![](<Kickoff.rtms.files/x.png>)';
-    if (scenario === 'empty deck') saved = emptyDeckText();
+    if (scenario === 'empty deck' || scenario.endsWith('without a link')) saved = emptyDeckText();
     if (scenario === 'unreadable deck') saved = undefined;
     if (scenario === 'empty deck' || scenario === 'extra notes') content.set(assets + '/notes.md', 'notes');
     if (scenario === 'Markdown link') saved = '[Picture](<Kickoff.rtms.files/x.png>)';
@@ -215,13 +215,13 @@ for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'mar
       };
       saved += '\n![](<Kickoff.rtms.files/outside.png>)';
     }
-    if (scenario === 'unreadable folder') fs.listFolder = async function* () { throw new Error('EACCES'); };
-    if (scenario === 'too many entries') {
+    if (scenario.startsWith('unreadable folder')) fs.listFolder = async function* () { throw new Error('EACCES'); };
+    if (scenario.startsWith('too many entries')) {
       for (let index = 0; index < 499; index++) folders.add(assets + '/extra-' + index);
     }
     await trashDeckFolders([{ file: original, text: saved }], [original], fs);
     const owned = scenario === 'picture and clutter' || scenario === 'marked page' || scenario === 'Markdown link';
-    const silent = scenario === 'empty deck' || scenario === 'unreadable deck';
+    const silent = scenario === 'empty deck' || scenario === 'unreadable deck' || scenario.endsWith('without a link');
     assert.deepEqual(changes, owned ? ['trash work/Kickoff.rtms.files'] : []);
     assert.deepEqual(notices, owned ? [[trashed, 'information']] : silent ? [] : [[kept, 'information']]);
     assert.equal(folders.has(assets), !owned);

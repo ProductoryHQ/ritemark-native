@@ -64,7 +64,7 @@ async function deckFolderOwnership(
     while (pending.length) {
       const dir = pending.pop()!;
       for await (const entry of fs.listFolder(dir)) {
-        if (++count > FOLDER_ENTRY_LIMIT) return 'foreign';
+        if (++count > FOLDER_ENTRY_LIMIT) return linkedIntoFolder ? 'foreign' : 'unlinked';
         const file = dir + '/' + entry.name;
         if (entry.kind === 'folder') pending.push(file);
         else if (entry.kind === 'file') files.add(file);
@@ -93,7 +93,8 @@ async function deckFolderOwnership(
     if (!linkedIntoFolder) return 'unlinked';
     return !hasOtherEntries && [...files].every(file => owned.has(file) || OS_CLUTTER.has(path.posix.basename(file))) ? 'owned' : 'foreign';
   } catch {
-    return 'foreign';
+    // Without a claim on the folder the deck says nothing, as it does for a folder it never linked into.
+    return linkedIntoFolder ? 'foreign' : 'unlinked';
   }
 }
 
