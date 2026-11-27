@@ -43,6 +43,9 @@ const noNotes = /\b(?:no (?:speaker )?notes|(?:speaker )?notes\s*[:–—-]\s*(?
 const slideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*)?\[?slide\s+(\d+)\b/i;
 const linkedSlideStart = /^(?:(?:[-*+]|\d+[.)])\s+)?(\*\*)?\[[^\]\n]+\]\(([^\n]*?)\)\1\s*[:\p{Pd}−]\s*(?:\*\*)?slide\s+(\d+)\b/iu;
 const entryName = (line) => titleWords(line.replace(/^(?:[-*+] |\d+[.)] )?/, ''));
+// The text a Markdown row shows: link labels, without emphasis or code marks.
+const inlineText = (text) => text.replace(/!?\[([^\]\n]*)\]\([^\n]*?\)/g, '$1')
+  .replace(/\*+|`+|~~/g, '').replace(/(^|[^\p{L}\p{N}])_+|_+(?=[^\p{L}\p{N}]|$)/gu, '$1');
 
 export function evidenceRedactor(env = process.env) {
   const keys = Object.entries(env)
@@ -138,7 +141,9 @@ export function scoreRun({ answer, visibleAnswer = answer, stepLabels, links = [
     if (!match) continue;
     const number = Number(linked ? linked[3] : match[1]);
     if (slideRows.has(number)) duplicateSlide = true;
-    slideRows.set(number, linked ? line.slice(linked[0].length) : line);
+    // Score what the row shows, so `quiet **room**` still reads as `quiet room`.
+    const row = linked ? line.slice(linked[0].length) : line;
+    slideRows.set(number, slideLines === markdownLines ? inlineText(row) : row);
   }
   const slides = customQuestion ? [] : facts.deck.slides.map(({ number, words, noteWords }) => {
     const row = slideRows.get(number) ?? '';

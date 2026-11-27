@@ -123,6 +123,24 @@ test('scores all six OpenCode link-first slide rows from Markdown and counts the
   }
 });
 
+test('a link-first slide row does not make the deck’s other rows fail on their Markdown marks', () => {
+  // Codex's review of #1132: slide 2 shows "quiet room" but is written "quiet **room**".
+  const href = 'Pilot%20deck.pptx#p=1';
+  const markdown = answer
+    .replace('Slide 1 — quiet room.', `- [Pilot deck](${href}): Slide 1 — quiet room.`)
+    .replace('Slide 2 — side entrance. Speaker notes: folding ramp.',
+      'Slide 2 — side **entrance**. Speaker notes: folding _ramp_.')
+    .replace('Slide 3 — next Tuesday.', 'Slide 3 — next `Tuesday`.');
+  const links = [...sample.links, { href, targetFile: 'Pilot deck.pptx', hasPassage: true }];
+  const result = scoreRun({ ...sample, answer: markdown, links }, facts);
+  assert.deepEqual(result.slides.slice(0, 3), [
+    { number: 1, content: true, notes: true },
+    { number: 2, content: true, notes: true },
+    { number: 3, content: true, notes: true },
+  ]);
+  assert.equal(result.criteria[2], 'pass');
+});
+
 test('accepts a password-free copy and the project folder label from the Claude run', () => {
   const result = scoreRun({
     ...sample,
