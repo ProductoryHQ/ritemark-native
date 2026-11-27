@@ -19,6 +19,8 @@
   "activationEvents": [
     "*",
     "onStartupFinished",
+    "onCommand:ritemark.help.github",
+    "onCommand:ritemark.help.discussions",
     "onCustomEditor:ritemark.editor",
     "onCustomEditor:ritemark.excelViewer",
     "onView:ritemark.unifiedView",

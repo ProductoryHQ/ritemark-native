@@ -3,7 +3,7 @@
  * computer's global state, `ritemark.guidance.v1`. Nothing is ever written in a
  * project's folder, so "Nothing in this folder was moved or changed" stays true.
  *
- * The Memento keeps ready requests, saved days, and the old week question.
+ * The Memento keeps ready requests and saved days, including migration from the old week question.
  * Its separate AI and ready-card count keys still share one value that a
  * different window can overwrite. Home presentations and Star live in the
  * home-presentations folder in extension global storage.
@@ -18,7 +18,7 @@ import type { AgentId } from '../agent/types';
 import { testChannelRequested } from '../analytics/consent';
 import { isConversationId } from '../conversations/types';
 import type { AnswerFeedbackTarget, AnswerReaction, StoredAnswerReaction } from '../feedback/answerFeedbackProtocol';
-import { localDay, releaseOf, withSavedDay, SAVED_DAYS_FOR_FEEDBACK } from './guidanceState';
+import { localDay, withSavedDay, SAVED_DAYS_FOR_OPEN_SOURCE } from './guidanceState';
 import type { ReadyGone, ReadyRecord } from './readyRequest';
 
 export const GUIDANCE_KEY = 'ritemark.guidance.v1';
@@ -97,7 +97,7 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
   return {
     v: 1,
     projects,
-    savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_FEEDBACK),
+    savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_OPEN_SOURCE),
     ...(value.positiveReaction === true ? { positiveReaction: true } : {}),
     ...(answerReactions.length ? { answerReactions } : {}),
     ...(typeof value.firstAppRun === 'string' || value.firstAppRun === null ? { firstAppRun: value.firstAppRun } : {}),
@@ -210,7 +210,7 @@ export class GuidanceStore {
 
   constructor(
     private readonly memento: MementoLike,
-    readonly version: string,
+    version: string,
     private readonly appRelease = version,
     globalStoragePath?: string,
   ) {
@@ -227,17 +227,16 @@ export class GuidanceStore {
     return result;
   }
 
+  private write({ release: _legacy, ...state }: GuidanceStateV1): PromiseLike<void> {
+    // The decoder already migrated legacy saved days into the version-independent list.
+    return this.memento.update(GUIDANCE_KEY, state);
+  }
+
   private async change(update: (state: GuidanceStateV1) => GuidanceStateV1): Promise<void> {
     await this.serialize(async (state) => {
       const next = update(state);
-      if (next !== state) await this.memento.update(GUIDANCE_KEY, next);
+      if (next !== state) await this.write(next);
     });
-  }
-
-  /** The existing week question's per-release view. */
-  release(state = this.read()): NonNullable<GuidanceStateV1['release']> {
-    const id = releaseOf(this.version);
-    return state.release?.id === id ? state.release : { id, savedDays: [] };
   }
 
   project(folderUri: string): ReadyRecord {
@@ -247,7 +246,7 @@ export class GuidanceStore {
   async updateProject(folderUri: string, change: (record: ReadyRecord) => ReadyRecord): Promise<ReadyRecord> {
     return this.serialize(async (state) => {
       const next = change(state.projects[folderUri] ?? {});
-      await this.memento.update(GUIDANCE_KEY, { ...state, projects: { ...state.projects, [folderUri]: next } });
+      await this.write({ ...state, projects: { ...state.projects, [folderUri]: next } });
       return next;
     });
   }
@@ -263,12 +262,8 @@ export class GuidanceStore {
   noteSavedDay(day: string): Promise<void> {
     if (!isDay(day)) return Promise.resolve();
     return this.change((state) => {
-      const savedDays = state.savedDays.length >= SAVED_DAYS_FOR_FEEDBACK || state.savedDays.includes(day)
+      const savedDays = state.savedDays.length >= SAVED_DAYS_FOR_OPEN_SOURCE || state.savedDays.includes(day)
         ? state.savedDays : withSavedDay(state.savedDays, day);
-      const release = this.release(state);
-      if (!release.savedDays.includes(day) && release.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) {
-        return { ...state, savedDays, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } };
-      }
       return savedDays === state.savedDays ? state : { ...state, savedDays };
     });
   }
@@ -292,7 +287,7 @@ export class GuidanceStore {
       const answerReactions = reaction === 'none'
         ? marks.filter(mark => !matches(mark))
         : [...marks, { conversationId, turnId, reaction, sent: false }].slice(-MAX_ANSWER_REACTIONS);
-      await this.memento.update(GUIDANCE_KEY, { ...state, answerReactions });
+      await this.write({ ...state, answerReactions });
       return true;
     });
   }
@@ -307,10 +302,6 @@ export class GuidanceStore {
     });
   }
 
-  answerFeedback(answer: 'sent' | 'not-now'): Promise<void> {
-    return this.change((state) => ({ ...state, release: { ...this.release(state), feedback: answer } }));
-  }
-
   initializeAppRun(appRun: string | undefined, previouslyActivated: boolean): Promise<void> {
     return this.change((state) => {
       if (state.firstAppRun === undefined) return { ...state, firstAppRun: previouslyActivated ? null : appRun ?? '' };
@@ -323,7 +314,7 @@ export class GuidanceStore {
     const state = this.read();
     if (!input.appRun || state.firstAppRun === undefined || state.firstAppRun === input.appRun) return false;
     if (input.whatMoved || (input.readyRequest && state.readyShownOn === input.day)) return false;
-    if (!state.positiveReaction && state.savedDays.length < SAVED_DAYS_FOR_FEEDBACK) return false;
+    if (!state.positiveReaction && state.savedDays.length < SAVED_DAYS_FOR_OPEN_SOURCE) return false;
 
     const folder = this.homeFolder;
     if (!folder) return true;
@@ -368,7 +359,7 @@ export class GuidanceStore {
     }
   }
 
-  /** Call only for Not now or an accepted Star handoff. */
+  /** End this release’s presentation or record an accepted Star handoff permanently. */
   async endHomePresentation(action: 'dismiss' | 'star'): Promise<void> {
     const folder = this.homeFolder;
     if (!folder) return;

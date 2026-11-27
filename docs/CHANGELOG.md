@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Home can invite you to star Ritemark or join Discussions. Both links are always available in Help.
 - Give a thumbs-up or thumbs-down on supported AI answers, add written feedback, or report an AI failure from its card.
 - In Send feedback, preview a picture of your Ritemark window and copy it to the clipboard when you open e-mail. Paste it into the message if you want to include it.
 - AI chat steps show which documents were read and explain when a document could not be opened (#996).

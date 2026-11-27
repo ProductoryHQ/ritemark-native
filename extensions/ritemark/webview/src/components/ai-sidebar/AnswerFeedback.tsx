@@ -104,7 +104,7 @@ export function AnswerFeedbackForm({ target, close, trigger }: {
         onChange={(event) => answerFeedbackStore.getState().edit(target, event.currentTarget.value)}
         className="block min-h-[52px] resize-none rounded-md border-hairline bg-surface px-2 py-1 text-[13px] leading-5 text-ink-body placeholder:text-ink-muted [field-sizing:content]"
       />
-      {failed && <p role="alert" className="mt-1 text-[12px] text-[var(--r-error)]">{FEEDBACK_COPY.card.failed}</p>}
+      {failed && <p role="alert" className="mt-1 text-[12px] text-[var(--r-error)]">{FEEDBACK_COPY.answer.failed}</p>}
       <div className="mt-2 flex items-center justify-between gap-2">
         <FeedbackLink disabled={busy} onClick={() => answerFeedbackStore.getState().openWithAnswer(target)}>{copy.addAnswer}</FeedbackLink>
         {omitted ? <Tooltip label={copy.writeFirst}>{send}</Tooltip> : send}

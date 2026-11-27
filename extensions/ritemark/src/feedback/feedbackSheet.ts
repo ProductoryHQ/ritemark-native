@@ -27,6 +27,18 @@ import { FEEDBACK_COPY } from './feedbackCopy';
 import { isSafeFeedbackQuotePart } from './feedbackQuoteSafety';
 import { answerForSheet, mailKindOf, routeOf } from './feedbackRoute';
 
+export const HELP_GITHUB_COMMAND = 'ritemark.help.github';
+export const HELP_DISCUSSIONS_COMMAND = 'ritemark.help.discussions';
+const GITHUB_URL = 'https://github.com/ProductoryHQ/ritemark-native';
+
+async function openHelpLink(url: string): Promise<boolean> {
+  try {
+    return await vscode.env.openExternal(vscode.Uri.parse(url, true));
+  } catch {
+    return false;
+  }
+}
+
 export const FEEDBACK_OPEN_COMMAND = 'ritemark.feedback.open';
 export const FEEDBACK_SUBMIT_COMMAND = '_ritemark.feedback.submit';
 /** Registered by patch 018 in the workbench. */
@@ -170,6 +182,10 @@ interface OpenSheet {
 }
 
 export function registerFeedback(context: vscode.ExtensionContext, deps: FeedbackDependencies): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(HELP_GITHUB_COMMAND, () => openHelpLink(GITHUB_URL)),
+    vscode.commands.registerCommand(HELP_DISCUSSIONS_COMMAND, () => openHelpLink(`${GITHUB_URL}/discussions`)),
+  );
   let open: OpenSheet | null = null;
 
   let opening = false;
@@ -268,11 +284,6 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
     vscode.commands.registerCommand(FEEDBACK_OPEN_COMMAND, openSheet),
     vscode.commands.registerCommand(FEEDBACK_SUBMIT_COMMAND, submit),
   );
-}
-
-/** The first-week card's send (R14, D11): the straight route, from Home, marked with the question it answers. */
-export async function sendWeekLine(text: string): Promise<boolean> {
-  return sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), asked: 'made_this_week' } }]);
 }
 
 /**

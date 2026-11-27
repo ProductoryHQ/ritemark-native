@@ -235,6 +235,62 @@ async function main(): Promise<void> {
     home.dispose();
   }
 
+  // Opening a visible slot claims the card once before two redraws can hand it to Home.
+  for (const claimed of [false, true]) {
+    const { home } = host();
+    type Action = import('../projects/protocol').OpenSourceAction;
+    type State = { guidance: { card: 'open-source' } | null; missing: object | null };
+    const internal = home as unknown as {
+      deps: { guidance: { presentOpenSource(): Promise<boolean>; actOnOpenSource(action: Action): Promise<boolean> } };
+      ready: boolean;
+      panel: { visible: boolean; webview: { postMessage(value: { state: State }): Promise<boolean> }; dispose(): void };
+      state(): Promise<State>;
+      push(): Promise<void>;
+      handle(request: { type: 'home/open-source-action'; action: Action }): Promise<void>;
+    };
+    let claims = 0;
+    let opened = 0;
+    let ended = false;
+    let browserAccepted = false;
+    let missing: object | null = null;
+    const displayed: (string | undefined)[] = [];
+    internal.deps.guidance = {
+      presentOpenSource: async () => { claims++; return claimed; },
+      actOnOpenSource: async (action) => {
+        assert.equal(action, 'star');
+        opened++;
+        ended = browserAccepted;
+        return browserAccepted;
+      },
+    };
+    internal.ready = true;
+    internal.panel.visible = false;
+    internal.panel.webview = { postMessage: async ({ state }) => { displayed.push(state.guidance?.card); return true; } };
+    internal.state = async () => ({ guidance: ended ? null : { card: 'open-source' }, missing });
+    await internal.push();
+    assert.equal(claims, 0, 'a hidden Home does not claim a presentation');
+    assert.equal(displayed.at(-1), undefined);
+    internal.panel.visible = true;
+    missing = {};
+    await internal.push();
+    assert.equal(claims, 0, 'a missing project does not claim a presentation');
+    missing = null;
+    await Promise.all([internal.push(), internal.push()]);
+    assert.equal(claims, 1);
+    assert.deepEqual(displayed.slice(-2), Array(2).fill(claimed ? 'open-source' : undefined));
+    const star = { type: 'home/open-source-action', action: 'star' } as const;
+    await internal.handle(star);
+    assert.equal(opened, claimed ? 1 : 0, 'only the Home that claimed the card can act on it');
+    if (claimed) {
+      await internal.push();
+      assert.equal(displayed.at(-1), 'open-source', 'a refused open leaves the card');
+      browserAccepted = true;
+      await internal.handle(star);
+      assert.equal(displayed.at(-1), undefined, 'accepted Star refreshes the slot');
+    }
+    home.dispose();
+  }
+
   console.log('HomePanel tests passed');
 }
 

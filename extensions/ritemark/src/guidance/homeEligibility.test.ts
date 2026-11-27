@@ -21,12 +21,12 @@ const today = { day: '2026-11-25', appRun: 'second' };
 
 test('S11: migrate legacy days on upgrade, count only file saves once per local day, and cap at three', async () => {
   const state = profile({
-    v: 1, projects: {}, release: { id: '2.3', savedDays: ['2026-11-20', '2026-11-19', '2026-11-20'] },
+    v: 1, projects: {}, release: { id: '2.3', savedDays: ['2026-11-20', '2026-11-19', '2026-11-20'], feedback: 'not-now' },
   });
   const first = new GuidanceStore(state, '2.4.0');
   const second = new GuidanceStore(state, '2.4.0');
-  assert.deepEqual(first.release(), { id: '2.4', savedDays: [] });
-  await first.answerFeedback('not-now');
+  const legacy = first.read().release;
+  assert.equal(legacy?.feedback, 'not-now');
   assert.deepEqual(first.read().savedDays, ['2026-11-19', '2026-11-20']);
   const date = new Date(2026, 10, 25);
   await first.noteDocumentSaved('untitled', date, false);
@@ -34,12 +34,10 @@ test('S11: migrate legacy days on upgrade, count only file saves once per local 
   assert.equal(first.read().savedDays.length, 2);
   await first.noteDocumentSaved('file', date, false);
   assert.equal(first.read().savedDays.length, 2);
-  assert.deepEqual(first.release().savedDays, []);
   await Promise.all([first.noteDocumentSaved('file', date, true), second.noteDocumentSaved('file', date, true)]);
-  assert.deepEqual(first.release().savedDays, ['2026-11-25']);
+  assert.equal(first.read().release, undefined, 'the first write migrates and retires the legacy record');
   await first.noteSavedDay('2026-11-26');
   const upgraded = new GuidanceStore(state, '2.5.0');
-  assert.deepEqual(upgraded.release(), { id: '2.5', savedDays: [] });
   assert.deepEqual(upgraded.read().savedDays, ['2026-11-19', '2026-11-20', '2026-11-25']);
 });
 

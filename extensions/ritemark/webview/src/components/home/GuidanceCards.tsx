@@ -1,6 +1,6 @@
 /**
  * Home's guidance cards (Sprint 140): the ready request (experience 35, frames
- * 1, 3 and 4) and the first-week question (experience 34, frame 1). One shows
+ * 1, 3 and 4) and the open-source card (experience 53, frame 6). One shows
  * at a time, under Waiting for you; the host decides which and gives the words
  * (`src/guidance/`), so the page only draws them and says what the person did.
  *
@@ -18,7 +18,6 @@ import type { WelcomeProviderId } from '../../../../src/welcome/protocol'
 import { Button } from '../ui/button'
 import { DropdownMenuItem } from '../ui/dropdown-menu'
 import { Icon } from '../ui/Icon'
-import { Input } from '../ui/input'
 import { SplitButton } from '../ui/split-button'
 import { Tooltip } from '../ui/tooltip'
 import { KeySheet } from '../welcome/WelcomeParts'
@@ -26,7 +25,6 @@ import { COPY, OPENCODE_SET_UP_TIP, browserOpened, reopenTip, stopWaitingTip } f
 import { send } from './homeClient'
 
 type ReadyRequest = Extract<HomeGuidance, { card: 'ready-request' }>
-type FeedbackCardState = Extract<HomeGuidance, { card: 'feedback' }>
 /** Sprint 156 (PR B): where OpenCode's key sheet was opened, the card's main part or Ask with; its save says so. */
 type KeySheetFrom = Extract<HomeRequest, { type: 'home/save-keys' }>['from']
 
@@ -198,70 +196,39 @@ export function ReadyRequestCard({ card, keysResult, onKeysClosed }: { card: Rea
   )
 }
 
-export function FeedbackCard({ card, text, onText }: {
-  card: FeedbackCardState
-  text: string
-  onText: (text: string) => void
-}) {
-  const empty = !text.trim()
+function OpenSourceCard() {
   return (
-    <section className="rh-guide rh-ask" aria-labelledby="rh-ask-head">
-      <h3 className="rh-guide-hd" id="rh-ask-head"><Icon name="chat-centered-text" size={16} tone="inherit" />{card.heading}</h3>
-      <p className="rh-guide-sub" id="rh-ask-lede">{card.lede}</p>
-      <Input
-        className="rh-ask-in"
-        value={text}
-        maxLength={1000}
-        placeholder={card.placeholder}
-        aria-label={card.heading}
-        aria-describedby="rh-ask-lede"
-        disabled={card.sending}
-        onChange={(event) => onText(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !empty && !card.sending) send({ type: 'home/feedback-send', text })
-        }}
-      />
-      {card.problem && <p className="rh-guide-problem rh-ask-problem" role="alert">{card.problem}</p>}
-      <div className="rh-ask-acts">
-        <Tooltip label={empty ? 'Write a line first' : 'Sends this line to the people who make Ritemark'}>
-          <Button size="compact" disabled={empty || card.sending} onClick={() => send({ type: 'home/feedback-send', text })}>
-            {card.sending ? 'Sending…' : card.problem ? 'Try again' : 'Send'}
-          </Button>
-        </Tooltip>
-        {card.problem && (
-          <Tooltip label="Opens your e-mail app with this line, to send it yourself">
-            <Button variant="ghost" size="compact" className="rh-quiet" disabled={empty} onClick={() => send({ type: 'home/feedback-mail', text })}>Open in e-mail</Button>
-          </Tooltip>
-        )}
-        <Tooltip label="Close this question for this release">
-          <Button variant="ghost" size="compact" className="rh-quiet" disabled={card.sending} onClick={() => send({ type: 'home/feedback-not-now' })}>Not now</Button>
-        </Tooltip>
+    <section className="rh-guide" aria-labelledby="rh-open-source-head">
+      <h3 className="rh-guide-hd" id="rh-open-source-head"><Icon name="github-logo" size={16} tone="inherit" />Ritemark is open source</h3>
+      <Tooltip label="Not now" className="rh-guide-x">
+        <Button variant="ghost" size="icon-sm" aria-label="Not now" onClick={() => send({ type: 'home/open-source-action', action: 'dismiss' })}>
+          <Icon name="x" size={12} tone="inherit" />
+        </Button>
+      </Tooltip>
+      <p className="rh-guide-body">Ritemark is free and open source. A star on GitHub helps other people find it, and in Discussions you can ask us and others anything.</p>
+      <div className="rh-guide-go">
+        <Button size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'star' })}>
+          <Icon name="star" size={14} tone="inherit" />Star on GitHub
+        </Button>
+        <Button variant="outline" size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'discussions' })}>
+          <Icon name="chats-circle" size={14} tone="inherit" />Discussions
+        </Button>
+        <span className="rh-guide-note">Both open in your browser.</span>
       </div>
     </section>
   )
 }
 
 /** The one guidance card, or nothing (R2). */
-export function GuidanceCard({ guidance: selected, whatMoved }: { guidance: HomeGuidance | null; whatMoved: ReactNode }) {
+export function GuidanceCard({ guidance, whatMoved }: { guidance: HomeGuidance | null; whatMoved: ReactNode }) {
   const [keysResult, setKeysResult] = useState<{ ok: boolean; message: string | null } | null>(null)
-  const [draft, setDraft] = useState<{ text: string; card: FeedbackCardState } | null>(null)
-  const hasDraft = useRef(false)
   useEffect(() => {
     const onMessage = (event: MessageEvent<HomeMessage>) => {
       if (event.data?.type === 'home/keys-saved') setKeysResult({ ok: Boolean(event.data.ok), message: event.data.message ?? null })
-      if (event.data?.type === 'home/feedback-answered') {
-        hasDraft.current = false
-        setDraft(null)
-      }
     }
     window.addEventListener('message', onMessage)
-    return () => {
-      window.removeEventListener('message', onMessage)
-      if (hasDraft.current) send({ type: 'home/feedback-draft-changed', hasDraft: false })
-    }
+    return () => window.removeEventListener('message', onMessage)
   }, [])
-  // A slot decision may already be in transit when the first keystroke reaches the host.
-  const guidance = selected?.card !== 'feedback' && draft ? draft.card : selected
   if (!guidance) return null
   if (guidance.card === 'what-moved') return <>{whatMoved}</>
   if (guidance.card === 'ready-request') return <ReadyRequestCard card={guidance} keysResult={keysResult} onKeysClosed={() => setKeysResult(null)} />
@@ -280,16 +247,5 @@ export function GuidanceCard({ guidance: selected, whatMoved }: { guidance: Home
       </section>
     )
   }
-  return <FeedbackCard
-    card={guidance}
-    text={draft?.text ?? ''}
-    onText={(text) => {
-      const present = text.length > 0
-      setDraft(present ? { text, card: guidance } : null)
-      if (present !== hasDraft.current) {
-        hasDraft.current = present
-        send({ type: 'home/feedback-draft-changed', hasDraft: present })
-      }
-    }}
-  />
+  return <OpenSourceCard />
 }

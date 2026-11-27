@@ -643,6 +643,7 @@ export function activate(context: vscode.ExtensionContext) {
   const guidance = hasProjectGuidance ? new GuidanceHost({
     context,
     store: guidanceStore,
+    appRun: process.env.VSCODE_PID,
     folder: guidanceFolder,
     runtimeAvailability: (runtimeId) => unifiedViewProvider.runtimeAvailability(runtimeId),
     startChat: (request) => unifiedViewProvider.startChat(request),
