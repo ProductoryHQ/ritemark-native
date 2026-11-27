@@ -211,7 +211,7 @@ export function sourceInventory(text: string): Pick<Inventory, 'links' | 'images
 /** The editor's document without the as-written attributes: what the person sees. */
 export function look(doc: PMNode): { json: unknown; html: string } {
   const strip = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(strip)
+    if (Array.isArray(value)) return value.filter(item => item?.type !== 'pictureDefinition').map(strip)
     if (value && typeof value === 'object') {
       return Object.fromEntries(Object.entries(value as Record<string, unknown>)
         // A picture with no look (experience 49's `picture`, null) looks as a picture did before it had one.
@@ -222,7 +222,9 @@ export function look(doc: PMNode): { json: unknown; html: string } {
     }
     return value
   }
-  return { json: strip(doc.toJSON()), html: editorHTML(doc).replace(/ data-md-[a-z-]+="[^"]*"/g, '') }
+  return { json: strip(doc.toJSON()), html: editorHTML(doc)
+    .replace(/<hr [^>]*data-md-image-definition="[^"]*"[^>]*>/g, '')
+    .replace(/ data-md-[a-z-]+="[^"]*"/g, '') }
 }
 
 /** Lines that end in a space or a tab, outside fenced code. */

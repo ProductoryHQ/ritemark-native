@@ -35,7 +35,8 @@ import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap 
 import { canonicalMarkdownProjection } from './editorSync/state';
 import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
-import { isRelativeImagePath, pictureFileInside } from './utils/imagePaths';
+import { isRelativeImagePath, pictureFileInside, unescapeMarkdownImagePath } from './utils/imagePaths';
+import { markdownImageDestinations } from './utils/markdownImages';
 import { ChatgptPictureHost } from './pictures/chatgptPictureHost';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
 import { resolveProjectScope } from './conversations/projectScope';
@@ -472,27 +473,14 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     const imageMappings: Record<string, string> = {};
     const docDir = path.dirname(documentUri.fsPath);
 
-    // The editor writes local destinations with spaces as ![alt](<path>).
-    const imageRegex = /!\[[^\]]*\]\((?:<([^>\r\n]+)>|([^)]+))\)/g;
-    let match;
-
-    while ((match = imageRegex.exec(markdown)) !== null) {
-      const imagePath = match[1] ?? match[2];
-
-      // Only local paths beside the document: ./a.png, ../a.png and the
-      // common bare form img/a.png. The webview restores exactly these on
-      // save (utils/imagePaths), so the two sides must use the same test.
-      if (!isRelativeImagePath(imagePath)) {
-        continue;
-      }
-
-      // Skip if already mapped
-      if (imageMappings[imagePath]) {
-        continue;
-      }
-
-      // Resolve relative path to absolute
-      const absolutePath = path.resolve(docDir, imagePath);
+    for (const imagePath of markdownImageDestinations(markdown)) {
+      // Use the written destination as the mapping key, so the webview
+      // can match it and put the same path back on save.
+      if (!isRelativeImagePath(imagePath)) continue;
+      let filePath = unescapeMarkdownImagePath(imagePath);
+      try { filePath = decodeURI(filePath); } catch { /* Use the undecoded path. */ }
+      if (!isRelativeImagePath(filePath) || filePath.includes('\0')) continue;
+      const absolutePath = path.resolve(docDir, filePath);
 
       // Check if file exists
       if (fs.existsSync(absolutePath)) {

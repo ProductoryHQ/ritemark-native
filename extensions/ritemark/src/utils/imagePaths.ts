@@ -9,6 +9,11 @@
  * Pure module — no `vscode` import — so the webview bundle can use it.
  */
 
+/** Remove CommonMark backslash escapes before resolving an image destination. */
+export function unescapeMarkdownImagePath(value: string): string {
+  return value.replace(/\\([\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e])/g, '$1');
+}
+
 /** `./a.png`, `../a.png` and the common bare form `img/a.png`. */
 export function isRelativeImagePath(value: string): boolean {
   const path = value.trim();

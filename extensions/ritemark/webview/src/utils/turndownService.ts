@@ -1,18 +1,19 @@
 import TurndownService from 'turndown'
-import { Lexer, marked, type Marked, type Tokens } from 'marked'
+import { Lexer, marked, type Links, type Marked, type Tokens } from 'marked'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
-import { isRelativeImagePath, isWebviewResourceUri } from '../../../src/utils/imagePaths'
+import { isRelativeImagePath, isWebviewResourceUri, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { pictureTarget } from '../../../src/decks/blocks/legacyToBlocks'
 import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
-import { addAsWrittenTurndownRules, blockImage, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
+import { pictureDefinition, pictureDefinitionAttribute } from '../extensions/pictures/pictureReferences'
+import { addAsWrittenTurndownRules, blockImage, blockLeading, blockTrailing, escapeTextRun, neutraliseBrackets, wrapMarked } from './markdownAsWritten'
 
 /** Marked encodes the destination for display, and host mappings may use its unencoded path. */
 function matchesImageSource(href: string, src: string): boolean {
   if (href === src) return true
   try {
     const encode = (url: string) => encodeURI(url).replace(/%25/g, '%')
-    return encode(href) === encode(src)
+    return encode(href) === encode(unescapeMarkdownImagePath(src))
   } catch {
     return false
   }
@@ -93,20 +94,37 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
   // (`neutraliseBrackets`). Only input with a bracket takes the extra pass; it
   // is parsed in an inert document, as Turndown parses its own string input.
   const turndown = service.turndown.bind(service)
+  let definitions: Links | undefined
+  const serialize = (root: TurndownService.Node): string => {
+    // Nested calls (e.g. one list item) still need the document's definitions.
+    if (definitions) return turndown(root)
+    const links: Links = Object.create(null)
+    const elements = (root as ParentNode).querySelectorAll?.(`hr[${pictureDefinitionAttribute}]`) ?? []
+    for (const element of Array.from(elements)) {
+      const definition = pictureDefinition(element.getAttribute(pictureDefinitionAttribute) ?? '')
+      if (definition) links[definition.tag] ??= { href: definition.href, title: definition.title }
+    }
+    definitions = links
+    try {
+      return turndown(root)
+    } finally {
+      definitions = undefined
+    }
+  }
   service.turndown = (input: string | TurndownService.Node): string => {
     if (typeof document === 'undefined') return turndown(input)
     if (typeof input === 'string') {
-      if (!/[[\]]/.test(input)) return turndown(input)
+      if (!definitions && !/[[\]]/.test(input)) return turndown(input)
       const inert = document.implementation?.createHTMLDocument?.('') ?? document
       const root = inert.createElement('div')
       root.innerHTML = input
       neutraliseBrackets(root)
-      return turndown(root)
+      return serialize(root)
     }
-    if (!/[[\]]/.test(input.textContent ?? '')) return turndown(input)
+    if (!/[[\]]/.test(input.textContent ?? '')) return serialize(input)
     const root = input.cloneNode(true)
     neutraliseBrackets(root)
-    return turndown(root as TurndownService.Node)
+    return serialize(root as TurndownService.Node)
   }
 
   // Strikethrough: TipTap's Strike mark renders `<s>`, and `marked` loads
@@ -151,17 +169,21 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
         src = isRelativeImagePath(title) && !isWebviewResourceUri(title.trim()) ? title : localPathOfDisplayUri(src.trim())
       }
       const label = `![${markdownAlt(alt)}]`
-      let markdown = label + `(${pictureTarget(src)})`
+      const caption = el.getAttribute('data-md-image-title') ?? (writtenTarget !== null && !useTitle ? title : '')
+      // Entities round-trip through marked's rendering of Markdown titles and avoid delimiter escapes.
+      const escapedCaption = caption.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/\\/g, '&#92;')
+      let markdown = label + `(${pictureTarget(src)}${caption ? ` "${escapedCaption}"` : ''})`
       if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
         const writtenLabel = alt === el.getAttribute('data-md-image-alt')
           ? el.getAttribute('data-md-image-label')
           : null
         const candidate = (writtenLabel ?? label) + writtenTarget
-        const blocks = new Lexer(instance.defaults).lex(candidate)
+        const lexer = new Lexer(instance.defaults)
+        if (definitions) lexer.tokens.links = definitions
+        const blocks = lexer.lex(candidate)
         const paragraph = blocks[0] as Tokens.Paragraph | undefined
         const tokens = paragraph?.type === 'paragraph' ? paragraph.tokens : []
         const token = tokens[0] as Tokens.Image | undefined
-        const caption = useTitle ? el.getAttribute('data-md-image-title') ?? '' : title
         if (blocks.length === 1 && tokens.length === 1 && token?.type === 'image' && token.raw === candidate &&
             !isWebviewResourceUri(token.href.trim()) && matchesImageSource(token.href, src) &&
             decodeImageText(el, token.text) === alt && decodeImageText(el, token.title ?? '') === caption) {
@@ -177,6 +199,13 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
   // The as-written rules, which also escape a table cell's pipes (the GFM
   // plugin doesn't, and an unescaped `|` breaks a table holding code).
   addAsWrittenTurndownRules(service)
+  service.addRule('pictureDefinition', {
+    filter: node => node.nodeName === 'HR' && node.hasAttribute(pictureDefinitionAttribute),
+    replacement(_content, node) {
+      const definition = pictureDefinition(node.getAttribute(pictureDefinitionAttribute) ?? '')
+      return definition ? blockLeading(node) + definition.raw + blockTrailing(node) : ''
+    },
+  })
   // Sprint 138 (#481, R2): equations written back as they were, `\$` kept,
   // and a typed `$` escaped only when it would pair up as math on reopening.
   addMathTurndownRules(service)

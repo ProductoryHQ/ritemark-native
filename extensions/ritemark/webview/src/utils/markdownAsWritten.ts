@@ -380,7 +380,7 @@ export const AS_WRITTEN_ATTRIBUTES = {
 } as const
 
 /** The blocks that can follow the block before them with no blank line, as written. */
-export const TIGHT_BLOCKS = ['paragraph', 'heading', 'codeBlock', 'blockquote', 'table', 'horizontalRule', 'image', 'bulletList', 'orderedList', 'taskList']
+export const TIGHT_BLOCKS = ['paragraph', 'heading', 'codeBlock', 'blockquote', 'table', 'horizontalRule', 'image', 'bulletList', 'orderedList', 'taskList', 'pictureDefinition']
 
 // ---------------------------------------------------------------------------
 // 3. The save: escapes
@@ -547,7 +547,7 @@ function hasListItemAncestor(node: Node): boolean {
   return false
 }
 
-type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv'
+type BlockKind = 'paragraph' | 'heading' | 'code' | 'quote' | 'table' | 'rule' | 'list' | 'other' | 'fdiv' | 'definition'
 
 function blockKind(node: Element): BlockKind {
   // Sprint 161: a block slide's `:::` block, which only the slide editor's own pipeline makes (never a Text document's).
@@ -564,7 +564,7 @@ function blockKind(node: Element): BlockKind {
     case 'PRE': return 'code'
     case 'BLOCKQUOTE': return 'quote'
     case 'TABLE': return 'table'
-    case 'HR': return 'rule'
+    case 'HR': return node.hasAttribute('data-md-image-definition') ? 'definition' : 'rule'
     case 'UL': case 'OL': return 'list'
     default: return 'other'
   }
@@ -590,7 +590,7 @@ function writtenTight(previous: Element | null, next: Element): boolean {
   if (before === 'other' || after === 'other') return false
   // A fence line (`:::`) never merges with the block beside it, so written tight it stays tight.
   if (before === 'fdiv' || after === 'fdiv') return true
-  if (before === 'heading' || before === 'code' || before === 'rule') return true
+  if (before === 'heading' || before === 'code' || before === 'rule' || before === 'definition') return true
   if (after === 'heading' || after === 'code') return true
   if (after === 'rule') return before !== 'paragraph' || !(writtenRule(next) ?? '-').trimStart().startsWith('-')
   if (before === 'paragraph') {

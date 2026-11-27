@@ -20,7 +20,7 @@
  */
 import { Marked, type Token } from 'marked'
 import type TurndownService from 'turndown'
-import { Extension, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
+import { Extension, Node, type AnyExtension, type Node as TipTapNode } from '@tiptap/core'
 import { DOMSerializer, type Schema } from '@tiptap/pm/model'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorProps } from '@tiptap/pm/view'
@@ -44,8 +44,10 @@ import { addDeckTurndownRules } from '../components/decks/handout/deckSchema'
 import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
 import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
+import { unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
+import { annotatePictureReferences, pictureDefinitionAttribute, pictureReferencesExtension } from '../extensions/pictures/pictureReferences'
 import { TabPane, TabsBlock, addTabsTurndownRules, tabsMarkedExtension } from '../extensions/tabs/tabsMarkdown'
 import { buttonBlockExtensions } from '../extensions/buttonBlock/ButtonBlock'
 import { addButtonTurndownRules, buttonMarkedExtension } from '../extensions/buttonBlock/buttonMarkdown'
@@ -78,7 +80,7 @@ editorMarked.use(asWrittenMarkedExtension)
 // text whose backslashes and underscores a save would rewrite.
 editorMarked.use(mathMarkedExtension as Parameters<typeof editorMarked.use>[0])
 // Experience 49: a picture's size, crop and caption, kept in the block after its image line.
-editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0])
+editorMarked.use(pictureMarkedExtension as Parameters<typeof editorMarked.use>[0], pictureReferencesExtension)
 // Sprint 163: the Tabs block (`::: {.panel-tabset}`), one block in a slide, a handout and a Text document. Only that
 // `:::` block: any other `:::` line in a Text document stays text.
 editorMarked.use(tabsMarkedExtension as Parameters<typeof editorMarked.use>[0])
@@ -215,7 +217,7 @@ function mapImages(container: HTMLElement, imageMappings?: Record<string, string
   const mappings = new Map(entries.map(([path, uri]) => [path, { path, uri }]))
   // Match marked's URL encoding, including its preservation of existing percent escapes.
   for (const [path, uri] of entries) {
-    const encoded = encodeURI(path).replace(/%25/g, '%')
+    const encoded = encodeURI(unescapeMarkdownImagePath(path)).replace(/%25/g, '%')
     if (!mappings.has(encoded)) mappings.set(encoded, { path, uri })
   }
 
@@ -251,6 +253,7 @@ function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tok
   const source = protectFenceTabs(preprocessed)
   const tokens = instance.lexer(source)
   annotateAsWritten(tokens, source)
+  if (instance === editorMarked) annotatePictureReferences(instance, tokens)
   prepareTokens?.(tokens)
   if (options.walkTokens) instance.walkTokens(tokens, options.walkTokens)
   const html = instance.parser(tokens)
@@ -336,6 +339,29 @@ export const MarkdownAsWritten = Extension.create({
         },
       },
     ]
+  },
+})
+
+/** Keep definitions in document order without adding a visible block. */
+export const PictureDefinitionNode = Node.create({
+  name: 'pictureDefinition',
+  group: 'block',
+  atom: true,
+  selectable: false,
+  addAttributes() {
+    return {
+      definition: {
+        default: null,
+        parseHTML: element => element.getAttribute(pictureDefinitionAttribute),
+        renderHTML: attrs => ({ [pictureDefinitionAttribute]: attrs.definition }),
+      },
+    }
+  },
+  parseHTML() {
+    return [{ tag: `hr[${pictureDefinitionAttribute}]`, priority: 100 }]
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['hr', { ...HTMLAttributes, hidden: '' }]
   },
 })
 
@@ -492,6 +518,7 @@ export function createEditorSchemaExtensions(slots: EditorExtensionSlots = {}): 
     // Sprint 163 PR 3: the Button block, the same in a Text document and on a slide.
     ...buttonBlockExtensions,
     slots.image ?? Image.configure(editorImageOptions),
+    PictureDefinitionNode,
     ...(slots.afterImage ?? []),
     // Sprint 94 (#81): comment callouts, gated on the kill-switch flag.
     // Registered at the highest level — when off, the extensions don't exist,

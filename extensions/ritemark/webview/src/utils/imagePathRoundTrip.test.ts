@@ -163,3 +163,57 @@ test('swapping a side picture into the slide words drops the previous picture sp
   assert.equal(swap.doc.firstChild?.attrs.mdImageTarget, null)
   assert.equal(saveSlide(swap.doc), '![](new.png)')
 })
+
+for (const [picture, path, definition] of [
+  ['![](./x.png "t")', './x.png', ''],
+  ['![](<a b.png> "t")', 'a b.png', ''],
+  ['![](images/my%20pic.png)', 'images/my%20pic.png', ''],
+  ['![](a(1).png)', 'a(1).png', ''],
+  ['![a][ref]', 'x.png', '\n[ref]: x.png\n'],
+] as const) {
+  test(`saving untouched ${picture} with its display mapping`, () => {
+    const source = `${picture}\n${definition}`
+    const opened = openDocument(source, { [path]: display })
+    assert.equal(opened.doc.firstChild?.attrs.src, display)
+    assert.equal(saveDocument(opened), source)
+  })
+}
+
+test('editing a picture destination keeps its author title', () => {
+  const opened = openDocument('![](./x.png "a &quot;quote&quot; and \\\\ slash")\n')
+  const state = EditorState.create({ doc: opened.doc })
+  const tr = state.tr.setNodeMarkup(0, undefined, { ...opened.doc.firstChild!.attrs, src: './new.png' })
+  const saved = saveDocument(opened, tr.doc)
+  assert.equal(openDocument(saved).doc.firstChild?.attrs.title, opened.doc.firstChild?.attrs.title)
+  assert.equal(openDocument(saved).doc.firstChild?.attrs.src, './new.png')
+})
+
+test('replacing a mapped picture keeps its author title', () => {
+  const opened = openDocument('![](./x.png "t")\n', { './x.png': display })
+  const tr = replacePicture(EditorState.create({ doc: opened.doc }), 0, { src: display, title: './new.png' })
+  assert.ok(tr)
+  assert.equal(saveDocument(opened, tr.doc), '![](./new.png "t")\n')
+})
+
+for (const [picture, definitions] of [
+  ['![Alt][UPPER]', '[upper]: <a b.png> \'Title\'\n[UPPER]: another.png'],
+  ['![ref][]', '[ref]: x.png'],
+  ['![ref]', '[ref]: x.png'],
+] as const) {
+  test(`saving ${picture} keeps its definitions where they were written`, () => {
+    for (const source of [
+      `${definitions}\n\n${picture}\n`,
+      `# Heading\n${definitions}\n${picture}\n`,
+    ]) {
+      assert.equal(saveDocument(openDocument(source)), source)
+    }
+  })
+}
+
+test('an escaped destination uses the exact host mapping key and keeps its spelling', () => {
+  const path = 'a\\(1\\).png'
+  const source = `![](${path})\n`
+  const opened = openDocument(source, { [path]: display })
+  assert.equal(opened.doc.firstChild?.attrs.src, display)
+  assert.equal(saveDocument(opened), source)
+})
