@@ -109,6 +109,13 @@ test('changed deck folds using the same first-word rule as Publish', () => {
 })
 
 test('republishing keeps the split and reads Publishing…', () => {
+  let split: React.ComponentProps<typeof SplitButton> | undefined
+  renderToStaticMarkup(createElement(function Probe() {
+    const control = DeckPublishControl({ state: { ...changedDeck, kind: 'publishing', changed: false }, onPublish: () => {}, onAction: () => {} })
+    if (React.isValidElement<React.ComponentProps<typeof SplitButton>>(control) && control.type === SplitButton) split = control.props
+    return control
+  }))
+  assert.equal(split?.main.tooltip, 'Your changes are going online')
   const root = parse(draw({ ...changedDeck, kind: 'publishing', changed: false })).querySelector('.rm-split[aria-busy="true"]')
   assert.ok(root)
   assert.equal(root.querySelector('.rm-split-main')?.text.trim(), 'Publishing…')
