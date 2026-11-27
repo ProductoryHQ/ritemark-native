@@ -439,7 +439,7 @@ export function publishedMenu(
       {pdfItem}
       {!state.live?.on && (state.changed || publishing) && (
         <PublishMenuItem tip={publishing ? undefined : 'Review and publish the changes'} disabled={publishing} onSelect={publish}>
-          <Icon name="arrows-clockwise" size={14} tone="inherit" />
+          <Icon name="globe" size={14} tone="inherit" />
           {publishing ? 'Publishing…' : 'Publish changes'}
         </PublishMenuItem>
       )}
