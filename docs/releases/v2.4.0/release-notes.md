@@ -61,6 +61,7 @@ If you run training or share slides with clients, you can update the page they a
 - **See the text toolbar where you work.** On a slide, it appears above the words you chose.
 - **Keep the slide's title in view.** **Slide settings** opens beside the slide, not over its title.
 - **Read the deck bar with a long note.** A long note no longer squeezes the theme and **Publish** buttons.
+- **Keep a block's buttons on one line.** On a narrow slide, the buttons under a block show as icons instead of wrapping onto a second line.
 - **Work with pictures and tables without covered text.** A small picture's bar no longer covers the line below. A table's menu stays in the window, and its add buttons sit on its edges.
 - **Keep hidden places hidden.** A place you turned off no longer shows for a moment when Ritemark opens.
 - **See a picture where you put it on a slide.** A small picture under a title no longer drops to the bottom or grows blurry.
