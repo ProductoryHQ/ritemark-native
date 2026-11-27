@@ -34,6 +34,13 @@ const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')
 const css = withoutComments(read('index.css'))
 const render = (element: ReturnType<typeof createElement>) => parse(renderToStaticMarkup(element))
 
+// Toolbar buttons carry the shared open-state chip styles.
+{
+  const button = render(createElement(Button, { variant: 'toolbar' }, 'Options')).querySelector('button')!
+  assert.ok(button.classList.contains('data-[state=open]:bg-surface-soft'))
+  assert.ok(button.classList.contains('data-[state=open]:text-ink-strong'))
+}
+
 // ── #614: an icon's colour ──
 {
   const coloured = render(createElement(Icon, { name: 'warning', className: 'text-[var(--r-error)]' })).querySelector('svg')!

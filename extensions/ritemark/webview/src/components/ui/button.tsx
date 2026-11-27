@@ -30,7 +30,8 @@ const buttonVariants = cva(
         toolbar:
           "border border-transparent bg-transparent text-ink-strong font-medium " + // Ritemark 2.0: plain icon buttons, a fill on hover, never a box
           "hover:bg-surface-soft " +
-          "data-[state=active]:bg-surface-soft data-[state=active]:text-ink-strong data-[state=active]:font-medium", // a toggle that is on: the ground's fill and ink (kit: .docbar .icon.on)
+          "data-[state=active]:bg-surface-soft data-[state=active]:text-ink-strong data-[state=active]:font-medium " + // a toggle that is on: the ground's fill and ink (kit: .docbar .icon.on)
+          "data-[state=open]:bg-surface-soft data-[state=open]:text-ink-strong", // #1107: Radix menu triggers keep their chip while open
         link: "text-primary underline-offset-4 hover:underline",
         // Sprint 158 (experience 47, frame 3): the action on a warning bar (`Alert variant="warning"`), in the bar's own tone
         warning:

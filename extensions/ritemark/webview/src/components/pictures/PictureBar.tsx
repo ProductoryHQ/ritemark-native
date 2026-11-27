@@ -149,7 +149,7 @@ function DescriptionField({ alt, caption, onWords, withCaption, compact }: { alt
     >
       <Tooltip label="The words a screen reader and a published page read">
         <PopoverTrigger asChild>
-          <Button type="button" variant="toolbar" size="compact" aria-label="Description" data-state={open ? 'active' : undefined}>
+          <Button type="button" variant="toolbar" size="compact" aria-label="Description">
             <Icon name="text-t" size={14} tone="inherit" />
             {compact ? null : 'Description'}
           </Button>

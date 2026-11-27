@@ -93,13 +93,14 @@ function boxIn(rect: DOMRect, origin: DOMRect): Box {
 }
 
 /** A choice in one of the bar's segments: on or not, with its tooltip. */
-function Choice({ on, label, tip, icon, onPick }: { on: boolean; label?: string; tip: string; icon?: PhosphorIconName; onPick: () => void }) {
+/** A choice in a segment's track; `plain` draws a lone toggle (One by one) as a toolbar button with no track. */
+function Choice({ on, label, tip, icon, onPick, plain }: { on: boolean; label?: string; tip: string; icon?: PhosphorIconName; onPick: () => void; plain?: boolean }) {
   return (
     <Tooltip label={tip}>
       <Button
         variant="toolbar"
         size="compact"
-        className="deck-bar-choice"
+        className={plain ? undefined : 'deck-bar-choice'}
         data-state={on ? 'active' : undefined}
         aria-pressed={on}
         aria-label={label ? undefined : tip}
@@ -834,15 +835,16 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
                   <Sep />
                   {/* README item 18: one toggle, pressed when on; off (All at once, the default) writes nothing. Folded,
                       it keeps its toggle as an icon with the same tooltip. */}
-                  <Segment label="Reveal">
-                    <Choice
-                      on={reveal}
-                      icon="cards-three"
-                      label={fold >= FOLD_AT.reveal ? undefined : REVEAL_LABEL}
-                      tip={REVEAL_TIP}
-                      onPick={() => run(act(pos => setReveal(editor.state, pos, !reveal)))}
-                    />
-                  </Segment>
+                  {/* One by one is a lone toggle: no segment track, so off has no ground and on takes the toolbar's
+                      active chip, never mistaken for an open menu's chip beside it (the Experience lead, 27 November). */}
+                  <Choice
+                    plain
+                    on={reveal}
+                    icon="cards-three"
+                    label={fold >= FOLD_AT.reveal ? undefined : REVEAL_LABEL}
+                    tip={REVEAL_TIP}
+                    onPick={() => run(act(pos => setReveal(editor.state, pos, !reveal)))}
+                  />
                 </>
               )}
               <Sep />
