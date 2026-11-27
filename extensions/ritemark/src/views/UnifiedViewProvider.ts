@@ -1090,6 +1090,16 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
               state: 'degraded',
               message: `Could not save your message. Nothing was sent to the agent. ${error instanceof Error ? error.message : String(error)}`,
             });
+            if (startsPlanExecution && agentId === 'codex') {
+              void this._view?.webview.postMessage({
+                type: 'codex-result',
+                conversationId: clientConversationId,
+                turnId: message.conversationTurnId,
+                agentId,
+                status: 'error',
+                error: 'Ritemark couldn’t continue this plan. Send your request again to start over.',
+              });
+            }
             break;
           }
           const conversationId = acceptedConversation?.conversationId ?? clientConversationId;

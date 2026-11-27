@@ -656,20 +656,21 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
     });
   }
 
-  /** Patch the last turn of a conversation's Codex/OpenCode transcript. */
-  function patchLastCodexTurn(
+  /** Patch a Codex/OpenCode turn, defaulting to the latest for unscoped messages. */
+  function patchCodexTurn(
     id: string | null,
     updater: (turn: CodexConversationTurn) => CodexConversationTurn | null,
-    options: { requireRunning?: boolean } = { requireRunning: true },
+    options: { requireRunning?: boolean; turnId?: string } = { requireRunning: true },
   ): void {
     patchConversation(id, (conversation) => {
       const conv = [...conversation.codexConversation];
-      const lastTurn = conv[conv.length - 1];
-      if (!lastTurn) return null;
-      if (options.requireRunning && !lastTurn.isRunning) return null;
-      const nextTurn = updater(lastTurn);
+      const index = options.turnId === undefined ? conv.length - 1 : conv.findIndex((turn) => turn.id === options.turnId);
+      const turn = conv[index];
+      if (!turn) return null;
+      if (options.requireRunning && !turn.isRunning) return null;
+      const nextTurn = updater(turn);
       if (!nextTurn) return null;
-      conv[conv.length - 1] = nextTurn;
+      conv[index] = nextTurn;
       return { codexConversation: conv };
     });
   }
@@ -1642,7 +1643,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         const runningTurn = [...conversation.codexConversation].reverse().find((t) => t.isRunning);
         const agentId = runningTurn?.runtime ?? 'codex';
         vscode.postMessage({ type: 'agent-cancel', conversationId, agentId });
-        patchLastCodexTurn(conversationId, (last) => ({
+        patchCodexTurn(conversationId, (last) => ({
           ...last,
           isRunning: false,
           result: { status: 'interrupted', error: 'Cancelled by user' },
@@ -3113,7 +3114,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // running ChatGPT turn in every thread that has one.
           if (message.status.state !== 'ready') {
             for (const id of Object.keys(get().conversations)) {
-              patchLastCodexTurn(id, (lastTurn) => lastTurn.runtime === 'opencode' ? null : ({
+              patchCodexTurn(id, (lastTurn) => lastTurn.runtime === 'opencode' ? null : ({
                 ...lastTurn,
                 approval: undefined,
                 isRunning: false,
@@ -3267,7 +3268,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const codexLast = conversation.codexConversation[conversation.codexConversation.length - 1];
           const add = <T extends { themeChanges?: ThemeChangeChipView[] }>(turn: T): T => (turn.themeChanges?.some((entry) => entry.id === chip.id) ? turn : { ...turn, themeChanges: [...(turn.themeChanges ?? []), chip] });
           const codexNewer = codexLast && (!agentLast || codexLast.isRunning || (!agentLast.isRunning && codexLast.timestamp >= agentLast.timestamp));
-          if (codexNewer) patchLastCodexTurn(targetId, add, { requireRunning: false });
+          if (codexNewer) patchCodexTurn(targetId, add, { requireRunning: false });
           else if (agentLast) patchLastAgentTurn(targetId, add, { requireRunning: false });
           break;
         }
@@ -3593,7 +3594,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-progress': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({
+          patchCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             activities: updateStep(lastTurn.activities, message.progress as AgentProgress),
             // Sprint 143 (#544): the AI went on; its wait is over.
@@ -3606,7 +3607,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const targetId = routeInbound(message);
           if (!targetId) break;
           // Sprint 139 (#552): another message (a working note, then the answer) starts a new paragraph.
-          patchLastCodexTurn(targetId, (lastTurn) => ({
+          patchCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             retry: undefined,
             streamingText: appendStreamedText(lastTurn.streamingText, message.delta, lastTurn.streamingMessageId, message.messageId),
@@ -3618,7 +3619,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-question': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({
+          patchCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             retry: undefined,
             pendingQuestion: {
@@ -3635,7 +3636,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-plan-text-delta': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({
+          patchCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             planText: `${lastTurn.planText || ''}${message.delta}`,
             planHandled: false,
@@ -3647,7 +3648,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-plan-update': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => applyCodexPlanUpdate(lastTurn, {
+          patchCodexTurn(targetId, (lastTurn) => applyCodexPlanUpdate(lastTurn, {
             explanation: message.explanation,
             plan: message.plan,
           }));
@@ -3658,7 +3659,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           const targetId = routeInbound(message);
           if (!targetId) break;
           let landed = false;
-          patchLastCodexTurn(
+          patchCodexTurn(
             targetId,
             (lastTurn) => {
               landed = true;
@@ -3671,7 +3672,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
                 liveDeckSteps: message.liveDeckSteps,
               });
             },
-            { requireRunning: false },
+            { requireRunning: false, turnId: message.turnId },
           );
           if (landed) {
             setTimeout(() => persistConversation(targetId), 100);
@@ -3690,7 +3691,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           // sees progress instead of a frozen UI.
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({ ...lastTurn, rpcProgressMessage: message.message }));
+          patchCodexTurn(targetId, (lastTurn) => ({ ...lastTurn, rpcProgressMessage: message.message }));
           break;
         }
 
@@ -3700,7 +3701,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           if (!targetId) break;
           const retry = decodeRuntimeRetry(message as unknown as Record<string, unknown>);
           if (!retry) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({ ...lastTurn, retry }));
+          patchCodexTurn(targetId, (lastTurn) => ({ ...lastTurn, retry }));
           break;
         }
 
@@ -3743,7 +3744,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
             }, { requireRunning: false }); // Sprint 128: a background subagent may ask after its turn ended.
           } else {
             // File-write / shell-command / permission approval for Codex + ACP
-            patchLastCodexTurn(targetId, (lastTurn) => ({
+            patchCodexTurn(targetId, (lastTurn) => ({
               ...lastTurn,
               retry: undefined,
               approval: {
@@ -3761,7 +3762,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
         case 'codex-approval': {
           const targetId = routeInbound(message);
           if (!targetId) break;
-          patchLastCodexTurn(targetId, (lastTurn) => ({
+          patchCodexTurn(targetId, (lastTurn) => ({
             ...lastTurn,
             retry: undefined,
             approval: {
