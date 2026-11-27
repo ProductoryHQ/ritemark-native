@@ -47,7 +47,7 @@ assert.equal(save('<img src="https://example.com/a.png" title="img/other.png" al
 assert.equal(save('<img src="img/missing.png" alt="a">'), '![a](img/missing.png)')
 
 installTestDocument()
-for (const path of ['Kickoff files/photo.png', 'Kickoff [files]/Õppepäev $& photo.png']) {
+for (const path of ['Kickoff Planning.rtms.files/photo.png', 'Kickoff [files]/Õppepäev $& photo.png']) {
   const markdown = `![](<${path}>)`
   const html = marked.parse(markdown, { async: false })
   const mappings = { [path]: display }

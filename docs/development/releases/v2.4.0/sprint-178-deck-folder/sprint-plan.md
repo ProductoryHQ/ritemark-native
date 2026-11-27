@@ -65,3 +65,7 @@ PR 1 goes first, because if the patch fails its size limit, R3 changes (option B
 
 - [x] The Experience lead's spec check against the decks README, "A deck's own folder": OK on 26 November, with two additions folded in (every deck `images/` line in R6; the new lines go to the lead with PRs 2 and 3). On a delete of an expanded row, the folder may go to the Trash with only the deck named in the ask, because the Trash gets it back.
 - [x] Jarmo, 26 November 2026: "las tuleb kaust sisse - pole probleem kui natuke edasi". Sprint 178 goes into 2.4 with patch 023, and the release candidate may move a little later. His yes approves this plan. Implementation starts on `sprint-178-deck-folder`.
+
+## Decisions
+
+- 27 Nov, Jarmo: the folder is `<deck file>.files`

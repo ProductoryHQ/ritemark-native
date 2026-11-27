@@ -203,8 +203,9 @@ export async function copyCreatedDeckPictures(deck: string, text: string, fs: Cr
   if (!links.size) return text;
 
   // A duplicate beside the original already resolves its pictures. It still needs its own folder.
-  const siblingFolder = (dir ? dir + '/' : '') + originalStem + ' files';
-  const needsOwnFolder = siblingFolder !== to && linksInto(links, siblingFolder) && !(await fs.kind(to));
+  const deckEndings = [DECK_EXTENSION, LEGACY_DECK_EXTENSION];
+  const siblingFolders = deckEndings.map(ending => ownDeckFolder(path.posix.join(dir, originalStem + ending)));
+  const needsOwnFolder = siblingFolders.some(folder => folder !== to && linksInto(links, folder)) && !(await fs.kind(to));
   const resolved = await Promise.all([...links].map(file => fs.resolves(file)));
   const hasMissingLinks = resolved.includes(false);
   if (!hasMissingLinks && !needsOwnFolder) return text;
@@ -212,7 +213,7 @@ export async function copyCreatedDeckPictures(deck: string, text: string, fs: Cr
   const stems = new Set([stem, originalStem]);
   const names = [...stems].flatMap(name => {
     const literal = name.replace(/[\[\]{}*?,]/g, char => `[${char}]`);
-    return [literal + DECK_EXTENSION, literal + LEGACY_DECK_EXTENSION];
+    return deckEndings.map(ending => literal + ending);
   });
   const candidates = await fs.findFiles(`**/{${names.join(',')}}`, COPY_SEARCH_LIMIT);
   const matches: string[] = [];

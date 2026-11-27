@@ -118,13 +118,13 @@ const DECK = [
 
 // ---- A path with spaces survives the deck editor's save and reopen in both picture forms.
 {
-  const path = 'Kickoff files/x.png'
+  const path = 'Kickoff.rtms.files/x.png'
   const deck = openDeck(DECK.replace('id: a1\n---', 'id: a1\npicture: right\n---'))
   assert.ok(deck.step(pictureIntoSlide(deck.state, 'a1', path)))
   assert.ok(deck.step(pictureIntoSlide(deck.state, 'b2', path)))
   const saved = deck.save()
-  assert.match(saved, /image: Kickoff files\/x\.png/)
-  assert.ok(saved.includes('![](<Kickoff files/x.png>)'))
+  assert.match(saved, /image: Kickoff\.rtms\.files\/x\.png/)
+  assert.ok(saved.includes('![](Kickoff.rtms.files/x.png)'))
   const reopened = slidesOf(openDeck(saved).state.doc)
   assert.equal(reopened[0].data.image, path)
   assert.deepEqual(blockPicturePaths(reopened[1].data.markdown ?? ''), [path])
@@ -139,9 +139,9 @@ const DECK = [
   assert.equal(new Set(ids).size, 3, 'three ids, none the same')
   assert.ok(ids.every(id => id !== 'a1' && id !== 'b2'), "none of the deck's own")
   const pictures = [
-    { id: ids[0], title: pictureTitleOf('first-shot.png'), path: 'Kickoff files/first-shot.png' },
-    { id: ids[1], title: pictureTitleOf('Õppepäev_2.png'), path: 'Kickoff files/Oppepaev_2.png' },
-    { id: ids[2], title: pictureTitleOf('first-shot.png'), path: 'Kickoff files/first-shot-2.png' },
+    { id: ids[0], title: pictureTitleOf('first-shot.png'), path: 'Kickoff.rtms.files/first-shot.png' },
+    { id: ids[1], title: pictureTitleOf('Õppepäev_2.png'), path: 'Kickoff.rtms.files/Oppepaev_2.png' },
+    { id: ids[2], title: pictureTitleOf('first-shot.png'), path: 'Kickoff.rtms.files/first-shot-2.png' },
   ]
   const depth = undoDepth(deck.state)
   assert.ok(deck.step(insertPictureSlides(deck.state, 1, pictures)))
@@ -149,12 +149,12 @@ const DECK = [
   const slides = slidesOf(deck.state.doc)
   assert.deepEqual(slides.map(slide => slide.data.id), ['a1', ids[0], ids[1], ids[2], 'b2'], 'at the drop place, in the files\' order')
   assert.deepEqual(slides.slice(1, 4).map(slide => slide.data.markdown), [
-    '# First shot\n\n![](<Kickoff files/first-shot.png>)',
-    '# Õppepäev 2\n\n![](<Kickoff files/Oppepaev_2.png>)',
-    '# First shot\n\n![](<Kickoff files/first-shot-2.png>)',
+    '# First shot\n\n![](Kickoff.rtms.files/first-shot.png)',
+    '# Õppepäev 2\n\n![](Kickoff.rtms.files/Oppepaev_2.png)',
+    '# First shot\n\n![](Kickoff.rtms.files/first-shot-2.png)',
   ], 'a Picture slide each: its title and its picture; two of the same name keep their own files')
   const saved = deck.save()
-  assert.match(saved, /```slide\n---\nid: \w+\n---\n# First shot\n\n!\[\]\(<Kickoff files\/first-shot\.png>\)\n```\n\n```slide/, 'written as block slides')
+  assert.match(saved, /```slide\n---\nid: \w+\n---\n# First shot\n\n!\[\]\(Kickoff\.rtms\.files\/first-shot\.png\)\n```\n\n```slide/, 'written as block slides')
   assert.ok(saved.indexOf('Ask who has done one.') < saved.indexOf('First shot') && saved.indexOf('first-shot-2') < saved.indexOf('What it taught us'), 'between the two parts')
   // One Cmd+Z takes them all back: the same bytes.
   assert.ok(deck.undo())

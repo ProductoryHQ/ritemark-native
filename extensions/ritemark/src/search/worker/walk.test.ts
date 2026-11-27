@@ -85,9 +85,9 @@ async function main() {
     await fsp.symlink(path.join(root, 'Notes.md'), path.join(root, 'Linked note.md'));
 
     await write(root, 'Kickoff.rtms');
-    await write(root, 'Kickoff files/Kickoff.html');
-    await write(root, 'Kickoff files/fonts/internal.md');
-    await write(root, 'Notes files/x.md');
+    await write(root, 'Kickoff.rtms.files/Kickoff.html');
+    await write(root, 'Kickoff.rtms.files/fonts/internal.md');
+    await write(root, 'Notes.rtms.files/x.md');
 
     const rulesOut = new Map<string, RootRules>();
     const { documents, limited } = await walkProject(
@@ -104,8 +104,8 @@ async function main() {
       'Budget.CSV',
       'Kickoff.rtms',
       'Linked note.md',
-      'Notes files/x.md',
       'Notes.md',
+      'Notes.rtms.files/x.md',
       'Report.docx',
       'Scan.pdf',
       'elsewhere/Linked.md',

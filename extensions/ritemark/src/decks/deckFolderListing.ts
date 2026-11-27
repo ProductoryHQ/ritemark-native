@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { deckPictureFolderName, isDeckPath } from './deckFileName';
+import { deckPictureFolderName, isDeckPath, deckFileOfPictureFolder } from './deckFileName';
 
 /** The deck names in a directory determine which folders belong to decks. */
 export function deckFolderNames(files: Iterable<string>): Set<string> {
@@ -9,7 +9,7 @@ export function deckFolderNames(files: Iterable<string>): Set<string> {
 function* candidateFolders(relative: string): Iterable<string> {
   const parts = relative.split('/');
   for (let index = 0; index < parts.length - 1; index++) {
-    if (parts[index].endsWith(' files')) yield parts.slice(0, index + 1).join('/');
+    if (deckFileOfPictureFolder(parts[index])) yield parts.slice(0, index + 1).join('/');
   }
 }
 

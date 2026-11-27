@@ -21,6 +21,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { deckFileOfPictureFolder, deckNameOf } from '../decks/deckFileName';
 import { PAGE_FOLLOWER } from '../decks/page/pageFollower';
 import { isInside, isPagePath } from '../browser/localPage';
 import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
@@ -201,8 +202,11 @@ export async function gatherPage(pagePath: string, projectFolder: string, option
   if (!isInside(hostedPath, projectFolder, platform)) throw new Error('This page is outside this project.');
   if (hosted) {
     const name = p.basename(hostedPath, '.html');
-    const expected = p.join(p.dirname(hostedPath), `${name} files`, p.basename(hostedPath));
-    if (key(pagePath) !== key(expected) || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
+    const folder = p.dirname(pagePath);
+    const deckFile = deckFileOfPictureFolder(key(p.basename(folder)));
+    const expected = p.join(p.dirname(hostedPath), p.basename(folder), p.basename(hostedPath));
+    if (deckFile === undefined || key(deckNameOf(deckFile)) !== key(name) || key(pagePath) !== key(expected)
+      || hosted.assetAddresses.some(address => !/^(?:fonts|logos)\/[\w.-]+$/.test(address)
       || address.endsWith('/.') || address.endsWith('/..'))) {
       throw new HostedDeckLayoutError(BAD_HOSTED_LAYOUT);
     }

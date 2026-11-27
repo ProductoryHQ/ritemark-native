@@ -19,14 +19,14 @@ import { PublishRecordStore, recordFor } from './publishRecords';
 import { PNG } from './testing/pictures';
 
 const oldPicture = 'images/old.png';
-const newPicture = 'Kickoff files/new.png';
+const newPicture = 'Kickoff.rtms.files/new.png';
 const font = 'fonts/Inter-4.001-latin.woff2';
 const logo = pageLogoFile(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'), 'svg');
 
 for (const { name, pictures, withLogo, sha256 } of [
-  { name: 'a', pictures: [newPicture], withLogo: false, sha256: '66468a240a8efb220100a1a3c428d364db05e6d2882daa82534c7b1a6a5622b6' },
+  { name: 'a', pictures: [newPicture], withLogo: false, sha256: '1f68cb98ef41782e290e8ff88dd542826781a45f89f2201730be052b586f68c9' },
   { name: 'b', pictures: [oldPicture], withLogo: true, sha256: '6fd86a74f34b340236fab927a878c9d7adf9ac9d826a113e8df56c23e87a4437' },
-  { name: 'c', pictures: [oldPicture, newPicture], withLogo: true, sha256: 'e1e7f5c6c2d626f6c53df94dac46c10d8d06b38b71fb474ad03d4cb9c3ff96b0' },
+  { name: 'c', pictures: [oldPicture, newPicture], withLogo: true, sha256: 'f1055e310b1edabd4b0cedd4a7b2494c000607e8f927fae6e94dd6ba33c85678' },
 ]) {
   test(`deck ${name} keeps its hosted URLs, bytes and Copy link`, async t => {
     const project = await testProject({});
@@ -47,12 +47,12 @@ for (const { name, pictures, withLogo, sha256 } of [
     const pagePath = pagePathFor(deckPath);
     await project.write('Training/Kickoff.html', page.html);
     const plan = await gatherPage(pagePath, project.dir);
-    const movedPath = project.page('Training/Kickoff files/Kickoff.html');
+    const movedPath = project.page('Training/Kickoff.rtms.files/Kickoff.html');
     const local = await buildDeckPage({ deckPath, text, theme, pagePath: movedPath }, assets);
-    await project.write('Training/Kickoff files/Kickoff.html', local.html);
+    await project.write('Training/Kickoff.rtms.files/Kickoff.html', local.html);
     const assetAddresses = [font, ...(withLogo ? [logo.address] : [])];
     for (const asset of assetAddresses) {
-      await project.write(`Training/Kickoff files/${asset}`, await fs.readFile(project.page(`Training/${asset}`)));
+      await project.write(`Training/Kickoff.rtms.files/${asset}`, await fs.readFile(project.page(`Training/${asset}`)));
     }
     for (const picture of pictures) {
       const address = picture === oldPicture ? '../images/old.png' : 'new.png';
@@ -89,17 +89,17 @@ test('Git excludes the moved font while allowing the same font beside the deck',
   const project = await testProject({});
   t.after(project.cleanup);
   execFileSync('git', ['init', '-q'], { cwd: project.dir });
-  await project.write('.gitignore', '/Kickoff files/fonts/\n');
+  await project.write('.gitignore', '/Kickoff.rtms.files/fonts/\n');
   const html = `<style>@font-face { font-family: Inter; src: url(${font}) }</style>`;
-  for (const folder of ['', 'Kickoff files/']) {
+  for (const folder of ['', 'Kickoff.rtms.files/']) {
     await project.write(`${folder}Kickoff.html`, html);
     await project.write(`${folder}${font}`, 'same font bytes');
   }
   const oldPlan = await gatherPage(project.page('Kickoff.html'), project.dir);
-  const movedPlan = await gatherPage(project.page('Kickoff files/Kickoff.html'), project.dir);
+  const movedPlan = await gatherPage(project.page('Kickoff.rtms.files/Kickoff.html'), project.dir);
   assert.deepEqual((await readVerifiedUpload(oldPlan)).files.map(file => file.urlPath), ['/index.html', `/${font}`]);
   assert.deepEqual((await readVerifiedUpload(movedPlan)).files.map(file => file.urlPath), ['/index.html']);
-  assert.deepEqual(movedPlan.leftOut, [{ display: `Kickoff files/${font}`, reason: 'gitIgnored' }]);
+  assert.deepEqual(movedPlan.leftOut, [{ display: `Kickoff.rtms.files/${font}`, reason: 'gitIgnored' }]);
 });
 
 test('the hosted sheet names the ignored moved font and sends the unignored font at its old address', async t => {
@@ -107,16 +107,16 @@ test('the hosted sheet names the ignored moved font and sends the unignored font
   t.after(project.cleanup);
   execFileSync('git', ['init', '-q'], { cwd: project.dir });
   const otherFont = 'fonts/Other.woff2';
-  await project.write('.gitignore', `/Kickoff files/${font}\n`);
+  await project.write('.gitignore', `/Kickoff.rtms.files/${font}\n`);
   const html = `<style>@font-face { src: url(${font}) } @font-face { src: url(${otherFont}) }</style>`;
-  for (const address of [font, otherFont]) await project.write(`Kickoff files/${address}`, 'font bytes');
-  const realPath = project.page('Kickoff files/Kickoff.html');
-  await project.write('Kickoff files/Kickoff.html', html);
+  for (const address of [font, otherFont]) await project.write(`Kickoff.rtms.files/${address}`, 'font bytes');
+  const realPath = project.page('Kickoff.rtms.files/Kickoff.html');
+  await project.write('Kickoff.rtms.files/Kickoff.html', html);
   const plan = await gatherPage(realPath, project.dir, {
     hostedDeck: { besideDeckPath: project.page('Kickoff.html'), html, assetAddresses: [font, otherFont] },
   });
   assert.deepEqual(sheetModelOf(plan, 'Training').leftOut, [
-    { name: 'Inter-4.001-latin.woff2', display: `Kickoff files/${font}`, reason: 'gitIgnored' },
+    { name: 'Inter-4.001-latin.woff2', display: `Kickoff.rtms.files/${font}`, reason: 'gitIgnored' },
   ]);
   assert.deepEqual((await readVerifiedUpload(plan)).files.map(file => file.urlPath), ['/index.html', `/${otherFont}`]);
 });
@@ -126,7 +126,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     const project = await testProject({});
     t.after(project.cleanup);
     const besideDeckPath = project.page('Training/Kickoff.html');
-    const realPath = project.page('Training/Kickoff files/Kickoff.html');
+    const realPath = project.page('Training/Kickoff.rtms.files/Kickoff.html');
     const accountId = 'a'.repeat(32);
     const siteName = 'kickoff-123abc';
     const address = siteAddress(siteName, 'training', '/index.html');
@@ -144,11 +144,11 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     await project.write('Training/Kickoff.html', oldHtml);
     await project.write('Training/Kickoff.rtms', '---\ndeck: 2\n---\n');
     const local = await makePage('Kickoff', realPath);
-    await project.write('Training/Kickoff files/Kickoff.html', local.html);
+    await project.write('Training/Kickoff.rtms.files/Kickoff.html', local.html);
     await project.write(`Training/${font}`, legacyFontBytes);
-    await project.write(`Training/Kickoff files/${font}`, legacyFontBytes);
+    await project.write(`Training/Kickoff.rtms.files/${font}`, legacyFontBytes);
     await project.write(`Training/${logo.address}`, logo.bytes);
-    await project.write(`Training/Kickoff files/${logo.address}`, logo.bytes);
+    await project.write(`Training/Kickoff.rtms.files/${logo.address}`, logo.bytes);
     if (mode === 'shared font') {
       await project.write('Training/Shared.html', (await makePage('Shared')).html
         .replaceAll(logo.address, 'images/old.png').replaceAll(font, './fonts/%49nter-4.001-latin.woff2'));
@@ -231,7 +231,7 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     assert.equal((await controller.recordFor(besideDeckPath))?.address, address);
     assert.equal((await controller.settingsProjection()).pages.find(p => p.id === siteName)?.address, address);
     assert.equal((await controller.legacyDeckRecord(besideDeckPath))?.address, address);
-    if (mode === 'cancel') await fs.rm(project.page(`Training/Kickoff files/${font}`));
+    if (mode === 'cancel') await fs.rm(project.page(`Training/Kickoff.rtms.files/${font}`));
     if (mode === 'success') {
       const release = controller.holdPage(besideDeckPath);
       assert.ok(release);
@@ -277,8 +277,8 @@ for (const mode of ['success', 'current theme logo', 'shared font', 'foreign fon
     assert.deepEqual(after?.deckFit, []);
     assert.deepEqual(after?.live, live);
     assert.deepEqual((await records.list()).find(r => r.siteName === alternateSite.siteName), { ...alternateSite, pagePath: realPath, deckFolder: true, live: pause });
-    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${font}`)), legacyFontBytes);
-    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff files/${logo.address}`)), logo.bytes);
+    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff.rtms.files/${font}`)), legacyFontBytes);
+    assert.deepEqual(await fs.readFile(project.page(`Training/Kickoff.rtms.files/${logo.address}`)), logo.bytes);
     assert.equal(await fs.readFile(realPath, 'utf8'), local.html);
     if (mode === '2.3 edited') {
       assert.match(await fs.readFile(besideDeckPath, 'utf8'), /Edited after publishing/);
@@ -341,13 +341,13 @@ test('a nested published address survives when the picture above the deck is rem
   const project = await testProject({});
   t.after(project.cleanup);
   const besideDeckPath = project.page('Training/Kickoff.html');
-  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  const realPath = project.page('Training/Kickoff.rtms.files/Kickoff.html');
   await project.write('shared.png', PNG);
   await project.write('Training/Kickoff.html', '<img src="../shared.png">');
   const before = await gatherPage(besideDeckPath, project.dir);
   assert.equal(before.files[0].relPath, 'Training/Kickoff.html');
   const html = '<p>Kickoff</p>';
-  await project.write('Training/Kickoff files/Kickoff.html', html);
+  await project.write('Training/Kickoff.rtms.files/Kickoff.html', html);
   const after = await gatherPage(realPath, project.dir, {
     hostedDeck: { besideDeckPath, html, assetAddresses: [] },
     publishedPagePath: before.files[0].relPath,
@@ -369,7 +369,7 @@ test('the hosted refusal names both files at a shared address', { skip: process.
   await project.write('images/photo.png', PNG);
   // On POSIX a literal backslash in a filename is valid, but Publish turns it into a URL separator.
   await project.write('images\\photo.png', PNG);
-  await assert.rejects(gatherPage(project.page('Kickoff files/Kickoff.html'), project.dir, {
+  await assert.rejects(gatherPage(project.page('Kickoff.rtms.files/Kickoff.html'), project.dir, {
     hostedDeck: {
       besideDeckPath: project.page('Kickoff.html'),
       html: '<img src="images/photo.png"><img src="images%5Cphoto.png">',
@@ -388,7 +388,7 @@ for (const mode of ['manual', 'live', 'legacy live'] as const) {
     const deckPath = project.page('Training/Kickoff.rtms');
     const besideDeckPath = project.page('Training/Kickoff.html');
     const legacy = mode === 'legacy live';
-    const realPath = legacy ? besideDeckPath : project.page('Training/Kickoff files/Kickoff.html');
+    const realPath = legacy ? besideDeckPath : project.page('Training/Kickoff.rtms.files/Kickoff.html');
     const makePage = async (upward: boolean) => {
       const text = ['---', 'deck: 2', '---', '', '```slide', '# Kickoff', '```', '', '![Inside](inside.png)',
         ...(upward ? ['![Map](../Sales/map.png)'] : [])].join('\n');
@@ -494,7 +494,7 @@ test('upward assets check Git and project scope, share identical bytes and widen
   });
   t.after(project.cleanup);
   execFileSync('git', ['init', '-q'], { cwd: project.dir });
-  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  const realPath = project.page('Training/Kickoff.rtms.files/Kickoff.html');
   const besideDeckPath = project.page('Training/Kickoff.html');
   const fontAddress = `/pictures/${createHash('sha256').update('font bytes').digest('hex').slice(0, 12)}.woff2`;
   const query = 'api_key=' + 'Ab9'.repeat(8);
@@ -534,7 +534,7 @@ test('a neutral address keeps only a known file type, so no part of a file name 
   // High review round 2 (nit): "board.ACMEX" went up as "/pictures/<hash>.acmex".
   const project = await testProject({ 'Sales/board.ACMEX': PNG, 'Sales/map.JPEG': PNG });
   t.after(project.cleanup);
-  const realPath = project.page('Training/Kickoff files/Kickoff.html');
+  const realPath = project.page('Training/Kickoff.rtms.files/Kickoff.html');
   const besideDeckPath = project.page('Training/Kickoff.html');
   const html = '<img src="../Sales/board.ACMEX"><img src="../Sales/map.JPEG">';
   const plan = await gatherPage(realPath, project.dir, { hostedDeck: { besideDeckPath, html, assetAddresses: [] } });

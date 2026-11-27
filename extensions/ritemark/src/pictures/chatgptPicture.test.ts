@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   {
     const { root, folder } = project();
     const documentPath = path.join(folder, 'Kickoff.rtms');
-    const deckFolder = path.join(folder, 'Kickoff files');
+    const deckFolder = path.join(folder, 'Kickoff.rtms.files');
     const oldFolder = path.join(folder, 'images');
     fs.mkdirSync(oldFolder);
     fs.writeFileSync(path.join(oldFolder, 'old.png'), PNG);
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
       documentPath, root, signal: new AbortController().signal,
     };
     assert.deepStrictEqual(await makePicture(deps(), input), {
-      kind: 'failed', problem: "“Kickoff files” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.",
+      kind: 'failed', problem: "“Kickoff.rtms.files” beside this deck is a file, not a folder, so pictures can't be saved. Rename it to add pictures.",
     });
     assert.strictEqual(fs.readFileSync(deckFolder, 'utf8'), 'keep this file');
     fs.unlinkSync(deckFolder);

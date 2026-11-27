@@ -63,7 +63,7 @@ const centring = (css: string) => css.split('\n').filter(line => /is-(?:lone|tit
 
 console.log('lone picture: passed');
 
-const dropped = "# The deck's title\n![](<Kickoff files/photo.png>)";
+const dropped = "# The deck's title\n![](<Kickoff.rtms.files/photo.png>)";
 const directPictureRule = slideCss.match(/\.blk-flow:has\(> \.blk-pic, > img\) > :is\(\.blk-pic, img\) \{([^}]+)\}/)?.[1] ?? '';
 
 test('#1116: Title & Photo centres a 64 px picture without enlarging it', () => {
@@ -98,7 +98,7 @@ test('#1116: a large picture shrinks into the remaining room under the title', (
 });
 
 test('#1116: a picture-only slide defaults to Middle', () => {
-  const picture = '![](<Kickoff files/photo.png>)';
+  const picture = '![](<Kickoff.rtms.files/photo.png>)';
   assert.equal(contentPlaceOf(picture, undefined, null), 'middle');
   assert.ok(canvas(picture).classList.contains('is-lone-pic'));
 });

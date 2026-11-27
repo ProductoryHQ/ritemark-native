@@ -185,8 +185,8 @@ assert.equal(startCommand('deck', false), undefined, 'with the flag off, a stray
 
 assert.deepEqual(recentItems(folder, [
   { path: at('Kickoff.rtms'), changedAt: 1 },
-  { path: at('Kickoff files/Kickoff.html'), changedAt: 2 },
-  { path: at('Notes files/x.md'), changedAt: 3 },
-], new Set()).map(file => file.path), [at('Notes files/x.md'), at('Kickoff.rtms')]);
+  { path: at('Kickoff.rtms.files/Kickoff.html'), changedAt: 2 },
+  { path: at('Notes.rtms.files/x.md'), changedAt: 3 },
+], new Set()).map(file => file.path), [at('Notes.rtms.files/x.md'), at('Kickoff.rtms')]);
 
 console.log('projects/homeState: all assertions passed');

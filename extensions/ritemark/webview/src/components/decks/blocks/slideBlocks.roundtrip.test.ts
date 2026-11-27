@@ -216,9 +216,9 @@ console.log(`slideBlocks.roundtrip: ${same}/${cases.length} byte for byte and st
 
 // The stage displays the mapped URL and writes the deck's angle-bracket destination back.
 {
-  const path = 'Kickoff files/photo.png'
-  const markdown = '![](<Kickoff files/photo.png>)'
-  const url = 'https://file%2B.vscode-resource.vscode-cdn.net/Kickoff%20files/photo.png?v=1'
+  const path = 'Kickoff Planning.rtms.files/photo.png'
+  const markdown = '![](<Kickoff Planning.rtms.files/photo.png>)'
+  const url = 'https://file%2B.vscode-resource.vscode-cdn.net/Kickoff%20Planning.rtms.files/photo.png?v=1'
   const doc = load(markdown, { [path]: url })
   assert.equal(save(doc), markdown)
   assert.equal(doc.firstChild?.attrs.src, url)
@@ -226,11 +226,11 @@ console.log(`slideBlocks.roundtrip: ${same}/${cases.length} byte for byte and st
   assert.equal(save(load(save(doc), { [path]: url })), markdown)
 }
 
-for (const picture of ['![](Kickoff%20files/photo.png)', '![](<Kickoff files/photo.png>)']) {
+for (const picture of ['![](Kickoff%20Planning.rtms.files/photo.png)', '![](<Kickoff Planning.rtms.files/photo.png>)']) {
   test(`editing slide text keeps ${picture}`, () => {
     const source = `${picture}\n\nWords.`
     const url = 'vscode-webview://assets/photo.png'
-    const doc = load(source, { 'Kickoff files/photo.png': url })
+    const doc = load(source, { 'Kickoff Planning.rtms.files/photo.png': url })
     assert.equal(doc.firstChild?.attrs.src, url)
     const edited = typeAtEndOfLastParagraph(doc, ' Edited.')
     assert.ok(edited)
@@ -240,7 +240,7 @@ for (const picture of ['![](Kickoff%20files/photo.png)', '![](<Kickoff files/pho
 
 test('a new slide picture with a space uses angle brackets', () => {
   const doc = load('Words.')
-  const image = doc.type.schema.nodes.image.create({ src: 'vscode-webview://assets/x.png', title: 'Kickoff files/x.png' })
+  const image = doc.type.schema.nodes.image.create({ src: 'vscode-webview://assets/x.png', title: 'Kickoff Planning.rtms.files/x.png' })
   const tr = EditorState.create({ doc }).tr.insert(doc.content.size, image)
-  assert.equal(save(tr.doc), 'Words.\n\n![](<Kickoff files/x.png>)')
+  assert.equal(save(tr.doc), 'Words.\n\n![](<Kickoff Planning.rtms.files/x.png>)')
 })
