@@ -257,9 +257,8 @@ async function main(): Promise<void> {
     internal.deps.guidance = {
       presentOpenSource: async () => { claims++; return claimed; },
       actOnOpenSource: async (action) => {
-        assert.equal(action, 'star');
         opened++;
-        ended = browserAccepted;
+        ended = browserAccepted && action === 'star';
         return browserAccepted;
       },
     };
@@ -285,7 +284,12 @@ async function main(): Promise<void> {
       await internal.push();
       assert.equal(displayed.at(-1), 'open-source', 'a refused open leaves the card');
       browserAccepted = true;
+      const pushesBeforeDiscussions = displayed.length;
+      await internal.handle({ ...star, action: 'discussions' });
+      assert.equal(opened, 2, 'Discussions opens from the current presentation');
+      assert.equal(displayed.length, pushesBeforeDiscussions, 'Discussions keeps the current slot');
       await internal.handle(star);
+      assert.equal(opened, 3, 'Star still works after Discussions');
       assert.equal(displayed.at(-1), undefined, 'accepted Star refreshes the slot');
     }
     home.dispose();

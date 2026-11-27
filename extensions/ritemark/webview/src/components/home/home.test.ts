@@ -7,6 +7,7 @@
  * Run: npx tsx webview/src/components/home/home.test.ts
  */
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
 import type { HomeState, ProjectRow, ProjectsState } from '../../../../src/projects/protocol'
 
@@ -126,7 +127,6 @@ assert.deepEqual(posted, [], 'drawing Home sends nothing')
 // ── The four-card grid (the Experience lead, 17 November): four across while each card can be 150 wide, two by two, one across ──
 
 {
-  const { readFileSync } = await import('node:fs')
   const css = readFileSync(new URL('./home.css', import.meta.url), 'utf8')
   const gap = Number(/\.rh-tiles \{[^}]*gap: (\d+)px/.exec(css)?.[1])
   assert.equal(gap, 12, 'the tiles’ gap')
@@ -477,6 +477,10 @@ assert.equal(words(openSource.querySelector('.rh-guide-note')!), 'Both open in y
 assert.deepEqual(openSource.querySelectorAll('button').map((button) => button.getAttribute('aria-label') ?? words(button)), ['Not now', 'Star on GitHub', 'Discussions'])
 assert.equal(openSource.querySelectorAll('.rh-guide-go button.h-7').length, 2)
 assert.equal(openSource.querySelector('input'), null)
+const guidanceSource = readFileSync(new URL('./GuidanceCards.tsx', import.meta.url), 'utf8')
+assert.match(guidanceSource, /<Tooltip label="Opens Ritemark on GitHub" asChild>\s*<Button[^\n]*action: 'star'/)
+assert.match(guidanceSource, /<Tooltip label="Opens Ritemark's Discussions on GitHub" asChild>\s*<Button[^\n]*action: 'discussions'/)
+assert.deepEqual(openSource.querySelectorAll('.rh-guide-go button[data-state="closed"]').map(words), ['Star on GitHub', 'Discussions'])
 
 assert.deepEqual(posted, [], 'drawing sends nothing to the host')
 

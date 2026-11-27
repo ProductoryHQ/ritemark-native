@@ -28,7 +28,7 @@ index 0df05b689ce..3400905b234 100644
  	static readonly MenubarNewBreakpointMenu = new MenuId('MenubarNewBreakpointMenu');
  	static readonly PanelAlignmentMenu = new MenuId('PanelAlignmentMenu');
 diff --git a/src/vs/workbench/browser/actions/helpActions.ts b/src/vs/workbench/browser/actions/helpActions.ts
-index 8251c4a4292..4bf1ae30462 100644
+index 8251c4a4292..e20f857af24 100644
 --- a/src/vs/workbench/browser/actions/helpActions.ts
 +++ b/src/vs/workbench/browser/actions/helpActions.ts
 @@ -127,18 +127,21 @@ class OpenDocumentationUrlAction extends Action2 {
@@ -56,7 +56,7 @@ index 8251c4a4292..4bf1ae30462 100644
  			}
  		});
  	}
-@@ -154,6 +157,116 @@ class OpenDocumentationUrlAction extends Action2 {
+@@ -154,6 +157,122 @@ class OpenDocumentationUrlAction extends Action2 {
  	}
  }
  
@@ -120,7 +120,10 @@ index 8251c4a4292..4bf1ae30462 100644
 +	constructor() {
 +		super({
 +			id: 'ritemark.help.openGitHub',
-+			title: localize2('ritemarkGitHub', "Ritemark on GitHub"),
++			title: {
++				...localize2('ritemarkGitHub', "Ritemark on GitHub"),
++				mnemonicTitle: localize({ key: 'miRitemarkGitHub', comment: ['&& denotes a mnemonic'] }, "Ritemark on Git&&Hub"),
++			},
 +			category: Categories.Help,
 +			menu: { id: MenuId.MenubarHelpMenu, group: '1_welcome', order: 5 }
 +		});
@@ -136,7 +139,10 @@ index 8251c4a4292..4bf1ae30462 100644
 +	constructor() {
 +		super({
 +			id: 'ritemark.help.openDiscussions',
-+			title: localize2('ritemarkDiscussions', "Discussions"),
++			title: {
++				...localize2('ritemarkDiscussions', "Discussions"),
++				mnemonicTitle: localize({ key: 'miRitemarkDiscussions', comment: ['&& denotes a mnemonic'] }, "&&Discussions"),
++			},
 +			category: Categories.Help,
 +			menu: { id: MenuId.MenubarHelpMenu, group: '1_welcome', order: 6 }
 +		});

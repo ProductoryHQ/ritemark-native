@@ -397,7 +397,8 @@ export class HomeHost implements vscode.Disposable {
       case 'home/open-source-action': {
         const slot = this.guidanceSlot;
         if (await slot.openSourcePresentation && this.guidanceSlot === slot
-          && await this.deps.guidance?.actOnOpenSource(request.action) && this.guidanceSlot === slot) {
+          && await this.deps.guidance?.actOnOpenSource(request.action)
+          && request.action !== 'discussions' && this.guidanceSlot === slot) {
           await this.guidanceEnded();
         }
         return;
@@ -627,7 +628,7 @@ export class HomeHost implements vscode.Disposable {
     const state = await this.state(slot);
     if (this.panel !== panel || this.guidanceSlot !== slot) return;
     if (state.guidance?.card === 'open-source') {
-      // Claim before posting so a concurrent Home cannot render the same release’s card.
+      // Claim or restore the release presentation before posting.
       if (panel.visible && !state.missing && this.deps.guidance) {
         slot.openSourcePresentation ??= this.deps.guidance.presentOpenSource();
         if (!await slot.openSourcePresentation) state.guidance = null;

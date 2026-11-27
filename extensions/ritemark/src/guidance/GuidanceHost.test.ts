@@ -605,6 +605,15 @@ async function main(): Promise<void> {
     const actionHost = new GuidanceHost({ ...deps, store: actionStore });
     assert.equal((await actionHost.homeGuidance(noReadyRequest))?.card, 'open-source');
     assert.equal(await actionHost.presentOpenSource(), true);
+    const markerFolder = path.join(folder, 'home-presentations');
+    const markers = () => fs.readdirSync(markerFolder).sort().map((name) => [name, fs.readFileSync(path.join(markerFolder, name), 'utf8')]);
+    const originalMarkers = markers();
+    const reloadedStore = new GuidanceStore(globalState, release, release, folder);
+    const reloadedHost = new GuidanceHost({ ...deps, store: reloadedStore });
+    assert.equal((await reloadedHost.homeGuidance(noReadyRequest))?.card, 'open-source', 'a same-run reload restores the card');
+    assert.equal(await reloadedHost.presentOpenSource(), true, 'Home can post the restored presentation');
+    assert.deepEqual(markers(), originalMarkers, 'restoring a presentation spends no display');
+    reloadedHost.dispose();
     if (action === 'discussions') {
       openWorks = false;
       assert.equal(await actionHost.actOnOpenSource(action), false);
@@ -614,8 +623,15 @@ async function main(): Promise<void> {
     const opens = opened.length;
     assert.equal(await actionHost.actOnOpenSource(action), true);
     assert.deepEqual(opened.slice(opens), action === 'discussions' ? ['https://github.com/ProductoryHQ/ritemark-native/discussions'] : []);
-    assert.equal(await actionStore.openHomePresentation('second'), undefined);
-    assert.equal(await actionHost.homeGuidance(noReadyRequest), null);
+    if (action === 'discussions') {
+      assert.ok(await actionStore.openHomePresentation('second'), 'Discussions leaves the presentation open');
+      assert.deepEqual(markers(), originalMarkers);
+    } else {
+      const afterDismiss = new GuidanceHost({ ...deps, store: reloadedStore });
+      assert.equal(await afterDismiss.homeGuidance(noReadyRequest), null, 'Not now survives a reload');
+      assert.equal(await afterDismiss.presentOpenSource(), false);
+      afterDismiss.dispose();
+    }
     actionHost.dispose();
   }
   assert.equal(await host.presentOpenSource(), true, 'dismissals do not stop a different release');
@@ -627,6 +643,10 @@ async function main(): Promise<void> {
   openWorks = true;
   assert.equal(await host.actOnOpenSource('star'), true);
   assert.equal(await store.openHomePresentation('second'), undefined);
+  const afterStar = new GuidanceHost({ ...deps, store: new GuidanceStore(globalState, '2.2.0', '2.2.0', folder) });
+  assert.equal(await afterStar.homeGuidance(noReadyRequest), null, 'an accepted Star survives a reload');
+  assert.equal(await afterStar.presentOpenSource(), false);
+  afterStar.dispose();
   const next = new GuidanceStore(globalState, '2.3.0', '2.3.0', folder);
   assert.equal(await next.homeEligible({ day: '2099-11-25', appRun: 'third' }), false, 'a Star handoff stops future releases too');
   assert.equal(await vscodeStub.commands.executeCommand('ritemark.help.discussions'), true, 'Help works after Home retires');

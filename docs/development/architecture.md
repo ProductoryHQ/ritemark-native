@@ -755,7 +755,7 @@ Home shows at most one guidance card under Waiting for you. The order is What mo
 
 **Word and PDF reading** stayed with each AI (#497's spike: ChatGPT passed both on the Mac; Claude, OpenCode and Windows were not run). Every AI's capability context gained an honesty line (name the files it could not open) and Ritemark's name for `AGENTS.md`, "About this project" (version 4), so the empty project's request and the starting point land where Home shows it. The counts line is listed once per folder and listed again only after the folder's watcher sees a file created or deleted.
 
-**Open-source invitation (Sprint 176).** Home claims a release marker in profile-global storage when posting the card to a visible panel. The claim keeps concurrent windows from presenting it twice. `home/open-source-action` carries only `star`, `discussions`, or `dismiss`. Home uses the same fixed-target extension commands as Help. An accepted Star handoff writes the permanent marker. An accepted Discussions handoff or dismissal ends the card for the release. The card sends no usage events.
+**Open-source invitation (Sprint 176).** Home claims a release marker in profile-global storage when posting the card to a visible panel. The claim counts once per release. Reloading or switching projects in the same app run restores an unanswered presentation without spending another display. `home/open-source-action` carries only `star`, `discussions`, or `dismiss`. Home uses the same fixed-target extension commands as Help. An accepted Star handoff writes the permanent marker. Opening Discussions leaves the card available. Not now dismisses it for the release. The card sends no usage events.
 
 ### The feedback door (Sprint 140, #466)
 

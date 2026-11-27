@@ -244,7 +244,9 @@ export class GuidanceHost implements vscode.Disposable {
     });
     if (card === 'open-source' && !selected) {
       const day = localDay(new Date());
-      if (this.store.read().readyShownOn === day || !await this.store.homeEligible({ day, appRun: this.deps.appRun ?? '' })) {
+      const appRun = this.deps.appRun ?? '';
+      if (this.store.read().readyShownOn === day
+        || (!await this.store.homeEligible({ day, appRun }) && !await this.store.openHomePresentation(appRun))) {
         card = null;
       }
     }
@@ -643,11 +645,12 @@ export class GuidanceHost implements vscode.Disposable {
     return { ok: true, message: null };
   }
 
-  /** Claim the release immediately before sending the card to a visible Home. */
+  /** Claim or restore the release presentation immediately before posting to a visible Home. */
   async presentOpenSource(): Promise<boolean> {
     const day = localDay(new Date());
     if (this.store.read().readyShownOn === day) return false;
-    return this.store.reserveHomePresentation({ day, appRun: this.deps.appRun ?? '' });
+    const appRun = this.deps.appRun ?? '';
+    return await this.store.reserveHomePresentation({ day, appRun }) || Boolean(await this.store.openHomePresentation(appRun));
   }
 
   async actOnOpenSource(action: OpenSourceAction): Promise<boolean> {
@@ -658,7 +661,7 @@ export class GuidanceHost implements vscode.Disposable {
         const command = action === 'star' ? HELP_GITHUB_COMMAND : HELP_DISCUSSIONS_COMMAND;
         if (!await vscode.commands.executeCommand<boolean>(command)) return false;
       }
-      await this.store.endHomePresentation(action === 'star' ? 'star' : 'dismiss');
+      if (action !== 'discussions') await this.store.endHomePresentation(action);
       return true;
     } finally {
       this.openingSourceLink = false;

@@ -207,12 +207,16 @@ function OpenSourceCard() {
       </Tooltip>
       <p className="rh-guide-body">Ritemark is free and open source. A star on GitHub helps other people find it, and in Discussions you can ask us and others anything.</p>
       <div className="rh-guide-go">
-        <Button size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'star' })}>
-          <Icon name="star" size={14} tone="inherit" />Star on GitHub
-        </Button>
-        <Button variant="outline" size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'discussions' })}>
-          <Icon name="chats-circle" size={14} tone="inherit" />Discussions
-        </Button>
+        <Tooltip label="Opens Ritemark on GitHub" asChild>
+          <Button size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'star' })}>
+            <Icon name="star" size={14} tone="inherit" />Star on GitHub
+          </Button>
+        </Tooltip>
+        <Tooltip label="Opens Ritemark's Discussions on GitHub" asChild>
+          <Button variant="outline" size="compact" onClick={() => send({ type: 'home/open-source-action', action: 'discussions' })}>
+            <Icon name="chats-circle" size={14} tone="inherit" />Discussions
+          </Button>
+        </Tooltip>
         <span className="rh-guide-note">Both open in your browser.</span>
       </div>
     </section>
