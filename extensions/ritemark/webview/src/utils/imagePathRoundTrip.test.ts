@@ -293,6 +293,17 @@ for (const source of ['![](a&amp;b.png)\n', '![a][ref]\n\n[ref]: a&amp;b.png\n']
   })
 }
 
+for (const source of ['![](chart.png)\n', '![Sales](chart.png)\n', '![a][c]\n\n[c]: chart.png\n']) {
+  test(`a file change never writes a local path for an unmapped picture: ${JSON.stringify(source)}`, () => {
+    // The file was missing when the document opened, so the host didn't map it (security review of #1115).
+    const opened = openDocument(source, {})
+    const refreshed = 'https://file%2B.vscode-resource.vscode-cdn.net/Users/someone/Projects/client/chart.png?v=99'
+    const tr = refreshPictureSources(EditorState.create({ doc: opened.doc }), 'chart.png', refreshed)
+    assert.equal(tr, null)
+    assert.equal(saveDocument(opened), source)
+  })
+}
+
 test('a file change updates an encoded picture without changing its Markdown', () => {
   const written = 'images/my%20pic.png'
   const source = `![](${written})\n`

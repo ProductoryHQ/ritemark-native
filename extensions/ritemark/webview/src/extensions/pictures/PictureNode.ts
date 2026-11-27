@@ -17,7 +17,7 @@ import { NodeSelection, Plugin, type EditorState } from '@tiptap/pm/state'
 import type { Decoration, DecorationSource, EditorView, NodeView } from '@tiptap/pm/view'
 import { boxStyle, cropOfRegion, hasFrame, innerStyle, isPlainLook, lookOf, outerStyle, slideFrameStyle, type PictureContext } from '../../../../src/markdown/pictureLook'
 import { missingHtml, picturePathOf } from '../../../../src/decks/blocks/slideRenderer'
-import { sameMarkdownImageFile } from '../../../../src/utils/imagePaths'
+import { isWebviewResourceUri, sameMarkdownImageFile } from '../../../../src/utils/imagePaths'
 import { isRelativeTarget } from '../../../../src/decks/deckLibraryFormat'
 import { PICTURE_CROP, cropMeta, cropOf, leavePicture, setPictureLook, type CropState } from './pictureCommands'
 
@@ -42,6 +42,10 @@ export function refreshPictureSources(state: EditorState, changedPath: string, d
   const tr = state.tr
   state.doc.descendants((node, pos) => {
     if (node.type.name !== 'image') return
+    // Only a picture the host mapped shows a webview URI. An unmapped one (its file was missing when the document
+    // opened) keeps its written path: giving it a display URI here would make the save write the absolute local
+    // path into the document (security review of #1115). It shows after the document is opened again.
+    if (!isWebviewResourceUri(String(node.attrs.src ?? '').trim())) return
     const written = node.attrs.mdImageSrc ?? imagePathOf(node.attrs)
     if (typeof written === 'string' && sameMarkdownImageFile(written, changedPath)) {
       tr.setNodeMarkup(pos, undefined, { ...node.attrs, src: displaySrc })
