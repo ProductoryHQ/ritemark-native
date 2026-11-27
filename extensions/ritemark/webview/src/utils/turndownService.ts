@@ -1,7 +1,7 @@
 import TurndownService from 'turndown'
 import { Lexer, marked, type Links, type Marked, type Tokens } from 'marked'
 import { tables, taskListItems } from 'turndown-plugin-gfm'
-import { isRelativeImagePath, isWebviewResourceUri, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
+import { isRelativeImagePath, isWebviewResourceUri, markdownImageSource, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { pictureTarget } from '../../../src/decks/blocks/legacyToBlocks'
 import { markdownAlt, parsePictureBlock } from '../../../src/markdown/pictureLook'
 import { addMathTurndownRules } from '../extensions/math/mathTurndownRules'
@@ -12,8 +12,8 @@ import { addAsWrittenTurndownRules, blockImage, blockLeading, blockTrailing, esc
 function matchesImageSource(href: string, src: string): boolean {
   if (href === src) return true
   try {
-    const encode = (url: string) => encodeURI(url).replace(/%25/g, '%')
-    return encode(href) === encode(unescapeMarkdownImagePath(src))
+    const rendered = markdownImageSource(href)
+    return rendered === src || rendered === markdownImageSource(unescapeMarkdownImagePath(src))
   } catch {
     return false
   }
@@ -170,8 +170,10 @@ export function createTurndownService(instance: Pick<Marked, 'defaults'> = marke
       }
       const label = `![${markdownAlt(alt)}]`
       const caption = el.getAttribute('data-md-image-title') ?? (writtenTarget !== null && !useTitle ? title : '')
-      // Entities round-trip through marked's rendering of Markdown titles and avoid delimiter escapes.
-      const escapedCaption = caption.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/\\/g, '&#92;')
+      const escapedCaption = caption
+        .replace(/&(?:#(?:[0-9]{1,7}|[xX][0-9a-fA-F]{1,6})|[a-zA-Z][a-zA-Z0-9]+);/g,
+          entity => decodeImageText(el, entity) === entity ? entity : '&amp;' + entity.slice(1))
+        .replace(/\\(?=[\x21-\x2f\x3a-\x40\x5b-\x60\x7b-\x7e]|$)|"/g, '\\$&')
       let markdown = label + `(${pictureTarget(src)}${caption ? ` "${escapedCaption}"` : ''})`
       if (writtenTarget !== null && (writtenSrc === null || src === writtenSrc)) {
         const writtenLabel = alt === el.getAttribute('data-md-image-alt')

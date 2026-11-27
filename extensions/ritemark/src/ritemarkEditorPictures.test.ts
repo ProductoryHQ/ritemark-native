@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import Module from 'node:module';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { sameMarkdownImageFile } from './utils/imagePaths';
 import { makeTempDir } from './testing/tempDir';
 
 const loader = Module as unknown as { _load(request: string, parent: { filename: string }, isMain: boolean): unknown };
@@ -26,6 +27,14 @@ const editor = Object.create(RitemarkEditorProvider.prototype) as {
 };
 
 const cases = [
+  ['literal percent escape', '![](Screen%20Shot.png)', 'Screen%20Shot.png', 'Screen%20Shot.png'],
+  ['quoted definition', '![ref]\n\n> [ref]: x.png', 'x.png', 'x.png'],
+  ['list definition', '![ref]\n\n- [ref]: x.png', 'x.png', 'x.png'],
+  ['ignore fenced definition', '![ref]\n\n```\n[ref]: old.png\n```\n\n[ref]: x.png', 'x.png', 'x.png'],
+  ['text after title delimiters', '![ref]\n\n[ref]: x.png\n(see) more', 'x.png', 'x.png'],
+  ['shortcut after malformed inline', '![ref](not valid\n\n[ref]: x.png', 'x.png', 'x.png'],
+  ['inline entity', '![](a&amp;b.png)', 'a&amp;b.png', 'a&b.png'],
+  ['reference entity', '![ref]\n\n[ref]: a&amp;b.png', 'a&amp;b.png', 'a&b.png'],
   ['double-quoted title', '![](./x.png "t")', './x.png', 'x.png'],
   ['angle destination and title', '![](<a b.png> "t")', 'a b.png', 'a b.png'],
   ['encoded space', '![](images/my%20pic.png)', 'images/my%20pic.png', 'images/my pic.png'],
@@ -48,6 +57,7 @@ for (const [name, markdown, key, file] of cases) {
       const absolutePath = path.join(dir, file);
       fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
       fs.writeFileSync(absolutePath, '');
+      if (name === 'ignore fenced definition') fs.writeFileSync(path.join(dir, 'old.png'), '');
       const mappings = editor.transformImagePaths(markdown, uri(path.join(dir, 'doc.md')), { asWebviewUri: uri });
       assert.deepEqual(mappings, { [key]: absolutePath + '?v=' + Math.round(fs.statSync(absolutePath).mtimeMs) });
     } finally {
@@ -56,12 +66,20 @@ for (const [name, markdown, key, file] of cases) {
   });
 }
 
-test('100 KB of unterminated angle destinations takes under 50 ms', () => {
-  const markdown = '![](<'.repeat(20_000);
+test('200 KB of unterminated angle destinations takes under 50 ms', () => {
+  const markdown = '![ref]\n\n[ref]: hostile-test.png\n\n' + '![](<'.repeat(40_000);
   const start = performance.now();
-  const mappings = editor.transformImagePaths(markdown, uri('/tmp/doc.md'), { asWebviewUri: uri });
+  const mappings = editor.transformImagePaths(markdown, uri('/dev/null/doc.md'), { asWebviewUri: uri });
   const elapsed = performance.now() - start;
   assert.deepEqual(mappings, {});
   assert.ok(elapsed < 50, `${elapsed.toFixed(2)} ms`);
-  console.log(`100 KB scan: ${elapsed.toFixed(2)} ms`);
+  console.log(`200 KB scan: ${elapsed.toFixed(2)} ms`);
+});
+
+test('file changes match the written spelling of a picture path', () => {
+  assert.ok(sameMarkdownImageFile('images/my%20pic.png', './images/my pic.png'));
+  assert.ok(sameMarkdownImageFile('Screen%20Shot.png', './Screen%20Shot.png'));
+  assert.ok(sameMarkdownImageFile(String.raw`a\(1\).png`, './a(1).png'));
+  assert.ok(sameMarkdownImageFile('a&amp;b.png', './a&b.png'));
+  assert.ok(!sameMarkdownImageFile('images/my%20pic.png', './other/my pic.png'));
 });

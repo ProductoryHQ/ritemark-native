@@ -44,7 +44,7 @@ import { addDeckTurndownRules } from '../components/decks/handout/deckSchema'
 import { mathMarkedExtension } from '../extensions/math/mathMarkedExtension'
 import { LiteralDollar, MathBlock, MathInline } from '../extensions/math/mathNodes'
 import { classifyLinkTarget, isSafeRelativePath } from '../lib/linkTargets'
-import { unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
+import { markdownImageSource, unescapeMarkdownImagePath } from '../../../src/utils/imagePaths'
 import { createTurndownService } from './turndownService'
 import { pictureMarkedExtension } from '../extensions/pictures/pictureMarked'
 import { annotatePictureReferences, pictureDefinitionAttribute, pictureReferencesExtension } from '../extensions/pictures/pictureReferences'
@@ -217,7 +217,7 @@ function mapImages(container: HTMLElement, imageMappings?: Record<string, string
   const mappings = new Map(entries.map(([path, uri]) => [path, { path, uri }]))
   // Match marked's URL encoding, including its preservation of existing percent escapes.
   for (const [path, uri] of entries) {
-    const encoded = encodeURI(unescapeMarkdownImagePath(path)).replace(/%25/g, '%')
+    const encoded = markdownImageSource(unescapeMarkdownImagePath(path))
     if (!mappings.has(encoded)) mappings.set(encoded, { path, uri })
   }
 
@@ -252,8 +252,8 @@ function parseAsWritten(markdown: string, instance: Marked, prepareTokens?: (tok
   const preprocessed = options.hooks ? options.hooks.preprocess(markdown) as string : markdown
   const source = protectFenceTabs(preprocessed)
   const tokens = instance.lexer(source)
-  annotateAsWritten(tokens, source)
   if (instance === editorMarked) annotatePictureReferences(instance, tokens)
+  annotateAsWritten(tokens, source)
   prepareTokens?.(tokens)
   if (options.walkTokens) instance.walkTokens(tokens, options.walkTokens)
   const html = instance.parser(tokens)

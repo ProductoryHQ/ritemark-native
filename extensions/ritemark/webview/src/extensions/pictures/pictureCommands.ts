@@ -141,10 +141,8 @@ export function replacePicture(state: EditorState, pos: number, picture: { src: 
   if (!node) return null
   const written = (node.attrs.picture as string | null) ?? ''
   const block = withLook(written, changedLook(lookOf(written), { crop: undefined, zoom: undefined, focus: undefined, caption: undefined }))
-  // Mapped pictures store the authored title separately from their filesystem path.
-  const authorTitle = node.attrs.mdImageTitle ?? (node.attrs.mdImageTarget && !node.attrs.mdImageSrc ? node.attrs.title : null)
   const tr = state.tr.setNodeMarkup(pos, undefined, {
-    ...node.attrs, ...newPictureSpelling, mdImageTitle: authorTitle,
+    ...node.attrs, ...newPictureSpelling,
     src: picture.src, title: picture.title, alt: '', picture: block || null,
   })
   tr.setSelection(NodeSelection.create(tr.doc, pos))

@@ -1,3 +1,5 @@
+import { Lexer, marked } from 'marked';
+
 // The deck importer's destination regex only handles one level of parentheses.
 // Index bracket pairs and bare destination ends once so malformed candidates
 // cannot repeatedly walk the same suffix.
@@ -7,8 +9,6 @@ const doubleTitle = /"(?:\\[!-/:-@\[-`{-~]|[^\\"]|\\(?![!-/:-@\[-`{-~]))*"/y;
 const singleTitle = /'(?:\\[!-/:-@\[-`{-~]|[^\\']|\\(?![!-/:-@\[-`{-~]))*'/y;
 const parenTitle = /\((?:\\[!-/:-@\[-`{-~]|[^\\()]|\\(?![!-/:-@\[-`{-~]))*\)/y;
 const whitespace = /[ \t\r\n]*/y;
-const definitionEnd = /[ \t]*(?:\r?\n|$)/y;
-const definitionStart = /(?:^|\n) {0,3}(?=\[)/g;
 
 function matchAt(rule: RegExp, source: string, start: number): RegExpExecArray | null {
   rule.lastIndex = start;
@@ -16,7 +16,7 @@ function matchAt(rule: RegExp, source: string, start: number): RegExpExecArray |
 }
 
 function normalizeLabel(label: string): string {
-  return label.trim().replace(/\s+/g, ' ').toLowerCase();
+  return label.toLowerCase().replace(/\s+/g, ' ');
 }
 
 /** Local path candidates from inline pictures and the definitions referenced by pictures. */
@@ -76,7 +76,7 @@ export function markdownImageDestinations(source: string): Set<string> {
     return end;
   }
 
-  function readTarget(start: number, definition: boolean): { target: string; tail: number } | undefined {
+  function readTarget(start: number): { target: string; tail: number } | undefined {
     let targetStart = start;
     let targetEnd = bareEnd[start];
     let end = targetEnd;
@@ -99,23 +99,31 @@ export function markdownImageDestinations(source: string): Set<string> {
       }
     }
 
-    if (definition ? !matchAt(definitionEnd, source, end) : source[tail] !== ')') return;
+    if (source[tail] !== ')') return;
     return { target: source.slice(targetStart, targetEnd), tail };
   }
 
   const references = new Set<string>();
+  const mayHaveDefinitions = source.includes(']:');
   for (let i = source.indexOf('!['); i !== -1; i = source.indexOf('![', i + 1)) {
     if (escaped[i]) continue;
     const close = brackets[i + 1];
     if (!close) continue;
     const next = close + 1;
     if (source[next] === '(') {
-      const inline = readTarget(skipSpace(next + 1), false);
+      const start = skipSpace(next + 1);
+      if (source[start] === ')') {
+        i = start;
+        continue;
+      }
+      const inline = readTarget(start);
       if (inline) {
         destinations.add(inline.target);
         i = inline.tail;
+        continue;
       }
-    } else {
+    }
+    if (mayHaveDefinitions) {
       const refClose = source[next] === '[' ? brackets[next] : 0;
       const start = refClose > next + 1 ? next + 1 : i + 2;
       const end = refClose > next + 1 ? refClose : close;
@@ -127,17 +135,13 @@ export function markdownImageDestinations(source: string): Set<string> {
   }
 
   if (references.size) {
-    for (const match of source.matchAll(definitionStart)) {
-      const start = match.index + match[0].length;
-      const close = brackets[start];
-      if (!close || close - start > 1000 || source[close + 1] !== ':') continue;
-      const label = normalizeLabel(source.slice(start + 1, close));
-      if (!references.has(label)) continue;
-      const definition = readTarget(skipSpace(close + 2), true);
-      if (definition) {
-        destinations.add(definition.target);
-        references.delete(label); // CommonMark uses the first definition.
-      }
+    // Use marked's block rules for container indentation, fences, and
+    // definition titles. The linear scan above handles inline candidates.
+    const lexer = new Lexer({ ...marked.defaults });
+    lexer.blockTokens(source.replace(/\r\n?/g, '\n'), lexer.tokens);
+    for (const label of references) {
+      const definition = lexer.tokens.links[label];
+      if (definition) destinations.add(definition.href);
     }
   }
   return destinations;

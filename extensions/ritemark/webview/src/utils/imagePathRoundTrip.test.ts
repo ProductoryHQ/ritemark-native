@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { marked } from 'marked'
 import { getSchema } from '@tiptap/core'
 import { EditorState } from '@tiptap/pm/state'
+import { refreshPictureSources } from '../extensions/pictures/PictureNode'
 import { replacePicture, replacePictureKeepingCaret } from '../extensions/pictures/pictureCommands'
 import { loadSlide, saveSlide } from '../components/decks/blocks/slideEditorHarness'
 import { installTestDocument, openDocument, saveDocument, typeAtEndOfLastParagraph } from './markdownFidelity'
@@ -188,12 +189,14 @@ test('editing a picture destination keeps its author title', () => {
   assert.equal(openDocument(saved).doc.firstChild?.attrs.src, './new.png')
 })
 
-test('replacing a mapped picture keeps its author title', () => {
-  const opened = openDocument('![](./x.png "t")\n', { './x.png': display })
-  const tr = replacePicture(EditorState.create({ doc: opened.doc }), 0, { src: display, title: './new.png' })
-  assert.ok(tr)
-  assert.equal(saveDocument(opened, tr.doc), '![](./new.png "t")\n')
-})
+for (const replace of [replacePicture, replacePictureKeepingCaret]) {
+  test(`${replace.name} clears the old author title`, () => {
+    const opened = openDocument('![](./x.png "t")\n', { './x.png': display })
+    const tr = replace(EditorState.create({ doc: opened.doc }), 0, { src: display, title: './new.png' })
+    assert.ok(tr)
+    assert.equal(saveDocument(opened, tr.doc), '![](./new.png)\n')
+  })
+}
 
 for (const [picture, definitions] of [
   ['![Alt][UPPER]', '[upper]: <a b.png> \'Title\'\n[UPPER]: another.png'],
@@ -216,4 +219,76 @@ test('an escaped destination uses the exact host mapping key and keeps its spell
   const opened = openDocument(source, { [path]: display })
   assert.equal(opened.doc.firstChild?.attrs.src, display)
   assert.equal(saveDocument(opened), source)
+})
+
+for (const [definition, text] of [
+  ['[r]: x.png', '(Photo by John)'],
+  ['[r]: x.png', '"Photo"'],
+  ['[r]: x.png', "'Photo'"],
+  ['> [r]: x.png', '(Photo)'],
+  ['- item\n\n  [r]: x.png', '(Photo)'],
+]) {
+  test(`editing a paragraph after ${definition} keeps ${text} on reopen`, () => {
+    const prefix = definition.startsWith('>') ? '> ' : definition.startsWith('-') ? '  ' : ''
+    const opened = openDocument(`![a][r]\n\n${definition}\n${prefix}Words\n`)
+    let pos = -1
+    opened.doc.descendants((node, offset) => {
+      if (node.type.name === 'paragraph' && node.textContent === 'Words') pos = offset
+    })
+    assert.ok(pos >= 0)
+    const tr = EditorState.create({ doc: opened.doc }).tr.insertText(text, pos + 1, pos + 6)
+    const saved = saveDocument(opened, tr.doc)
+    assert.ok(openDocument(saved).doc.textContent.includes(text), saved)
+  })
+}
+
+test('deleting a heading does not turn the next paragraph into a picture title', () => {
+  const opened = openDocument('![a][r]\n\n[r]: x.png\n# H\n"Quote"\n')
+  const state = EditorState.create({ doc: opened.doc })
+  let pos = -1
+  opened.doc.forEach((node, offset) => { if (node.type.name === 'heading') pos = offset })
+  assert.ok(pos >= 0)
+  const saved = saveDocument(opened, state.tr.delete(pos, pos + opened.doc.nodeAt(pos)!.nodeSize).doc)
+  assert.ok(openDocument(saved).doc.textContent.includes('"Quote"'), saved)
+})
+
+for (const [before, after] of [['# H', 'Para B'], ['Para', '> q'], ['---', 'Para B'], ['```\ncode\n```', 'Para B']]) {
+  test(`dropping a link definition preserves spacing after ${before}`, () => {
+    const opened = openDocument(`${before}\n\n[l]: u\n${after}\n`)
+    assert.equal(saveDocument(opened), `${before}\n\n${after}\n`)
+  })
+}
+
+test('rewritten titles escape only Markdown-sensitive characters', () => {
+  const html = markdownToEditorHTML('![](old.png "t")')
+  const root = document.createElement('div')
+  root.innerHTML = html
+  const image = root.querySelector('img')!
+  image.setAttribute('src', 'new.png')
+  const title = String.raw`R&D \ path \"quote" &amp;`
+  image.setAttribute('title', title)
+  const saved = save(root.innerHTML)
+  assert.equal(saved, String.raw`![](new.png "R&D \ path \\\"quote\" &amp;amp;")`)
+  assert.equal(openDocument(saved).doc.firstChild?.attrs.title, title)
+})
+
+for (const source of ['![](a&amp;b.png)\n', '![a][ref]\n\n[ref]: a&amp;b.png\n']) {
+  test(`entity destination maps and round-trips: ${source}`, () => {
+    const opened = openDocument(source, { 'a&amp;b.png': display })
+    assert.equal(opened.doc.firstChild?.attrs.src, display)
+    assert.equal(saveDocument(opened), source)
+    assert.equal(saveDocument(openDocument(source)), source)
+  })
+}
+
+test('a file change updates an encoded picture without changing its Markdown', () => {
+  const written = 'images/my%20pic.png'
+  const source = `![](${written})\n`
+  const opened = openDocument(source, { [written]: display })
+  const refreshed = display + '8'
+  const tr = refreshPictureSources(EditorState.create({ doc: opened.doc }), './images/my pic.png', refreshed)
+  assert.ok(tr)
+  assert.equal(tr.doc.firstChild?.attrs.src, refreshed)
+  assert.equal(tr.getMeta('addToHistory'), false)
+  assert.equal(saveDocument(opened, tr.doc), source)
 })

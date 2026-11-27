@@ -35,7 +35,7 @@ import type { DocumentEditPayload, DocumentRenderPayload, DocumentSyncBootstrap 
 import { canonicalMarkdownProjection } from './editorSync/state';
 import { joinFrontMatter, splitFrontMatter, type DocumentProperties } from './editorSync/frontMatter';
 import { versionedWebviewAssetUri } from './views/webviewAssetUri';
-import { isRelativeImagePath, pictureFileInside, unescapeMarkdownImagePath } from './utils/imagePaths';
+import { markdownImageFilePaths, pictureFileInside, sameMarkdownImageFile } from './utils/imagePaths';
 import { markdownImageDestinations } from './utils/markdownImages';
 import { ChatgptPictureHost } from './pictures/chatgptPictureHost';
 import { resolveDocumentResourceRoots, resolveDocumentRoot, toMarkdownRelativePath } from './webviewResourceRoots';
@@ -476,14 +476,10 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     for (const imagePath of markdownImageDestinations(markdown)) {
       // Use the written destination as the mapping key, so the webview
       // can match it and put the same path back on save.
-      if (!isRelativeImagePath(imagePath)) continue;
-      let filePath = unescapeMarkdownImagePath(imagePath);
-      try { filePath = decodeURI(filePath); } catch { /* Use the undecoded path. */ }
-      if (!isRelativeImagePath(filePath) || filePath.includes('\0')) continue;
-      const absolutePath = path.resolve(docDir, filePath);
-
-      // Check if file exists
-      if (fs.existsSync(absolutePath)) {
+      const absolutePath = markdownImageFilePaths(imagePath)
+        .map(filePath => path.resolve(docDir, filePath))
+        .find(filePath => fs.existsSync(filePath));
+      if (absolutePath) {
         // Convert to webview URI. The mtime version param busts the webview's
         // cache when the file content changed since the last render (pairs
         // with the live 'imageRefreshed' watcher in resolveCustomTextEditor).
@@ -891,7 +887,7 @@ export class RitemarkEditorProvider implements vscode.CustomTextEditorProvider {
     imageWatcher.onDidChange((uri) => {
       if (isDisposed) { return; }
       const rel = toMarkdownRelativePath(path.dirname(document.uri.fsPath), uri.fsPath);
-      if (!document.getText().includes(rel.replace(/^\.\//, ''))) { return; }
+      if (![...markdownImageDestinations(document.getText())].some(written => sameMarkdownImageFile(written, rel))) { return; }
       void webview.postMessage({
         type: 'imageRefreshed',
         path: rel,

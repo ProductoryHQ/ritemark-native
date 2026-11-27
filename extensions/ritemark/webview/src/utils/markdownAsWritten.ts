@@ -25,6 +25,7 @@
  * the HTML `marked` makes is the same apart from the added attributes.
  */
 import { delimiterUnits, tableHasWidths } from '../../../src/markdown/tableWidths'
+import { definitionAllowsTight, pictureDefinitionAttribute } from '../extensions/pictures/pictureReferences'
 import type TurndownService from 'turndown'
 import type { MarkedExtension, Token, Tokens } from 'marked'
 
@@ -93,13 +94,15 @@ export function annotateAsWritten(tokens: Token[], source: string): void {
 }
 
 function walkBlocks(tokens: Token[], tabs: boolean): void {
-  tokens.forEach((token, index) => {
+  let previous: Token | undefined
+  for (const token of tokens) {
+    if (token.type === 'pictureDefinition' && !token.keep) continue
     const block = token as Token & AsWrittenToken
-    const previous = tokens[index - 1]
     // The block comes straight after the one before it: no `space` token
     // between, and no blank line at the end of the earlier block's raw text
     // (a heading or a rule keeps its trailing blank line in its raw).
     block.rmTight = !!previous && previous.type !== 'space' && !ENDS_WITH_BLANK_LINE.test(previous.raw)
+    previous = token
     if (token.type === 'list') {
       block.rmTabs = tabs
       for (const item of (token as Tokens.List).items) walkBlocks(item.tokens, tabs)
@@ -112,7 +115,7 @@ function walkBlocks(tokens: Token[], tabs: boolean): void {
       // Sprint 163: each tab's pane holds blocks, read on their own (the pane's first block follows its heading).
       for (const pane of (token as unknown as { tabs: Array<{ tokens: Token[] }> }).tabs) walkBlocks(pane.tokens, tabs)
     }
-  })
+  }
 }
 
 function escapeAttribute(value: string): string {
@@ -564,7 +567,7 @@ function blockKind(node: Element): BlockKind {
     case 'PRE': return 'code'
     case 'BLOCKQUOTE': return 'quote'
     case 'TABLE': return 'table'
-    case 'HR': return node.hasAttribute('data-md-image-definition') ? 'definition' : 'rule'
+    case 'HR': return node.hasAttribute(pictureDefinitionAttribute) ? 'definition' : 'rule'
     case 'UL': case 'OL': return 'list'
     default: return 'other'
   }
@@ -583,14 +586,19 @@ function writtenRule(node: Element): string | null {
  * list, a quote or a table goes on taking lines until a blank line or a
  * block that can interrupt it (CommonMark §4.8, §5.1, §5.2; GFM tables).
  */
-function writtenTight(previous: Element | null, next: Element): boolean {
+function writtenTight(previous: Element | null, next: Element, content?: string): boolean {
   if (!previous || next.getAttribute('data-md-tight') !== 'true') return false
   const before = blockKind(previous)
   const after = blockKind(next)
   if (before === 'other' || after === 'other') return false
   // A fence line (`:::`) never merges with the block beside it, so written tight it stays tight.
   if (before === 'fdiv' || after === 'fdiv') return true
-  if (before === 'heading' || before === 'code' || before === 'rule' || before === 'definition') return true
+  if (before === 'definition') {
+    // Turndown joins at the larger gap. The paragraph's leading side has its
+    // rendered Markdown and can detect a title crossing the block boundary.
+    return content === undefined || definitionAllowsTight(previous.getAttribute(pictureDefinitionAttribute)!, content)
+  }
+  if (before === 'heading' || before === 'code' || before === 'rule') return true
   if (after === 'heading' || after === 'code') return true
   if (after === 'rule') return before !== 'paragraph' || !(writtenRule(next) ?? '-').trimStart().startsWith('-')
   if (before === 'paragraph') {
@@ -602,9 +610,9 @@ function writtenTight(previous: Element | null, next: Element): boolean {
 }
 
 /** The newlines before a top-level block. */
-export function blockLeading(node: Element): string {
+export function blockLeading(node: Element, content?: string): string {
   if (isList(node) && node.getAttribute('data-md-continues') === 'true' && isList(node.previousElementSibling)) return '\n'
-  return writtenTight(node.previousElementSibling, node) ? '\n' : '\n\n'
+  return writtenTight(node.previousElementSibling, node, content) ? '\n' : '\n\n'
 }
 
 /** The newlines after a top-level block. */
@@ -908,7 +916,8 @@ export function addAsWrittenTurndownRules(service: TurndownService): void {
   service.addRule('asWrittenParagraph', {
     filter: 'p',
     replacement(content, node) {
-      return blockLeading(node as Element) + escapeLineStarts(content) + blockTrailing(node as Element)
+      const paragraph = escapeLineStarts(content)
+      return blockLeading(node as Element, paragraph) + paragraph + blockTrailing(node as Element)
     },
   })
 

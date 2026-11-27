@@ -1,5 +1,4 @@
 import { Lexer, type Marked, type MarkedExtension, type Token, type Tokens } from 'marked'
-import { tightAttribute } from '../../utils/markdownAsWritten'
 
 export const pictureDefinitionAttribute = 'data-md-image-definition'
 
@@ -13,10 +12,17 @@ export function pictureDefinition(raw: string): Tokens.Def | undefined {
   if (definition?.raw === raw) return definition
 }
 
+/** Would a following line extend the definition with a title? */
+export function definitionAllowsTight(raw: string, following: string): boolean {
+  const reparsed = definitionTokenizer.def(raw + '\n' + following)
+  return reparsed?.raw.replace(/\n+$/, '') === raw
+}
+
 interface PictureDefinition extends Tokens.Generic {
   type: 'pictureDefinition'
   tag: string
   keep?: boolean
+  rmTight?: boolean
 }
 
 type ReferencePicture = Tokens.Image & { referenceLabel?: string }
@@ -49,7 +55,7 @@ export const pictureReferencesExtension: MarkedExtension = {
       if (!(token as PictureDefinition).keep) return ''
       const raw = token.raw.replace(/\n+$/, '')
       const escaped = raw.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      const tight = tightAttribute(token) ? ' data-md-tight="true"' : ''
+      const tight = (token as PictureDefinition).rmTight ? ' data-md-tight="true"' : ''
       return `<hr hidden ${pictureDefinitionAttribute}="${escaped}"${tight}>\n`
     },
   }],
