@@ -27,7 +27,7 @@ import { isMac } from '../../../hooks/usePlatform'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, barLeftPastPane, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
   dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type BoxIconMenuCloseReason, type ChosenBlock,
 } from './blockBar'
@@ -451,8 +451,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
     const inPane = barLeft(placed.screen.left, width, placed.pane, window.innerWidth)
     if (inPane === null && fold < MAX_FOLD) { setFold(fold + 1); return }
-    // At the last fold, keep the row intact and let any excess extend past the pane.
-    const left = inPane ?? Math.max(8, placed.pane.left + 8)
+    // At the last fold, keep the row intact: past the pane if it must be, never past the window (Add and Delete stay).
+    const left = inPane ?? barLeftPastPane(width, placed.pane, window.innerWidth)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
   }, [barShowing, placed, chosen, drag, fold])

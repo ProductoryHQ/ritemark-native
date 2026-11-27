@@ -854,6 +854,15 @@ export function iconSpot(box: Box, scale: number): { left: number; top: number }
  * The bar's left edge: under the block, inside the slide's pane (8 px from its edges, the divider included: the
  * Experience lead on #773), and on the window. Null when the bar is wider than the pane: its own group then folds.
  */
+/**
+ * Where the bar goes when even its last fold is wider than the pane (27 November, the bar never wraps): inside the
+ * window, as far left as the pane allows and further over the strip if it must, so its last buttons (Add, Delete) are
+ * never cut off at the window's right edge.
+ */
+export function barLeftPastPane(width: number, pane: { left: number }, windowWidth: number): number {
+  return Math.max(8, Math.min(pane.left + 8, windowWidth - 8 - width))
+}
+
 export function barLeft(blockLeft: number, width: number, pane: { left: number; right: number }, windowWidth: number): number | null {
   const min = Math.max(8, pane.left + 8)
   const max = Math.min(windowWidth - 8, pane.right - 8) - width

@@ -40,7 +40,7 @@ import { iconMenuChoices, iconMenuStartQuery } from '../slide/iconSearch'
 import { SLIDE_COMMAND, setBlockValue } from './slideCommands'
 import {
   BAR_KINDS, HANDLE_SIZE, RING_LINE, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, chosenBlockAt, columnCount, columnIndexAt, columnShares, deleteBlock, dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, removeColumn, ringGap,
-  FOLD_AT, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind, type BoxIconMenuCloseReason,
+  FOLD_AT, MAX_FOLD, barLeftPastPane, REVEAL_LABEL, REVEAL_TIP, revealsOneBlock, setColumnCount, setColumnSplit, setReveal, snapSplit, splitGuideX, splitPlace, splitShares, tabAcross, turnInto, type BarKind, type BoxIconMenuCloseReason,
   MARK_LABEL, MARK_MENU_TIP, MARK_TIP, divAttributesOf, setBoxesMark,
 } from './blockBar'
 
@@ -658,6 +658,10 @@ stable(COLUMNS, 'three columns')
   const rowWidth = widthBeforeDelete + deleteWidth + deleteGap
   assert.equal(barLeft(300, widthBeforeDelete, pane, 1440), 232, 'without Delete the row fits at this fold')
   assert.equal(barLeft(300, rowWidth, pane, 1440), null, 'the complete row needs another fold')
+  // Wider than the pane even folded: it stays in the window, sliding left over the strip, never off the right edge.
+  assert.equal(barLeftPastPane(506, { left: 400 }, 760), 246, 'over the strip, its right end 8 px inside the window')
+  assert.equal(barLeftPastPane(300, { left: 400 }, 1440), 408, 'room to the right: at the pane\'s left')
+  assert.equal(barLeftPastPane(900, { left: 400 }, 760), 8, 'wider than the window: from its left edge')
   const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
   assert.doesNotMatch(barSource, /maxWidth:|flexWrap:/, 'measure the complete intrinsic row even at MAX_FOLD')
   assert.match(barSource, /\{!iconOnly && BAR_KIND_LABEL\[chosen.kind\]\}/, 'the type keeps only its icons at the last fold')
