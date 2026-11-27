@@ -35,6 +35,15 @@ assert.equal(FEEDBACK_COPY.handoff.opened.report, "Your report is in a new e-mai
 assert.equal(FEEDBACK_COPY.sheet.shortenedNote, 'Shortened to fit an e-mail. Copy takes the whole answer.', 'D10');
 assert.equal(REPORT_RECIPIENT, 'info@productory.eu', 'the shape\'s decision 7');
 
+test('the picture copy handoff uses the lead’s words', () => {
+  assert.deepEqual(FEEDBACK_COPY.picture.copyHandoff, {
+    wordsButton: 'Copy words',
+    pictureButton: 'Copy picture',
+    pictureHint: 'Puts the picture back on your clipboard',
+    wordsCopied: 'Your words are on the clipboard now, in place of the picture. Paste them, then press Copy picture.',
+  });
+});
+
 // Sprint 126's honesty rule over every e-mail-route string: no word claims a delivery Ritemark cannot see (S58)
 for (const words of emailRouteStrings()) {
   for (const claim of DELIVERY_CLAIM_WORDS) {
@@ -291,6 +300,18 @@ test('feedback command validates the open and binds submissions to its card and 
     assert.equal(mailBody, email.copyText);
     assert.ok(email.copyText.endsWith(`${message}\n\n${LAST_ANSWER_LABEL}\n> Chosen answer.`));
   }
+  const withPicture = { ...base, withPicture: true };
+  const withoutPicture = { ...base, withPicture: false };
+  const eventCount = events.length;
+  const plainMail = await submit({ ...withoutPicture, route: 'email', includeQuote: true });
+  const plainBody = mailBody;
+  const pictureMail = await submit({ ...withPicture, route: 'straight', includeQuote: true });
+  assert.deepEqual(pictureMail, plainMail, 'a picture selects e-mail and leaves the text report unchanged');
+  assert.equal(mailBody, plainBody);
+  assert.equal(events.length, eventCount, 'picture feedback must not go to analytics');
+  assert.equal(routeOf(withPicture), 'email');
+  assert.equal(mailKindOf(withPicture), 'feedback');
+  assert.equal(await submit({ ...withPicture, route: 'straight', withPicture: 'true' }), null);
   const fullField = 'x'.repeat(8000);
   const longMail = await submit({ ...base, route: 'email', text: fullField, includeQuote: true });
   assert.equal(longMail.outcome, 'too-long');
