@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { test } from 'node:test';
 import { CODEX_MODEL_IDS } from '../../../../src/ai/modelConfig';
 import { AGENTS, type AgentId } from '../../../../src/agent/types';
 import { RUNTIME_CAPABILITIES } from '../../../../src/runtime/capabilities';
@@ -785,3 +787,116 @@ try {
 }
 
 console.log('Runtime switching tests passed.');
+
+
+test('a missing saved plan ends the approved plan’s continuation in chat', async () => {
+  const load = createRequire(import.meta.url);
+  const Module = load('node:module');
+  const originalLoad = Module._load;
+  const subscribe = () => ({ dispose() {} });
+  const vscodeStub = {
+    EventEmitter: class { event = subscribe; },
+    TerminalLink: class {},
+    commands: { executeCommand: async () => undefined },
+    workspace: {
+      onDidChangeConfiguration: subscribe,
+      getConfiguration: () => ({ get: () => undefined }),
+      createFileSystemWatcher: () => ({ onDidCreate: subscribe, onDidDelete: subscribe, dispose() {} }),
+      onDidDeleteFiles: subscribe,
+      onDidRenameFiles: subscribe,
+      onDidCreateFiles: subscribe,
+      onDidChangeTextDocument: subscribe,
+    },
+    window: { tabGroups: { onDidChangeTabs: subscribe, onDidChangeTabGroups: subscribe }, onDidChangeActiveColorTheme: subscribe },
+    extensions: { onDidChange: subscribe },
+  };
+  Module._load = function (request: string, ...args: unknown[]) {
+    return request === 'vscode' ? vscodeStub : originalLoad.call(this, request, ...args);
+  };
+  let UnifiedViewProvider: { prototype: object };
+  try {
+    ({ UnifiedViewProvider } = load('../../../../src/views/UnifiedViewProvider'));
+  } finally {
+    Module._load = originalLoad;
+  }
+
+  const provider = Object.assign(Object.create(UnifiedViewProvider.prototype), {
+    _viewGeneration: 0,
+    _liveThinkingEffortCapabilities: new Map(),
+    _conversationCheckpointQueues: new Map(),
+    _conversationController: {
+      currentRolloutMode: async () => 'host',
+      savedComposerModel: async () => undefined,
+      runtimeConversation: async () => ({ events: [] }),
+    },
+  });
+  const hostMessages: ExtensionMessage[] = [];
+  let receive!: (message: unknown) => Promise<void>;
+  const view = {
+    visible: false,
+    webview: {
+      onDidReceiveMessage: (handler: typeof receive) => { receive = handler; },
+      postMessage: async (message: ExtensionMessage) => {
+        hostMessages.push(message);
+        deliver(message);
+        return true;
+      },
+    },
+    onDidChangeVisibility: subscribe,
+    onDidDispose: subscribe,
+  };
+  const originalPost = vscode.postMessage;
+  const requests: unknown[] = [];
+  vscode.postMessage = (message) => { requests.push(message); };
+
+  try {
+    void provider.resolveWebviewView(view, {}, {});
+    seedActiveConversation({
+      codexConversation: [makeCodexTurn({
+        id: 'saved-plan', requestedPlanMode: true, requiresPlanReview: true,
+        streamingText: 'Review the draft.', result: { status: 'success' },
+      })],
+    });
+    useAISidebarStore.getState().approveCodexPlan('saved-plan');
+    const request = requests.find((message) => (message as { type: string }).type === 'agent-execute');
+    assert.ok(request);
+    const [, pending] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(pending.isRunning, true);
+
+    await receive(request);
+
+    assert.ok(hostMessages.some((message) => message.type === 'conversation/store-status'
+      && message.message?.endsWith('Approved plan has no matching conversation turn')));
+    const result = hostMessages.find((message) => message.type === 'codex-result');
+    assert.ok(result, 'the host sends a terminal result for the rejected continuation');
+    assert.equal(result.turnId, pending.id);
+    assert.match(result.error ?? '', /couldn.t continue this plan.*send your request again/i);
+    const [plan, execution] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(plan.planDecision, 'approved');
+    assert.equal(execution.result?.error, result.error);
+    assert.equal(execution.isRunning, false);
+  } finally {
+    provider._endViewResolve?.end();
+    vscode.postMessage = originalPost;
+    resetStore();
+  }
+});
+
+
+test('a turn-scoped Codex result leaves a newer turn running', () => {
+  try {
+    const id = seedActiveConversation({
+      codexConversation: [
+        makeCodexTurn({ id: 'continuation', isRunning: true }),
+        makeCodexTurn({ id: 'newer', isRunning: true }),
+      ],
+    });
+    deliver({ type: 'codex-result', conversationId: id, turnId: 'continuation', status: 'error', error: 'Could not continue.' });
+    const [continuation, newer] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(continuation.isRunning, false);
+    assert.equal(continuation.result?.error, 'Could not continue.');
+    assert.equal(newer.isRunning, true);
+  } finally {
+    resetStore();
+  }
+});
